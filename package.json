@@ -1,0 +1,33 @@
+{
+  "name": "codalyn",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Codalyn monorepo — Webflow product suite (Flint, Beacon, Loadout) and Tower dashboard.",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "app": "node scripts/app.mjs",
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "biome format --write .",
+    "check": "biome check .",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "turbo run build --filter=@codalyn/loadout && changeset publish",
+    "clean": "turbo run clean && rm -rf node_modules .turbo"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.12",
+    "@changesets/cli": "^2.31.0",
+    "turbo": "^2.9.6",
+    "typescript": "^6.0.3"
+  }
+}

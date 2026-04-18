@@ -1,0 +1,62 @@
+name: Publish @codalyn/loadout
+
+on:
+  push:
+    tags:
+      - "loadout@*"
+  workflow_dispatch: {}
+
+concurrency:
+  group: publish-loadout-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm for Trusted Publishing
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter @codalyn/loadout typecheck
+
+      - name: Lint
+        run: pnpm --filter @codalyn/loadout lint
+
+      - name: Build
+        run: pnpm --filter @codalyn/loadout build
+
+      - name: Publish to npm with provenance
+        working-directory: packages/loadout
+        run: npm publish --provenance --access public
+
+      - name: Purge jsDelivr cache
+        if: success()
+        run: |
+          curl -s "https://purge.jsdelivr.net/npm/@codalyn/loadout@latest/dist/index.js"
+          curl -s "https://purge.jsdelivr.net/npm/@codalyn/loadout@latest/dist/index.css"

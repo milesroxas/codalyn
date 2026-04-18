@@ -1,0 +1,83 @@
+{
+  "name": "@codalyn/loadout",
+  "version": "1.1.4",
+  "description": "Professional TypeScript toolkit for extending Webflow with custom scripts.",
+  "license": "ISC",
+  "author": {
+    "name": "Miles Roxas",
+    "url": "https://milesroxas.com/"
+  },
+  "homepage": "https://github.com/milesroxas/codalyn/tree/main/packages/loadout#readme",
+  "bugs": {
+    "url": "https://github.com/milesroxas/codalyn/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/milesroxas/codalyn.git",
+    "directory": "packages/loadout"
+  },
+  "keywords": [
+    "webflow",
+    "codalyn",
+    "loadout",
+    "custom-scripts"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "dist/index.js",
+    "dist/index.css",
+    "**/*.css"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "src/**/README.md",
+    "docs/**/*.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "build": "cross-env NODE_ENV=production node ./bin/build.js && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "dev": "cross-env NODE_ENV=development node ./bin/build.js",
+    "check": "biome check ./src && tsc --noEmit",
+    "check:fix": "biome check --write ./src && tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint ./src",
+    "lint:fix": "biome lint --write ./src",
+    "format": "biome format --write ./src",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:run": "playwright test",
+    "clean": "rm -rf dist .turbo",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@finsweet/ts-utils": "^0.40.0",
+    "swiper": "^12.1.3"
+  },
+  "devDependencies": {
+    "@finsweet/tsconfig": "^1.4.2",
+    "@playwright/test": "^1.59.1",
+    "cross-env": "^10.1.0",
+    "esbuild": "^0.28.0"
+  }
+}

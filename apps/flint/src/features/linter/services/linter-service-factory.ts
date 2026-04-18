@@ -1,0 +1,61 @@
+// src/features/linter/services/linter-service-factory.ts
+import { createStyleService } from "@/entities/style/services/style.service";
+import { getCurrentPreset, getRuleRegistry } from "@/features/linter/model/linter.factory";
+import { resolvePresetOrFallback } from "@/features/linter/presets";
+import { createUtilityClassAnalyzer } from "@/features/linter/services/analyzers/utility-class-analyzer";
+import { createElementLintService } from "@/features/linter/services/element-lint-service";
+import { createLintContextService } from "@/features/linter/services/lint-context.service";
+import { createPageLintService } from "@/features/linter/services/page-lint-service";
+import { createPresetElementsService } from "@/features/linter/services/preset-elements.service";
+import { createRuleRunner } from "@/features/linter/services/rule-runner";
+
+/**
+ * Centralized factory for creating linter services with shared dependencies.
+ * Reduces redundant service creation and ensures consistency.
+ */
+export function createLinterServices() {
+  // Core services - created once and shared
+  const styleService = createStyleService();
+  const analyzer = createUtilityClassAnalyzer();
+  const contextService = createLintContextService({ styleService });
+  const presetElementsService = createPresetElementsService();
+
+  // Get active preset for grammar-aware rule runner
+  const activePreset = resolvePresetOrFallback(getCurrentPreset());
+  const activeGrammar =
+    activePreset.grammar || ({ parse: (n: string) => ({ raw: n, kind: "custom" as const }) } as any);
+
+  const ruleRunner = createRuleRunner(getRuleRegistry(), analyzer, (name: string, isCombo?: boolean) => {
+    const kind = activeGrammar.parse(name).kind as any;
+    // Grammar takes priority: naming conventions (is-*, u-*, dash-only) are authoritative.
+    // This prevents utility classes like padding-section-* from being reclassified as combo
+    // just because Webflow applied them as secondary classes alongside padding-global.
+    if (kind === "utility" || kind === "combo") return kind;
+    // Treat component classes as utility to exclude them from custom class rules
+    if (kind === "component") return "utility";
+    // For custom-named classes, respect Webflow's combo flag (secondary class application)
+    if (isCombo === true) return "combo";
+    return "custom";
+  });
+
+  // Higher-level services - now using shared context service
+  const elementLintService = createElementLintService({
+    contextService,
+    ruleRunner,
+  });
+  const pageLintService = createPageLintService({ contextService, ruleRunner });
+
+  return {
+    styleService,
+    analyzer,
+    contextService,
+    ruleRunner,
+    elementLintService,
+    pageLintService,
+    presetElementsService,
+    activePreset,
+    activeGrammar,
+  } as const;
+}
+
+export type LinterServices = ReturnType<typeof createLinterServices>;

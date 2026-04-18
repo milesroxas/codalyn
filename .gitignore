@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+pnpm-debug.log*
+
+# Build outputs
+dist/
+bundle/
+.next/
+out/
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Test coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Caches
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Editor/OS
+.DS_Store
+Thumbs.db
+.idea/
+
+# Local AI / agent tool settings
+.claude/
+**/.claude/
+.cursor/mcp.json
+**/settings.local.json
+
+# Legacy migration folder
+_legacy/
+
+# Other package managers
+package-lock.json
+yarn.lock
+
+# Webflow bundle artifacts
+public/**/*.zip

@@ -1,0 +1,15 @@
+{
+  "name": "@codalyn/tower",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tower — Codalyn backend + dashboard (Next.js on Vercel). Placeholder.",
+  "scripts": {
+    "dev": "echo 'Tower not yet scaffolded. Run pnpm --filter @codalyn/tower init when ready.'",
+    "build": "echo 'Tower build placeholder' && exit 0",
+    "lint": "echo 'Tower lint placeholder' && exit 0",
+    "typecheck": "echo 'Tower typecheck placeholder' && exit 0",
+    "test": "echo 'Tower test placeholder' && exit 0",
+    "clean": "rm -rf .next .turbo node_modules"
+  }
+}

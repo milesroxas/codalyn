@@ -1,0 +1,189 @@
+# Linter Rules
+
+This directory contains all rules that the linter executes. It includes:
+
+- Canonical, preset‑agnostic structural rules (shared by all presets)
+- Preset‑specific rules (e.g., Lumos, Client‑First) organized by Rule Type
+- Shared rules that can be used across multiple presets
+
+---
+
+## Taxonomy
+
+- **Structure**: element graph and roles
+- **Naming**: lexical patterns and tokens for individual class names
+- **Composition**: rules about the class list on an element, including count, ordering, and the presence of a single base
+- **Property**: rules that inspect computed style declarations or utilities' property effects
+
+## Directory Structure
+
+```txt
+src/features/linter/rules/
+├── canonical/                    # Preset-agnostic structural / page rules
+│   ├── __tests__/
+│   ├── child-group-key-match.ts
+│   ├── main-children.page.ts
+│   ├── section-parent-is-main.ts
+│   └── index.ts
+├── shared/                       # Rules shared across presets
+│   ├── property/
+│   │   ├── __tests__/
+│   │   ├── color-variable.ts
+│   │   ├── utility-duplicate-properties.ts
+│   │   ├── utility-duplicate-property.ts
+│   │   └── index.ts
+│   ├── structure/
+│   │   ├── __tests__/
+│   │   ├── missing-class-on-div.ts
+│   │   └── index.ts
+│   └── index.ts
+├── lumos/
+│   ├── composition/__tests__/
+│   ├── naming/__tests__/
+│   ├── property/
+│   ├── README.md
+│   └── …
+├── client-first/
+│   ├── composition/__tests__/
+│   ├── naming/__tests__/
+│   ├── property/__tests__/
+│   ├── structure/__tests__/
+│   ├── README.md
+│   └── …
+└── README.md
+```
+
+---
+
+## Execution Model
+
+- Rules are executed by the rule runner: `src/features/linter/services/rule-runner.ts`
+- The runner provides element‑level analysis inputs (`analyzeElement(args)`) to rules with:
+  - `classes: { name, order, elementId, isCombo, detectionSource }[]`
+  - `allStyles: StyleInfo[]`
+  - `getClassType(name, isCombo?)`
+  - `getRuleConfig(ruleId)`
+  - Role/graph helpers (from the detection + graph layers):
+    - `rolesByElement?`
+    - `getRoleForElement?(elementId) → ElementRole`
+    - `getParentId?(elementId) → string | null`
+    - `getChildrenIds?(elementId) → string[]`
+    - `getAncestorIds?(elementId) → string[]`
+    - `getClassNamesForElement?(elementId) → string[]`
+    - `parseClass?(name) → ParsedClass`
+- Page‑scope rules (e.g., main singleton) live under `canonical/*.page.ts` and are executed by the page rule runner in `page-lint-service.ts` before element rules
+- Each violation has `metadata.elementId` and, when available, `metadata.role` to power UI labels and grouping
+
+## ✨ Enhanced Message Formatting
+
+The linter now features intelligent message formatting that automatically applies appropriate color coding:
+
+- **Message Analysis**: The `message-formatter.ts` analyzes violation messages to detect content types
+- **Pattern Recognition**: Automatically identifies message structures like "Child group key X does not match root key Y. Rename to Z"
+- **Smart Color Coding**: Applies context-appropriate colors based on message position and content type
+- **Visual Hierarchy**: Creates clear distinction between errors, suggestions, and reference content
+
+**Example**: In the message "Child group key component*error does not match root key component_group. Rename to component_group*[element]\_wrap":
+
+- `component_error` → Error content (orange-red)
+- `component_group` → Webflow class (blue)
+- `component_group_[element]_wrap` → Suggestion (green)
+
+---
+
+## Canonical Rules (Preset‑agnostic)
+
+These use canonical roles and the element graph. They apply to any preset.
+
+- `main-children.page.ts` (page): Requires `main` to contain at least one `section` or `componentRoot` child — **registered** in `registry.ts`
+- `child-group-key-match.ts` (element): `childGroup` must share the component key with its nearest `componentRoot` ancestor — **registered** in `registry.ts`
+- `section-parent-is-main.ts` (element): `section` must be a direct child of `main` — implemented but **not currently registered** in the registry
+
+Do not duplicate these in presets. If a preset needs stronger/different behavior, extend detectors or add additional role‑aware rules that complement (not replace) the canonical set.
+
+---
+
+## Shared Rules
+
+### Property Rules
+
+- `color-variable.ts`: Detects color values that should use CSS variables (`shared:property:color-variable`)
+- `utility-duplicate-properties.ts`: Identifies custom/combo classes that duplicate or subset a utility (`shared:property:duplicate-of-utility`)
+- `utility-duplicate-property.ts`: Identifies utility classes that duplicate the same property/value as other utilities (`canonical:utility-duplicate-property`)
+
+### Structure Rules
+
+- `missing-class-on-div.ts`: Suggests adding semantic classes to div elements
+
+These shared rules are imported and used by multiple presets to avoid duplication.
+
+---
+
+## Preset‑specific Rules
+
+### Lumos (naming, composition, shared property/structure)
+
+- **Naming**: `naming-class-format.ts`, `combo-class-format.element.ts`
+- **Composition**: `class-order.element.ts`, `variant-requires-base.element.ts`, `combo-limit.element.ts`
+- **Property**: Uses shared rules only. Lumos-specific files `utility-class-duplicate-properties.ts` and `utility-class-exact-duplicate.ts` exist but are not currently included in the preset.
+
+### Client‑First (naming, composition, property, structure, + shared)
+
+- **Naming**, **composition**, **property**, **structure**: see `client-first/README.md` and `client-first/**/*.ts`
+
+---
+
+## Role‑first Guidance for Writing Rules
+
+- Prefer canonical roles + element graph over classifier contexts:
+  - Use `getRoleForElement`, `getParentId`, `getChildrenIds`, `getAncestorIds`
+  - Use `parseClass` for token/key derivation; avoid ad‑hoc string parsing
+- Keep rules strictly typed and defensive. Return an empty array when a precondition fails
+- Avoid recomputing site‑wide data in rules; use inputs provided by the runner
+- Canonical rules must remain preset‑agnostic; do not reference preset‑specific conventions inside them
+- Preset rules should be cohesive to that preset's grammar/conventions and must not duplicate canonical checks
+
+---
+
+## Adding or Registering Rules
+
+1. Place your rule under the appropriate folder:
+
+   - Shared structural checks → `canonical/`
+   - Preset naming/format/property → `naming/` or `property/`
+   - Role‑aware checks → `role-aware/`
+   - Rules used by multiple presets → `shared/`
+
+2. Register in a preset:
+
+   - Edit `src/features/linter/presets/<preset>.preset.ts` (e.g. `lumos.preset.ts`, `client-first.preset.ts`)
+   - Add the rule in the `rules` array (canonical first, then preset naming/property, then shared)
+
+3. If your rule needs class parsing or graph helpers, use the provided `analyzeElement` args
+
+---
+
+## Page vs Element Rules
+
+- **Page‑scope**: add rules in `canonical/*.page.ts` and they will be executed by the page rule runner inside `page-lint-service.ts`
+- **Element‑scope**: use the standard `Rule` shape with `analyzeElement` and register in the preset as usual
+
+---
+
+## Testing
+
+See root `README.md` → **Testing**. Colocate Vitest files under `**/__tests__/` next to the code under test.
+
+---
+
+## Performance
+
+- The runner aggregates inputs once per element; avoid site‑wide work inside rules
+- Canonical detection and graph building are O(n) and cached per page signature (sorted element IDs)
+
+---
+
+## Compatibility & Removals
+
+- Removed duplicates: `component-root-required-structure.ts` and `lumos-child-group-references-parent.ts`
+- Avoid re‑introducing preset rules that implement canonical behavior; extend canonical rules if changes are needed

@@ -1,0 +1,55 @@
+import type React from "react";
+import { useEffect, useState } from "react";
+import { DocsButton } from "@/features/linter/ui/controls/DocsButton";
+import { LintPageButton } from "@/features/linter/ui/controls/LintPageButton";
+import { PresetSwitcher } from "@/features/linter/ui/controls/PresetSwitcher";
+import { cn } from "@/shared/utils";
+
+interface ActionBarProps {
+  loading: boolean;
+  mode: "element" | "page";
+  issueCount: number;
+  onLint: () => Promise<void> | void;
+  hasRun?: boolean;
+}
+
+export const ActionBar: React.FC<ActionBarProps> = ({ loading, mode, issueCount, onLint, hasRun = false }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [prevIssueCount, setPrevIssueCount] = useState(issueCount);
+
+  useEffect(() => {
+    setIsVisible(true);
+  }, []);
+
+  useEffect(() => {
+    if (prevIssueCount !== issueCount) {
+      setPrevIssueCount(issueCount);
+    }
+  }, [issueCount, prevIssueCount]);
+
+  return (
+    <div
+      className={cn(
+        "shrink-0 border-t bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70 transition-[opacity,transform] duration-700 ease-out",
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+      )}
+    >
+      <div className="mx-auto max-w-[420px] px-4 py-2">
+        <div className="flex items-stretch gap-2 h-8">
+          <PresetSwitcher onPresetChange={() => void onLint()} />
+          <div className="flex-1 flex items-stretch min-w-0">
+            <LintPageButton
+              onClick={() => void onLint()}
+              loading={loading}
+              issueCount={issueCount}
+              fullWidth
+              className="h-full rounded-sm text-base transition-all duration-300 ease-out"
+              label={mode === "page" ? (hasRun ? "Re-Lint" : "Lint Page") : "Re-Lint"}
+            />
+          </div>
+          <DocsButton className="h-full rounded-sm w-8 shrink-0" />
+        </div>
+      </div>
+    </div>
+  );
+};

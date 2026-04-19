@@ -1,0 +1,40 @@
+# Project name prefixes containers, networks, and volumes so this stack stays distinct
+# from other Docker Compose projects on the same machine (`docker compose ls`).
+name: codalyn-tower
+
+services:
+  tower:
+    build:
+      context: ../..
+      dockerfile: apps/tower/Dockerfile
+    image: codalyn-tower:latest
+    container_name: codalyn-tower-app
+    init: true
+    ports:
+      # Host port defaults to 3100 to avoid clashing with other Next.js apps; override: TOWER_PORT=3000
+      - "${TOWER_PORT:-3100}:3000"
+    env_file:
+      - path: .env.docker
+        required: false
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+    stop_grace_period: 15s
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    networks:
+      - tower
+
+networks:
+  tower:
+    name: codalyn-tower-net

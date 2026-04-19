@@ -8,13 +8,14 @@ Monorepo for the Codalyn product suite — Webflow tools and the Tower dashboard
 apps/
   flint/      Webflow Designer Extension — class linter
   beacon/     Webflow Designer Extension — asset tooling
-  tower/      Next.js dashboard (Vercel) — planned
+  tower/      Next.js dashboard + Webflow Data API proxy (Vercel)
 packages/
   loadout/    @codalyn/loadout — Webflow runtime library (npm + jsDelivr)
+  webflow-kit/ @codalyn/webflow-kit — shared Webflow API + image defaults (Tower + Beacon)
 ```
 
 Each app follows **Feature-Sliced Design**: `app/`, `pages/`, `widgets/`, `features/`, `entities/`, `shared/`.
-Package boundaries act as **DDD bounded contexts** — no cross-app imports; cross-cut via `packages/*`.
+Package boundaries act as **DDD bounded contexts** — no cross-app imports; cross-cut via `packages/*` (e.g. `@codalyn/webflow-kit`).
 
 Use this file for workspace setup and repo-wide commands; each app’s README covers that app’s architecture, local scripts, and internal documentation.
 
@@ -51,7 +52,7 @@ pnpm app <app> build:prod      # channel preset to production, prompts for recip
 pnpm app <app> build:dev       # channel preset to development, prompts for recipient
 ```
 
-Applies to `flint` and `beacon`. Tower is a placeholder.
+Applies to `flint` and `beacon`. Tower uses `pnpm app tower dev` / `pnpm app tower build`.
 
 ## Release — @codalyn/loadout
 

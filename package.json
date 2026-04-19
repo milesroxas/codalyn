@@ -9,6 +9,9 @@
     "node": ">=20",
     "pnpm": ">=10"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["sharp", "esbuild"]
+  },
   "scripts": {
     "app": "node scripts/app.mjs",
     "dev": "turbo run dev",

@@ -76,13 +76,15 @@ export function ImageEditorWorkspace(props: ImageEditorWorkspaceProps) {
               />
             </div>
           ) : !imageSrc ? (
-            <EmptyImageSourceSection
-              dropZoneLabelClass={dropZoneLabelClass}
-              fileInputId={fileInputId}
-              handleDrag={handleDrag}
-              handleDragState={handleDragState}
-              handleDrop={handleDrop}
-            />
+            <div className="px-4 pt-4">
+              <EmptyImageSourceSection
+                dropZoneLabelClass={dropZoneLabelClass}
+                fileInputId={fileInputId}
+                handleDrag={handleDrag}
+                handleDragState={handleDragState}
+                handleDrop={handleDrop}
+              />
+            </div>
           ) : null}
         </section>
 

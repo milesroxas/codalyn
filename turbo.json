@@ -7,7 +7,7 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "bundle/**", ".next/**", "!.next/cache/**"],
-      "env": ["VITE_*", "NEXT_PUBLIC_*"]
+      "env": ["VITE_*", "NEXT_PUBLIC_*", "DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "VERCEL_ENV"]
     },
     "build:dev": {
       "dependsOn": ["^build"],

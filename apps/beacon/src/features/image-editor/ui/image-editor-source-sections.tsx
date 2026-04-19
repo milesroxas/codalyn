@@ -3,7 +3,6 @@ import type { DragEvent, RefObject } from "react";
 
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
-import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 
 const OUTGOING_FADE_CLASS = "transition-opacity duration-[380ms] ease-out will-change-[opacity] transform-gpu";
 
@@ -110,25 +109,20 @@ export function LoadedImageSourceSection(props: {
 }) {
   const { fileBaseName, busy, fileInputRef } = props;
   return (
-    <Card size="sm">
-      <CardHeader className="space-y-1 pb-2">
-        <CardTitle className="text-sm font-medium">Source image</CardTitle>
-        <CardDescription className="min-w-0 truncate text-xs leading-snug" title={fileBaseName}>
-          {fileBaseName}
-        </CardDescription>
-        <CardAction>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={busy}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload aria-hidden className="size-3.5" />
-            Change image
-          </Button>
-        </CardAction>
-      </CardHeader>
-    </Card>
+    <div className="flex min-h-0 items-center gap-2 border-b border-border bg-muted/40 py-1.5 pr-1.5 pl-3">
+      <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={fileBaseName}>
+        {fileBaseName}
+      </p>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        disabled={busy}
+        aria-label="Change image"
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <Upload aria-hidden className="size-3.5" />
+      </Button>
+    </div>
   );
 }

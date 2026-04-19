@@ -1,0 +1,21 @@
+# Lean build context for Tower (see apps/tower/Dockerfile). Do not copy other apps or install artifacts.
+.git
+.github
+.cursor
+.turbo
+**/.turbo
+**/node_modules
+**/dist
+**/.next
+**/bundle
+**/coverage
+.changeset
+
+apps/beacon
+apps/flint
+packages/loadout
+
+scripts
+
+**/.env
+**/.env.*

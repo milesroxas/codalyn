@@ -160,60 +160,60 @@ export function ImageEditor() {
 
   const loadedEditor =
     imageSrc != null ? (
-      <>
-        <section className="flex flex-col gap-3">
-          <LoadedImageSourceSection busy={busy} fileBaseName={fileBaseName} fileInputRef={fileInputRef} />
-        </section>
-        <ImageEditorCropExportPanel
-          aspectPreset={aspectPreset}
-          assetFolders={assetFolders}
-          baseId={baseId}
-          busy={busy}
-          completedCrop={completedCrop}
-          componentImageProps={componentImageProps}
-          crop={crop}
-          cropAspect={cropAspect}
-          cropFrameMode={cropFrameMode}
-          estimateNonce={estimateNonce}
-          estimatePending={estimatePending}
-          estimatedBytes={estimatedBytes}
-          fileBaseName={fileBaseName}
-          folderActionBusy={folderActionBusy}
-          foldersLoading={foldersLoading}
-          heightStr={heightStr}
-          imageSrc={imageSrc}
-          onApplyToCanvas={applyToCanvas}
-          onCreateAssetFolder={createAssetFolderNamed}
-          onCropComplete={onCropComplete}
-          onQualityCommit={onQualityCommit}
-          originalBytes={originalBytes}
-          outputHeight={outputHeight}
-          outputWidth={outputWidth}
-          placement={placement}
-          quality={quality}
-          replaceLibraryAsset={replaceLibraryAsset}
-          selectedAssetFolderId={selectedAssetFolderId}
-          selectedComponentImagePropId={selectedComponentImagePropId}
-          selectedElementType={selectedElementType}
-          componentImagePropsResolving={componentImagePropsResolving}
-          setAspectPreset={setAspectPreset}
-          setCrop={setCrop}
-          setCropFrameMode={setCropFrameMode}
-          setFileBaseName={setFileBaseName}
-          setHeightStr={setHeightStr}
-          setOutputHeight={setOutputHeight}
-          setOutputWidth={setOutputWidth}
-          setPlacement={setPlacement}
-          setQuality={setQuality}
-          setReplaceLibraryAsset={setReplaceLibraryAsset}
-          setSelectedAssetFolderId={setSelectedAssetFolderId}
-          setSelectedComponentImagePropId={setSelectedComponentImagePropId}
-          setWidthStr={setWidthStr}
-          setZoom={setZoom}
-          widthStr={widthStr}
-          zoom={zoom}
-        />
-      </>
+      <div className="flex flex-col gap-3">
+        <LoadedImageSourceSection busy={busy} fileBaseName={fileBaseName} fileInputRef={fileInputRef} />
+        <div className="flex flex-col gap-3 px-4">
+          <ImageEditorCropExportPanel
+            aspectPreset={aspectPreset}
+            assetFolders={assetFolders}
+            baseId={baseId}
+            busy={busy}
+            completedCrop={completedCrop}
+            componentImageProps={componentImageProps}
+            crop={crop}
+            cropAspect={cropAspect}
+            cropFrameMode={cropFrameMode}
+            estimateNonce={estimateNonce}
+            estimatePending={estimatePending}
+            estimatedBytes={estimatedBytes}
+            fileBaseName={fileBaseName}
+            folderActionBusy={folderActionBusy}
+            foldersLoading={foldersLoading}
+            heightStr={heightStr}
+            imageSrc={imageSrc}
+            onApplyToCanvas={applyToCanvas}
+            onCreateAssetFolder={createAssetFolderNamed}
+            onCropComplete={onCropComplete}
+            onQualityCommit={onQualityCommit}
+            originalBytes={originalBytes}
+            outputHeight={outputHeight}
+            outputWidth={outputWidth}
+            placement={placement}
+            quality={quality}
+            replaceLibraryAsset={replaceLibraryAsset}
+            selectedAssetFolderId={selectedAssetFolderId}
+            selectedComponentImagePropId={selectedComponentImagePropId}
+            selectedElementType={selectedElementType}
+            componentImagePropsResolving={componentImagePropsResolving}
+            setAspectPreset={setAspectPreset}
+            setCrop={setCrop}
+            setCropFrameMode={setCropFrameMode}
+            setFileBaseName={setFileBaseName}
+            setHeightStr={setHeightStr}
+            setOutputHeight={setOutputHeight}
+            setOutputWidth={setOutputWidth}
+            setPlacement={setPlacement}
+            setQuality={setQuality}
+            setReplaceLibraryAsset={setReplaceLibraryAsset}
+            setSelectedAssetFolderId={setSelectedAssetFolderId}
+            setSelectedComponentImagePropId={setSelectedComponentImagePropId}
+            setWidthStr={setWidthStr}
+            setZoom={setZoom}
+            widthStr={widthStr}
+            zoom={zoom}
+          />
+        </div>
+      </div>
     ) : null;
 
   return (

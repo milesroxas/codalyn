@@ -56,6 +56,38 @@ const isVariant = (name: string, prefixes: string[]) => prefixes.some((p) => nam
 
 const isUtility = (name: string, classType?: ClassType) => classType === "utility" || /^u[_-]/.test(name);
 
+function resolveComboLimitConfig(getRuleConfig: ElementAnalysisArgs["getRuleConfig"]): ComboLimitConfig {
+  const rc = typeof getRuleConfig === "function" ? getRuleConfig("lumos:composition:combo-limit") : undefined;
+  const cs = (rc?.customSettings ?? {}) as Partial<ComboLimitConfig>;
+  return {
+    maxCombos: Number.isFinite(cs.maxCombos as number) ? (cs.maxCombos as number) : defaultConfig.maxCombos,
+    countUtilities: typeof cs.countUtilities === "boolean" ? cs.countUtilities : defaultConfig.countUtilities,
+    variantPrefixes:
+      Array.isArray(cs.variantPrefixes) && cs.variantPrefixes.length > 0
+        ? (cs.variantPrefixes as string[])
+        : defaultConfig.variantPrefixes,
+    assumeFirstAsBase:
+      typeof cs.assumeFirstAsBase === "boolean" ? cs.assumeFirstAsBase : defaultConfig.assumeFirstAsBase,
+  };
+}
+
+function findBaseTokenIndex(
+  ordered: ElementAnalysisArgs["classes"],
+  getClassType: ElementAnalysisArgs["getClassType"],
+  variantPrefixes: string[]
+): number {
+  let baseIdx = -1;
+  for (let i = 0; i < ordered.length; i++) {
+    const c = ordered[i];
+    const t = typeof getClassType === "function" ? getClassType(c.className, c.isCombo) : undefined;
+    if (!isUtility(c.className, t) && !isVariant(c.className, variantPrefixes)) {
+      baseIdx = i;
+      break;
+    }
+  }
+  return baseIdx;
+}
+
 export const createLumosComboLimitRule = (): CompositionRule => ({
   id: "lumos:composition:combo-limit",
   name: "Limit classes after base",
@@ -71,35 +103,11 @@ export const createLumosComboLimitRule = (): CompositionRule => ({
     const { classes, elementId, getClassType, getRuleConfig } = args;
     if (!classes?.length) return [];
 
-    const cfg: ComboLimitConfig = (() => {
-      const rc = typeof getRuleConfig === "function" ? getRuleConfig("lumos:composition:combo-limit") : undefined;
-      const cs = (rc?.customSettings ?? {}) as Partial<ComboLimitConfig>;
-      return {
-        maxCombos: Number.isFinite(cs.maxCombos as number) ? (cs.maxCombos as number) : defaultConfig.maxCombos,
-        countUtilities: typeof cs.countUtilities === "boolean" ? cs.countUtilities : defaultConfig.countUtilities,
-        variantPrefixes:
-          Array.isArray(cs.variantPrefixes) && cs.variantPrefixes.length > 0
-            ? (cs.variantPrefixes as string[])
-            : defaultConfig.variantPrefixes,
-        assumeFirstAsBase:
-          typeof cs.assumeFirstAsBase === "boolean" ? cs.assumeFirstAsBase : defaultConfig.assumeFirstAsBase,
-      };
-    })();
+    const cfg = resolveComboLimitConfig(getRuleConfig);
 
-    // Preserve actual order from Designer
     const ordered = [...classes].sort((a, b) => a.order - b.order);
 
-    // Find the base: first token that is not utility and not variant.
-    // If none is found, optionally treat the first as base to avoid double-penalizing.
-    let baseIdx = -1;
-    for (let i = 0; i < ordered.length; i++) {
-      const c = ordered[i];
-      const t = typeof getClassType === "function" ? getClassType(c.className, c.isCombo) : undefined;
-      if (!isUtility(c.className, t) && !isVariant(c.className, cfg.variantPrefixes)) {
-        baseIdx = i;
-        break;
-      }
-    }
+    let baseIdx = findBaseTokenIndex(ordered, getClassType, cfg.variantPrefixes);
     if (baseIdx === -1 && cfg.assumeFirstAsBase && ordered.length > 0) {
       baseIdx = 0;
     }

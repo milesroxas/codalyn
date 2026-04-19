@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Severity } from "@/features/linter/model/rule.types";
 import { useAnimationStore } from "@/features/linter/store/animation.store";
 import { SeverityButton } from "@/shared/ui/severity-button";
@@ -49,54 +49,36 @@ export const SeverityFilter: React.FC<SeverityFilterProps> = ({
     }
   }, [severityTilesVisible]);
 
+  const startSeverityCountPhase = useCallback(() => {
+    setHasAnimated(true);
+    setDisplayCounts(counts);
+    countAnimationCompleteRef.current = 0;
+    const target = (counts.error > 0 ? 1 : 0) + (counts.warning > 0 ? 1 : 0) + (counts.suggestion > 0 ? 1 : 0);
+    targetAnimationCountRef.current = target;
+    if (target === 0) {
+      completeSeverityAnimation();
+      requestAnimationFrame(() => {
+        showViolations();
+      });
+    } else {
+      startSeverityCounts();
+    }
+  }, [counts, completeSeverityAnimation, showViolations, startSeverityCounts]);
+
   // Handle tile entrance animation complete
   const handleTileAnimationEnd = (e: React.TransitionEvent<HTMLDivElement>) => {
-    // Only respond to the container's own transition end, not children
     if (e.target !== e.currentTarget) return;
     if (severityTilesVisible && !severityCountsAnimating && !hasAnimated) {
-      setHasAnimated(true);
-      setDisplayCounts(counts);
-      countAnimationCompleteRef.current = 0;
-      const target = (counts.error > 0 ? 1 : 0) + (counts.warning > 0 ? 1 : 0) + (counts.suggestion > 0 ? 1 : 0);
-      targetAnimationCountRef.current = target;
-      if (target === 0) {
-        // No counts to animate; immediately complete and reveal violations
-        completeSeverityAnimation();
-        requestAnimationFrame(() => {
-          showViolations();
-        });
-      } else {
-        startSeverityCounts();
-      }
+      startSeverityCountPhase();
     }
   };
 
   // If tiles are already visible (no transition end fires), initialize counts
   useEffect(() => {
     if (severityTilesVisible && !severityCountsAnimating && !hasAnimated) {
-      setHasAnimated(true);
-      setDisplayCounts(counts);
-      countAnimationCompleteRef.current = 0;
-      const target = (counts.error > 0 ? 1 : 0) + (counts.warning > 0 ? 1 : 0) + (counts.suggestion > 0 ? 1 : 0);
-      targetAnimationCountRef.current = target;
-      if (target === 0) {
-        completeSeverityAnimation();
-        requestAnimationFrame(() => {
-          showViolations();
-        });
-      } else {
-        startSeverityCounts();
-      }
+      startSeverityCountPhase();
     }
-  }, [
-    severityTilesVisible,
-    severityCountsAnimating,
-    hasAnimated,
-    counts,
-    completeSeverityAnimation,
-    showViolations,
-    startSeverityCounts,
-  ]);
+  }, [severityTilesVisible, severityCountsAnimating, hasAnimated, startSeverityCountPhase]);
 
   // Handle count animation complete
   const handleCountAnimationComplete = () => {

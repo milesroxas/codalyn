@@ -1,9 +1,9 @@
-import './styles.css';
+import "./styles.css";
 
-import { createCarousel } from './lib';
-import type { CarouselInstance } from './types';
+import { createCarousel } from "./lib";
+import type { CarouselInstance } from "./types";
 
-const CAROUSEL_SELECTOR = '[data-slider-instance]';
+const CAROUSEL_SELECTOR = "[data-slider-instance]";
 
 let instances: CarouselInstance[] = [];
 
@@ -35,4 +35,4 @@ export function destroyCarousel(): void {
 }
 
 // Re-export domain-specific types only
-export type { CarouselInstance } from './types';
+export type { CarouselInstance } from "./types";

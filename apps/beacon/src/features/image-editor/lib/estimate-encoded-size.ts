@@ -17,26 +17,3 @@ export async function estimateEncodedOutputBytes(options: {
   const { blob } = await encodeCanvasToOptimizedFile(canvas, options.quality);
   return blob.size;
 }
-
-export async function fetchUrlByteLength(url: string): Promise<number | null> {
-  try {
-    const head = await fetch(url, { method: "HEAD" });
-    if (head.ok) {
-      const raw = head.headers.get("Content-Length");
-      if (raw) {
-        const n = Number.parseInt(raw, 10);
-        if (Number.isFinite(n) && n >= 0) {
-          return n;
-        }
-      }
-    }
-    const res = await fetch(url);
-    if (!res.ok) {
-      return null;
-    }
-    const blob = await res.blob();
-    return blob.size;
-  } catch {
-    return null;
-  }
-}

@@ -1,3 +1,5 @@
+import { fileStemWithoutExtension } from "./file-name";
+
 /** Safe base name for Webflow assets (extension added separately). */
 export function sanitizeAssetBaseName(raw: string): string {
   const trimmed = raw.trim();
@@ -7,4 +9,9 @@ export function sanitizeAssetBaseName(raw: string): string {
     .replace(/\s+/g, " ")
     .slice(0, 100);
   return safe.length > 0 ? safe : "edited";
+}
+
+/** Derives a safe asset base name from a local file name (drops extension, then sanitizes). */
+export function assetBaseNameFromFileName(fileName: string): string {
+  return sanitizeAssetBaseName(fileStemWithoutExtension(fileName) || "edited");
 }

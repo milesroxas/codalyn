@@ -1,4 +1,24 @@
-import type { CompositionRule, ElementAnalysisArgs, RuleResult } from "@/features/linter/model/rule.types";
+import type {
+  CompositionRule,
+  ElementAnalysisArgs,
+  ElementClassItem,
+  RuleResult,
+} from "@/features/linter/model/rule.types";
+
+function elementHasComboBase(
+  ordered: ElementClassItem[],
+  getClassType: NonNullable<ElementAnalysisArgs["getClassType"]>
+): boolean {
+  for (const c of ordered) {
+    const name = c.className;
+    if (name.startsWith("is-")) continue;
+    const classType = getClassType(name, c.isCombo);
+    if (classType === "custom" || classType === "utility") {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Client-First: Combo classes (is-*) must not stand alone.
@@ -30,22 +50,7 @@ export const createCFComboNotAloneRule = (): CompositionRule => ({
     const combos = ordered.filter((c) => c.className.startsWith("is-"));
     if (combos.length === 0) return [];
 
-    // Check for base class presence: any non-combo, non-utility-prefix class counts as base
-    let hasBase = false;
-    for (const c of ordered) {
-      const name = c.className;
-      // Skip combo classes
-      if (name.startsWith("is-")) continue;
-      // A base class is any custom class (has underscore) or a non-combo, non-variant class
-      // In Client-First: custom classes (folder_element) and global utility classes can serve as base
-      const classType = getClassType(name, c.isCombo);
-      if (classType === "custom" || classType === "utility") {
-        hasBase = true;
-        break;
-      }
-    }
-
-    if (hasBase) return [];
+    if (elementHasComboBase(ordered, getClassType)) return [];
 
     const firstCombo = combos[0];
 

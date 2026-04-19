@@ -6,11 +6,58 @@ import {
 } from "@/entities/component/services/component-catalog.service";
 import { toElementKey } from "@/entities/element/lib/id";
 import type { WebflowElement } from "@/entities/element/model/element.types";
+import type { StyleWithElement } from "@/entities/style/model/style.types";
 import { getIsEditingComponentDefinition } from "@/features/linter/lib/webflow-component-definition-edit-mode";
 import type { RuleResult } from "@/features/linter/model/rule.types";
 import type { LintContext, LintContextService } from "@/features/linter/services/lint-context.service";
 import type { RuleRunner } from "@/features/linter/services/rule-runner";
 import { createDebugger } from "@/shared/utils/debug";
+
+function resolveStylesForElementLint(
+  context: LintContext,
+  elementId: string,
+  useStructuralContext: boolean,
+  debug: ReturnType<typeof createDebugger>
+): { stylesToAnalyze: StyleWithElement[]; rolesForRun: LintContext["rolesByElement"] } {
+  const elementStyles = context.elementStyleMap.get(elementId) || [];
+  if (!useStructuralContext) {
+    debug.log("lintElement: standard context analyzing", elementStyles.length, "styles for", elementId);
+    return { stylesToAnalyze: elementStyles, rolesForRun: context.rolesByElement };
+  }
+  const stylesToAnalyze = Array.from(context.elementStyleMap.values()).flat();
+  debug.log(
+    "lintElement: structural context analyzing",
+    stylesToAnalyze.length,
+    "styles across",
+    Object.keys(context.rolesByElement).length,
+    "elements"
+  );
+  return { stylesToAnalyze, rolesForRun: context.rolesByElement };
+}
+
+function applyClassFilterToStyles(
+  stylesToAnalyze: StyleWithElement[],
+  classFilter: ((name: string) => boolean) | undefined
+): { styles: StyleWithElement[]; ignoredClassNames: string[]; filteredElementIds: Set<string> } {
+  if (!classFilter) {
+    return { styles: stylesToAnalyze, ignoredClassNames: [], filteredElementIds: new Set() };
+  }
+  const ignoredClassNames: string[] = [];
+  const filteredElementIds = new Set<string>();
+  const beforeFilterIds = new Set(stylesToAnalyze.map((s) => s.elementId));
+  const filtered = stylesToAnalyze.filter((s) => {
+    if (!classFilter(s.name)) {
+      ignoredClassNames.push(s.name);
+      return false;
+    }
+    return true;
+  });
+  const afterFilterIds = new Set(filtered.map((s) => s.elementId));
+  for (const id of beforeFilterIds) {
+    if (!afterFilterIds.has(id)) filteredElementIds.add(id);
+  }
+  return { styles: filtered, ignoredClassNames, filteredElementIds };
+}
 
 export interface ElementLintOptions {
   classFilter?: (name: string) => boolean;
@@ -54,48 +101,12 @@ export function createElementLintService(deps: { contextService: LintContextServ
     //    - Structural ON: analyze ALL styles in the section (like page lint but scoped)
     //    - Structural OFF: analyze only the selected element (original behavior)
     const elementId = toElementKey(element);
-    const elementStyles = context.elementStyleMap.get(elementId) || [];
-    let stylesToAnalyze: typeof elementStyles | Array<(typeof elementStyles)[number]> = elementStyles;
-    let rolesForRun = context.rolesByElement;
+    let { stylesToAnalyze, rolesForRun } = resolveStylesForElementLint(context, elementId, useStructuralContext, debug);
 
-    if (useStructuralContext) {
-      // When structural context is enabled, analyze ALL styles in the section
-      // This makes it work like page lint but scoped to the component boundary
-      stylesToAnalyze = Array.from(context.elementStyleMap.values()).flat();
-
-      // Use all roles in the context (no restriction needed for section-scoped linting)
-      rolesForRun = context.rolesByElement;
-
-      debug.log(
-        "lintElement: structural context analyzing",
-        stylesToAnalyze.length,
-        "styles across",
-        Object.keys(rolesForRun).length,
-        "elements"
-      );
-    } else {
-      debug.log("lintElement: standard context analyzing", elementStyles.length, "styles for", elementId);
-    }
-
-    // 3) Apply third-party class filter before running rules
-    const ignoredClassNames: string[] = [];
-    const filteredElementIds = new Set<string>();
-    const classFilter = options?.classFilter;
-    if (classFilter) {
-      const beforeFilterIds = new Set(stylesToAnalyze.map((s) => s.elementId));
-      const filtered = stylesToAnalyze.filter((s) => {
-        if (!classFilter(s.name)) {
-          ignoredClassNames.push(s.name);
-          return false;
-        }
-        return true;
-      });
-      stylesToAnalyze = filtered;
-      const afterFilterIds = new Set(stylesToAnalyze.map((s) => s.elementId));
-      for (const id of beforeFilterIds) {
-        if (!afterFilterIds.has(id)) filteredElementIds.add(id);
-      }
-    }
+    const filtered = applyClassFilterToStyles(stylesToAnalyze, options?.classFilter);
+    stylesToAnalyze = filtered.styles;
+    const ignoredClassNames = filtered.ignoredClassNames;
+    const filteredElementIds = filtered.filteredElementIds;
 
     // 4) Execute rules via the same runner API used by page scans
     //    Skip page rules when no page context is available

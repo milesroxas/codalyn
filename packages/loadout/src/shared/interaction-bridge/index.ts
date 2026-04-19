@@ -11,7 +11,7 @@
  */
 
 // Event emission
-export { emit, emitPerSlide, isAvailable } from './emit';
-export type { StateAssignment, StateConfig, StateValue } from './state';
+export { emit, emitPerSlide, isAvailable } from "./emit";
+export type { StateAssignment, StateConfig, StateValue } from "./state";
 // State management
-export { clearState, getState, setState } from './state';
+export { clearState, getState, setState } from "./state";

@@ -1,13 +1,13 @@
-import { readdirSync } from 'node:fs';
-import { join, sep } from 'node:path';
-import * as esbuild from 'esbuild';
+import { readdirSync } from "node:fs";
+import { join, sep } from "node:path";
+import * as esbuild from "esbuild";
 
 // Config output
-const BUILD_DIRECTORY = 'dist';
-const PRODUCTION = process.env.NODE_ENV === 'production';
+const BUILD_DIRECTORY = "dist";
+const PRODUCTION = process.env.NODE_ENV === "production";
 
 // Config entrypoint files
-const ENTRY_POINTS = ['src/index.ts'];
+const ENTRY_POINTS = ["src/index.ts"];
 
 // Config dev serving
 const LIVE_RELOAD = !PRODUCTION;
@@ -21,14 +21,14 @@ const context = await esbuild.context({
   outdir: BUILD_DIRECTORY,
   minify: PRODUCTION,
   sourcemap: !PRODUCTION,
-  target: PRODUCTION ? 'es2020' : 'esnext',
-  inject: LIVE_RELOAD ? ['./bin/live-reload.js'] : undefined,
+  target: PRODUCTION ? "es2020" : "esnext",
+  inject: LIVE_RELOAD ? ["./bin/live-reload.js"] : undefined,
   define: {
     SERVE_ORIGIN: JSON.stringify(SERVE_ORIGIN),
   },
   splitting: true,
-  format: 'esm',
-  chunkNames: 'chunks/[name]-[hash]',
+  format: "esm",
+  chunkNames: "chunks/[name]-[hash]",
 });
 
 // Build files in prod
@@ -72,15 +72,15 @@ function logServedFiles() {
   const jsFiles = [];
 
   files.forEach((file) => {
-    if (file.endsWith('.map')) return;
+    if (file.endsWith(".map")) return;
 
     const paths = file.split(sep);
     paths[0] = SERVE_ORIGIN;
-    const location = paths.join('/');
+    const location = paths.join("/");
 
-    if (location.includes('/chunks/')) return;
+    if (location.includes("/chunks/")) return;
 
-    if (location.endsWith('.css')) {
+    if (location.endsWith(".css")) {
       cssFiles.push(location);
     } else {
       jsFiles.push(location);
@@ -114,13 +114,10 @@ function logServedFiles() {
 
 ${cssFiles
   .map((localUrl) => {
-    const cdnUrl = localUrl.replace(
-      SERVE_ORIGIN,
-      'https://cdn.jsdelivr.net/npm/@codalyn/loadout@latest/dist'
-    );
+    const cdnUrl = localUrl.replace(SERVE_ORIGIN, "https://cdn.jsdelivr.net/npm/@codalyn/loadout@latest/dist");
     return `  loadCSS('${localUrl}', '${cdnUrl}');`;
   })
-  .join('\n')}
+  .join("\n")}
 })();
 </script>`;
 
@@ -191,10 +188,7 @@ ${cssFiles
   var cacheBuster = useLocal ? '?t=' + Date.now() : '';
 ${jsFiles
   .map((localUrl) => {
-    const cdnUrl = localUrl.replace(
-      SERVE_ORIGIN,
-      'https://cdn.jsdelivr.net/npm/@codalyn/loadout@latest/dist'
-    );
+    const cdnUrl = localUrl.replace(SERVE_ORIGIN, "https://cdn.jsdelivr.net/npm/@codalyn/loadout@latest/dist");
     return `
   loadScript(
     useLocal ? '${localUrl}' + cacheBuster : '${cdnUrl}',
@@ -213,21 +207,21 @@ ${jsFiles
     }
   );`;
   })
-  .join('')}
+  .join("")}
 })();
 </script>`;
 
   // ANSI color codes for styling
   const colors = {
-    reset: '\x1b[0m',
-    bright: '\x1b[1m',
-    cyan: '\x1b[36m',
-    green: '\x1b[32m',
-    yellow: '\x1b[33m',
-    dim: '\x1b[2m',
+    reset: "\x1b[0m",
+    bright: "\x1b[1m",
+    cyan: "\x1b[36m",
+    green: "\x1b[32m",
+    yellow: "\x1b[33m",
+    dim: "\x1b[2m",
   };
 
-  const separator = `${colors.dim}${'─'.repeat(80)}${colors.reset}`;
+  const separator = `${colors.dim}${"─".repeat(80)}${colors.reset}`;
 
   console.log(`\n${separator}`);
   console.log(

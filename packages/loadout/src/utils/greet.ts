@@ -1,4 +1,4 @@
-import { getPublishDate } from '@finsweet/ts-utils';
+import { getPublishDate } from "@finsweet/ts-utils";
 
 /**
  * Greets the user by printing a message in the console.
@@ -9,13 +9,10 @@ export const greetUser = (name: string) => {
 
   console.log(`test ${name}!`);
   console.log(
-    `heyyy world This site was last published ${name} on ${publishDate?.toLocaleDateString(
-      'en-US',
-      {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-      }
-    )}.`
+    `heyyy world This site was last published ${name} on ${publishDate?.toLocaleDateString("en-US", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    })}.`
   );
 };

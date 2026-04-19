@@ -1,16 +1,10 @@
-import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { RuleResult } from "@/features/linter/model/rule.types";
 import { useElementLint } from "@/features/linter/store/elementLint.store";
 import { usePageLint } from "@/features/linter/store/pageLint.store";
-import { ActionBar } from "@/features/linter/ui/controls/ActionBar";
-import { FeedbackFab } from "@/features/linter/ui/controls/FeedbackFab";
-import { type LintViewMode, ModeToggle } from "@/features/linter/ui/controls/ModeToggle";
-import SeverityFilter, { type SeverityFilterValue } from "@/features/linter/ui/controls/SeverityFilter";
-import { StructuralContextToggle } from "@/features/linter/ui/controls/StructuralContextToggle";
-import { ViolationsList } from "@/features/linter/ui/violations/ViolationsList";
-import { trackModeSwitched, trackSeverityFilterChanged } from "@/shared/lib/analytics";
-import { cn } from "@/shared/utils";
+import type { LintViewMode } from "@/features/linter/ui/controls/ModeToggle";
+import type { SeverityFilterValue } from "@/features/linter/ui/controls/SeverityFilter";
+import { LinterPanelBody } from "@/features/linter/view/LinterPanelBody";
 
 export function LinterPanel() {
   const {
@@ -93,111 +87,32 @@ export function LinterPanel() {
   // ESC handling moved to store to avoid duplicates
 
   return (
-    <section
-      className={cn(
-        "relative h-full flex flex-col transition-all duration-700 ease-spring",
-        isPanelVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
-      )}
-    >
-      <div className="pl-4 pr-0 flex-1 min-h-0 flex flex-col">
-        {error && (
-          <div className="flex items-center gap-2 py-2 text-sm text-destructive">
-            <AlertCircle className="h-3 w-3" />
-            {error}
-          </div>
-        )}
-
-        {!error && !loading && hasRun && count === 0 && mode === "page" && (
-          <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-3 w-3" />
-            No issues found
-          </div>
-        )}
-
-        {!error && (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div
-              className={cn(
-                "pt-4 transition-[opacity,transform,height,margin] duration-300 ease-gentle will-change-[opacity,transform]",
-                hideModeToggle ? "opacity-0 -translate-y-2 h-0 -mb-2" : "opacity-100 translate-y-0 h-auto mb-4"
-              )}
-            >
-              <div className="flex gap-3 items-center justify-between">
-                <ModeToggle
-                  mode={mode}
-                  onChange={(next) => {
-                    trackModeSwitched({ from_mode: mode, to_mode: next });
-                    setMode(next);
-                  }}
-                />
-                {mode === "element" && (
-                  <div className="flex pr-2 items-center gap-2">
-                    <StructuralContextToggle enabled={structuralContext} onChange={setStructuralContext} />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {mode === "page" && !loading && !hasRun ? (
-              <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-                <AlertCircle className="h-3 w-3" />
-                Click the button to lint this page
-              </div>
-            ) : (
-              <div className="flex min-h-0 flex-1 flex-col">
-                {mode === "page" && (
-                  <div className="pr-4 sticky top-0 z-10 bg-gradient-to-b from-background to-transparent w-full">
-                    <SeverityFilter
-                      filter={severityFilter}
-                      counts={{
-                        error: errorCount,
-                        warning: warningCount,
-                        suggestion: suggestionCount,
-                      }}
-                      onChange={(next) => {
-                        trackSeverityFilterChanged({ filter: next });
-                        setSeverityFilter(next);
-                      }}
-                      condensed={filtersCondensed}
-                    />
-                  </div>
-                )}
-                <div className="min-h-0 flex-1">
-                  <ViolationsList
-                    violations={filteredViolations}
-                    passedClassNames={activePassedClassNames}
-                    ignoredClassNames={activeIgnoredClassNames}
-                    showHighlight={mode === "page" || (mode === "element" && structuralContext)}
-                    bypassAnimation={mode === "element"}
-                    onScrollStateChange={mode === "page" ? setFiltersCondensed : undefined}
-                    onScrollDirectionChange={
-                      mode === "page"
-                        ? (dir) => {
-                            setHideModeToggle(dir === "down");
-                          }
-                        : undefined
-                    }
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      <FeedbackFab className="absolute bottom-16 right-4 z-20" />
-      <ActionBar
-        loading={isBusy}
-        mode={mode}
-        issueCount={activeViolations.length}
-        hasRun={mode === "page" ? hasRun : false}
-        onLint={async () => {
-          if (mode === "page") {
-            await lintPage();
-          } else {
-            await refreshElementLint();
-          }
-        }}
-      />
-    </section>
+    <LinterPanelBody
+      error={error}
+      loading={loading}
+      hasRun={hasRun}
+      count={count}
+      mode={mode}
+      setMode={setMode}
+      severityFilter={severityFilter}
+      setSeverityFilter={setSeverityFilter}
+      filtersCondensed={filtersCondensed}
+      setFiltersCondensed={setFiltersCondensed}
+      hideModeToggle={hideModeToggle}
+      setHideModeToggle={setHideModeToggle}
+      isPanelVisible={isPanelVisible}
+      filteredViolations={filteredViolations}
+      activePassedClassNames={activePassedClassNames}
+      activeIgnoredClassNames={activeIgnoredClassNames}
+      errorCount={errorCount}
+      warningCount={warningCount}
+      suggestionCount={suggestionCount}
+      structuralContext={structuralContext}
+      setStructuralContext={setStructuralContext}
+      isBusy={isBusy}
+      activeViolations={activeViolations}
+      lintPage={lintPage}
+      refreshElementLint={refreshElementLint}
+    />
   );
 }

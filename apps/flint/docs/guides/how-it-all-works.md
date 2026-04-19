@@ -169,7 +169,7 @@ flowchart TD
   - Server runs on port `1337` and restarts on TSX/TS/CSS changes
 - Bundling
   - Deterministic output names: `bundle.js` and `styles.css`
-  - `pnpm build:dev` and `pnpm build:prod` run `tsc`, Vite build (mode), `webflow extension bundle`, and archive to timestamped zip files under `bundle/development/` or `bundle/prod/`
+  - `pnpm build`, `pnpm build:dev`, and `pnpm build:prod` all invoke the shared root CLI (`scripts/build-cli.mjs`) which runs `tsc --noEmit`, `vite build --mode <channel>`, `webflow extension bundle`, and archives a timestamped zip to `bundle/<channel>/<recipient>/`. `build:dev` / `build:prod` pre-select the channel (development or production) and prompt for recipient
 
 ## Configuration and opinion modes
 

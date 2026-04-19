@@ -58,6 +58,15 @@ const hasAnyPrefix = (name: string, prefixes: string[]) => prefixes.some((p) => 
 const isUtility = (name: string, classType: ClassType) =>
   classType === "utility" || name.startsWith("u_") || name.startsWith("u-");
 
+function classActsAsVariantBase(className: string, classType: ClassType, cfg: VariantRequiresBaseConfig): boolean {
+  const isComponentBase = hasAnyPrefix(className, cfg.componentPrefixes);
+  const isCustomBase =
+    !isUtility(className, classType) && !hasAnyPrefix(className, cfg.variantPrefixes) && classType === "custom";
+  const isComboBase = cfg.allowComboAsBase && classType === "combo";
+  const isUnknownBase = cfg.allowUnknownAsBase && classType === "unknown";
+  return isComponentBase || isCustomBase || isComboBase || isUnknownBase;
+}
+
 export const createLumosVariantRequiresBaseRule = (): CompositionRule => ({
   id: "lumos:composition:variant-requires-base",
   name: "Variant requires a base class",
@@ -92,19 +101,7 @@ export const createLumosVariantRequiresBaseRule = (): CompositionRule => ({
 
     for (const c of ordered) {
       const t = getClassType(c.className, c.isCombo);
-
-      // Component base by prefix
-      const isComponentBase = hasAnyPrefix(c.className, cfg.componentPrefixes);
-
-      // Custom base-like: not utility, not variant, and type is custom
-      const isCustomBase =
-        !isUtility(c.className, t) && !hasAnyPrefix(c.className, cfg.variantPrefixes) && t === "custom";
-
-      // Optional allowances
-      const isComboBase = cfg.allowComboAsBase && t === "combo";
-      const isUnknownBase = cfg.allowUnknownAsBase && t === "unknown";
-
-      if (isComponentBase || isCustomBase || isComboBase || isUnknownBase) {
+      if (classActsAsVariantBase(c.className, t, cfg)) {
         hasBase = true;
         break;
       }

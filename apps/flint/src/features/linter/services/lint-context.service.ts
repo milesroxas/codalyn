@@ -108,24 +108,32 @@ function filterValidElements(elements: WebflowElement[]): WebflowElement[] {
  * Resolves each ComponentInstance to a component definition id for catalog lookups.
  * Uses `element.getComponent()` when available so ids align with `webflow.getAllComponents()`.
  */
+async function componentDefinitionIdForInstance(
+  el: WebflowElement
+): Promise<{ elementId: string; defId: string } | null> {
+  if ((el as any)?.type !== "ComponentInstance") return null;
+  const elementId = toElementKey(el);
+  let defId: string | null = null;
+  if (typeof (el as any).getComponent === "function") {
+    try {
+      const comp = await (el as any).getComponent();
+      if (comp?.id != null) defId = String(comp.id);
+    } catch {
+      /* fall through to id.component */
+    }
+  }
+  if (defId == null && (el as any)?.id?.component != null) {
+    defId = String((el as any).id.component);
+  }
+  if (defId == null) return null;
+  return { elementId, defId };
+}
+
 async function buildComponentDefinitionIdByElementId(allValidElements: WebflowElement[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   for (const el of allValidElements) {
-    if ((el as any)?.type !== "ComponentInstance") continue;
-    const id = toElementKey(el);
-    let defId: string | null = null;
-    if (typeof (el as any).getComponent === "function") {
-      try {
-        const comp = await (el as any).getComponent();
-        if (comp?.id != null) defId = String(comp.id);
-      } catch {
-        /* fall through to id.component */
-      }
-    }
-    if (defId == null && (el as any)?.id?.component != null) {
-      defId = String((el as any).id.component);
-    }
-    if (defId != null) out.set(id, defId);
+    const pair = await componentDefinitionIdForInstance(el);
+    if (pair) out.set(pair.elementId, pair.defId);
   }
   return out;
 }
@@ -404,63 +412,61 @@ export function createLintContextService(deps: { styleService: StyleService }): 
     return await createContext([element]);
   }
 
+  async function lintContextFromStructuralPage(
+    element: WebflowElement,
+    wf: { getAllElements: () => Promise<WebflowElement[]> }
+  ): Promise<LintContext> {
+    const allElements = await wf.getAllElements();
+    if (!Array.isArray(allElements) || allElements.length === 0) {
+      debug.warn("createElementContextWithStructural: page getAllElements empty");
+      return await createContext([element]);
+    }
+
+    const fullPageContext = await createContext(allElements);
+    const elementId = toElementKey(element);
+    if (!elementId) {
+      debug.warn("createElementContextWithStructural: toElementKey returned empty for element");
+      return await createContext([element]);
+    }
+
+    const sectionId = findSectionContainingElement(elementId, fullPageContext);
+    if (sectionId) {
+      debug.log("createElementContextWithStructural: scoped to section", sectionId);
+      return createScopedContextForSection(sectionId, fullPageContext);
+    }
+
+    const placedRootId = findEnclosingPlacedComponentRoot(elementId, fullPageContext);
+    if (placedRootId) {
+      debug.log("createElementContextWithStructural: scoped to placed component", placedRootId);
+      return createScopedContextForSection(placedRootId, fullPageContext);
+    }
+
+    debug.log("createElementContextWithStructural: no section or placed component scope, using fullPageContext");
+    return fullPageContext;
+  }
+
   async function createElementContextWithStructural(
     element: WebflowElement,
     useStructural: boolean = false,
     pageContext?: LintContext
   ): Promise<LintContext> {
     if (pageContext) {
-      // If we have page context, always use it for best accuracy
       return createElementContext(element, pageContext);
     }
 
     if (!useStructural) {
-      // Standard isolated context (original behavior)
       debug.log("createElementContextWithStructural: structural off, isolated context");
       return await createContext([element]);
     }
 
-    // For structural context without page context, we need a scoped, page-like context: prefer a
-    // semantic section, else the enclosing placed component (nav/header often has no section role).
-
     try {
-      // Access Webflow Designer API
       const wf = (window as any).webflow;
       if (!wf || typeof wf.getAllElements !== "function") {
         debug.warn("createElementContextWithStructural: webflow API unavailable or getAllElements missing");
         return await createContext([element]);
       }
 
-      const allElements = await wf.getAllElements();
-      if (!Array.isArray(allElements) || allElements.length === 0) {
-        debug.warn("createElementContextWithStructural: page getAllElements empty");
-        return await createContext([element]);
-      }
-
-      // Create full page context and then scope it down to the section
-      const fullPageContext = await createContext(allElements);
-
-      // Now find the section that contains our target element and scope down
-      const elementId = toElementKey(element);
-      if (!elementId) {
-        debug.warn("createElementContextWithStructural: toElementKey returned empty for element");
-        return await createContext([element]);
-      }
-
-      const sectionId = findSectionContainingElement(elementId, fullPageContext);
-      if (sectionId) {
-        debug.log("createElementContextWithStructural: scoped to section", sectionId);
-        return createScopedContextForSection(sectionId, fullPageContext);
-      }
-
-      const placedRootId = findEnclosingPlacedComponentRoot(elementId, fullPageContext);
-      if (placedRootId) {
-        debug.log("createElementContextWithStructural: scoped to placed component", placedRootId);
-        return createScopedContextForSection(placedRootId, fullPageContext);
-      }
-
-      debug.log("createElementContextWithStructural: no section or placed component scope, using fullPageContext");
-      return fullPageContext;
+      return await lintContextFromStructuralPage(element, wf);
     } catch (error) {
       debug.error("createElementContextWithStructural: unexpected error", error);
       return await createContext([element]);

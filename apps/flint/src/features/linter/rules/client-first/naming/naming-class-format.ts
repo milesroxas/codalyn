@@ -91,6 +91,67 @@ const CF_UTILITY_EXACTS = new Set([
 /** Accept lowercase tokens separated by hyphen OR underscore */
 const CLIENT_FIRST_NAME_RE = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 
+function isCfUtilityCanonical(canonical: string): boolean {
+  if (CF_UTILITY_EXACTS.has(canonical)) return true;
+  for (const prefix of CF_UTILITY_PREFIXES) {
+    const escaped = prefix.replace(/[-\\^$*+?.()|[\]{}]/g, "\\$&");
+    const needsBoundary = !/[-_]$/.test(prefix);
+    const re = new RegExp(`^${escaped}${needsBoundary ? "(?:$|[-_])" : ""}`);
+    if (re.test(canonical)) return true;
+  }
+  return false;
+}
+
+function evaluateCfCustomElementTerm(
+  className: string,
+  projectTerms: string[],
+  knownElements: string[]
+): RuleResult | null {
+  const folderTokens = tokenizeCFCustomClass(className);
+  if (folderTokens.length < 2) return null;
+
+  const elementPart = folderTokens[folderTokens.length - 1];
+  const dashWords = elementPart.split("-");
+  const finalElement = dashWords[dashWords.length - 1];
+
+  if (knownElements.includes(finalElement)) return null;
+
+  if (projectTerms.includes(finalElement)) {
+    return {
+      ruleId: "cf:naming:class-format",
+      name: "Client-First: Custom Class Format",
+      message: `Class "${className}" uses project-defined element "${finalElement}".`,
+      severity: "suggestion",
+      className,
+      isCombo: false,
+    };
+  }
+
+  const folderPart = folderTokens.slice(0, -1).join("_");
+  const suggestedFix = `${folderPart}_wrapper`;
+
+  return {
+    ruleId: "cf:naming:class-format",
+    name: "Client-First: Custom Class Format",
+    message: `Class "${className}" uses unrecognized element "${finalElement}". Consider using a known element term or add it to project configuration.`,
+    severity: "suggestion",
+    className,
+    isCombo: false,
+    metadata: {
+      unrecognizedElement: finalElement,
+      suggestedName: suggestedFix,
+    },
+    expandedViewCapabilities: [
+      {
+        contentType: "recognized-elements",
+        title: "View Recognized Elements",
+        description: "See all recognized element names for this preset",
+        isRelevantFor: (violation) => Boolean(violation.metadata?.unrecognizedElement),
+      },
+    ],
+  };
+}
+
 const customClassConfig: RuleConfigSchema = {
   projectDefinedElements: {
     label: "Project-defined element terms",
@@ -127,69 +188,13 @@ export const createCFNamingClassFormatRule = (): NamingRule => ({
       };
     }
 
-    // Canonical form (treat hyphens and underscores equally for utilities)
     const canonical = className.replace(/_/g, "-");
+    if (isCfUtilityCanonical(canonical)) return null;
 
-    // 2) Utility systems short-circuit
-    if (CF_UTILITY_EXACTS.has(canonical)) return null;
-    for (const prefix of CF_UTILITY_PREFIXES) {
-      const escaped = prefix.replace(/[-\\^$*+?.()|[\]{}]/g, "\\$&");
-      // If the prefix already ends with a hyphen/underscore, don't force an extra boundary
-      const needsBoundary = !/[-_]$/.test(prefix);
-      const re = new RegExp(`^${escaped}${needsBoundary ? "(?:$|[-_])" : ""}`);
-      if (re.test(canonical)) return null;
-    }
-
-    // 3) Element recognition (suggestion-level) for non-utility classes
-    // Use grammar's tokenizer: split on underscore only (preserving dashes within segments)
-    const folderTokens = tokenizeCFCustomClass(className);
-    if (folderTokens.length < 2) return null;
-
-    // The element is the last underscore-separated segment; check its last dash-word
-    const elementPart = folderTokens[folderTokens.length - 1];
-    const dashWords = elementPart.split("-");
-    const finalElement = dashWords[dashWords.length - 1];
-
-    const knownElements = getClientFirstKnownElements();
     const projectTerms: string[] =
       (context?.config?.projectDefinedElements as string[]) ??
       (customClassConfig.projectDefinedElements.default as string[]);
 
-    if (knownElements.includes(finalElement)) return null;
-    if (projectTerms.includes(finalElement)) {
-      return {
-        ruleId: "cf:naming:class-format",
-        name: "Client-First: Custom Class Format",
-        message: `Class "${className}" uses project-defined element "${finalElement}".`,
-        severity: "suggestion",
-        className,
-        isCombo: false,
-      };
-    }
-
-    // 4) Fallback suggestion: use CF convention (folder_element-wrapper)
-    const folderPart = folderTokens.slice(0, -1).join("_");
-    const suggestedFix = `${folderPart}_wrapper`;
-
-    return {
-      ruleId: "cf:naming:class-format",
-      name: "Client-First: Custom Class Format",
-      message: `Class "${className}" uses unrecognized element "${finalElement}". Consider using a known element term or add it to project configuration.`,
-      severity: "suggestion",
-      className,
-      isCombo: false,
-      metadata: {
-        unrecognizedElement: finalElement,
-        suggestedName: suggestedFix,
-      },
-      expandedViewCapabilities: [
-        {
-          contentType: "recognized-elements",
-          title: "View Recognized Elements",
-          description: "See all recognized element names for this preset",
-          isRelevantFor: (violation) => Boolean(violation.metadata?.unrecognizedElement),
-        },
-      ],
-    };
+    return evaluateCfCustomElementTerm(className, projectTerms, getClientFirstKnownElements());
   },
 });

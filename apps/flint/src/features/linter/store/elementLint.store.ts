@@ -52,6 +52,54 @@ function buildLintOptions() {
   };
 }
 
+const emptyLintResultState = {
+  results: [] as RuleResult[],
+  classNames: [] as string[],
+  ignoredClassNames: [] as string[],
+  roles: [] as ElementRole[],
+};
+
+async function runElementLintRefresh(
+  get: () => ElementLintStore,
+  set: (partial: Partial<ElementLintStore> | ((s: ElementLintStore) => Partial<ElementLintStore>)) => void
+): Promise<void> {
+  ensureLinterInitialized("balanced");
+  getLinterServices().contextService.clearCache();
+  set({ loading: true, error: null });
+  const wf: any = (window as any).webflow;
+  if (!wf || typeof wf.getSelectedElement !== "function") {
+    set({ ...emptyLintResultState, loading: false });
+    return;
+  }
+  const el = await wf.getSelectedElement();
+  const isComponentInstance = (el as any)?.type === "ComponentInstance";
+  debug.log("refresh: selected element type", (el as any)?.type, "structuralContext", get().structuralContext);
+  set({
+    lastSelectedElementKey: el ? toElementKey(el as any) : null,
+  });
+  if (!el || (typeof el.getStyles !== "function" && !(get().structuralContext && isComponentInstance))) {
+    debug.warn("refresh: skipping lint; getStyles missing and not component in structural mode");
+    set({ ...emptyLintResultState, loading: false });
+    return;
+  }
+  const state = get();
+  const { results, ignoredClassNames } = await scanSelectedElement(el, state.structuralContext, buildLintOptions());
+  set({
+    results,
+    ignoredClassNames,
+    classNames: [],
+    roles: [],
+    loading: false,
+  });
+
+  trackLintElementCompleted({
+    preset: getCurrentPreset(),
+    violation_count: results.length,
+    ignored_count: ignoredClassNames.length,
+    structural_context: state.structuralContext,
+  });
+}
+
 export const useElementLintStore = create<ElementLintStore>()(
   devtools(
     (set, get) => ({
@@ -60,53 +108,8 @@ export const useElementLintStore = create<ElementLintStore>()(
       refresh: async () => {
         if (get().loading) return;
         try {
-          ensureLinterInitialized("balanced");
-          getLinterServices().contextService.clearCache();
-          set({ loading: true, error: null });
-          const wf: any = (window as any).webflow;
-          if (!wf || typeof wf.getSelectedElement !== "function") {
-            set({
-              results: [],
-              classNames: [],
-              ignoredClassNames: [],
-              roles: [],
-              loading: false,
-            });
-            return;
-          }
-          const el = await wf.getSelectedElement();
-          const isComponentInstance = (el as any)?.type === "ComponentInstance";
-          debug.log("refresh: selected element type", (el as any)?.type, "structuralContext", get().structuralContext);
-          set({
-            lastSelectedElementKey: el ? toElementKey(el as any) : null,
-          });
-          if (!el || (typeof el.getStyles !== "function" && !(get().structuralContext && isComponentInstance))) {
-            debug.warn("refresh: skipping lint; getStyles missing and not component in structural mode");
-            set({ results: [], classNames: [], ignoredClassNames: [], roles: [], loading: false });
-            return;
-          }
-          const state = get();
-          const { results, ignoredClassNames } = await scanSelectedElement(
-            el,
-            state.structuralContext,
-            buildLintOptions()
-          );
-          set({
-            results,
-            ignoredClassNames,
-            classNames: [],
-            roles: [],
-            loading: false,
-          });
-
-          trackLintElementCompleted({
-            preset: getCurrentPreset(),
-            violation_count: results.length,
-            ignored_count: ignoredClassNames.length,
-            structural_context: state.structuralContext,
-          });
+          await runElementLintRefresh(get, set);
         } catch (err: unknown) {
-          // eslint-disable-next-line no-console
           console.error("[ElementLintStore] refresh failed", err);
           posthog.capture("lint_error", {
             mode: "element",

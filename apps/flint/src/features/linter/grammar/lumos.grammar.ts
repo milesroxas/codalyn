@@ -11,6 +11,26 @@ function getClassType(name: string): ClassType {
   return "custom";
 }
 
+function lumosComponentKeyFromTokens(tokens: string[]): string | null {
+  if (tokens.length < 2) {
+    return tokens.length === 1 ? (tokens[0] ?? null) : null;
+  }
+
+  const lastToken = tokens[tokens.length - 1]?.toLowerCase();
+  if (lastToken === "wrap" || lastToken === "wrapper") {
+    const keyTokens = tokens.slice(0, -1);
+    if (keyTokens.length >= 2) {
+      return keyTokens.slice(0, 2).join("_");
+    }
+    if (keyTokens.length === 1) {
+      return keyTokens[0];
+    }
+    return null;
+  }
+
+  return tokens.slice(0, 2).join("_");
+}
+
 function parseCustom(name: string): ParsedClass {
   const tokens = name.split("_").filter(Boolean);
   const parsed: ParsedClass = {
@@ -23,43 +43,13 @@ function parseCustom(name: string): ParsedClass {
     parsed.type = tokens[0];
   }
   if (tokens.length > 2) {
-    // Assume middle token is variation when there are 3+ tokens
     parsed.variation = tokens.slice(1, -1).join("_") || undefined;
   }
   if (tokens.length >= 2) {
     parsed.elementToken = tokens[tokens.length - 1];
   }
 
-  // Extract componentKey consistently for both componentRoot and childGroup
-  // componentRoot: name_variant_wrap → componentKey: name_variant
-  // childGroup: name_variant_element_wrap → componentKey: name_variant
-  if (tokens.length >= 2) {
-    const lastToken = tokens[tokens.length - 1]?.toLowerCase();
-    if (lastToken === "wrap" || lastToken === "wrapper") {
-      const keyTokens = tokens.slice(0, -1); // Remove wrapper suffix
-
-      if (keyTokens.length >= 2) {
-        // Always use first two tokens for componentKey (name_variant)
-        // This ensures both "hero_primary_wrap" and "hero_primary_cta_wrap"
-        // have the same componentKey: "hero_primary"
-        parsed.componentKey = keyTokens.slice(0, 2).join("_");
-      } else if (keyTokens.length === 1) {
-        // Single token case (e.g., "hero_wrap")
-        parsed.componentKey = keyTokens[0];
-      } else {
-        parsed.componentKey = null;
-      }
-    } else {
-      // For non-wrapper classes, use first two tokens if available
-      if (tokens.length >= 2) {
-        parsed.componentKey = tokens.slice(0, 2).join("_");
-      } else {
-        parsed.componentKey = tokens[0] || null;
-      }
-    }
-  } else {
-    parsed.componentKey = null;
-  }
+  parsed.componentKey = tokens.length >= 2 ? lumosComponentKeyFromTokens(tokens) : null;
 
   return parsed;
 }

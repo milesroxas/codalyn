@@ -28,10 +28,7 @@ export interface FeatureModule {
  * );
  * ```
  */
-export async function initFeature(
-  selector: string,
-  loader: () => Promise<FeatureModule>
-): Promise<void> {
+export async function initFeature(selector: string, loader: () => Promise<FeatureModule>): Promise<void> {
   // Early return if feature elements don't exist
   if (!document.querySelector(selector)) {
     return;
@@ -61,8 +58,6 @@ export async function initFeature(
  * ]);
  * ```
  */
-export async function initFeatures(
-  features: Array<[string, () => Promise<FeatureModule>]>
-): Promise<void> {
+export async function initFeatures(features: Array<[string, () => Promise<FeatureModule>]>): Promise<void> {
   await Promise.all(features.map(([selector, loader]) => initFeature(selector, loader)));
 }

@@ -10,9 +10,9 @@
  * This will be deprecated in favor of the new interaction bridge.
  */
 
-import type Swiper from 'swiper';
+import type Swiper from "swiper";
 
-import { emit, setState } from '../../../shared/interaction-bridge';
+import { emit, setState } from "../../../shared/interaction-bridge";
 
 /**
  * Configuration for IX3 integration
@@ -63,9 +63,7 @@ function calculateIndices(
 function applySlideStates(swiper: Swiper): void {
   // Get all slides from the wrapper (excludes duplicate slides in loop mode)
   const wrapper = swiper.wrapperEl;
-  const slides = wrapper
-    ? Array.from(wrapper.querySelectorAll('.swiper-slide:not(.swiper-slide-duplicate)'))
-    : [];
+  const slides = wrapper ? Array.from(wrapper.querySelectorAll(".swiper-slide:not(.swiper-slide-duplicate)")) : [];
 
   // Safety check for empty carousel
   if (!slides || slides.length === 0) {
@@ -90,7 +88,7 @@ function applySlideStates(swiper: Swiper): void {
  */
 function getEventNames(config: IX3Config): { start: string; end: string } {
   // Use prefix to build default event names
-  const prefix = config.eventPrefix || 'interaction';
+  const prefix = config.eventPrefix || "interaction";
   const defaultStart = `${prefix}:state-change:start`;
   const defaultEnd = `${prefix}:state-change:end`;
 
@@ -131,20 +129,20 @@ export function setupInteractionBridge(swiper: Swiper, config: IX3Config = {}): 
 
   // Apply initial state markers BEFORE init to prevent CSS transition on first slide
   // This ensures the first slide starts with data-state="active" already applied
-  swiper.on('beforeInit', () => {
+  swiper.on("beforeInit", () => {
     applySlideStates(swiper);
   });
 
   // Emit init event after Swiper is ready
-  swiper.on('init', () => {
-    emit('init', {
+  swiper.on("init", () => {
+    emit("init", {
       featureId: config.featureId,
-      type: 'carousel',
+      type: "carousel",
     });
   });
 
   // Update state markers when slide changes start
-  swiper.on('slideChangeTransitionStart', () => {
+  swiper.on("slideChangeTransitionStart", () => {
     // Apply the new state markers FIRST
     // This ensures the new active slide has data-state="active" before IX3 animations trigger
     applySlideStates(swiper);
@@ -153,16 +151,16 @@ export function setupInteractionBridge(swiper: Swiper, config: IX3Config = {}): 
     emit(eventNames.start, {
       featureId: config.featureId,
       slideIndex: swiper.realIndex,
-      type: 'carousel',
+      type: "carousel",
     });
   });
 
   // Emit event when slide change ends
-  swiper.on('slideChangeTransitionEnd', () => {
+  swiper.on("slideChangeTransitionEnd", () => {
     emit(eventNames.end, {
       featureId: config.featureId,
       slideIndex: swiper.realIndex,
-      type: 'carousel',
+      type: "carousel",
     });
   });
 }
@@ -206,7 +204,7 @@ export function parseIX3Config(dataset: IX3Dataset): IX3Config {
   }
 
   if (dataset.interactionEvents !== undefined) {
-    config.enabled = dataset.interactionEvents === 'on' || dataset.interactionEvents === 'true';
+    config.enabled = dataset.interactionEvents === "on" || dataset.interactionEvents === "true";
   }
 
   if (dataset.interactionPrefix) {

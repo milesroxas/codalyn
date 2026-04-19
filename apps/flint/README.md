@@ -2,6 +2,8 @@
 
 Lint Webflow classes in real time. Validates naming, detects duplicate utilities, and applies context-aware rules so teams keep sites clean while they work.
 
+Workspace setup (Node, pnpm, `pnpm install`), monorepo-wide scripts, and the shared Webflow extension bundle CLI live in the [repository root README](../../README.md).
+
 ### Table of Contents
 
 - [Overview](#overview)
@@ -28,21 +30,8 @@ Flint is a React + Vite Designer extension written in strict TypeScript. It atta
 
 ### Quick start
 
-- Install dependencies:
-  ```bash
-  pnpm install
-  ```
-- Start the Designer dev server (prints the URL you set as your Webflow “Development URL”):
-  ```bash
-  pnpm dev
-  ```
-- Build timestamped bundles:
-  ```bash
-  pnpm build       # Interactive CLI: pick channel (prod/dev) and recipient
-  pnpm build:dev   # Direct: development mode → bundle/development/internal/
-  pnpm build:prod  # Direct: production mode → bundle/prod/internal/
-  ```
-  Output goes to `bundle/<channel>/<recipient>/` (e.g. `bundle/prod/group-a/`).
+- From the repository root: `pnpm app flint dev` (or from this directory: `pnpm dev`). Use the printed URL as the Webflow “Development URL”.
+- Extension bundles: see root README (`pnpm app flint build`, `build:dev`, `build:prod`). Zips are written under `bundle/<channel>/<recipient>/` in this package.
 - Preview the compiled extension locally:
   ```bash
   pnpm preview
@@ -56,11 +45,11 @@ Flint is a React + Vite Designer extension written in strict TypeScript. It atta
 
 ### Development
 
-- Tooling: Vite, strict TypeScript, Biome (lint + format), Vitest, Zustand, Radix UI (via shadcn). Scripts live in `package.json`.
+- Tooling: Vite, strict TypeScript, Biome (lint + format), Vitest, Zustand, Radix UI (via shadcn). Scripts live in `package.json`. Lint and format rules are in `biome.json`; use `pnpm lint`, `pnpm lint:all` (includes `tsc --noEmit`), and `pnpm format`.
 - Path aliases: `@/* → src/*` (`tsconfig.json`) aligned with Vite (`vite.config.ts`).
 - Framework toggles: `.env.development` / `.env.production` expose `VITE_ENABLE_CLIENT_FIRST` and `VITE_ENABLE_LUMOS` (see `docs/guides/framework_config.md`).
 - Webflow integration: `vite.config.ts` registers a `wf-vite-extension-plugin` that injects the Designer boot scripts, watches TS/TSX/CSS files, and serves `webflow.json` via `/__webflow` for the CLI.
-- Build pipeline: `pnpm build` runs an interactive CLI; `pnpm build:dev` / `pnpm build:prod` run `tsc`, Vite build, `webflow extension bundle`, and move the zip into `bundle/<channel>/<recipient>/`. `scripts/post-build.js` can mirror `dist/` into `public/` for manual distribution.
+- Build pipeline: uses the shared root build CLI (documented in the repository root README). `scripts/post-build.js` can mirror `dist/` into `public/` for manual distribution.
 
 ### Architecture overview
 
@@ -88,7 +77,6 @@ Flint is a React + Vite Designer extension written in strict TypeScript. It atta
   - `docs/guides/how-it-all-works.md` — walkthrough of the runtime lifecycle, registry, and UI flow.
   - `docs/guides/framework_config.md` — environment variable switches for enabling Client-first vs Lumos presets.
   - `docs/guides/extending-presets.md` — adding or extending presets (grammar, detectors, rules).
-  - `docs/guides/linting.md` — Biome + TypeScript (`pnpm lint:all`, `pnpm format`).
 - **Notes**
   - `docs/notes/rules.md` — catalog of rule categories and Lumos rule behavior.
 - **Module READMEs & references**
@@ -132,7 +120,7 @@ Flint is a React + Vite Designer extension written in strict TypeScript. It atta
 
 ```
 ├── docs/
-│   ├── guides/ (framework_config, how-it-all-works, extending-presets, linting)
+│   ├── guides/ (framework_config, how-it-all-works, extending-presets)
 │   ├── notes/rules.md
 │   └── rfcs/template.md
 ├── src/

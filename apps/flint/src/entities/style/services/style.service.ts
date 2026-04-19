@@ -21,6 +21,104 @@ export interface ElementStyleInfo {
 
 const DEBUG = false;
 
+const COMBO_NAME_HEURISTIC = /^(?:is[-_][A-Za-z0-9_]+|is[A-Z][A-Za-z0-9_]*)$/;
+
+async function appendUniqueAppliedStyleIfNew(
+  style: Style,
+  index: number,
+  seenIds: Set<string>,
+  uniqueStyles: StyleInfo[],
+  debug: boolean
+): Promise<void> {
+  const id = style.id;
+  const name = await style.getName();
+  const trimmedName = name?.trim() || "";
+  const { isCombo, detectionSource } = await detectComboFromStyle(style, trimmedName);
+
+  if (!id || seenIds.has(id)) {
+    return;
+  }
+  seenIds.add(id);
+
+  let properties: Record<string, unknown> = {};
+  try {
+    properties = await style.getProperties({ breakpoint: "main" });
+  } catch (err) {
+    console.error(`Error getting properties for style ${trimmedName}:`, err);
+  }
+
+  uniqueStyles.push({
+    id,
+    name: trimmedName,
+    properties,
+    order: index,
+    isCombo,
+    detectionSource,
+  });
+  if (debug) console.log(`Added unique style: ${trimmedName} (ID: ${id})`);
+}
+
+async function collectUniqueAppliedStyles(appliedStyles: Style[], debug: boolean): Promise<StyleInfo[]> {
+  const seenIds = new Set<string>();
+  const uniqueStyles: StyleInfo[] = [];
+
+  if (debug) console.log("Processing applied styles...");
+  for (let i = 0; i < appliedStyles.length; i++) {
+    try {
+      await appendUniqueAppliedStyleIfNew(appliedStyles[i], i, seenIds, uniqueStyles, debug);
+    } catch (err) {
+      console.error(`Error processing applied style at index ${i}:`, err);
+    }
+  }
+  return uniqueStyles;
+}
+
+async function detectComboFromStyle(
+  style: Style,
+  trimmedName: string
+): Promise<{ isCombo: boolean; detectionSource: "api" | "heuristic" }> {
+  if (typeof style.isComboClass === "function") {
+    try {
+      const isCombo = await style.isComboClass();
+      return { isCombo, detectionSource: "api" };
+    } catch {
+      return { isCombo: COMBO_NAME_HEURISTIC.test(trimmedName), detectionSource: "heuristic" };
+    }
+  }
+  return { isCombo: COMBO_NAME_HEURISTIC.test(trimmedName), detectionSource: "heuristic" };
+}
+
+async function mapAllStylesEntry(style: Style, index: number): Promise<StyleInfo> {
+  try {
+    const name = await style.getName();
+    const trimmed = name?.trim() || "";
+    const { isCombo, detectionSource } = await detectComboFromStyle(style, trimmed);
+    let properties: Record<string, unknown> = {};
+    try {
+      properties = await style.getProperties({ breakpoint: "main" });
+    } catch (err) {
+      if (DEBUG) console.error(`Error getting properties for style ${name}:`, err);
+    }
+    return {
+      id: style.id,
+      name: trimmed,
+      properties,
+      order: index,
+      isCombo,
+      detectionSource,
+    };
+  } catch (err) {
+    if (DEBUG) console.error(`Error getting name for style at index ${index}, ID ${style.id}:`, err);
+    return {
+      id: style.id,
+      name: "",
+      properties: {},
+      order: index,
+      isCombo: false,
+    };
+  }
+}
+
 export const createStyleService = () => {
   const getAllStylesWithProperties = (): Promise<StyleInfo[]> => {
     let cachedAllStylesPromise = getStyleServiceCache();
@@ -32,55 +130,7 @@ export const createStyleService = () => {
 
         if (DEBUG) console.log("Extracting names and properties from all styles...");
         const allStylesWithProperties = await Promise.all(
-          allStyles.map(async (style, index) => {
-            try {
-              const name = await style.getName();
-              let properties = {};
-              // Prefer Webflow Designer API for combo detection; fall back to heuristic
-              let isCombo = false;
-              let detectionSource: "api" | "heuristic" = "heuristic";
-              if (typeof style.isComboClass === "function") {
-                try {
-                  isCombo = await style.isComboClass();
-                  detectionSource = "api";
-                } catch (_err) {
-                  // Fallback to heuristic if API throws
-                  isCombo = /^(?:is[-_][A-Za-z0-9_]+|is[A-Z][A-Za-z0-9_]*)$/.test(name || "");
-                  detectionSource = "heuristic";
-                }
-              } else {
-                // Heuristic fallback when API isn't available
-                isCombo = /^(?:is[-_][A-Za-z0-9_]+|is[A-Z][A-Za-z0-9_]*)$/.test(name || "");
-                detectionSource = "heuristic";
-              }
-
-              try {
-                // Retrieve unique (non-inherited) properties for all classes
-                // so combos/customs can be compared against utilities
-                properties = await style.getProperties({ breakpoint: "main" });
-              } catch (err) {
-                if (DEBUG) console.error(`Error getting properties for style ${name}:`, err);
-              }
-
-              return {
-                id: style.id,
-                name: name?.trim() || "",
-                properties,
-                index,
-                isCombo,
-                detectionSource,
-              };
-            } catch (err) {
-              if (DEBUG) console.error(`Error getting name for style at index ${index}, ID ${style.id}:`, err);
-              return {
-                id: style.id,
-                name: "",
-                properties: {},
-                index,
-                isCombo: false,
-              };
-            }
-          })
+          allStyles.map((style, index) => mapAllStylesEntry(style as unknown as Style, index))
         );
 
         const validStyles = allStylesWithProperties.filter((style) => style.name);
@@ -119,59 +169,7 @@ export const createStyleService = () => {
       return [];
     }
 
-    const seenIds = new Set<string>();
-    const uniqueStyles: StyleInfo[] = [];
-
-    if (DEBUG) console.log("Processing applied styles...");
-    for (let i = 0; i < appliedStyles.length; i++) {
-      try {
-        const style = appliedStyles[i];
-        const id = style.id;
-        const name = await style.getName();
-        const trimmedName = name?.trim() || "";
-        // Prefer Webflow Designer API for combo detection; fall back to heuristic
-        let isCombo = false;
-        let detectionSource: "api" | "heuristic" = "heuristic";
-        if (typeof style.isComboClass === "function") {
-          try {
-            isCombo = await style.isComboClass();
-            detectionSource = "api";
-          } catch {
-            isCombo = /^(?:is[-_][A-Za-z0-9_]+|is[A-Z][A-Za-z0-9_]*)$/.test(trimmedName);
-            detectionSource = "heuristic";
-          }
-        } else {
-          isCombo = /^(?:is[-_][A-Za-z0-9_]+|is[A-Z][A-Za-z0-9_]*)$/.test(trimmedName);
-          detectionSource = "heuristic";
-        }
-
-        if (id && !seenIds.has(id)) {
-          seenIds.add(id);
-
-          let properties = {};
-          try {
-            // Retrieve unique (non-inherited) properties for all classes
-            properties = await style.getProperties({ breakpoint: "main" });
-          } catch (err) {
-            console.error(`Error getting properties for style ${trimmedName}:`, err);
-          }
-
-          uniqueStyles.push({
-            id,
-            name: trimmedName,
-            properties,
-            order: i,
-            isCombo,
-            detectionSource,
-          });
-          if (DEBUG) console.log(`Added unique style: ${trimmedName} (ID: ${id})`);
-        }
-      } catch (err) {
-        console.error(`Error processing applied style at index ${i}:`, err);
-      }
-    }
-
-    return uniqueStyles;
+    return collectUniqueAppliedStyles(appliedStyles, DEBUG);
   };
 
   // Lightweight helper: only fetch class names for an element (no properties)

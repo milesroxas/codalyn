@@ -1,4 +1,4 @@
-import { initFeatures } from './utils/features';
+import { initFeatures } from "./utils/features";
 
 /**
  * Main application entry point
@@ -9,7 +9,7 @@ window.Webflow ||= [];
 window.Webflow.push(() => {
   initFeatures([
     // Carousel feature - only loads if [data-slider-instance] exists
-    ['[data-slider-instance]', () => import('./features/carousel')],
+    ["[data-slider-instance]", () => import("./features/carousel")],
 
     // Add more features here as you build them:
     // ['[data-tabs]', () => import('./features/tabs')],

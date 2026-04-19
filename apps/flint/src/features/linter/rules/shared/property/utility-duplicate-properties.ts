@@ -58,6 +58,98 @@ const compareDecls = (a: Record<string, string>, b: Record<string, string>, mode
   return true;
 };
 
+function firstDuplicateOfUtilityHit(
+  classItem: ElementAnalysisArgs["classes"][number],
+  getClassType: ElementAnalysisArgs["getClassType"],
+  getComparable: (className: string) => Record<string, string> | null,
+  utilityDecls: Map<string, Record<string, string>>,
+  compareMode: "equal" | "subset"
+): RuleResult | undefined {
+  const kind: ClassType =
+    typeof getClassType === "function" ? getClassType(classItem.className) : ("unknown" as ClassType);
+  if (kind === "utility") return undefined;
+
+  const subjectDecls = getComparable(classItem.className);
+  if (!subjectDecls || Object.keys(subjectDecls).length === 0) return undefined;
+
+  for (const [utilName, utilDeclsEntry] of utilityDecls) {
+    if (!compareDecls(subjectDecls, utilDeclsEntry, compareMode)) continue;
+
+    return {
+      ruleId: "shared:property:duplicate-of-utility",
+      name: "Avoid duplicate of existing utility",
+      message:
+        compareMode === "equal"
+          ? `"${classItem.className}" duplicates utility "${utilName}". Remove the custom class or replace it with the utility.`
+          : `"${classItem.className}" is a subset of utility "${utilName}". Consider replacing with or augmenting the utility instead of redefining properties.`,
+      severity: "warning",
+      className: classItem.className,
+      isCombo: kind === "combo",
+    };
+  }
+
+  return undefined;
+}
+
+function collectDuplicateOfUtilityResults(
+  classes: ElementAnalysisArgs["classes"],
+  getClassType: ElementAnalysisArgs["getClassType"],
+  getComparable: (className: string) => Record<string, string> | null,
+  utilityDecls: Map<string, Record<string, string>>,
+  compareMode: "equal" | "subset"
+): RuleResult[] {
+  const results: RuleResult[] = [];
+
+  for (const classItem of classes) {
+    const hit = firstDuplicateOfUtilityHit(classItem, getClassType, getComparable, utilityDecls, compareMode);
+    if (hit) results.push(hit);
+  }
+
+  return results;
+}
+
+function buildDuplicateUtilityLookup(
+  allStyles: ElementAnalysisArgs["allStyles"],
+  getClassType: ElementAnalysisArgs["getClassType"],
+  mergedCfg: DuplicateOfUtilityConfig
+): {
+  getComparable: (name: string) => Record<string, string> | null;
+  utilityDecls: Map<string, Record<string, string>>;
+} | null {
+  const byName = new Map<string, Record<string, string>>();
+  for (const s of allStyles) {
+    if (s.name && s.properties) {
+      byName.set(s.name, s.properties as Record<string, string>);
+    }
+  }
+
+  const comparableCache = new Map<string, Record<string, string>>();
+  const getComparable = (className: string): Record<string, string> | null => {
+    if (comparableCache.has(className)) {
+      const cached = comparableCache.get(className);
+      return cached ?? null;
+    }
+    const props = byName.get(className);
+    if (!props) return null;
+    const cmp = buildComparableDecls(props, mergedCfg);
+    comparableCache.set(className, cmp);
+    return cmp;
+  };
+
+  const utilityDecls = new Map<string, Record<string, string>>();
+  for (const [name] of byName) {
+    const kind: ClassType = typeof getClassType === "function" ? getClassType(name) : ("unknown" as ClassType);
+    if (kind === "utility") {
+      const cmp = getComparable(name);
+      if (cmp && Object.keys(cmp).length) utilityDecls.set(name, cmp);
+    }
+  }
+
+  if (utilityDecls.size === 0) return null;
+
+  return { getComparable, utilityDecls };
+}
+
 /**
  * Shared rule: flags custom or combo classes that duplicate an existing utility class's declarations.
  * Category: "property" because it inspects authored style declarations.
@@ -76,7 +168,6 @@ export const createDuplicateOfUtilityRule = (): Rule => ({
   analyzeElement: (args: ElementAnalysisArgs): RuleResult[] => {
     const { classes = [], allStyles = [], getClassType, getRuleConfig } = args;
 
-    // Merge config with any user-provided settings for this rule.
     const mergedCfg: DuplicateOfUtilityConfig = {
       ...DEFAULT_CONFIG,
       ...(typeof getRuleConfig === "function"
@@ -85,72 +176,15 @@ export const createDuplicateOfUtilityRule = (): Rule => ({
         : {}),
     };
 
-    // Index styles by name and split into utilities and non-utilities.
-    const byName = new Map<string, Record<string, string>>();
-    for (const s of allStyles) {
-      if (s.name && s.properties) {
-        byName.set(s.name, s.properties as Record<string, string>);
-      }
-    }
+    const lookup = buildDuplicateUtilityLookup(allStyles, getClassType, mergedCfg);
+    if (!lookup) return [];
 
-    // Build a cache of comparable declaration maps.
-    const comparableCache = new Map<string, Record<string, string>>();
-    const getComparable = (className: string): Record<string, string> | null => {
-      if (comparableCache.has(className)) {
-        const cached = comparableCache.get(className);
-        return cached ?? null;
-      }
-      const props = byName.get(className);
-      if (!props) return null;
-      const cmp = buildComparableDecls(props, mergedCfg);
-      comparableCache.set(className, cmp);
-      return cmp;
-    };
-
-    // Collect utility styles present in the site for reference.
-    const utilityDecls = new Map<string, Record<string, string>>();
-    for (const [name] of byName) {
-      const kind: ClassType = typeof getClassType === "function" ? getClassType(name) : ("unknown" as ClassType);
-      if (kind === "utility") {
-        const cmp = getComparable(name);
-        if (cmp && Object.keys(cmp).length) utilityDecls.set(name, cmp);
-      }
-    }
-
-    if (utilityDecls.size === 0) return [];
-
-    const results: RuleResult[] = [];
-
-    for (const className of classes) {
-      const kind: ClassType =
-        typeof getClassType === "function" ? getClassType(className.className) : ("unknown" as ClassType);
-      if (kind === "utility") continue; // only flag non-utility classes
-
-      const subjectDecls = getComparable(className.className);
-      if (!subjectDecls || Object.keys(subjectDecls).length === 0) continue;
-
-      for (const [utilName, utilDecls] of utilityDecls) {
-        const isDup = compareDecls(subjectDecls, utilDecls, mergedCfg.compareMode);
-
-        if (isDup) {
-          results.push({
-            ruleId: "shared:property:duplicate-of-utility",
-            name: "Avoid duplicate of existing utility",
-            message:
-              mergedCfg.compareMode === "equal"
-                ? `"${className.className}" duplicates utility "${utilName}". Remove the custom class or replace it with the utility.`
-                : `"${className.className}" is a subset of utility "${utilName}". Consider replacing with or augmenting the utility instead of redefining properties.`,
-            severity: "warning",
-            className: className.className,
-            isCombo: kind === "combo",
-          });
-
-          // One finding per subject class is enough
-          break;
-        }
-      }
-    }
-
-    return results;
+    return collectDuplicateOfUtilityResults(
+      classes,
+      getClassType,
+      lookup.getComparable,
+      lookup.utilityDecls,
+      mergedCfg.compareMode
+    );
   },
 });

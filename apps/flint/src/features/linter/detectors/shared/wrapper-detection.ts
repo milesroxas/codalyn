@@ -1,5 +1,10 @@
 // Shared wrapper detection utilities to eliminate code duplication
-import type { DetectionContext, ElementSnapshot, RoleDetector } from "@/features/linter/model/preset.types";
+import type {
+  DetectionContext,
+  ElementSnapshot,
+  RoleDetectionResult,
+  RoleDetector,
+} from "@/features/linter/model/preset.types";
 
 /** Accept underscore or hyphen suffixes for wrap */
 const WRAP_SUFFIX_RE = /(?:^|[_-])(wrap|wrapper)$/i;
@@ -199,6 +204,26 @@ export const canBeComponentRoot = (
   };
 };
 
+function structuralWrapperRole(
+  namedRole: "componentRoot" | "childGroup",
+  elementId: string,
+  context: DetectionContext
+): RoleDetectionResult {
+  if (namedRole === "componentRoot") {
+    const canBeRoot = canBeComponentRoot(elementId, context);
+    if (!canBeRoot.canBe) {
+      return { role: "childGroup", score: 0.95 };
+    }
+    return { role: "componentRoot", score: 0.9 };
+  }
+
+  const structural = isStructuralChildGroup(elementId, context);
+  if (!structural.isChildGroup) {
+    return { role: "componentRoot", score: 0.9 };
+  }
+  return { role: "childGroup", score: 0.95 };
+}
+
 /**
  * Create a wrapper detector with preset-specific naming logic
  */
@@ -214,33 +239,13 @@ export const createWrapperDetector = (config: {
 
     if (!firstClass || !endsWithWrap(firstClass)) return null;
 
-    // Step 1: Get naming-based classification
     const namedRole = config.classifyNaming(firstClass);
     if (!namedRole) return null;
 
-    // Step 2: If we have structural context, validate the classification
     if (context.rolesByElement && context.graph) {
-      if (namedRole === "componentRoot") {
-        const canBeRoot = canBeComponentRoot(element.id, context);
-        if (!canBeRoot.canBe) {
-          // Naming suggests componentRoot, but structure suggests childGroup
-          return { role: "childGroup", score: 0.95 };
-        }
-
-        return { role: "componentRoot", score: 0.9 };
-      } else if (namedRole === "childGroup") {
-        const structural = isStructuralChildGroup(element.id, context);
-
-        if (!structural.isChildGroup) {
-          // Naming suggests childGroup, but structurally it's not (likely componentRoot)
-          return { role: "componentRoot", score: 0.9 };
-        }
-
-        return { role: "childGroup", score: 0.95 };
-      }
+      return structuralWrapperRole(namedRole, element.id, context);
     }
 
-    // No override needed, use naming classification
     const score = namedRole === "componentRoot" ? 0.85 : 0.8;
     return { role: namedRole, score };
   },

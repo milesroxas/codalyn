@@ -29,6 +29,41 @@ function getElementIdFromAnyElement(element: any): string | undefined {
   return undefined;
 }
 
+async function findInAllElementsList(wf: any, elementId: string): Promise<any | undefined> {
+  if (typeof wf.getAllElements !== "function") return undefined;
+  const allElements: any[] = await wf.getAllElements();
+  dbg("getAllElements size", Array.isArray(allElements) ? allElements.length : 0);
+  if (!Array.isArray(allElements) || allElements.length === 0) return undefined;
+  return allElements.find((el) => getElementIdFromAnyElement(el) === String(elementId));
+}
+
+async function findByTreeTraversal(wf: any, elementId: string): Promise<any | undefined> {
+  if (typeof wf.getRootElement !== "function") return undefined;
+  dbg("fallback traversal from root");
+  const root = await wf.getRootElement();
+  if (!root) return undefined;
+  const queue: any[] = [root];
+  while (queue.length) {
+    const el = queue.shift();
+    const id = getElementIdFromAnyElement(el);
+    if (id === String(elementId)) {
+      dbg("found via traversal");
+      return el;
+    }
+    if (typeof el?.getChildren === "function") {
+      const children = await el.getChildren();
+      if (Array.isArray(children) && children.length) {
+        queue.push(...children);
+      }
+    }
+  }
+  return undefined;
+}
+
+async function findElementByIdInDesigner(wf: any, elementId: string): Promise<any | undefined> {
+  return (await findInAllElementsList(wf, elementId)) ?? (await findByTreeTraversal(wf, elementId));
+}
+
 export async function selectElementById(elementId: string): Promise<boolean> {
   try {
     if (!elementId) {
@@ -47,43 +82,7 @@ export async function selectElementById(elementId: string): Promise<boolean> {
       return false;
     }
 
-    // Try to resolve the element via Designer API
-    let target: any | undefined;
-    const hasGetAll = typeof wf.getAllElements === "function";
-    if (hasGetAll) {
-      const allElements: any[] = await wf.getAllElements();
-      dbg("getAllElements size", Array.isArray(allElements) ? allElements.length : 0);
-      if (Array.isArray(allElements) && allElements.length > 0) {
-        target = allElements.find((el) => {
-          const id = getElementIdFromAnyElement(el);
-          return id === String(elementId);
-        });
-      }
-    }
-
-    // Fallback: traverse from root using getChildren() if available
-    if (!target && typeof wf.getRootElement === "function") {
-      dbg("fallback traversal from root");
-      const root = await wf.getRootElement();
-      if (root) {
-        const queue: any[] = [root];
-        while (queue.length) {
-          const el = queue.shift();
-          const id = getElementIdFromAnyElement(el);
-          if (id === String(elementId)) {
-            target = el;
-            dbg("found via traversal");
-            break;
-          }
-          if (typeof el?.getChildren === "function") {
-            const children = await el.getChildren();
-            if (Array.isArray(children) && children.length) {
-              queue.push(...children);
-            }
-          }
-        }
-      }
-    }
+    const target = await findElementByIdInDesigner(wf, elementId);
 
     if (!target) {
       dbg("target not found; dispatching fallback");

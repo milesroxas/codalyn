@@ -5,6 +5,9 @@ import Cropper from "react-easy-crop";
 
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
 import { parseOutputDimension } from "@/features/image-editor/lib/apply-cropped-export";
+import type { AspectPreset } from "@/features/image-editor/lib/aspect-preset";
+import type { AssetFolderRow } from "@/features/image-editor/lib/asset-folder-row";
+import type { ComponentImagePropOption } from "@/features/image-editor/lib/component-image-prop";
 import {
   getImageEditorPlacementReadiness,
   type ImageEditorPlacementBlocker,
@@ -32,22 +35,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/shared/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group";
 
-export type AspectPreset = "free" | "1" | "16-9" | "4-3" | "3-2" | "9-16";
-
 /** Aspect ratio templates vs. W×H-driven crop frame (same slot in the UI). */
 export type CropFrameMode = "aspect" | "custom";
 
-export type ComponentImagePropOption = { propId: string; label: string };
-
-export type AssetFolderRow = {
-  id: string;
-  name: string;
-  /** `parent` folder id, or `null` if this folder sits at the top level of Assets. */
-  parentId: string | null;
-  /** Full path for display, e.g. `Brand / Logos`. */
-  pathLabel: string;
-  handle: AssetFolder;
-};
+export type { AspectPreset, AssetFolderRow, ComponentImagePropOption };
 
 export type ImageEditorCropExportPanelProps = {
   baseId: string;

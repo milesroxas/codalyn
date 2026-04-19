@@ -18,6 +18,36 @@ export interface UtilityClassDuplicateInfo {
   };
 }
 
+function collectPerPropertyDuplicateInfo(
+  className: string,
+  propEntries: [string, CSSScalar][],
+  duplicateProps: Map<string, string[]>,
+  propertyToClassesMap: Map<string, Set<string>>
+): { formattedProperty: { property: string; value: string; classes: string[] } | undefined } {
+  let formattedProperty: { property: string; value: string; classes: string[] } | undefined;
+
+  for (const [propName, propValue] of propEntries) {
+    const propKey = `${propName}:${stableStringify(propValue)}`;
+    const classesWithThisProp = propertyToClassesMap.get(propKey);
+
+    if (!classesWithThisProp || classesWithThisProp.size <= 1) continue;
+
+    const duplicates = Array.from(classesWithThisProp).filter((cls) => cls !== className);
+    if (duplicates.length === 0) continue;
+
+    duplicateProps.set(propKey, duplicates);
+    if (propEntries.length !== 1) continue;
+
+    formattedProperty = {
+      property: propName,
+      value: typeof propValue === "string" ? propValue : stableStringify(propValue),
+      classes: duplicates,
+    };
+  }
+
+  return { formattedProperty };
+}
+
 export type UtilityAnalyzerOptions = {
   /**
    * Optional classifier that tells the analyzer which class names should be
@@ -101,6 +131,26 @@ export const createUtilityClassAnalyzer = (opts: UtilityAnalyzerOptions = {}) =>
 
   const normalizeProperties = (props: CSSPropertiesDict): string => stableStringify(props || {});
 
+  function indexPropertiesForClassName(
+    className: string,
+    properties: CSSPropertiesDict,
+    propertyToClassesMap: Map<string, Set<string>>,
+    exactPropertiesToClassesMap: Map<string, Set<string>>
+  ): void {
+    for (const [propName, propValue] of Object.entries(properties)) {
+      const propKey = `${propName}:${stableStringify(propValue)}`;
+      if (!propertyToClassesMap.has(propKey)) {
+        propertyToClassesMap.set(propKey, new Set<string>());
+      }
+      propertyToClassesMap.get(propKey)?.add(className);
+    }
+    const fingerprint = normalizeProperties(properties);
+    if (!exactPropertiesToClassesMap.has(fingerprint)) {
+      exactPropertiesToClassesMap.set(fingerprint, new Set<string>());
+    }
+    exactPropertiesToClassesMap.get(fingerprint)?.add(className);
+  }
+
   const logDuplicateProperties = (): void => {
     if (!debug) return;
     console.log("Checking for utility classes with duplicate properties:");
@@ -139,21 +189,9 @@ export const createUtilityClassAnalyzer = (opts: UtilityAnalyzerOptions = {}) =>
       utilityClassPropertiesMap.set(style.name, [...existing, { name: style.name, properties: props }]);
     }
 
-    // Build property:value -> classes and exact fingerprint -> classes maps
     utilityClassPropertiesMap.forEach((styleEntries, className) => {
       for (const entry of styleEntries) {
-        for (const [propName, propValue] of Object.entries(entry.properties)) {
-          const propKey = `${propName}:${stableStringify(propValue)}`;
-          if (!propertyToClassesMap.has(propKey)) {
-            propertyToClassesMap.set(propKey, new Set<string>());
-          }
-          propertyToClassesMap.get(propKey)?.add(className);
-        }
-        const fingerprint = normalizeProperties(entry.properties);
-        if (!exactPropertiesToClassesMap.has(fingerprint)) {
-          exactPropertiesToClassesMap.set(fingerprint, new Set<string>());
-        }
-        exactPropertiesToClassesMap.get(fingerprint)?.add(className);
+        indexPropertiesForClassName(className, entry.properties, propertyToClassesMap, exactPropertiesToClassesMap);
       }
     });
 
@@ -169,38 +207,23 @@ export const createUtilityClassAnalyzer = (opts: UtilityAnalyzerOptions = {}) =>
   };
 
   const analyzeDuplicates = (className: string, properties: CSSPropertiesDict): UtilityClassDuplicateInfo | null => {
-    const propEntries = Object.entries(properties ?? {});
+    const propEntries = Object.entries(properties ?? {}) as [string, CSSScalar][];
     if (propEntries.length === 0) return null;
 
     const duplicateProps = new Map<string, string[]>();
-    let formattedProperty: { property: string; value: string; classes: string[] } | undefined;
-    let exactMatches: string[] = [];
+    const { formattedProperty } = collectPerPropertyDuplicateInfo(
+      className,
+      propEntries,
+      duplicateProps,
+      propertyToClassesMap
+    );
 
-    for (const [propName, propValue] of propEntries) {
-      const propKey = `${propName}:${stableStringify(propValue)}`;
-      const classesWithThisProp = propertyToClassesMap.get(propKey);
-
-      if (classesWithThisProp && classesWithThisProp.size > 1) {
-        const duplicates = Array.from(classesWithThisProp).filter((cls) => cls !== className);
-        if (duplicates.length > 0) {
-          duplicateProps.set(propKey, duplicates);
-          if (propEntries.length === 1) {
-            formattedProperty = {
-              property: propName,
-              value: typeof propValue === "string" ? propValue : stableStringify(propValue),
-              classes: duplicates,
-            };
-          }
-        }
-      }
-    }
-
-    // Full-property duplicate check
     const fingerprint = normalizeProperties(properties);
     const classesWithSameFingerprint = exactPropertiesToClassesMap.get(fingerprint);
-    if (classesWithSameFingerprint && classesWithSameFingerprint.size > 1) {
-      exactMatches = Array.from(classesWithSameFingerprint).filter((cls) => cls !== className);
-    }
+    const exactMatches =
+      classesWithSameFingerprint && classesWithSameFingerprint.size > 1
+        ? Array.from(classesWithSameFingerprint).filter((cls) => cls !== className)
+        : [];
 
     if (duplicateProps.size === 0 && exactMatches.length === 0) return null;
 

@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/build-cli.js",
-    "build:prod": "tsc && vite build --mode production && webflow extension bundle && mkdir -p bundle/prod/${VITE_BUNDLE_RECIPIENT:-internal} && mv bundle.zip bundle/prod/${VITE_BUNDLE_RECIPIENT:-internal}/v$(node -p \"require('./package.json').version\")_${VITE_BUNDLE_RECIPIENT:-internal}_$(date +'%m-%d_%H-%M-%S').zip",
-    "build:dev": "tsc && vite build --mode development && webflow extension bundle && mkdir -p bundle/development/${VITE_BUNDLE_RECIPIENT:-internal} && mv bundle.zip bundle/development/${VITE_BUNDLE_RECIPIENT:-internal}/v$(node -p \"require('./package.json').version\")_${VITE_BUNDLE_RECIPIENT:-internal}_$(date +'%m-%d_%H-%M-%S').zip",
+    "build": "node ../../scripts/build-cli.mjs --app beacon",
+    "build:prod": "node ../../scripts/build-cli.mjs --app beacon --channel production",
+    "build:dev": "node ../../scripts/build-cli.mjs --app beacon --channel development",
     "typecheck": "tsc --noEmit",
     "lint": "biome check . && node scripts/assert-no-biome-ignore.mjs",
     "lint:fix": "biome check --write .",
@@ -21,7 +21,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",
-    "@clack/prompts": "^1.2.0",
     "@tailwindcss/vite": "^4.2.2",
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
@@ -29,7 +28,6 @@
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.1.4",
     "@webflow/designer-extension-typings": "^2.0.33",
-    "picocolors": "^1.1.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "tailwindcss": "^4.2.2",

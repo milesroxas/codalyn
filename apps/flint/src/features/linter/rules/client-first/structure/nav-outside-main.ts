@@ -1,5 +1,61 @@
 import type { ElementAnalysisArgs, RuleResult, StructureRule } from "@/features/linter/model/rule.types";
 
+function isNavLikeElement(
+  elementId: string,
+  classes: ElementAnalysisArgs["classes"],
+  getTagName: (id: string) => string | null | undefined
+): boolean {
+  const tagName = getTagName(elementId);
+  const isNavByTag = tagName?.toLowerCase() === "nav";
+  const isNavByClass = classes?.some((c) => /^nav(?:bar|igation)?(?:[_-]|$)/i.test(c.className));
+  return isNavByTag || isNavByClass;
+}
+
+function isNavInsideMainAncestor(
+  ancestorIds: string[],
+  getRoleForElement: ElementAnalysisArgs["getRoleForElement"],
+  getClassNamesForElement: ElementAnalysisArgs["getClassNamesForElement"]
+): boolean {
+  for (const ancestorId of ancestorIds) {
+    if (getRoleForElement) {
+      const role = getRoleForElement(ancestorId);
+      if (role === "main") {
+        return true;
+      }
+    }
+
+    if (getClassNamesForElement) {
+      const ancestorClasses = getClassNamesForElement(ancestorId);
+      if (ancestorClasses?.includes("main-wrapper")) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function cfNavOutsideMainViolation(
+  elementId: string,
+  classes: ElementAnalysisArgs["classes"],
+  tagName: string | null | undefined
+): RuleResult {
+  const navIdentifier = tagName?.toLowerCase() === "nav" ? "<nav>" : (classes?.[0]?.className ?? "nav");
+
+  return {
+    ruleId: "cf:structure:nav-outside-main",
+    name: "Client-First: Nav outside main-wrapper",
+    message: `Navigation element "${navIdentifier}" is inside main-wrapper. In Client-First, nav should be placed outside main-wrapper since it is not page-specific content.`,
+    severity: "warning",
+    className: classes?.[0]?.className ?? "",
+    elementId,
+    isCombo: false,
+    metadata: {
+      detectedBy: tagName?.toLowerCase() === "nav" ? "tag" : "class",
+      tagName: tagName ?? undefined,
+    },
+  };
+}
+
 /**
  * Client-First: Nav should be outside of main-wrapper.
  *
@@ -24,57 +80,16 @@ export const createCFNavOutsideMainRule = (): StructureRule => ({
 
     if (!elementId || !getTagName || !getAncestorIds) return [];
 
-    // Check if this element is a nav element (by tag or class)
-    const tagName = getTagName(elementId);
-    const isNavByTag = tagName?.toLowerCase() === "nav";
-    const isNavByClass = classes?.some((c) => /^nav(?:bar|igation)?(?:[_-]|$)/i.test(c.className));
+    if (!isNavLikeElement(elementId, classes, getTagName)) return [];
 
-    if (!isNavByTag && !isNavByClass) return [];
-
-    // Check if any ancestor has the "main" role or "main-wrapper" class
     const ancestorIds = getAncestorIds(elementId);
     if (!ancestorIds || ancestorIds.length === 0) return [];
 
-    let isInsideMain = false;
-
-    for (const ancestorId of ancestorIds) {
-      // Check role
-      if (getRoleForElement) {
-        const role = getRoleForElement(ancestorId);
-        if (role === "main") {
-          isInsideMain = true;
-          break;
-        }
-      }
-
-      // Check class name as fallback
-      if (getClassNamesForElement) {
-        const ancestorClasses = getClassNamesForElement(ancestorId);
-        if (ancestorClasses?.includes("main-wrapper")) {
-          isInsideMain = true;
-          break;
-        }
-      }
-    }
+    const isInsideMain = isNavInsideMainAncestor(ancestorIds, getRoleForElement, getClassNamesForElement);
 
     if (!isInsideMain) return [];
 
-    const navIdentifier = isNavByTag ? "<nav>" : (classes?.[0]?.className ?? "nav");
-
-    return [
-      {
-        ruleId: "cf:structure:nav-outside-main",
-        name: "Client-First: Nav outside main-wrapper",
-        message: `Navigation element "${navIdentifier}" is inside main-wrapper. In Client-First, nav should be placed outside main-wrapper since it is not page-specific content.`,
-        severity: "warning",
-        className: classes?.[0]?.className ?? "",
-        elementId,
-        isCombo: false,
-        metadata: {
-          detectedBy: isNavByTag ? "tag" : "class",
-          tagName: tagName ?? undefined,
-        },
-      },
-    ];
+    const tagName = getTagName(elementId);
+    return [cfNavOutsideMainViolation(elementId, classes, tagName)];
   },
 });

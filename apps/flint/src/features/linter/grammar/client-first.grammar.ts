@@ -86,6 +86,58 @@ function isWrapperToken(token: string): boolean {
   return lower === "wrap" || lower === "wrapper" || lower.endsWith("-wrap") || lower.endsWith("-wrapper");
 }
 
+function setComponentKeyForSectionRoot(parsed: ParsedClass, tokens: string[]): void {
+  if (tokens.length >= 3) {
+    parsed.componentKey = tokens.slice(1, 3).join("_");
+  } else if (tokens.length === 2) {
+    parsed.componentKey = tokens[1];
+  } else {
+    parsed.componentKey = null;
+  }
+}
+
+function setComponentKeyForNonSectionCustom(parsed: ParsedClass, tokens: string[]): void {
+  if (tokens.length >= 3) {
+    parsed.componentKey = tokens.slice(0, 2).join("_");
+  } else if (tokens.length >= 1) {
+    parsed.componentKey = tokens[0];
+  } else {
+    parsed.componentKey = null;
+  }
+}
+
+function setComponentKeyForNonWrapperTail(parsed: ParsedClass, tokens: string[]): void {
+  if (tokens[0]?.toLowerCase() === "section") {
+    setComponentKeyForSectionRoot(parsed, tokens);
+    return;
+  }
+  setComponentKeyForNonSectionCustom(parsed, tokens);
+}
+
+function setComponentKeyForWrapperTail(parsed: ParsedClass, tokens: string[]): void {
+  const keyTokens = tokens.slice(0, -1);
+  if (keyTokens.length >= 2) {
+    parsed.componentKey = keyTokens.slice(0, 2).join("_");
+  } else if (keyTokens.length === 1) {
+    parsed.componentKey = keyTokens[0];
+  } else {
+    parsed.componentKey = null;
+  }
+}
+
+function assignCustomComponentKey(parsed: ParsedClass, tokens: string[]): void {
+  if (tokens.length < 2) {
+    parsed.componentKey = null;
+    return;
+  }
+  const lastToken = tokens[tokens.length - 1] ?? "";
+  if (isWrapperToken(lastToken)) {
+    setComponentKeyForWrapperTail(parsed, tokens);
+  } else {
+    setComponentKeyForNonWrapperTail(parsed, tokens);
+  }
+}
+
 function parseCustom(name: string): ParsedClass {
   // Client-First: underscore `_` is the ONLY folder separator.
   // Dashes within each segment are meaningful (e.g., "team-list_headshot-image"
@@ -101,48 +153,7 @@ function parseCustom(name: string): ParsedClass {
   if (tokens.length > 2) parsed.variation = tokens.slice(1, -1).join("_") || undefined;
   if (tokens.length >= 2) parsed.elementToken = tokens[tokens.length - 1];
 
-  // Extract componentKey: for wrapper patterns, exclude the wrapper suffix
-  // e.g., "home-testimonials_wrapper" -> "home-testimonials", "team-list_headshot-wrapper" -> "team-list"
-  if (tokens.length >= 2) {
-    const lastToken = tokens[tokens.length - 1] ?? "";
-    if (isWrapperToken(lastToken)) {
-      // Remove wrapper suffix and use the remaining tokens as componentKey
-      const keyTokens = tokens.slice(0, -1);
-      if (keyTokens.length >= 2) {
-        // For child groups, use the first two tokens to match component root
-        parsed.componentKey = keyTokens.slice(0, 2).join("_");
-      } else if (keyTokens.length === 1) {
-        // For simple wrappers, use the single token
-        parsed.componentKey = keyTokens[0];
-      } else {
-        parsed.componentKey = null;
-      }
-    } else {
-      // Client-First: treat `section_[root]` as component root and key = root token
-      if (tokens[0]?.toLowerCase() === "section") {
-        if (tokens.length >= 3) {
-          parsed.componentKey = tokens.slice(1, 3).join("_");
-        } else if (tokens.length === 2) {
-          parsed.componentKey = tokens[1];
-        } else {
-          parsed.componentKey = null;
-        }
-      } else {
-        // For other non-wrapper classes in Client-First:
-        // - 3+ underscore-tokens (nested folders): use first two as componentKey
-        // - 1-2 underscore-tokens: use first token as componentKey
-        if (tokens.length >= 3) {
-          parsed.componentKey = tokens.slice(0, 2).join("_");
-        } else if (tokens.length >= 1) {
-          parsed.componentKey = tokens[0];
-        } else {
-          parsed.componentKey = null;
-        }
-      }
-    }
-  } else {
-    parsed.componentKey = null;
-  }
+  assignCustomComponentKey(parsed, tokens);
 
   return parsed;
 }

@@ -1,19 +1,15 @@
-# Designer Extension Starter: TypeScript (Alt)
+# Beacon — Webflow Designer Extension
 
-Explore the [documentation](https://developers.webflow.com/designer/reference/introduction) for in-depth information about Designer Extension features and API.
+Asset tooling Designer Extension for Webflow. See the [Designer Extension docs](https://developers.webflow.com/designer/reference/introduction) for API reference.
+
+Workspace setup, monorepo commands, and the shared Webflow extension bundle workflow are documented in the [repository root README](../../README.md).
 
 ## Development
 
-```bash
-pnpm dev
-```
+From the repository root: `pnpm app beacon dev`. From this directory: `pnpm dev`.
 
-Runs the Vite dev server (port 1337) with the Webflow extension template injected. Use the URL as the "Development URL" in the Webflow Designer Apps panel.
+Runs the Vite dev server (port 1337) with the Webflow extension template injected. Use the printed URL as the "Development URL" in the Webflow Designer Apps panel.
 
-## Deployment
+## Build
 
-```bash
-pnpm build
-```
-
-Interactive build (typecheck, Vite build to `dist/`, `webflow extension bundle`, versioned zip under `bundle/`). Upload the produced `bundle.zip` for your workspace or the Marketplace.
+From this directory: `pnpm build`, `pnpm build:prod`, or `pnpm build:dev`. From the repository root: `pnpm app beacon build`, `pnpm app beacon build:prod`, or `pnpm app beacon build:dev`. Details (shared CLI, output paths) are in the root README.

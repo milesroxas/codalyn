@@ -27,13 +27,9 @@ buildInfo.buildTime  // ISO 8601 timestamp  — e.g. "2026-02-27T10:30:00.000Z"
 | `version` | `package.json → version` | `vite.config.ts` `define.__APP_VERSION__` |
 | `channel` | Vite `--mode` flag | `build:prod` → `"production"`, `build:dev` → `"development"` |
 | `buildTime` | `new Date().toISOString()` at build start | `vite.config.ts` `define.__BUILD_TIME__` |
-| `recipient` | `VITE_BUNDLE_RECIPIENT` env var | Set per build; defaults to `"internal"` if omitted |
+| `recipient` | `VITE_BUNDLE_RECIPIENT` env var | Set by the build CLI from the interactive recipient prompt; falls back to `"internal"` at runtime if the variable is absent |
 
-**Tagging a build for a specific recipient:**
-```bash
-VITE_BUNDLE_RECIPIENT=acme_corp pnpm build:prod
-```
-All PostHog events from that bundle will carry `bundle_recipient: "acme_corp"` as a super property, allowing cohort filtering by distribution target.
+Recipient at build time comes from the shared root build CLI (see repository root README); it sets `VITE_BUNDLE_RECIPIENT` so PostHog can tag cohorts by distribution target.
 
 ### PostHog integration
 
@@ -46,21 +42,6 @@ posthog.register({
   build_time: buildInfo.buildTime,
 });
 ```
-
-### Bundle output
-
-Builds are saved to versioned zip files in `bundle/` organized by channel and recipient:
-
-```
-bundle/
-  prod/
-    internal/    v1.2.0_02-27_10-30-00.zip
-    acme_corp/   v1.2.0_02-27_10-30-00.zip
-  development/
-    internal/    v1.2.0_02-27_10-30-00.zip
-```
-
-The recipient folder is created automatically if it doesn't exist. Run via `pnpm build:prod` or `pnpm build:dev`.
 
 ---
 

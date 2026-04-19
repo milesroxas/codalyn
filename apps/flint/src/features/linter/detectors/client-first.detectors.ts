@@ -6,7 +6,69 @@ import {
   SUBPART_HINTS,
 } from "@/features/linter/detectors/shared/wrapper-detection";
 import { isPageWrapperClass } from "@/features/linter/grammar/client-first.grammar";
-import type { ElementSnapshot, RoleDetector } from "@/features/linter/model/preset.types";
+import type {
+  DetectionContext,
+  ElementSnapshot,
+  RoleDetectionResult,
+  RoleDetector,
+} from "@/features/linter/model/preset.types";
+
+function isPageSlotSnapshot(element: ElementSnapshot): boolean {
+  const elementIdObj = element.id as unknown as { id?: { component?: unknown; element?: unknown } };
+  return !element.tagName && Boolean(elementIdObj?.id?.component && elementIdObj?.id?.element);
+}
+
+function detectPageSlotMainFallback(element: ElementSnapshot, context: DetectionContext): RoleDetectionResult | null {
+  if (context.rolesByElement && Object.values(context.rolesByElement).includes("main")) {
+    return null;
+  }
+
+  if (!isPageSlotSnapshot(element)) return null;
+
+  const graph = context.graph;
+  const allElements = context.allElements;
+  if (!graph || !allElements) return null;
+
+  const parentId = graph.getParentId(element.id);
+  if (!parentId) return null;
+
+  const parentElement = allElements.find((el) => el.id === parentId);
+  const isUnderPageWrapper = parentElement?.classes.some((cls) => isPageWrapperClass(cls));
+  if (!isUnderPageWrapper) return null;
+
+  const allPageSlots = allElements.filter((el) => {
+    if (!isPageSlotSnapshot(el)) return false;
+
+    const slotParentId = graph.getParentId(el.id);
+    if (!slotParentId) return false;
+
+    const slotParent = allElements.find((p) => p.id === slotParentId);
+    return slotParent?.classes.some((cls) => isPageWrapperClass(cls)) ?? false;
+  });
+
+  if (allPageSlots.length === 1) {
+    return {
+      role: "main",
+      score: 0.8,
+      reasoning:
+        "Single page slot under page-wrapper detected as main (configure with main-wrapper class and <main> tag)",
+    };
+  }
+
+  if (allPageSlots.length > 1) {
+    const isFirstSlot = allPageSlots[0].id === element.id;
+    if (isFirstSlot) {
+      return {
+        role: "main",
+        score: 0.75,
+        reasoning:
+          "First page slot of multiple under page-wrapper detected as main (configure with main-wrapper class and <main> tag)",
+      };
+    }
+  }
+
+  return null;
+}
 
 export const clientFirstRoleDetectors: RoleDetector[] = [
   {
@@ -144,64 +206,6 @@ export const clientFirstRoleDetectors: RoleDetector[] = [
   {
     id: "client-first-page-slot-main-fallback",
     description: "Fallback detection for page slots as main elements when no main-wrapper class found",
-    detect: (element: ElementSnapshot, context) => {
-      // Only run this fallback if no main role has been detected yet
-      if (context?.rolesByElement && Object.values(context.rolesByElement).includes("main")) {
-        return null; // Main already detected, don't interfere
-      }
-
-      // Check if this is a page slot (no element type but has component+element ID)
-      const elementIdObj = element.id as any;
-      const isPageSlot = !element.tagName && elementIdObj?.id?.component && elementIdObj?.id?.element;
-
-      if (!isPageSlot) return null;
-
-      // Must be under page-wrapper to be considered main
-      if (context?.graph && context?.allElements) {
-        const parentId = context.graph.getParentId(element.id);
-        if (parentId) {
-          const parentElement = context.allElements.find((el) => el.id === parentId);
-          const isUnderPageWrapper = parentElement?.classes.some((cls) => isPageWrapperClass(cls));
-
-          if (isUnderPageWrapper) {
-            // Count how many page slots exist under page-wrapper
-            const allPageSlots = context.allElements.filter((el) => {
-              const elIdObj = el.id as any;
-              const isSlot = !el.tagName && elIdObj?.id?.component && elIdObj?.id?.element;
-              if (!isSlot) return false;
-
-              const slotParentId = context.graph?.getParentId(el.id);
-              if (!slotParentId) return false;
-
-              const slotParent = context.allElements?.find((p) => p.id === slotParentId);
-              return slotParent?.classes.some((cls) => isPageWrapperClass(cls));
-            });
-
-            if (allPageSlots.length === 1) {
-              // Single page slot under page-wrapper - assign main role with warning
-              return {
-                role: "main",
-                score: 0.8,
-                reasoning:
-                  "Single page slot under page-wrapper detected as main (configure with main-wrapper class and <main> tag)",
-              };
-            } else if (allPageSlots.length > 1) {
-              // Multiple slots - assign main to first one found
-              const isFirstSlot = allPageSlots[0].id === element.id;
-              if (isFirstSlot) {
-                return {
-                  role: "main",
-                  score: 0.75,
-                  reasoning:
-                    "First page slot of multiple under page-wrapper detected as main (configure with main-wrapper class and <main> tag)",
-                };
-              }
-            }
-          }
-        }
-      }
-
-      return null;
-    },
+    detect: detectPageSlotMainFallback,
   },
 ];

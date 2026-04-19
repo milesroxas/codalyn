@@ -86,6 +86,19 @@ function analyzeMessageContent(message: string): string[] {
   return variants;
 }
 
+function variantForChildGroupKeyMessage(
+  message: string,
+  matchIndex: number
+): "errorContent" | "webflowClass" | "suggestionContent" | null {
+  if (!message.includes("Child group key") || !message.includes("does not match") || !message.includes("Rename to")) {
+    return null;
+  }
+  if (matchIndex === 0) return "errorContent";
+  if (matchIndex === 1) return "webflowClass";
+  if (matchIndex === 2) return "suggestionContent";
+  return null;
+}
+
 /**
  * Analyzes content based on specific message structure patterns
  */
@@ -105,32 +118,19 @@ function analyzeContentByMessageStructure(
   if (isCssPropertyName(content)) {
     return "propertyName";
   }
-  // Handle "Child group key X does not match root key Y. Rename to Z." pattern
-  if (message.includes("Child group key") && message.includes("does not match") && message.includes("Rename to")) {
-    if (matchIndex === 0) {
-      // First quoted item is the error content
-      return "errorContent";
-    } else if (matchIndex === 1) {
-      // Second quoted item is the reference webflow class
-      return "webflowClass";
-    } else if (matchIndex === 2) {
-      // Third quoted item (after "Rename to") is the suggestion
-      return "suggestionContent";
-    }
-  }
+
+  const childKeyVariant = variantForChildGroupKeyMessage(message, matchIndex);
+  if (childKeyVariant) return childKeyVariant;
 
   // Handle other common patterns
   if (message.toLowerCase().includes("rename to") && matchIndex === totalMatches - 1) {
-    // Last quoted item after "rename to" is likely a suggestion
     return "suggestionContent";
   }
 
   if (message.toLowerCase().includes("does not match") && matchIndex === 0) {
-    // First quoted item in a "does not match" message is likely error content
     return "errorContent";
   }
 
-  // Check if it's a webflow class by pattern
   if (isWebflowClassName(content)) {
     return "webflowClass";
   }

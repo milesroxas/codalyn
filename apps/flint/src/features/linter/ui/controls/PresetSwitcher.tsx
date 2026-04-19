@@ -17,6 +17,63 @@ const presetLogos: Record<string, string> = {
   "client-first": "./images/logo-client-first.svg",
 };
 
+function clearStoredRuleConfig(): void {
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("webflow-linter-rules-config");
+    }
+  } catch (err: unknown) {
+    if ((import.meta as any)?.env?.DEV) {
+      console.debug("[PresetSwitcher] localStorage cleanup failed", err);
+    }
+  }
+}
+
+function clearPageLintResultsSafe(): void {
+  try {
+    const store = usePageLint.getState();
+    if (store && typeof store.clearResults === "function") {
+      store.clearResults();
+    }
+  } catch (err: unknown) {
+    if ((import.meta as any)?.env?.DEV) {
+      console.debug("[PresetSwitcher] store.clearResults failed", err);
+    }
+  }
+}
+
+async function resetStyleCacheSafe(): Promise<void> {
+  try {
+    const mod = await import("@/entities/style/services/style-cache");
+    if (mod && typeof mod.resetStyleServiceCache === "function") {
+      mod.resetStyleServiceCache();
+    }
+  } catch (err: unknown) {
+    if ((import.meta as any)?.env?.DEV) {
+      console.debug("[PresetSwitcher] resetStyleServiceCache failed", err);
+    }
+  }
+}
+
+async function applyPresetSelection(
+  id: PresetId,
+  fromPreset: PresetId,
+  actions: {
+    setPreset: (next: PresetId) => void;
+    setOpen: (open: boolean) => void;
+    onPresetChange?: (next: PresetId) => void;
+  }
+): Promise<void> {
+  trackPresetSwitched({ from_preset: fromPreset, to_preset: id });
+  ensureLinterInitialized("balanced", id);
+  actions.setPreset(id);
+  clearStoredRuleConfig();
+  clearPageLintResultsSafe();
+  await resetStyleCacheSafe();
+  actions.setOpen(false);
+  actions.onPresetChange?.(id);
+}
+
 interface PresetSwitcherProps {
   onPresetChange?: (preset: PresetId) => void;
 }
@@ -55,45 +112,7 @@ export const PresetSwitcher: React.FC<PresetSwitcherProps> = ({ onPresetChange }
                 type="button"
                 key={id}
                 onClick={() => {
-                  trackPresetSwitched({ from_preset: preset, to_preset: id });
-                  ensureLinterInitialized("balanced", id);
-                  setPreset(id);
-                  try {
-                    if (typeof localStorage !== "undefined") {
-                      localStorage.removeItem("webflow-linter-rules-config");
-                    }
-                  } catch (err: unknown) {
-                    if ((import.meta as any)?.env?.DEV) {
-                      // eslint-disable-next-line no-console
-                      console.debug("[PresetSwitcher] localStorage cleanup failed", err);
-                    }
-                  }
-                  try {
-                    const store = usePageLint.getState();
-                    if (store && typeof store.clearResults === "function") {
-                      store.clearResults();
-                    }
-                  } catch (err: unknown) {
-                    if ((import.meta as any)?.env?.DEV) {
-                      // eslint-disable-next-line no-console
-                      console.debug("[PresetSwitcher] store.clearResults failed", err);
-                    }
-                  }
-                  void (async () => {
-                    try {
-                      const mod = await import("@/entities/style/services/style-cache");
-                      if (mod && typeof mod.resetStyleServiceCache === "function") {
-                        mod.resetStyleServiceCache();
-                      }
-                    } catch (err: unknown) {
-                      if ((import.meta as any)?.env?.DEV) {
-                        // eslint-disable-next-line no-console
-                        console.debug("[PresetSwitcher] resetStyleServiceCache failed", err);
-                      }
-                    }
-                  })();
-                  setOpen(false);
-                  onPresetChange?.(id);
+                  void applyPresetSelection(id, preset, { setPreset, setOpen, onPresetChange });
                 }}
                 className={`w-full text-left rounded-xs px-2 py-1.5 mb-1 text-[11px] cursor-pointer hover:bg-accent hover:text-accent-foreground ${
                   preset === id ? "bg-accent/60 text-accent-foreground" : ""

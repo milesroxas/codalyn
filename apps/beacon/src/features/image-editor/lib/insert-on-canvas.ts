@@ -62,8 +62,3 @@ export async function placeImageOnCanvasWithAsset(asset: Asset, replaceSelectedI
   await created.setAsset(asset);
   await webflow.setSelectedElement(created);
 }
-
-export async function placeImageOnCanvas(file: File, replaceSelectedImage: boolean): Promise<void> {
-  const asset = await webflow.createAsset(file);
-  await placeImageOnCanvasWithAsset(asset, replaceSelectedImage);
-}

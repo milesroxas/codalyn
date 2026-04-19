@@ -1,14 +1,14 @@
-import Swiper from 'swiper';
+import Swiper from "swiper";
 
-import { parseIX3Config, setupInteractionBridge } from './integration/interactionBridge';
-import { buildCarouselConfig } from './model';
-import type { CarouselDataset, CarouselInstance } from './types';
+import { parseIX3Config, setupInteractionBridge } from "./integration/interactionBridge";
+import { buildCarouselConfig } from "./model";
+import type { CarouselDataset, CarouselInstance } from "./types";
 
 /**
  * Validate carousel element structure
  */
 function isValidCarouselElement(element: HTMLElement): boolean {
-  return !!element.querySelector('.swiper-wrapper');
+  return !!element.querySelector(".swiper-wrapper");
 }
 
 /**
@@ -21,7 +21,7 @@ export function createCarousel(element: HTMLElement): CarouselInstance | null {
 
   // Additional safety check: ensure element is connected to DOM
   if (!element.isConnected) {
-    console.warn('[Carousel] Element not connected to DOM, skipping initialization');
+    console.warn("[Carousel] Element not connected to DOM, skipping initialization");
     return null;
   }
 
@@ -56,7 +56,7 @@ export function createCarousel(element: HTMLElement): CarouselInstance | null {
       element,
     };
   } catch (error) {
-    console.error('[Carousel] Failed to initialize:', error);
+    console.error("[Carousel] Failed to initialize:", error);
     return null;
   }
 }

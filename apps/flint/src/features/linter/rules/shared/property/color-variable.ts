@@ -40,6 +40,29 @@ const isZeroOpacity = (value: string): boolean => {
   return false;
 };
 
+function shouldSkipColorInspection(propertyValue: unknown): boolean {
+  return (
+    propertyValue === undefined ||
+    propertyValue === null ||
+    propertyValue === "inherit" ||
+    propertyValue === "currentColor" ||
+    propertyValue === "transparent" ||
+    (typeof propertyValue === "string" && isZeroOpacity(propertyValue))
+  );
+}
+
+function isHardcodedColorCandidate(propertyValue: unknown): boolean {
+  return (
+    typeof propertyValue === "string" &&
+    (propertyValue.startsWith("hsla(") ||
+      propertyValue.startsWith("rgba(") ||
+      propertyValue.startsWith("rgb(") ||
+      propertyValue.startsWith("hsl(") ||
+      propertyValue.startsWith("#") ||
+      /^[a-z]+$/i.test(propertyValue))
+  );
+}
+
 /**
  * Shared rule: ensures color properties use Webflow variables instead of hardcoded values.
  * Supports configurable list of color properties to check.
@@ -74,51 +97,36 @@ export const createColorVariableRule = (): PropertyRule => ({
 
       const results: RuleResult[] = [];
 
-      // Check each target property
       for (const propertyName of ruleConfig.targetProperties) {
         const propertyValue = properties[propertyName];
 
-        // Skip if property is not set, a CSS keyword, or a fully transparent color
-        if (
-          propertyValue === undefined ||
-          propertyValue === null ||
-          propertyValue === "inherit" ||
-          propertyValue === "currentColor" ||
-          propertyValue === "transparent" ||
-          (typeof propertyValue === "string" && isZeroOpacity(propertyValue))
-        ) {
+        if (shouldSkipColorInspection(propertyValue)) {
           continue;
         }
 
-        // Check if the property value is NOT a color variable
-        if (!isColorVariable(propertyValue)) {
-          // Only flag if it's a color value (string starting with color formats)
-          if (
-            typeof propertyValue === "string" &&
-            (propertyValue.startsWith("hsla(") ||
-              propertyValue.startsWith("rgba(") ||
-              propertyValue.startsWith("rgb(") ||
-              propertyValue.startsWith("hsl(") ||
-              propertyValue.startsWith("#") ||
-              /^[a-z]+$/i.test(propertyValue)) // named colors like 'red', 'blue'
-          ) {
-            results.push({
-              ruleId: "shared:property:color-variable",
-              name: "Use Color Variables",
-              message: `Property "${propertyName}" uses hardcoded color "${convertColorToHex(
-                propertyValue
-              )}". Consider using a Webflow color variable for better maintainability.`,
-              severity: "warning",
-              className,
-              isCombo: false, // Will be set correctly by the rule runner
-              metadata: {
-                propertyName,
-                currentValue: convertColorToHex(propertyValue),
-                suggestion: "Replace with a Webflow color variable",
-              },
-            });
-          }
+        if (isColorVariable(propertyValue)) {
+          continue;
         }
+
+        if (!isHardcodedColorCandidate(propertyValue)) {
+          continue;
+        }
+
+        results.push({
+          ruleId: "shared:property:color-variable",
+          name: "Use Color Variables",
+          message: `Property "${propertyName}" uses hardcoded color "${convertColorToHex(
+            propertyValue as string
+          )}". Consider using a Webflow color variable for better maintainability.`,
+          severity: "warning",
+          className,
+          isCombo: false, // Will be set correctly by the rule runner
+          metadata: {
+            propertyName,
+            currentValue: convertColorToHex(propertyValue as string),
+            suggestion: "Replace with a Webflow color variable",
+          },
+        });
       }
 
       return results;

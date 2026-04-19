@@ -32,12 +32,12 @@ declare const Webflow: WebflowGlobal | undefined;
  */
 function resolveIX3(): IX3API | null {
   // Check if running in Webflow environment
-  if (typeof Webflow === 'undefined' || typeof Webflow.require !== 'function') {
+  if (typeof Webflow === "undefined" || typeof Webflow.require !== "function") {
     return null;
   }
 
   try {
-    const ix3 = Webflow.require('ix3');
+    const ix3 = Webflow.require("ix3");
     return ix3 || null;
   } catch {
     return null;
@@ -80,9 +80,7 @@ export function emit(eventName: string, payload?: unknown): void {
 
   try {
     // Normalize event name - add interaction: prefix if not present
-    const normalizedName = eventName.startsWith('interaction:')
-      ? eventName
-      : `interaction:${eventName}`;
+    const normalizedName = eventName.startsWith("interaction:") ? eventName : `interaction:${eventName}`;
 
     // Emit the event - IX3 will handle animation based on Webflow Designer configuration
     ix3.emit(normalizedName, payload);
@@ -141,12 +139,10 @@ export function emitPerSlide(
     const displayIndex = options.oneBasedIndex ? slideIndex + 1 : slideIndex;
 
     // Replace {index} placeholder with actual index
-    const eventName = options.eventPattern.replace('{index}', displayIndex.toString());
+    const eventName = options.eventPattern.replace("{index}", displayIndex.toString());
 
     // Normalize event name - add interaction: prefix if not present
-    const normalizedName = eventName.startsWith('interaction:')
-      ? eventName
-      : `interaction:${eventName}`;
+    const normalizedName = eventName.startsWith("interaction:") ? eventName : `interaction:${eventName}`;
 
     const payload = {
       slideIndex,

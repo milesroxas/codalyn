@@ -29,7 +29,7 @@ export interface StateAssignment {
 /**
  * Valid state values
  */
-export type StateValue = 'active' | 'prev' | 'next' | 'inactive';
+export type StateValue = "active" | "prev" | "next" | "inactive";
 
 /**
  * Apply state markers to a collection of elements
@@ -52,7 +52,7 @@ export function setState(
   assignment: StateAssignment,
   config: StateConfig = {}
 ): void {
-  const attr = config.attr || 'data-state';
+  const attr = config.attr || "data-state";
   const itemsArray = Array.from(items);
 
   // Clear all states from all items
@@ -62,21 +62,21 @@ export function setState(
 
   // Apply new states
   if (assignment.active !== undefined && itemsArray[assignment.active]) {
-    itemsArray[assignment.active].setAttribute(attr, 'active');
+    itemsArray[assignment.active].setAttribute(attr, "active");
   }
 
   if (assignment.prev !== undefined && itemsArray[assignment.prev]) {
-    itemsArray[assignment.prev].setAttribute(attr, 'prev');
+    itemsArray[assignment.prev].setAttribute(attr, "prev");
   }
 
   if (assignment.next !== undefined && itemsArray[assignment.next]) {
-    itemsArray[assignment.next].setAttribute(attr, 'next');
+    itemsArray[assignment.next].setAttribute(attr, "next");
   }
 
   // Mark remaining items as inactive
   for (let i = 0; i < itemsArray.length; i++) {
     if (i !== assignment.active && i !== assignment.prev && i !== assignment.next) {
-      itemsArray[i].setAttribute(attr, 'inactive');
+      itemsArray[i].setAttribute(attr, "inactive");
     }
   }
 }
@@ -94,7 +94,7 @@ export function setState(
  * ```
  */
 export function clearState(items: Element[] | NodeListOf<Element>, config: StateConfig = {}): void {
-  const attr = config.attr || 'data-state';
+  const attr = config.attr || "data-state";
   const itemsArray = Array.from(items);
 
   for (const item of itemsArray) {
@@ -116,10 +116,10 @@ export function clearState(items: Element[] | NodeListOf<Element>, config: State
  * ```
  */
 export function getState(element: Element, config: StateConfig = {}): StateValue | null {
-  const attr = config.attr || 'data-state';
+  const attr = config.attr || "data-state";
   const value = element.getAttribute(attr);
 
-  if (value === 'active' || value === 'prev' || value === 'next' || value === 'inactive') {
+  if (value === "active" || value === "prev" || value === "next" || value === "inactive") {
     return value;
   }
 

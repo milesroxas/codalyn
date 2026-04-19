@@ -1,6 +1,82 @@
 import type { WebflowElement } from "@/entities/element/model/element.types";
 import { toElementKey } from "../lib/id";
 
+function elementTypeLabel(element: WebflowElement): string {
+  return (element as any)?.type || "(empty/slot)";
+}
+
+function isSlotLike(element: WebflowElement): boolean {
+  const t = elementTypeLabel(element);
+  return !t || t === "(empty/slot)";
+}
+
+async function mapChildrenFromParent(
+  element: WebflowElement,
+  parentId: string,
+  elementIdSet: Set<string>,
+  parentIdByChildId: Record<string, string | null>,
+  discoveredElements: WebflowElement[]
+): Promise<void> {
+  if (typeof (element as any).getChildren !== "function") {
+    if (isSlotLike(element)) {
+      console.log(`[ParentRelationshipService] Slot ${parentId} has NO getChildren method`);
+    }
+    return;
+  }
+
+  try {
+    const children = await (element as any).getChildren();
+    const isSlot = isSlotLike(element);
+
+    if (isSlot) {
+      console.log(
+        `[ParentRelationshipService] Slot ${parentId} getChildren returned:`,
+        Array.isArray(children) ? children.length : children
+      );
+    }
+
+    if (!Array.isArray(children)) {
+      return;
+    }
+
+    for (const child of children) {
+      const childId = toElementKey(child);
+      const childType = elementTypeLabel(child);
+      parentIdByChildId[childId] = parentId;
+
+      if (isSlot) {
+        console.log(`[ParentRelationshipService] Slot child found: ${childId} (type: ${childType})`);
+      }
+
+      if (!elementIdSet.has(childId)) {
+        elementIdSet.add(childId);
+        discoveredElements.push(child);
+        console.log(`[ParentRelationshipService] Discovered new element: ${childId} (type: ${childType})`);
+      }
+    }
+  } catch (error) {
+    console.warn(`[ParentRelationshipService] getChildren error for element ${parentId}:`, error);
+  }
+}
+
+function logElementsDebug(elements: WebflowElement[]): void {
+  console.log(`[ParentRelationshipService] Processing ${elements.length} elements:`);
+  for (const el of elements) {
+    const elType = (el as any)?.type || "(empty/slot)";
+    console.log(`  - ${toElementKey(el)}: ${elType}`);
+  }
+}
+
+function logFinalMap(parentIdByChildId: Record<string, string | null>, discoveredCount: number): void {
+  console.log(`[ParentRelationshipService] Final parent-child map:`);
+  for (const [childId, parentId] of Object.entries(parentIdByChildId)) {
+    if (parentId) {
+      console.log(`  ${childId} -> parent: ${parentId}`);
+    }
+  }
+  console.log(`[ParentRelationshipService] Total discovered: ${discoveredCount}`);
+}
+
 export interface ParentChildMapResult {
   parentIdByChildId: Record<string, string | null>;
   discoveredElements: WebflowElement[];
@@ -32,67 +108,16 @@ export function createParentRelationshipService(): ParentRelationshipService {
       }
     }
 
-    // Debug: Log all elements being processed
-    console.log(`[ParentRelationshipService] Processing ${elements.length} elements:`);
-    for (const el of elements) {
-      const elType = (el as any)?.type || "(empty/slot)";
-      console.log(`  - ${toElementKey(el)}: ${elType}`);
-    }
+    logElementsDebug(elements);
 
     // Build parent-child relationships by traversing from each element using getChildren()
     // Also discover children that weren't in the original elements set (e.g., slot children)
     for (const element of elements) {
       const parentId = toElementKey(element);
-      const elementType = (element as any)?.type || "(empty/slot)";
-      const isSlot = !elementType || elementType === "(empty/slot)";
-
-      // Debug: Log slot elements
-      if (isSlot) {
+      if (isSlotLike(element)) {
         console.log(`[ParentRelationshipService] Processing slot element: ${parentId}`);
       }
-
-      // Check if element has getChildren method
-      if (typeof (element as any).getChildren === "function") {
-        try {
-          const children = await (element as any).getChildren();
-
-          // Debug: Log children for slots
-          if (isSlot) {
-            console.log(
-              `[ParentRelationshipService] Slot ${parentId} getChildren returned:`,
-              Array.isArray(children) ? children.length : children
-            );
-          }
-
-          if (Array.isArray(children)) {
-            for (const child of children) {
-              const childId = toElementKey(child);
-              const childType = (child as any)?.type || "(empty/slot)";
-
-              // Always map the parent-child relationship
-              parentIdByChildId[childId] = parentId;
-
-              // Debug: Log discovered children
-              if (isSlot) {
-                console.log(`[ParentRelationshipService] Slot child found: ${childId} (type: ${childType})`);
-              }
-
-              // Track elements that weren't in the original set (discovered from slots)
-              if (!elementIdSet.has(childId)) {
-                elementIdSet.add(childId);
-                discoveredElements.push(child);
-                console.log(`[ParentRelationshipService] Discovered new element: ${childId} (type: ${childType})`);
-              }
-            }
-          }
-        } catch (error) {
-          // getChildren() errors are non-fatal; continue with other elements
-          console.warn(`[ParentRelationshipService] getChildren error for element ${parentId}:`, error);
-        }
-      } else if (isSlot) {
-        // Slot doesn't have getChildren - log this
-        console.log(`[ParentRelationshipService] Slot ${parentId} has NO getChildren method`);
-      }
+      await mapChildrenFromParent(element, parentId, elementIdSet, parentIdByChildId, discoveredElements);
     }
 
     // Recursively process discovered elements to find their children too
@@ -104,14 +129,7 @@ export function createParentRelationshipService(): ParentRelationshipService {
       discoveredElements.push(...nested.discoveredElements);
     }
 
-    // Debug: Log final parent-child relationships
-    console.log(`[ParentRelationshipService] Final parent-child map:`);
-    for (const [childId, parentId] of Object.entries(parentIdByChildId)) {
-      if (parentId) {
-        console.log(`  ${childId} -> parent: ${parentId}`);
-      }
-    }
-    console.log(`[ParentRelationshipService] Total discovered: ${discoveredElements.length}`);
+    logFinalMap(parentIdByChildId, discoveredElements.length);
 
     return { parentIdByChildId, discoveredElements };
   }

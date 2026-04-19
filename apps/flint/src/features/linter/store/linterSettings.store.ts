@@ -14,32 +14,7 @@ interface StoredSettings {
   presetIgnoredClasses: Record<string, string[]>;
 }
 
-function loadFromStorage(): StoredSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<StoredSettings>;
-      const globalIgnoredClasses = normalizeIgnoredClassList(parsed.globalIgnoredClasses ?? []);
-      const rawPreset = parsed.presetIgnoredClasses;
-      const presetIgnoredClasses: Record<string, string[]> = {};
-      if (rawPreset && typeof rawPreset === "object") {
-        for (const [k, v] of Object.entries(rawPreset)) {
-          if (Array.isArray(v)) {
-            presetIgnoredClasses[k] = normalizeIgnoredClassList(v);
-          }
-        }
-      }
-      return {
-        autoSelectElement: parsed.autoSelectElement ?? true,
-        ignoreThirdPartyClasses: parsed.ignoreThirdPartyClasses ?? true,
-        windowPreset: parsed.windowPreset ?? "compact",
-        globalIgnoredClasses,
-        presetIgnoredClasses,
-      };
-    }
-  } catch {
-    // ignore parse errors
-  }
+function defaultStoredSettings(): StoredSettings {
   return {
     autoSelectElement: true,
     ignoreThirdPartyClasses: true,
@@ -47,6 +22,34 @@ function loadFromStorage(): StoredSettings {
     globalIgnoredClasses: [],
     presetIgnoredClasses: {},
   };
+}
+
+function normalizePresetIgnoredMap(raw: unknown): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw)) {
+    if (Array.isArray(v)) {
+      out[k] = normalizeIgnoredClassList(v);
+    }
+  }
+  return out;
+}
+
+function loadFromStorage(): StoredSettings {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultStoredSettings();
+    const parsed = JSON.parse(raw) as Partial<StoredSettings>;
+    return {
+      autoSelectElement: parsed.autoSelectElement ?? true,
+      ignoreThirdPartyClasses: parsed.ignoreThirdPartyClasses ?? true,
+      windowPreset: parsed.windowPreset ?? "compact",
+      globalIgnoredClasses: normalizeIgnoredClassList(parsed.globalIgnoredClasses ?? []),
+      presetIgnoredClasses: normalizePresetIgnoredMap(parsed.presetIgnoredClasses),
+    };
+  } catch {
+    return defaultStoredSettings();
+  }
 }
 
 function saveToStorage(settings: StoredSettings): void {

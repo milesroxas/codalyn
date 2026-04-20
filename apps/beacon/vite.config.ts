@@ -9,15 +9,47 @@ import pkg from "./package.json";
 const beaconRoot = __dirname;
 const towerRoot = path.join(beaconRoot, "../tower");
 
-/** Resolves Tower base URL: explicit VITE_TOWER_ORIGIN, else http://TOWER_DEV_HOST:TOWER_PORT using Beacon + Tower env (incl. Tower `PORT`). */
+/** Default Tower for `vite build --mode production` when `VITE_TOWER_ORIGIN` is unset. Override via env or `.env.production`. */
+const DEFAULT_PRODUCTION_TOWER_ORIGIN = "https://codalyn-tower.vercel.app";
+
+function isLocalTowerUrl(origin: string): boolean {
+  try {
+    const u = new URL(origin);
+    return u.hostname === "localhost" || u.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Tower base URL baked into the bundle.
+ * - Dev / `vite build --mode development`: default `http://TOWER_DEV_HOST:TOWER_PORT` when unset.
+ * - Production (`vite build --mode production`): defaults to codalyn-tower.vercel.app when unset.
+ *   Override with `VITE_TOWER_ORIGIN`. `http://localhost` from env is rejected (mixed content); use
+ *   `BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION=1` for rare local Tower tests.
+ */
 function resolveTowerOrigin(mode: string): string {
   const beaconEnv = loadEnv(mode, beaconRoot, "");
   const towerEnv = loadEnv(mode, towerRoot, "");
-  const explicit = beaconEnv.VITE_TOWER_ORIGIN?.trim();
+  const explicit =
+    beaconEnv.VITE_TOWER_ORIGIN?.trim() || process.env.VITE_TOWER_ORIGIN?.trim() || "";
+  const allowLocalInProd =
+    beaconEnv.BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION === "1" ||
+    process.env.BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION === "1";
+
   if (explicit) {
-    return explicit.replace(/\/$/, "");
+    const origin = explicit.replace(/\/$/, "");
+    if (mode === "production" && isLocalTowerUrl(origin) && !allowLocalInProd) {
+      // `.env.local` often points at local Tower; never bake that into a Webflow prod bundle.
+      return DEFAULT_PRODUCTION_TOWER_ORIGIN.replace(/\/$/, "");
+    }
+    return origin;
   }
-  // Default port matches apps/tower/scripts/dev.mjs when Tower `PORT` is unset.
+
+  if (mode === "production") {
+    return DEFAULT_PRODUCTION_TOWER_ORIGIN.replace(/\/$/, "");
+  }
+
   const port = beaconEnv.TOWER_PORT || towerEnv.PORT || towerEnv.TOWER_PORT || "3100";
   const host = beaconEnv.TOWER_DEV_HOST || "localhost";
   return `http://${host}:${port}`;

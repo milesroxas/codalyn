@@ -1,8 +1,15 @@
+import { type ImageExportFormat, mimeTypeForFormat } from "@codalyn/webflow-kit";
 import type { Area } from "react-easy-crop";
-
+import {
+  asCmsBinding,
+  type CmsImageBindingRef,
+  resolveSingleElementCmsImageBinding,
+} from "@/features/image-editor/lib/element-cms-image-binding";
+import { towerFetch } from "@/shared/lib/tower-client";
 import { renderCroppedRegionToCanvas } from "./crop-image";
 import { encodeCanvasToOptimizedFile } from "./encode-image-blob";
 import { placeImageOnCanvasAtBody, placeImageOnCanvasWithAsset } from "./insert-on-canvas";
+import { searchComponentInstanceImageProps } from "./search-component-instance-image-props";
 
 export const MAX_EDGE = 8192;
 export const MIN_EDGE = 1;
@@ -23,6 +30,32 @@ export function parseOutputDimension(input: string, fallback: number): number {
   return clampEdge(n);
 }
 
+/**
+ * Pixel dimensions for export so the output matches the crop aspect ratio (no stretch).
+ * Uses the larger of the resolved width/height as the long edge, then derives the other side.
+ */
+export function outputDimensionsMatchingCrop(
+  completedCrop: Area,
+  widthInput: number,
+  heightInput: number
+): { width: number; height: number } {
+  const ar = completedCrop.width / completedCrop.height;
+  if (ar <= 0 || !Number.isFinite(ar)) {
+    return { width: clampEdge(widthInput), height: clampEdge(heightInput) };
+  }
+  const w = clampEdge(widthInput);
+  const h = clampEdge(heightInput);
+  const maxEdge = Math.max(w, h);
+  if (ar >= 1) {
+    const outW = clampEdge(maxEdge);
+    const outH = clampEdge(Math.round(outW / ar));
+    return { width: outW, height: outH };
+  }
+  const outH = clampEdge(maxEdge);
+  const outW = clampEdge(Math.round(outH * ar));
+  return { width: outW, height: outH };
+}
+
 export type ExportResult =
   | { kind: "success"; message: string }
   | { kind: "info"; message: string }
@@ -34,6 +67,194 @@ export type PlacementMode = "canvas" | "selection" | "replace";
 /** Webflow Designer API `element.type` for Image elements. */
 export const WEBFLOW_IMAGE_ELEMENT_TYPE = "Image" as const;
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+function webflowValidationDetailLine(d: unknown): string {
+  if (!isRecord(d)) {
+    return "";
+  }
+  let p = "";
+  if (typeof d.param === "string") {
+    p = d.param;
+  } else if (typeof d.field === "string") {
+    p = d.field;
+  }
+  let description = "";
+  if (typeof d.description === "string") {
+    description = d.description;
+  } else if (typeof d.message === "string") {
+    description = d.message;
+  }
+  return [p, description].filter((s) => s.trim().length > 0).join(": ");
+}
+
+function towerErrorMessageFromJson(parsed: Record<string, unknown>): string | null {
+  const msg = typeof parsed.message === "string" ? parsed.message.trim() : "";
+  const details = parsed.details;
+  if (Array.isArray(details) && details.length > 0) {
+    const joined = details.map(webflowValidationDetailLine).filter(Boolean).join("; ");
+    if (joined) {
+      return (msg ? `${msg} — ${joined}` : joined).slice(0, 500);
+    }
+  }
+  if (typeof parsed.error === "string" && parsed.error.trim()) {
+    return parsed.error;
+  }
+  if (msg) {
+    return msg;
+  }
+  if (typeof parsed.hint === "string" && parsed.hint.trim()) {
+    return parsed.hint;
+  }
+  return null;
+}
+
+async function readTowerErrorDetail(res: Response): Promise<string> {
+  const raw = (await res.text()).trim();
+  if (!raw) {
+    return res.statusText || `HTTP ${res.status}`;
+  }
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out = towerErrorMessageFromJson(parsed);
+    if (out) {
+      return out;
+    }
+  } catch {
+    // use raw
+  }
+  return raw.slice(0, 500);
+}
+
+async function resolveCollectionFieldSlug(collectionId: string, fieldId: string): Promise<string> {
+  const collectionRes = await towerFetch(`/api/v2/webflow/collections/${encodeURIComponent(collectionId)}`);
+  if (!collectionRes.ok) {
+    const detail = await readTowerErrorDetail(collectionRes);
+    throw new Error(`Could not read CMS collection fields (${collectionRes.status}): ${detail}`);
+  }
+
+  let data: unknown;
+  try {
+    data = await collectionRes.json();
+  } catch {
+    throw new Error("Could not parse CMS collection details.");
+  }
+
+  const fields = isRecord(data) && Array.isArray(data.fields) ? data.fields : null;
+  if (!fields) {
+    throw new Error("CMS collection response was missing fields.");
+  }
+
+  for (const field of fields) {
+    if (!isRecord(field)) {
+      continue;
+    }
+    if (field.id !== fieldId) {
+      continue;
+    }
+    if (typeof field.slug === "string" && field.slug.trim()) {
+      return field.slug;
+    }
+    break;
+  }
+
+  throw new Error("Could not resolve the CMS image field.");
+}
+
+/**
+ * PATCH staged collection item — image field in `fieldData` (Image type: `fileId` + `url` per Data API).
+ * @see https://developers.webflow.com/data/docs/working-with-the-cms/manage-collections-and-items (update item)
+ * @see https://developers.webflow.com/data/reference/field-types-item-values (Image write)
+ */
+async function updateCmsImageField(options: {
+  binding: CmsImageBindingRef;
+  cmsItemId: string;
+  imageUrl: string;
+  asset: Asset;
+}): Promise<void> {
+  const { binding, cmsItemId, imageUrl, asset } = options;
+  const fieldSlug = await resolveCollectionFieldSlug(binding.collectionId, binding.fieldId);
+  const path = `/api/v2/webflow/collections/${encodeURIComponent(binding.collectionId)}/items/${encodeURIComponent(cmsItemId)}?skipInvalidFiles=false`;
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  } as const;
+
+  const bodyWithAsset = {
+    fieldData: {
+      [fieldSlug]: { fileId: asset.id, url: imageUrl },
+    },
+  };
+  const bodyUrlOnly = {
+    fieldData: {
+      [fieldSlug]: { url: imageUrl },
+    },
+  };
+
+  let patchRes = await towerFetch(path, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(bodyWithAsset),
+  });
+
+  if (!patchRes.ok) {
+    patchRes = await towerFetch(path, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(bodyUrlOnly),
+    });
+  }
+
+  if (!patchRes.ok) {
+    const detail = await readTowerErrorDetail(patchRes);
+    throw new Error(`Could not update CMS item image field (${patchRes.status}): ${detail}`);
+  }
+}
+
+async function applyCmsBindingWithAsset(options: {
+  binding: CmsImageBindingRef;
+  label: string;
+  cmsItemId: string | null | undefined;
+  asset: Asset;
+  /** When the selection is a canvas Image, syncs the element to the new site asset so the Designer shows it without a reload. */
+  syncCanvasImage?: ImageElement | null;
+}): Promise<ExportResult> {
+  const { binding, label, cmsItemId, asset, syncCanvasImage } = options;
+  if (!cmsItemId) {
+    return {
+      kind: "info",
+      message: "Switch to a CMS item page, then try again.",
+    };
+  }
+
+  const imageUrl = await asset.getUrl();
+  if (!imageUrl?.trim()) {
+    return { kind: "error", message: "Could not resolve the uploaded image URL for CMS." };
+  }
+
+  await updateCmsImageField({ binding, cmsItemId, imageUrl: imageUrl.trim(), asset });
+  if (syncCanvasImage) {
+    try {
+      await syncCanvasImage.setAsset(asset);
+    } catch {
+      /* CMS mode may forbid; field still updated via API */
+    }
+  }
+  return {
+    kind: "success",
+    message: `Updated CMS field “${binding.fieldName ?? label}”.`,
+  };
+}
+
+function multipleCmsBindingSelectionResult(): ExportResult {
+  return {
+    kind: "info",
+    message: "Selected element has multiple CMS image bindings. Pick a more specific element.",
+  };
+}
+
 async function applyAssetFolder(asset: Asset, folder: AssetFolder): Promise<void> {
   await asset.setParent(folder);
 }
@@ -42,9 +263,10 @@ async function applyAssetFolder(asset: Asset, folder: AssetFolder): Promise<void
 async function tryApplyComponentInstanceImageProp(
   instance: ComponentElement,
   asset: Asset,
-  componentImagePropId: string | null | undefined
+  componentImagePropId: string | null | undefined,
+  currentCmsItemId: string | null | undefined
 ): Promise<ExportResult | null> {
-  const imageProps = await instance.searchProps({ valueType: "imageAsset" });
+  const imageProps = await searchComponentInstanceImageProps(instance);
   if (imageProps.length === 0) {
     return null;
   }
@@ -68,11 +290,135 @@ async function tryApplyComponentInstanceImageProp(
     return { kind: "error", message: "Could not resolve the component image field." };
   }
 
+  const cmsBinding = asCmsBinding(match.value);
+  if (cmsBinding) {
+    const result = await applyCmsBindingWithAsset({
+      binding: cmsBinding,
+      label: match.display.label,
+      cmsItemId: currentCmsItemId,
+      asset,
+    });
+    await webflow.setSelectedElement(instance);
+    return result;
+  }
+
   await instance.setProps([{ propId, value: asset.id }]);
   return {
     kind: "success",
     message: `Updated “${match.display.label}”.`,
   };
+}
+
+async function handleReplaceWithLibraryAsset(options: {
+  img: ImageElement;
+  file: File;
+  targetFolder: AssetFolder;
+}): Promise<ExportResult> {
+  const { img, file, targetFolder } = options;
+  const existing = await img.getAsset();
+  if (!existing) {
+    const asset = await webflow.createAsset(file);
+    await applyAssetFolder(asset, targetFolder);
+    await img.setAsset(asset);
+    await webflow.setSelectedElement(img);
+    return { kind: "success", message: "Image applied." };
+  }
+  await existing.setFile(file);
+  await applyAssetFolder(existing, targetFolder);
+  await webflow.setSelectedElement(img);
+  return { kind: "success", message: "Asset file updated." };
+}
+
+async function handleReplacePlacement(options: {
+  selectedElement: AnyElement | null;
+  file: File;
+  targetFolder: AssetFolder;
+  replaceLibraryAsset: boolean;
+  currentCmsItemId: string | null | undefined;
+}): Promise<ExportResult> {
+  const { selectedElement, file, targetFolder, replaceLibraryAsset, currentCmsItemId } = options;
+  if (selectedElement?.type !== WEBFLOW_IMAGE_ELEMENT_TYPE) {
+    return {
+      kind: "info",
+      message: "Select an Image on the canvas.",
+    };
+  }
+
+  const img = selectedElement as ImageElement;
+  const cmsBinding = await resolveSingleElementCmsImageBinding(img);
+  if (cmsBinding === "multiple") {
+    return multipleCmsBindingSelectionResult();
+  }
+  if (cmsBinding) {
+    const asset = await webflow.createAsset(file);
+    await applyAssetFolder(asset, targetFolder);
+    const result = await applyCmsBindingWithAsset({
+      binding: cmsBinding.binding,
+      label: cmsBinding.label,
+      cmsItemId: currentCmsItemId,
+      asset,
+      syncCanvasImage: img,
+    });
+    await webflow.setSelectedElement(img);
+    return result;
+  }
+
+  if (replaceLibraryAsset) {
+    return handleReplaceWithLibraryAsset({ img, file, targetFolder });
+  }
+
+  const asset = await webflow.createAsset(file);
+  await applyAssetFolder(asset, targetFolder);
+  await img.setAsset(asset);
+  await webflow.setSelectedElement(img);
+  return { kind: "success", message: "Image replaced." };
+}
+
+async function handleSelectionPlacement(options: {
+  selectedElement: AnyElement | null;
+  file: File;
+  targetFolder: AssetFolder;
+  componentImagePropId: string | null | undefined;
+  currentCmsItemId: string | null | undefined;
+}): Promise<ExportResult> {
+  const { selectedElement, file, targetFolder, componentImagePropId, currentCmsItemId } = options;
+  const asset = await webflow.createAsset(file);
+  await applyAssetFolder(asset, targetFolder);
+
+  if (selectedElement?.type === "ComponentInstance") {
+    const applied = await tryApplyComponentInstanceImageProp(
+      selectedElement as ComponentElement,
+      asset,
+      componentImagePropId,
+      currentCmsItemId
+    );
+    if (applied) {
+      return applied;
+    }
+  }
+
+  if (selectedElement) {
+    const cmsBinding = await resolveSingleElementCmsImageBinding(selectedElement);
+    if (cmsBinding === "multiple") {
+      return multipleCmsBindingSelectionResult();
+    }
+    if (cmsBinding) {
+      const syncCanvasImage =
+        selectedElement.type === WEBFLOW_IMAGE_ELEMENT_TYPE ? (selectedElement as ImageElement) : null;
+      const result = await applyCmsBindingWithAsset({
+        binding: cmsBinding.binding,
+        label: cmsBinding.label,
+        cmsItemId: currentCmsItemId,
+        asset,
+        syncCanvasImage,
+      });
+      await webflow.setSelectedElement(selectedElement);
+      return result;
+    }
+  }
+
+  await placeImageOnCanvasWithAsset(asset, false);
+  return { kind: "success", message: "Image placed." };
 }
 
 export async function applyCroppedImageToWebflow(options: {
@@ -81,9 +427,13 @@ export async function applyCroppedImageToWebflow(options: {
   outputWidth: number;
   outputHeight: number;
   quality: number;
+  /** Output codec; when Tower is configured, WebP and AVIF both use `/api/v1/images/optimize`. */
+  exportFormat: ImageExportFormat;
   fileBaseName: string;
   /** When the selection has multiple image props, the prop to set (from the panel). */
   componentImagePropId?: string | null;
+  /** Current CMS item id from Designer `currentcmsitem` subscription. */
+  currentCmsItemId?: string | null;
   targetFolder: AssetFolder;
   placement: PlacementMode;
   /** Only for `placement === "replace"`: update the existing Assets file instead of uploading a new asset. */
@@ -95,8 +445,10 @@ export async function applyCroppedImageToWebflow(options: {
     outputWidth,
     outputHeight,
     quality,
+    exportFormat,
     fileBaseName,
     componentImagePropId,
+    currentCmsItemId,
     targetFolder,
     placement,
     replaceLibraryAsset,
@@ -104,9 +456,12 @@ export async function applyCroppedImageToWebflow(options: {
 
   try {
     const canvas = await renderCroppedRegionToCanvas(imageSrc, completedCrop, outputWidth, outputHeight);
-    const { blob, fileName } = await encodeCanvasToOptimizedFile(canvas, quality, { baseName: fileBaseName });
-    const file = new File([blob], fileName, { type: blob.type });
-    const sel = await webflow.getSelectedElement();
+    const { blob, fileName } = await encodeCanvasToOptimizedFile(canvas, quality, {
+      baseName: fileBaseName,
+      format: exportFormat,
+    });
+    const file = new File([blob], fileName, { type: blob.type || mimeTypeForFormat(exportFormat) });
+    const selectedElement = await webflow.getSelectedElement();
 
     if (placement === "canvas") {
       const asset = await webflow.createAsset(file);
@@ -116,49 +471,22 @@ export async function applyCroppedImageToWebflow(options: {
     }
 
     if (placement === "replace") {
-      if (sel?.type !== WEBFLOW_IMAGE_ELEMENT_TYPE) {
-        return {
-          kind: "info",
-          message: "Select an Image on the canvas.",
-        };
-      }
-      const img = sel as ImageElement;
-
-      if (replaceLibraryAsset) {
-        const existing = await img.getAsset();
-        if (!existing) {
-          const asset = await webflow.createAsset(file);
-          await applyAssetFolder(asset, targetFolder);
-          await img.setAsset(asset);
-          await webflow.setSelectedElement(img);
-          return { kind: "success", message: "Image applied." };
-        }
-        await existing.setFile(file);
-        await applyAssetFolder(existing, targetFolder);
-        await webflow.setSelectedElement(img);
-        return { kind: "success", message: "Asset file updated." };
-      }
-
-      const asset = await webflow.createAsset(file);
-      await applyAssetFolder(asset, targetFolder);
-      await img.setAsset(asset);
-      await webflow.setSelectedElement(img);
-      return { kind: "success", message: "Image replaced." };
+      return handleReplacePlacement({
+        selectedElement,
+        file,
+        targetFolder,
+        replaceLibraryAsset,
+        currentCmsItemId,
+      });
     }
 
-    // placement === "selection"
-    const asset = await webflow.createAsset(file);
-    await applyAssetFolder(asset, targetFolder);
-
-    if (sel?.type === "ComponentInstance") {
-      const applied = await tryApplyComponentInstanceImageProp(sel as ComponentElement, asset, componentImagePropId);
-      if (applied) {
-        return applied;
-      }
-    }
-
-    await placeImageOnCanvasWithAsset(asset, false);
-    return { kind: "success", message: "Image placed." };
+    return handleSelectionPlacement({
+      selectedElement,
+      file,
+      targetFolder,
+      componentImagePropId,
+      currentCmsItemId,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not process the image.";
     return { kind: "error", message };

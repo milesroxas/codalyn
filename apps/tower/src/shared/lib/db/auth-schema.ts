@@ -1,10 +1,13 @@
 import { relations } from "drizzle-orm";
-import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import type { BeaconAppSettings } from "@codalyn/webflow-kit";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  /** Webflow Data API `authorized_user` id from Designer `getIdToken` + `/beta/token/resolve`. */
+  webflowAuthorizedUserId: text("webflow_authorized_user_id").unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -73,9 +76,52 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)]
 );
 
-export const userRelations = relations(user, ({ many }) => ({
+/**
+ * Binds Webflow OAuth `state` to a Tower user when the Designer extension starts OAuth via POST (Bearer session),
+ * so the browser callback does not rely on a first-party session cookie.
+ */
+export const webflowOauthAuthorizeState = pgTable("webflow_oauth_authorize_state", {
+  state: text("state").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** Webflow OAuth access token for Data API (Bearer), one row per Tower user. */
+/** Beacon Designer extension preferences (theme, defaults, presets) per Tower user. */
+export const beaconAppSettings = pgTable("beacon_app_settings", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  payload: jsonb("payload").$type<BeaconAppSettings>().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const webflowOAuthToken = pgTable("webflow_oauth_token", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  expiresAt: timestamp("expires_at"),
+  scope: text("scope"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const userRelations = relations(user, ({ many, one }) => ({
   sessions: many(session),
   accounts: many(account),
+  webflowOAuth: one(webflowOAuthToken),
+  webflowOauthAuthorizeStates: many(webflowOauthAuthorizeState),
+  beaconAppSettings: one(beaconAppSettings),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -88,6 +134,27 @@ export const sessionRelations = relations(session, ({ one }) => ({
 export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
+    references: [user.id],
+  }),
+}));
+
+export const webflowOAuthTokenRelations = relations(webflowOAuthToken, ({ one }) => ({
+  user: one(user, {
+    fields: [webflowOAuthToken.userId],
+    references: [user.id],
+  }),
+}));
+
+export const webflowOauthAuthorizeStateRelations = relations(webflowOauthAuthorizeState, ({ one }) => ({
+  user: one(user, {
+    fields: [webflowOauthAuthorizeState.userId],
+    references: [user.id],
+  }),
+}));
+
+export const beaconAppSettingsRelations = relations(beaconAppSettings, ({ one }) => ({
+  user: one(user, {
+    fields: [beaconAppSettings.userId],
     references: [user.id],
   }),
 }));

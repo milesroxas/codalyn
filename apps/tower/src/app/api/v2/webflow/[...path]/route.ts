@@ -1,18 +1,23 @@
 import { webflowDataApiUrl } from "@codalyn/webflow-kit";
-import { headers } from "next/headers";
-import { auth } from "@/server/auth";
-
-const webflowToken = process.env.WEBFLOW_API_TOKEN;
+import { verifyTowerApiRequest } from "@/server/tower-api-auth";
+import { hasWebflowOAuthCredentials, resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 
 async function forward(req: Request, segments: string[]) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await verifyTowerApiRequest(req);
+  if (!auth.ok) {
+    return auth.response;
   }
+  const webflowToken = await resolveWebflowBearerToken({ userId: auth.userId });
   if (!webflowToken) {
-    return Response.json({ error: "WEBFLOW_API_TOKEN is not configured" }, { status: 503 });
+    return Response.json(
+      {
+        error: "No Webflow access token available",
+        hint: hasWebflowOAuthCredentials()
+          ? "Sign in to Tower and connect Webflow (POST /api/integrations/webflow/authorize from Beacon, or the dashboard flow) so an access token is stored for your user."
+          : "Configure Webflow OAuth (WEBFLOW_CLIENT_ID, WEBFLOW_CLIENT_SECRET, WEBFLOW_REDIRECT_URI) and connect your account from Beacon.",
+      },
+      { status: 503 }
+    );
   }
 
   const target = webflowDataApiUrl(segments);

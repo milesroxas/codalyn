@@ -61,3 +61,19 @@ export function resolveSelectedAssetFolderHandle(
   }
   return assetFolders.find((f) => f.id === selectedAssetFolderId)?.handle;
 }
+
+/** When the user did not pick a folder, optionally use the first library folder (sorted path). */
+export function resolveAssetFolderHandleForExport(
+  selectedAssetFolderId: string | null,
+  assetFolders: AssetFolderRow[],
+  options: { useDefaultWhenUnpicked: boolean }
+): AssetFolder | undefined {
+  const picked = resolveSelectedAssetFolderHandle(selectedAssetFolderId, assetFolders);
+  if (picked) {
+    return picked;
+  }
+  if (options.useDefaultWhenUnpicked && assetFolders.length > 0) {
+    return assetFolders[0].handle;
+  }
+  return undefined;
+}

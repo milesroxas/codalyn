@@ -1,5 +1,5 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./auth-schema";
 
 function resolveDatabaseUrl(): string {
@@ -14,6 +14,6 @@ function resolveDatabaseUrl(): string {
   return "postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder";
 }
 
-const sql = neon(resolveDatabaseUrl());
+const pool = new Pool({ connectionString: resolveDatabaseUrl() });
 
-export const db = drizzle(sql, { schema });
+export const db = drizzle(pool, { schema });

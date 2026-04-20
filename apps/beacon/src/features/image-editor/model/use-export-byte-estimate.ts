@@ -1,10 +1,11 @@
+import type { ImageExportFormat } from "@codalyn/webflow-kit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Area } from "react-easy-crop";
 
 import { estimateEncodedOutputBytes } from "@/features/image-editor/lib/estimate-encoded-size";
 import { getExportGeometryKey } from "@/features/image-editor/lib/export-geometry-key";
 
-/** Encode is expensive (AVIF/WASM); debounce so sliders do not queue hundreds of runs. */
+/** When Tower is set, both formats call optimize — debounce so sliders do not queue many requests. */
 const ESTIMATE_DEBOUNCE_MS = 400;
 
 export function useExportByteEstimate(options: {
@@ -13,8 +14,9 @@ export function useExportByteEstimate(options: {
   effectiveOutputW: number;
   effectiveOutputH: number;
   quality: number;
+  exportFormat: ImageExportFormat;
 }) {
-  const { imageSrc, completedCrop, effectiveOutputW, effectiveOutputH, quality } = options;
+  const { imageSrc, completedCrop, effectiveOutputW, effectiveOutputH, quality, exportFormat } = options;
 
   const [estimatedBytes, setEstimatedBytes] = useState<number | null>(null);
   const [estimatePending, setEstimatePending] = useState(false);
@@ -49,6 +51,7 @@ export function useExportByteEstimate(options: {
         outputWidth: w,
         outputHeight: h,
         quality,
+        format: exportFormat,
       })
         .then((bytes) => {
           if (estimateGenRef.current !== gen) {
@@ -68,7 +71,7 @@ export function useExportByteEstimate(options: {
     return () => {
       window.clearTimeout(t);
     };
-  }, [estimateNonce, quality, imageSrc, completedCrop, effectiveOutputW, effectiveOutputH]);
+  }, [estimateNonce, quality, exportFormat, imageSrc, completedCrop, effectiveOutputW, effectiveOutputH]);
 
   const onQualityCommit = useCallback(() => {
     setEstimateNonce((n) => n + 1);

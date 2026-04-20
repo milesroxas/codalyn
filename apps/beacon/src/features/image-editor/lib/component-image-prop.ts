@@ -1,1 +1,1 @@
-export type ComponentImagePropOption = { propId: string; label: string };
+export type ComponentImagePropOption = { propId: string; label: string; isCmsBinding: boolean };

@@ -1,6 +1,6 @@
 /**
  * Default export format for Designer extension bundles and CMS uploads.
- * WebP stays the default so Beacon’s Vite pipeline and Webflow’s extension API stay predictable.
+ * WebP stays the default (encoded in the extension); AVIF is typically produced server-side (e.g. Tower).
  */
 export const DEFAULT_IMAGE_EXPORT_FORMAT = "webp" as const;
 

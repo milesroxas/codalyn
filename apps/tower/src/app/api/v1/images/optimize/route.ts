@@ -1,16 +1,15 @@
 import { fileExtensionForFormat } from "@codalyn/webflow-kit";
-import { headers } from "next/headers";
 import { optimizeImageBuffer, parseImageFormatParam } from "@/features/image-processing/lib/optimize-image";
-import { auth } from "@/server/auth";
+import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 
 export const runtime = "nodejs";
+/** Large PNG in → AVIF out can exceed default limits on some hosts; adjust per deployment. */
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await verifyTowerApiRequest(req);
+  if (!auth.ok) {
+    return auth.response;
   }
 
   const url = new URL(req.url);

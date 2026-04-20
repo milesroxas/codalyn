@@ -1,8 +1,31 @@
 # Project name prefixes containers, networks, and volumes so this stack stays distinct
 # from other Docker Compose projects on the same machine (`docker compose ls`).
+#
+# Reserved host ports (override via `.env` — see `.env.compose.example`):
+#   Postgres: ${POSTGRES_PORT:-35432}  (Codalyn Tower default; not 5432 to avoid clashes)
+#   Tower UI: ${TOWER_PORT:-3100}
 name: codalyn-tower
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: codalyn-tower-db
+    environment:
+      POSTGRES_USER: tower
+      POSTGRES_PASSWORD: tower
+      POSTGRES_DB: tower
+    ports:
+      - "${POSTGRES_PORT:-35432}:5432"
+    volumes:
+      - tower_pgdata:/var/lib/postgresql/data
+    networks:
+      - tower
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tower -d tower"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   tower:
     build:
       context: ../..
@@ -18,6 +41,9 @@ services:
         required: false
     environment:
       NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     stop_grace_period: 15s
     healthcheck:
@@ -34,6 +60,9 @@ services:
       start_period: 45s
     networks:
       - tower
+
+volumes:
+  tower_pgdata:
 
 networks:
   tower:

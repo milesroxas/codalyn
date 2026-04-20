@@ -19,8 +19,9 @@ export async function optimizeImageBuffer(
 }
 
 export function parseImageFormatParam(value: string | null): ImageExportFormat {
-  if (value && isImageExportFormat(value)) {
-    return value;
+  const normalized = value?.trim().toLowerCase() ?? "";
+  if (normalized && isImageExportFormat(normalized)) {
+    return normalized;
   }
   return DEFAULT_IMAGE_EXPORT_FORMAT;
 }

@@ -7,7 +7,21 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "bundle/**", ".next/**", "!.next/cache/**"],
-      "env": ["VITE_*", "NEXT_PUBLIC_*", "DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "VERCEL_ENV"]
+      "env": [
+        "VITE_*",
+        "NEXT_PUBLIC_*",
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "VERCEL_ENV",
+        "BEACON_API_KEY",
+        "WEBFLOW_API_TOKEN",
+        "WEBFLOW_CLIENT_ID",
+        "WEBFLOW_CLIENT_SECRET",
+        "WEBFLOW_REDIRECT_URI",
+        "WEBFLOW_OAUTH_SCOPES",
+        "TOWER_CORS_ORIGINS"
+      ]
     },
     "build:dev": {
       "dependsOn": ["^build"],

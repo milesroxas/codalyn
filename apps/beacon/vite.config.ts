@@ -3,8 +3,25 @@ import fs from "node:fs";
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import pkg from "./package.json";
+
+const beaconRoot = __dirname;
+const towerRoot = path.join(beaconRoot, "../tower");
+
+/** Resolves Tower base URL: explicit VITE_TOWER_ORIGIN, else http://TOWER_DEV_HOST:TOWER_PORT using Beacon + Tower env (incl. Tower `PORT`). */
+function resolveTowerOrigin(mode: string): string {
+  const beaconEnv = loadEnv(mode, beaconRoot, "");
+  const towerEnv = loadEnv(mode, towerRoot, "");
+  const explicit = beaconEnv.VITE_TOWER_ORIGIN?.trim();
+  if (explicit) {
+    return explicit.replace(/\/$/, "");
+  }
+  // Default port matches apps/tower/scripts/dev.mjs when Tower `PORT` is unset.
+  const port = beaconEnv.TOWER_PORT || towerEnv.PORT || towerEnv.TOWER_PORT || "3100";
+  const host = beaconEnv.TOWER_DEV_HOST || "localhost";
+  return `http://${host}:${port}`;
+}
 
 const wfDesignerExtensionPlugin = (): Plugin => {
   let webflowHTML = "";
@@ -57,36 +74,18 @@ const wfDesignerExtensionPlugin = (): Plugin => {
   };
 };
 
-/** Force @jsquash/avif to use the single-thread encoder so the build never pulls avif_enc_mt (+ workers). */
-const jsquashAvifSingleThread = (): Plugin => ({
-  name: "jsquash-avif-single-thread",
-  enforce: "pre",
-  resolveId(id, importer) {
-    const enc = path.resolve(__dirname, "node_modules/@jsquash/avif/codec/enc/avif_enc.js");
-    const idN = id.replace(/\\/g, "/");
-    const impN = importer?.replace(/\\/g, "/") ?? "";
-    if (impN.includes("@jsquash/avif/encode.js") && idN.endsWith("codec/enc/avif_enc_mt.js")) {
-      return enc;
-    }
-    if (idN.includes("@jsquash/avif/codec/enc/avif_enc_mt.js")) {
-      return enc;
-    }
-    return undefined;
-  },
-});
-
 export default defineConfig(({ mode }) => ({
   base: "./",
-  plugins: [tailwindcss(), react(), wfDesignerExtensionPlugin(), jsquashAvifSingleThread()],
+  plugins: [tailwindcss(), react(), wfDesignerExtensionPlugin()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_CHANNEL__: JSON.stringify(mode),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    "import.meta.env.VITE_TOWER_ORIGIN": JSON.stringify(resolveTowerOrigin(mode)),
   },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "wasm-feature-detect": path.resolve(__dirname, "./src/shims/wasm-feature-detect.ts"),
     },
   },
   server: {
@@ -94,10 +93,6 @@ export default defineConfig(({ mode }) => ({
     watch: {
       usePolling: true,
     },
-  },
-  /** Prebundling strips sibling `avif_enc.wasm`; without it, fetches hit the SPA fallback (HTML) and WASM fails. */
-  optimizeDeps: {
-    exclude: ["@jsquash/avif"],
   },
   build: {
     outDir: "dist",

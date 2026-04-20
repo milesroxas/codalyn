@@ -11,6 +11,7 @@ export type ImageEditorWorkspaceProps = {
   queueFile: (file: File | undefined) => void;
   imageSrc: string | null;
   loadedEditor: ReactNode;
+  emptyStateContent?: ReactNode;
   dropZoneLabelClass: string;
   handleDrag: (e: DragEvent) => void;
   handleDragState: (e: DragEvent, active: boolean) => void;
@@ -31,6 +32,7 @@ export function ImageEditorWorkspace(props: ImageEditorWorkspaceProps) {
     queueFile,
     imageSrc,
     loadedEditor,
+    emptyStateContent,
     dropZoneLabelClass,
     handleDrag,
     handleDragState,
@@ -77,13 +79,15 @@ export function ImageEditorWorkspace(props: ImageEditorWorkspaceProps) {
             </div>
           ) : !imageSrc ? (
             <div className="px-4 pt-4">
-              <EmptyImageSourceSection
-                dropZoneLabelClass={dropZoneLabelClass}
-                fileInputId={fileInputId}
-                handleDrag={handleDrag}
-                handleDragState={handleDragState}
-                handleDrop={handleDrop}
-              />
+              {emptyStateContent ?? (
+                <EmptyImageSourceSection
+                  dropZoneLabelClass={dropZoneLabelClass}
+                  fileInputId={fileInputId}
+                  handleDrag={handleDrag}
+                  handleDragState={handleDragState}
+                  handleDrop={handleDrop}
+                />
+              )}
             </div>
           ) : null}
         </section>

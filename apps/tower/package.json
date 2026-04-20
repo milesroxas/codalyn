@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Tower — Codalyn backend + dashboard (Next.js on Vercel). Webflow Data API proxy for Beacon; image pipeline.",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "node scripts/dev.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "biome check .",
@@ -19,7 +19,6 @@
   },
   "dependencies": {
     "@codalyn/webflow-kit": "workspace:*",
-    "@neondatabase/serverless": "^1.1.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@vercel/blob": "^1.0.0",
     "better-auth": "^1.6.5",
@@ -27,6 +26,7 @@
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "next": "^15.2.4",
+    "pg": "^8.20.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "sharp": "^0.34.1",
@@ -38,6 +38,7 @@
     "@biomejs/biome": "^2.4.12",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^25.6.0",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "drizzle-kit": "^0.31.10",

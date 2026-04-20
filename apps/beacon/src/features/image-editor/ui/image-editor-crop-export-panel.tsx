@@ -1,10 +1,11 @@
+import type { ImageExportFormat } from "@codalyn/webflow-kit";
 import { Crop, FolderPlus, Loader2 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useState } from "react";
 import type { Area } from "react-easy-crop";
 import Cropper from "react-easy-crop";
 
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
-import { parseOutputDimension } from "@/features/image-editor/lib/apply-cropped-export";
+import { parseOutputDimension, WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
 import type { AspectPreset } from "@/features/image-editor/lib/aspect-preset";
 import type { AssetFolderRow } from "@/features/image-editor/lib/asset-folder-row";
 import type { ComponentImagePropOption } from "@/features/image-editor/lib/component-image-prop";
@@ -66,6 +67,10 @@ export type ImageEditorCropExportPanelProps = {
   quality: number;
   setQuality: (q: number) => void;
   onQualityCommit: () => void;
+  exportFormat: ImageExportFormat;
+  allowAvifEncoding: boolean;
+  setExportFormat: (f: ImageExportFormat) => void;
+  onExportFormatCommit: () => void;
   completedCrop: Area | null;
   estimatePending: boolean;
   estimatedBytes: number | null;
@@ -88,6 +93,10 @@ export type ImageEditorCropExportPanelProps = {
   selectedElementType: string | null;
   /** True while resolving image fields for the selected component instance. */
   componentImagePropsResolving: boolean;
+  /** When true, export may use the first Assets folder if none is selected (CMS field update on current item). */
+  cmsPrimaryUpload: boolean;
+  /** True while resolving CMS image bindings on the selected canvas element. */
+  elementCmsBindingLoading: boolean;
   busy: boolean;
   onApplyToCanvas: () => void | Promise<void>;
 };
@@ -114,7 +123,7 @@ const PLACEMENT_OPTIONS: {
   {
     value: "selection",
     title: "Selection",
-    description: "Near the selected element, or a component image field.",
+    description: "Near the selected element, or into a connected component/CMS image field.",
   },
   {
     value: "replace",
@@ -140,7 +149,10 @@ const IMAGE_EDITOR_PLACEMENT_BLOCKER_LABELS: Record<ImageEditorPlacementBlocker,
 function placeButtonStateForPlacement(p: {
   busy: boolean;
   foldersLoading: boolean;
+  assetFolderCount: number;
   selectedAssetFolderId: string | null;
+  cmsPrimaryUpload: boolean;
+  elementCmsBindingLoading: boolean;
   completedCrop: Area | null;
   placement: PlacementMode;
   selectedElementType: string | null;
@@ -151,7 +163,10 @@ function placeButtonStateForPlacement(p: {
   const {
     busy,
     foldersLoading,
+    assetFolderCount,
     selectedAssetFolderId,
+    cmsPrimaryUpload,
+    elementCmsBindingLoading,
     completedCrop,
     placement,
     selectedElementType,
@@ -166,7 +181,22 @@ function placeButtonStateForPlacement(p: {
   if (foldersLoading) {
     return { disabled: true, label: "Loading folders…", busy: false };
   }
-  if (selectedAssetFolderId === null) {
+  if (assetFolderCount === 0) {
+    return { disabled: true, label: "Create an Assets folder", busy: false };
+  }
+
+  const selectionBindingLoading =
+    elementCmsBindingLoading &&
+    placement !== "canvas" &&
+    (placement === "replace"
+      ? selectedElementType === WEBFLOW_IMAGE_ELEMENT_TYPE
+      : selectedElementType !== "ComponentInstance" && selectedElementType !== null);
+
+  if (selectionBindingLoading) {
+    return { disabled: true, label: "Syncing selection…", busy: false };
+  }
+
+  if (selectedAssetFolderId === null && !cmsPrimaryUpload) {
     return { disabled: true, label: "Choose a folder", busy: false };
   }
 
@@ -410,6 +440,10 @@ type ExportCardProps = {
   quality: number;
   setQuality: (q: number) => void;
   onQualityCommit: () => void;
+  exportFormat: ImageExportFormat;
+  allowAvifEncoding: boolean;
+  setExportFormat: (f: ImageExportFormat) => void;
+  onExportFormatCommit: () => void;
   completedCrop: Area | null;
   estimatePending: boolean;
   estimatedBytes: number | null;
@@ -425,6 +459,10 @@ function ExportEncodeCard(p: ExportCardProps) {
     quality,
     setQuality,
     onQualityCommit,
+    exportFormat,
+    allowAvifEncoding,
+    setExportFormat,
+    onExportFormatCommit,
     completedCrop,
     estimatePending,
     estimatedBytes,
@@ -456,6 +494,35 @@ function ExportEncodeCard(p: ExportCardProps) {
               onChange={(e) => setFileBaseName(e.target.value)}
               onBlur={() => setFileBaseName(sanitizeAssetBaseName(fileBaseName))}
             />
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="text-muted-foreground text-xs" id={`${baseId}-format`}>
+              Output format
+            </span>
+            <ToggleGroup
+              type="single"
+              value={exportFormat}
+              onValueChange={(v) => {
+                if (v === "webp" || v === "avif") {
+                  setExportFormat(v);
+                  onExportFormatCommit();
+                }
+              }}
+              aria-labelledby={`${baseId}-format`}
+              className="justify-stretch"
+            >
+              <ToggleGroupItem value="webp" className="flex-1">
+                WebP
+              </ToggleGroupItem>
+              <ToggleGroupItem value="avif" className="flex-1" disabled={!allowAvifEncoding}>
+                AVIF
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <p className="text-muted-foreground text-[10px] leading-snug">
+              {allowAvifEncoding
+                ? "With Tower connected, WebP and AVIF both use the same optimize API. Without Tower, only WebP (in-browser) is available."
+                : "Guest mode uses WebP only. Sign in to Tower to unlock AVIF compression."}
+            </p>
           </div>
           <div className="flex flex-col gap-2">
             <Label className="text-muted-foreground text-xs" htmlFor={`${baseId}-quality`}>
@@ -493,7 +560,42 @@ type AssetFolderCardProps = {
   selectedAssetFolderId: string | null;
   setSelectedAssetFolderId: (id: string | null) => void;
   onCreateAssetFolder: (name: string, parentFolderId: string | null) => Promise<boolean>;
+  cmsPrimaryUpload: boolean;
+  defaultFolderPathLabel: string | null;
 };
+
+function AssetLibraryLocationDescription(p: {
+  cmsPrimaryUpload: boolean;
+  selectedAssetFolderId: string | null;
+  defaultFolderPathLabel: string | null;
+}) {
+  const { cmsPrimaryUpload, selectedAssetFolderId, defaultFolderPathLabel } = p;
+  if (cmsPrimaryUpload) {
+    if (!defaultFolderPathLabel) {
+      return (
+        <>
+          A CMS image field needs a URL. Webflow builds that from a new site file, and the Designer only allows that
+          after an Assets folder exists. That folder is for Webflow’s file system—not how your collection content is
+          organized.
+        </>
+      );
+    }
+    return (
+      <>
+        {selectedAssetFolderId === null ? (
+          <>
+            Beacon files the new site file under{" "}
+            <span className="text-foreground font-medium">{defaultFolderPathLabel}</span> unless you pick a different
+            folder below.
+          </>
+        ) : (
+          <>Optional: move the new site file to another folder after upload.</>
+        )}
+      </>
+    );
+  }
+  return <>Choose where this file is filed. Paths show nested folder names.</>;
+}
 
 function getFolderStatusText(assetFolders: AssetFolderRow[], selectedAssetFolderId: string | null): string {
   if (assetFolders.length === 0) {
@@ -512,7 +614,18 @@ function getFolderStatusText(assetFolders: AssetFolderRow[], selectedAssetFolder
   return `${selectedFolderPathLabel} · ${folderCountLabel}`;
 }
 
-function AssetDestinationCard(p: AssetFolderCardProps) {
+type AssetFolderToolbarProps = {
+  baseId: string;
+  assetFolders: AssetFolderRow[];
+  foldersLoading: boolean;
+  folderActionBusy: boolean;
+  busy: boolean;
+  selectedAssetFolderId: string | null;
+  setSelectedAssetFolderId: (id: string | null) => void;
+  onCreateAssetFolder: (name: string, parentFolderId: string | null) => Promise<boolean>;
+};
+
+function AssetFolderToolbar(p: AssetFolderToolbarProps) {
   const {
     baseId,
     assetFolders,
@@ -526,7 +639,6 @@ function AssetDestinationCard(p: AssetFolderCardProps) {
 
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  /** Where the new folder is created: site root vs under a folder chosen in the modal. */
   const [newFolderParent, setNewFolderParent] = useState<"root" | "child">("root");
   const [newFolderParentFolderId, setNewFolderParentFolderId] = useState<string | null>(null);
   const newFolderFieldId = useId();
@@ -557,180 +669,217 @@ function AssetDestinationCard(p: AssetFolderCardProps) {
   };
 
   return (
-    <section className="mt-4 flex flex-col gap-3" aria-labelledby={`${baseId}-step-assets`}>
-      <h2 className="sr-only" id={`${baseId}-step-assets`}>
-        Step 3: Assets folder
-      </h2>
-      <StepBadge n={3} label="Save to Assets" />
-      <Card size="sm">
-        <CardHeader className="space-y-1 pb-2">
-          <CardTitle className="text-sm font-medium">Destination folder</CardTitle>
-          <CardDescription className="text-xs leading-snug">
-            Pick a folder for this upload. Paths show nested names.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4 pt-0">
-          <div className="flex flex-col gap-2.5 rounded-lg border border-border/70 bg-muted/20 p-3">
-            <Label className="text-xs font-medium" htmlFor={folderFieldId}>
-              Folder
-            </Label>
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <Select
-                  value={selectedAssetFolderId ?? undefined}
-                  onValueChange={(v) => {
-                    setSelectedAssetFolderId(v);
-                  }}
-                  disabled={folderSelectDisabled}
-                >
-                  <SelectTrigger id={folderFieldId} size="full">
-                    <SelectValue placeholder="Choose a folder" />
-                  </SelectTrigger>
-                  <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
-                    {assetFolders.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.pathLabel}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Dialog
-                open={newFolderDialogOpen}
-                onOpenChange={(open) => {
-                  setNewFolderDialogOpen(open);
-                  if (open) {
-                    setNewFolderName("");
-                    setNewFolderParent(selectedAssetFolderId ? "child" : "root");
-                    setNewFolderParentFolderId(selectedAssetFolderId);
+    <div className="flex flex-col gap-2.5 rounded-lg border border-border/70 bg-muted/20 p-3">
+      <Label className="text-xs font-medium" htmlFor={folderFieldId}>
+        Folder
+      </Label>
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <Select
+            value={selectedAssetFolderId ?? undefined}
+            onValueChange={(v) => {
+              setSelectedAssetFolderId(v);
+            }}
+            disabled={folderSelectDisabled}
+          >
+            <SelectTrigger id={folderFieldId} size="full">
+              <SelectValue placeholder="Choose a folder" />
+            </SelectTrigger>
+            <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
+              {assetFolders.map((f) => (
+                <SelectItem key={f.id} value={f.id}>
+                  {f.pathLabel}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Dialog
+          open={newFolderDialogOpen}
+          onOpenChange={(open) => {
+            setNewFolderDialogOpen(open);
+            if (open) {
+              setNewFolderName("");
+              setNewFolderParent(selectedAssetFolderId ? "child" : "root");
+              setNewFolderParentFolderId(selectedAssetFolderId);
+            }
+          }}
+        >
+          <DialogTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              className="shrink-0"
+              aria-label="Create folder"
+              disabled={newFolderButtonDisabled}
+            >
+              <FolderPlus aria-hidden className="size-3.5" />
+              <span className="sr-only">Create folder</span>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-sm" showCloseButton>
+            <DialogHeader>
+              <DialogTitle>New folder</DialogTitle>
+              <DialogDescription>Name and location.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3 py-1">
+              <RadioGroup
+                className="flex flex-col gap-2"
+                value={newFolderParent}
+                onValueChange={(v) => {
+                  const nextParent = v as "root" | "child";
+                  setNewFolderParent(nextParent);
+                  if (nextParent === "child" && !newFolderParentFolderId && hasAvailableParentFolders) {
+                    setNewFolderParentFolderId(selectedAssetFolderId ?? assetFolders[0]?.id ?? null);
                   }
                 }}
               >
-                <DialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    className="shrink-0"
-                    aria-label="Create folder"
-                    disabled={newFolderButtonDisabled}
+                <label
+                  htmlFor={newFolderRootId}
+                  className="flex cursor-pointer items-center gap-2.5 rounded-md border border-transparent p-2 hover:bg-muted/50"
+                >
+                  <RadioGroupItem value="root" id={newFolderRootId} />
+                  <span className="text-sm">Top level</span>
+                </label>
+                <label
+                  htmlFor={newFolderChildId}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-md border border-transparent p-2",
+                    hasAvailableParentFolders ? "cursor-pointer hover:bg-muted/50" : "cursor-not-allowed opacity-60"
+                  )}
+                >
+                  <RadioGroupItem value="child" id={newFolderChildId} disabled={!hasAvailableParentFolders} />
+                  <span className="text-sm">Inside folder</span>
+                </label>
+              </RadioGroup>
+              {!hasAvailableParentFolders ? (
+                <p className="text-muted-foreground text-xs">No folders yet. Create a top-level folder first.</p>
+              ) : null}
+              {newFolderParent === "child" && hasAvailableParentFolders ? (
+                <div className="grid gap-2">
+                  <Label className="text-xs" htmlFor={newFolderParentFieldId}>
+                    Parent folder
+                  </Label>
+                  <Select
+                    value={newFolderParentFolderId ?? undefined}
+                    onValueChange={(v) => setNewFolderParentFolderId(v)}
+                    disabled={folderActionBusy}
                   >
-                    <FolderPlus aria-hidden className="size-3.5" />
-                    <span className="sr-only">Create folder</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-sm" showCloseButton>
-                  <DialogHeader>
-                    <DialogTitle>New folder</DialogTitle>
-                    <DialogDescription>Name and location.</DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-3 py-1">
-                    <RadioGroup
-                      className="flex flex-col gap-2"
-                      value={newFolderParent}
-                      onValueChange={(v) => {
-                        const nextParent = v as "root" | "child";
-                        setNewFolderParent(nextParent);
-                        if (nextParent === "child" && !newFolderParentFolderId && hasAvailableParentFolders) {
-                          setNewFolderParentFolderId(selectedAssetFolderId ?? assetFolders[0]?.id ?? null);
-                        }
-                      }}
-                    >
-                      <label
-                        htmlFor={newFolderRootId}
-                        className="flex cursor-pointer items-center gap-2.5 rounded-md border border-transparent p-2 hover:bg-muted/50"
-                      >
-                        <RadioGroupItem value="root" id={newFolderRootId} />
-                        <span className="text-sm">Top level</span>
-                      </label>
-                      <label
-                        htmlFor={newFolderChildId}
-                        className={cn(
-                          "flex items-center gap-2.5 rounded-md border border-transparent p-2",
-                          hasAvailableParentFolders
-                            ? "cursor-pointer hover:bg-muted/50"
-                            : "cursor-not-allowed opacity-60"
-                        )}
-                      >
-                        <RadioGroupItem value="child" id={newFolderChildId} disabled={!hasAvailableParentFolders} />
-                        <span className="text-sm">Inside folder</span>
-                      </label>
-                    </RadioGroup>
-                    {!hasAvailableParentFolders ? (
-                      <p className="text-muted-foreground text-xs">No folders yet. Create a top-level folder first.</p>
-                    ) : null}
-                    {newFolderParent === "child" && hasAvailableParentFolders ? (
-                      <div className="grid gap-2">
-                        <Label className="text-xs" htmlFor={newFolderParentFieldId}>
-                          Parent folder
-                        </Label>
-                        <Select
-                          value={newFolderParentFolderId ?? undefined}
-                          onValueChange={(v) => setNewFolderParentFolderId(v)}
-                          disabled={folderActionBusy}
-                        >
-                          <SelectTrigger id={newFolderParentFieldId} size="full">
-                            <SelectValue placeholder="Choose a parent folder" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
-                            {assetFolders.map((folder) => (
-                              <SelectItem key={folder.id} value={folder.id}>
-                                {folder.pathLabel}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : null}
-                    <div className="grid gap-2">
-                      <Label className="text-xs" htmlFor={newFolderFieldId}>
-                        Name
-                      </Label>
-                      <Input
-                        id={newFolderFieldId}
-                        placeholder="e.g. Campaign images"
-                        value={newFolderName}
-                        disabled={folderActionBusy}
-                        onChange={(e) => setNewFolderName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            void submitNewFolder();
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter className="flex-row justify-end">
-                    <DialogClose asChild>
-                      <Button type="button" variant="outline">
-                        Cancel
-                      </Button>
-                    </DialogClose>
-                    <Button
-                      type="button"
-                      disabled={
-                        folderActionBusy ||
-                        !newFolderName.trim() ||
-                        (newFolderParent === "child" && !newFolderParentFolderId)
-                      }
-                      onClick={() => void submitNewFolder()}
-                    >
-                      {folderActionBusy ? <Loader2 aria-hidden className="size-4 animate-spin" /> : "Create"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                    <SelectTrigger id={newFolderParentFieldId} size="full">
+                      <SelectValue placeholder="Choose a parent folder" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
+                      {assetFolders.map((folder) => (
+                        <SelectItem key={folder.id} value={folder.id}>
+                          {folder.pathLabel}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+              <div className="grid gap-2">
+                <Label className="text-xs" htmlFor={newFolderFieldId}>
+                  Name
+                </Label>
+                <Input
+                  id={newFolderFieldId}
+                  placeholder="e.g. Campaign images"
+                  value={newFolderName}
+                  disabled={folderActionBusy}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void submitNewFolder();
+                    }
+                  }}
+                />
+              </div>
             </div>
-            {foldersLoading ? (
-              <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
-                Loading folders…
-              </p>
-            ) : (
-              <p className="text-muted-foreground text-xs tabular-nums">{folderStatusText}</p>
-            )}
-          </div>
+            <DialogFooter className="flex-row justify-end">
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                type="button"
+                disabled={
+                  folderActionBusy || !newFolderName.trim() || (newFolderParent === "child" && !newFolderParentFolderId)
+                }
+                onClick={() => void submitNewFolder()}
+              >
+                {folderActionBusy ? <Loader2 aria-hidden className="size-4 animate-spin" /> : "Create"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+      {foldersLoading ? (
+        <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+          <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
+          Loading folders…
+        </p>
+      ) : (
+        <p className="text-muted-foreground text-xs tabular-nums">{folderStatusText}</p>
+      )}
+    </div>
+  );
+}
+
+function AssetDestinationCard(p: AssetFolderCardProps) {
+  const {
+    baseId,
+    assetFolders,
+    foldersLoading,
+    folderActionBusy,
+    busy,
+    selectedAssetFolderId,
+    setSelectedAssetFolderId,
+    onCreateAssetFolder,
+    cmsPrimaryUpload,
+    defaultFolderPathLabel,
+  } = p;
+
+  const hideCardForCmsAutoFile = cmsPrimaryUpload && assetFolders.length > 0 && !foldersLoading;
+
+  if (hideCardForCmsAutoFile) {
+    return null;
+  }
+
+  const stepLabel = cmsPrimaryUpload ? "Site file (Webflow)" : "Save to Assets";
+  const cardTitle = cmsPrimaryUpload ? "Site file for this field" : "Asset library location";
+
+  return (
+    <section className="mt-4 flex flex-col gap-3" aria-labelledby={`${baseId}-step-assets`}>
+      <h2 className="sr-only" id={`${baseId}-step-assets`}>
+        {cmsPrimaryUpload ? "Step 4: Site file (required by Webflow)" : "Step 4: Assets folder"}
+      </h2>
+      <StepBadge n={4} label={stepLabel} />
+      <Card size="sm">
+        <CardHeader className="space-y-1 pb-2">
+          <CardTitle className="text-sm font-medium">{cardTitle}</CardTitle>
+          <CardDescription className="text-xs leading-snug">
+            <AssetLibraryLocationDescription
+              cmsPrimaryUpload={cmsPrimaryUpload}
+              selectedAssetFolderId={selectedAssetFolderId}
+              defaultFolderPathLabel={defaultFolderPathLabel}
+            />
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 pt-0">
+          <AssetFolderToolbar
+            baseId={baseId}
+            assetFolders={assetFolders}
+            foldersLoading={foldersLoading}
+            folderActionBusy={folderActionBusy}
+            busy={busy}
+            selectedAssetFolderId={selectedAssetFolderId}
+            setSelectedAssetFolderId={setSelectedAssetFolderId}
+            onCreateAssetFolder={onCreateAssetFolder}
+          />
         </CardContent>
       </Card>
     </section>
@@ -763,9 +912,9 @@ function PlacementCard(p: PlacementCardProps) {
   return (
     <section className="mt-4 flex flex-col gap-3" aria-labelledby={`${baseId}-step-place`}>
       <h2 className="sr-only" id={`${baseId}-step-place`}>
-        Step 4: Placement
+        Step 3: Placement
       </h2>
-      <StepBadge n={4} label="Place on canvas" />
+      <StepBadge n={3} label="Place on canvas" />
       <Card size="sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Placement</CardTitle>
@@ -868,6 +1017,10 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     quality,
     setQuality,
     onQualityCommit,
+    exportFormat,
+    allowAvifEncoding,
+    setExportFormat,
+    onExportFormatCommit,
     completedCrop,
     estimatePending,
     estimatedBytes,
@@ -888,16 +1041,23 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     setSelectedComponentImagePropId,
     selectedElementType,
     componentImagePropsResolving,
+    cmsPrimaryUpload,
+    elementCmsBindingLoading,
     busy,
     onApplyToCanvas,
   } = props;
+
+  const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
 
   const placeButton = useMemo(
     () =>
       placeButtonStateForPlacement({
         busy,
         foldersLoading,
+        assetFolderCount: assetFolders.length,
         selectedAssetFolderId,
+        cmsPrimaryUpload,
+        elementCmsBindingLoading,
         completedCrop,
         placement,
         selectedElementType,
@@ -908,7 +1068,10 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     [
       busy,
       foldersLoading,
+      assetFolders.length,
       selectedAssetFolderId,
+      cmsPrimaryUpload,
+      elementCmsBindingLoading,
       completedCrop,
       placement,
       selectedElementType,
@@ -972,22 +1135,15 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         quality={quality}
         setQuality={setQuality}
         onQualityCommit={onQualityCommit}
+        exportFormat={exportFormat}
+        allowAvifEncoding={allowAvifEncoding}
+        setExportFormat={setExportFormat}
+        onExportFormatCommit={onExportFormatCommit}
         completedCrop={completedCrop}
         estimatePending={estimatePending}
         estimatedBytes={estimatedBytes}
         originalBytes={originalBytes}
         estimateNonce={estimateNonce}
-      />
-
-      <AssetDestinationCard
-        baseId={baseId}
-        assetFolders={assetFolders}
-        foldersLoading={foldersLoading}
-        folderActionBusy={folderActionBusy}
-        busy={busy}
-        selectedAssetFolderId={selectedAssetFolderId}
-        setSelectedAssetFolderId={setSelectedAssetFolderId}
-        onCreateAssetFolder={onCreateAssetFolder}
       />
 
       <PlacementCard
@@ -999,6 +1155,19 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         componentImageProps={componentImageProps}
         selectedComponentImagePropId={selectedComponentImagePropId}
         setSelectedComponentImagePropId={setSelectedComponentImagePropId}
+      />
+
+      <AssetDestinationCard
+        baseId={baseId}
+        assetFolders={assetFolders}
+        foldersLoading={foldersLoading}
+        folderActionBusy={folderActionBusy}
+        busy={busy}
+        selectedAssetFolderId={selectedAssetFolderId}
+        setSelectedAssetFolderId={setSelectedAssetFolderId}
+        onCreateAssetFolder={onCreateAssetFolder}
+        cmsPrimaryUpload={cmsPrimaryUpload}
+        defaultFolderPathLabel={defaultFolderPathLabel}
       />
 
       <div className="mt-6 flex flex-col gap-2">

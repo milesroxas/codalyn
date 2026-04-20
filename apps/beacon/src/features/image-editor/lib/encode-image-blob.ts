@@ -5,6 +5,7 @@ import {
   mimeTypeForFormat,
 } from "@codalyn/webflow-kit";
 import { sanitizeAssetBaseName } from "@/features/image-editor/lib/sanitize-asset-base-name";
+import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
 import { waitForNextPaint } from "@/shared/lib/wait-for-next-paint";
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
@@ -39,26 +40,45 @@ export async function encodeCanvasToOptimizedFile(
   const format = options?.format ?? DEFAULT_IMAGE_EXPORT_FORMAT;
   await waitForNextPaint();
 
-  if (format === "webp") {
-    const blob = await canvasToBlob(canvas, "image/webp", q);
+  const tower = getTowerOrigin();
+  if (tower) {
+    const qualityPercent = Math.min(100, Math.max(1, Math.round(q * 100)));
+    const png = await canvasToBlob(canvas, "image/png");
+    const res = await towerFetch(
+      `/api/v1/images/optimize?format=${encodeURIComponent(format)}&quality=${qualityPercent}`,
+      {
+        method: "POST",
+        body: png,
+        headers: { "Content-Type": "image/png" },
+      }
+    );
+
+    if (!res.ok) {
+      const detail = (await res.text()).slice(0, 240);
+      if (res.status === 401) {
+        throw new Error(
+          "Tower rejected the request (401). Set VITE_BEACON_API_KEY to match Tower BEACON_API_KEY, or use a session that can call /api/v1."
+        );
+      }
+      throw new Error(`Tower image optimize failed (${res.status}): ${detail || res.statusText}`);
+    }
+
+    const blob = await res.blob();
     return {
       blob,
-      fileName: `${base}.${fileExtensionForFormat("webp")}`,
-      mimeType: blob.type || mimeTypeForFormat("webp"),
+      fileName: `${base}.${fileExtensionForFormat(format)}`,
+      mimeType: blob.type || mimeTypeForFormat(format),
     };
   }
 
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Canvas has no 2D context");
+  if (format === "avif") {
+    throw new Error("AVIF needs Tower: set VITE_TOWER_ORIGIN (and VITE_BEACON_API_KEY if Tower uses BEACON_API_KEY).");
   }
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const { default: encodeAvif } = await import("@jsquash/avif/encode");
-  const ab = await encodeAvif(imageData, { quality: Math.round(q * 100) });
-  const blob = new Blob([ab], { type: mimeTypeForFormat("avif") });
+
+  const blob = await canvasToBlob(canvas, "image/webp", q);
   return {
     blob,
-    fileName: `${base}.${fileExtensionForFormat("avif")}`,
-    mimeType: mimeTypeForFormat("avif"),
+    fileName: `${base}.${fileExtensionForFormat("webp")}`,
+    mimeType: blob.type || mimeTypeForFormat("webp"),
   };
 }

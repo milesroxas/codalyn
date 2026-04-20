@@ -2,7 +2,7 @@ import { webflowDataApiUrl } from "@codalyn/webflow-kit";
 
 /**
  * Server-side Webflow Data API client (Bearer token).
- * Prefer Tower’s authenticated proxy (`/api/v1/webflow/*`) from Beacon so tokens stay on the server.
+ * Prefer Tower’s authenticated proxy (`/api/v2/webflow/*`) from Beacon so tokens stay on the server.
  */
 export class WebflowDataClient {
   constructor(private readonly accessToken: string) {}

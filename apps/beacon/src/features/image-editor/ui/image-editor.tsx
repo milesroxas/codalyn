@@ -1,10 +1,13 @@
+import { DEFAULT_IMAGE_EXPORT_FORMAT, type ImageExportFormat, isImageExportFormat } from "@codalyn/webflow-kit";
 import type { DragEvent } from "react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Area } from "react-easy-crop";
-
+import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
+import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
-import { parseOutputDimension } from "@/features/image-editor/lib/apply-cropped-export";
+import { outputDimensionsMatchingCrop, parseOutputDimension } from "@/features/image-editor/lib/apply-cropped-export";
 import { type AspectPreset, aspectValue } from "@/features/image-editor/lib/aspect-preset";
+import { isCmsPrimaryUploadContext } from "@/features/image-editor/lib/cms-primary-upload-context";
 import { useApplyCroppedToWebflow } from "@/features/image-editor/model/use-apply-cropped-to-webflow";
 import { useComponentInstanceImageProps } from "@/features/image-editor/model/use-component-instance-image-props";
 import { useExportByteEstimate } from "@/features/image-editor/model/use-export-byte-estimate";
@@ -16,11 +19,38 @@ import {
   type CropFrameMode,
   ImageEditorCropExportPanel,
 } from "@/features/image-editor/ui/image-editor-crop-export-panel";
-import { LoadedImageSourceSection } from "@/features/image-editor/ui/image-editor-source-sections";
+import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
+import {
+  EmptyImageSourceSection,
+  LoadedImageSourceSection,
+} from "@/features/image-editor/ui/image-editor-source-sections";
 import { ImageEditorWorkspace } from "@/features/image-editor/ui/image-editor-workspace";
 import { cn } from "@/shared/lib/utils";
 
-export function ImageEditor() {
+const EXPORT_FORMAT_STORAGE_KEY = "beacon:image-export-format";
+const TOWER_EMAIL_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";
+
+type ImageEditorProps = {
+  onOnboardingVisibilityChange?: (visible: boolean) => void;
+};
+
+function readStoredExportFormat(): ImageExportFormat {
+  try {
+    const s = localStorage.getItem(EXPORT_FORMAT_STORAGE_KEY);
+    if (s) {
+      const key = s.trim().toLowerCase();
+      if (isImageExportFormat(key)) {
+        return key;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_IMAGE_EXPORT_FORMAT;
+}
+
+export function ImageEditor(props: ImageEditorProps = {}) {
+  const { onOnboardingVisibilityChange } = props;
   const baseId = useId();
   const fileInputId = `${baseId}-file`;
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -36,10 +66,17 @@ export function ImageEditor() {
   const [heightStr, setHeightStr] = useState("1200");
   const [fileBaseName, setFileBaseName] = useState("edited");
   const [quality, setQuality] = useState(0.75);
+  const [exportFormat, setExportFormat] = useState<ImageExportFormat>(readStoredExportFormat);
   const [placement, setPlacement] = useState<PlacementMode>("selection");
   const [replaceLibraryAsset, setReplaceLibraryAsset] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [originalBytes, setOriginalBytes] = useState<number | null>(null);
+  const [guestOnboardingComplete, setGuestOnboardingComplete] = useState(false);
+  const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
+  const towerConfigured = isTowerConfigured();
+  const allowAvifEncoding = Boolean(towerUser);
+  const showOnboardingLoading = !imageSrc && towerSessionPending && !towerUser && !guestOnboardingComplete;
+  const showGuestOnboarding = !imageSrc && !towerSessionPending && !towerUser && !guestOnboardingComplete;
 
   const {
     assetFolders,
@@ -55,8 +92,33 @@ export function ImageEditor() {
     selectedComponentImagePropId,
     setSelectedComponentImagePropId,
     selectedElementType,
+    currentCmsItemId,
     componentImagePropsResolving,
+    elementCmsBinding,
+    elementCmsBindingLoading,
   } = useComponentInstanceImageProps();
+
+  const cmsPrimaryUpload = useMemo(
+    () =>
+      isCmsPrimaryUploadContext({
+        currentCmsItemId,
+        placement,
+        selectedElementType,
+        elementCmsBinding,
+        componentImagePropsResolving,
+        componentImageProps,
+        selectedComponentImagePropId,
+      }),
+    [
+      currentCmsItemId,
+      placement,
+      selectedElementType,
+      elementCmsBinding,
+      componentImagePropsResolving,
+      componentImageProps,
+      selectedComponentImagePropId,
+    ]
+  );
 
   const {
     dissolve,
@@ -73,6 +135,30 @@ export function ImageEditor() {
     void webflow.setExtensionSize({ width: 440, height: 880 });
   }, []);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(EXPORT_FORMAT_STORAGE_KEY, exportFormat);
+    } catch {
+      /* ignore */
+    }
+  }, [exportFormat]);
+
+  useEffect(() => {
+    if (!allowAvifEncoding && exportFormat === "avif") {
+      setExportFormat("webp");
+    }
+  }, [allowAvifEncoding, exportFormat]);
+
+  useEffect(() => {
+    if (towerUser) {
+      setGuestOnboardingComplete(true);
+    }
+  }, [towerUser]);
+
+  useEffect(() => {
+    onOnboardingVisibilityChange?.(showOnboardingLoading || showGuestOnboarding);
+  }, [onOnboardingVisibilityChange, showOnboardingLoading, showGuestOnboarding]);
+
   useImageOutputDimensionsOnLoad(
     imageSrc,
     setOutputWidth,
@@ -87,8 +173,16 @@ export function ImageEditor() {
 
   useRevokeBlobUrlOnChange(imageSrc);
 
-  const effectiveOutputW = useMemo(() => parseOutputDimension(widthStr, outputWidth), [widthStr, outputWidth]);
-  const effectiveOutputH = useMemo(() => parseOutputDimension(heightStr, outputHeight), [heightStr, outputHeight]);
+  const parsedOutputW = useMemo(() => parseOutputDimension(widthStr, outputWidth), [widthStr, outputWidth]);
+  const parsedOutputH = useMemo(() => parseOutputDimension(heightStr, outputHeight), [heightStr, outputHeight]);
+
+  const { effectiveOutputW, effectiveOutputH } = useMemo(() => {
+    if (!completedCrop) {
+      return { effectiveOutputW: parsedOutputW, effectiveOutputH: parsedOutputH };
+    }
+    const { width, height } = outputDimensionsMatchingCrop(completedCrop, parsedOutputW, parsedOutputH);
+    return { effectiveOutputW: width, effectiveOutputH: height };
+  }, [completedCrop, parsedOutputW, parsedOutputH]);
 
   const cropAspect = useMemo(() => {
     if (cropFrameMode === "custom") {
@@ -107,6 +201,7 @@ export function ImageEditor() {
     effectiveOutputW,
     effectiveOutputH,
     quality,
+    exportFormat,
   });
 
   const { busy, applyToCanvas } = useApplyCroppedToWebflow({
@@ -115,6 +210,7 @@ export function ImageEditor() {
     effectiveOutputW,
     effectiveOutputH,
     quality,
+    exportFormat,
     fileBaseName,
     setFileBaseName,
     setOutputWidth,
@@ -123,10 +219,12 @@ export function ImageEditor() {
     setHeightStr,
     componentImageProps,
     selectedComponentImagePropId,
+    currentCmsItemId,
     assetFolders,
     selectedAssetFolderId,
     placement,
     replaceLibraryAsset,
+    cmsPrimaryUpload,
   });
 
   const onCropComplete = useCallback((_c: Area, px: Area) => {
@@ -152,6 +250,15 @@ export function ImageEditor() {
     },
     [handleDragState, queueFile]
   );
+
+  const openTowerEmailSignInPopup = useCallback(() => {
+    const base = getTowerAuthBaseUrl();
+    if (!base) {
+      return;
+    }
+    const origin = encodeURIComponent(window.location.origin);
+    window.open(`${base}/sign-in?beaconOrigin=${origin}`, "beacon-tower-auth", TOWER_EMAIL_AUTH_POPUP_FEATURES);
+  }, []);
 
   const dropZoneLabelClass = cn(
     "flex aspect-video w-full cursor-pointer items-center justify-center rounded-xl border-2 border-dashed p-4 transition-colors",
@@ -195,6 +302,8 @@ export function ImageEditor() {
             selectedComponentImagePropId={selectedComponentImagePropId}
             selectedElementType={selectedElementType}
             componentImagePropsResolving={componentImagePropsResolving}
+            cmsPrimaryUpload={cmsPrimaryUpload}
+            elementCmsBindingLoading={elementCmsBindingLoading}
             setAspectPreset={setAspectPreset}
             setCrop={setCrop}
             setCropFrameMode={setCropFrameMode}
@@ -204,6 +313,10 @@ export function ImageEditor() {
             setOutputWidth={setOutputWidth}
             setPlacement={setPlacement}
             setQuality={setQuality}
+            exportFormat={exportFormat}
+            allowAvifEncoding={allowAvifEncoding}
+            setExportFormat={setExportFormat}
+            onExportFormatCommit={onQualityCommit}
             setReplaceLibraryAsset={setReplaceLibraryAsset}
             setSelectedAssetFolderId={setSelectedAssetFolderId}
             setSelectedComponentImagePropId={setSelectedComponentImagePropId}
@@ -218,6 +331,33 @@ export function ImageEditor() {
 
   return (
     <ImageEditorWorkspace
+      emptyStateContent={
+        showOnboardingLoading ? (
+          <section
+            className="mx-auto flex min-h-[560px] w-full max-w-md flex-col justify-center py-3"
+            aria-live="polite"
+          >
+            <div className="flex flex-col items-center text-center">
+              <h2 className="text-2xl font-semibold text-foreground">Welcome to Beacon</h2>
+              <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">Loading your start options…</p>
+            </div>
+          </section>
+        ) : showGuestOnboarding ? (
+          <ImageEditorOnboarding
+            towerConfigured={towerConfigured}
+            onSignInToTower={openTowerEmailSignInPopup}
+            onContinueAsGuest={() => setGuestOnboardingComplete(true)}
+          />
+        ) : (
+          <EmptyImageSourceSection
+            dropZoneLabelClass={dropZoneLabelClass}
+            fileInputId={fileInputId}
+            handleDrag={handleDrag}
+            handleDragState={handleDragState}
+            handleDrop={handleDrop}
+          />
+        )
+      }
       beginOutgoingFade={beginOutgoingFade}
       dissolve={dissolve}
       dissolving={dissolving}

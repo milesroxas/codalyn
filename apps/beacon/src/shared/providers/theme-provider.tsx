@@ -6,6 +6,9 @@ type ThemeProviderProps = {
   children: React.ReactNode;
   defaultTheme?: Theme;
   storageKey?: string;
+  /** Controlled theme (single source of truth); requires `onThemeChange`. */
+  theme?: Theme;
+  onThemeChange?: (theme: Theme) => void;
 };
 
 type ThemeProviderState = {
@@ -19,9 +22,20 @@ export function ThemeProvider({
   children,
   defaultTheme = "dark",
   storageKey = "ui-theme",
+  theme: themeProp,
+  onThemeChange,
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = React.useState<Theme>(() => (localStorage.getItem(storageKey) as Theme) || defaultTheme);
+  const isControlled = themeProp !== undefined && onThemeChange !== undefined;
+
+  const [internalTheme, setInternalTheme] = React.useState<Theme>(() => {
+    if (isControlled) {
+      return themeProp;
+    }
+    return (localStorage.getItem(storageKey) as Theme) || defaultTheme;
+  });
+
+  const theme = isControlled ? themeProp : internalTheme;
 
   React.useEffect(() => {
     const root = window.document.documentElement;
@@ -38,12 +52,25 @@ export function ThemeProvider({
     root.classList.add(theme);
   }, [theme]);
 
+  const setTheme = React.useCallback(
+    (next: Theme) => {
+      if (isControlled) {
+        onThemeChange(next);
+      } else {
+        try {
+          localStorage.setItem(storageKey, next);
+        } catch {
+          /* ignore */
+        }
+        setInternalTheme(next);
+      }
+    },
+    [isControlled, onThemeChange, storageKey]
+  );
+
   const value = {
     theme,
-    setTheme: (next: Theme) => {
-      localStorage.setItem(storageKey, next);
-      setTheme(next);
-    },
+    setTheme,
   };
 
   return (

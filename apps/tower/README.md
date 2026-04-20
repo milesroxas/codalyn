@@ -15,7 +15,7 @@ Next.js app on Vercel: **Better Auth** (Drizzle + Neon), **Zustand**, **Tailwind
 | `src/server`   | Server-only singletons (`auth`).                              |
 
 
-Shared **Webflow + image defaults** live in `**@codalyn/webflow-kit`** (workspace package). Do not duplicate constants in Beacon or Tower.
+Shared **Webflow + image defaults** live in `@codalyn/webflow-kit` (workspace package). Do not duplicate constants in Beacon or Tower.
 
 ## Scripts
 
@@ -42,7 +42,7 @@ Tower has its **own** Compose project name, image name, container name, and netw
 | Host port       | `${TOWER_PORT:-3100}` → container `3000` (default **3100** avoids clashing with other local Next apps) |
 
 
-Build context is the **monorepo root** (`.dockerignore` keeps the context small). The image uses Next **standalone** output, runs as the `**node`** user, and includes a **healthcheck** on `/api/health`.
+Build context is the **monorepo root** (`.dockerignore` keeps the context small). The image uses Next **standalone** output, runs as the `node` user, and includes a **healthcheck** on `/api/health`.
 
 ```bash
 # From repo root
@@ -58,9 +58,26 @@ docker compose up --build -d
 
 ## Beacon → Tower
 
-1. User must be signed in (Better Auth session cookie or equivalent when you wire extension auth).
-2. Call `**/api/v1/webflow/*`** — segments map to `https://api.webflow.com/v2/...` with `**WEBFLOW_API_TOKEN`** on the server.
-3. Image pipeline: `**POST /api/v1/images/optimize?format=webp**` (default) or `**format=avif**`. WebP remains the default everywhere for Designer extension compatibility.
+**`/api/v1/*`** accepts:
+
+1. **`Authorization: Bearer <BEACON_API_KEY>`** when `BEACON_API_KEY` is set on Tower (match `VITE_BEACON_API_KEY` in Beacon). Use this from the Designer extension; CORS on `/api/v1/*` allows cross-origin `fetch` with Bearer.
+2. **Better Auth session** (cookie) when calling the API from the browser on Tower’s origin (e.g. dashboard).
+
+The key in `VITE_BEACON_API_KEY` is **bundled in the extension** — acceptable for **local/dev** only; plan a token-exchange or OAuth-style flow before production.
+
+**Beacon:** copy `apps/beacon/.env.example` → `.env.local`, set `VITE_TOWER_ORIGIN` (e.g. `http://localhost:3100` with Docker) and `VITE_BEACON_API_KEY`. Use `towerFetch()` from `src/shared/lib/tower-client.ts` for requests to Tower.
+
+**Tower:** set `BEACON_API_KEY` in `.env.local` or `.env.docker` (same value as Beacon’s `VITE_BEACON_API_KEY`).
+
+### Webflow Data API (aligned with official docs)
+
+Webflow’s [Working with the Data API](https://developers.webflow.com/data/docs/data-clients) overview points to [Authentication](https://developers.webflow.com/data/reference/authentication): every **v2** request uses `Authorization: Bearer YOUR_TOKEN`.
+
+**OAuth (`WEBFLOW_CLIENT_ID` / `WEBFLOW_CLIENT_SECRET` + `WEBFLOW_REDIRECT_URI`):** Beacon “Connect Webflow” stores each signed-in user’s **OAuth access token** in Tower’s DB. **`GET|POST|… /api/v2/webflow/...`** forwards to `https://api.webflow.com/v2/...` using **only** that per-user token (no shared site/workspace env fallback).
+
+**Designer sign-in** (`POST /api/auth/webflow-designer`) may still need **`WEBFLOW_TOKEN_RESOLVE_BEARER`** (or **`WEBFLOW_API_TOKEN`**) with scope `authorized_user:read` until the user has connected Webflow and a stored token exists — see `apps/tower/.env.example`.
+
+**Images:** `POST /api/v1/images/optimize?format=webp` (default) or `format=avif` (WebP stays default for Designer-safe pipelines).
 
 ## Regenerating Better Auth Drizzle schema
 

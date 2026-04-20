@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { ElementCmsBindingResolution } from "@/features/image-editor/lib/cms-primary-upload-context";
 import type { ComponentImagePropOption } from "@/features/image-editor/lib/component-image-prop";
+import {
+  refreshComponentInstanceSelection,
+  refreshNonComponentInstanceSelection,
+} from "@/features/image-editor/model/refresh-component-instance-image-props";
 
 export function useComponentInstanceImageProps() {
   const [componentImageProps, setComponentImageProps] = useState<ComponentImagePropOption[]>([]);
   const [selectedComponentImagePropId, setSelectedComponentImagePropId] = useState<string | null>(null);
   const [selectedElementType, setSelectedElementType] = useState<string | null>(null);
+  const [currentCmsItemId, setCurrentCmsItemId] = useState<string | null>(null);
   const [componentImagePropsResolving, setComponentImagePropsResolving] = useState(false);
+  const [elementCmsBinding, setElementCmsBinding] = useState<ElementCmsBindingResolution>("none");
+  const [elementCmsBindingLoading, setElementCmsBindingLoading] = useState(false);
   const componentPropsResolveGenRef = useRef(0);
 
   const refreshComponentImageProps = useCallback(async (el: AnyElement | null) => {
@@ -14,62 +22,49 @@ export function useComponentInstanceImageProps() {
     setSelectedElementType(el?.type ?? null);
 
     if (el?.type !== "ComponentInstance") {
-      setComponentImagePropsResolving(false);
-      setComponentImageProps([]);
-      setSelectedComponentImagePropId(null);
+      await refreshNonComponentInstanceSelection(el, gen, componentPropsResolveGenRef, {
+        setComponentImagePropsResolving,
+        setComponentImageProps,
+        setSelectedComponentImagePropId,
+        setElementCmsBinding,
+        setElementCmsBindingLoading,
+      });
       return;
     }
 
-    setComponentImagePropsResolving(true);
-    try {
-      const instance = el as ComponentElement;
-      const props = await instance.searchProps({ valueType: "imageAsset" });
-      if (gen !== componentPropsResolveGenRef.current) {
-        return;
-      }
-      const opts: ComponentImagePropOption[] = props.map((p) => ({
-        propId: p.propId,
-        label: p.display.label,
-      }));
-      setComponentImageProps(opts);
-      setSelectedComponentImagePropId((prev) => {
-        if (opts.length === 0) {
-          return null;
-        }
-        if (opts.length === 1) {
-          return opts[0].propId;
-        }
-        if (prev && opts.some((o) => o.propId === prev)) {
-          return prev;
-        }
-        return opts[0].propId;
-      });
-    } catch {
-      if (gen !== componentPropsResolveGenRef.current) {
-        return;
-      }
-      setComponentImageProps([]);
-      setSelectedComponentImagePropId(null);
-    } finally {
-      if (gen === componentPropsResolveGenRef.current) {
-        setComponentImagePropsResolving(false);
-      }
-    }
+    setElementCmsBinding("none");
+    setElementCmsBindingLoading(false);
+
+    await refreshComponentInstanceSelection(el as ComponentElement, gen, componentPropsResolveGenRef, {
+      setComponentImagePropsResolving,
+      setComponentImageProps,
+      setSelectedComponentImagePropId,
+    });
   }, []);
 
   useEffect(() => {
-    void webflow.getSelectedElement().then((el) => void refreshComponentImageProps(el));
-    const unsub = webflow.subscribe("selectedelement", (el) => {
-      void refreshComponentImageProps(el);
+    void webflow.getSelectedElement().then((e) => void refreshComponentImageProps(e));
+    const unsub = webflow.subscribe("selectedelement", (e) => {
+      void refreshComponentImageProps(e);
     });
     return unsub;
   }, [refreshComponentImageProps]);
+
+  useEffect(() => {
+    const unsub = webflow.subscribe("currentcmsitem", (cmsItemId) => {
+      setCurrentCmsItemId(cmsItemId ?? null);
+    });
+    return unsub;
+  }, []);
 
   return {
     componentImageProps,
     selectedComponentImagePropId,
     setSelectedComponentImagePropId,
     selectedElementType,
+    currentCmsItemId,
     componentImagePropsResolving,
+    elementCmsBinding,
+    elementCmsBindingLoading,
   };
 }

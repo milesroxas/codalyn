@@ -4,6 +4,7 @@ import type { Area } from "react-easy-crop";
 
 import {
   applyCroppedImageToWebflow,
+  downloadCroppedImageWebp,
   type ExportResult,
   type PlacementMode,
 } from "@/features/image-editor/lib/apply-cropped-export";
@@ -83,6 +84,34 @@ export function useApplyCroppedToWebflow(options: {
       });
       return;
     }
+    const w = effectiveOutputW;
+    const h = effectiveOutputH;
+    const safeName = sanitizeAssetBaseName(fileBaseName);
+
+    if (placement === "download") {
+      setBusy(true);
+      try {
+        setOutputWidth(w);
+        setOutputHeight(h);
+        setWidthStr(String(w));
+        setHeightStr(String(h));
+        setFileBaseName(safeName);
+
+        const result = await downloadCroppedImageWebp({
+          imageSrc,
+          completedCrop,
+          outputWidth: w,
+          outputHeight: h,
+          quality,
+          fileBaseName: safeName,
+        });
+        await notifyExportResult(result);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     const targetFolder = resolveAssetFolderHandleForExport(selectedAssetFolderId, assetFolders, {
       useDefaultWhenUnpicked: cmsPrimaryUpload,
     });
@@ -95,13 +124,10 @@ export function useApplyCroppedToWebflow(options: {
     }
     setBusy(true);
     try {
-      const w = effectiveOutputW;
-      const h = effectiveOutputH;
       setOutputWidth(w);
       setOutputHeight(h);
       setWidthStr(String(w));
       setHeightStr(String(h));
-      const safeName = sanitizeAssetBaseName(fileBaseName);
       setFileBaseName(safeName);
 
       const result = await applyCroppedImageToWebflow({

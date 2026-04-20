@@ -41,7 +41,8 @@ export async function encodeCanvasToOptimizedFile(
   await waitForNextPaint();
 
   const tower = getTowerOrigin();
-  if (tower) {
+  // WebP is encoded in-browser so guest mode works without Tower auth; Tower handles AVIF only (sharp).
+  if (tower && format === "avif") {
     const qualityPercent = Math.min(100, Math.max(1, Math.round(q * 100)));
     const png = await canvasToBlob(canvas, "image/png");
     const res = await towerFetch(

@@ -19,6 +19,7 @@ import {
   resolvePresetExportQuality,
 } from "@/features/image-editor/lib/export-preset";
 import { useApplyCroppedToWebflow } from "@/features/image-editor/model/use-apply-cropped-to-webflow";
+import { useCmsCollectionTemplatePage } from "@/features/image-editor/model/use-cms-collection-template-page";
 import { useComponentInstanceImageProps } from "@/features/image-editor/model/use-component-instance-image-props";
 import { useExportByteEstimate } from "@/features/image-editor/model/use-export-byte-estimate";
 import { useImageDissolveTransition } from "@/features/image-editor/model/use-image-dissolve-transition";
@@ -62,7 +63,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   const [fileBaseName, setFileBaseName] = useState("edited");
   const [quality, setQuality] = useState(settings.defaultExportQuality);
   const [exportFormat, setExportFormat] = useState<ImageExportFormat>(settings.defaultExportFormat);
-  const [placement, setPlacement] = useState<PlacementMode>("selection");
+  const [placement, setPlacement] = useState<PlacementMode>("library");
   const [replaceLibraryAsset, setReplaceLibraryAsset] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [originalBytes, setOriginalBytes] = useState<number | null>(null);
@@ -79,6 +80,9 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   const serverExportDefaultsAppliedRef = useRef(false);
   const towerConfigured = isTowerConfigured();
   const allowAvifEncoding = Boolean(towerUser);
+  const isConfirmedGuest = !towerUser && !towerSessionPending;
+  const cmsCollectionTemplatePage = useCmsCollectionTemplatePage();
+  const guestCmsTemplateRestricted = isConfirmedGuest && cmsCollectionTemplatePage;
   const showOnboardingLoading = !imageSrc && towerSessionPending && !towerUser && !guestOnboardingComplete;
   const showGuestOnboarding = !imageSrc && !towerSessionPending && !towerUser && !guestOnboardingComplete;
 
@@ -246,7 +250,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   const exportPresetMatchId = useMemo(
     () =>
       findMatchingExportPresetId(
-        settings.imagePresets,
+        isConfirmedGuest ? [] : settings.imagePresets,
         exportPresetDefaults,
         parsedOutputW,
         parsedOutputH,
@@ -255,6 +259,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
         formatForPresetMatch
       ),
     [
+      isConfirmedGuest,
       settings.imagePresets,
       exportPresetDefaults,
       parsedOutputW,
@@ -377,7 +382,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
         <LoadedImageSourceSection busy={busy} fileBaseName={fileBaseName} fileInputRef={fileInputRef} />
         <div className="flex flex-col gap-3 px-4">
           <ImageEditorCropExportPanel
-            exportPresets={settings.imagePresets}
+            exportPresets={isConfirmedGuest ? [] : settings.imagePresets}
             exportPresetDefaults={exportPresetDefaults}
             onApplyExportPreset={applyExportPreset}
             onExportPresetChooseCustom={() => setExportPresetManualOverride(true)}
@@ -418,6 +423,8 @@ export function ImageEditor(props: ImageEditorProps = {}) {
             componentImagePropsResolving={componentImagePropsResolving}
             cmsPrimaryUpload={cmsPrimaryUpload}
             elementCmsBindingLoading={elementCmsBindingLoading}
+            elementCmsBinding={elementCmsBinding}
+            guestCmsTemplateRestricted={guestCmsTemplateRestricted}
             setAspectPreset={setAspectPreset}
             setCrop={setCrop}
             setCropFrameMode={setCropFrameMode}

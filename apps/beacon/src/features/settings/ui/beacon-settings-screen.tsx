@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { HeaderLogo } from "@/app/ui/Header";
+import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { GuestSettingsUpsell } from "@/features/settings/ui/guest-settings-upsell";
 import { SettingsPanelSkeleton } from "@/features/settings/ui/settings-panel-skeleton";
@@ -21,8 +22,16 @@ const LazyAccount = lazy(() =>
   import("@/features/settings/ui/settings-account-panel").then((m) => ({ default: m.SettingsAccountPanel }))
 );
 
-function SettingsSectionBody({ section }: { section: SettingsSectionId }) {
-  const Comp = section === "presets" ? LazyPresets : section === "preferences" ? LazyPreferences : LazyAccount;
+function SettingsSectionBody({
+  section,
+  allowPresetsPanel,
+}: {
+  section: SettingsSectionId;
+  allowPresetsPanel: boolean;
+}) {
+  const effectiveSection: SettingsSectionId = !allowPresetsPanel && section === "presets" ? "preferences" : section;
+  const Comp =
+    effectiveSection === "presets" ? LazyPresets : effectiveSection === "preferences" ? LazyPreferences : LazyAccount;
   return (
     <Suspense fallback={<SettingsPanelSkeleton />}>
       <Comp />
@@ -37,8 +46,21 @@ export type BeaconSettingsScreenProps = {
 
 export function BeaconSettingsScreen(props: BeaconSettingsScreenProps) {
   const { onBack, initialSection = DEFAULT_SETTINGS_SECTION } = props;
-  const [section, setSection] = useState<SettingsSectionId>(initialSection);
   const { isTowerUser } = useBeaconAppSettings();
+  const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
+  /** Presets require Tower; while a session token is resolving, keep Export available to avoid flicker for signed-in users. */
+  const allowPresetsSection = Boolean(towerUser?.id) || towerSessionPending;
+
+  const [section, setSection] = useState<SettingsSectionId>(() => {
+    const guestForPresets = !towerUser && !towerSessionPending;
+    return guestForPresets && initialSection === "presets" ? "preferences" : initialSection;
+  });
+
+  useEffect(() => {
+    if (!allowPresetsSection && section === "presets") {
+      setSection("preferences");
+    }
+  }, [allowPresetsSection, section]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -55,12 +77,12 @@ export function BeaconSettingsScreen(props: BeaconSettingsScreenProps) {
           </div>
           <div className="min-w-0" aria-hidden />
         </div>
-        <SettingsSectionNav value={section} onValueChange={setSection} />
+        <SettingsSectionNav value={section} onValueChange={setSection} showPresetsSection={allowPresetsSection} />
       </header>
 
       <div className="min-h-0 flex-1 overflow-auto px-3 pb-3 pt-3">
-        {!isTowerUser ? <GuestSettingsUpsell /> : null}
-        <SettingsSectionBody section={section} />
+        {!isTowerUser && section !== "account" ? <GuestSettingsUpsell /> : null}
+        <SettingsSectionBody section={section} allowPresetsPanel={allowPresetsSection} />
       </div>
     </div>
   );

@@ -61,8 +61,8 @@ export type ExportResult =
   | { kind: "info"; message: string }
   | { kind: "error"; message: string };
 
-/** Where to put the new image on the canvas. */
-export type PlacementMode = "canvas" | "selection" | "replace";
+/** Where the export goes: Assets only, canvas placement, replace selected Image, or local WebP download. */
+export type PlacementMode = "library" | "canvas" | "selection" | "replace" | "download";
 
 /** Webflow Designer API `element.type` for Image elements. */
 export const WEBFLOW_IMAGE_ELEMENT_TYPE = "Image" as const;
@@ -427,7 +427,7 @@ export async function applyCroppedImageToWebflow(options: {
   outputWidth: number;
   outputHeight: number;
   quality: number;
-  /** Output codec; when Tower is configured, WebP and AVIF both use `/api/v1/images/optimize`. */
+  /** Output codec; AVIF uses Tower `/api/v1/images/optimize`; WebP is encoded in the extension. */
   exportFormat: ImageExportFormat;
   fileBaseName: string;
   /** When the selection has multiple image props, the prop to set (from the panel). */
@@ -463,6 +463,12 @@ export async function applyCroppedImageToWebflow(options: {
     const file = new File([blob], fileName, { type: blob.type || mimeTypeForFormat(exportFormat) });
     const selectedElement = await webflow.getSelectedElement();
 
+    if (placement === "library") {
+      const asset = await webflow.createAsset(file);
+      await applyAssetFolder(asset, targetFolder);
+      return { kind: "success", message: "Saved to Assets." };
+    }
+
     if (placement === "canvas") {
       const asset = await webflow.createAsset(file);
       await applyAssetFolder(asset, targetFolder);
@@ -487,6 +493,41 @@ export async function applyCroppedImageToWebflow(options: {
       componentImagePropId,
       currentCmsItemId,
     });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not process the image.";
+    return { kind: "error", message };
+  }
+}
+
+/** Guest-friendly export: optimized WebP file download (no Assets upload or canvas changes). */
+export async function downloadCroppedImageWebp(options: {
+  imageSrc: string;
+  completedCrop: Area;
+  outputWidth: number;
+  outputHeight: number;
+  quality: number;
+  fileBaseName: string;
+}): Promise<ExportResult> {
+  const { imageSrc, completedCrop, outputWidth, outputHeight, quality, fileBaseName } = options;
+  try {
+    const canvas = await renderCroppedRegionToCanvas(imageSrc, completedCrop, outputWidth, outputHeight);
+    const { blob, fileName } = await encodeCanvasToOptimizedFile(canvas, quality, {
+      baseName: fileBaseName,
+      format: "webp",
+    });
+    const url = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+    return { kind: "success", message: "Image downloaded." };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not process the image.";
     return { kind: "error", message };

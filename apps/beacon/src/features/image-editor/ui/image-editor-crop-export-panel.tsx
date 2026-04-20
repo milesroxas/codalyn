@@ -8,11 +8,15 @@ import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-ex
 import { parseOutputDimension, WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
 import { type AspectPreset, aspectLabels } from "@/features/image-editor/lib/aspect-preset";
 import type { AssetFolderRow } from "@/features/image-editor/lib/asset-folder-row";
+import type { ElementCmsBindingResolution } from "@/features/image-editor/lib/cms-primary-upload-context";
 import type { ComponentImagePropOption } from "@/features/image-editor/lib/component-image-prop";
 import { type ExportPresetDefaults, findMatchingExportPresetId } from "@/features/image-editor/lib/export-preset";
 import {
   getImageEditorPlacementReadiness,
   type ImageEditorPlacementBlocker,
+  resolvePlacementWhenOptionHidden,
+  shouldOfferReplacePlacement,
+  shouldOfferSelectionPlacement,
 } from "@/features/image-editor/lib/image-editor-placement-readiness";
 import { sanitizeAssetBaseName } from "@/features/image-editor/lib/sanitize-asset-base-name";
 import { ExportSizeEstimate } from "@/features/image-editor/ui/export-size-estimate";
@@ -99,6 +103,10 @@ export type ImageEditorCropExportPanelProps = {
   cmsPrimaryUpload: boolean;
   /** True while resolving CMS image bindings on the selected canvas element. */
   elementCmsBindingLoading: boolean;
+  /** Resolved CMS image binding count on the selected non-component element (`none` until loaded). */
+  elementCmsBinding: ElementCmsBindingResolution;
+  /** Guest on a CMS collection template page: only Assets or local WebP download. */
+  guestCmsTemplateRestricted: boolean;
   busy: boolean;
   onApplyToCanvas: () => void | Promise<void>;
   exportPresets: BeaconImagePresetRow[];
@@ -129,19 +137,29 @@ const PLACEMENT_OPTIONS: {
   description: string;
 }[] = [
   {
+    value: "library",
+    title: "Assets only",
+    description: "Upload to your folder. The page stays unchanged.",
+  },
+  {
     value: "canvas",
     title: "Page",
-    description: "Append to the page (selection ignored).",
+    description: "New image at the end of the page body.",
   },
   {
     value: "selection",
-    title: "Selection",
-    description: "Near the selected element, or into a connected component/CMS image field.",
+    title: "Use selection",
+    description: "Bind a field or insert next to the selection.",
   },
   {
     value: "replace",
-    title: "Replace",
-    description: "Swap the image on the selected Image element.",
+    title: "Replace image",
+    description: "Swap the selected Image's source.",
+  },
+  {
+    value: "download",
+    title: "Download image",
+    description: "Save an optimized WebP file to your computer.",
   },
 ];
 
@@ -152,12 +170,41 @@ type PlaceButtonState = {
 };
 
 const IMAGE_EDITOR_PLACEMENT_BLOCKER_LABELS: Record<ImageEditorPlacementBlocker, string> = {
-  "missing-crop": "Adjust crop first",
-  "replace-wrong-type": "Select an image",
+  "missing-crop": "Crop first",
+  "replace-wrong-type": "Select an Image",
   "selection-empty": "Select an element",
-  "selection-props-loading": "Syncing selection…",
-  "selection-pick-field": "Choose a field",
+  "selection-props-loading": "Syncing…",
+  "selection-pick-field": "Pick a field",
 };
+
+function placeButtonStateIfDownloadExport(p: {
+  placement: PlacementMode;
+  completedCrop: Area | null;
+  selectedElementType: string | null;
+  componentImagePropsResolving: boolean;
+  componentImagePropCount: number;
+  selectedComponentImagePropId: string | null;
+}): PlaceButtonState | null {
+  if (p.placement !== "download") {
+    return null;
+  }
+  const readiness = getImageEditorPlacementReadiness({
+    placement: p.placement,
+    hasCompletedCrop: p.completedCrop != null,
+    selectedElementType: p.selectedElementType,
+    componentImagePropsResolving: p.componentImagePropsResolving,
+    componentImagePropCount: p.componentImagePropCount,
+    selectedComponentImagePropId: p.selectedComponentImagePropId,
+  });
+  if (!readiness.ok) {
+    return {
+      disabled: true,
+      label: IMAGE_EDITOR_PLACEMENT_BLOCKER_LABELS[readiness.blocker],
+      busy: false,
+    };
+  }
+  return { disabled: false, label: "Download image", busy: false };
+}
 
 function placeButtonStateForPlacement(p: {
   busy: boolean;
@@ -189,8 +236,21 @@ function placeButtonStateForPlacement(p: {
   } = p;
 
   if (busy) {
-    return { disabled: true, label: "Placing…", busy: true };
+    return { disabled: true, label: "Saving…", busy: true };
   }
+
+  const downloadState = placeButtonStateIfDownloadExport({
+    placement,
+    completedCrop,
+    selectedElementType,
+    componentImagePropsResolving,
+    componentImagePropCount,
+    selectedComponentImagePropId,
+  });
+  if (downloadState) {
+    return downloadState;
+  }
+
   if (foldersLoading) {
     return { disabled: true, label: "Loading folders…", busy: false };
   }
@@ -201,12 +261,13 @@ function placeButtonStateForPlacement(p: {
   const selectionBindingLoading =
     elementCmsBindingLoading &&
     placement !== "canvas" &&
+    placement !== "library" &&
     (placement === "replace"
       ? selectedElementType === WEBFLOW_IMAGE_ELEMENT_TYPE
       : selectedElementType !== "ComponentInstance" && selectedElementType !== null);
 
   if (selectionBindingLoading) {
-    return { disabled: true, label: "Syncing selection…", busy: false };
+    return { disabled: true, label: "Syncing…", busy: false };
   }
 
   if (selectedAssetFolderId === null && !cmsPrimaryUpload) {
@@ -230,6 +291,9 @@ function placeButtonStateForPlacement(p: {
     };
   }
 
+  if (placement === "library") {
+    return { disabled: false, label: "Save to Assets", busy: false };
+  }
   if (placement === "canvas") {
     return { disabled: false, label: "Add to page", busy: false };
   }
@@ -722,30 +786,39 @@ function ExportEncodeCard(p: ExportCardProps) {
                 <span className="text-muted-foreground text-xs" id={`${baseId}-format`}>
                   Output format
                 </span>
-                <ToggleGroup
-                  type="single"
-                  value={exportFormat}
-                  onValueChange={(v) => {
-                    if (v === "webp" || v === "avif") {
-                      setExportFormat(v);
-                      onExportFormatCommit();
-                    }
-                  }}
-                  aria-labelledby={`${baseId}-format`}
-                  className="justify-stretch"
-                >
-                  <ToggleGroupItem value="webp" className="flex-1">
-                    WebP
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="avif" className="flex-1" disabled={!allowAvifEncoding}>
-                    AVIF
-                  </ToggleGroupItem>
-                </ToggleGroup>
-                <p className="text-muted-foreground text-[10px] leading-snug">
-                  {allowAvifEncoding
-                    ? "With Tower connected, WebP and AVIF both use the same optimize API. Without Tower, only WebP (in-browser) is available."
-                    : "Guest mode uses WebP only. Sign in to Tower to unlock AVIF compression."}
-                </p>
+                {allowAvifEncoding ? (
+                  <>
+                    <ToggleGroup
+                      type="single"
+                      value={exportFormat}
+                      onValueChange={(v) => {
+                        if (v === "webp" || v === "avif") {
+                          setExportFormat(v);
+                          onExportFormatCommit();
+                        }
+                      }}
+                      aria-labelledby={`${baseId}-format`}
+                      className="justify-stretch"
+                    >
+                      <ToggleGroupItem value="webp" className="flex-1">
+                        WebP
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="avif" className="flex-1">
+                        AVIF
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                    <p className="text-muted-foreground text-[10px] leading-snug">
+                      WebP is encoded in-browser. AVIF is compressed through Tower.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-foreground text-sm font-medium leading-snug">WebP</div>
+                    <p className="text-muted-foreground text-[10px] leading-snug">
+                      Sign in to Tower to unlock AVIF compression.
+                    </p>
+                  </>
+                )}
               </div>
               <div className="flex flex-col gap-2">
                 <Label className="text-muted-foreground text-xs" htmlFor={`${baseId}-quality`}>
@@ -1120,6 +1193,9 @@ type PlacementCardProps = {
   componentImageProps: ComponentImagePropOption[];
   selectedComponentImagePropId: string | null;
   setSelectedComponentImagePropId: (id: string | null) => void;
+  offerSelectionPlacement: boolean;
+  offerReplacePlacement: boolean;
+  guestCmsTemplateRestricted: boolean;
 };
 
 function PlacementCard(p: PlacementCardProps) {
@@ -1132,32 +1208,55 @@ function PlacementCard(p: PlacementCardProps) {
     componentImageProps,
     selectedComponentImagePropId,
     setSelectedComponentImagePropId,
+    offerSelectionPlacement,
+    offerReplacePlacement,
+    guestCmsTemplateRestricted,
   } = p;
+
+  const placementOptions = PLACEMENT_OPTIONS.filter((o) => {
+    if (guestCmsTemplateRestricted) {
+      return o.value === "library" || o.value === "download";
+    }
+    if (o.value === "download") {
+      return false;
+    }
+    if (o.value === "selection") {
+      return offerSelectionPlacement;
+    }
+    if (o.value === "replace") {
+      return offerReplacePlacement;
+    }
+    return true;
+  });
+
+  const placementRadioValue = guestCmsTemplateRestricted
+    ? placement
+    : resolvePlacementWhenOptionHidden(placement, offerSelectionPlacement, offerReplacePlacement);
 
   return (
     <section className="mt-4 flex flex-col gap-3" aria-labelledby={`${baseId}-step-place`}>
       <h2 className="sr-only" id={`${baseId}-step-place`}>
         Step 3: Placement
       </h2>
-      <StepBadge n={3} label="Place on canvas" />
+      <StepBadge n={3} label="Save destination" />
       <Card size="sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Placement</CardTitle>
-          <CardDescription>How the image is added after upload.</CardDescription>
+          <CardDescription>Choose how to use this export.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 pt-0">
           <RadioGroup
             className="flex flex-col gap-3"
-            value={placement}
+            value={placementRadioValue}
             onValueChange={(v) => setPlacement(v as PlacementMode)}
           >
-            {PLACEMENT_OPTIONS.map((opt) => (
+            {placementOptions.map((opt) => (
               <label
                 key={opt.value}
                 htmlFor={`${baseId}-place-${opt.value}`}
                 className={cn(
                   "flex cursor-pointer gap-3 rounded-lg border border-transparent p-2.5 ring-1 ring-foreground/10 transition-colors",
-                  placement === opt.value ? "bg-accent/50 border-primary/30" : "hover:bg-muted/40"
+                  placementRadioValue === opt.value ? "bg-accent/50 border-primary/30" : "hover:bg-muted/40"
                 )}
               >
                 <RadioGroupItem className="mt-0.5" id={`${baseId}-place-${opt.value}`} value={opt.value} />
@@ -1169,7 +1268,7 @@ function PlacementCard(p: PlacementCardProps) {
             ))}
           </RadioGroup>
 
-          {placement === "replace" ? (
+          {placementRadioValue === "replace" ? (
             <div className="flex items-center gap-2">
               <Checkbox
                 id={`${baseId}-lib-replace`}
@@ -1177,12 +1276,12 @@ function PlacementCard(p: PlacementCardProps) {
                 onCheckedChange={(v) => setReplaceLibraryAsset(v === true)}
               />
               <Label className="cursor-pointer font-normal" htmlFor={`${baseId}-lib-replace`}>
-                Update Assets file
+                Overwrite file in Assets
               </Label>
             </div>
           ) : null}
 
-          {placement === "selection" && componentImageProps.length > 0 ? (
+          {placementRadioValue === "selection" && componentImageProps.length > 0 ? (
             <div className="flex flex-col gap-2">
               <Label className="text-muted-foreground text-xs" htmlFor={`${baseId}-comp-prop`}>
                 Component field
@@ -1269,6 +1368,8 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     componentImagePropsResolving,
     cmsPrimaryUpload,
     elementCmsBindingLoading,
+    elementCmsBinding,
+    guestCmsTemplateRestricted,
     busy,
     onApplyToCanvas,
     exportPresets,
@@ -1286,6 +1387,44 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
 
   const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
 
+  const offerSelectionPlacement = useMemo(
+    () =>
+      shouldOfferSelectionPlacement({
+        selectedElementType,
+        componentImagePropsResolving,
+        componentImagePropCount: componentImageProps.length,
+        elementCmsBinding,
+        elementCmsBindingLoading,
+      }),
+    [
+      selectedElementType,
+      componentImagePropsResolving,
+      componentImageProps.length,
+      elementCmsBinding,
+      elementCmsBindingLoading,
+    ]
+  );
+
+  const offerReplacePlacement = useMemo(() => shouldOfferReplacePlacement(selectedElementType), [selectedElementType]);
+
+  const resolvedPlacement = useMemo(() => {
+    let p = resolvePlacementWhenOptionHidden(placement, offerSelectionPlacement, offerReplacePlacement);
+    if (guestCmsTemplateRestricted) {
+      if (p !== "library" && p !== "download") {
+        p = "library";
+      }
+    } else if (p === "download") {
+      p = "library";
+    }
+    return p;
+  }, [placement, offerSelectionPlacement, offerReplacePlacement, guestCmsTemplateRestricted]);
+
+  useLayoutEffect(() => {
+    if (resolvedPlacement !== placement) {
+      setPlacement(resolvedPlacement);
+    }
+  }, [resolvedPlacement, placement, setPlacement]);
+
   const placeButton = useMemo(
     () =>
       placeButtonStateForPlacement({
@@ -1296,7 +1435,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         cmsPrimaryUpload,
         elementCmsBindingLoading,
         completedCrop,
-        placement,
+        placement: resolvedPlacement,
         selectedElementType,
         componentImagePropsResolving,
         componentImagePropCount: componentImageProps.length,
@@ -1310,7 +1449,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
       cmsPrimaryUpload,
       elementCmsBindingLoading,
       completedCrop,
-      placement,
+      resolvedPlacement,
       selectedElementType,
       componentImagePropsResolving,
       componentImageProps.length,
@@ -1413,20 +1552,25 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         componentImageProps={componentImageProps}
         selectedComponentImagePropId={selectedComponentImagePropId}
         setSelectedComponentImagePropId={setSelectedComponentImagePropId}
+        offerSelectionPlacement={offerSelectionPlacement}
+        offerReplacePlacement={offerReplacePlacement}
+        guestCmsTemplateRestricted={guestCmsTemplateRestricted}
       />
 
-      <AssetDestinationCard
-        baseId={baseId}
-        assetFolders={assetFolders}
-        foldersLoading={foldersLoading}
-        folderActionBusy={folderActionBusy}
-        busy={busy}
-        selectedAssetFolderId={selectedAssetFolderId}
-        setSelectedAssetFolderId={setSelectedAssetFolderId}
-        onCreateAssetFolder={onCreateAssetFolder}
-        cmsPrimaryUpload={cmsPrimaryUpload}
-        defaultFolderPathLabel={defaultFolderPathLabel}
-      />
+      {resolvedPlacement === "download" ? null : (
+        <AssetDestinationCard
+          baseId={baseId}
+          assetFolders={assetFolders}
+          foldersLoading={foldersLoading}
+          folderActionBusy={folderActionBusy}
+          busy={busy}
+          selectedAssetFolderId={selectedAssetFolderId}
+          setSelectedAssetFolderId={setSelectedAssetFolderId}
+          onCreateAssetFolder={onCreateAssetFolder}
+          cmsPrimaryUpload={cmsPrimaryUpload}
+          defaultFolderPathLabel={defaultFolderPathLabel}
+        />
+      )}
 
       <div className="mt-6 flex flex-col gap-2">
         <Button type="button" className="w-full" disabled={placeButton.disabled} onClick={() => void onApplyToCanvas()}>

@@ -23,7 +23,7 @@ export function isCmsPrimaryUploadContext(options: {
     selectedComponentImagePropId,
   } = options;
 
-  if (!currentCmsItemId || placement === "canvas") {
+  if (!currentCmsItemId || placement === "canvas" || placement === "library" || placement === "download") {
     return false;
   }
 

@@ -31,8 +31,7 @@ function isLocalTowerUrl(origin: string): boolean {
 function resolveTowerOrigin(mode: string): string {
   const beaconEnv = loadEnv(mode, beaconRoot, "");
   const towerEnv = loadEnv(mode, towerRoot, "");
-  const explicit =
-    beaconEnv.VITE_TOWER_ORIGIN?.trim() || process.env.VITE_TOWER_ORIGIN?.trim() || "";
+  const explicit = beaconEnv.VITE_TOWER_ORIGIN?.trim() || process.env.VITE_TOWER_ORIGIN?.trim() || "";
   const allowLocalInProd =
     beaconEnv.BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION === "1" ||
     process.env.BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION === "1";

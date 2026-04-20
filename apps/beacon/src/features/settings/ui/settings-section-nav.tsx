@@ -19,14 +19,18 @@ export const DEFAULT_SETTINGS_SECTION: SettingsSectionId = ITEMS[0].id;
 export type SettingsSectionNavProps = {
   value: SettingsSectionId;
   onValueChange: (id: SettingsSectionId) => void;
+  /** When false (guest), the Export / saved-presets section is hidden. */
+  showPresetsSection: boolean;
 };
 
-export function SettingsSectionNav({ value, onValueChange }: SettingsSectionNavProps) {
+export function SettingsSectionNav({ value, onValueChange, showPresetsSection }: SettingsSectionNavProps) {
+  const visibleItems = showPresetsSection ? ITEMS : ITEMS.filter((item) => item.id !== "presets");
+
   return (
     <nav aria-label="Settings sections" className="-mx-3 min-w-0 bg-secondary px-3 py-1.5">
       <NavigationMenu viewport={false} className="max-w-none justify-start">
         <NavigationMenuList className="flex w-full flex-wrap justify-start gap-0.5">
-          {ITEMS.map((item) => (
+          {visibleItems.map((item) => (
             <NavigationMenuItem key={item.id}>
               <NavigationMenuLink asChild active={value === item.id} className="h-auto p-0">
                 <button

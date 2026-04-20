@@ -37,3 +37,14 @@ export function getTowerAuthBaseUrl(): string {
 export function isTowerConfigured(): boolean {
   return Boolean(baseURL);
 }
+
+const TOWER_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";
+
+/** Opens Tower sign-in or sign-up in a popup for Beacon (Designer extension) flows. */
+export function openTowerAuthPopup(path: "/sign-in" | "/sign-up"): void {
+  if (!baseURL) {
+    return;
+  }
+  const origin = encodeURIComponent(window.location.origin);
+  window.open(`${baseURL}${path}?beaconOrigin=${origin}`, "beacon-tower-auth", TOWER_AUTH_POPUP_FEATURES);
+}

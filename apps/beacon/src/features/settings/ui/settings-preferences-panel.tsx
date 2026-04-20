@@ -5,12 +5,10 @@ import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-setti
 import { Label } from "@/shared/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
-import { Slider } from "@/shared/ui/slider";
-import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group";
 
 export function SettingsPreferencesPanel() {
   const baseId = useId();
-  const { settings, updateSettings, isTowerUser } = useBeaconAppSettings();
+  const { settings, updateSettings } = useBeaconAppSettings();
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,61 +60,10 @@ export function SettingsPreferencesPanel() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium">Default export</h2>
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          Starting values for format and quality when you open a new image. Saved export presets live under Presets.
-        </p>
-        <div className="flex flex-col gap-2">
-          <span className="text-muted-foreground text-xs" id={`${baseId}-format`}>
-            Compression type
-          </span>
-          <ToggleGroup
-            type="single"
-            value={settings.defaultExportFormat}
-            onValueChange={(v) => {
-              if (v === "webp" || v === "avif") {
-                updateSettings({ defaultExportFormat: v });
-              }
-            }}
-            variant="outline"
-            size="sm"
-            className="w-full"
-            aria-labelledby={`${baseId}-format`}
-          >
-            <ToggleGroupItem value="webp" className="flex-1">
-              WebP
-            </ToggleGroupItem>
-            <ToggleGroupItem value="avif" className="flex-1" disabled={!isTowerUser}>
-              AVIF
-            </ToggleGroupItem>
-          </ToggleGroup>
-          {!isTowerUser ? (
-            <p className="text-muted-foreground text-[10px] leading-snug">
-              AVIF needs a Tower account. Guests use WebP in the Designer.
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label className="text-muted-foreground text-xs" htmlFor={`${baseId}-quality`}>
-            Quality
-          </Label>
-          <Slider
-            id={`${baseId}-quality`}
-            min={0.05}
-            max={1}
-            step={0.01}
-            value={[settings.defaultExportQuality]}
-            onValueChange={(v) => {
-              const q = v[0];
-              if (typeof q === "number") {
-                updateSettings({ defaultExportQuality: q });
-              }
-            }}
-          />
-        </div>
+        <h2 className="text-sm font-medium">Default crop aspect</h2>
         <div className="flex flex-col gap-2">
           <Label className="text-muted-foreground text-xs" htmlFor={`${baseId}-aspect`}>
-            Default crop aspect
+            Aspect ratio preset
           </Label>
           <Select
             value={settings.defaultAspectPreset}

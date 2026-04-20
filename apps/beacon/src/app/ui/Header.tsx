@@ -1,4 +1,4 @@
-import { ChevronDown, LogIn, LogOut } from "lucide-react";
+import { ChevronDown, LogIn, LogOut, Settings } from "lucide-react";
 import {
   type Dispatch,
   type MutableRefObject,
@@ -21,7 +21,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
-import { ThemeToggle } from "@/shared/ui/theme-toggle";
 
 const lightLogoSrc = `${import.meta.env.BASE_URL}images/light-logo-beacon.svg`;
 const darkLogoSrc = `${import.meta.env.BASE_URL}images/dark-logo-beacon.svg`;
@@ -321,17 +320,28 @@ function WebflowConnectionControl({
   );
 }
 
-function HeaderLogo() {
-  return (
-    <h1 className="m-0 flex shrink-0 items-center justify-center text-lg font-medium leading-widest">
+type HeaderLogoProps = {
+  /** When false, renders a div so the screen can use a separate page `<h1>` (e.g. Settings). */
+  asHeading?: boolean;
+};
+
+export function HeaderLogo({ asHeading = true }: HeaderLogoProps) {
+  const className = "m-0 flex shrink-0 items-center justify-center text-lg font-medium leading-widest";
+  const inner = (
+    <>
       <span className="sr-only">Beacon</span>
       <img src={lightLogoSrc} alt="" aria-hidden className="h-4 w-auto dark:hidden" />
       <img src={darkLogoSrc} alt="" aria-hidden className="hidden h-4 w-auto dark:block" />
-    </h1>
+    </>
   );
+  return asHeading ? <h1 className={className}>{inner}</h1> : <div className={className}>{inner}</div>;
 }
 
-function HeaderWithTower() {
+type HeaderProps = {
+  onOpenSettings: () => void;
+};
+
+function HeaderWithTower({ onOpenSettings }: HeaderProps) {
   const { user, isPending, clearStoredSession } = useBeaconTowerSession();
   const base = getTowerAuthBaseUrl();
   const [webflowConnection, setWebflowConnection] = useWebflowExtensionConnection(base, user?.email);
@@ -375,7 +385,9 @@ function HeaderWithTower() {
               webflowConnection={webflowConnection}
               onOpenWebflowOAuthPopup={openWebflowOAuthPopup}
             />
-            <ThemeToggle />
+            <Button type="button" variant="ghost" size="icon-sm" aria-label="Settings" onClick={onOpenSettings}>
+              <Settings aria-hidden />
+            </Button>
           </div>
         </div>
       </div>
@@ -383,11 +395,11 @@ function HeaderWithTower() {
   );
 }
 
-export default function Header() {
+export default function Header({ onOpenSettings }: HeaderProps) {
   const towerOk = isTowerConfigured();
 
   if (towerOk) {
-    return <HeaderWithTower />;
+    return <HeaderWithTower onOpenSettings={onOpenSettings} />;
   }
 
   return (
@@ -400,7 +412,9 @@ export default function Header() {
           <HeaderLogo />
         </div>
         <div className="flex min-w-0 justify-end">
-          <ThemeToggle />
+          <Button type="button" variant="ghost" size="icon-sm" aria-label="Settings" onClick={onOpenSettings}>
+            <Settings aria-hidden />
+          </Button>
         </div>
       </div>
     </header>

@@ -6,6 +6,9 @@ import chokidar from "chokidar";
 import { defineConfig, type Plugin } from "vite";
 import pkg from "./package.json";
 
+/** Vitest loads this config; skip Webflow dev plugins (chokidar) so the process can exit cleanly. */
+const isVitest = Boolean(process.env.VITEST);
+
 const wfDesignerExtensionPlugin = (): Plugin => {
   let webflowHTML = "";
   const configPath = path.join("./webflow.json");
@@ -79,7 +82,7 @@ const wfDesignerExtensionPlugin = (): Plugin => {
 
 export default defineConfig(({ mode }) => ({
   base: "./",
-  plugins: [react(), wfDesignerExtensionPlugin()],
+  plugins: [react(), ...(isVitest ? [] : [wfDesignerExtensionPlugin()])],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_CHANNEL__: JSON.stringify(mode),

@@ -1,4 +1,4 @@
-import type { ImageExportFormat } from "@codalyn/webflow-kit";
+import type { BeaconImagePresetRow, ImageExportFormat } from "@codalyn/webflow-kit";
 import { Crop, FolderPlus, Loader2 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useState } from "react";
 import type { Area } from "react-easy-crop";
@@ -6,9 +6,10 @@ import Cropper from "react-easy-crop";
 
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
 import { parseOutputDimension, WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
-import type { AspectPreset } from "@/features/image-editor/lib/aspect-preset";
+import { type AspectPreset, aspectLabels } from "@/features/image-editor/lib/aspect-preset";
 import type { AssetFolderRow } from "@/features/image-editor/lib/asset-folder-row";
 import type { ComponentImagePropOption } from "@/features/image-editor/lib/component-image-prop";
+import { type ExportPresetDefaults, findMatchingExportPresetId } from "@/features/image-editor/lib/export-preset";
 import {
   getImageEditorPlacementReadiness,
   type ImageEditorPlacementBlocker,
@@ -54,6 +55,7 @@ export type ImageEditorCropExportPanelProps = {
   setCropFrameMode: (m: CropFrameMode) => void;
   aspectPreset: AspectPreset;
   setAspectPreset: (p: AspectPreset) => void;
+  visibleBuiltinAspectPresets: AspectPreset[];
   widthStr: string;
   setWidthStr: (s: string) => void;
   outputWidth: number;
@@ -99,6 +101,17 @@ export type ImageEditorCropExportPanelProps = {
   elementCmsBindingLoading: boolean;
   busy: boolean;
   onApplyToCanvas: () => void | Promise<void>;
+  exportPresets: BeaconImagePresetRow[];
+  exportPresetDefaults: ExportPresetDefaults;
+  onApplyExportPreset: (preset: BeaconImagePresetRow) => void;
+  onExportPresetChooseCustom: () => void;
+  exportPresetManualOverride: boolean;
+  hideExportFieldsFromPreset: boolean;
+  exportPresetEncodingSummary: string | null;
+  parsedExportWidth: number;
+  parsedExportHeight: number;
+  effectiveExportWidth: number;
+  effectiveExportHeight: number;
 };
 
 /** Fade + slide down into place; `delayMs` staggers rows below the crop preview. */
@@ -240,6 +253,113 @@ function StepBadge({ n, label }: { n: number; label: string }) {
   );
 }
 
+function ExportPresetSelectBlock(props: {
+  baseId: string;
+  exportPresets: BeaconImagePresetRow[];
+  exportPresetDefaults: ExportPresetDefaults;
+  onApplyExportPreset: (preset: BeaconImagePresetRow) => void;
+  onExportPresetChooseCustom: () => void;
+  exportPresetManualOverride: boolean;
+  quality: number;
+  exportFormat: ImageExportFormat;
+  allowAvifEncoding: boolean;
+  onQualityCommit: () => void;
+  onExportFormatCommit: () => void;
+  parsedExportWidth: number;
+  parsedExportHeight: number;
+}) {
+  const {
+    baseId,
+    exportPresets,
+    exportPresetDefaults,
+    onApplyExportPreset,
+    onExportPresetChooseCustom,
+    exportPresetManualOverride,
+    quality,
+    exportFormat,
+    allowAvifEncoding,
+    onQualityCommit,
+    onExportFormatCommit,
+    parsedExportWidth,
+    parsedExportHeight,
+  } = props;
+
+  const formatForPresetMatch = useMemo(
+    () => (f: ImageExportFormat) => (!allowAvifEncoding && f === "avif" ? "webp" : f),
+    [allowAvifEncoding]
+  );
+
+  const exportPresetSelectValue = useMemo(() => {
+    if (exportPresetManualOverride) {
+      return "__custom__";
+    }
+    if (exportPresets.length === 0) {
+      return "__custom__";
+    }
+    const id = findMatchingExportPresetId(
+      exportPresets,
+      exportPresetDefaults,
+      parsedExportWidth,
+      parsedExportHeight,
+      exportFormat,
+      quality,
+      formatForPresetMatch
+    );
+    return id ?? "__custom__";
+  }, [
+    exportPresetManualOverride,
+    exportPresets,
+    exportPresetDefaults,
+    parsedExportWidth,
+    parsedExportHeight,
+    exportFormat,
+    quality,
+    formatForPresetMatch,
+  ]);
+
+  if (exportPresets.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label className="text-xs" htmlFor={`${baseId}-export-preset-crop`}>
+        Export preset
+      </Label>
+      <Select
+        value={exportPresetSelectValue}
+        onValueChange={(v) => {
+          if (v === "__custom__") {
+            onExportPresetChooseCustom();
+            return;
+          }
+          const preset = exportPresets.find((x) => x.id === v);
+          if (preset) {
+            onApplyExportPreset(preset);
+            onQualityCommit();
+            onExportFormatCommit();
+          }
+        }}
+      >
+        <SelectTrigger id={`${baseId}-export-preset-crop`} size="full">
+          <SelectValue placeholder="Choose a preset" />
+        </SelectTrigger>
+        <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
+          <SelectItem value="__custom__">Custom (manual)</SelectItem>
+          {exportPresets.map((preset) => (
+            <SelectItem key={preset.id} value={preset.id}>
+              {preset.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-muted-foreground text-[10px] leading-snug">
+        Choose before you crop. Pick Custom (manual) to change pixels or encoding yourself. Manage presets in Settings.
+      </p>
+    </div>
+  );
+}
+
 type CropStageProps = {
   baseId: string;
   imageSrc: string;
@@ -254,6 +374,7 @@ type CropStageProps = {
   setCropFrameMode: (m: CropFrameMode) => void;
   aspectPreset: AspectPreset;
   setAspectPreset: (p: AspectPreset) => void;
+  visibleBuiltinAspectPresets: AspectPreset[];
   widthStr: string;
   setWidthStr: (s: string) => void;
   outputWidth: number;
@@ -262,6 +383,20 @@ type CropStageProps = {
   setHeightStr: (s: string) => void;
   outputHeight: number;
   setOutputHeight: (n: number) => void;
+  exportPresets: BeaconImagePresetRow[];
+  exportPresetDefaults: ExportPresetDefaults;
+  onApplyExportPreset: (preset: BeaconImagePresetRow) => void;
+  onExportPresetChooseCustom: () => void;
+  exportPresetManualOverride: boolean;
+  quality: number;
+  exportFormat: ImageExportFormat;
+  allowAvifEncoding: boolean;
+  onQualityCommit: () => void;
+  onExportFormatCommit: () => void;
+  parsedExportWidth: number;
+  parsedExportHeight: number;
+  hideExportFieldsFromPreset: boolean;
+  exportPresetEncodingSummary: string | null;
 };
 
 function CropStageSection(p: CropStageProps) {
@@ -279,6 +414,7 @@ function CropStageSection(p: CropStageProps) {
     setCropFrameMode,
     aspectPreset,
     setAspectPreset,
+    visibleBuiltinAspectPresets,
     widthStr,
     setWidthStr,
     outputWidth,
@@ -287,6 +423,20 @@ function CropStageSection(p: CropStageProps) {
     setHeightStr,
     outputHeight,
     setOutputHeight,
+    exportPresets,
+    exportPresetDefaults,
+    onApplyExportPreset,
+    onExportPresetChooseCustom,
+    exportPresetManualOverride,
+    quality,
+    exportFormat,
+    allowAvifEncoding,
+    onQualityCommit,
+    onExportFormatCommit,
+    parsedExportWidth,
+    parsedExportHeight,
+    hideExportFieldsFromPreset,
+    exportPresetEncodingSummary,
   } = p;
 
   return (
@@ -298,9 +448,26 @@ function CropStageSection(p: CropStageProps) {
       <Card size="sm">
         <CardHeader className="space-y-1 pb-2">
           <CardTitle className="text-sm font-medium">Crop area</CardTitle>
-          <CardDescription>Drag to reposition and choose what gets exported.</CardDescription>
+          <CardDescription>
+            Optional: pick an export preset first, then drag to reposition and choose what gets exported.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 pt-0">
+          <ExportPresetSelectBlock
+            baseId={baseId}
+            exportPresets={exportPresets}
+            exportPresetDefaults={exportPresetDefaults}
+            onApplyExportPreset={onApplyExportPreset}
+            onExportPresetChooseCustom={onExportPresetChooseCustom}
+            exportPresetManualOverride={exportPresetManualOverride}
+            quality={quality}
+            exportFormat={exportFormat}
+            allowAvifEncoding={allowAvifEncoding}
+            onQualityCommit={onQualityCommit}
+            onExportFormatCommit={onExportFormatCommit}
+            parsedExportWidth={parsedExportWidth}
+            parsedExportHeight={parsedExportHeight}
+          />
           <div className="relative aspect-video w-full overflow-hidden rounded-xl border-2 border-dashed border-border bg-muted/30">
             <Cropper
               aspect={cropAspect}
@@ -315,101 +482,6 @@ function CropStageSection(p: CropStageProps) {
           </div>
 
           <div className={staggerBelowCropClass(belowCropEntered, 0)}>
-            <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-medium" htmlFor={`${baseId}-frame-mode`}>
-                  Frame
-                </Label>
-                <p className="text-muted-foreground text-xs leading-snug">
-                  Presets lock aspect ratio. Custom matches your output width and height.
-                </p>
-              </div>
-              <ToggleGroup
-                id={`${baseId}-frame-mode`}
-                className="grid w-full grid-cols-2 gap-1"
-                type="single"
-                value={cropFrameMode}
-                onValueChange={(v) => {
-                  if (v) {
-                    setCropFrameMode(v as CropFrameMode);
-                  }
-                }}
-                variant="outline"
-                size="sm"
-                spacing={0}
-              >
-                <ToggleGroupItem value="aspect">Presets</ToggleGroupItem>
-                <ToggleGroupItem value="custom">Custom</ToggleGroupItem>
-              </ToggleGroup>
-              {cropFrameMode === "aspect" ? (
-                <ToggleGroup
-                  id={`${baseId}-aspect`}
-                  className="grid w-full grid-cols-3 gap-1"
-                  type="single"
-                  value={aspectPreset}
-                  onValueChange={(v) => {
-                    if (v) {
-                      setAspectPreset(v as AspectPreset);
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                  spacing={0}
-                >
-                  <ToggleGroupItem value="free">Free</ToggleGroupItem>
-                  <ToggleGroupItem value="1">1:1</ToggleGroupItem>
-                  <ToggleGroupItem value="16-9">16:9</ToggleGroupItem>
-                  <ToggleGroupItem value="4-3">4:3</ToggleGroupItem>
-                  <ToggleGroupItem value="3-2">3:2</ToggleGroupItem>
-                  <ToggleGroupItem value="9-16">9:16</ToggleGroupItem>
-                </ToggleGroup>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs" htmlFor={`${baseId}-ow`}>
-                        Width (px)
-                      </Label>
-                      <Input
-                        id={`${baseId}-ow`}
-                        aria-label="Output width in pixels"
-                        inputMode="numeric"
-                        type="text"
-                        value={widthStr}
-                        onChange={(e) => setWidthStr(e.target.value)}
-                        onBlur={() => {
-                          const w = parseOutputDimension(widthStr, outputWidth);
-                          setOutputWidth(w);
-                          setWidthStr(String(w));
-                        }}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs" htmlFor={`${baseId}-oh`}>
-                        Height (px)
-                      </Label>
-                      <Input
-                        id={`${baseId}-oh`}
-                        aria-label="Output height in pixels"
-                        inputMode="numeric"
-                        type="text"
-                        value={heightStr}
-                        onChange={(e) => setHeightStr(e.target.value)}
-                        onBlur={() => {
-                          const h = parseOutputDimension(heightStr, outputHeight);
-                          setOutputHeight(h);
-                          setHeightStr(String(h));
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground text-xs leading-snug">Use values from 1 to 8192 px per side.</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className={staggerBelowCropClass(belowCropEntered, 90)}>
             <div className="flex flex-col gap-2.5 rounded-lg border border-border/70 bg-muted/20 p-3">
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-xs font-medium" htmlFor={`${baseId}-zoom`}>
@@ -426,6 +498,117 @@ function CropStageSection(p: CropStageProps) {
                 onValueChange={(v) => setZoom(v[0] ?? 1)}
               />
             </div>
+          </div>
+
+          <div className={staggerBelowCropClass(belowCropEntered, 90)}>
+            {hideExportFieldsFromPreset ? (
+              <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">
+                  Output size (preset)
+                </p>
+                <p className="mt-1 text-sm font-medium tabular-nums">
+                  {parsedExportWidth} × {parsedExportHeight}px
+                </p>
+                {exportPresetEncodingSummary ? (
+                  <p className="text-muted-foreground mt-1 text-[11px] leading-snug">{exportPresetEncodingSummary}</p>
+                ) : null}
+                <p className="text-muted-foreground mt-2 text-[10px] leading-snug">
+                  Pick Custom (manual) in Export preset above to edit pixels or encoding.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium" htmlFor={`${baseId}-frame-mode`}>
+                    Crop shape
+                  </Label>
+                  <p className="text-muted-foreground text-xs leading-snug">
+                    Aspect ratios lock the crop mask. Custom uses the width and height fields below for the crop shape.
+                  </p>
+                </div>
+                <ToggleGroup
+                  id={`${baseId}-frame-mode`}
+                  className="grid w-full grid-cols-2 gap-1"
+                  type="single"
+                  value={cropFrameMode}
+                  onValueChange={(v) => {
+                    if (v) {
+                      setCropFrameMode(v as CropFrameMode);
+                    }
+                  }}
+                  variant="outline"
+                  size="sm"
+                  spacing={0}
+                >
+                  <ToggleGroupItem value="aspect">Aspect ratios</ToggleGroupItem>
+                  <ToggleGroupItem value="custom">Custom</ToggleGroupItem>
+                </ToggleGroup>
+                {cropFrameMode === "aspect" ? (
+                  <ToggleGroup
+                    id={`${baseId}-aspect`}
+                    className="grid w-full grid-cols-3 gap-1"
+                    type="single"
+                    value={aspectPreset}
+                    onValueChange={(v) => {
+                      if (v) {
+                        setAspectPreset(v as AspectPreset);
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    spacing={0}
+                  >
+                    {visibleBuiltinAspectPresets.map((preset) => (
+                      <ToggleGroupItem key={preset} value={preset}>
+                        {aspectLabels[preset]}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col gap-1.5">
+                        <Label className="text-xs" htmlFor={`${baseId}-ow`}>
+                          Width (px)
+                        </Label>
+                        <Input
+                          id={`${baseId}-ow`}
+                          aria-label="Output width in pixels"
+                          inputMode="numeric"
+                          type="text"
+                          value={widthStr}
+                          onChange={(e) => setWidthStr(e.target.value)}
+                          onBlur={() => {
+                            const w = parseOutputDimension(widthStr, outputWidth);
+                            setOutputWidth(w);
+                            setWidthStr(String(w));
+                          }}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label className="text-xs" htmlFor={`${baseId}-oh`}>
+                          Height (px)
+                        </Label>
+                        <Input
+                          id={`${baseId}-oh`}
+                          aria-label="Output height in pixels"
+                          inputMode="numeric"
+                          type="text"
+                          value={heightStr}
+                          onChange={(e) => setHeightStr(e.target.value)}
+                          onBlur={() => {
+                            const h = parseOutputDimension(heightStr, outputHeight);
+                            setOutputHeight(h);
+                            setHeightStr(String(h));
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-muted-foreground text-xs leading-snug">Use values from 1 to 8192 px per side.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -449,6 +632,12 @@ type ExportCardProps = {
   estimatedBytes: number | null;
   originalBytes: number | null;
   estimateNonce: number;
+  parsedExportWidth: number;
+  parsedExportHeight: number;
+  effectiveExportWidth: number;
+  effectiveExportHeight: number;
+  hideExportFieldsFromPreset: boolean;
+  exportPresetEncodingSummary: string | null;
 };
 
 function ExportEncodeCard(p: ExportCardProps) {
@@ -468,6 +657,12 @@ function ExportEncodeCard(p: ExportCardProps) {
     estimatedBytes,
     originalBytes,
     estimateNonce,
+    parsedExportWidth,
+    parsedExportHeight,
+    effectiveExportWidth,
+    effectiveExportHeight,
+    hideExportFieldsFromPreset,
+    exportPresetEncodingSummary,
   } = p;
 
   return (
@@ -479,9 +674,29 @@ function ExportEncodeCard(p: ExportCardProps) {
       <Card size="sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">File & quality</CardTitle>
-          <CardDescription>Name and compression before upload.</CardDescription>
+          <CardDescription>
+            {hideExportFieldsFromPreset
+              ? "Name the asset and check the size estimate. Encoding is set by your preset in step 1."
+              : "Confirm format and quality, or adjust after choosing a preset in step 1."}
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 pt-0">
+          <div
+            className="rounded-md border border-border/60 bg-muted/15 px-2.5 py-2 text-[11px] tabular-nums"
+            aria-live="polite"
+          >
+            <span className="text-muted-foreground">Export pixels </span>
+            <span className="font-medium text-foreground">
+              {completedCrop
+                ? `${effectiveExportWidth}×${effectiveExportHeight}`
+                : `${parsedExportWidth}×${parsedExportHeight}`}
+            </span>
+            {completedCrop ? (
+              <span className="text-muted-foreground"> (from crop)</span>
+            ) : (
+              <span className="text-muted-foreground"> (adjust crop to finalize)</span>
+            )}
+          </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs" htmlFor={`${baseId}-fn`}>
               File name
@@ -495,56 +710,66 @@ function ExportEncodeCard(p: ExportCardProps) {
               onBlur={() => setFileBaseName(sanitizeAssetBaseName(fileBaseName))}
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <span className="text-muted-foreground text-xs" id={`${baseId}-format`}>
-              Output format
-            </span>
-            <ToggleGroup
-              type="single"
-              value={exportFormat}
-              onValueChange={(v) => {
-                if (v === "webp" || v === "avif") {
-                  setExportFormat(v);
-                  onExportFormatCommit();
-                }
-              }}
-              aria-labelledby={`${baseId}-format`}
-              className="justify-stretch"
-            >
-              <ToggleGroupItem value="webp" className="flex-1">
-                WebP
-              </ToggleGroupItem>
-              <ToggleGroupItem value="avif" className="flex-1" disabled={!allowAvifEncoding}>
-                AVIF
-              </ToggleGroupItem>
-            </ToggleGroup>
-            <p className="text-muted-foreground text-[10px] leading-snug">
-              {allowAvifEncoding
-                ? "With Tower connected, WebP and AVIF both use the same optimize API. Without Tower, only WebP (in-browser) is available."
-                : "Guest mode uses WebP only. Sign in to Tower to unlock AVIF compression."}
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label className="text-muted-foreground text-xs" htmlFor={`${baseId}-quality`}>
-              Quality
-            </Label>
-            <Slider
-              id={`${baseId}-quality`}
-              min={0.05}
-              max={1}
-              step={0.01}
-              value={[quality]}
-              onValueChange={(v) => setQuality(v[0] ?? 0.75)}
-              onValueCommit={onQualityCommit}
-            />
-            <ExportSizeEstimate
-              completedCrop={completedCrop}
-              estimatePending={estimatePending}
-              estimatedBytes={estimatedBytes}
-              originalBytes={originalBytes}
-              showQualityCommitHint={completedCrop !== null && estimateNonce === 0}
-            />
-          </div>
+          {hideExportFieldsFromPreset && exportPresetEncodingSummary ? (
+            <div className="rounded-md border border-border/60 bg-muted/10 px-2.5 py-2">
+              <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">Encoding (preset)</p>
+              <p className="text-foreground mt-0.5 text-sm font-medium leading-snug">{exportPresetEncodingSummary}</p>
+            </div>
+          ) : null}
+          {!hideExportFieldsFromPreset ? (
+            <>
+              <div className="flex flex-col gap-2">
+                <span className="text-muted-foreground text-xs" id={`${baseId}-format`}>
+                  Output format
+                </span>
+                <ToggleGroup
+                  type="single"
+                  value={exportFormat}
+                  onValueChange={(v) => {
+                    if (v === "webp" || v === "avif") {
+                      setExportFormat(v);
+                      onExportFormatCommit();
+                    }
+                  }}
+                  aria-labelledby={`${baseId}-format`}
+                  className="justify-stretch"
+                >
+                  <ToggleGroupItem value="webp" className="flex-1">
+                    WebP
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="avif" className="flex-1" disabled={!allowAvifEncoding}>
+                    AVIF
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                <p className="text-muted-foreground text-[10px] leading-snug">
+                  {allowAvifEncoding
+                    ? "With Tower connected, WebP and AVIF both use the same optimize API. Without Tower, only WebP (in-browser) is available."
+                    : "Guest mode uses WebP only. Sign in to Tower to unlock AVIF compression."}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="text-muted-foreground text-xs" htmlFor={`${baseId}-quality`}>
+                  Quality
+                </Label>
+                <Slider
+                  id={`${baseId}-quality`}
+                  min={0.05}
+                  max={1}
+                  step={0.01}
+                  value={[quality]}
+                  onValueChange={(v) => setQuality(v[0] ?? 0.75)}
+                  onValueCommit={onQualityCommit}
+                />
+              </div>
+            </>
+          ) : null}
+          <ExportSizeEstimate
+            completedCrop={completedCrop}
+            estimatePending={estimatePending}
+            estimatedBytes={estimatedBytes}
+            originalBytes={originalBytes}
+            showQualityCommitHint={completedCrop !== null && estimateNonce === 0}
+          />
         </CardContent>
       </Card>
     </section>
@@ -1004,6 +1229,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     setCropFrameMode,
     aspectPreset,
     setAspectPreset,
+    visibleBuiltinAspectPresets,
     widthStr,
     setWidthStr,
     outputWidth,
@@ -1045,6 +1271,17 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     elementCmsBindingLoading,
     busy,
     onApplyToCanvas,
+    exportPresets,
+    exportPresetDefaults,
+    onApplyExportPreset,
+    onExportPresetChooseCustom,
+    exportPresetManualOverride,
+    hideExportFieldsFromPreset,
+    exportPresetEncodingSummary,
+    parsedExportWidth,
+    parsedExportHeight,
+    effectiveExportWidth,
+    effectiveExportHeight,
   } = props;
 
   const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
@@ -1118,6 +1355,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         setCropFrameMode={setCropFrameMode}
         aspectPreset={aspectPreset}
         setAspectPreset={setAspectPreset}
+        visibleBuiltinAspectPresets={visibleBuiltinAspectPresets}
         widthStr={widthStr}
         setWidthStr={setWidthStr}
         outputWidth={outputWidth}
@@ -1126,6 +1364,20 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         setHeightStr={setHeightStr}
         outputHeight={outputHeight}
         setOutputHeight={setOutputHeight}
+        exportPresets={exportPresets}
+        exportPresetDefaults={exportPresetDefaults}
+        onApplyExportPreset={onApplyExportPreset}
+        onExportPresetChooseCustom={onExportPresetChooseCustom}
+        exportPresetManualOverride={exportPresetManualOverride}
+        quality={quality}
+        exportFormat={exportFormat}
+        allowAvifEncoding={allowAvifEncoding}
+        onQualityCommit={onQualityCommit}
+        onExportFormatCommit={onExportFormatCommit}
+        parsedExportWidth={parsedExportWidth}
+        parsedExportHeight={parsedExportHeight}
+        hideExportFieldsFromPreset={hideExportFieldsFromPreset}
+        exportPresetEncodingSummary={exportPresetEncodingSummary}
       />
 
       <ExportEncodeCard
@@ -1144,6 +1396,12 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         estimatedBytes={estimatedBytes}
         originalBytes={originalBytes}
         estimateNonce={estimateNonce}
+        parsedExportWidth={parsedExportWidth}
+        parsedExportHeight={parsedExportHeight}
+        effectiveExportWidth={effectiveExportWidth}
+        effectiveExportHeight={effectiveExportHeight}
+        hideExportFieldsFromPreset={hideExportFieldsFromPreset}
+        exportPresetEncodingSummary={exportPresetEncodingSummary}
       />
 
       <PlacementCard

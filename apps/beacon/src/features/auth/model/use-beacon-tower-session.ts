@@ -48,18 +48,18 @@ function toBridgedTowerUser(sessionData: unknown): BridgedTowerUser | undefined 
         session?: { userId?: unknown };
       }
     | undefined;
-  const email = typeof s?.user?.email === "string" ? s.user.email : "";
-  if (!email) {
+  const u = s?.user;
+  const email = typeof u?.email === "string" ? u.email : "";
+  if (!email || !u) {
     return undefined;
   }
-  const idFromUser = typeof s.user?.id === "string" && s.user.id.trim() ? s.user.id.trim() : "";
-  const idFromSession =
-    typeof s.session?.userId === "string" && s.session.userId.trim() ? s.session.userId.trim() : "";
+  const idFromUser = typeof u.id === "string" && u.id.trim() ? u.id.trim() : "";
+  const idFromSession = typeof s.session?.userId === "string" && s.session.userId.trim() ? s.session.userId.trim() : "";
   return {
     id: idFromUser || idFromSession,
     email,
-    name: s.user?.name ?? null,
-    image: s.user?.image ?? null,
+    name: u.name ?? null,
+    image: u.image ?? null,
   };
 }
 

@@ -1,10 +1,10 @@
 import {
+  type BeaconAppSettings,
   getDefaultBeaconAppSettings,
   mergeBeaconAppSettings,
   parseBeaconAppSettings,
-  type BeaconAppSettings,
 } from "@codalyn/webflow-kit";
-import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { towerFetch } from "@/shared/lib/tower-client";
 import { ThemeProvider } from "@/shared/providers/theme-provider";

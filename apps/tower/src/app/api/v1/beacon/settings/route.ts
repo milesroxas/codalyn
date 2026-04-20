@@ -1,14 +1,14 @@
 import {
+  type BeaconAppSettings,
   getDefaultBeaconAppSettings,
   mergeBeaconAppSettings,
   parseBeaconAppSettings,
   parseBeaconAppSettingsPartial,
-  type BeaconAppSettings,
 } from "@codalyn/webflow-kit";
 import { eq } from "drizzle-orm";
+import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { db } from "@/shared/lib/db";
 import { beaconAppSettings as beaconAppSettingsTable } from "@/shared/lib/db/auth-schema";
-import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 
 export const runtime = "nodejs";
 

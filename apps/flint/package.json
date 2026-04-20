@@ -14,7 +14,7 @@
     "lint:all": "pnpm typecheck && pnpm lint",
     "format": "biome format --write .",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "vitest run",
     "test:run": "vitest run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",

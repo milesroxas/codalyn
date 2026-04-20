@@ -1,4 +1,3 @@
-import type { ImageExportFormat } from "@codalyn/webflow-kit";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useId } from "react";
 import { type AspectPreset, aspectLabels } from "@/features/image-editor/lib/aspect-preset";
@@ -65,8 +64,7 @@ export function SettingsPreferencesPanel() {
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium">Default export</h2>
         <p className="text-muted-foreground text-xs leading-relaxed">
-          Used when you start editing a new image. Changing options here does not affect the current file until you
-          reload or pick new defaults manually.
+          Starting values for format and quality when you open a new image. Saved export presets live under Presets.
         </p>
         <div className="flex flex-col gap-2">
           <span className="text-muted-foreground text-xs" id={`${baseId}-format`}>
@@ -118,19 +116,12 @@ export function SettingsPreferencesPanel() {
         </div>
         <div className="flex flex-col gap-2">
           <Label className="text-muted-foreground text-xs" htmlFor={`${baseId}-aspect`}>
-            Default aspect ratio
+            Default crop aspect
           </Label>
           <Select
             value={settings.defaultAspectPreset}
             onValueChange={(v) => {
-              if (
-                v === "free" ||
-                v === "1" ||
-                v === "16-9" ||
-                v === "4-3" ||
-                v === "3-2" ||
-                v === "9-16"
-              ) {
+              if (v === "free" || v === "1" || v === "16-9" || v === "4-3" || v === "3-2" || v === "9-16") {
                 updateSettings({ defaultAspectPreset: v });
               }
             }}

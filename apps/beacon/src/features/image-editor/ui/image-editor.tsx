@@ -1,5 +1,9 @@
-import { DEFAULT_IMAGE_EXPORT_FORMAT, type ImageExportFormat, isImageExportFormat } from "@codalyn/webflow-kit";
-import type { DragEvent } from "react";
+import {
+  type BeaconImagePresetRow,
+  getVisibleBuiltinAspectPresets,
+  type ImageExportFormat,
+} from "@codalyn/webflow-kit";
+import type { DragEvent, SetStateAction } from "react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Area } from "react-easy-crop";
 import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
@@ -8,6 +12,12 @@ import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-ex
 import { outputDimensionsMatchingCrop, parseOutputDimension } from "@/features/image-editor/lib/apply-cropped-export";
 import { type AspectPreset, aspectValue } from "@/features/image-editor/lib/aspect-preset";
 import { isCmsPrimaryUploadContext } from "@/features/image-editor/lib/cms-primary-upload-context";
+import {
+  type ExportPresetDefaults,
+  findMatchingExportPresetId,
+  resolvePresetExportFormat,
+  resolvePresetExportQuality,
+} from "@/features/image-editor/lib/export-preset";
 import { useApplyCroppedToWebflow } from "@/features/image-editor/model/use-apply-cropped-to-webflow";
 import { useComponentInstanceImageProps } from "@/features/image-editor/model/use-component-instance-image-props";
 import { useExportByteEstimate } from "@/features/image-editor/model/use-export-byte-estimate";
@@ -25,39 +35,24 @@ import {
   LoadedImageSourceSection,
 } from "@/features/image-editor/ui/image-editor-source-sections";
 import { ImageEditorWorkspace } from "@/features/image-editor/ui/image-editor-workspace";
+import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { cn } from "@/shared/lib/utils";
 
-const EXPORT_FORMAT_STORAGE_KEY = "beacon:image-export-format";
 const TOWER_EMAIL_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";
 
 type ImageEditorProps = {
   onOnboardingVisibilityChange?: (visible: boolean) => void;
 };
 
-function readStoredExportFormat(): ImageExportFormat {
-  try {
-    const s = localStorage.getItem(EXPORT_FORMAT_STORAGE_KEY);
-    if (s) {
-      const key = s.trim().toLowerCase();
-      if (isImageExportFormat(key)) {
-        return key;
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return DEFAULT_IMAGE_EXPORT_FORMAT;
-}
-
 export function ImageEditor(props: ImageEditorProps = {}) {
   const { onOnboardingVisibilityChange } = props;
+  const { settings, updateSettings, canPersistExportDefaults, syncState } = useBeaconAppSettings();
   const baseId = useId();
   const fileInputId = `${baseId}-file`;
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [aspectPreset, setAspectPreset] = useState<AspectPreset>("free");
+  const [aspectPreset, setAspectPreset] = useState<AspectPreset>(settings.defaultAspectPreset);
   const [cropFrameMode, setCropFrameMode] = useState<CropFrameMode>("aspect");
   const [completedCrop, setCompletedCrop] = useState<Area | null>(null);
   const [outputWidth, setOutputWidth] = useState(1200);
@@ -65,14 +60,23 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   const [widthStr, setWidthStr] = useState("1200");
   const [heightStr, setHeightStr] = useState("1200");
   const [fileBaseName, setFileBaseName] = useState("edited");
-  const [quality, setQuality] = useState(0.75);
-  const [exportFormat, setExportFormat] = useState<ImageExportFormat>(readStoredExportFormat);
+  const [quality, setQuality] = useState(settings.defaultExportQuality);
+  const [exportFormat, setExportFormat] = useState<ImageExportFormat>(settings.defaultExportFormat);
   const [placement, setPlacement] = useState<PlacementMode>("selection");
   const [replaceLibraryAsset, setReplaceLibraryAsset] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [originalBytes, setOriginalBytes] = useState<number | null>(null);
   const [guestOnboardingComplete, setGuestOnboardingComplete] = useState(false);
+  /** True after user picks "Custom (manual)" in preset dropdown; shows format/quality/dimension editors even if values still match a preset. */
+  const [exportPresetManualOverride, setExportPresetManualOverride] = useState(false);
+  const [imageSrc, setImageSrcInternal] = useState<string | null>(null);
+  const setImageSrc = useCallback((action: SetStateAction<string | null>) => {
+    setExportPresetManualOverride(false);
+    setImageSrcInternal(action);
+  }, []);
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
+  const exportDefaultsHydratedRef = useRef(!towerUser?.id);
+  const serverExportDefaultsAppliedRef = useRef(false);
   const towerConfigured = isTowerConfigured();
   const allowAvifEncoding = Boolean(towerUser);
   const showOnboardingLoading = !imageSrc && towerSessionPending && !towerUser && !guestOnboardingComplete;
@@ -97,6 +101,20 @@ export function ImageEditor(props: ImageEditorProps = {}) {
     elementCmsBinding,
     elementCmsBindingLoading,
   } = useComponentInstanceImageProps();
+
+  const visibleBuiltinAspectPresets = useMemo(() => getVisibleBuiltinAspectPresets(settings), [settings]);
+
+  useEffect(() => {
+    if (visibleBuiltinAspectPresets.length === 0) {
+      return;
+    }
+    if (!visibleBuiltinAspectPresets.includes(aspectPreset)) {
+      const next = visibleBuiltinAspectPresets[0];
+      if (next !== undefined) {
+        setAspectPreset(next);
+      }
+    }
+  }, [visibleBuiltinAspectPresets, aspectPreset]);
 
   const cmsPrimaryUpload = useMemo(
     () =>
@@ -136,12 +154,31 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(EXPORT_FORMAT_STORAGE_KEY, exportFormat);
-    } catch {
-      /* ignore */
+    exportDefaultsHydratedRef.current = !towerUser?.id;
+    serverExportDefaultsAppliedRef.current = false;
+  }, [towerUser?.id]);
+
+  useEffect(() => {
+    if (!towerUser?.id || syncState !== "synced" || serverExportDefaultsAppliedRef.current) {
+      return;
     }
-  }, [exportFormat]);
+    serverExportDefaultsAppliedRef.current = true;
+    setExportFormat(settings.defaultExportFormat);
+    setQuality(settings.defaultExportQuality);
+    setAspectPreset(settings.defaultAspectPreset);
+    exportDefaultsHydratedRef.current = true;
+  }, [towerUser?.id, syncState, settings]);
+
+  useEffect(() => {
+    if (!exportDefaultsHydratedRef.current || !canPersistExportDefaults) {
+      return;
+    }
+    updateSettings({
+      defaultExportFormat: exportFormat,
+      defaultExportQuality: quality,
+      defaultAspectPreset: aspectPreset,
+    });
+  }, [exportFormat, quality, aspectPreset, canPersistExportDefaults, updateSettings]);
 
   useEffect(() => {
     if (!allowAvifEncoding && exportFormat === "avif") {
@@ -175,6 +212,75 @@ export function ImageEditor(props: ImageEditorProps = {}) {
 
   const parsedOutputW = useMemo(() => parseOutputDimension(widthStr, outputWidth), [widthStr, outputWidth]);
   const parsedOutputH = useMemo(() => parseOutputDimension(heightStr, outputHeight), [heightStr, outputHeight]);
+
+  const exportPresetDefaults: ExportPresetDefaults = useMemo(
+    () => ({
+      exportFormat: settings.defaultExportFormat,
+      exportQuality: settings.defaultExportQuality,
+    }),
+    [settings.defaultExportFormat, settings.defaultExportQuality]
+  );
+
+  const applyExportPreset = useCallback(
+    (preset: BeaconImagePresetRow) => {
+      setExportPresetManualOverride(false);
+      const fmtRaw = resolvePresetExportFormat(preset, exportPresetDefaults);
+      const fmt = !allowAvifEncoding && fmtRaw === "avif" ? "webp" : fmtRaw;
+      const qual = resolvePresetExportQuality(preset, exportPresetDefaults);
+      setExportFormat(fmt);
+      setQuality(qual);
+      setOutputWidth(preset.width);
+      setOutputHeight(preset.height);
+      setWidthStr(String(preset.width));
+      setHeightStr(String(preset.height));
+      setCropFrameMode("custom");
+    },
+    [allowAvifEncoding, exportPresetDefaults]
+  );
+
+  const formatForPresetMatch = useMemo(
+    () => (f: ImageExportFormat) => (!allowAvifEncoding && f === "avif" ? "webp" : f),
+    [allowAvifEncoding]
+  );
+
+  const exportPresetMatchId = useMemo(
+    () =>
+      findMatchingExportPresetId(
+        settings.imagePresets,
+        exportPresetDefaults,
+        parsedOutputW,
+        parsedOutputH,
+        exportFormat,
+        quality,
+        formatForPresetMatch
+      ),
+    [
+      settings.imagePresets,
+      exportPresetDefaults,
+      parsedOutputW,
+      parsedOutputH,
+      exportFormat,
+      quality,
+      formatForPresetMatch,
+    ]
+  );
+
+  const exportPresetMatchActive = exportPresetMatchId !== null && !exportPresetManualOverride;
+
+  const exportPresetEncodingSummary = useMemo(() => {
+    if (!exportPresetMatchActive || !exportPresetMatchId) {
+      return null;
+    }
+    const row = settings.imagePresets.find((p) => p.id === exportPresetMatchId);
+    if (!row) {
+      return null;
+    }
+    const f = resolvePresetExportFormat(row, exportPresetDefaults);
+    const q = resolvePresetExportQuality(row, exportPresetDefaults);
+    return `${row.name} · ${f.toUpperCase()} · ${Math.round(q * 100)}%`;
+  }, [exportPresetMatchActive, exportPresetMatchId, settings.imagePresets, exportPresetDefaults]);
+
+  const hideExportFieldsFromPreset = exportPresetMatchActive && exportPresetEncodingSummary !== null;
 
   const { effectiveOutputW, effectiveOutputH } = useMemo(() => {
     if (!completedCrop) {
@@ -271,7 +377,15 @@ export function ImageEditor(props: ImageEditorProps = {}) {
         <LoadedImageSourceSection busy={busy} fileBaseName={fileBaseName} fileInputRef={fileInputRef} />
         <div className="flex flex-col gap-3 px-4">
           <ImageEditorCropExportPanel
+            exportPresets={settings.imagePresets}
+            exportPresetDefaults={exportPresetDefaults}
+            onApplyExportPreset={applyExportPreset}
+            onExportPresetChooseCustom={() => setExportPresetManualOverride(true)}
+            exportPresetManualOverride={exportPresetManualOverride}
+            hideExportFieldsFromPreset={hideExportFieldsFromPreset}
+            exportPresetEncodingSummary={exportPresetEncodingSummary}
             aspectPreset={aspectPreset}
+            visibleBuiltinAspectPresets={visibleBuiltinAspectPresets}
             assetFolders={assetFolders}
             baseId={baseId}
             busy={busy}
@@ -324,6 +438,10 @@ export function ImageEditor(props: ImageEditorProps = {}) {
             setZoom={setZoom}
             widthStr={widthStr}
             zoom={zoom}
+            parsedExportWidth={parsedOutputW}
+            parsedExportHeight={parsedOutputH}
+            effectiveExportWidth={effectiveOutputW}
+            effectiveExportHeight={effectiveOutputH}
           />
         </div>
       </div>

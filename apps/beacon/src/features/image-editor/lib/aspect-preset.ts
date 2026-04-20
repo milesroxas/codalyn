@@ -1,5 +1,14 @@
 export type AspectPreset = "free" | "1" | "16-9" | "4-3" | "3-2" | "9-16";
 
+export const aspectLabels: Record<AspectPreset, string> = {
+  free: "Free",
+  "1": "1:1",
+  "16-9": "16:9",
+  "4-3": "4:3",
+  "3-2": "3:2",
+  "9-16": "9:16",
+};
+
 export function aspectValue(preset: AspectPreset): number | undefined {
   switch (preset) {
     case "free":

@@ -7,10 +7,11 @@ import { resolveAuthSecret } from "@/server/auth-secret";
 import { sendChangeEmailConfirmationEmail } from "@/server/email/change-email-confirmation-email";
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
 import { towerOrganization } from "@/server/membership/tower-organization";
+import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { db } from "@/shared/lib/db";
 import * as schema from "@/shared/lib/db/auth-schema";
 
-const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3100";
+const baseURL = resolveTowerPublicBaseUrl();
 
 /** Beacon extension + local dev; keep in sync with `middleware` CORS defaults + env extras. */
 const defaultTrustedOrigins = [

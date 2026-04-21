@@ -8,13 +8,9 @@ import {
 } from "@/server/email/operator-customer-invite-email";
 import { isTowerProductAdmin } from "@/server/membership/product-admin";
 import { signOperatorCustomerInviteToken } from "@/server/operator-customer-invite-token";
+import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { db } from "@/shared/lib/db";
 import { user } from "@/shared/lib/db/auth-schema";
-
-function towerAppBaseUrl(): string {
-  const raw = process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
-  return raw.replace(/\/$/, "");
-}
 
 function normalizeEmail(raw: unknown): string | null {
   if (typeof raw !== "string") {
@@ -57,9 +53,9 @@ export async function POST(req: Request) {
   }
 
   const token = signOperatorCustomerInviteToken(email);
-  const base = towerAppBaseUrl();
+  const base = resolveTowerPublicBaseUrl();
   const invitePath = `/sign-up?invite=${encodeURIComponent(token)}`;
-  const inviteUrl = base ? `${base}${invitePath}` : invitePath;
+  const inviteUrl = `${base}${invitePath}`;
 
   await sendOperatorNewCustomerInviteEmail({
     email,

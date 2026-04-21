@@ -1,9 +1,5 @@
 import { sendTransactionalEmail } from "@/server/email/resend-send";
-
-function towerAppBaseUrl(): string {
-  const raw = process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
-  return raw.replace(/\/$/, "");
-}
+import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -17,7 +13,7 @@ export async function sendChangeEmailConfirmationEmail(data: {
   newEmail: string;
   url: string;
 }): Promise<void> {
-  const base = towerAppBaseUrl();
+  const base = resolveTowerPublicBaseUrl();
   const subject = "Confirm your Tower email change";
   const text = [
     `You requested to change your Tower account email to ${data.newEmail}.`,

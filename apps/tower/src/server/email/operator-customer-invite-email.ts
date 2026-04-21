@@ -1,9 +1,5 @@
 import { sendTransactionalEmail } from "@/server/email/resend-send";
-
-function towerAppBaseUrl(): string {
-  const raw = process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
-  return raw.replace(/\/$/, "");
-}
+import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -46,9 +42,9 @@ export async function sendOperatorExistingUserTeamEligibleEmail(data: {
   email: string;
   inviterLabel: string;
 }): Promise<void> {
-  const base = towerAppBaseUrl();
+  const base = resolveTowerPublicBaseUrl();
   const teamPath = "/team";
-  const teamUrl = base ? `${base}${teamPath}` : teamPath;
+  const teamUrl = `${base}${teamPath}`;
   const subject = "Your Tower account can create a team workspace";
   const text = [
     `${data.inviterLabel} enabled team workspace creation on your Tower account.`,

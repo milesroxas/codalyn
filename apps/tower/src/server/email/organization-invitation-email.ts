@@ -1,9 +1,5 @@
 import { sendTransactionalEmail } from "@/server/email/resend-send";
-
-function towerAppBaseUrl(): string {
-  const raw = process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
-  return raw.replace(/\/$/, "");
-}
+import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 
 /**
  * Team invitation email (Better Auth organization `sendInvitationEmail`).
@@ -17,9 +13,9 @@ export async function sendOrganizationInvitationEmail(data: {
   inviter: { user: { name: string | null; email?: string | null } };
   invitation: { id: string };
 }): Promise<void> {
-  const base = towerAppBaseUrl();
+  const base = resolveTowerPublicBaseUrl();
   const acceptPath = `/invitations/accept?invitationId=${encodeURIComponent(data.invitation.id)}`;
-  const acceptUrl = base ? `${base}${acceptPath}` : acceptPath;
+  const acceptUrl = `${base}${acceptPath}`;
   const inviterName = data.inviter.user.name?.trim() || data.inviter.user.email || "A teammate";
   const orgName = data.organization.name;
   const subject = `You’re invited to ${orgName} on Tower`;

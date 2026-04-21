@@ -16,6 +16,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
+import { nextCycledBeaconTheme, persistBeaconThemePreference } from "@/features/beacon/lib/beacon-theme-preference";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 
@@ -29,7 +30,8 @@ export function OperatorShell(props: { userEmail: string; children: ReactNode })
   const { userEmail, children } = props;
   const pathname = usePathname();
   const router = useRouter();
-  const { setTheme, resolvedTheme } = useTheme();
+  const { data: session } = authClient.useSession();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -46,9 +48,13 @@ export function OperatorShell(props: { userEmail: string; children: ReactNode })
     setSigningOut(false);
   }, [router]);
 
-  const toggleTheme = () => {
-    setTheme(resolvedTheme === "dark" ? "light" : "dark");
-  };
+  const cycleTheme = useCallback(() => {
+    const next = nextCycledBeaconTheme(theme);
+    setTheme(next);
+    if (session?.user) {
+      persistBeaconThemePreference(next);
+    }
+  }, [theme, setTheme, session?.user]);
 
   const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
     <nav className="flex flex-col gap-0.5 p-3">
@@ -155,7 +161,7 @@ export function OperatorShell(props: { userEmail: string; children: ReactNode })
           <div className="hidden md:block" />
           <div className="flex items-center gap-2">
             {mounted ? (
-              <Button type="button" variant="ghost" size="icon-sm" onClick={toggleTheme} aria-label="Toggle theme">
+              <Button type="button" variant="ghost" size="icon-sm" onClick={cycleTheme} aria-label="Cycle theme">
                 {resolvedTheme === "dark" ? (
                   <IconSun aria-hidden className="size-4 text-zinc-600 dark:text-zinc-400" />
                 ) : (

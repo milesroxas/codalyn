@@ -12,13 +12,13 @@ export function App() {
   return (
     <BeaconAppSettingsProvider>
       <TooltipProvider delayDuration={200}>
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden" data-version={buildInfo.version}>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-version={buildInfo.version}>
           {surface === "settings" ? (
             <BeaconSettingsScreen onBack={() => setSurface("main")} />
           ) : (
             <>
               {onboardingVisible ? null : <Header onOpenSettings={() => setSurface("settings")} />}
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-4">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-4">
                 <ImageEditor onOnboardingVisibilityChange={setOnboardingVisible} />
               </div>
             </>

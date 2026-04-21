@@ -16,6 +16,11 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:local": "node scripts/db-migrate.mjs local",
+    "db:migrate:dev": "node scripts/db-migrate.mjs dev",
+    "db:migrate:prod": "node scripts/db-migrate.mjs prod",
+    "db:migrate:dev:vercel": "node scripts/db-migrate.mjs dev --vercel",
+    "db:migrate:prod:vercel": "node scripts/db-migrate.mjs prod --vercel",
     "db:check": "drizzle-kit check",
     "db:studio": "drizzle-kit studio",
     "clean": "rm -rf .next .turbo node_modules"

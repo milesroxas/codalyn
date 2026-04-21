@@ -14,8 +14,11 @@ export type BeaconThemePreference = z.infer<typeof beaconThemePreferenceSchema>;
 
 const PRESET_EDGE = z.number().int().min(1).max(8192);
 
-/** Default ceiling when migrating presets that only had a quality slider (legacy). */
-export const BEACON_PRESET_DEFAULT_MAX_FILE_BYTES = 2 * 1024 * 1024;
+/**
+ * Default encoded-size cap for presets (migration + invalid-input fallback).
+ * ~100 KB keeps exports lean for fast LCP and small transfer sizes.
+ */
+export const BEACON_PRESET_DEFAULT_MAX_FILE_BYTES = 100 * 1024;
 
 /** Allowed range for `maxFileSizeBytes` on image presets (export UX). */
 export const BEACON_PRESET_MAX_FILE_BYTES_MIN = 1024;
@@ -45,6 +48,11 @@ export const beaconAppSettingsSchema = z.object({
   defaultExportQuality: z.number().min(0).max(1),
   defaultAspectPreset: beaconAspectPresetSchema,
   imagePresets: z.array(beaconImagePresetRowSchema),
+  /**
+   * Workspace-level export presets visible only to designers (and admins), not to editors.
+   * Stored with team settings; cleared in API responses for editor experience.
+   */
+  designerOnlyImagePresets: z.array(beaconImagePresetRowSchema).default([]),
   /** Built-in aspects removed from the crop preset strip; empty means all built-ins are shown. */
   hiddenBuiltinAspectPresets: z.array(beaconAspectPresetSchema).default([]),
   /**
@@ -58,11 +66,12 @@ export type BeaconAppSettings = z.infer<typeof beaconAppSettingsSchema>;
 export function getDefaultBeaconAppSettings(): BeaconAppSettings {
   return {
     version: 1,
-    theme: "light",
+    theme: "system",
     defaultExportFormat: DEFAULT_IMAGE_EXPORT_FORMAT,
     defaultExportQuality: 0.75,
     defaultAspectPreset: "free",
     imagePresets: [],
+    designerOnlyImagePresets: [],
     hiddenBuiltinAspectPresets: [],
     limitCropZoomToNativeResolution: false,
   };
@@ -71,6 +80,11 @@ export function getDefaultBeaconAppSettings(): BeaconAppSettings {
 export function getVisibleBuiltinAspectPresets(settings: BeaconAppSettings): BeaconAspectPreset[] {
   const hidden = new Set(settings.hiddenBuiltinAspectPresets);
   return BEACON_BUILTIN_ASPECT_PRESETS.filter((p) => !hidden.has(p));
+}
+
+/** Export strip: workspace presets plus designer-only rows when present. */
+export function getBeaconExportImagePresets(settings: BeaconAppSettings): BeaconImagePresetRow[] {
+  return [...settings.imagePresets, ...settings.designerOnlyImagePresets];
 }
 
 function migrateImagePresetRow(row: unknown): unknown {
@@ -103,6 +117,7 @@ export function parseBeaconAppSettings(raw: unknown): BeaconAppSettings {
       ? {
           ...(raw as Record<string, unknown>),
           imagePresets: migrateImagePresetsField((raw as Record<string, unknown>).imagePresets),
+          designerOnlyImagePresets: migrateImagePresetsField((raw as Record<string, unknown>).designerOnlyImagePresets),
         }
       : raw;
   const parsed = beaconAppSettingsSchema.safeParse(prepped);
@@ -133,6 +148,7 @@ export function mergeBeaconAppSettings(base: BeaconAppSettings, patch: Partial<B
     ...base,
     ...clean,
     imagePresets: clean.imagePresets ?? base.imagePresets,
+    designerOnlyImagePresets: clean.designerOnlyImagePresets ?? base.designerOnlyImagePresets,
   });
 }
 

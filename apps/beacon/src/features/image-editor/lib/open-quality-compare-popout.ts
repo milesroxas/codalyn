@@ -118,27 +118,76 @@ export function openQualityComparePopout(options: {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 2px;
-    margin-left: -1px;
+    left: 50%;
+    width: 1px;
+    transform: translateX(-50%);
     background: #fff;
     box-shadow: 0 0 0 1px rgba(0,0,0,0.45);
     pointer-events: none;
     z-index: 2;
   }
-  .compare-controls {
-    width: 100%;
-    max-width: 1280px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  .compare-wipe-handle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    box-sizing: border-box;
+    width: 14px;
+    height: 32px;
+    transform: translate(-50%, -50%);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background-color: #fafafa;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0 4px,
+      rgba(10, 10, 10, 0.35) 4px 5px,
+      transparent 5px 9px,
+      rgba(10, 10, 10, 0.35) 9px 10px,
+      transparent 10px 14px,
+      rgba(10, 10, 10, 0.35) 14px 15px,
+      transparent 15px 100%
+    );
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.35),
+      0 2px 8px rgba(0, 0, 0, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    pointer-events: none;
+    z-index: 3;
   }
-  .compare-labels { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: #a3a3a3; text-transform: uppercase; letter-spacing: 0.04em; }
-  #scrub { width: 100%; height: 8px; accent-color: #fafafa; cursor: ew-resize; }
+  .compare-scrub-hit {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    cursor: grab;
+    touch-action: none;
+  }
+  .compare-scrub-hit:active {
+    cursor: grabbing;
+  }
+  .compare-scrub-hit:focus-visible {
+    outline: 2px solid #a3a3a3;
+    outline-offset: 2px;
+  }
+  .stage .compare-labels {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 600;
+    color: #a3a3a3;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    z-index: 5;
+  }
 </style>
 </head>
 <body>
   <h1>Compression compare</h1>
-  <p class="hint">Adjust export quality below (matches Beacon). Wipe slider compares original vs compressed. Save and close applies quality to the extension.</p>
+  <p class="hint">Adjust export quality below (matches Beacon). Drag the handle on the preview to compare. Save and close applies quality to the extension.</p>
   <div class="toolbar">
     <div class="quality-field">
       <label for="quality">Export quality</label>
@@ -156,13 +205,21 @@ export function openQualityComparePopout(options: {
       <div class="clip" id="clip" style="clip-path: inset(0 50% 0 0);">
         <img id="imgOriginal" src="${o}" alt="" />
       </div>
-      <div class="divider" id="divider" style="left: 50%;"></div>
+      <div class="divider" id="divider"></div>
+      <div class="compare-wipe-handle" id="compareWipeHandle"></div>
+      <div
+        class="compare-scrub-hit"
+        id="compareScrubHit"
+        role="slider"
+        tabindex="0"
+        aria-valuenow="50"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-label="Compare original and compressed"
+        aria-valuetext="50% original on the left"
+      ></div>
+      <div class="compare-labels"><span>Original</span><span>Compressed</span></div>
     </div>
-  </div>
-  <div class="compare-controls">
-    <span class="hint" style="margin:0">Compare wipe</span>
-    <input type="range" id="scrub" min="0" max="100" step="1" value="50" aria-valuetext="50% original on the left" />
-    <div class="compare-labels"><span>Original</span><span>Compressed</span></div>
   </div>
   <script>
     (function () {
@@ -171,7 +228,9 @@ export function openQualityComparePopout(options: {
       var TARGET_ORIGIN = ${originJs};
       var DEBOUNCE_MS = 400;
 
-      var scrub = document.getElementById("scrub");
+      var stage = document.getElementById("stage");
+      var compareScrubHit = document.getElementById("compareScrubHit");
+      var compareWipeHandle = document.getElementById("compareWipeHandle");
       var clip = document.getElementById("clip");
       var divider = document.getElementById("divider");
       var qualityEl = document.getElementById("quality");
@@ -181,14 +240,63 @@ export function openQualityComparePopout(options: {
       var imgOriginal = document.getElementById("imgOriginal");
       var encodeErr = document.getElementById("encodeErr");
 
-      function syncScrub() {
-        var v = Number(scrub.value);
+      var scrubPct = 50;
+
+      function applyScrub(pct) {
+        var v = Math.max(0, Math.min(100, Math.round(pct)));
+        scrubPct = v;
         clip.style.clipPath = "inset(0 " + (100 - v) + "% 0 0)";
         divider.style.left = v + "%";
-        scrub.setAttribute("aria-valuetext", v + "% original on the left");
+        divider.style.transform = "translateX(-50%)";
+        compareWipeHandle.style.left = v + "%";
+        compareWipeHandle.style.transform = "translate(-50%, -50%)";
+        compareScrubHit.setAttribute("aria-valuenow", String(v));
+        compareScrubHit.setAttribute("aria-valuetext", v + "% original on the left");
       }
-      scrub.addEventListener("input", syncScrub);
-      syncScrub();
+
+      function scrubFromClientX(clientX) {
+        if (!stage) return;
+        var rect = stage.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        var pct = ((clientX - rect.left) / rect.width) * 100;
+        applyScrub(pct);
+      }
+
+      compareScrubHit.addEventListener("pointerdown", function (e) {
+        compareScrubHit.setPointerCapture(e.pointerId);
+        scrubFromClientX(e.clientX);
+      });
+      compareScrubHit.addEventListener("pointermove", function (e) {
+        if (compareScrubHit.hasPointerCapture(e.pointerId)) {
+          scrubFromClientX(e.clientX);
+        }
+      });
+      compareScrubHit.addEventListener("pointerup", function (e) {
+        if (compareScrubHit.hasPointerCapture(e.pointerId)) {
+          compareScrubHit.releasePointerCapture(e.pointerId);
+        }
+      });
+      compareScrubHit.addEventListener("pointercancel", function (e) {
+        if (compareScrubHit.hasPointerCapture(e.pointerId)) {
+          compareScrubHit.releasePointerCapture(e.pointerId);
+        }
+      });
+      compareScrubHit.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+          e.preventDefault();
+          applyScrub(scrubPct - 1);
+        } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+          e.preventDefault();
+          applyScrub(scrubPct + 1);
+        } else if (e.key === "Home") {
+          e.preventDefault();
+          applyScrub(0);
+        } else if (e.key === "End") {
+          e.preventDefault();
+          applyScrub(100);
+        }
+      });
+      applyScrub(50);
 
       function setQualityPctLabel() {
         var q = Number(qualityEl.value);

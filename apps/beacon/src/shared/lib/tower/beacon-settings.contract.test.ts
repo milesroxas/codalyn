@@ -18,6 +18,12 @@ describe("Tower ↔ Beacon settings JSON contract", () => {
       editorExperience: false,
       canManageTeamBeaconSettings: false,
       restrictToEditorExperience: false,
+      workspaceMemberRole: "designer" as const,
+      appUserRole: "user",
+      hasActiveWorkspace: true,
+      workspaces: [{ id: "org_1", name: "Acme" }],
+      activeOrganizationId: "org_1",
+      activeOrganizationName: "Acme",
     };
     const parsed = parseBeaconAppSettings((envelope as { settings: unknown }).settings);
     expect(parsed.version).toBe(1);
@@ -25,6 +31,12 @@ describe("Tower ↔ Beacon settings JSON contract", () => {
     expect(envelope.editorExperience).toBe(false);
     expect(envelope.canManageTeamBeaconSettings).toBe(false);
     expect(envelope.restrictToEditorExperience).toBe(false);
+    expect(envelope.workspaceMemberRole).toBe("designer");
+    expect(envelope.appUserRole).toBe("user");
+    expect(envelope.hasActiveWorkspace).toBe(true);
+    expect(envelope.workspaces).toEqual([{ id: "org_1", name: "Acme" }]);
+    expect(envelope.activeOrganizationId).toBe("org_1");
+    expect(envelope.activeOrganizationName).toBe("Acme");
   });
 
   it("accepts PUT-style partial patches used by mergeBeaconAppSettings on Tower", () => {

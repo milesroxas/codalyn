@@ -1,10 +1,22 @@
 import type { BeaconOrgTeamSettings } from "@codalyn/webflow-kit";
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt } from "drizzle-orm";
 import { auth } from "@/server/auth";
 import { db } from "@/shared/lib/db";
 import { member, organization, session as sessionTable, user } from "@/shared/lib/db/auth-schema";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { isTowerTeamAdminRole } from "@/shared/lib/membership/tower-organization-access";
+
+export type BeaconWorkspaceOption = { id: string; name: string };
+
+/** Organizations the user is a member of (Tower team workspaces), sorted by name. */
+export async function listBeaconWorkspacesForUser(userId: string): Promise<BeaconWorkspaceOption[]> {
+  return db
+    .select({ id: organization.id, name: organization.name })
+    .from(member)
+    .innerJoin(organization, eq(member.organizationId, organization.id))
+    .where(eq(member.userId, userId))
+    .orderBy(asc(organization.name));
+}
 
 export type BeaconMembershipContext = {
   userId: string;
@@ -32,9 +44,12 @@ export function computeBeaconEditorExperience(ctx: BeaconMembershipContext): boo
   return false;
 }
 
-/** Designers and product admins may edit team Beacon presets. */
+/** Org admins, designers, and product admins may edit team Beacon presets in Tower. */
 export function canManageBeaconTeamSettings(ctx: BeaconMembershipContext): boolean {
   if (isProductAdminAppRole(ctx.appUserRole)) {
+    return true;
+  }
+  if (isTowerTeamAdminRole(ctx.memberRole)) {
     return true;
   }
   return ctx.memberRole === "designer";

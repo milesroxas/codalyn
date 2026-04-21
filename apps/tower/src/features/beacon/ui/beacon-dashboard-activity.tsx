@@ -21,6 +21,89 @@ type BeaconApiPayload = {
   canManageTeamBeaconSettings?: boolean;
 };
 
+type BeaconPresetRow = BeaconAppSettings["imagePresets"][number];
+
+function cappedPresetMaxBytes(p: BeaconPresetRow): number {
+  const maxB =
+    typeof p.maxFileSizeBytes === "number" && p.maxFileSizeBytes >= BEACON_PRESET_MAX_FILE_BYTES_MIN
+      ? p.maxFileSizeBytes
+      : BEACON_PRESET_DEFAULT_MAX_FILE_BYTES;
+  return Math.min(BEACON_PRESET_MAX_FILE_BYTES_MAX, maxB);
+}
+
+function isEmptyPresetsState(
+  presets: BeaconPresetRow[],
+  designerPresets: BeaconPresetRow[],
+  canManage: boolean,
+  editorExp: boolean
+): boolean {
+  return presets.length === 0 && (!canManage || editorExp || designerPresets.length === 0);
+}
+
+function PresetListItem({ preset, designerBadge }: { preset: BeaconPresetRow; designerBadge?: boolean }) {
+  const capped = cappedPresetMaxBytes(preset);
+  return (
+    <li className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 border-b border-border/60 pb-2 last:border-0 last:pb-0">
+      <span
+        className={
+          designerBadge
+            ? "flex min-w-0 flex-wrap items-center gap-2 font-medium text-foreground"
+            : "min-w-0 font-medium text-foreground"
+        }
+      >
+        {preset.name}
+        {designerBadge ? (
+          <Badge variant="outline" className="text-[10px] font-normal">
+            Designers
+          </Badge>
+        ) : null}
+      </span>
+      <span className="shrink-0 font-mono text-muted-foreground">
+        {preset.width}×{preset.height}
+        {preset.exportFormat ? ` · ${preset.exportFormat}` : ""} · max {formatBeaconPresetMax(capped)}
+      </span>
+    </li>
+  );
+}
+
+function WorkspacePresetsCardContent(props: {
+  error: string | null;
+  presets: BeaconPresetRow[];
+  designerPresets: BeaconPresetRow[];
+  canManage: boolean;
+  editorExp: boolean;
+}) {
+  const { error, presets, designerPresets, canManage, editorExp } = props;
+  if (error) {
+    return <p className="text-xs text-destructive">{error}</p>;
+  }
+  if (isEmptyPresetsState(presets, designerPresets, canManage, editorExp)) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No export presets yet.
+        {canManage ? (
+          <>
+            {" "}
+            <Link href="/beacon" className="font-medium text-foreground underline-offset-4 hover:underline">
+              Add presets in Tower
+            </Link>
+          </>
+        ) : null}
+      </p>
+    );
+  }
+  return (
+    <ul className="max-h-40 space-y-2 overflow-auto text-xs">
+      {presets.map((p) => (
+        <PresetListItem key={p.id} preset={p} />
+      ))}
+      {canManage && !editorExp
+        ? designerPresets.map((p) => <PresetListItem key={`d-${p.id}`} preset={p} designerBadge />)
+        : null}
+    </ul>
+  );
+}
+
 export function BeaconDashboardActivity() {
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const [payload, setPayload] = useState<BeaconApiPayload | null>(null);
@@ -72,7 +155,9 @@ export function BeaconDashboardActivity() {
   }
 
   const presets = payload?.settings.imagePresets ?? [];
+  const designerPresets = payload?.settings.designerOnlyImagePresets ?? [];
   const canManage = Boolean(payload?.canManageTeamBeaconSettings);
+  const editorExp = Boolean(payload?.editorExperience);
 
   return (
     <section className="mb-10 space-y-3">
@@ -111,49 +196,18 @@ export function BeaconDashboardActivity() {
           <div>
             <CardTitle>Workspace export presets</CardTitle>
             <CardDescription className="mt-1.5">
-              Presets available in the Beacon image editor for this workspace. Open Beacon to use them; they refresh
-              when you return to the app or switch back to its tab.
+              Synced for this workspace in Beacon. Designer-only rows are omitted in editor mode.
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          {error ? (
-            <p className="text-xs text-destructive">{error}</p>
-          ) : presets.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              No export presets yet.
-              {canManage ? (
-                <>
-                  {" "}
-                  <Link href="/beacon" className="font-medium text-foreground underline-offset-4 hover:underline">
-                    Add presets in Tower
-                  </Link>
-                </>
-              ) : null}
-            </p>
-          ) : (
-            <ul className="max-h-40 space-y-2 overflow-auto text-xs">
-              {presets.map((p) => {
-                const maxB =
-                  typeof p.maxFileSizeBytes === "number" && p.maxFileSizeBytes >= BEACON_PRESET_MAX_FILE_BYTES_MIN
-                    ? p.maxFileSizeBytes
-                    : BEACON_PRESET_DEFAULT_MAX_FILE_BYTES;
-                const capped = Math.min(BEACON_PRESET_MAX_FILE_BYTES_MAX, maxB);
-                return (
-                  <li
-                    key={p.id}
-                    className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 border-b border-border/60 pb-2 last:border-0 last:pb-0"
-                  >
-                    <span className="min-w-0 font-medium text-foreground">{p.name}</span>
-                    <span className="shrink-0 font-mono text-muted-foreground">
-                      {p.width}×{p.height}
-                      {p.exportFormat ? ` · ${p.exportFormat}` : ""} · max {formatBeaconPresetMax(capped)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <WorkspacePresetsCardContent
+            error={error}
+            presets={presets}
+            designerPresets={designerPresets}
+            canManage={canManage}
+            editorExp={editorExp}
+          />
           <div className="pt-1">
             <Button variant="outline" size="sm" asChild>
               <Link href="/beacon">Manage in Tower</Link>

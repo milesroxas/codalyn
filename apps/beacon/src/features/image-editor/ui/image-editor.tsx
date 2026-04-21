@@ -1,5 +1,6 @@
 import {
   type BeaconImagePresetRow,
+  getBeaconExportImagePresets,
   getVisibleBuiltinAspectPresets,
   type ImageExportFormat,
 } from "@codalyn/webflow-kit";
@@ -113,6 +114,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   } = useComponentInstanceImageProps();
 
   const visibleBuiltinAspectPresets = useMemo(() => getVisibleBuiltinAspectPresets(settings), [settings]);
+  const exportImagePresets = useMemo(() => getBeaconExportImagePresets(settings), [settings]);
 
   useEffect(() => {
     if (visibleBuiltinAspectPresets.length === 0) {
@@ -255,8 +257,8 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   );
 
   const selectedExportPresetRow = useMemo(
-    () => (selectedExportPresetId ? settings.imagePresets.find((p) => p.id === selectedExportPresetId) : undefined),
-    [selectedExportPresetId, settings.imagePresets]
+    () => (selectedExportPresetId ? exportImagePresets.find((p) => p.id === selectedExportPresetId) : undefined),
+    [selectedExportPresetId, exportImagePresets]
   );
 
   const selectedExportPresetValid = useMemo(() => {
@@ -315,11 +317,11 @@ export function ImageEditor(props: ImageEditorProps = {}) {
     if (!selectedExportPresetId) {
       return "__custom__";
     }
-    if (!settings.imagePresets.some((p) => p.id === selectedExportPresetId)) {
+    if (!exportImagePresets.some((p) => p.id === selectedExportPresetId)) {
       return "__custom__";
     }
     return selectedExportPresetId;
-  }, [exportPresetManualOverride, selectedExportPresetId, settings.imagePresets]);
+  }, [exportPresetManualOverride, selectedExportPresetId, exportImagePresets]);
 
   const { effectiveOutputW, effectiveOutputH } = useMemo(() => {
     if (!completedCrop) {
@@ -480,11 +482,11 @@ export function ImageEditor(props: ImageEditorProps = {}) {
 
   const loadedEditor =
     imageSrc != null ? (
-      <div className="flex flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-3">
         <LoadedImageSourceSection busy={busy} fileBaseName={fileBaseName} fileInputRef={fileInputRef} />
-        <div className="flex flex-col gap-3 px-4">
+        <div className="flex min-w-0 flex-col gap-3 px-4">
           <ImageEditorCropExportPanel
-            exportPresets={isConfirmedGuest ? [] : settings.imagePresets}
+            exportPresets={isConfirmedGuest ? [] : exportImagePresets}
             onApplyExportPreset={applyExportPreset}
             onExportPresetChooseCustom={() => {
               setExportPresetManualOverride(true);

@@ -16,6 +16,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
+import { nextCycledBeaconTheme, persistBeaconThemePreference } from "@/features/beacon/lib/beacon-theme-preference";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { Button } from "@/shared/ui/button";
 
@@ -25,7 +26,7 @@ export function TowerHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
-  const { setTheme, resolvedTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
@@ -41,9 +42,13 @@ export function TowerHeader() {
     setSigningOut(false);
   }, [router]);
 
-  const toggleTheme = () => {
-    setTheme(resolvedTheme === "dark" ? "light" : "dark");
-  };
+  const cycleTheme = useCallback(() => {
+    const next = nextCycledBeaconTheme(theme);
+    setTheme(next);
+    if (session?.user) {
+      persistBeaconThemePreference(next);
+    }
+  }, [theme, setTheme, session?.user]);
 
   const hideAppChrome = !session?.user && publicLoggedOutSurfaces.has(pathname);
   if (hideAppChrome) {
@@ -96,7 +101,7 @@ export function TowerHeader() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {mounted ? (
-            <Button type="button" variant="ghost" size="icon-sm" onClick={toggleTheme} aria-label="Toggle theme">
+            <Button type="button" variant="ghost" size="icon-sm" onClick={cycleTheme} aria-label="Cycle theme">
               {resolvedTheme === "dark" ? (
                 <IconSun aria-hidden className="size-4" stroke={1.5} />
               ) : (

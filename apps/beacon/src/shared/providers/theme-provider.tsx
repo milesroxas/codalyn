@@ -20,7 +20,7 @@ const ThemeProviderContext = React.createContext<ThemeProviderState | undefined>
 
 export function ThemeProvider({
   children,
-  defaultTheme = "dark",
+  defaultTheme = "system",
   storageKey = "ui-theme",
   theme: themeProp,
   onThemeChange,

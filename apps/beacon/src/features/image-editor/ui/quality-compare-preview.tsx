@@ -1,5 +1,5 @@
 import { ExternalLink, Loader2 } from "lucide-react";
-import { useCallback, useId, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useCallback, useRef, useState } from "react";
 
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
@@ -15,7 +15,7 @@ type QualityComparePreviewProps = {
 
 export function QualityComparePreview(p: QualityComparePreviewProps) {
   const { originalSrc, compressedSrc, pending, exportWidth, exportHeight, onOpenQualityPopout } = p;
-  const rangeId = useId();
+  const previewRef = useRef<HTMLDivElement>(null);
   const [scrubPct, setScrubPct] = useState(50);
 
   const ready = originalSrc !== null && compressedSrc !== null && !pending;
@@ -28,13 +28,67 @@ export function QualityComparePreview(p: QualityComparePreviewProps) {
     onOpenQualityPopout();
   }, [originalSrc, compressedSrc, onOpenQualityPopout]);
 
+  const setScrubFromClientX = useCallback((clientX: number) => {
+    const el = previewRef.current;
+    if (!el) {
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) {
+      return;
+    }
+    const pct = ((clientX - rect.left) / rect.width) * 100;
+    setScrubPct(Math.min(100, Math.max(0, Math.round(pct))));
+  }, []);
+
+  const onScrubPointerDown = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setScrubFromClientX(e.clientX);
+    },
+    [setScrubFromClientX]
+  );
+
+  const onScrubPointerMove = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
+        return;
+      }
+      setScrubFromClientX(e.clientX);
+    },
+    [setScrubFromClientX]
+  );
+
+  const onScrubPointerUp = useCallback((e: PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  }, []);
+
+  const onScrubKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+      e.preventDefault();
+      setScrubPct((p) => Math.max(0, p - 1));
+    } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+      e.preventDefault();
+      setScrubPct((p) => Math.min(100, p + 1));
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setScrubPct(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setScrubPct(100);
+    }
+  }, []);
+
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 space-y-0.5">
           <p className="text-foreground text-xs font-medium leading-none">Compression preview</p>
           <p className="text-muted-foreground text-[10px] leading-snug">
-            Drag the wedge to compare lossless crop vs. export.
+            Drag the handle on the preview to compare lossless crop vs. export.
           </p>
         </div>
         <Button
@@ -53,6 +107,7 @@ export function QualityComparePreview(p: QualityComparePreviewProps) {
       </div>
 
       <div
+        ref={previewRef}
         className={cn(
           "relative max-h-52 w-full overflow-hidden rounded-lg border border-border/50 bg-muted/25 shadow-inner",
           pending && "min-h-[128px]"
@@ -87,34 +142,38 @@ export function QualityComparePreview(p: QualityComparePreviewProps) {
           </div>
         ) : null}
         {ready ? (
-          <div
-            className="pointer-events-none absolute top-0 bottom-0 w-px bg-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.25)]"
-            style={{ left: `${scrubPct}%`, transform: "translateX(-50%)" }}
-          />
+          <>
+            <div
+              className="pointer-events-none absolute top-0 bottom-0 z-1 w-px bg-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.25)]"
+              style={{ left: `${scrubPct}%`, transform: "translateX(-50%)" }}
+              aria-hidden
+            />
+            <div
+              className="compare-wipe-handle pointer-events-none absolute top-1/2 z-2"
+              style={{ left: `${scrubPct}%`, transform: "translate(-50%, -50%)" }}
+              aria-hidden
+            />
+            <div
+              className="absolute inset-0 z-3 touch-none cursor-grab outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              onPointerDown={onScrubPointerDown}
+              onPointerMove={onScrubPointerMove}
+              onPointerUp={onScrubPointerUp}
+              onPointerCancel={onScrubPointerUp}
+              onKeyDown={onScrubKeyDown}
+              role="slider"
+              tabIndex={0}
+              aria-valuenow={scrubPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Compare crop and export"
+              aria-valuetext={`${scrubPct}% original visible on the left`}
+            />
+            <div className="text-muted-foreground pointer-events-none absolute inset-x-2 bottom-2 z-4 flex justify-between text-[10px] font-medium tabular-nums">
+              <span>Crop</span>
+              <span>Export</span>
+            </div>
+          </>
         ) : null}
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <input
-          id={rangeId}
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={scrubPct}
-          disabled={!ready}
-          onChange={(e) => setScrubPct(Number(e.target.value))}
-          aria-valuetext={`${scrubPct}% original visible on the left`}
-          className={cn(
-            "h-1.5 w-full cursor-ew-resize appearance-none rounded-full bg-muted accent-primary disabled:cursor-not-allowed disabled:opacity-45",
-            "[&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:cursor-ew-resize [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-border [&::-webkit-slider-thumb]:bg-background [&::-webkit-slider-thumb]:shadow-sm",
-            "[&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:cursor-ew-resize [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-border [&::-moz-range-thumb]:bg-background [&::-moz-range-thumb]:shadow-sm"
-          )}
-        />
-        <div className="text-muted-foreground flex justify-between text-[10px] font-medium tabular-nums">
-          <span>{pending ? "Updating…" : ready ? "Crop" : "—"}</span>
-          <span>{pending ? "" : ready ? "Export" : ""}</span>
-        </div>
       </div>
     </div>
   );

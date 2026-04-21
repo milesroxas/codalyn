@@ -15,10 +15,14 @@ const LEGACY_FORMAT_KEY = "beacon:image-export-format";
 
 export type BeaconSettingsSyncState = "idle" | "loading" | "synced" | "error";
 
+export type BeaconTowerWorkspace = { id: string; name: string };
+
 type BeaconAppSettingsContextValue = {
   settings: BeaconAppSettings;
   updateSettings: (patch: Partial<BeaconAppSettings>) => void;
   syncState: BeaconSettingsSyncState;
+  /** Re-fetch settings from Tower (no-op when signed out). */
+  refreshBeaconSettings: () => void;
   /** True when signed in to Tower (session may still be resolving). */
   isTowerUser: boolean;
   /** Persist export defaults from the image editor after Tower sync (or always for guests). */
@@ -29,6 +33,18 @@ type BeaconAppSettingsContextValue = {
   canManageTeamBeaconSettings: boolean;
   /** Team admins only: self-switch for editor-style Beacon (default off). */
   restrictToEditorExperience: boolean;
+  /** Active Tower workspace membership role (`member.role`), when synced. */
+  workspaceMemberRole: string | null;
+  /** Better Auth `user.role` (e.g. product admin), when synced. */
+  appUserRole: string | null;
+  /** Whether the session has an active organization (workspace) selected. */
+  hasActiveWorkspace: boolean;
+  /** Workspaces the user belongs to (from Tower), when synced. */
+  beaconWorkspaces: BeaconTowerWorkspace[];
+  activeOrganizationId: string | null;
+  activeOrganizationName: string | null;
+  /** Switch active Tower workspace (session); refetches settings on success. */
+  setActiveBeaconWorkspace: (organizationId: string) => void;
 };
 
 const BeaconAppSettingsContext = createContext<BeaconAppSettingsContextValue | undefined>(undefined);
@@ -73,6 +89,12 @@ type TowerBeaconApiEnvelope = {
   editorExperience?: boolean;
   canManageTeamBeaconSettings?: boolean;
   restrictToEditorExperience?: boolean;
+  workspaceMemberRole?: string | null;
+  appUserRole?: string | null;
+  hasActiveWorkspace?: boolean;
+  workspaces?: BeaconTowerWorkspace[];
+  activeOrganizationId?: string | null;
+  activeOrganizationName?: string | null;
 };
 
 function applyTowerBeaconEnvelope(
@@ -82,6 +104,12 @@ function applyTowerBeaconEnvelope(
     setEditorExperience: (v: boolean) => void;
     setCanManageTeamBeaconSettings: (v: boolean) => void;
     setRestrictToEditorExperience: (v: boolean) => void;
+    setWorkspaceMemberRole: (v: string | null) => void;
+    setAppUserRole: (v: string | null) => void;
+    setHasActiveWorkspace: (v: boolean) => void;
+    setBeaconWorkspaces: (v: BeaconTowerWorkspace[]) => void;
+    setActiveOrganizationId: (v: string | null) => void;
+    setActiveOrganizationName: (v: string | null) => void;
   }
 ) {
   if (data.settings) {
@@ -98,6 +126,26 @@ function applyTowerBeaconEnvelope(
   if (data.restrictToEditorExperience !== undefined) {
     setters.setRestrictToEditorExperience(Boolean(data.restrictToEditorExperience));
   }
+  if (data.workspaceMemberRole !== undefined) {
+    setters.setWorkspaceMemberRole(data.workspaceMemberRole);
+  }
+  if (data.appUserRole !== undefined) {
+    setters.setAppUserRole(data.appUserRole);
+  }
+  if (data.workspaces !== undefined) {
+    setters.setBeaconWorkspaces(data.workspaces);
+  }
+  if (data.activeOrganizationId !== undefined) {
+    setters.setActiveOrganizationId(data.activeOrganizationId);
+  }
+  if (data.activeOrganizationName !== undefined) {
+    setters.setActiveOrganizationName(data.activeOrganizationName);
+  }
+  if (data.activeOrganizationId !== undefined) {
+    setters.setHasActiveWorkspace(Boolean(data.activeOrganizationId));
+  } else if (data.hasActiveWorkspace !== undefined) {
+    setters.setHasActiveWorkspace(Boolean(data.hasActiveWorkspace));
+  }
 }
 
 export function BeaconAppSettingsProvider({ children }: { children: ReactNode }) {
@@ -107,6 +155,12 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
   const [editorExperience, setEditorExperience] = useState(false);
   const [canManageTeamBeaconSettings, setCanManageTeamBeaconSettings] = useState(false);
   const [restrictToEditorExperience, setRestrictToEditorExperience] = useState(false);
+  const [workspaceMemberRole, setWorkspaceMemberRole] = useState<string | null>(null);
+  const [appUserRole, setAppUserRole] = useState<string | null>(null);
+  const [hasActiveWorkspace, setHasActiveWorkspace] = useState(false);
+  const [beaconWorkspaces, setBeaconWorkspaces] = useState<BeaconTowerWorkspace[]>([]);
+  const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null);
+  const [activeOrganizationName, setActiveOrganizationName] = useState<string | null>(null);
 
   const isTowerUser = Boolean(user?.id);
 
@@ -136,6 +190,12 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
           setEditorExperience,
           setCanManageTeamBeaconSettings,
           setRestrictToEditorExperience,
+          setWorkspaceMemberRole,
+          setAppUserRole,
+          setHasActiveWorkspace,
+          setBeaconWorkspaces,
+          setActiveOrganizationId,
+          setActiveOrganizationName,
         });
         setSyncState("synced");
       })
@@ -155,6 +215,12 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
       setEditorExperience(false);
       setCanManageTeamBeaconSettings(false);
       setRestrictToEditorExperience(false);
+      setWorkspaceMemberRole(null);
+      setAppUserRole(null);
+      setHasActiveWorkspace(false);
+      setBeaconWorkspaces([]);
+      setActiveOrganizationId(null);
+      setActiveOrganizationName(null);
       return;
     }
 
@@ -201,11 +267,35 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
             setEditorExperience,
             setCanManageTeamBeaconSettings,
             setRestrictToEditorExperience,
+            setWorkspaceMemberRole,
+            setAppUserRole,
+            setHasActiveWorkspace,
+            setBeaconWorkspaces,
+            setActiveOrganizationId,
+            setActiveOrganizationName,
           });
         });
       }
     },
     [user?.id]
+  );
+
+  const setActiveBeaconWorkspace = useCallback(
+    (organizationId: string) => {
+      if (!user?.id || !organizationId.trim()) {
+        return;
+      }
+      void towerFetch("/api/v1/beacon/active-workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: organizationId.trim() }),
+      }).then((r) => {
+        if (r.ok) {
+          pullSettingsFromTower();
+        }
+      });
+    },
+    [user?.id, pullSettingsFromTower]
   );
 
   const handleThemeChange = useCallback(
@@ -215,26 +305,46 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
     [updateSettings]
   );
 
+  const refreshBeaconSettings = useCallback(() => {
+    pullSettingsFromTower();
+  }, [pullSettingsFromTower]);
+
   const value = useMemo(
     (): BeaconAppSettingsContextValue => ({
       settings,
       updateSettings,
       syncState,
+      refreshBeaconSettings,
       isTowerUser,
       canPersistExportDefaults,
       editorExperience,
       canManageTeamBeaconSettings,
       restrictToEditorExperience,
+      workspaceMemberRole,
+      appUserRole,
+      hasActiveWorkspace,
+      beaconWorkspaces,
+      activeOrganizationId,
+      activeOrganizationName,
+      setActiveBeaconWorkspace,
     }),
     [
       settings,
       updateSettings,
       syncState,
+      refreshBeaconSettings,
       isTowerUser,
       canPersistExportDefaults,
       editorExperience,
       canManageTeamBeaconSettings,
       restrictToEditorExperience,
+      workspaceMemberRole,
+      appUserRole,
+      hasActiveWorkspace,
+      beaconWorkspaces,
+      activeOrganizationId,
+      activeOrganizationName,
+      setActiveBeaconWorkspace,
     ]
   );
 

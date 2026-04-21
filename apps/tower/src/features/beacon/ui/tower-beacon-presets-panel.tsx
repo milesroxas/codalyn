@@ -70,6 +70,9 @@ export type TowerBeaconPresetsPanelProps = {
   saving: boolean;
   settings: BeaconAppSettings | undefined;
   presets: BeaconImagePresetRow[];
+  designerPresets: BeaconImagePresetRow[];
+  presetTarget: "workspace" | "designer";
+  setPresetTarget: (v: "workspace" | "designer") => void;
   canManage: boolean;
   teamPresetsLocked: boolean;
   canEditPresets: boolean;
@@ -86,13 +89,15 @@ export type TowerBeaconPresetsPanelProps = {
   draftMaxUnit: MaxSizeUnit;
   setDraftMaxUnit: (v: MaxSizeUnit) => void;
   addPreset: () => void;
-  removePreset: (id: string) => void;
+  removePreset: (id: string, scope: "workspace" | "designer") => void;
   updatePreset: (
     id: string,
+    scope: "workspace" | "designer",
     patch: Partial<Pick<BeaconImagePresetRow, "name" | "width" | "height" | "exportFormat" | "maxFileSizeBytes">>
   ) => void;
 };
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: parallel workspace + designer cards
 export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
   const {
     baseId,
@@ -100,6 +105,9 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
     saving,
     settings,
     presets,
+    designerPresets,
+    presetTarget,
+    setPresetTarget,
     canManage,
     teamPresetsLocked,
     canEditPresets,
@@ -142,8 +150,8 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Saved export presets</CardTitle>
-          <CardDescription>One-tap targets in Beacon’s crop step for this workspace.</CardDescription>
+          <CardTitle>Workspace presets</CardTitle>
+          <CardDescription>Visible to everyone in this workspace in Beacon.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {presets.length === 0 && !loading ? (
@@ -185,7 +193,7 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                         onBlur={(e) => {
                           const t = e.target.value.trim() || "Untitled";
                           if (t !== p.name) {
-                            updatePreset(p.id, { name: t });
+                            updatePreset(p.id, "workspace", { name: t });
                           }
                         }}
                       />
@@ -201,7 +209,7 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                           onBlur={(e) => {
                             const n = parsePresetOutputDimension(e.target.value, p.width);
                             if (n !== p.width) {
-                              updatePreset(p.id, { width: n });
+                              updatePreset(p.id, "workspace", { width: n });
                             }
                           }}
                         />
@@ -216,7 +224,7 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                           onBlur={(e) => {
                             const n = parsePresetOutputDimension(e.target.value, p.height);
                             if (n !== p.height) {
-                              updatePreset(p.id, { height: n });
+                              updatePreset(p.id, "workspace", { height: n });
                             }
                           }}
                         />
@@ -228,7 +236,9 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                         className={cn("h-9 w-full px-2.5", nativeSelectClass)}
                         value={p.exportFormat ?? settings?.defaultExportFormat ?? "webp"}
                         disabled={saving}
-                        onChange={(e) => updatePreset(p.id, { exportFormat: e.target.value as ImageExportFormat })}
+                        onChange={(e) =>
+                          updatePreset(p.id, "workspace", { exportFormat: e.target.value as ImageExportFormat })
+                        }
                       >
                         <option value="webp">WebP</option>
                         <option value="avif">AVIF</option>
@@ -241,7 +251,7 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                         disabled={saving}
                         onCommit={(next) => {
                           if (next !== p.maxFileSizeBytes) {
-                            updatePreset(p.id, { maxFileSizeBytes: next });
+                            updatePreset(p.id, "workspace", { maxFileSizeBytes: next });
                           }
                         }}
                       />
@@ -254,7 +264,7 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                     className="shrink-0 text-muted-foreground hover:text-destructive"
                     aria-label={`Remove ${p.name}`}
                     disabled={saving}
-                    onClick={() => removePreset(p.id)}
+                    onClick={() => removePreset(p.id, "workspace")}
                   >
                     <IconTrash aria-hidden className="size-4" stroke={1.5} />
                   </Button>
@@ -266,6 +276,18 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
           {canEditPresets ? (
             <div className="rounded-lg border border-dashed border-border/80 bg-background/50 p-4">
               <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">New preset</p>
+              <div className="mb-3 space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Adds to</Label>
+                <select
+                  className={cn("h-9 w-full max-w-sm px-2.5", nativeSelectClass)}
+                  value={presetTarget}
+                  disabled={saving}
+                  onChange={(e) => setPresetTarget(e.target.value as "workspace" | "designer")}
+                >
+                  <option value="workspace">Workspace (everyone)</option>
+                  <option value="designer">Designers only</option>
+                </select>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor={`${baseId}-new-name`}>Name</Label>
@@ -342,6 +364,138 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
         </CardContent>
         {saving ? <CardFooter className="text-xs text-muted-foreground">Saving…</CardFooter> : null}
       </Card>
+
+      {canManage ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Designer presets</CardTitle>
+            <CardDescription>Not shown to members in Beacon editor mode.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {designerPresets.length === 0 && !loading ? (
+              <p className="text-sm text-muted-foreground">
+                No designer-only presets yet.{canEditPresets ? " Add one above." : ""}
+              </p>
+            ) : !canEditPresets ? (
+              <ul className="space-y-2 text-sm">
+                {designerPresets.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex flex-wrap items-baseline justify-between gap-2 rounded-md border border-border/50 px-3 py-2"
+                  >
+                    <span className="font-medium text-foreground">{p.name}</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {p.width}×{p.height}
+                      {p.exportFormat
+                        ? ` · ${p.exportFormat}`
+                        : settings?.defaultExportFormat
+                          ? ` · ${settings.defaultExportFormat}`
+                          : ""}{" "}
+                      · max {formatBeaconPresetMax(p.maxFileSizeBytes)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul className="space-y-3">
+                {designerPresets.map((p) => (
+                  <li
+                    key={`d-${p.id}-${p.width}-${p.height}-${p.name}-${p.exportFormat ?? ""}-${p.maxFileSizeBytes}`}
+                    className="flex flex-col gap-3 rounded-lg border border-border/60 bg-muted/15 p-3 sm:flex-row sm:items-end"
+                  >
+                    <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Name</Label>
+                        <Input
+                          className="h-9 text-sm"
+                          defaultValue={p.name}
+                          disabled={saving}
+                          onBlur={(e) => {
+                            const t = e.target.value.trim() || "Untitled";
+                            if (t !== p.name) {
+                              updatePreset(p.id, "designer", { name: t });
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Width</Label>
+                          <Input
+                            className="h-9 text-sm tabular-nums"
+                            inputMode="numeric"
+                            defaultValue={String(p.width)}
+                            disabled={saving}
+                            onBlur={(e) => {
+                              const n = parsePresetOutputDimension(e.target.value, p.width);
+                              if (n !== p.width) {
+                                updatePreset(p.id, "designer", { width: n });
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Height</Label>
+                          <Input
+                            className="h-9 text-sm tabular-nums"
+                            inputMode="numeric"
+                            defaultValue={String(p.height)}
+                            disabled={saving}
+                            onBlur={(e) => {
+                              const n = parsePresetOutputDimension(e.target.value, p.height);
+                              if (n !== p.height) {
+                                updatePreset(p.id, "designer", { height: n });
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label className="text-xs text-muted-foreground">Format</Label>
+                        <select
+                          className={cn("h-9 w-full px-2.5", nativeSelectClass)}
+                          value={p.exportFormat ?? settings?.defaultExportFormat ?? "webp"}
+                          disabled={saving}
+                          onChange={(e) =>
+                            updatePreset(p.id, "designer", { exportFormat: e.target.value as ImageExportFormat })
+                          }
+                        >
+                          <option value="webp">WebP</option>
+                          <option value="avif">AVIF</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label className="text-xs text-muted-foreground">Max encoded size</Label>
+                        <PresetMaxEditor
+                          maxFileSizeBytes={p.maxFileSizeBytes}
+                          disabled={saving}
+                          onCommit={(next) => {
+                            if (next !== p.maxFileSizeBytes) {
+                              updatePreset(p.id, "designer", { maxFileSizeBytes: next });
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      aria-label={`Remove ${p.name}`}
+                      disabled={saving}
+                      onClick={() => removePreset(p.id, "designer")}
+                    >
+                      <IconTrash aria-hidden className="size-4" stroke={1.5} />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+          {saving ? <CardFooter className="text-xs text-muted-foreground">Saving…</CardFooter> : null}
+        </Card>
+      ) : null}
     </div>
   );
 }

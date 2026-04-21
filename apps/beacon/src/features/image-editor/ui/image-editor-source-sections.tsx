@@ -110,7 +110,7 @@ export function LoadedImageSourceSection(props: {
 }) {
   const { fileBaseName, busy, fileInputRef } = props;
   return (
-    <div className="flex min-h-0 items-center gap-2 border-b border-border bg-muted/40 py-1.5 pr-1.5 pl-3">
+    <div className="flex min-h-0 min-w-0 items-center gap-2 border-b border-border bg-muted/40 py-1.5 pr-1.5 pl-3">
       <IconPhoto aria-hidden className="size-3.5 shrink-0 text-muted-foreground" stroke={1.5} />
       <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={fileBaseName}>
         {fileBaseName}

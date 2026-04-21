@@ -11,6 +11,7 @@ import {
   SettingsSectionNav,
 } from "@/features/settings/ui/settings-section-nav";
 import { Button } from "@/shared/ui/button";
+import { ScrollArea } from "@/shared/ui/scroll-area";
 
 const LazyPresets = lazy(() =>
   import("@/features/settings/ui/settings-presets-panel").then((m) => ({ default: m.SettingsPresetsPanel }))
@@ -63,7 +64,7 @@ export function BeaconSettingsScreen(props: BeaconSettingsScreenProps) {
   }, [allowPresetsSection, section]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <header className="supports-backdrop-filter:bg-background/75 relative border-b border-border/70 bg-background/90 px-3 pt-2 pb-0 backdrop-blur">
         <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2">
           <div className="flex min-w-0 items-center gap-2 overflow-hidden">
@@ -80,9 +81,13 @@ export function BeaconSettingsScreen(props: BeaconSettingsScreenProps) {
         <SettingsSectionNav value={section} onValueChange={setSection} showPresetsSection={allowPresetsSection} />
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto px-3 pb-3 pt-3">
-        {!isTowerUser && section !== "account" ? <GuestSettingsUpsell /> : null}
-        <SettingsSectionBody section={section} allowPresetsPanel={allowPresetsSection} />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-3 pt-3">
+        <ScrollArea className="h-full min-h-0 min-w-0 flex-1">
+          <div className="box-border min-w-0 max-w-full overflow-x-clip px-3">
+            {!isTowerUser && section !== "account" ? <GuestSettingsUpsell /> : null}
+            <SettingsSectionBody section={section} allowPresetsPanel={allowPresetsSection} />
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );

@@ -14,7 +14,7 @@ export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
 
   return (
     <section
-      className="mx-auto flex w-full max-w-sm flex-col gap-5 px-1 py-4"
+      className="mx-auto flex w-full min-w-0 max-w-sm flex-col gap-5 px-1 py-4"
       aria-labelledby="beacon-onboarding-title"
     >
       <header className="flex flex-col items-center gap-1.5 text-center">

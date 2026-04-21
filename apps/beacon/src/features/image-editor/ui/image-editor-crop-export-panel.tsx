@@ -1,5 +1,5 @@
 import type { BeaconImagePresetRow, ImageExportFormat } from "@codalyn/webflow-kit";
-import { Crop, FolderPlus, Loader2 } from "lucide-react";
+import { Crop, FolderPlus, Info, Loader2 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useState } from "react";
 import type { Area, MediaSize } from "react-easy-crop";
 import Cropper from "react-easy-crop";
@@ -41,10 +41,44 @@ import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Slider } from "@/shared/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 /** Matches react-easy-crop `getMediaZoom`: rendered size vs natural, dominant axis. */
 function mediaDisplayToNaturalRatio(media: MediaSize): number {
   return media.width > media.height ? media.width / media.naturalWidth : media.height / media.naturalHeight;
+}
+
+function InfoTip(props: { text: string; ariaLabel: string; className?: string }) {
+  const { text, ariaLabel, className } = props;
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        type="button"
+        className={cn(
+          "text-muted-foreground hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+          className
+        )}
+        aria-label={ariaLabel}
+      >
+        <Info className="size-3.5" aria-hidden />
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-left leading-snug">
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function PresetLimitMeterGroup(p: { estimatedBytes: number; maxBytes: number }) {
+  const { estimatedBytes, maxBytes } = p;
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <ExportPresetLimitBar estimatedBytes={estimatedBytes} maxBytes={maxBytes} className="w-24" />
+      <span className="text-muted-foreground/90 whitespace-nowrap text-[10px] tabular-nums" aria-hidden>
+        max {formatFileSize(maxBytes)}
+      </span>
+    </div>
+  );
 }
 
 /** Upper bound for crop preview zoom slider and Cropper (historical UI cap). */
@@ -378,15 +412,29 @@ function ExportPresetSelectBlock(props: {
     onExportFormatCommit,
   } = props;
 
+  const presetTriggerLabel = useMemo(() => {
+    if (exportPresetSelectValue === "__custom__") {
+      return "Custom";
+    }
+    const preset = exportPresets.find((x) => x.id === exportPresetSelectValue);
+    return preset ? `${preset.name} · ${preset.width}×${preset.height}` : "Preset";
+  }, [exportPresetSelectValue, exportPresets]);
+
   if (exportPresets.length === 0) {
     return null;
   }
 
   return (
     <div className="flex flex-col gap-1.5">
-      <Label className="text-xs" htmlFor={`${baseId}-export-preset-crop`}>
-        Export preset
-      </Label>
+      <div className="flex items-center gap-1">
+        <Label className="text-xs" htmlFor={`${baseId}-export-preset-crop`}>
+          Preset
+        </Label>
+        <InfoTip
+          ariaLabel="About export presets"
+          text="Choose first, then crop. Custom keeps full control. Edit presets in Settings."
+        />
+      </div>
       <Select
         value={exportPresetSelectValue}
         onValueChange={(v) => {
@@ -403,10 +451,10 @@ function ExportPresetSelectBlock(props: {
         }}
       >
         <SelectTrigger id={`${baseId}-export-preset-crop`} size="full">
-          <SelectValue placeholder="Choose a preset" />
+          <SelectValue placeholder="Preset">{presetTriggerLabel}</SelectValue>
         </SelectTrigger>
         <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
-          <SelectItem value="__custom__">Custom (manual)</SelectItem>
+          <SelectItem value="__custom__">Custom</SelectItem>
           {exportPresets.map((preset) => (
             <SelectItem key={preset.id} value={preset.id}>
               {preset.name}
@@ -414,9 +462,6 @@ function ExportPresetSelectBlock(props: {
           ))}
         </SelectContent>
       </Select>
-      <p className="text-muted-foreground text-[10px] leading-snug">
-        Choose before you crop. Pick Custom (manual) to change pixels or encoding yourself. Manage presets in Settings.
-      </p>
     </div>
   );
 }
@@ -521,9 +566,7 @@ function CropStageSection(p: CropStageProps) {
       <Card size="sm">
         <CardHeader className="space-y-1 pb-2">
           <CardTitle className="text-sm font-medium">Crop area</CardTitle>
-          <CardDescription>
-            Optional: pick an export preset first, then drag to reposition and choose what gets exported.
-          </CardDescription>
+          <CardDescription>Pick a preset (or Custom), then drag to frame what you export.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 pt-0">
           <ExportPresetSelectBlock
@@ -573,33 +616,36 @@ function CropStageSection(p: CropStageProps) {
           <div className={staggerBelowCropClass(belowCropEntered, 90)}>
             {lockCropOutputForPreset ? (
               <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
-                <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">
-                  Output size (preset)
-                </p>
+                <div className="flex items-center gap-1">
+                  <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">
+                    Output size (preset)
+                  </p>
+                  <InfoTip
+                    ariaLabel="About preset output size"
+                    text="Pick Custom (manual) in Export preset above to change output dimensions or crop shape. Adjust encoding in step 2 anytime."
+                  />
+                </div>
                 <p className="mt-1 text-sm font-medium tabular-nums">
                   {parsedExportWidth} × {parsedExportHeight}px
                 </p>
                 {exportPresetEncodingSummary ? (
                   <p className="text-muted-foreground mt-1 text-[11px] leading-snug">{exportPresetEncodingSummary}</p>
                 ) : null}
-                <p className="text-muted-foreground mt-2 text-[10px] leading-snug">
-                  Pick Custom (manual) in Export preset above to change output dimensions or crop shape. Adjust encoding
-                  in step 2 anytime.
-                </p>
               </div>
             ) : (
               <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
-                <div className="space-y-1">
+                <div className="flex items-center gap-1">
                   <Label className="text-xs font-medium" htmlFor={`${baseId}-frame-mode`}>
                     Crop shape
                   </Label>
-                  <p className="text-muted-foreground text-xs leading-snug">
-                    Aspect ratios lock the crop mask. Custom uses the width and height fields below for the crop shape.
-                  </p>
+                  <InfoTip
+                    ariaLabel="About crop shape"
+                    text="Aspect ratios lock the crop mask. Custom uses the width and height fields below for the crop shape."
+                  />
                 </div>
                 <ToggleGroup
                   id={`${baseId}-frame-mode`}
-                  className="grid w-full grid-cols-2 gap-1"
+                  className="grid w-full min-w-0 grid-cols-2 gap-0"
                   type="single"
                   value={cropFrameMode}
                   onValueChange={(v) => {
@@ -611,13 +657,23 @@ function CropStageSection(p: CropStageProps) {
                   size="sm"
                   spacing={0}
                 >
-                  <ToggleGroupItem value="aspect">Aspect ratios</ToggleGroupItem>
-                  <ToggleGroupItem value="custom">Custom</ToggleGroupItem>
+                  <ToggleGroupItem
+                    value="aspect"
+                    className="min-w-0 shrink whitespace-normal text-center leading-tight"
+                  >
+                    Aspect ratios
+                  </ToggleGroupItem>
+                  <ToggleGroupItem
+                    value="custom"
+                    className="min-w-0 shrink whitespace-normal text-center leading-tight"
+                  >
+                    Custom
+                  </ToggleGroupItem>
                 </ToggleGroup>
                 {cropFrameMode === "aspect" ? (
                   <ToggleGroup
                     id={`${baseId}-aspect`}
-                    className="grid w-full grid-cols-3 gap-1"
+                    className="grid w-full min-w-0 grid-cols-3 gap-0"
                     type="single"
                     value={aspectPreset}
                     onValueChange={(v) => {
@@ -630,7 +686,11 @@ function CropStageSection(p: CropStageProps) {
                     spacing={0}
                   >
                     {visibleBuiltinAspectPresets.map((preset) => (
-                      <ToggleGroupItem key={preset} value={preset}>
+                      <ToggleGroupItem
+                        key={preset}
+                        value={preset}
+                        className="min-w-0 shrink whitespace-normal text-center leading-tight"
+                      >
                         {aspectLabels[preset]}
                       </ToggleGroupItem>
                     ))}
@@ -639,9 +699,12 @@ function CropStageSection(p: CropStageProps) {
                   <div className="flex flex-col gap-2">
                     <div className="grid grid-cols-2 gap-2">
                       <div className="flex flex-col gap-1.5">
-                        <Label className="text-xs" htmlFor={`${baseId}-ow`}>
-                          Width (px)
-                        </Label>
+                        <div className="flex items-center gap-1">
+                          <Label className="text-xs" htmlFor={`${baseId}-ow`}>
+                            Width (px)
+                          </Label>
+                          <InfoTip ariaLabel="About output dimensions" text="Use values from 1 to 8192 px per side." />
+                        </div>
                         <Input
                           id={`${baseId}-ow`}
                           aria-label="Output width in pixels"
@@ -675,7 +738,6 @@ function CropStageSection(p: CropStageProps) {
                         />
                       </div>
                     </div>
-                    <p className="text-muted-foreground text-xs leading-snug">Use values from 1 to 8192 px per side.</p>
                   </div>
                 )}
               </div>
@@ -719,6 +781,51 @@ type ExportCardProps = {
   activePresetMaxFileBytes: number | null;
 };
 
+function ExportPresetCaptionRow(p: {
+  baseId: string;
+  exportPresetFileLimit: ExportCardProps["exportPresetFileLimit"];
+  presetLimitMeter: { estimatedBytes: number; maxBytes: number } | null;
+}) {
+  const { baseId, exportPresetFileLimit, presetLimitMeter } = p;
+
+  if (exportPresetFileLimit) {
+    return (
+      <div className="flex w-full min-w-0 items-center gap-3">
+        <p
+          className="text-muted-foreground min-w-0 flex-1 truncate text-[11px] leading-snug"
+          id={`${baseId}-preset-file-hint`}
+        >
+          <span className="text-foreground font-medium">{exportPresetFileLimit.presetName}</span>
+          <span aria-hidden className="text-muted-foreground/70">
+            {" · "}
+          </span>
+          <span className="text-muted-foreground/90">{exportPresetFileLimit.format.toUpperCase()}</span>
+        </p>
+        {presetLimitMeter ? (
+          <PresetLimitMeterGroup
+            estimatedBytes={presetLimitMeter.estimatedBytes}
+            maxBytes={presetLimitMeter.maxBytes}
+          />
+        ) : (
+          <span className="text-muted-foreground/90 shrink-0 whitespace-nowrap text-[10px] tabular-nums">
+            max {formatFileSize(exportPresetFileLimit.maxFileSizeBytes)}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  if (presetLimitMeter) {
+    return (
+      <div className="flex w-full justify-end">
+        <PresetLimitMeterGroup estimatedBytes={presetLimitMeter.estimatedBytes} maxBytes={presetLimitMeter.maxBytes} />
+      </div>
+    );
+  }
+
+  return null;
+}
+
 function ExportEncodeCard(p: ExportCardProps) {
   const {
     baseId,
@@ -757,6 +864,11 @@ function ExportEncodeCard(p: ExportCardProps) {
     !estimatePending &&
     completedCrop !== null;
 
+  const presetLimitMeter =
+    showPresetLimitBar && activePresetMaxFileBytes !== null && estimatedBytes !== null
+      ? { estimatedBytes, maxBytes: activePresetMaxFileBytes }
+      : null;
+
   return (
     <section className="mt-4 flex flex-col gap-3" aria-labelledby={`${baseId}-step-export`}>
       <h2 className="sr-only" id={`${baseId}-step-export`}>
@@ -778,38 +890,67 @@ function ExportEncodeCard(p: ExportCardProps) {
           </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-5 pt-0">
-          <div className="flex flex-col gap-2">
-            <Label className="text-xs font-medium" id={`${baseId}-format`}>
-              File type
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium" htmlFor={`${baseId}-fn`}>
+              File name
             </Label>
-            {allowAvifEncoding ? (
-              <>
-                <ToggleGroup
-                  type="single"
-                  value={exportFormat}
-                  onValueChange={(v) => {
-                    if (v === "webp" || v === "avif") {
-                      setExportFormat(v);
-                      onExportFormatCommit();
+            <Input
+              id={`${baseId}-fn`}
+              aria-label="Exported file base name"
+              autoComplete="off"
+              value={fileBaseName}
+              onChange={(e) => setFileBaseName(e.target.value)}
+              onBlur={() => setFileBaseName(sanitizeAssetBaseName(fileBaseName))}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5">
+              <Label className="text-xs font-medium" id={`${baseId}-format`}>
+                File type
+              </Label>
+              {allowAvifEncoding ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                      aria-label="When to use WebP vs AVIF"
+                    >
+                      <Info className="size-3.5" aria-hidden />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[16rem] whitespace-pre-line text-left">
+                    {
+                      "WebP — Default: broad browser support; encodes in Designer.\n\nAVIF — Often smaller at similar quality; encoding uses Tower."
                     }
-                  }}
-                  aria-labelledby={`${baseId}-format`}
-                  className="grid w-full grid-cols-2 gap-1.5"
-                  variant="outline"
-                  size="sm"
-                  spacing={0}
-                >
-                  <ToggleGroupItem value="webp" className="text-xs font-medium">
-                    WebP
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="avif" className="text-xs font-medium">
-                    AVIF
-                  </ToggleGroupItem>
-                </ToggleGroup>
-                <p className="text-muted-foreground text-[10px] leading-snug">
-                  WebP encodes in the Designer. AVIF uses Tower.
-                </p>
-              </>
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
+            </div>
+            {allowAvifEncoding ? (
+              <ToggleGroup
+                type="single"
+                value={exportFormat}
+                onValueChange={(v) => {
+                  if (v === "webp" || v === "avif") {
+                    setExportFormat(v);
+                    onExportFormatCommit();
+                  }
+                }}
+                aria-labelledby={`${baseId}-format`}
+                className="grid w-full min-w-0 grid-cols-2 gap-0"
+                variant="outline"
+                size="sm"
+                spacing={0}
+              >
+                <ToggleGroupItem value="webp" className="min-w-0 shrink text-xs font-medium whitespace-normal">
+                  WebP
+                </ToggleGroupItem>
+                <ToggleGroupItem value="avif" className="min-w-0 shrink text-xs font-medium whitespace-normal">
+                  AVIF
+                </ToggleGroupItem>
+              </ToggleGroup>
             ) : (
               <>
                 <div className="text-foreground rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm font-medium">
@@ -840,55 +981,46 @@ function ExportEncodeCard(p: ExportCardProps) {
             )}
           </div>
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-baseline justify-between gap-2">
+          <div className="flex flex-col gap-3.5">
+            <div className="flex flex-col gap-2">
               <Label className="text-xs font-medium" htmlFor={`${baseId}-quality`}>
                 Quality
               </Label>
-              <span className="text-muted-foreground text-xs tabular-nums">{Math.round(quality * 100)}%</span>
+              {exportPresetFileLimit || presetLimitMeter ? (
+                <ExportPresetCaptionRow
+                  baseId={baseId}
+                  exportPresetFileLimit={exportPresetFileLimit}
+                  presetLimitMeter={presetLimitMeter}
+                />
+              ) : null}
             </div>
-            {exportPresetFileLimit ? (
-              <p className="text-muted-foreground text-[10px] leading-snug" id={`${baseId}-preset-file-hint`}>
-                <span className="text-foreground font-medium">{exportPresetFileLimit.presetName}</span>
-                {" · "}
-                {exportPresetFileLimit.format.toUpperCase()}
-                {" · max "}
-                {formatFileSize(exportPresetFileLimit.maxFileSizeBytes)}
-              </p>
-            ) : null}
-            <Slider
-              id={`${baseId}-quality`}
-              min={0.05}
-              max={1}
-              step={0.01}
-              value={[quality]}
-              onValueChange={(v) => setQuality(v[0] ?? 0.75)}
-              onValueCommit={onQualityCommit}
-              aria-describedby={exportPresetFileLimit ? `${baseId}-preset-file-hint` : undefined}
-            />
-            {showPresetLimitBar ? (
-              <ExportPresetLimitBar estimatedBytes={estimatedBytes} maxBytes={activePresetMaxFileBytes} />
-            ) : null}
+            <div className="flex items-center gap-3 py-1.5">
+              <div className="min-w-0 flex-1">
+                <Slider
+                  id={`${baseId}-quality`}
+                  min={0.05}
+                  max={1}
+                  step={0.01}
+                  value={[quality]}
+                  onValueChange={(v) => setQuality(v[0] ?? 0.75)}
+                  onValueCommit={onQualityCommit}
+                  aria-describedby={exportPresetFileLimit ? `${baseId}-preset-file-hint` : undefined}
+                  className="[&_[data-slot=slider-track]]:h-2 [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:min-h-4 [&_[data-slot=slider-thumb]]:min-w-4 [&_[data-slot=slider-thumb]]:after:-inset-3"
+                />
+              </div>
+              <span
+                className="text-muted-foreground min-w-[2.75rem] shrink-0 text-right text-xs tabular-nums"
+                aria-live="polite"
+              >
+                {Math.round(quality * 100)}%
+              </span>
+            </div>
             <ExportEncodeSizeFootnote
               completedCrop={completedCrop}
               estimatePending={estimatePending}
               estimatedBytes={estimatedBytes}
               originalBytes={originalBytes}
               showQualityCommitHint={completedCrop !== null && estimateNonce === 0}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs font-medium" htmlFor={`${baseId}-fn`}>
-              File name
-            </Label>
-            <Input
-              id={`${baseId}-fn`}
-              aria-label="Exported file base name"
-              autoComplete="off"
-              value={fileBaseName}
-              onChange={(e) => setFileBaseName(e.target.value)}
-              onBlur={() => setFileBaseName(sanitizeAssetBaseName(fileBaseName))}
             />
           </div>
         </CardContent>
@@ -1015,7 +1147,7 @@ function AssetFolderToolbar(p: AssetFolderToolbarProps) {
   };
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-lg border border-border/70 bg-muted/20 p-3">
+    <div className="flex flex-col gap-2.5">
       <Label className="text-xs font-medium" htmlFor={folderFieldId}>
         Folder
       </Label>
@@ -1294,7 +1426,7 @@ function PlacementCard(p: PlacementCardProps) {
         </CardHeader>
         <CardContent className="flex flex-col gap-4 pt-0">
           <RadioGroup
-            className="flex flex-col gap-3"
+            className="flex flex-col gap-2"
             value={placementRadioValue}
             onValueChange={(v) => setPlacement(v as PlacementMode)}
           >
@@ -1303,15 +1435,13 @@ function PlacementCard(p: PlacementCardProps) {
                 key={opt.value}
                 htmlFor={`${baseId}-place-${opt.value}`}
                 className={cn(
-                  "flex cursor-pointer gap-3 rounded-lg border border-transparent p-2.5 ring-1 ring-foreground/10 transition-colors",
+                  "flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border border-transparent p-2.5 ring-1 ring-foreground/10 transition-colors",
                   placementRadioValue === opt.value ? "bg-accent/50 border-primary/30" : "hover:bg-muted/40"
                 )}
               >
-                <RadioGroupItem className="mt-0.5" id={`${baseId}-place-${opt.value}`} value={opt.value} />
-                <span className="min-w-0 flex flex-col gap-0.5">
-                  <span className="text-sm font-medium leading-none">{opt.title}</span>
-                  <span className="text-muted-foreground text-xs leading-snug">{opt.description}</span>
-                </span>
+                <RadioGroupItem id={`${baseId}-place-${opt.value}`} value={opt.value} />
+                <span className="min-w-0 flex-1 text-sm font-medium leading-none">{opt.title}</span>
+                <InfoTip ariaLabel={`About ${opt.title}`} text={opt.description} />
               </label>
             ))}
           </RadioGroup>

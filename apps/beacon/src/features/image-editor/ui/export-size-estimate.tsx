@@ -1,9 +1,11 @@
-import { Loader2 } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
+import { useId } from "react";
 import type { Area } from "react-easy-crop";
 
 import { formatFileSize, formatSizeDeltaPercent } from "@/features/image-editor/lib/format-file-size";
 import { cn } from "@/shared/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 type PresetFillTone = "safe" | "caution" | "warn" | "over";
 
@@ -27,31 +29,56 @@ const PRESET_METER_BAR: Record<PresetFillTone, string> = {
   over: "bg-destructive",
 };
 
+const PRESET_LIMIT_SEGMENT_COUNT = 4;
+const PRESET_LIMIT_SEGMENT_INDEXES = [0, 1, 2, 3] as const;
+
+function segmentFillPercent(ratio: number, segmentIndex: number): number {
+  const start = segmentIndex / PRESET_LIMIT_SEGMENT_COUNT;
+  const end = (segmentIndex + 1) / PRESET_LIMIT_SEGMENT_COUNT;
+  if (ratio <= start) {
+    return 0;
+  }
+  if (ratio >= end) {
+    return 100;
+  }
+  return ((ratio - start) / (end - start)) * 100;
+}
+
 type ExportPresetLimitBarProps = {
   estimatedBytes: number;
   maxBytes: number;
   className?: string;
 };
 
-/** Thin fill vs. preset max; sits directly under the quality slider. */
+/** Four rounded segments vs. preset max (fills left→right; color follows usage). */
 export function ExportPresetLimitBar({ estimatedBytes, maxBytes, className }: ExportPresetLimitBarProps) {
   const ratio = maxBytes > 0 ? estimatedBytes / maxBytes : 0;
-  const widthPct = Math.min(100, ratio * 100);
   const tone = presetFillTone(ratio);
 
   return (
     <div
-      className={cn("bg-muted/80 h-1 w-full overflow-hidden rounded-full", className)}
+      className={cn("flex min-w-0 w-full gap-1", className)}
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={maxBytes}
       aria-valuenow={Math.min(estimatedBytes, maxBytes)}
       aria-label={`Estimated file size is ${formatFileSize(estimatedBytes)} of ${formatFileSize(maxBytes)} preset limit`}
     >
-      <div
-        className={cn("h-full rounded-full transition-[width] duration-300 ease-out", PRESET_METER_BAR[tone])}
-        style={{ width: `${widthPct}%` }}
-      />
+      {PRESET_LIMIT_SEGMENT_INDEXES.map((segmentIndex) => {
+        const fillPct = segmentFillPercent(ratio, segmentIndex);
+        return (
+          <div
+            key={`preset-limit-seg-${segmentIndex}`}
+            className="bg-muted/80 flex h-2 min-h-2 min-w-0 flex-1 overflow-hidden rounded-[1px]"
+            aria-hidden
+          >
+            <div
+              className={cn("h-full rounded-[1px] transition-[width] duration-300 ease-out", PRESET_METER_BAR[tone])}
+              style={{ width: `${fillPct}%` }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -72,6 +99,7 @@ export function ExportEncodeSizeFootnote({
   completedCrop,
   showQualityCommitHint = false,
 }: ExportEncodeSizeFootnoteProps) {
+  const detailsId = useId();
   const originalLabel = originalBytes !== null ? formatFileSize(originalBytes) : "Unknown";
 
   let estDisplay: ReactNode;
@@ -99,25 +127,53 @@ export function ExportEncodeSizeFootnote({
       ? "Original size unavailable."
       : null;
 
+  const tooltipLines: string[] = [];
+  if (showQualityCommitHint && !estimatePending && completedCrop) {
+    tooltipLines.push("Release the slider to refresh the estimate.");
+  }
+  if (delta) {
+    tooltipLines.push(delta);
+  }
+  if (unknownOriginalNote) {
+    tooltipLines.push(unknownOriginalNote);
+  }
+
   return (
-    <div aria-busy={estimatePending} aria-live="polite" className="flex flex-col gap-1">
-      <div className="text-muted-foreground flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 text-[11px] leading-tight tabular-nums">
+    <div aria-busy={estimatePending} aria-live="polite" className="flex flex-col gap-2">
+      <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] leading-tight tabular-nums">
         <p className="min-w-0">
           <span className="text-muted-foreground/85">Original </span>
           <span className="text-foreground font-medium">{originalLabel}</span>
         </p>
-        <p className="min-w-0 text-right">
-          <span className="text-muted-foreground/85">Est. output </span>
-          {estDisplay}
-        </p>
+        <div className="flex min-w-0 items-center justify-end gap-1">
+          <p className="min-w-0 text-right">
+            <span className="text-muted-foreground/85">Est. output </span>
+            {estDisplay}
+          </p>
+          {tooltipLines.length > 0 ? (
+            <>
+              <span id={detailsId} className="sr-only">
+                {tooltipLines.join(" ")}
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent hover:bg-muted/40"
+                    aria-label="Size estimate details"
+                    aria-describedby={detailsId}
+                  >
+                    <Info className="size-3.5 shrink-0" aria-hidden />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-60 whitespace-pre-line text-left">
+                  {tooltipLines.join("\n\n")}
+                </TooltipContent>
+              </Tooltip>
+            </>
+          ) : null}
+        </div>
       </div>
-      {showQualityCommitHint && !estimatePending && completedCrop ? (
-        <p className="text-muted-foreground text-[10px] leading-snug">Release the slider to refresh the estimate.</p>
-      ) : null}
-      {delta ? <p className="text-muted-foreground text-[10px] leading-snug">{delta}</p> : null}
-      {unknownOriginalNote ? (
-        <p className="text-muted-foreground text-[10px] leading-snug">{unknownOriginalNote}</p>
-      ) : null}
     </div>
   );
 }

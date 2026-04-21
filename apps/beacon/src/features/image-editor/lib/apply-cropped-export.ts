@@ -164,8 +164,9 @@ async function resolveCollectionFieldSlug(collectionId: string, fieldId: string)
 }
 
 /**
- * PATCH staged collection item — image field in `fieldData` (Image type: `fileId` + `url` per Data API).
- * @see https://developers.webflow.com/data/docs/working-with-the-cms/manage-collections-and-items (update item)
+ * PATCH live collection item — publishes field updates to the live CMS item (not staged-only draft).
+ * Image field in `fieldData` (Image type: `fileId` + `url` or `{ url }` per Data API).
+ * @see https://developers.webflow.com/data/reference/cms/collection-items/live-items/update-item-live
  * @see https://developers.webflow.com/data/reference/field-types-item-values (Image write)
  */
 async function updateCmsImageField(options: {
@@ -176,7 +177,7 @@ async function updateCmsImageField(options: {
 }): Promise<void> {
   const { binding, cmsItemId, imageUrl, asset } = options;
   const fieldSlug = await resolveCollectionFieldSlug(binding.collectionId, binding.fieldId);
-  const path = `/api/v2/webflow/collections/${encodeURIComponent(binding.collectionId)}/items/${encodeURIComponent(cmsItemId)}?skipInvalidFiles=false`;
+  const path = `/api/v2/webflow/collections/${encodeURIComponent(binding.collectionId)}/items/${encodeURIComponent(cmsItemId)}/live?skipInvalidFiles=false`;
   const headers = {
     "Content-Type": "application/json",
     Accept: "application/json",

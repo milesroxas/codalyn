@@ -33,8 +33,8 @@ export function useExportByteEstimate(options: {
     setEstimatedBytes(null);
     setEstimatePending(false);
     estimateGenRef.current += 1;
-    setEstimateNonce(0);
-  }, [geometryKey]);
+    setEstimateNonce(imageSrc && completedCrop ? 1 : 0);
+  }, [geometryKey, imageSrc, completedCrop]);
 
   useEffect(() => {
     if (estimateNonce === 0 || !imageSrc || !completedCrop) {

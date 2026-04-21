@@ -29,8 +29,9 @@ export function TowerBeaconScreen() {
   const [draftW, setDraftW] = useState("1920");
   const [draftH, setDraftH] = useState("1080");
   const [draftFormat, setDraftFormat] = useState<ImageExportFormat>("webp");
-  const [draftMaxStr, setDraftMaxStr] = useState("500");
+  const [draftMaxStr, setDraftMaxStr] = useState("100");
   const [draftMaxUnit, setDraftMaxUnit] = useState<MaxSizeUnit>("kb");
+  const [presetTarget, setPresetTarget] = useState<"workspace" | "designer">("workspace");
 
   const refresh = useCallback(async () => {
     if (!session?.user) {
@@ -135,6 +136,7 @@ export function TowerBeaconScreen() {
   const teamPresetsLocked = Boolean(payload?.editorExperience);
   const canEditPresets = canManage && !teamPresetsLocked;
   const presets = settings?.imagePresets ?? [];
+  const designerPresets = settings?.designerOnlyImagePresets ?? [];
 
   const addPreset = () => {
     if (!canEditPresets) {
@@ -155,29 +157,44 @@ export function TowerBeaconScreen() {
       exportFormat: draftFormat,
       maxFileSizeBytes,
     };
-    void applyPatch({ imagePresets: [...presets, row] });
+    if (presetTarget === "designer") {
+      void applyPatch({ designerOnlyImagePresets: [...designerPresets, row] });
+    } else {
+      void applyPatch({ imagePresets: [...presets, row] });
+    }
     setDraftName("");
     setDraftW(String(w));
     setDraftH(String(h));
   };
 
-  const removePreset = (id: string) => {
+  const removePreset = (id: string, scope: "workspace" | "designer") => {
     if (!canEditPresets) {
       return;
     }
-    void applyPatch({ imagePresets: presets.filter((p) => p.id !== id) });
+    if (scope === "designer") {
+      void applyPatch({ designerOnlyImagePresets: designerPresets.filter((p) => p.id !== id) });
+    } else {
+      void applyPatch({ imagePresets: presets.filter((p) => p.id !== id) });
+    }
   };
 
   const updatePreset = (
     id: string,
+    scope: "workspace" | "designer",
     patch: Partial<Pick<BeaconImagePresetRow, "name" | "width" | "height" | "exportFormat" | "maxFileSizeBytes">>
   ) => {
     if (!canEditPresets) {
       return;
     }
-    void applyPatch({
-      imagePresets: presets.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-    });
+    if (scope === "designer") {
+      void applyPatch({
+        designerOnlyImagePresets: designerPresets.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+      });
+    } else {
+      void applyPatch({
+        imagePresets: presets.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+      });
+    }
   };
 
   return (
@@ -186,8 +203,8 @@ export function TowerBeaconScreen() {
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Beacon</p>
         <h1 className="text-2xl font-semibold tracking-tight">Workspace presets</h1>
         <p className="max-w-2xl text-muted-foreground">
-          Image export presets shared with your workspace. Members see them in the Beacon Webflow app; changes apply
-          when Beacon reloads settings (tab focus or reopening the app).
+          Workspace export presets and crop shortcuts sync to every member; designer-only presets stay hidden from
+          editor-mode members. Beacon picks up changes when the app reloads settings (tab focus or reopen).
         </p>
       </div>
 
@@ -212,6 +229,9 @@ export function TowerBeaconScreen() {
           saving={saving}
           settings={settings}
           presets={presets}
+          designerPresets={designerPresets}
+          presetTarget={presetTarget}
+          setPresetTarget={setPresetTarget}
           canManage={canManage}
           teamPresetsLocked={teamPresetsLocked}
           canEditPresets={canEditPresets}

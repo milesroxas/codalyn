@@ -26,6 +26,9 @@ yarn-error.log*
 !.env.example
 !.env.*.example
 
+# Neon CLI (`neonctl set-context` writes org/project in cwd; keep local)
+.neon
+
 # Test coverage
 coverage/
 .nyc_output/

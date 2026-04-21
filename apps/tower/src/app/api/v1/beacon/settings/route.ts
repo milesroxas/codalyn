@@ -1,6 +1,7 @@
 import {
   type BeaconAppSettings,
   getDefaultBeaconAppSettings,
+  mergeBeaconAppSettings,
   mergeOrgTeamSettingsIntoUser,
   parseBeaconAppSettings,
   parseBeaconAppSettingsPartial,
@@ -11,13 +12,14 @@ import { eq } from "drizzle-orm";
 import {
   canManageBeaconTeamSettings,
   computeBeaconEditorExperience,
+  listBeaconWorkspacesForUser,
   resolveBeaconMembershipContext,
   resolveTargetOrganizationIdForTeamSettings,
 } from "@/server/beacon-settings-context";
 import { persistTeamBeaconPatch, upsertUserBeaconPayload } from "@/server/beacon-settings-persist";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { db } from "@/shared/lib/db";
-import { beaconAppSettings as beaconAppSettingsTable } from "@/shared/lib/db/auth-schema";
+import { beaconAppSettings as beaconAppSettingsTable, organization } from "@/shared/lib/db/auth-schema";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { isTowerTeamAdminRole } from "@/shared/lib/membership/tower-organization-access";
 
@@ -44,7 +46,10 @@ function extractBody(raw: unknown): { organizationId?: string; patch: Partial<Be
 }
 
 async function loadEffectiveSettings(userId: string, ctx: Awaited<ReturnType<typeof resolveBeaconMembershipContext>>) {
-  const rows = await db.select().from(beaconAppSettingsTable).where(eq(beaconAppSettingsTable.userId, userId)).limit(1);
+  const [rows, workspaces] = await Promise.all([
+    db.select().from(beaconAppSettingsTable).where(eq(beaconAppSettingsTable.userId, userId)).limit(1),
+    listBeaconWorkspacesForUser(userId),
+  ]);
 
   const row = rows[0];
   const userSettings: BeaconAppSettings = row?.payload
@@ -54,15 +59,33 @@ async function loadEffectiveSettings(userId: string, ctx: Awaited<ReturnType<typ
   const team = ctx?.beaconTeamSettings ?? null;
   const merged = mergeOrgTeamSettingsIntoUser(userSettings, team);
   const editorExperience = ctx ? computeBeaconEditorExperience(ctx) : false;
+  const settings = editorExperience ? mergeBeaconAppSettings(merged, { designerOnlyImagePresets: [] }) : merged;
   const canManageTeamBeaconSettings = ctx ? canManageBeaconTeamSettings(ctx) : false;
   const restrictToEditorExperience =
     ctx && isTowerTeamAdminRole(ctx.memberRole) ? ctx.beaconRestrictToEditorExperience : false;
 
+  const activeId = ctx?.activeOrganizationId ?? null;
+  let activeOrganizationName = activeId !== null ? (workspaces.find((w) => w.id === activeId)?.name ?? null) : null;
+  if (activeId && activeOrganizationName === null) {
+    const o = await db
+      .select({ name: organization.name })
+      .from(organization)
+      .where(eq(organization.id, activeId))
+      .limit(1);
+    activeOrganizationName = o[0]?.name ?? null;
+  }
+
   return {
-    settings: merged,
+    settings,
     editorExperience,
     canManageTeamBeaconSettings,
     restrictToEditorExperience,
+    workspaceMemberRole: ctx?.memberRole ?? null,
+    appUserRole: ctx?.appUserRole ?? null,
+    hasActiveWorkspace: Boolean(activeId),
+    workspaces,
+    activeOrganizationId: activeId,
+    activeOrganizationName,
   };
 }
 

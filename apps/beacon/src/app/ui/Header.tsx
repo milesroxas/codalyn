@@ -1,4 +1,4 @@
-import { ChevronDown, LogIn, LogOut, Settings } from "lucide-react";
+import { ChevronDown, ExternalLink, LogIn, LogOut, Settings } from "lucide-react";
 import {
   type Dispatch,
   type MutableRefObject,
@@ -255,6 +255,16 @@ function TowerAuthBar({ user, isPending, onOpenTowerEmailPopup, onSignOut }: Tow
               <span className="truncate text-sm font-medium text-foreground">{user.email}</span>
             </div>
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => {
+              const origin = getTowerAuthBaseUrl();
+              if (origin) window.open(origin, "_blank", "noopener,noreferrer");
+            }}
+          >
+            <ExternalLink aria-hidden />
+            Open Tower
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"

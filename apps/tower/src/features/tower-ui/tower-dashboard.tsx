@@ -1,5 +1,6 @@
-import { IconActivity, IconBook, IconPlug, IconUsers } from "@tabler/icons-react";
+import { IconPlug, IconRadar2, IconUsers } from "@tabler/icons-react";
 import Link from "next/link";
+import { BeaconDashboardActivity } from "@/features/beacon/ui/beacon-dashboard-activity";
 import type { TowerDashboardSummary } from "@/server/dashboard-summary";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -14,40 +15,33 @@ const shortcutCards = [
     external: false,
     icon: IconUsers,
     action: "Manage team",
-    badge: "Tenant",
+    badge: "Workspace",
   },
   {
-    title: "Health API",
-    description: "JSON status for monitors and deploy verification.",
-    href: "/api/health",
+    title: "Beacon",
+    description: "Workspace image presets for the Beacon Webflow app, synced from Tower.",
+    href: "/beacon",
     external: false,
-    icon: IconActivity,
-    action: "View response",
-    badge: "Ops",
-  },
-  {
-    title: "Data API docs",
-    description: "REST reference for the Webflow Data API used by Beacon and Tower.",
-    href: "https://developers.webflow.com/data/reference/rest-introduction",
-    external: true,
-    icon: IconBook,
-    action: "Open docs",
-    badge: "Docs",
+    icon: IconRadar2,
+    action: "Manage presets",
+    badge: "Beacon",
   },
 ] as const;
 
 export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) {
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8 sm:py-10">
+    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Tower</p>
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Tower</p>
         <h1 className="text-2xl font-semibold tracking-tight">Workspace</h1>
         <p className="max-w-2xl text-muted-foreground">
-          Connect Webflow, coordinate your team, and use the Data API gateway for Beacon and automation.
+          Connect Webflow, manage your team, and keep Beacon export presets in sync with your workspace.
         </p>
       </div>
 
       <Separator className="my-8" />
+
+      <BeaconDashboardActivity />
 
       <section className="mb-10 space-y-3">
         <h2 className="text-sm font-medium text-foreground">Your connection</h2>
@@ -111,7 +105,7 @@ export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) 
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-foreground">Shortcuts</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           {shortcutCards.map(({ title, description, href, icon: Icon, action, badge, external }) => (
             <Card key={title} className="flex h-full flex-col">
               <CardHeader className="space-y-3">
@@ -141,28 +135,6 @@ export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) 
           ))}
         </div>
       </section>
-
-      {summary.isProductAdmin ? (
-        <>
-          <Separator className="my-10" />
-          <div className="rounded-xl border border-dashed border-amber-500/35 bg-amber-500/6 px-4 py-4 sm:px-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-widest text-amber-700 dark:text-amber-500/90">
-                  Operator
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Product and platform tools are separate from this workspace. Open the operator console to manage the
-                  SaaS.
-                </p>
-              </div>
-              <Button size="sm" variant="secondary" asChild>
-                <Link href="/console">Open operator</Link>
-              </Button>
-            </div>
-          </div>
-        </>
-      ) : null}
     </main>
   );
 }

@@ -224,7 +224,7 @@ export function TeamDashboard() {
 
   if (sessionPending) {
     return (
-      <main className="mx-auto min-h-[60vh] max-w-4xl px-4 py-10 sm:px-6">
+      <main className="mx-auto min-h-dvh max-w-4xl px-4 py-10 sm:px-6">
         <p className="text-sm text-muted-foreground">Loading…</p>
       </main>
     );
@@ -232,7 +232,7 @@ export function TeamDashboard() {
 
   if (!session?.user) {
     return (
-      <main className="mx-auto flex min-h-[60vh] max-w-4xl flex-col gap-6 px-4 py-12 sm:px-6">
+      <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-6 px-4 py-12 sm:px-6">
         <div className="max-w-md space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
           <p className="text-sm text-muted-foreground">Sign in to manage workspaces, members, and invitations.</p>

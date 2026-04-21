@@ -1,11 +1,22 @@
 "use client";
 
-import { IconHome, IconLogout, IconMoon, IconSun, IconUserPlus, IconUsers } from "@tabler/icons-react";
+import {
+  IconHome,
+  IconLayoutDashboard,
+  IconLogout,
+  IconMoon,
+  IconRadar2,
+  IconSettings,
+  IconSun,
+  IconUserPlus,
+  IconUsers,
+} from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
+import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { Button } from "@/shared/ui/button";
 
 const publicLoggedOutSurfaces = new Set(["/", "/sign-in", "/sign-up"]);
@@ -40,7 +51,7 @@ export function TowerHeader() {
   }
 
   return (
-    <header className="supports-backdrop-filter:bg-background/75 sticky top-0 z-50 border-b border-border bg-background/90 px-4 py-3 backdrop-blur">
+    <header className="supports-backdrop-filter:bg-background/75 sticky top-0 z-50 border-b border-border bg-background/90 px-4 py-3 backdrop-blur sm:px-6">
       <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <Link href="/" className="shrink-0 font-semibold tracking-tight text-foreground">
@@ -59,6 +70,28 @@ export function TowerHeader() {
                 Team
               </Link>
             </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/beacon" className="inline-flex items-center gap-1.5">
+                <IconRadar2 aria-hidden className="size-4 shrink-0" stroke={1.5} />
+                Beacon
+              </Link>
+            </Button>
+            {session?.user && isProductAdminAppRole(session.user.role) ? (
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/console" className="inline-flex items-center gap-1.5">
+                  <IconLayoutDashboard aria-hidden className="size-4 shrink-0" stroke={1.5} />
+                  Operator
+                </Link>
+              </Button>
+            ) : null}
+            {session?.user ? (
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/account" className="inline-flex items-center gap-1.5">
+                  <IconSettings aria-hidden className="size-4 shrink-0" stroke={1.5} />
+                  Account
+                </Link>
+              </Button>
+            ) : null}
           </nav>
         </div>
         <div className="flex shrink-0 items-center gap-2">

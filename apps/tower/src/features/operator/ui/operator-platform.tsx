@@ -36,7 +36,7 @@ export function OperatorPlatform() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-widest text-amber-600 dark:text-amber-500/90">
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-amber-600 dark:text-amber-500/90">
           Infrastructure
         </p>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Platform</h1>
@@ -60,7 +60,7 @@ export function OperatorPlatform() {
         </CardHeader>
         <CardContent>
           {raw ? (
-            <pre className="max-h-64 overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-3 font-mono text-[11px] leading-relaxed dark:border-zinc-800 dark:bg-zinc-900/60">
+            <pre className="max-h-64 overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-3 font-mono text-xs leading-relaxed dark:border-zinc-800 dark:bg-zinc-900/60">
               {raw}
             </pre>
           ) : (

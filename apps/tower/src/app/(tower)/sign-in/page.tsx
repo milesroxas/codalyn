@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, Suspense, useId, useState } from "react";
+import { type FormEvent, Suspense, useEffect, useId, useState } from "react";
 import { tryFinishBeaconTowerAuthPopup } from "@/features/auth/lib/beacon-opener-auth";
+import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { authClient } from "@/features/auth/model/auth-client";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
@@ -14,17 +15,64 @@ import { Label } from "@/shared/ui/label";
 
 const inputClass = "h-10 rounded-lg bg-background/80 dark:bg-input/40";
 
+type SignInPostResult = { kind: "beacon_popup" } | { kind: "error"; message: string } | { kind: "done" };
+
+async function runAfterTowerSignIn(opts: {
+  data: Parameters<typeof resolveUserAndTokenAfterEmailAuth>[0];
+  beaconOrigin: string | null;
+  operatorInviteToken: string | null;
+}): Promise<SignInPostResult> {
+  const { user: u, token } = await resolveUserAndTokenAfterEmailAuth(opts.data);
+  if (tryFinishBeaconTowerAuthPopup(opts.beaconOrigin, u ? userToBeaconPayload(u) : undefined, token)) {
+    return { kind: "beacon_popup" };
+  }
+  if (opts.operatorInviteToken && !opts.beaconOrigin) {
+    const redeemResult = await redeemOperatorInviteClient(opts.operatorInviteToken);
+    if (redeemResult !== "ok") {
+      return { kind: "error", message: messageForRedeemFailure(redeemResult) };
+    }
+  }
+  return { kind: "done" };
+}
+
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const beaconOrigin = searchParams.get("beaconOrigin");
+  const operatorInviteParam = searchParams.get("invite");
   const emailId = useId();
   const passwordId = useId();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (!operatorInviteParam || beaconOrigin) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const res = await fetch(`/api/account/operator-invite-details?token=${encodeURIComponent(operatorInviteParam)}`, {
+        credentials: "same-origin",
+      });
+      if (cancelled) {
+        return;
+      }
+      if (!res.ok) {
+        setError("This invite link is invalid or expired.");
+        return;
+      }
+      const data = (await res.json().catch(() => null)) as { email?: string } | null;
+      if (data?.email) {
+        setEmail(data.email);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [operatorInviteParam, beaconOrigin]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -40,8 +88,16 @@ function SignInForm() {
       setError(err.message ?? "Sign in failed");
       return;
     }
-    const { user: u, token } = await resolveUserAndTokenAfterEmailAuth(data);
-    if (tryFinishBeaconTowerAuthPopup(beaconOrigin, u ? userToBeaconPayload(u) : undefined, token)) {
+    const post = await runAfterTowerSignIn({
+      data,
+      beaconOrigin,
+      operatorInviteToken: operatorInviteParam?.trim() || null,
+    });
+    if (post.kind === "beacon_popup") {
+      return;
+    }
+    if (post.kind === "error") {
+      setError(post.message);
       return;
     }
     if (data?.user) {
@@ -96,10 +152,10 @@ function SignInForm() {
           </form>
         </CardContent>
         <CardFooter className="flex-col border-t border-border/60 bg-muted/20 px-6 py-4">
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-left text-sm text-muted-foreground">
             No account?{" "}
             <Link
-              href={`/sign-up?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`}
+              href={`/sign-up?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}${operatorInviteParam ? `&invite=${encodeURIComponent(operatorInviteParam)}` : ""}`}
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
               Create one
@@ -116,7 +172,7 @@ export default function SignInPage() {
     <Suspense
       fallback={
         <AuthShell>
-          <p className="text-center text-sm text-muted-foreground">Loading…</p>
+          <p className="text-left text-sm text-muted-foreground">Loading…</p>
         </AuthShell>
       }
     >

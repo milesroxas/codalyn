@@ -14,7 +14,7 @@ export function OperatorGate({ children }: { children: ReactNode }) {
 
   if (isPending) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+      <div className="flex min-h-dvh items-center justify-center bg-zinc-950">
         <p className="text-sm text-zinc-400">Loading operator workspace…</p>
       </div>
     );
@@ -22,9 +22,9 @@ export function OperatorGate({ children }: { children: ReactNode }) {
 
   if (!session?.user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-zinc-950 px-4">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-zinc-950 px-4">
         <div className="max-w-md space-y-3 text-center">
-          <p className="text-xs font-medium uppercase tracking-widest text-amber-500/90">Tower operator</p>
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-amber-500/90">Tower operator</p>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-50">Sign in required</h1>
           <p className="text-sm text-zinc-400">
             Product administration is separate from the tenant workspace. Use an account with the{" "}
@@ -45,7 +45,7 @@ export function OperatorGate({ children }: { children: ReactNode }) {
 
   if (!isProductAdmin) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-zinc-950 px-4">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-zinc-950 px-4">
         <div className="max-w-md rounded-xl border border-zinc-800 bg-zinc-900/80 p-8">
           <div className="flex items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800">

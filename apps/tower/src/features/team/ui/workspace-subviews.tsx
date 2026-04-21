@@ -15,7 +15,7 @@ import { Label } from "@/shared/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 
 const selectRowClass =
-  "h-8 w-full min-w-[6.5rem] rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
+  "h-8 w-full min-w-28 rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
 function MemberInitial(props: { name: string; email: string }) {
   const letter = (props.name?.trim()[0] ?? props.email?.trim()[0] ?? "?").toUpperCase();
@@ -42,7 +42,7 @@ function WorkspaceIdentityCard(props: {
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="truncate text-xl font-semibold tracking-tight">{activeOrg.name}</h2>
-          <Badge variant="secondary" className="font-mono text-[10px]">
+          <Badge variant="secondary" className="font-mono text-xs">
             {activeOrg.slug}
           </Badge>
         </div>
@@ -95,12 +95,12 @@ function WorkspacePeopleTab(props: {
             <p className="px-4 py-8 text-center text-sm text-muted-foreground">No members yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-left text-sm">
+              <table className="w-full min-w-[32.5rem] text-left text-sm">
                 <thead>
                   <tr className="border-b bg-muted/20 text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-4 py-3 font-medium">Member</th>
                     <th className="px-4 py-3 font-medium">Role</th>
-                    {canManageTeam ? <th className="w-[140px] px-4 py-3 text-end font-medium">Actions</th> : null}
+                    {canManageTeam ? <th className="w-36 px-4 py-3 text-end font-medium">Actions</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -282,14 +282,14 @@ function WorkspaceInvitesTab(props: {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left text-sm">
+              <table className="w-full min-w-[35rem] text-left text-sm">
                 <thead>
                   <tr className="border-b bg-muted/20 text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-4 py-3 font-medium">Email</th>
                     <th className="px-4 py-3 font-medium">Role</th>
                     <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="min-w-[140px] px-4 py-3 font-medium">Expires</th>
-                    {canManageTeam ? <th className="w-[200px] px-4 py-3 text-end font-medium">Actions</th> : null}
+                    <th className="min-w-36 px-4 py-3 font-medium">Expires</th>
+                    {canManageTeam ? <th className="w-52 px-4 py-3 text-end font-medium">Actions</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -522,14 +522,14 @@ export function WorkspaceTabsShell(props: {
             <TabsTrigger value="people" className="gap-2 px-3 py-2 sm:flex-1">
               <IconUsers className="size-4 opacity-70" aria-hidden />
               People
-              <Badge variant="outline" className="h-5 min-w-6 px-1.5 font-mono text-[10px]">
+              <Badge variant="outline" className="h-5 min-w-6 px-1.5 font-mono text-xs">
                 {members.length}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="invites" className="gap-2 px-3 py-2 sm:flex-1">
               <IconMailForward className="size-4 opacity-70" aria-hidden />
               Invitations
-              <Badge variant="outline" className="h-5 min-w-6 px-1.5 font-mono text-[10px]">
+              <Badge variant="outline" className="h-5 min-w-6 px-1.5 font-mono text-xs">
                 {pendingInviteCount}
               </Badge>
             </TabsTrigger>

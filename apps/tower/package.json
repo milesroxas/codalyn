@@ -23,6 +23,8 @@
   "dependencies": {
     "@codalyn/webflow-kit": "workspace:*",
     "@fontsource-variable/geist": "^5.2.8",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.0",
     "@tabler/icons-react": "^3.41.1",
     "@vercel/blob": "^1.0.0",
     "better-auth": "^1.6.5",
@@ -38,6 +40,7 @@
     "resend": "^6.12.2",
     "sharp": "^0.34.1",
     "tailwind-merge": "^3.5.0",
+    "three": "^0.184.0",
     "zod": "^3.24.2",
     "zustand": "^5.0.12"
   },
@@ -48,6 +51,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.184.0",
     "drizzle-kit": "^0.31.10",
     "postcss": "^8.5.10",
     "shadcn": "^4.3.0",

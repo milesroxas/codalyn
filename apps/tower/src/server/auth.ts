@@ -4,6 +4,8 @@ import { nextCookies } from "better-auth/next-js";
 import { admin, bearer } from "better-auth/plugins";
 import { adminAc, userAc } from "better-auth/plugins/admin/access";
 import { resolveAuthSecret } from "@/server/auth-secret";
+import { sendChangeEmailConfirmationEmail } from "@/server/email/change-email-confirmation-email";
+import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
 import { towerOrganization } from "@/server/membership/tower-organization";
 import { db } from "@/shared/lib/db";
 import * as schema from "@/shared/lib/db/auth-schema";
@@ -34,6 +36,14 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendEmailVerificationEmail({
+        user: { email: user.email, name: user.name },
+        url,
+      });
+    },
+  },
   user: {
     additionalFields: {
       webflowAuthorizedUserId: {
@@ -47,6 +57,19 @@ export const auth = betterAuth({
         defaultValue: false,
         input: false,
       },
+    },
+    changeEmail: {
+      enabled: true,
+      sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
+        await sendChangeEmailConfirmationEmail({
+          user: { email: user.email, name: user.name },
+          newEmail,
+          url,
+        });
+      },
+    },
+    deleteUser: {
+      enabled: true,
     },
   },
   secret: resolveAuthSecret(),

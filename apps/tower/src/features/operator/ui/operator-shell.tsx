@@ -76,11 +76,11 @@ export function OperatorShell(props: { userEmail: string; children: ReactNode })
   );
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="flex min-h-dvh bg-zinc-50 dark:bg-zinc-950">
       {/* Desktop sidebar */}
       <aside className="hidden w-56 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950 text-zinc-100 md:flex">
         <div className="border-b border-zinc-800 px-4 py-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-500/90">Operator</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-500/90">Operator</p>
           <p className="mt-1 text-sm font-semibold text-zinc-50">Tower</p>
           <p className="mt-2 truncate text-xs text-zinc-500" title={userEmail}>
             {userEmail}
@@ -111,7 +111,7 @@ export function OperatorShell(props: { userEmail: string; children: ReactNode })
             aria-label="Close menu"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute left-0 top-0 flex h-full w-[min(18rem,100%)] flex-col border-r border-zinc-800 bg-zinc-950 text-zinc-100 shadow-xl">
+          <div className="absolute left-0 top-0 flex h-full w-full max-w-72 flex-col border-r border-zinc-800 bg-zinc-950 text-zinc-100 shadow-xl">
             <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
               <span className="text-sm font-semibold text-zinc-50">Operator</span>
               <Button

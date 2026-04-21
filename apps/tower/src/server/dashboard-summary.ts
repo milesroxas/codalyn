@@ -2,7 +2,6 @@ import { webflowDataApiUrl } from "@codalyn/webflow-kit";
 import { and, desc, eq, gt } from "drizzle-orm";
 import { headers } from "next/headers";
 import { auth } from "@/server/auth";
-import { isTowerProductAdmin } from "@/server/membership/product-admin";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 import { db } from "@/shared/lib/db";
 import { organization, session as sessionTable } from "@/shared/lib/db/auth-schema";
@@ -14,8 +13,6 @@ export type TowerDashboardSummary = {
   activeOrganizationName: string | null;
   webflowOAuthConnected: boolean;
   webflowSites: { id: string; displayName?: string }[] | null;
-  /** Present when signed in; true if the user may open `/console` (operator). */
-  isProductAdmin: boolean;
 };
 
 export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary> {
@@ -31,7 +28,6 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
       activeOrganizationName: null,
       webflowOAuthConnected: false,
       webflowSites: null,
-      isProductAdmin: false,
     };
   }
 
@@ -90,6 +86,5 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
     activeOrganizationName,
     webflowOAuthConnected,
     webflowSites,
-    isProductAdmin: isTowerProductAdmin(sessionData.user),
   };
 }

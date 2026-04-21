@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, Suspense, useId, useState } from "react";
+import { type FormEvent, Suspense, useEffect, useId, useState } from "react";
 import { tryFinishBeaconTowerAuthPopup } from "@/features/auth/lib/beacon-opener-auth";
+import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { authClient } from "@/features/auth/model/auth-client";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
@@ -37,11 +38,32 @@ function messageForEnableTeamError(errorKey: string | undefined): string {
   return "Account created, but team workspace could not be enabled yet. You can upgrade later.";
 }
 
+async function runAfterTowerSignUp(opts: {
+  operatorInviteToken: string | null;
+  beaconOrigin: string | null;
+  startWithTeamWorkspace: boolean;
+}): Promise<string | null> {
+  if (opts.operatorInviteToken && !opts.beaconOrigin) {
+    const redeemResult = await redeemOperatorInviteClient(opts.operatorInviteToken);
+    if (redeemResult !== "ok") {
+      return messageForRedeemFailure(redeemResult);
+    }
+  }
+  if (opts.startWithTeamWorkspace && !opts.beaconOrigin) {
+    const enable = await postEnableTeamCreation();
+    if (!enable.ok) {
+      return messageForEnableTeamError(enable.errorKey);
+    }
+  }
+  return null;
+}
+
 function SignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const beaconOrigin = searchParams.get("beaconOrigin");
+  const operatorInviteParam = searchParams.get("invite");
   const nameId = useId();
   const emailId = useId();
   const passwordId = useId();
@@ -52,6 +74,37 @@ function SignUpForm() {
   const [startWithTeamWorkspace, setStartWithTeamWorkspace] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [operatorInviteToken, setOperatorInviteToken] = useState<string | null>(null);
+  const [inviteEmailLocked, setInviteEmailLocked] = useState(false);
+
+  useEffect(() => {
+    if (!operatorInviteParam || beaconOrigin) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const res = await fetch(`/api/account/operator-invite-details?token=${encodeURIComponent(operatorInviteParam)}`, {
+        credentials: "same-origin",
+      });
+      if (cancelled) {
+        return;
+      }
+      if (!res.ok) {
+        setError("This invite link is invalid or expired. Ask your administrator for a new one.");
+        return;
+      }
+      const data = (await res.json().catch(() => null)) as { email?: string } | null;
+      if (data?.email) {
+        setEmail(data.email);
+        setStartWithTeamWorkspace(true);
+        setOperatorInviteToken(operatorInviteParam);
+        setInviteEmailLocked(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [operatorInviteParam, beaconOrigin]);
 
   async function finishSignUp(data: Parameters<typeof resolveUserAndTokenAfterEmailAuth>[0]) {
     const { user: u, token } = await resolveUserAndTokenAfterEmailAuth(data);
@@ -77,12 +130,14 @@ function SignUpForm() {
       setError(err.message ?? "Sign up failed");
       return;
     }
-    if (startWithTeamWorkspace && !beaconOrigin) {
-      const enable = await postEnableTeamCreation();
-      if (!enable.ok) {
-        setError(messageForEnableTeamError(enable.errorKey));
-        return;
-      }
+    const postErr = await runAfterTowerSignUp({
+      operatorInviteToken,
+      beaconOrigin,
+      startWithTeamWorkspace,
+    });
+    if (postErr) {
+      setError(postErr);
+      return;
     }
     await finishSignUp(data);
   }
@@ -119,6 +174,8 @@ function SignUpForm() {
                 onChange={(ev) => setEmail(ev.target.value)}
                 className={inputClass}
                 required
+                readOnly={inviteEmailLocked}
+                aria-readonly={inviteEmailLocked}
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -142,13 +199,16 @@ function SignUpForm() {
                     Team workspace
                   </Label>
                   <p id={`${teamWorkspaceId}-hint`} className="text-xs leading-relaxed text-muted-foreground">
-                    Create a team workspace now (team plan / onboarding), or add it later from billing.
+                    {operatorInviteToken
+                      ? "Your invite includes permission to create a team workspace."
+                      : "Create a team workspace now (team plan / onboarding), or add it later from billing."}
                   </p>
                 </div>
                 <Switch
                   id={teamWorkspaceId}
                   checked={startWithTeamWorkspace}
                   onCheckedChange={setStartWithTeamWorkspace}
+                  disabled={Boolean(operatorInviteToken)}
                   className="mt-0.5 shrink-0"
                   aria-describedby={`${teamWorkspaceId}-hint`}
                 />
@@ -165,7 +225,7 @@ function SignUpForm() {
           </form>
         </CardContent>
         <CardFooter className="flex-col border-t border-border/60 bg-muted/20 px-6 py-4">
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-left text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link
               href={`/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`}
@@ -185,7 +245,7 @@ export default function SignUpPage() {
     <Suspense
       fallback={
         <AuthShell>
-          <p className="text-center text-sm text-muted-foreground">Loading…</p>
+          <p className="text-left text-sm text-muted-foreground">Loading…</p>
         </AuthShell>
       }
     >

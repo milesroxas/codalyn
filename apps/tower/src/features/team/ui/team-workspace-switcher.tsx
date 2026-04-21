@@ -45,7 +45,8 @@ export function TeamWorkspaceSwitcher(props: {
             type="button"
             variant="outline"
             disabled={disabled}
-            className="h-9 min-w-[12rem] max-w-[min(100%,18rem)] justify-between gap-2 px-3 font-normal"
+            size="lg"
+            className="min-w-48 max-w-[min(18rem,100%)] justify-between gap-2 px-3 font-normal"
             aria-label="Workspace menu"
           >
             <span className="flex min-w-0 flex-1 items-center gap-2 text-left">

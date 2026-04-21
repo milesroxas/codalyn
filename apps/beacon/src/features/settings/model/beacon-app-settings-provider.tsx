@@ -4,7 +4,7 @@ import {
   mergeBeaconAppSettings,
   parseBeaconAppSettings,
 } from "@codalyn/webflow-kit";
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { towerFetch } from "@/shared/lib/tower-client";
 import { ThemeProvider } from "@/shared/providers/theme-provider";
@@ -112,17 +112,15 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
 
   const canPersistExportDefaults = !isTowerUser || syncState === "synced";
 
-  useEffect(() => {
+  const abortRef = useRef<AbortController | null>(null);
+
+  const pullSettingsFromTower = useCallback(() => {
     if (!user?.id) {
-      setSettings(readLocal());
-      setSyncState("idle");
-      setEditorExperience(false);
-      setCanManageTeamBeaconSettings(false);
-      setRestrictToEditorExperience(false);
       return;
     }
-
+    abortRef.current?.abort();
     const ac = new AbortController();
+    abortRef.current = ac;
     setSyncState("loading");
 
     void towerFetch("/api/v1/beacon/settings", { signal: ac.signal })
@@ -147,9 +145,39 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
         }
         setSyncState("error");
       });
-
-    return () => ac.abort();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      abortRef.current?.abort();
+      setSettings(readLocal());
+      setSyncState("idle");
+      setEditorExperience(false);
+      setCanManageTeamBeaconSettings(false);
+      setRestrictToEditorExperience(false);
+      return;
+    }
+
+    pullSettingsFromTower();
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, [user?.id, pullSettingsFromTower]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+    const onResume = () => {
+      if (document.visibilityState === "visible") {
+        pullSettingsFromTower();
+      }
+    };
+    document.addEventListener("visibilitychange", onResume);
+    return () => {
+      document.removeEventListener("visibilitychange", onResume);
+    };
+  }, [user?.id, pullSettingsFromTower]);
 
   const updateSettings = useCallback(
     (patch: Partial<BeaconAppSettings>) => {

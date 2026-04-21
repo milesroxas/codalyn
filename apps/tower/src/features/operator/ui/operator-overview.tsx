@@ -36,7 +36,7 @@ export function OperatorOverview() {
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-widest text-amber-600 dark:text-amber-500/90">
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-amber-600 dark:text-amber-500/90">
           Product & platform
         </p>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Overview</h1>
@@ -60,7 +60,7 @@ export function OperatorOverview() {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="line-clamp-4 font-mono text-[10px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+            <p className="line-clamp-4 font-mono text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
               {healthText ?? "—"}
             </p>
           </CardContent>
@@ -98,7 +98,8 @@ export function OperatorOverview() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              Invites, seats, and workspace roles are managed in the tenant app — not in operator tools.
+              Customer sign-up invites and workspace eligibility are under Accounts. Invites to an existing team and
+              seat limits are managed in Team.
             </p>
           </CardContent>
           <CardFooter className="justify-end border-t border-zinc-100 pt-3 dark:border-zinc-800">

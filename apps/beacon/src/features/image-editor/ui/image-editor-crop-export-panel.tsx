@@ -1,7 +1,7 @@
 import type { BeaconImagePresetRow, ImageExportFormat } from "@codalyn/webflow-kit";
 import { Crop, FolderPlus, Loader2 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useState } from "react";
-import type { Area } from "react-easy-crop";
+import type { Area, MediaSize } from "react-easy-crop";
 import Cropper from "react-easy-crop";
 
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
@@ -10,7 +10,7 @@ import { type AspectPreset, aspectLabels } from "@/features/image-editor/lib/asp
 import type { AssetFolderRow } from "@/features/image-editor/lib/asset-folder-row";
 import type { ElementCmsBindingResolution } from "@/features/image-editor/lib/cms-primary-upload-context";
 import type { ComponentImagePropOption } from "@/features/image-editor/lib/component-image-prop";
-import { type ExportPresetDefaults, findMatchingExportPresetId } from "@/features/image-editor/lib/export-preset";
+import { formatFileSize } from "@/features/image-editor/lib/format-file-size";
 import {
   getImageEditorPlacementReadiness,
   type ImageEditorPlacementBlocker,
@@ -19,7 +19,8 @@ import {
   shouldOfferSelectionPlacement,
 } from "@/features/image-editor/lib/image-editor-placement-readiness";
 import { sanitizeAssetBaseName } from "@/features/image-editor/lib/sanitize-asset-base-name";
-import { ExportSizeEstimate } from "@/features/image-editor/ui/export-size-estimate";
+import { ExportEncodeSizeFootnote, ExportPresetLimitBar } from "@/features/image-editor/ui/export-size-estimate";
+import { QualityComparePreview } from "@/features/image-editor/ui/quality-compare-preview";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -40,6 +41,26 @@ import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Slider } from "@/shared/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group";
+
+/** Matches react-easy-crop `getMediaZoom`: rendered size vs natural, dominant axis. */
+function mediaDisplayToNaturalRatio(media: MediaSize): number {
+  return media.width > media.height ? media.width / media.naturalWidth : media.height / media.naturalHeight;
+}
+
+/** Upper bound for crop preview zoom slider and Cropper (historical UI cap). */
+const IMAGE_EDITOR_CROP_MAX_ZOOM = 4;
+
+function maxZoomForNativeResolutionCap(media: MediaSize | null, limit: boolean): number {
+  if (!limit || !media?.naturalWidth || !media?.naturalHeight) {
+    return IMAGE_EDITOR_CROP_MAX_ZOOM;
+  }
+  const r = mediaDisplayToNaturalRatio(media);
+  if (!(r > 0) || !Number.isFinite(r)) {
+    return IMAGE_EDITOR_CROP_MAX_ZOOM;
+  }
+  const nativeCap = 1 / r;
+  return Math.min(IMAGE_EDITOR_CROP_MAX_ZOOM, Math.max(1, nativeCap));
+}
 
 /** Aspect ratio templates vs. W×H-driven crop frame (same slot in the UI). */
 export type CropFrameMode = "aspect" | "custom";
@@ -82,6 +103,9 @@ export type ImageEditorCropExportPanelProps = {
   estimatedBytes: number | null;
   originalBytes: number | null;
   estimateNonce: number;
+  originalPreviewUrl: string | null;
+  compressedPreviewUrl: string | null;
+  previewPending: boolean;
   assetFolders: AssetFolderRow[];
   foldersLoading: boolean;
   folderActionBusy: boolean;
@@ -110,16 +134,28 @@ export type ImageEditorCropExportPanelProps = {
   busy: boolean;
   onApplyToCanvas: () => void | Promise<void>;
   exportPresets: BeaconImagePresetRow[];
-  exportPresetDefaults: ExportPresetDefaults;
   onApplyExportPreset: (preset: BeaconImagePresetRow) => void;
   onExportPresetChooseCustom: () => void;
-  exportPresetManualOverride: boolean;
-  hideExportFieldsFromPreset: boolean;
+  /** Select value for export preset dropdown (includes `__custom__`). */
+  exportPresetSelectValue: string;
+  lockCropOutputForPreset: boolean;
   exportPresetEncodingSummary: string | null;
+  /** When a preset applies (W×H + format), ceiling for size check + copy in export step. */
+  exportPresetFileLimit: {
+    presetName: string;
+    maxFileSizeBytes: number;
+    format: ImageExportFormat;
+  } | null;
+  /** Pass estimated-vs-preset meter in the size card; null hides the meter. */
+  activePresetMaxFileBytes: number | null;
+  /** When set, primary export is disabled (preset file guard). */
+  exportPlaceBlockedLabel: string | null;
   parsedExportWidth: number;
   parsedExportHeight: number;
   effectiveExportWidth: number;
   effectiveExportHeight: number;
+  onOpenQualityPopout: () => void;
+  limitCropZoomToNativeResolution: boolean;
 };
 
 /** Fade + slide down into place; `delayMs` staggers rows below the crop preview. */
@@ -207,6 +243,7 @@ function placeButtonStateIfDownloadExport(p: {
 }
 
 function placeButtonStateForPlacement(p: {
+  exportPlaceBlockedLabel: string | null;
   busy: boolean;
   foldersLoading: boolean;
   assetFolderCount: number;
@@ -221,6 +258,7 @@ function placeButtonStateForPlacement(p: {
   selectedComponentImagePropId: string | null;
 }): PlaceButtonState {
   const {
+    exportPlaceBlockedLabel,
     busy,
     foldersLoading,
     assetFolderCount,
@@ -237,6 +275,10 @@ function placeButtonStateForPlacement(p: {
 
   if (busy) {
     return { disabled: true, label: "Saving…", busy: true };
+  }
+
+  if (exportPlaceBlockedLabel) {
+    return { disabled: true, label: exportPlaceBlockedLabel, busy: false };
   }
 
   const downloadState = placeButtonStateIfDownloadExport({
@@ -320,66 +362,21 @@ function StepBadge({ n, label }: { n: number; label: string }) {
 function ExportPresetSelectBlock(props: {
   baseId: string;
   exportPresets: BeaconImagePresetRow[];
-  exportPresetDefaults: ExportPresetDefaults;
+  exportPresetSelectValue: string;
   onApplyExportPreset: (preset: BeaconImagePresetRow) => void;
   onExportPresetChooseCustom: () => void;
-  exportPresetManualOverride: boolean;
-  quality: number;
-  exportFormat: ImageExportFormat;
-  allowAvifEncoding: boolean;
   onQualityCommit: () => void;
   onExportFormatCommit: () => void;
-  parsedExportWidth: number;
-  parsedExportHeight: number;
 }) {
   const {
     baseId,
     exportPresets,
-    exportPresetDefaults,
+    exportPresetSelectValue,
     onApplyExportPreset,
     onExportPresetChooseCustom,
-    exportPresetManualOverride,
-    quality,
-    exportFormat,
-    allowAvifEncoding,
     onQualityCommit,
     onExportFormatCommit,
-    parsedExportWidth,
-    parsedExportHeight,
   } = props;
-
-  const formatForPresetMatch = useMemo(
-    () => (f: ImageExportFormat) => (!allowAvifEncoding && f === "avif" ? "webp" : f),
-    [allowAvifEncoding]
-  );
-
-  const exportPresetSelectValue = useMemo(() => {
-    if (exportPresetManualOverride) {
-      return "__custom__";
-    }
-    if (exportPresets.length === 0) {
-      return "__custom__";
-    }
-    const id = findMatchingExportPresetId(
-      exportPresets,
-      exportPresetDefaults,
-      parsedExportWidth,
-      parsedExportHeight,
-      exportFormat,
-      quality,
-      formatForPresetMatch
-    );
-    return id ?? "__custom__";
-  }, [
-    exportPresetManualOverride,
-    exportPresets,
-    exportPresetDefaults,
-    parsedExportWidth,
-    parsedExportHeight,
-    exportFormat,
-    quality,
-    formatForPresetMatch,
-  ]);
 
   if (exportPresets.length === 0) {
     return null;
@@ -448,19 +445,16 @@ type CropStageProps = {
   outputHeight: number;
   setOutputHeight: (n: number) => void;
   exportPresets: BeaconImagePresetRow[];
-  exportPresetDefaults: ExportPresetDefaults;
+  exportPresetSelectValue: string;
   onApplyExportPreset: (preset: BeaconImagePresetRow) => void;
   onExportPresetChooseCustom: () => void;
-  exportPresetManualOverride: boolean;
-  quality: number;
-  exportFormat: ImageExportFormat;
-  allowAvifEncoding: boolean;
   onQualityCommit: () => void;
   onExportFormatCommit: () => void;
+  lockCropOutputForPreset: boolean;
+  exportPresetEncodingSummary: string | null;
   parsedExportWidth: number;
   parsedExportHeight: number;
-  hideExportFieldsFromPreset: boolean;
-  exportPresetEncodingSummary: string | null;
+  limitCropZoomToNativeResolution: boolean;
 };
 
 function CropStageSection(p: CropStageProps) {
@@ -488,20 +482,35 @@ function CropStageSection(p: CropStageProps) {
     outputHeight,
     setOutputHeight,
     exportPresets,
-    exportPresetDefaults,
+    exportPresetSelectValue,
     onApplyExportPreset,
     onExportPresetChooseCustom,
-    exportPresetManualOverride,
-    quality,
-    exportFormat,
-    allowAvifEncoding,
     onQualityCommit,
     onExportFormatCommit,
+    lockCropOutputForPreset,
+    exportPresetEncodingSummary,
     parsedExportWidth,
     parsedExportHeight,
-    hideExportFieldsFromPreset,
-    exportPresetEncodingSummary,
+    limitCropZoomToNativeResolution,
   } = p;
+
+  const [cropMediaSize, setCropMediaSize] = useState<MediaSize | null>(null);
+
+  useEffect(() => {
+    void imageSrc;
+    setCropMediaSize(null);
+  }, [imageSrc]);
+
+  const cropMaxZoom = useMemo(
+    () => maxZoomForNativeResolutionCap(cropMediaSize, limitCropZoomToNativeResolution),
+    [cropMediaSize, limitCropZoomToNativeResolution]
+  );
+
+  useLayoutEffect(() => {
+    if (zoom > cropMaxZoom) {
+      setZoom(cropMaxZoom);
+    }
+  }, [zoom, cropMaxZoom, setZoom]);
 
   return (
     <section className="mt-4 flex flex-col gap-3" aria-labelledby={`${baseId}-step-crop`}>
@@ -520,17 +529,11 @@ function CropStageSection(p: CropStageProps) {
           <ExportPresetSelectBlock
             baseId={baseId}
             exportPresets={exportPresets}
-            exportPresetDefaults={exportPresetDefaults}
+            exportPresetSelectValue={exportPresetSelectValue}
             onApplyExportPreset={onApplyExportPreset}
             onExportPresetChooseCustom={onExportPresetChooseCustom}
-            exportPresetManualOverride={exportPresetManualOverride}
-            quality={quality}
-            exportFormat={exportFormat}
-            allowAvifEncoding={allowAvifEncoding}
             onQualityCommit={onQualityCommit}
             onExportFormatCommit={onExportFormatCommit}
-            parsedExportWidth={parsedExportWidth}
-            parsedExportHeight={parsedExportHeight}
           />
           <div className="relative aspect-video w-full overflow-hidden rounded-xl border-2 border-dashed border-border bg-muted/30">
             <Cropper
@@ -538,9 +541,12 @@ function CropStageSection(p: CropStageProps) {
               image={imageSrc}
               crop={crop}
               zoom={zoom}
+              minZoom={1}
+              maxZoom={cropMaxZoom}
               onCropChange={setCrop}
               onZoomChange={setZoom}
               onCropComplete={onCropComplete}
+              onMediaLoaded={setCropMediaSize}
               objectFit="contain"
             />
           </div>
@@ -556,16 +562,16 @@ function CropStageSection(p: CropStageProps) {
               <Slider
                 id={`${baseId}-zoom`}
                 min={1}
-                max={4}
+                max={cropMaxZoom}
                 step={0.01}
                 value={[zoom]}
-                onValueChange={(v) => setZoom(v[0] ?? 1)}
+                onValueChange={(v) => setZoom(Math.min(cropMaxZoom, v[0] ?? 1))}
               />
             </div>
           </div>
 
           <div className={staggerBelowCropClass(belowCropEntered, 90)}>
-            {hideExportFieldsFromPreset ? (
+            {lockCropOutputForPreset ? (
               <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
                 <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">
                   Output size (preset)
@@ -577,7 +583,8 @@ function CropStageSection(p: CropStageProps) {
                   <p className="text-muted-foreground mt-1 text-[11px] leading-snug">{exportPresetEncodingSummary}</p>
                 ) : null}
                 <p className="text-muted-foreground mt-2 text-[10px] leading-snug">
-                  Pick Custom (manual) in Export preset above to edit pixels or encoding.
+                  Pick Custom (manual) in Export preset above to change output dimensions or crop shape. Adjust encoding
+                  in step 2 anytime.
                 </p>
               </div>
             ) : (
@@ -696,12 +703,20 @@ type ExportCardProps = {
   estimatedBytes: number | null;
   originalBytes: number | null;
   estimateNonce: number;
+  originalPreviewUrl: string | null;
+  compressedPreviewUrl: string | null;
+  previewPending: boolean;
   parsedExportWidth: number;
   parsedExportHeight: number;
   effectiveExportWidth: number;
   effectiveExportHeight: number;
-  hideExportFieldsFromPreset: boolean;
-  exportPresetEncodingSummary: string | null;
+  onOpenQualityPopout: () => void;
+  exportPresetFileLimit: {
+    presetName: string;
+    maxFileSizeBytes: number;
+    format: ImageExportFormat;
+  } | null;
+  activePresetMaxFileBytes: number | null;
 };
 
 function ExportEncodeCard(p: ExportCardProps) {
@@ -721,13 +736,26 @@ function ExportEncodeCard(p: ExportCardProps) {
     estimatedBytes,
     originalBytes,
     estimateNonce,
+    originalPreviewUrl,
+    compressedPreviewUrl,
+    previewPending,
     parsedExportWidth,
     parsedExportHeight,
     effectiveExportWidth,
     effectiveExportHeight,
-    hideExportFieldsFromPreset,
-    exportPresetEncodingSummary,
+    onOpenQualityPopout,
+    exportPresetFileLimit,
+    activePresetMaxFileBytes,
   } = p;
+
+  const exportW = completedCrop ? effectiveExportWidth : parsedExportWidth;
+  const exportH = completedCrop ? effectiveExportHeight : parsedExportHeight;
+  const showPresetLimitBar =
+    activePresetMaxFileBytes !== null &&
+    activePresetMaxFileBytes > 0 &&
+    estimatedBytes !== null &&
+    !estimatePending &&
+    completedCrop !== null;
 
   return (
     <section className="mt-4 flex flex-col gap-3" aria-labelledby={`${baseId}-step-export`}>
@@ -736,33 +764,122 @@ function ExportEncodeCard(p: ExportCardProps) {
       </h2>
       <StepBadge n={2} label="Export" />
       <Card size="sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">File & quality</CardTitle>
-          <CardDescription>
-            {hideExportFieldsFromPreset
-              ? "Name the asset and check the size estimate. Encoding is set by your preset in step 1."
-              : "Confirm format and quality, or adjust after choosing a preset in step 1."}
+        <CardHeader className="space-y-1 pb-3">
+          <CardTitle className="text-sm font-medium">Encode & save</CardTitle>
+          <CardDescription className="text-xs leading-snug">
+            Choose a format, check the preview, then tune quality. Estimates appear once the crop is set.
           </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4 pt-0">
-          <div
-            className="rounded-md border border-border/60 bg-muted/15 px-2.5 py-2 text-[11px] tabular-nums"
-            aria-live="polite"
-          >
-            <span className="text-muted-foreground">Export pixels </span>
-            <span className="font-medium text-foreground">
-              {completedCrop
-                ? `${effectiveExportWidth}×${effectiveExportHeight}`
-                : `${parsedExportWidth}×${parsedExportHeight}`}
+          <p className="text-muted-foreground pt-0.5 text-[11px] tabular-nums leading-snug" aria-live="polite">
+            Output{" "}
+            <span className="text-foreground font-medium">
+              {exportW}×{exportH}px
             </span>
-            {completedCrop ? (
-              <span className="text-muted-foreground"> (from crop)</span>
+            {completedCrop ? null : <span className="text-muted-foreground"> · finalize in crop step</span>}
+          </p>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5 pt-0">
+          <div className="flex flex-col gap-2">
+            <Label className="text-xs font-medium" id={`${baseId}-format`}>
+              File type
+            </Label>
+            {allowAvifEncoding ? (
+              <>
+                <ToggleGroup
+                  type="single"
+                  value={exportFormat}
+                  onValueChange={(v) => {
+                    if (v === "webp" || v === "avif") {
+                      setExportFormat(v);
+                      onExportFormatCommit();
+                    }
+                  }}
+                  aria-labelledby={`${baseId}-format`}
+                  className="grid w-full grid-cols-2 gap-1.5"
+                  variant="outline"
+                  size="sm"
+                  spacing={0}
+                >
+                  <ToggleGroupItem value="webp" className="text-xs font-medium">
+                    WebP
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="avif" className="text-xs font-medium">
+                    AVIF
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                <p className="text-muted-foreground text-[10px] leading-snug">
+                  WebP encodes in the Designer. AVIF uses Tower.
+                </p>
+              </>
             ) : (
-              <span className="text-muted-foreground"> (adjust crop to finalize)</span>
+              <>
+                <div className="text-foreground rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm font-medium">
+                  WebP
+                </div>
+                <p className="text-muted-foreground text-[10px] leading-snug">Sign in to Tower to enable AVIF.</p>
+              </>
             )}
           </div>
+
+          <div className="flex flex-col gap-2">
+            {completedCrop ? (
+              <QualityComparePreview
+                originalSrc={originalPreviewUrl}
+                compressedSrc={compressedPreviewUrl}
+                pending={previewPending}
+                exportWidth={effectiveExportWidth}
+                exportHeight={effectiveExportHeight}
+                onOpenQualityPopout={onOpenQualityPopout}
+              />
+            ) : (
+              <div className="flex min-h-[120px] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border/70 bg-muted/15 px-4 py-6 text-center">
+                <p className="text-muted-foreground text-xs font-medium">Preview after crop</p>
+                <p className="text-muted-foreground max-w-[16rem] text-[10px] leading-snug">
+                  Complete step 1 to compare lossless crop and compressed output.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <Label className="text-xs font-medium" htmlFor={`${baseId}-quality`}>
+                Quality
+              </Label>
+              <span className="text-muted-foreground text-xs tabular-nums">{Math.round(quality * 100)}%</span>
+            </div>
+            {exportPresetFileLimit ? (
+              <p className="text-muted-foreground text-[10px] leading-snug" id={`${baseId}-preset-file-hint`}>
+                <span className="text-foreground font-medium">{exportPresetFileLimit.presetName}</span>
+                {" · "}
+                {exportPresetFileLimit.format.toUpperCase()}
+                {" · max "}
+                {formatFileSize(exportPresetFileLimit.maxFileSizeBytes)}
+              </p>
+            ) : null}
+            <Slider
+              id={`${baseId}-quality`}
+              min={0.05}
+              max={1}
+              step={0.01}
+              value={[quality]}
+              onValueChange={(v) => setQuality(v[0] ?? 0.75)}
+              onValueCommit={onQualityCommit}
+              aria-describedby={exportPresetFileLimit ? `${baseId}-preset-file-hint` : undefined}
+            />
+            {showPresetLimitBar ? (
+              <ExportPresetLimitBar estimatedBytes={estimatedBytes} maxBytes={activePresetMaxFileBytes} />
+            ) : null}
+            <ExportEncodeSizeFootnote
+              completedCrop={completedCrop}
+              estimatePending={estimatePending}
+              estimatedBytes={estimatedBytes}
+              originalBytes={originalBytes}
+              showQualityCommitHint={completedCrop !== null && estimateNonce === 0}
+            />
+          </div>
+
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs" htmlFor={`${baseId}-fn`}>
+            <Label className="text-xs font-medium" htmlFor={`${baseId}-fn`}>
               File name
             </Label>
             <Input
@@ -774,75 +891,6 @@ function ExportEncodeCard(p: ExportCardProps) {
               onBlur={() => setFileBaseName(sanitizeAssetBaseName(fileBaseName))}
             />
           </div>
-          {hideExportFieldsFromPreset && exportPresetEncodingSummary ? (
-            <div className="rounded-md border border-border/60 bg-muted/10 px-2.5 py-2">
-              <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">Encoding (preset)</p>
-              <p className="text-foreground mt-0.5 text-sm font-medium leading-snug">{exportPresetEncodingSummary}</p>
-            </div>
-          ) : null}
-          {!hideExportFieldsFromPreset ? (
-            <>
-              <div className="flex flex-col gap-2">
-                <span className="text-muted-foreground text-xs" id={`${baseId}-format`}>
-                  Output format
-                </span>
-                {allowAvifEncoding ? (
-                  <>
-                    <ToggleGroup
-                      type="single"
-                      value={exportFormat}
-                      onValueChange={(v) => {
-                        if (v === "webp" || v === "avif") {
-                          setExportFormat(v);
-                          onExportFormatCommit();
-                        }
-                      }}
-                      aria-labelledby={`${baseId}-format`}
-                      className="justify-stretch"
-                    >
-                      <ToggleGroupItem value="webp" className="flex-1">
-                        WebP
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="avif" className="flex-1">
-                        AVIF
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-                    <p className="text-muted-foreground text-[10px] leading-snug">
-                      WebP is encoded in-browser. AVIF is compressed through Tower.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-foreground text-sm font-medium leading-snug">WebP</div>
-                    <p className="text-muted-foreground text-[10px] leading-snug">
-                      Sign in to Tower to unlock AVIF compression.
-                    </p>
-                  </>
-                )}
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label className="text-muted-foreground text-xs" htmlFor={`${baseId}-quality`}>
-                  Quality
-                </Label>
-                <Slider
-                  id={`${baseId}-quality`}
-                  min={0.05}
-                  max={1}
-                  step={0.01}
-                  value={[quality]}
-                  onValueChange={(v) => setQuality(v[0] ?? 0.75)}
-                  onValueCommit={onQualityCommit}
-                />
-              </div>
-            </>
-          ) : null}
-          <ExportSizeEstimate
-            completedCrop={completedCrop}
-            estimatePending={estimatePending}
-            estimatedBytes={estimatedBytes}
-            originalBytes={originalBytes}
-            showQualityCommitHint={completedCrop !== null && estimateNonce === 0}
-          />
         </CardContent>
       </Card>
     </section>
@@ -1351,6 +1399,9 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     estimatedBytes,
     originalBytes,
     estimateNonce,
+    originalPreviewUrl,
+    compressedPreviewUrl,
+    previewPending,
     assetFolders,
     foldersLoading,
     folderActionBusy,
@@ -1373,16 +1424,20 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     busy,
     onApplyToCanvas,
     exportPresets,
-    exportPresetDefaults,
     onApplyExportPreset,
     onExportPresetChooseCustom,
-    exportPresetManualOverride,
-    hideExportFieldsFromPreset,
+    exportPresetSelectValue,
+    lockCropOutputForPreset,
     exportPresetEncodingSummary,
+    exportPresetFileLimit,
+    activePresetMaxFileBytes,
+    exportPlaceBlockedLabel,
     parsedExportWidth,
     parsedExportHeight,
     effectiveExportWidth,
     effectiveExportHeight,
+    onOpenQualityPopout,
+    limitCropZoomToNativeResolution,
   } = props;
 
   const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
@@ -1428,6 +1483,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
   const placeButton = useMemo(
     () =>
       placeButtonStateForPlacement({
+        exportPlaceBlockedLabel,
         busy,
         foldersLoading,
         assetFolderCount: assetFolders.length,
@@ -1442,6 +1498,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         selectedComponentImagePropId,
       }),
     [
+      exportPlaceBlockedLabel,
       busy,
       foldersLoading,
       assetFolders.length,
@@ -1504,19 +1561,16 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         outputHeight={outputHeight}
         setOutputHeight={setOutputHeight}
         exportPresets={exportPresets}
-        exportPresetDefaults={exportPresetDefaults}
         onApplyExportPreset={onApplyExportPreset}
         onExportPresetChooseCustom={onExportPresetChooseCustom}
-        exportPresetManualOverride={exportPresetManualOverride}
-        quality={quality}
-        exportFormat={exportFormat}
-        allowAvifEncoding={allowAvifEncoding}
+        exportPresetSelectValue={exportPresetSelectValue}
         onQualityCommit={onQualityCommit}
         onExportFormatCommit={onExportFormatCommit}
+        lockCropOutputForPreset={lockCropOutputForPreset}
+        exportPresetEncodingSummary={exportPresetEncodingSummary}
         parsedExportWidth={parsedExportWidth}
         parsedExportHeight={parsedExportHeight}
-        hideExportFieldsFromPreset={hideExportFieldsFromPreset}
-        exportPresetEncodingSummary={exportPresetEncodingSummary}
+        limitCropZoomToNativeResolution={limitCropZoomToNativeResolution}
       />
 
       <ExportEncodeCard
@@ -1535,12 +1589,16 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         estimatedBytes={estimatedBytes}
         originalBytes={originalBytes}
         estimateNonce={estimateNonce}
+        originalPreviewUrl={originalPreviewUrl}
+        compressedPreviewUrl={compressedPreviewUrl}
+        previewPending={previewPending}
         parsedExportWidth={parsedExportWidth}
         parsedExportHeight={parsedExportHeight}
         effectiveExportWidth={effectiveExportWidth}
         effectiveExportHeight={effectiveExportHeight}
-        hideExportFieldsFromPreset={hideExportFieldsFromPreset}
-        exportPresetEncodingSummary={exportPresetEncodingSummary}
+        onOpenQualityPopout={onOpenQualityPopout}
+        exportPresetFileLimit={exportPresetFileLimit}
+        activePresetMaxFileBytes={activePresetMaxFileBytes}
       />
 
       <PlacementCard

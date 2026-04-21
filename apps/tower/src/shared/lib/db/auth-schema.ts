@@ -1,6 +1,6 @@
-import type { BeaconAppSettings } from "@codalyn/webflow-kit";
+import type { BeaconAppSettings, BeaconOrgTeamSettings } from "@codalyn/webflow-kit";
 import { relations } from "drizzle-orm";
-import { boolean, index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -8,6 +8,16 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   /** Webflow Data API `authorized_user` id from Designer `getIdToken` + `/beta/token/resolve`. */
   webflowAuthorizedUserId: text("webflow_authorized_user_id").unique(),
+  /** App-wide role from Better Auth admin plugin: `user` or `product_admin`. */
+  role: text("role"),
+  /**
+   * Eligible to create organizations (team workspaces). Set by signup intent, billing/upgrade webhooks, or ops.
+   * Server-enforced via `allowUserToCreateOrganization`; not set by public client input.
+   */
+  canCreateOrganization: boolean("can_create_organization").default(false).notNull(),
+  banned: boolean("banned").default(false).notNull(),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires"),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -29,6 +39,8 @@ export const session = pgTable(
       .notNull(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
+    activeOrganizationId: text("active_organization_id"),
+    impersonatedBy: text("impersonated_by"),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -116,12 +128,83 @@ export const webflowOAuthToken = pgTable("webflow_oauth_token", {
     .notNull(),
 });
 
+/** Team tenant (Better Auth organization plugin). */
+export const organization = pgTable(
+  "organization",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    logo: text("logo"),
+    metadata: text("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    /** Nullable cap on members; null means use a high default (free tier). Wired to Stripe seat count later. */
+    seatLimit: integer("seat_limit"),
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    subscriptionStatus: text("subscription_status"),
+    billingPlan: text("billing_plan"),
+    /** Team-wide Beacon export presets (designers + product admins). Merged into members’ effective settings. */
+    beaconTeamSettings: jsonb("beacon_team_settings").$type<BeaconOrgTeamSettings | null>(),
+  },
+  (table) => [index("organization_slug_idx").on(table.slug)]
+);
+
+export const member = pgTable(
+  "member",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** Team roles: `admin`, `designer`, `editor` (see `tower-organization-access.ts`). */
+    role: text("role").notNull(),
+    /**
+     * Team admins only: when true, Beacon hides designer tooling and uses team presets like an editor.
+     * Default false.
+     */
+    beaconRestrictToEditorExperience: boolean("beacon_restrict_to_editor_experience").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("member_organizationId_idx").on(table.organizationId),
+    index("member_userId_idx").on(table.userId),
+    uniqueIndex("member_organization_user_unique").on(table.organizationId, table.userId),
+  ]
+);
+
+export const invitation = pgTable(
+  "invitation",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: text("role"),
+    status: text("status").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    inviterId: text("inviter_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    index("invitation_organizationId_idx").on(table.organizationId),
+    index("invitation_email_idx").on(table.email),
+  ]
+);
+
 export const userRelations = relations(user, ({ many, one }) => ({
   sessions: many(session),
   accounts: many(account),
   webflowOAuth: one(webflowOAuthToken),
   webflowOauthAuthorizeStates: many(webflowOauthAuthorizeState),
   beaconAppSettings: one(beaconAppSettings),
+  members: many(member),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -155,6 +238,33 @@ export const webflowOauthAuthorizeStateRelations = relations(webflowOauthAuthori
 export const beaconAppSettingsRelations = relations(beaconAppSettings, ({ one }) => ({
   user: one(user, {
     fields: [beaconAppSettings.userId],
+    references: [user.id],
+  }),
+}));
+
+export const organizationRelations = relations(organization, ({ many }) => ({
+  members: many(member),
+  invitations: many(invitation),
+}));
+
+export const memberRelations = relations(member, ({ one }) => ({
+  organization: one(organization, {
+    fields: [member.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [member.userId],
+    references: [user.id],
+  }),
+}));
+
+export const invitationRelations = relations(invitation, ({ one }) => ({
+  organization: one(organization, {
+    fields: [invitation.organizationId],
+    references: [organization.id],
+  }),
+  inviter: one(user, {
+    fields: [invitation.inviterId],
     references: [user.id],
   }),
 }));

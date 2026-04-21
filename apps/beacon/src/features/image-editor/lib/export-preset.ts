@@ -12,8 +12,8 @@ export function resolvePresetExportFormat(
   return preset.exportFormat ?? defaults.exportFormat;
 }
 
-export function resolvePresetExportQuality(preset: BeaconImagePresetRow, defaults: ExportPresetDefaults): number {
-  return preset.exportQuality ?? defaults.exportQuality;
+export function resolvePresetExportQuality(_preset: BeaconImagePresetRow, defaults: ExportPresetDefaults): number {
+  return defaults.exportQuality;
 }
 
 export function exportPresetMatchesSession(
@@ -22,15 +22,11 @@ export function exportPresetMatchesSession(
   width: number,
   height: number,
   format: ImageExportFormat,
-  quality: number,
   normalizeFormat?: (f: ImageExportFormat) => ImageExportFormat
 ): boolean {
   const nf = normalizeFormat ?? ((f: ImageExportFormat) => f);
   return (
-    preset.width === width &&
-    preset.height === height &&
-    nf(resolvePresetExportFormat(preset, defaults)) === nf(format) &&
-    resolvePresetExportQuality(preset, defaults) === quality
+    preset.width === width && preset.height === height && nf(resolvePresetExportFormat(preset, defaults)) === nf(format)
   );
 }
 
@@ -40,11 +36,10 @@ export function findMatchingExportPresetId(
   width: number,
   height: number,
   format: ImageExportFormat,
-  quality: number,
   normalizeFormat?: (f: ImageExportFormat) => ImageExportFormat
 ): string | null {
   for (const p of presets) {
-    if (exportPresetMatchesSession(p, defaults, width, height, format, quality, normalizeFormat)) {
+    if (exportPresetMatchesSession(p, defaults, width, height, format, normalizeFormat)) {
       return p.id;
     }
   }

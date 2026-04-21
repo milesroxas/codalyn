@@ -10,7 +10,3 @@ interface ImportMetaEnv {
   readonly VITE_TOWER_ORIGIN?: string;
   readonly VITE_BEACON_API_KEY?: string;
 }
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}

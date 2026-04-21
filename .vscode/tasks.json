@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Open TOWER + BEACON terminals",
+      "dependsOn": ["TOWER", "BEACON"],
+      "dependsOrder": "parallel",
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    },
+    {
+      "label": "TOWER",
+      "type": "shell",
+      "command": "exec /bin/zsh -il",
+      "options": {
+        "cwd": "${workspaceFolder}/apps/tower"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "tower-beacon"
+      }
+    },
+    {
+      "label": "BEACON",
+      "type": "shell",
+      "command": "exec /bin/zsh -il",
+      "options": {
+        "cwd": "${workspaceFolder}/apps/beacon"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "tower-beacon"
+      }
+    }
+  ]
+}

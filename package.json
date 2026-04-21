@@ -10,7 +10,10 @@
     "pnpm": ">=10"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["sharp", "esbuild"]
+    "onlyBuiltDependencies": [
+      "sharp",
+      "esbuild"
+    ]
   },
   "scripts": {
     "app": "node scripts/app.mjs",

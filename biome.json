@@ -16,6 +16,7 @@
       "!!**/.turbo",
       "!!**/.next",
       "!!**/_legacy",
+      "!!**/drizzle/meta",
       "!**/*.config.js",
       "!**/*.config.mjs",
       "!**/scripts/post-build.js"
@@ -77,5 +78,17 @@
       "allowWrongLineComments": false,
       "tailwindDirectives": true
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["**/vite-env.d.ts"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off"
+          }
+        }
+      }
+    }
+  ]
 }

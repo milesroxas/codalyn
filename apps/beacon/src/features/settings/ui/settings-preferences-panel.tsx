@@ -2,6 +2,7 @@ import { Monitor, Moon, Sun } from "lucide-react";
 import { useId } from "react";
 import { type AspectPreset, aspectLabels } from "@/features/image-editor/lib/aspect-preset";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
+import { Checkbox } from "@/shared/ui/checkbox";
 import { Label } from "@/shared/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
@@ -84,6 +85,25 @@ export function SettingsPreferencesPanel() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-medium">Image editor</h2>
+        <div className="flex items-start gap-2">
+          <Checkbox
+            id={`${baseId}-limit-crop-zoom`}
+            checked={settings.limitCropZoomToNativeResolution}
+            onCheckedChange={(v) => updateSettings({ limitCropZoomToNativeResolution: v === true })}
+          />
+          <div className="grid gap-1.5 leading-none">
+            <Label className="cursor-pointer font-normal" htmlFor={`${baseId}-limit-crop-zoom`}>
+              Cap crop zoom to image resolution
+            </Label>
+            <p className="text-muted-foreground text-xs leading-snug">
+              Stops the crop preview from zooming past about 1:1 pixels so the image does not look upscaled and soft.
+            </p>
+          </div>
         </div>
       </section>
     </div>

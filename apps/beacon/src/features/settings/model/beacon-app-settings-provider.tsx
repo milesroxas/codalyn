@@ -23,6 +23,12 @@ type BeaconAppSettingsContextValue = {
   isTowerUser: boolean;
   /** Persist export defaults from the image editor after Tower sync (or always for guests). */
   canPersistExportDefaults: boolean;
+  /** Team editors + team admins who opt in: limited UI; uses designer team presets. */
+  editorExperience: boolean;
+  /** Designers and product admins may edit workspace team presets (stored on the organization). */
+  canManageTeamBeaconSettings: boolean;
+  /** Team admins only: self-switch for editor-style Beacon (default off). */
+  restrictToEditorExperience: boolean;
 };
 
 const BeaconAppSettingsContext = createContext<BeaconAppSettingsContextValue | undefined>(undefined);
@@ -62,10 +68,45 @@ function writeLocal(settings: BeaconAppSettings) {
   }
 }
 
+type TowerBeaconApiEnvelope = {
+  settings?: BeaconAppSettings;
+  editorExperience?: boolean;
+  canManageTeamBeaconSettings?: boolean;
+  restrictToEditorExperience?: boolean;
+};
+
+function applyTowerBeaconEnvelope(
+  data: TowerBeaconApiEnvelope,
+  setters: {
+    setSettings: (s: BeaconAppSettings) => void;
+    setEditorExperience: (v: boolean) => void;
+    setCanManageTeamBeaconSettings: (v: boolean) => void;
+    setRestrictToEditorExperience: (v: boolean) => void;
+  }
+) {
+  if (data.settings) {
+    const parsed = parseBeaconAppSettings(data.settings);
+    setters.setSettings(parsed);
+    writeLocal(parsed);
+  }
+  if (data.editorExperience !== undefined) {
+    setters.setEditorExperience(Boolean(data.editorExperience));
+  }
+  if (data.canManageTeamBeaconSettings !== undefined) {
+    setters.setCanManageTeamBeaconSettings(Boolean(data.canManageTeamBeaconSettings));
+  }
+  if (data.restrictToEditorExperience !== undefined) {
+    setters.setRestrictToEditorExperience(Boolean(data.restrictToEditorExperience));
+  }
+}
+
 export function BeaconAppSettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useBeaconTowerSession();
   const [settings, setSettings] = useState<BeaconAppSettings>(() => readLocal());
   const [syncState, setSyncState] = useState<BeaconSettingsSyncState>("idle");
+  const [editorExperience, setEditorExperience] = useState(false);
+  const [canManageTeamBeaconSettings, setCanManageTeamBeaconSettings] = useState(false);
+  const [restrictToEditorExperience, setRestrictToEditorExperience] = useState(false);
 
   const isTowerUser = Boolean(user?.id);
 
@@ -75,6 +116,9 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
     if (!user?.id) {
       setSettings(readLocal());
       setSyncState("idle");
+      setEditorExperience(false);
+      setCanManageTeamBeaconSettings(false);
+      setRestrictToEditorExperience(false);
       return;
     }
 
@@ -86,11 +130,15 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
         if (!r.ok) {
           throw new Error(`settings ${r.status}`);
         }
-        return r.json() as Promise<{ settings: BeaconAppSettings }>;
+        return r.json() as Promise<TowerBeaconApiEnvelope & { settings: BeaconAppSettings }>;
       })
-      .then(({ settings: s }) => {
-        setSettings(s);
-        writeLocal(s);
+      .then((data) => {
+        applyTowerBeaconEnvelope(data, {
+          setSettings,
+          setEditorExperience,
+          setCanManageTeamBeaconSettings,
+          setRestrictToEditorExperience,
+        });
         setSyncState("synced");
       })
       .catch(() => {
@@ -115,6 +163,17 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
+        }).then(async (r) => {
+          if (!r.ok) {
+            return;
+          }
+          const data = (await r.json()) as TowerBeaconApiEnvelope;
+          applyTowerBeaconEnvelope(data, {
+            setSettings,
+            setEditorExperience,
+            setCanManageTeamBeaconSettings,
+            setRestrictToEditorExperience,
+          });
         });
       }
     },
@@ -135,8 +194,20 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
       syncState,
       isTowerUser,
       canPersistExportDefaults,
+      editorExperience,
+      canManageTeamBeaconSettings,
+      restrictToEditorExperience,
     }),
-    [settings, updateSettings, syncState, isTowerUser, canPersistExportDefaults]
+    [
+      settings,
+      updateSettings,
+      syncState,
+      isTowerUser,
+      canPersistExportDefaults,
+      editorExperience,
+      canManageTeamBeaconSettings,
+      restrictToEditorExperience,
+    ]
   );
 
   return (

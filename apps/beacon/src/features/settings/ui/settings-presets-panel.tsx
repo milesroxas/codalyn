@@ -1,16 +1,52 @@
-import { BEACON_BUILTIN_ASPECT_PRESETS, type BeaconImagePresetRow, type ImageExportFormat } from "@codalyn/webflow-kit";
+import {
+  BEACON_BUILTIN_ASPECT_PRESETS,
+  BEACON_PRESET_DEFAULT_MAX_FILE_BYTES,
+  BEACON_PRESET_MAX_FILE_BYTES_MAX,
+  BEACON_PRESET_MAX_FILE_BYTES_MIN,
+  type BeaconImagePresetRow,
+  type ImageExportFormat,
+} from "@codalyn/webflow-kit";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { parseOutputDimension } from "@/features/image-editor/lib/apply-cropped-export";
 import { type AspectPreset, aspectLabels } from "@/features/image-editor/lib/aspect-preset";
-import { resolvePresetExportFormat, resolvePresetExportQuality } from "@/features/image-editor/lib/export-preset";
+import { resolvePresetExportFormat } from "@/features/image-editor/lib/export-preset";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { Slider } from "@/shared/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group";
+
+type MaxUnit = "kb" | "mb";
+
+function draftToMaxBytes(value: string, unit: MaxUnit): number {
+  const n = Number.parseFloat(value.replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) {
+    return BEACON_PRESET_DEFAULT_MAX_FILE_BYTES;
+  }
+  const raw = unit === "mb" ? n * 1024 * 1024 : n * 1024;
+  return Math.min(BEACON_PRESET_MAX_FILE_BYTES_MAX, Math.max(BEACON_PRESET_MAX_FILE_BYTES_MIN, Math.round(raw)));
+}
+
+function maxBytesToDraft(bytes: number): { value: string; unit: MaxUnit } {
+  if (bytes >= 1024 * 1024) {
+    const mb = bytes / (1024 * 1024);
+    const rounded = Math.round(mb * 10) / 10;
+    return { value: Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1), unit: "mb" };
+  }
+  return { value: String(Math.max(1, Math.round(bytes / 1024))), unit: "kb" };
+}
+
+function bytesToStrInUnit(bytes: number, unit: MaxUnit): string {
+  if (unit === "mb") {
+    const mb = bytes / (1024 * 1024);
+    const t = Math.max(0.01, Math.round(mb * 100) / 100);
+    return t >= 10 ? t.toFixed(0) : String(t);
+  }
+  return String(Math.max(1, Math.round(bytes / 1024)));
+}
 
 function PresetRowFields(props: {
   baseId: string;
@@ -19,7 +55,7 @@ function PresetRowFields(props: {
   defaultQuality: number;
   isTowerUser: boolean;
   onUpdate: (
-    patch: Partial<Pick<BeaconImagePresetRow, "name" | "width" | "height" | "exportFormat" | "exportQuality">>
+    patch: Partial<Pick<BeaconImagePresetRow, "name" | "width" | "height" | "exportFormat" | "maxFileSizeBytes">>
   ) => void;
   onRemove: () => void;
 }) {
@@ -27,12 +63,10 @@ function PresetRowFields(props: {
   const [nameDraft, setNameDraft] = useState(p.name);
   const [wStr, setWStr] = useState(String(p.width));
   const [hStr, setHStr] = useState(String(p.height));
+  const [maxStr, setMaxStr] = useState(() => maxBytesToDraft(p.maxFileSizeBytes).value);
+  const [maxUnit, setMaxUnit] = useState<MaxUnit>(() => maxBytesToDraft(p.maxFileSizeBytes).unit);
 
   const resolvedFormat = resolvePresetExportFormat(p, {
-    exportFormat: defaultFormat,
-    exportQuality: defaultQuality,
-  });
-  const resolvedQuality = resolvePresetExportQuality(p, {
     exportFormat: defaultFormat,
     exportQuality: defaultQuality,
   });
@@ -41,7 +75,10 @@ function PresetRowFields(props: {
     setNameDraft(p.name);
     setWStr(String(p.width));
     setHStr(String(p.height));
-  }, [p.name, p.width, p.height]);
+    const d = maxBytesToDraft(p.maxFileSizeBytes);
+    setMaxStr(d.value);
+    setMaxUnit(d.unit);
+  }, [p.name, p.width, p.height, p.maxFileSizeBytes]);
 
   return (
     <li className="flex flex-col gap-3 rounded-lg border border-border/60 bg-background p-2.5">
@@ -135,23 +172,53 @@ function PresetRowFields(props: {
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
-      <div className="flex flex-col gap-2">
-        <Label className="text-muted-foreground text-[11px]" htmlFor={`${baseId}-q-${p.id}`}>
-          Quality
-        </Label>
-        <Slider
-          id={`${baseId}-q-${p.id}`}
-          min={0.05}
-          max={1}
-          step={0.01}
-          value={[resolvedQuality]}
-          onValueChange={(vals) => {
-            const q = vals[0];
-            if (typeof q === "number") {
-              onUpdate({ exportQuality: q });
-            }
-          }}
-        />
+      <div className="flex flex-col gap-2 sm:max-w-xs">
+        <div className="flex items-baseline justify-between gap-2">
+          <Label className="text-muted-foreground text-[11px]" htmlFor={`${baseId}-max-${p.id}`}>
+            Max file size
+          </Label>
+          <span className="text-muted-foreground text-[10px] leading-none">Ceiling for exports</span>
+        </div>
+        <div className="flex gap-2">
+          <Input
+            id={`${baseId}-max-${p.id}`}
+            inputMode="decimal"
+            type="text"
+            className="h-8 min-w-0 flex-1 text-xs tabular-nums"
+            value={maxStr}
+            onChange={(e) => setMaxStr(e.target.value)}
+            onBlur={() => {
+              const next = draftToMaxBytes(maxStr, maxUnit);
+              const d = maxBytesToDraft(next);
+              setMaxStr(d.value);
+              setMaxUnit(d.unit);
+              if (next !== p.maxFileSizeBytes) {
+                onUpdate({ maxFileSizeBytes: next });
+              }
+            }}
+          />
+          <Select
+            value={maxUnit}
+            onValueChange={(v) => {
+              if (v !== "kb" && v !== "mb") {
+                return;
+              }
+              setMaxUnit(v);
+              setMaxStr(bytesToStrInUnit(p.maxFileSizeBytes, v));
+            }}
+          >
+            <SelectTrigger className="h-8 w-[4.5rem] shrink-0 px-2 text-xs" aria-label="Unit for max file size">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectItem value="kb">KB</SelectItem>
+              <SelectItem value="mb">MB</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <p className="text-muted-foreground text-[10px] leading-snug">
+          Exports that use this preset cannot be placed while the estimate is over this limit.
+        </p>
       </div>
       <div className="flex justify-end">
         <Button
@@ -176,7 +243,8 @@ export function SettingsPresetsPanel() {
   const [draftW, setDraftW] = useState("1920");
   const [draftH, setDraftH] = useState("1080");
   const [draftFormat, setDraftFormat] = useState<ImageExportFormat>(settings.defaultExportFormat);
-  const [draftQuality, setDraftQuality] = useState(settings.defaultExportQuality);
+  const [draftMaxStr, setDraftMaxStr] = useState("500");
+  const [draftMaxUnit, setDraftMaxUnit] = useState<MaxUnit>("kb");
 
   useEffect(() => {
     setDraftFormat(settings.defaultExportFormat);
@@ -215,18 +283,22 @@ export function SettingsPresetsPanel() {
     if (!isTowerUser && fmt === "avif") {
       fmt = "webp";
     }
+    const maxFileSizeBytes = draftToMaxBytes(draftMaxStr, draftMaxUnit);
     const row: BeaconImagePresetRow = {
       id: crypto.randomUUID(),
       name,
       width: w,
       height: h,
       exportFormat: fmt,
-      exportQuality: draftQuality,
+      maxFileSizeBytes,
     };
     updateSettings({ imagePresets: [...settings.imagePresets, row] });
     setDraftName("");
     setDraftW(String(w));
     setDraftH(String(h));
+    const d = maxBytesToDraft(maxFileSizeBytes);
+    setDraftMaxStr(d.value);
+    setDraftMaxUnit(d.unit);
   };
 
   const removePreset = (id: string) => {
@@ -235,7 +307,7 @@ export function SettingsPresetsPanel() {
 
   const updatePreset = (
     id: string,
-    patch: Partial<Pick<BeaconImagePresetRow, "name" | "width" | "height" | "exportFormat" | "exportQuality">>
+    patch: Partial<Pick<BeaconImagePresetRow, "name" | "width" | "height" | "exportFormat" | "maxFileSizeBytes">>
   ) => {
     updateSettings({
       imagePresets: settings.imagePresets.map((p) => (p.id === id ? { ...p, ...patch } : p)),
@@ -315,9 +387,9 @@ export function SettingsPresetsPanel() {
         <div>
           <h2 className="text-sm font-medium">Saved export presets</h2>
           <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-            One-tap targets in the editor: pick one at the start of the crop step (before you frame the shot). Applying
-            a preset sets pixels, format, and quality, and switches crop to Custom so the frame matches width and
-            height.
+            One-tap targets in the editor: pick one at the start of the crop step. Applying a preset sets pixels and
+            format, uses your default quality from the editor, and switches crop to Custom so the frame matches width
+            and height. A preset can block export when the estimated file is larger than its max size.
           </p>
         </div>
 
@@ -397,22 +469,41 @@ export function SettingsPresetsPanel() {
               </ToggleGroup>
             </div>
             <div className="flex flex-col gap-2 sm:max-w-xs">
-              <Label className="text-muted-foreground text-[11px]" htmlFor={`${baseId}-new-q`}>
-                Quality
+              <Label className="text-muted-foreground text-[11px]" htmlFor={`${baseId}-new-max`}>
+                Max file size
               </Label>
-              <Slider
-                id={`${baseId}-new-q`}
-                min={0.05}
-                max={1}
-                step={0.01}
-                value={[draftQuality]}
-                onValueChange={(vals) => {
-                  const q = vals[0];
-                  if (typeof q === "number") {
-                    setDraftQuality(q);
-                  }
-                }}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id={`${baseId}-new-max`}
+                  inputMode="decimal"
+                  type="text"
+                  className="h-9 min-w-0 flex-1 text-xs tabular-nums"
+                  value={draftMaxStr}
+                  onChange={(e) => setDraftMaxStr(e.target.value)}
+                  onBlur={() => {
+                    const next = draftToMaxBytes(draftMaxStr, draftMaxUnit);
+                    const d = maxBytesToDraft(next);
+                    setDraftMaxStr(d.value);
+                    setDraftMaxUnit(d.unit);
+                  }}
+                />
+                <Select
+                  value={draftMaxUnit}
+                  onValueChange={(v) => {
+                    if (v === "kb" || v === "mb") {
+                      setDraftMaxUnit(v);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9 w-[4.5rem] shrink-0 px-2 text-xs" aria-label="Unit for max file size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectItem value="kb">KB</SelectItem>
+                    <SelectItem value="mb">MB</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <Button
               type="button"

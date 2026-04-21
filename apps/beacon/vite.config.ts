@@ -89,17 +89,32 @@ const wfDesignerExtensionPlugin = (): Plugin => {
     },
 
     configureServer(server) {
+      const webflowCors = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+      } as const;
       server.middlewares.use((req, res, next) => {
-        if (req.url === "/__webflow") {
+        const pathOnly = req.url?.split("?")[0]?.split("#")[0];
+        if (pathOnly !== "/__webflow") {
+          next();
+          return;
+        }
+        if (req.method === "OPTIONS") {
+          res.writeHead(204, webflowCors);
+          res.end();
+          return;
+        }
+        if (req.method === "GET") {
           res.writeHead(200, {
+            ...webflowCors,
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "*",
           });
           res.end(fs.readFileSync(configPath, "utf-8"));
-        } else {
-          next();
+          return;
         }
+        res.statusCode = 405;
+        res.end();
       });
     },
   };
@@ -140,11 +155,13 @@ export default defineConfig(({ mode }) => ({
     environment: "node",
     globals: true,
     passWithNoTests: true,
+    setupFiles: ["./src/test/setup-tests.ts"],
+    environmentMatchGlobs: [["**/*.test.tsx", "jsdom"]],
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
       include: ["src/**/*.{ts,tsx}"],
-      exclude: ["**/*.d.ts", "**/__tests__/**", "**/vite-env.d.ts"],
+      exclude: ["**/*.d.ts", "**/__tests__/**", "**/vite-env.d.ts", "**/*.test.{ts,tsx}", "**/test/**"],
     },
   },
 }));

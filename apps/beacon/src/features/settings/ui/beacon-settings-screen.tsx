@@ -46,10 +46,10 @@ export type BeaconSettingsScreenProps = {
 
 export function BeaconSettingsScreen(props: BeaconSettingsScreenProps) {
   const { onBack, initialSection = DEFAULT_SETTINGS_SECTION } = props;
-  const { isTowerUser } = useBeaconAppSettings();
+  const { isTowerUser, editorExperience } = useBeaconAppSettings();
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
   /** Presets require Tower; while a session token is resolving, keep Export available to avoid flicker for signed-in users. */
-  const allowPresetsSection = Boolean(towerUser?.id) || towerSessionPending;
+  const allowPresetsSection = (Boolean(towerUser?.id) || towerSessionPending) && !editorExperience;
 
   const [section, setSection] = useState<SettingsSectionId>(() => {
     const guestForPresets = !towerUser && !towerSessionPending;

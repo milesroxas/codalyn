@@ -1,8 +1,10 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { bearer } from "better-auth/plugins";
+import { admin, bearer } from "better-auth/plugins";
+import { adminAc, userAc } from "better-auth/plugins/admin/access";
 import { resolveAuthSecret } from "@/server/auth-secret";
+import { towerOrganization } from "@/server/membership/tower-organization";
 import { db } from "@/shared/lib/db";
 import * as schema from "@/shared/lib/db/auth-schema";
 
@@ -39,10 +41,29 @@ export const auth = betterAuth({
         required: false,
         input: false,
       },
+      canCreateOrganization: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+        input: false,
+      },
     },
   },
   secret: resolveAuthSecret(),
   baseURL,
   trustedOrigins: resolveTrustedOrigins(),
-  plugins: [nextCookies(), bearer()],
+  plugins: [
+    nextCookies(),
+    bearer(),
+    towerOrganization,
+    admin({
+      defaultRole: "user",
+      /** Only this app role may use admin plugin APIs (list users, etc.). Do not register a generic `admin` role. */
+      adminRoles: ["product_admin"],
+      roles: {
+        user: userAc,
+        product_admin: adminAc,
+      },
+    }),
+  ],
 });

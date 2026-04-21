@@ -102,17 +102,6 @@ export function useBeaconTowerSession(): {
   }, [refetch, towerOrigin]);
 
   useEffect(() => {
-    if (!hasStoredSessionToken) {
-      return;
-    }
-    function onFocus() {
-      void refetch();
-    }
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [hasStoredSessionToken, refetch]);
-
-  useEffect(() => {
     function onMessage(ev: MessageEvent) {
       handleTowerMessage(ev, towerOrigin, () => {
         void refetch();

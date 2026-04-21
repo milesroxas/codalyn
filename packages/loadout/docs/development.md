@@ -550,14 +550,12 @@ pnpm check  # Biome + TypeScript check
   testDir: "./tests",
   timeout: 30000,              // 30 second timeout per test
   fullyParallel: true,         // Run tests in parallel
-  projects: [                  // Test on multiple browsers
+  projects: [                  // Chromium only until specs cover real flows
     { name: "chromium" },
-    { name: "firefox" },
-    { name: "webkit" }
   ],
   webServer: {                 // Auto-start dev server
     command: "pnpm dev",
-    port: 3000,
+    port: 3005,
     reuseExistingServer: true
   }
 }
@@ -1509,8 +1507,7 @@ if (isDev) {
 #### 2. Use Biome Disable Comments Sparingly
 
 ```typescript
-// Only when absolutely necessary
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: this function needs multiple nested checks
+// Only when absolutely necessary — prefer extracting helpers instead of suppressing rules
 function complexCalculation() {
   // ...
 }

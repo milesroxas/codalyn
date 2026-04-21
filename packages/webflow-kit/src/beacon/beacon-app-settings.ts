@@ -14,6 +14,13 @@ export type BeaconThemePreference = z.infer<typeof beaconThemePreferenceSchema>;
 
 const PRESET_EDGE = z.number().int().min(1).max(8192);
 
+/** Default ceiling when migrating presets that only had a quality slider (legacy). */
+export const BEACON_PRESET_DEFAULT_MAX_FILE_BYTES = 2 * 1024 * 1024;
+
+/** Allowed range for `maxFileSizeBytes` on image presets (export UX). */
+export const BEACON_PRESET_MAX_FILE_BYTES_MIN = 1024;
+export const BEACON_PRESET_MAX_FILE_BYTES_MAX = 50 * 1024 * 1024;
+
 export const beaconImagePresetRowSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -21,8 +28,8 @@ export const beaconImagePresetRowSchema = z.object({
   height: PRESET_EDGE,
   /** When omitted, app default export format applies. */
   exportFormat: WEBP_AVIF.optional(),
-  /** When omitted, app default export quality applies. */
-  exportQuality: z.number().min(0.05).max(1).optional(),
+  /** Export must not exceed this encoded size when the preset is active (bytes). */
+  maxFileSizeBytes: z.number().int().min(BEACON_PRESET_MAX_FILE_BYTES_MIN).max(BEACON_PRESET_MAX_FILE_BYTES_MAX),
 });
 
 export type BeaconImagePresetRow = z.infer<typeof beaconImagePresetRowSchema>;
@@ -40,6 +47,10 @@ export const beaconAppSettingsSchema = z.object({
   imagePresets: z.array(beaconImagePresetRowSchema),
   /** Built-in aspects removed from the crop preset strip; empty means all built-ins are shown. */
   hiddenBuiltinAspectPresets: z.array(beaconAspectPresetSchema).default([]),
+  /**
+   * When true, the crop preview zoom cannot exceed roughly 1:1 source pixels (avoids upscaled blur).
+   */
+  limitCropZoomToNativeResolution: z.boolean().default(false),
 });
 
 export type BeaconAppSettings = z.infer<typeof beaconAppSettingsSchema>;
@@ -53,6 +64,7 @@ export function getDefaultBeaconAppSettings(): BeaconAppSettings {
     defaultAspectPreset: "free",
     imagePresets: [],
     hiddenBuiltinAspectPresets: [],
+    limitCropZoomToNativeResolution: false,
   };
 }
 
@@ -61,8 +73,39 @@ export function getVisibleBuiltinAspectPresets(settings: BeaconAppSettings): Bea
   return BEACON_BUILTIN_ASPECT_PRESETS.filter((p) => !hidden.has(p));
 }
 
+function migrateImagePresetRow(row: unknown): unknown {
+  if (row === null || typeof row !== "object" || Array.isArray(row)) {
+    return row;
+  }
+  const o = row as Record<string, unknown>;
+  const { exportQuality: _legacyQuality, ...rest } = o;
+  const rawMax = rest.maxFileSizeBytes;
+  if (typeof rawMax === "number" && Number.isFinite(rawMax)) {
+    const clamped = Math.min(
+      BEACON_PRESET_MAX_FILE_BYTES_MAX,
+      Math.max(BEACON_PRESET_MAX_FILE_BYTES_MIN, Math.round(rawMax))
+    );
+    return { ...rest, maxFileSizeBytes: clamped };
+  }
+  return { ...rest, maxFileSizeBytes: BEACON_PRESET_DEFAULT_MAX_FILE_BYTES };
+}
+
+function migrateImagePresetsField(raw: unknown): unknown {
+  if (!Array.isArray(raw)) {
+    return raw;
+  }
+  return raw.map(migrateImagePresetRow);
+}
+
 export function parseBeaconAppSettings(raw: unknown): BeaconAppSettings {
-  const parsed = beaconAppSettingsSchema.safeParse(raw);
+  const prepped =
+    raw !== null && typeof raw === "object" && !Array.isArray(raw)
+      ? {
+          ...(raw as Record<string, unknown>),
+          imagePresets: migrateImagePresetsField((raw as Record<string, unknown>).imagePresets),
+        }
+      : raw;
+  const parsed = beaconAppSettingsSchema.safeParse(prepped);
   if (parsed.success) {
     return parsed.data;
   }

@@ -29,6 +29,110 @@ async function notifyExportResult(result: ExportResult): Promise<void> {
   await webflow.notify({ type: "Error", message: result.message });
 }
 
+function syncExportDimensionsToState(
+  w: number,
+  h: number,
+  safeName: string,
+  setters: {
+    setOutputWidth: (n: number) => void;
+    setOutputHeight: (n: number) => void;
+    setWidthStr: (s: string) => void;
+    setHeightStr: (s: string) => void;
+    setFileBaseName: (s: string) => void;
+  }
+): void {
+  setters.setOutputWidth(w);
+  setters.setOutputHeight(h);
+  setters.setWidthStr(String(w));
+  setters.setHeightStr(String(h));
+  setters.setFileBaseName(safeName);
+}
+
+async function exportDownloadPlacement(args: {
+  imageSrc: string;
+  completedCrop: Area;
+  w: number;
+  h: number;
+  quality: number;
+  safeName: string;
+  dimSetters: Parameters<typeof syncExportDimensionsToState>[3];
+  setBusy: (v: boolean) => void;
+}): Promise<void> {
+  const { imageSrc, completedCrop, w, h, quality, safeName, dimSetters, setBusy } = args;
+  setBusy(true);
+  try {
+    syncExportDimensionsToState(w, h, safeName, dimSetters);
+    const result = await downloadCroppedImageWebp({
+      imageSrc,
+      completedCrop,
+      outputWidth: w,
+      outputHeight: h,
+      quality,
+      fileBaseName: safeName,
+    });
+    await notifyExportResult(result);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function exportWebflowPlacement(args: {
+  imageSrc: string;
+  completedCrop: Area;
+  w: number;
+  h: number;
+  quality: number;
+  exportFormat: ImageExportFormat;
+  safeName: string;
+  dimSetters: Parameters<typeof syncExportDimensionsToState>[3];
+  setBusy: (v: boolean) => void;
+  componentImageProps: ComponentImagePropOption[];
+  selectedComponentImagePropId: string | null;
+  currentCmsItemId: string | null;
+  targetFolder: AssetFolder;
+  placement: PlacementMode;
+  replaceLibraryAsset: boolean;
+}): Promise<void> {
+  const {
+    imageSrc,
+    completedCrop,
+    w,
+    h,
+    quality,
+    exportFormat,
+    safeName,
+    dimSetters,
+    setBusy,
+    componentImageProps,
+    selectedComponentImagePropId,
+    currentCmsItemId,
+    targetFolder,
+    placement,
+    replaceLibraryAsset,
+  } = args;
+  setBusy(true);
+  try {
+    syncExportDimensionsToState(w, h, safeName, dimSetters);
+    const result = await applyCroppedImageToWebflow({
+      imageSrc,
+      completedCrop,
+      outputWidth: w,
+      outputHeight: h,
+      quality,
+      exportFormat,
+      fileBaseName: safeName,
+      componentImagePropId: componentImageProps.length > 1 ? selectedComponentImagePropId : null,
+      currentCmsItemId,
+      targetFolder,
+      placement,
+      replaceLibraryAsset: placement === "replace" ? replaceLibraryAsset : false,
+    });
+    await notifyExportResult(result);
+  } finally {
+    setBusy(false);
+  }
+}
+
 export function useApplyCroppedToWebflow(options: {
   imageSrc: string | null;
   completedCrop: Area | null;
@@ -50,6 +154,8 @@ export function useApplyCroppedToWebflow(options: {
   placement: PlacementMode;
   replaceLibraryAsset: boolean;
   cmsPrimaryUpload: boolean;
+  /** When set, export must not run (preset size guard). */
+  exportPlaceBlockedLabel: string | null;
 }) {
   const {
     imageSrc,
@@ -72,11 +178,19 @@ export function useApplyCroppedToWebflow(options: {
     placement,
     replaceLibraryAsset,
     cmsPrimaryUpload,
+    exportPlaceBlockedLabel,
   } = options;
 
   const [busy, setBusy] = useState(false);
 
   const applyToCanvas = useCallback(async () => {
+    if (exportPlaceBlockedLabel) {
+      await webflow.notify({
+        type: exportPlaceBlockedLabel === "Over preset file limit" ? "Error" : "Warning",
+        message: exportPlaceBlockedLabel,
+      });
+      return;
+    }
     if (!imageSrc || !completedCrop) {
       await webflow.notify({
         type: "Warning",
@@ -87,28 +201,25 @@ export function useApplyCroppedToWebflow(options: {
     const w = effectiveOutputW;
     const h = effectiveOutputH;
     const safeName = sanitizeAssetBaseName(fileBaseName);
+    const dimSetters = {
+      setOutputWidth,
+      setOutputHeight,
+      setWidthStr,
+      setHeightStr,
+      setFileBaseName,
+    };
 
     if (placement === "download") {
-      setBusy(true);
-      try {
-        setOutputWidth(w);
-        setOutputHeight(h);
-        setWidthStr(String(w));
-        setHeightStr(String(h));
-        setFileBaseName(safeName);
-
-        const result = await downloadCroppedImageWebp({
-          imageSrc,
-          completedCrop,
-          outputWidth: w,
-          outputHeight: h,
-          quality,
-          fileBaseName: safeName,
-        });
-        await notifyExportResult(result);
-      } finally {
-        setBusy(false);
-      }
+      await exportDownloadPlacement({
+        imageSrc,
+        completedCrop,
+        w,
+        h,
+        quality,
+        safeName,
+        dimSetters,
+        setBusy,
+      });
       return;
     }
 
@@ -122,32 +233,23 @@ export function useApplyCroppedToWebflow(options: {
       });
       return;
     }
-    setBusy(true);
-    try {
-      setOutputWidth(w);
-      setOutputHeight(h);
-      setWidthStr(String(w));
-      setHeightStr(String(h));
-      setFileBaseName(safeName);
-
-      const result = await applyCroppedImageToWebflow({
-        imageSrc,
-        completedCrop,
-        outputWidth: w,
-        outputHeight: h,
-        quality,
-        exportFormat,
-        fileBaseName: safeName,
-        componentImagePropId: componentImageProps.length > 1 ? selectedComponentImagePropId : null,
-        currentCmsItemId,
-        targetFolder,
-        placement,
-        replaceLibraryAsset: placement === "replace" ? replaceLibraryAsset : false,
-      });
-      await notifyExportResult(result);
-    } finally {
-      setBusy(false);
-    }
+    await exportWebflowPlacement({
+      imageSrc,
+      completedCrop,
+      w,
+      h,
+      quality,
+      exportFormat,
+      safeName,
+      dimSetters,
+      setBusy,
+      componentImageProps,
+      selectedComponentImagePropId,
+      currentCmsItemId,
+      targetFolder,
+      placement,
+      replaceLibraryAsset,
+    });
   }, [
     imageSrc,
     completedCrop,
@@ -161,7 +263,7 @@ export function useApplyCroppedToWebflow(options: {
     setOutputHeight,
     setWidthStr,
     setHeightStr,
-    componentImageProps.length,
+    componentImageProps,
     selectedComponentImagePropId,
     currentCmsItemId,
     selectedAssetFolderId,
@@ -169,6 +271,7 @@ export function useApplyCroppedToWebflow(options: {
     placement,
     replaceLibraryAsset,
     cmsPrimaryUpload,
+    exportPlaceBlockedLabel,
   ]);
 
   return { busy, applyToCanvas };

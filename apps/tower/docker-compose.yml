@@ -3,7 +3,8 @@
 #
 # Reserved host ports (override via `.env` — see `.env.compose.example`):
 #   Postgres: ${POSTGRES_PORT:-35432}  (Codalyn Tower default; not 5432 to avoid clashes)
-#   Tower UI: ${TOWER_PORT:-3100}
+#   Tower UI: ${TOWER_PORT:-3100} — same default as `pnpm app tower dev`; do not run full
+#   compose + dev on the same host port. Use `docker compose up -d postgres` only, or change TOWER_PORT.
 name: codalyn-tower
 
 services:
@@ -34,7 +35,7 @@ services:
     container_name: codalyn-tower-app
     init: true
     ports:
-      # Host port defaults to 3100 to avoid clashing with other Next.js apps; override: TOWER_PORT=3000
+      # Host port defaults to 3100 (same as Tower dev). Override TOWER_PORT if dev already uses 3100.
       - "${TOWER_PORT:-3100}:3000"
     env_file:
       - path: .env.docker

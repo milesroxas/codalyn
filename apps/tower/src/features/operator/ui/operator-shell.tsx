@@ -1,12 +1,17 @@
 "use client";
 
 import {
-  IconActivity,
   IconArrowLeft,
-  IconLayoutDashboard,
+  IconBuilding,
+  IconChevronDown,
+  IconDashboard,
   IconLogout,
   IconMenu2,
   IconMoon,
+  IconPlug,
+  IconSearch,
+  IconSettings,
+  IconShieldCheck,
   IconSun,
   IconUsers,
   IconX,
@@ -17,17 +22,44 @@ import { useTheme } from "next-themes";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
 import { nextCycledBeaconTheme, persistBeaconThemePreference } from "@/features/beacon/lib/beacon-theme-preference";
+import { initialsFor } from "@/features/operator/model/format";
+import { OperatorCommandPalette } from "@/features/operator/ui/operator-command-palette";
 import { cn } from "@/shared/lib/utils";
+import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
+import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 const nav = [
-  { href: "/console", label: "Overview", icon: IconLayoutDashboard },
-  { href: "/console/accounts", label: "Accounts", icon: IconUsers },
-  { href: "/console/platform", label: "Platform", icon: IconActivity },
+  { href: "/console", label: "Overview", icon: IconDashboard },
+  { href: "/console/customers", label: "Customers", icon: IconUsers },
+  { href: "/console/workspaces", label: "Workspaces", icon: IconBuilding },
+  { href: "/console/platform", label: "Platform", icon: IconPlug },
 ] as const;
 
-export function OperatorShell(props: { userEmail: string; children: ReactNode }) {
-  const { userEmail, children } = props;
+function isActiveNav(pathname: string, href: string): boolean {
+  if (href === "/console") {
+    return pathname === href || pathname === `${href}/`;
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export type OperatorShellProps = {
+  userEmail: string;
+  userName: string;
+  children: ReactNode;
+};
+
+export function OperatorShell({ userEmail, userName, children }: OperatorShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = authClient.useSession();
@@ -35,9 +67,22 @@ export function OperatorShell(props: { userEmail: string; children: ReactNode })
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const isCmdK = (event.key === "k" || event.key === "K") && (event.metaKey || event.ctrlKey);
+      if (isCmdK) {
+        event.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   const onSignOut = useCallback(async () => {
@@ -56,24 +101,37 @@ export function OperatorShell(props: { userEmail: string; children: ReactNode })
     }
   }, [theme, setTheme, session?.user]);
 
-  const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
-    <nav className="flex flex-col gap-0.5 p-3">
+  const brand = (
+    <Link
+      href="/console"
+      className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/50"
+      aria-label="Operator console home"
+    >
+      <span className="flex size-7 items-center justify-center rounded-md bg-foreground text-background">
+        <IconShieldCheck className="size-4" aria-hidden />
+      </span>
+      <div className="flex flex-col leading-tight">
+        <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Tower</span>
+        <span className="text-sm font-semibold text-foreground">Operator</span>
+      </div>
+    </Link>
+  );
+
+  const NavItems = ({ onNavigate }: { onNavigate?: () => void }) => (
+    <nav className="flex flex-col gap-0.5 px-2">
       {nav.map(({ href, label, icon: Icon }) => {
-        const isExactOverview = href === "/console";
-        const isActive = isExactOverview
-          ? pathname === href || pathname === `${href}/`
-          : pathname === href || pathname.startsWith(`${href}/`);
+        const active = isActiveNav(pathname, href);
         return (
           <Link
             key={href}
             href={href}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              isActive ? "bg-zinc-800 text-zinc-50" : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100"
+              "group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors",
+              active ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
             )}
           >
-            <Icon className="size-4 shrink-0 opacity-80" aria-hidden />
+            <Icon className={cn("size-4 shrink-0", active ? "text-foreground" : "opacity-70")} aria-hidden />
             {label}
           </Link>
         );
@@ -81,110 +139,182 @@ export function OperatorShell(props: { userEmail: string; children: ReactNode })
     </nav>
   );
 
+  const SidebarFooter = (
+    <div className="mt-auto flex flex-col gap-2 border-t border-border px-3 py-3">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+        asChild
+      >
+        <Link href="/">
+          <IconArrowLeft className="size-4" aria-hidden />
+          Tenant workspace
+        </Link>
+      </Button>
+    </div>
+  );
+
   return (
-    <div className="flex min-h-dvh bg-zinc-50 dark:bg-zinc-950">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950 text-zinc-100 md:flex">
-        <div className="border-b border-zinc-800 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-500/90">Operator</p>
-          <p className="mt-1 text-sm font-semibold text-zinc-50">Tower</p>
-          <p className="mt-2 truncate text-xs text-zinc-500" title={userEmail}>
-            {userEmail}
-          </p>
-        </div>
-        <NavLinks />
-        <div className="mt-auto border-t border-zinc-800 p-3">
+    <div className="relative flex min-h-dvh flex-col bg-background text-foreground">
+      {/* Top bar */}
+      <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/90 px-3 backdrop-blur supports-backdrop-filter:bg-background/75 sm:px-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="md:hidden"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+        >
+          <IconMenu2 className="size-4" />
+        </Button>
+
+        <div className="hidden md:flex md:w-56">{brand}</div>
+        <div className="flex md:hidden">{brand}</div>
+
+        <div className="ml-auto flex items-center gap-2">
           <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start gap-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-            asChild
-          >
-            <Link href="/">
-              <IconArrowLeft className="size-4" aria-hidden />
-              Tenant workspace
-            </Link>
-          </Button>
-        </div>
-      </aside>
-
-      {/* Mobile drawer */}
-      {mobileOpen ? (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <button
             type="button"
-            className="absolute inset-0 bg-black/60"
-            aria-label="Close menu"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="absolute left-0 top-0 flex h-full w-full max-w-72 flex-col border-r border-zinc-800 bg-zinc-950 text-zinc-100 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-              <span className="text-sm font-semibold text-zinc-50">Operator</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="text-zinc-400"
-                onClick={() => setMobileOpen(false)}
-                aria-label="Close"
+            variant="outline"
+            size="sm"
+            onClick={() => setPaletteOpen(true)}
+            className="hidden gap-2 text-muted-foreground sm:inline-flex"
+          >
+            <IconSearch className="size-4" aria-hidden />
+            <span>Search…</span>
+            <kbd className="ml-2 hidden items-center gap-0.5 rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground md:inline-flex">
+              ⌘K
+            </kbd>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setPaletteOpen(true)}
+            aria-label="Search"
+            className="sm:hidden"
+          >
+            <IconSearch className="size-4" />
+          </Button>
+
+          {mounted ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon-sm" onClick={cycleTheme} aria-label="Cycle theme">
+                  {resolvedTheme === "dark" ? (
+                    <IconSun aria-hidden className="size-4" />
+                  ) : (
+                    <IconMoon aria-hidden className="size-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Cycle theme</TooltipContent>
+            </Tooltip>
+          ) : null}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" className="gap-2 pl-1.5 pr-1.5" aria-label="Account menu">
+                <Avatar className="size-6">
+                  <AvatarFallback>{initialsFor(userName || userEmail)}</AvatarFallback>
+                </Avatar>
+                <span className="hidden max-w-40 truncate text-sm md:inline">{userEmail}</span>
+                <IconChevronDown className="size-3.5 opacity-60" aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel className="normal-case">
+                <div className="flex flex-col gap-0.5">
+                  <span className="truncate text-sm font-medium text-foreground">{userName || userEmail}</span>
+                  <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
+                  <span className="mt-1">
+                    <Badge variant="secondary" className="gap-1">
+                      <IconShieldCheck className="size-3" />
+                      Operator
+                    </Badge>
+                  </span>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem asChild>
+                  <Link href="/account" className="gap-2">
+                    <IconSettings className="size-4" />
+                    Account settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/" className="gap-2">
+                    <IconArrowLeft className="size-4" />
+                    Switch to tenant
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={signingOut}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  void onSignOut();
+                }}
+                className="gap-2"
               >
-                <IconX className="size-5" />
-              </Button>
-            </div>
-            <NavLinks onNavigate={() => setMobileOpen(false)} />
-            <div className="mt-auto border-t border-zinc-800 p-3">
-              <Button variant="ghost" size="sm" className="w-full justify-start text-zinc-400" asChild>
-                <Link href="/" onClick={() => setMobileOpen(false)}>
-                  Tenant workspace
-                </Link>
-              </Button>
-            </div>
-          </div>
+                <IconLogout className="size-4" />
+                {signingOut ? "Signing out…" : "Sign out"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      ) : null}
+      </header>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-zinc-200 bg-white/90 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
-          <div className="flex items-center gap-2 md:hidden">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              className="border-zinc-300 dark:border-zinc-700"
-              onClick={() => setMobileOpen(true)}
-              aria-label="Open menu"
-            >
-              <IconMenu2 className="size-4" />
-            </Button>
-            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Tower operator</span>
+      <div className="flex min-w-0 flex-1">
+        {/* Desktop sidebar */}
+        <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col border-r border-border bg-background md:flex">
+          <div className="px-3 py-4">
+            <p className="px-2 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Navigate</p>
           </div>
-          <div className="hidden md:block" />
-          <div className="flex items-center gap-2">
-            {mounted ? (
-              <Button type="button" variant="ghost" size="icon-sm" onClick={cycleTheme} aria-label="Cycle theme">
-                {resolvedTheme === "dark" ? (
-                  <IconSun aria-hidden className="size-4 text-zinc-600 dark:text-zinc-400" />
-                ) : (
-                  <IconMoon aria-hidden className="size-4 text-zinc-600" />
-                )}
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={signingOut}
-              className="gap-1.5 border-zinc-300 dark:border-zinc-700"
-              onClick={() => void onSignOut()}
-            >
-              <IconLogout className="size-4" aria-hidden />
-              Sign out
-            </Button>
-          </div>
-        </header>
+          <NavItems />
+          {SidebarFooter}
+        </aside>
 
-        <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        {/* Mobile drawer */}
+        {mobileOpen ? (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <button
+              type="button"
+              aria-label="Close menu"
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setMobileOpen(false)}
+            />
+            <div className="absolute left-0 top-0 flex h-full w-72 max-w-[85%] flex-col border-r border-border bg-background shadow-lg">
+              <div className="flex h-14 items-center justify-between border-b border-border px-3">
+                {brand}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setMobileOpen(false)}
+                  aria-label="Close"
+                >
+                  <IconX className="size-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto py-4">
+                <NavItems onNavigate={() => setMobileOpen(false)} />
+              </div>
+              {SidebarFooter}
+            </div>
+          </div>
+        ) : null}
+
+        <main className="flex min-w-0 flex-1 flex-col">
+          <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</div>
+        </main>
       </div>
+
+      <OperatorCommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }

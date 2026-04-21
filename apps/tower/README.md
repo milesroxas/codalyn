@@ -35,9 +35,34 @@ pnpm app tower db:migrate:prod:vercel  # production env from Vercel
 
 Copy `.env.example` to `.env.local` and fill values before `pnpm build` or `db:push`.
 
+### Local URL / port (dev owns **3100**)
+
+**`pnpm app tower dev`** defaults to **http://localhost:3100** (`scripts/dev.mjs`). Treat **3100** as the host port for **Tower dev** (Turbopack / HMR) during normal monorepo work.
+
 ## Docker (isolated stack)
 
 Tower has its **own** Compose project name, image name, container name, and network so it does not collide with other Docker projects on the same machine.
+
+**Compose vs dev on 3100:** the **`tower`** service maps **`${TOWER_PORT:-3100}:3000`**, same default host port as dev. You **cannot** run the **full** stack (Postgres + containerized Next) on **3100** while **`pnpm app tower dev`** is already listening there (`EADDRINUSE`). Use one of these:
+
+| Situation | What to do |
+| --------- | ---------- |
+| **Dev on 3100 + Postgres in Docker** | From `apps/tower`: `docker compose up -d postgres`. Keep host `DATABASE_URL` on `127.0.0.1:${POSTGRES_PORT:-35432}` (see `.env` / `.env.local`). Run **`pnpm app tower db:migrate:local`** when the DB is up. |
+| **Full stack in Docker on 3100** | Stop **`pnpm app tower dev`**, then `pnpm app tower docker:up` (or `docker compose up --build -d` from `apps/tower`). |
+| **Containerized Next and dev at the same time** | Set **`TOWER_PORT`** (e.g. **3101**) in `apps/tower/.env` and set **`BETTER_AUTH_URL`**, **`NEXT_PUBLIC_APP_URL`**, and **`WEBFLOW_REDIRECT_URI`** in `.env.docker` to that same origin (e.g. `http://localhost:3101`). |
+
+From the repo root:
+
+```bash
+pnpm app tower docker:up      # full stack; host port = TOWER_PORT (default 3100 — free dev first)
+pnpm app tower docker:down
+```
+
+Postgres only (typical with dev on **3100**):
+
+```bash
+cd apps/tower && docker compose up -d postgres
+```
 
 
 | Item            | Value                                                                                                  |
@@ -46,7 +71,7 @@ Tower has its **own** Compose project name, image name, container name, and netw
 | Image           | `codalyn-tower:latest`                                                                                 |
 | Container       | `codalyn-tower-app`                                                                                    |
 | Network         | `codalyn-tower-net`                                                                                    |
-| Host port       | `${TOWER_PORT:-3100}` → container `3000` (default **3100** avoids clashing with other local Next apps) |
+| Host port       | **`${TOWER_PORT:-3100}`** → container `3000` (defaults to **3100**; conflicts with **dev** unless you change `TOWER_PORT` or stop dev) |
 
 
 Build context is the **monorepo root** (`.dockerignore` keeps the context small). The image uses Next **standalone** output, runs as the `node` user, and includes a **healthcheck** on `/api/health`.
@@ -55,9 +80,9 @@ Build context is the **monorepo root** (`.dockerignore` keeps the context small)
 # From repo root
 docker build -f apps/tower/Dockerfile -t codalyn-tower:latest .
 
-# Recommended: compose from apps/tower
+# Compose from apps/tower (or use `pnpm app tower docker:up` from root)
 cd apps/tower
-cp .env.docker.example .env.docker   # set DATABASE_URL, BETTER_AUTH_*, URLs to match host port
+cp .env.docker.example .env.docker   # set DATABASE_URL, BETTER_AUTH_*, URLs to match the host port you publish (see table above)
 docker compose up --build -d
 ```
 
@@ -72,7 +97,7 @@ docker compose up --build -d
 
 The key in `VITE_BEACON_API_KEY` is **bundled in the extension** — acceptable for **local/dev** only; plan a token-exchange or OAuth-style flow before production.
 
-**Beacon:** copy `apps/beacon/.env.example` → `.env.local`, set `VITE_TOWER_ORIGIN` (e.g. `http://localhost:3100` with Docker) and `VITE_BEACON_API_KEY`. Use `towerFetch()` from `src/shared/lib/tower-client.ts` for requests to Tower.
+**Beacon:** copy `apps/beacon/.env.example` → `.env.local`, set `VITE_TOWER_ORIGIN` to the Tower origin you run locally (typically **`http://localhost:3100`** when **`pnpm app tower dev`** is running). If you hit Tower via another host port (e.g. Docker with `TOWER_PORT=3101`), match that origin. Set `VITE_BEACON_API_KEY`. Use `towerFetch()` from `src/shared/lib/tower-client.ts` for requests to Tower.
 
 **Tower:** set `BEACON_API_KEY` in `.env.local` or `.env.docker` (same value as Beacon’s `VITE_BEACON_API_KEY`).
 

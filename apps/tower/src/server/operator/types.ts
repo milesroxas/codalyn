@@ -1,0 +1,143 @@
+export type OperatorMetrics = {
+  totals: {
+    users: number;
+    productAdmins: number;
+    eligibleForWorkspace: number;
+    banned: number;
+    workspaces: number;
+    pendingInvitations: number;
+    webflowConnected: number;
+  };
+  activity: {
+    activeSessions: number;
+    signupsLast7d: number;
+    signupsLast30d: number;
+    workspacesLast30d: number;
+  };
+  recentUsers: Array<{
+    id: string;
+    email: string;
+    name: string;
+    role: string | null;
+    createdAt: string;
+  }>;
+  recentWorkspaces: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    memberCount: number;
+    createdAt: string;
+  }>;
+};
+
+export type OperatorUserRow = {
+  id: string;
+  email: string;
+  name: string;
+  role: string | null;
+  emailVerified: boolean;
+  banned: boolean;
+  banReason: string | null;
+  banExpires: string | null;
+  canCreateOrganization: boolean;
+  webflowConnected: boolean;
+  memberships: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OperatorUserListResponse = {
+  rows: OperatorUserRow[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type OperatorUserMembership = {
+  memberId: string;
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  role: string;
+  createdAt: string;
+};
+
+export type OperatorUserSession = {
+  id: string;
+  createdAt: string;
+  updatedAt: string | null;
+  expiresAt: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+};
+
+export type OperatorUserDetail = OperatorUserRow & {
+  image: string | null;
+  webflowAuthorizedUserId: string | null;
+  memberOf: OperatorUserMembership[];
+  activeSessions: OperatorUserSession[];
+};
+
+export type OperatorWorkspaceRow = {
+  id: string;
+  name: string;
+  slug: string;
+  logo: string | null;
+  seatLimit: number | null;
+  billingPlan: string | null;
+  subscriptionStatus: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  memberCount: number;
+  pendingInvitations: number;
+  createdAt: string;
+};
+
+export type OperatorWorkspaceListResponse = {
+  rows: OperatorWorkspaceRow[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type OperatorWorkspaceMember = {
+  memberId: string;
+  userId: string;
+  email: string;
+  name: string;
+  role: string;
+  beaconRestrictToEditorExperience: boolean;
+  createdAt: string;
+};
+
+export type OperatorWorkspaceInvitation = {
+  id: string;
+  email: string;
+  role: string | null;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  inviterEmail: string | null;
+};
+
+export type OperatorWorkspaceDetail = OperatorWorkspaceRow & {
+  metadata: string | null;
+  members: OperatorWorkspaceMember[];
+  invitations: OperatorWorkspaceInvitation[];
+};
+
+export type OperatorUserPatch = {
+  role?: "user" | "product_admin" | null;
+  canCreateOrganization?: boolean;
+  banned?: boolean;
+  banReason?: string | null;
+  banExpires?: string | null;
+};
+
+export type OperatorWorkspacePatch = {
+  name?: string;
+  slug?: string;
+  seatLimit?: number | null;
+  billingPlan?: string | null;
+  subscriptionStatus?: string | null;
+};

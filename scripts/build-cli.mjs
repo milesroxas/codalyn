@@ -21,6 +21,7 @@ import color from "picocolors";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, "..");
+const isNonInteractive = process.env.CI === "true" || !process.stdin.isTTY || !process.stdout.isTTY;
 
 function parseArgs(argv) {
   const args = { app: null, channel: null };
@@ -100,6 +101,7 @@ async function resolveBuildChannel(channelArg) {
     process.exit(1);
   }
   if (channelArg) return channelArg;
+  if (isNonInteractive) return "production";
   const picked = await p.select({
     message: "Build channel",
     options: [
@@ -115,6 +117,10 @@ async function resolveBuildChannel(channelArg) {
 }
 
 async function resolveRecipientName(appPath, channelDir) {
+  const ciRecipient = process.env.BUILD_RECIPIENT ?? process.env.VITE_BUNDLE_RECIPIENT;
+  if (ciRecipient?.trim()) return ciRecipient.trim();
+  if (isNonInteractive) return "internal";
+
   const existing = getExistingRecipients(appPath, channelDir);
   const recipientOptions = [
     ...existing.map((r) => ({ value: r, label: r, hint: "existing" })),
@@ -215,7 +221,7 @@ async function main() {
     "Build summary"
   );
 
-  const confirmed = await p.confirm({ message: "Start build?", initialValue: true });
+  const confirmed = isNonInteractive ? true : await p.confirm({ message: "Start build?", initialValue: true });
 
   if (p.isCancel(confirmed) || !confirmed) {
     p.cancel("Build cancelled.");

@@ -8,6 +8,7 @@ import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { authClient } from "@/features/auth/model/auth-client";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
+import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
@@ -16,6 +17,13 @@ import { Label } from "@/shared/ui/label";
 const inputClass = "h-10 rounded-lg bg-background/80 dark:bg-input/40";
 
 type SignInPostResult = { kind: "beacon_popup" } | { kind: "error"; message: string } | { kind: "done" };
+
+function resolvePostSignInTarget(user: { role?: string | null } | null | undefined, callbackUrl: string): string {
+  if (callbackUrl !== "/") {
+    return callbackUrl;
+  }
+  return isProductAdminAppRole(user?.role ?? null) ? "/console" : callbackUrl;
+}
 
 async function runAfterTowerSignIn(opts: {
   data: Parameters<typeof resolveUserAndTokenAfterEmailAuth>[0];
@@ -101,7 +109,7 @@ function SignInForm() {
       return;
     }
     if (data?.user) {
-      router.push(callbackUrl);
+      router.push(resolvePostSignInTarget(data.user, callbackUrl));
       router.refresh();
     }
   }

@@ -52,7 +52,7 @@ pnpm app <app> build:prod      # channel preset to production, prompts for recip
 pnpm app <app> build:dev       # channel preset to development, prompts for recipient
 ```
 
-Applies to `flint` and `beacon`. Tower uses `pnpm app tower dev` / `pnpm app tower build`.
+Applies to `flint` and `beacon`. Tower uses `pnpm app tower dev` / `pnpm app tower build`. Local Tower dev owns host port **3100** by default; Docker and Postgres are documented in `apps/tower/README.md` (including how to avoid port clashes).
 
 ## Release — @codalyn/loadout
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 
 function SuccessInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const popup = searchParams.get("popup");
 
@@ -11,19 +12,21 @@ function SuccessInner() {
     if (popup === "1" && window.opener) {
       window.opener.postMessage({ type: "codalyn:webflow-oauth", status: "success" }, "*");
       window.close();
+      return;
     }
-  }, [popup]);
+    router.replace("/?webflow=connected");
+  }, [popup, router]);
 
   return (
     <main className="p-6">
-      <p>Webflow is connected. You can close this window.</p>
+      <p className="text-sm text-muted-foreground">Webflow is connected. Redirecting…</p>
     </main>
   );
 }
 
 export default function WebflowOAuthSuccessPage() {
   return (
-    <Suspense fallback={<p className="p-6">Loading…</p>}>
+    <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Loading…</p>}>
       <SuccessInner />
     </Suspense>
   );

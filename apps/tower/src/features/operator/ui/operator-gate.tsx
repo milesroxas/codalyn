@@ -7,6 +7,7 @@ import { authClient } from "@/features/auth/model/auth-client";
 import { OperatorShell } from "@/features/operator/ui/operator-shell";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 
 export function OperatorGate({ children }: { children: ReactNode }) {
   const { data: session, isPending } = authClient.useSession();
@@ -14,28 +15,31 @@ export function OperatorGate({ children }: { children: ReactNode }) {
 
   if (isPending) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-zinc-950">
-        <p className="text-sm text-zinc-400">Loading operator workspace…</p>
+      <div className="flex min-h-dvh items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-48" />
+        </div>
       </div>
     );
   }
 
   if (!session?.user) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-zinc-950 px-4">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-background px-4">
         <div className="max-w-md space-y-3 text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-amber-500/90">Tower operator</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-50">Sign in required</h1>
-          <p className="text-sm text-zinc-400">
-            Product administration is separate from the tenant workspace. Use an account with the{" "}
-            <span className="font-mono text-xs text-zinc-300">product_admin</span> role.
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Tower · Operator</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in required</h1>
+          <p className="text-sm text-muted-foreground">
+            The operator console is a separate surface from the tenant workspace. Sign in with an account that has the{" "}
+            <span className="font-mono text-xs">product_admin</span> role.
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Button asChild>
             <Link href="/sign-in?callbackUrl=/console">Sign in</Link>
           </Button>
-          <Button variant="outline" className="border-zinc-700 bg-transparent text-zinc-200 hover:bg-zinc-900" asChild>
+          <Button variant="outline" asChild>
             <Link href="/">Back to Tower</Link>
           </Button>
         </div>
@@ -45,16 +49,16 @@ export function OperatorGate({ children }: { children: ReactNode }) {
 
   if (!isProductAdmin) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-zinc-950 px-4">
-        <div className="max-w-md rounded-xl border border-zinc-800 bg-zinc-900/80 p-8">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-background px-4">
+        <div className="max-w-md rounded-xl border border-border bg-card p-6">
           <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800">
-              <IconShieldLock className="size-5 text-zinc-400" aria-hidden />
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <IconShieldLock className="size-5 text-muted-foreground" aria-hidden />
             </span>
             <div className="min-w-0 space-y-2">
-              <h1 className="text-lg font-semibold tracking-tight text-zinc-50">Access denied</h1>
-              <p className="text-sm text-zinc-400">
-                This workspace is only for product operators. Tenant roles and invitations are managed under Team.
+              <h1 className="text-lg font-semibold tracking-tight text-foreground">Access denied</h1>
+              <p className="text-sm text-muted-foreground">
+                The operator console is only available to SaaS operators. Tenant workspace roles are managed under Team.
               </p>
               <Button className="mt-3" variant="secondary" size="sm" asChild>
                 <Link href="/team">Open Team</Link>
@@ -62,12 +66,16 @@ export function OperatorGate({ children }: { children: ReactNode }) {
             </div>
           </div>
         </div>
-        <Button variant="ghost" className="text-zinc-500 hover:text-zinc-300" asChild>
+        <Button variant="ghost" asChild>
           <Link href="/">← Tower home</Link>
         </Button>
       </div>
     );
   }
 
-  return <OperatorShell userEmail={session.user.email}>{children}</OperatorShell>;
+  return (
+    <OperatorShell userEmail={session.user.email} userName={session.user.name ?? ""}>
+      {children}
+    </OperatorShell>
+  );
 }

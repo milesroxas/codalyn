@@ -14,8 +14,16 @@ function resolveAppUrl(): string {
   ).replace(/\/$/, "");
 }
 
-function oauthErrorRedirect(appUrl: string, params: Record<string, string>): NextResponse {
-  const q = new URLSearchParams({ ...params, popup: "1" });
+function oauthErrorRedirect(
+  appUrl: string,
+  params: Record<string, string>,
+  { popup }: { popup: boolean } = { popup: true }
+): NextResponse {
+  const base: Record<string, string> = { ...params };
+  if (popup) {
+    base.popup = "1";
+  }
+  const q = new URLSearchParams(base);
   return NextResponse.redirect(`${appUrl}/integrations/webflow/error?${q.toString()}`);
 }
 
@@ -53,6 +61,13 @@ async function persistWebflowOAuthToken(userId: string, tokenResponse: WebflowOA
 export async function GET(request: Request) {
   const appUrl = resolveAppUrl();
   const { searchParams } = new URL(request.url);
+  const cookieStore = await cookies();
+  // Dashboard GET authorize flow sets the `wf_oauth_state` cookie; POST (Beacon popup)
+  // flow persists state in the DB. Presence of the cookie on return indicates the
+  // direct first-party flow so errors don't land on the popup-handoff pages.
+  const cookieExpected = cookieStore.get("wf_oauth_state")?.value;
+  const isPopupFlow = !cookieExpected;
+
   const oauthError = searchParams.get("error");
   if (oauthError) {
     const oauthDesc = searchParams.get("error_description");
@@ -60,17 +75,15 @@ export async function GET(request: Request) {
     if (oauthDesc) {
       errParams.error_description = oauthDesc;
     }
-    return oauthErrorRedirect(appUrl, errParams);
+    return oauthErrorRedirect(appUrl, errParams, { popup: isPopupFlow });
   }
 
   const code = searchParams.get("code");
   const state = searchParams.get("state");
   if (!code || !state) {
-    return oauthErrorRedirect(appUrl, { error: "missing_code" });
+    return oauthErrorRedirect(appUrl, { error: "missing_code" }, { popup: isPopupFlow });
   }
 
-  const cookieStore = await cookies();
-  const cookieExpected = cookieStore.get("wf_oauth_state")?.value;
   let userId: string | undefined;
 
   if (cookieExpected && cookieExpected === state) {
@@ -93,7 +106,7 @@ export async function GET(request: Request) {
 
   if (!userId) {
     cookieStore.delete("wf_oauth_state");
-    return oauthErrorRedirect(appUrl, { error: "invalid_state" });
+    return oauthErrorRedirect(appUrl, { error: "invalid_state" }, { popup: isPopupFlow });
   }
 
   let tokenResponse: WebflowOAuthTokenResponse;
@@ -101,12 +114,19 @@ export async function GET(request: Request) {
     tokenResponse = await exchangeWebflowAuthorizationCode(code);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "token_exchange_failed";
-    return oauthErrorRedirect(appUrl, {
-      error: "token_exchange",
-      detail: msg,
-    });
+    return oauthErrorRedirect(
+      appUrl,
+      {
+        error: "token_exchange",
+        detail: msg,
+      },
+      { popup: isPopupFlow }
+    );
   }
 
   await persistWebflowOAuthToken(userId, tokenResponse);
-  return NextResponse.redirect(`${appUrl}/integrations/webflow/success?popup=1`);
+  if (isPopupFlow) {
+    return NextResponse.redirect(`${appUrl}/integrations/webflow/success?popup=1`);
+  }
+  return NextResponse.redirect(`${appUrl}/?webflow=connected`);
 }

@@ -68,7 +68,7 @@ export function BeaconSettingsScreen(props: BeaconSettingsScreenProps) {
       <header className="supports-backdrop-filter:bg-background/75 relative border-b border-border/70 bg-background/90 px-3 pt-2 pb-0 backdrop-blur">
         <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2">
           <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-            <Button type="button" size="icon-sm" variant="ghost" onClick={onBack} aria-label="Back to editor">
+            <Button type="button" size="icon-sm" variant="ghost" onClick={onBack} aria-label="Back">
               <ArrowLeft aria-hidden className="size-4" />
             </Button>
             <h1 className="m-0 truncate text-base font-medium leading-none">Settings</h1>

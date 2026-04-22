@@ -21,6 +21,8 @@ type BeaconCompositionPanelProps = {
   onAddComponent: (c: ComponentSearchResult) => void;
   onRemove: (row: HydratedBeaconComponent) => void;
   removingKey: string | null;
+  onCreateListTarget: () => void;
+  listTargetPending: boolean;
 };
 
 export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
@@ -39,6 +41,8 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
     onAddComponent,
     onRemove,
     removingKey,
+    onCreateListTarget,
+    listTargetPending,
   } = props;
 
   return (
@@ -60,9 +64,21 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
             </TooltipContent>
           </Tooltip>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => void onBackToList()}>
-          Back to list
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={listTargetPending || removingKey !== null || activeDataList == null}
+            aria-busy={listTargetPending}
+            onClick={() => void onCreateListTarget()}
+          >
+            {listTargetPending ? "Creating…" : "Create target"}
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => void onBackToList()}>
+            Back to list
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2" data-slot="beacon_list">
@@ -145,7 +161,7 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
                   variant="ghost"
                   className="shrink-0 text-destructive hover:bg-destructive/10"
                   aria-label={`Remove ${row.name}`}
-                  disabled={removingKey !== null}
+                  disabled={removingKey !== null || listTargetPending}
                   onClick={() => void onRemove(row)}
                 >
                   {removingKey === row.key ? (

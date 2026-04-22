@@ -5,6 +5,10 @@ import {
   type HydratedBeaconComponent,
   listInstancesInBeaconTarget,
 } from "@/features/beacons/model/beacon-page-targets";
+import {
+  BEACON_UTILITIES_COMPONENT_GROUP,
+  createBeaconListTargetComponent,
+} from "@/features/beacons/model/create-beacon-list-target-component";
 import { createBeaconTargetOnPage } from "@/features/beacons/model/create-beacon-target";
 import {
   installBeaconsWrapperOnPage,
@@ -61,6 +65,7 @@ export function BeaconsScreen() {
   const [addPending, setAddPending] = useState(false);
   const [selected, setSelected] = useState<HydratedBeaconComponent[]>([]);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
+  const [listTargetPending, setListTargetPending] = useState(false);
   const [openingBeaconKey, setOpeningBeaconKey] = useState<string | null>(null);
   const [beaconToDelete, setBeaconToDelete] = useState<BeaconOnPage | null>(null);
   const [deletePendingKey, setDeletePendingKey] = useState<string | null>(null);
@@ -98,6 +103,7 @@ export function BeaconsScreen() {
       setSelected([]);
       targetRef.current = null;
       setBeaconName("");
+      setListTargetPending(false);
       void refreshPageBeacons();
     });
   }, [refreshPageBeacons]);
@@ -135,6 +141,7 @@ export function BeaconsScreen() {
     setCatalogError(null);
     setBeaconName("");
     setCreateFormOpen(false);
+    setListTargetPending(false);
     void refreshPageBeacons();
   }, [refreshPageBeacons]);
 
@@ -257,6 +264,29 @@ export function BeaconsScreen() {
     }
   };
 
+  const handleCreateListTarget = async () => {
+    if (listTargetPending || activeDataList == null) return;
+    const listContainer = targetRef.current;
+    if (!listContainer) return;
+    setListTargetPending(true);
+    try {
+      const created = await createBeaconListTargetComponent({
+        dataList: activeDataList,
+        listContainer,
+      });
+      const registeredName = await created.getName();
+      void webflow.notify({
+        type: "Success",
+        message: `List target “${registeredName}” added under ${BEACON_UTILITIES_COMPONENT_GROUP}.`,
+      });
+    } catch (err) {
+      const message = formatDesignerError(err);
+      void webflow.notify({ type: "Error", message });
+    } finally {
+      setListTargetPending(false);
+    }
+  };
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       {/* /beacons page title only. Global app bar is `Header` in the shell, not this strip. */}
@@ -321,6 +351,8 @@ export function BeaconsScreen() {
               onAddComponent={handleAddComponent}
               onRemove={handleRemove}
               removingKey={removingKey}
+              onCreateListTarget={handleCreateListTarget}
+              listTargetPending={listTargetPending}
             />
           )}
 

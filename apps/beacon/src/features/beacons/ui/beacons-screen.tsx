@@ -6,7 +6,10 @@ import {
   syncBeaconListTargetDesignerPreview,
 } from "@/features/beacons/model/beacon-list-target-designer-preview";
 import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
-import { syncBeaconPageInlineScript } from "@/features/beacons/model/beacon-page-inline-script";
+import {
+  getBeaconPageRuntimeSyncStatus,
+  syncBeaconPageInlineScript,
+} from "@/features/beacons/model/beacon-page-inline-script";
 import {
   type BeaconOnPage,
   beaconTargetKey,
@@ -40,6 +43,7 @@ import { BeaconComposerListPanel } from "@/features/beacons/ui/beacon-composer-l
 import { BeaconComposerStudioPanel } from "@/features/beacons/ui/beacon-composer-studio-panel";
 import { BeaconCompositionPanel } from "@/features/beacons/ui/beacon-composition-panel";
 import { BeaconHomePanel } from "@/features/beacons/ui/beacon-home-panel";
+import { BeaconPageRuntimeHeaderStatus } from "@/features/beacons/ui/beacon-page-runtime-header-status";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -123,12 +127,16 @@ export function BeaconsScreen() {
   const [beaconToDelete, setBeaconToDelete] = useState<BeaconOnPage | null>(null);
   const [deletePendingKey, setDeletePendingKey] = useState<string | null>(null);
   const [embedSyncPending, setEmbedSyncPending] = useState(false);
+  const [pageRuntimeStatusLoading, setPageRuntimeStatusLoading] = useState(true);
+  const [pageRuntimeSynced, setPageRuntimeSynced] = useState(false);
+  const [pageRuntimeSyncReason, setPageRuntimeSyncReason] = useState<string | undefined>(undefined);
+  /** Hash can match while Engine still changed beacon contents; user must Sync to acknowledge. */
+  const [engineListCompositionStale, setEngineListCompositionStale] = useState(false);
 
   const [beaconMainTab, setBeaconMainTab] = useState<"engine" | "composer">("engine");
   const [composerEligibleLoading, setComposerEligibleLoading] = useState(false);
   const [composerEligible, setComposerEligible] = useState<BeaconOnPage[]>([]);
   const [composerRuntimeOk, setComposerRuntimeOk] = useState(false);
-  const [composerRuntimeReason, setComposerRuntimeReason] = useState<string | undefined>(undefined);
   const [composerStudio, setComposerStudio] = useState<{ beacon: BeaconOnPage; initialSignature: string } | null>(null);
   const [composerDraft, setComposerDraft] = useState<BeaconCompositionDraftRow[]>([]);
   const [composerOpeningKey, setComposerOpeningKey] = useState<string | null>(null);
@@ -140,6 +148,20 @@ export function BeaconsScreen() {
 
   const refreshPageBeacons = useCallback(async () => {
     setPageScanLoading(true);
+    setPageRuntimeStatusLoading(true);
+    const runtimePromise = getBeaconPageRuntimeSyncStatus()
+      .then((runtime) => {
+        setPageRuntimeSynced(runtime.synced);
+        setPageRuntimeSyncReason(runtime.reason);
+      })
+      .catch(() => {
+        setPageRuntimeSynced(false);
+        setPageRuntimeSyncReason("Could not check page script status.");
+      })
+      .finally(() => {
+        setPageRuntimeStatusLoading(false);
+      });
+
     try {
       const [found, installed, legacy] = await Promise.all([
         findBeaconTargetsOnPage(),
@@ -156,6 +178,8 @@ export function BeaconsScreen() {
     } finally {
       setPageScanLoading(false);
     }
+
+    await runtimePromise;
   }, []);
 
   const loadComposerEligible = useCallback(async () => {
@@ -165,15 +189,38 @@ export function BeaconsScreen() {
       const r = await listComposerEligibleLists(found);
       setComposerEligible(r.eligible);
       setComposerRuntimeOk(r.runtimeOk);
-      setComposerRuntimeReason(r.runtimeReason);
+      setPageRuntimeSynced(r.pageRuntimeSynced);
+      setPageRuntimeSyncReason(r.runtimeOk ? undefined : r.runtimeReason);
     } catch {
       setComposerEligible([]);
       setComposerRuntimeOk(false);
-      setComposerRuntimeReason("Could not load Composer lists.");
+      try {
+        const runtime = await getBeaconPageRuntimeSyncStatus();
+        setPageRuntimeSynced(runtime.synced);
+        setPageRuntimeSyncReason(runtime.reason);
+      } catch {
+        setPageRuntimeSynced(false);
+        setPageRuntimeSyncReason("Could not check page script status.");
+      }
     } finally {
       setComposerEligibleLoading(false);
     }
   }, []);
+
+  const syncShellOk = useMemo(
+    () => pageRuntimeSynced && !engineListCompositionStale,
+    [pageRuntimeSynced, engineListCompositionStale]
+  );
+
+  const syncShellReason = useMemo(
+    () =>
+      !pageRuntimeSynced
+        ? pageRuntimeSyncReason
+        : engineListCompositionStale
+          ? "Beacon list changed in Engine — sync page script."
+          : undefined,
+    [pageRuntimeSynced, pageRuntimeSyncReason, engineListCompositionStale]
+  );
 
   const runComposerCatalogLoad = useCallback(async (q: string) => {
     setComposerCatalogLoading(true);
@@ -249,6 +296,7 @@ export function BeaconsScreen() {
       setRemoveListTargetDialogOpen(false);
       setActiveBeaconKey(null);
       listTargetResolveGen.current += 1;
+      setEngineListCompositionStale(false);
       void refreshPageBeacons();
       if (typeof webflow.getCurrentMode === "function") {
         void (async () => {
@@ -534,6 +582,7 @@ export function BeaconsScreen() {
         type: "Success",
         message: "Composition saved. Preview and page script updated — publish for the live site.",
       });
+      setEngineListCompositionStale(false);
       void refreshPageBeacons();
       void loadComposerEligible();
     } catch (err) {
@@ -552,6 +601,7 @@ export function BeaconsScreen() {
     try {
       const instance = await appendComponentToBeacon(container, c.id);
       setSelected((prev) => [...prev, { key: crypto.randomUUID(), componentId: c.id, name: c.name, instance }]);
+      setEngineListCompositionStale(true);
       void refreshPageBeacons();
     } catch (err) {
       const message = formatDesignerError(err);
@@ -566,12 +616,14 @@ export function BeaconsScreen() {
     setEmbedSyncPending(true);
     try {
       await syncBeaconsInstallEmbedOnPage();
+      setEngineListCompositionStale(false);
       void webflow.notify({
         type: "Success",
         message: "Page custom code updated. Publish the site to apply on the live site.",
       });
+      await refreshPageBeacons();
       if (beaconMainTab === "composer") {
-        void loadComposerEligible();
+        await loadComposerEligible();
       }
     } catch (err) {
       const message = formatDesignerError(err);
@@ -597,6 +649,7 @@ export function BeaconsScreen() {
       } catch {
         /* selection is optional */
       }
+      setEngineListCompositionStale(false);
       void refreshPageBeacons();
     } catch (err) {
       const message = formatDesignerError(err);
@@ -615,6 +668,7 @@ export function BeaconsScreen() {
       await removeBeaconTargetFromPage(target.container);
       setBeaconToDelete(null);
       void webflow.notify({ type: "Success", message: "Beacon removed." });
+      setEngineListCompositionStale(true);
       void refreshPageBeacons();
     } catch (err) {
       const message = formatDesignerError(err);
@@ -630,6 +684,7 @@ export function BeaconsScreen() {
     try {
       await removeComponentInstanceFromCanvas(row.instance);
       setSelected((prev) => prev.filter((p) => p.key !== row.key));
+      setEngineListCompositionStale(true);
       void refreshPageBeacons();
     } catch (err) {
       const message = formatDesignerError(err);
@@ -744,21 +799,28 @@ export function BeaconsScreen() {
       <div className="shrink-0 border-b border-border/50 bg-muted/20 dark:bg-muted/15" data-slot="beacons_route_header">
         <div className="mx-auto flex h-8 min-w-0 max-w-lg items-center justify-between gap-2 px-3">
           <h2 className="text-sm font-medium leading-none tracking-tight text-foreground">Beacons</h2>
-          {beaconsWrapperInstalled ? (
-            <div
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5"
-              data-slot="beacon_install_done"
-              role="status"
-            >
-              <span
-                className="size-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(16,185,129,0.4)]"
-                aria-hidden
-              />
-              <span className="text-[0.65rem] font-medium leading-none text-emerald-800 dark:text-emerald-300">
-                Installed
-              </span>
-            </div>
-          ) : null}
+          <div className="flex min-w-0 shrink-0 items-center justify-end gap-1.5">
+            {beaconsWrapperInstalled && !pageRuntimeStatusLoading ? (
+              <div
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5"
+                data-slot="beacon_install_done"
+                role="status"
+              >
+                <span
+                  className="size-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(16,185,129,0.4)]"
+                  aria-hidden
+                />
+                <span className="text-[0.65rem] font-medium leading-none text-emerald-800 dark:text-emerald-300">
+                  Installed
+                </span>
+              </div>
+            ) : null}
+            <BeaconPageRuntimeHeaderStatus
+              loading={pageRuntimeStatusLoading}
+              synced={syncShellOk}
+              reason={syncShellReason}
+            />
+          </div>
         </div>
       </div>
 
@@ -796,6 +858,9 @@ export function BeaconsScreen() {
                   deletePendingKey={deletePendingKey}
                   embedSyncPending={embedSyncPending}
                   onSyncInstallEmbed={handleSyncInstallEmbed}
+                  pageRuntimeStatusLoading={pageRuntimeStatusLoading}
+                  pageRuntimeSynced={syncShellOk}
+                  pageRuntimeSyncReason={syncShellReason}
                 />
               )}
 
@@ -825,6 +890,9 @@ export function BeaconsScreen() {
                   listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
                   embedSyncPending={embedSyncPending}
                   onSyncInstallEmbed={handleSyncInstallEmbed}
+                  pageRuntimeStatusLoading={pageRuntimeStatusLoading}
+                  pageRuntimeSynced={syncShellOk}
+                  pageRuntimeSyncReason={syncShellReason}
                 />
               )}
             </TabsContent>
@@ -835,8 +903,8 @@ export function BeaconsScreen() {
                   pageScanLoading={pageScanLoading}
                   beaconsWrapperInstalled={beaconsWrapperInstalled}
                   loading={composerEligibleLoading}
-                  runtimeOk={composerRuntimeOk}
-                  runtimeReason={composerRuntimeReason}
+                  runtimeOk={composerRuntimeOk && syncShellOk}
+                  engineCompositionStale={composerRuntimeOk && engineListCompositionStale}
                   eligible={composerEligible}
                   openingKey={composerOpeningKey}
                   onOpenList={(b) => void handleOpenComposerStudio(b)}
@@ -862,6 +930,11 @@ export function BeaconsScreen() {
                   onBack={handleComposerStudioBack}
                   onSave={() => void handleComposerSave()}
                   savePending={composerSavePending}
+                  pageRuntimeStatusLoading={pageRuntimeStatusLoading}
+                  pageRuntimeSynced={syncShellOk}
+                  pageRuntimeSyncReason={syncShellReason}
+                  embedSyncPending={embedSyncPending}
+                  onSyncInstallEmbed={handleSyncInstallEmbed}
                 />
               )}
             </TabsContent>

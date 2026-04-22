@@ -1,5 +1,6 @@
 import { Loader2, Trash2 } from "lucide-react";
 import type { BeaconOnPage } from "@/features/beacons/model/beacon-page-targets";
+import { BeaconEmbedSyncStrip } from "@/features/beacons/ui/beacon-embed-sync-strip";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -201,6 +202,9 @@ type BeaconHomePanelProps = {
   deletePendingKey: string | null;
   embedSyncPending: boolean;
   onSyncInstallEmbed: () => void;
+  pageRuntimeStatusLoading: boolean;
+  pageRuntimeSynced: boolean;
+  pageRuntimeSyncReason?: string;
 };
 
 export function BeaconHomePanel(props: BeaconHomePanelProps) {
@@ -224,6 +228,9 @@ export function BeaconHomePanel(props: BeaconHomePanelProps) {
     deletePendingKey,
     embedSyncPending,
     onSyncInstallEmbed,
+    pageRuntimeStatusLoading,
+    pageRuntimeSynced,
+    pageRuntimeSyncReason,
   } = props;
 
   if (!beaconsWrapperInstalled) {
@@ -250,25 +257,20 @@ export function BeaconHomePanel(props: BeaconHomePanelProps) {
 
       {legacyBeaconsOnBody.length > 0 ? <Separator /> : null}
 
-      <div
-        className="flex flex-col gap-2 rounded-lg border border-border/80 bg-muted/15 px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between"
-        data-slot="beacon_embed_sync_home"
-      >
-        <p className="text-xs leading-snug text-muted-foreground">
-          Sync updates page footer custom code with the beacon runtime (Webflow Data API). Publish to go live.
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          disabled={embedSyncPending || pageScanLoading}
-          aria-busy={embedSyncPending}
-          onClick={() => void onSyncInstallEmbed()}
-        >
-          {embedSyncPending ? "Syncing…" : "Sync page script"}
-        </Button>
-      </div>
+      <BeaconEmbedSyncStrip
+        dataSlot="beacon_embed_sync_home"
+        embedSyncPending={embedSyncPending}
+        disableButton={pageScanLoading}
+        onSyncInstallEmbed={onSyncInstallEmbed}
+        pageRuntimeStatusLoading={pageRuntimeStatusLoading}
+        pageRuntimeSynced={pageRuntimeSynced}
+        pageRuntimeSyncReason={pageRuntimeSyncReason}
+        copy={{
+          loading: "Checking…",
+          synced: "Footer JS OK · publish for live.",
+          unsyncedFallback: "Footer script missing or outdated.",
+        }}
+      />
 
       <OnThisPageSection
         nameFieldId={nameFieldId}

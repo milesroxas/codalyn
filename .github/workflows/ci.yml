@@ -12,6 +12,9 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,19 +28,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "pnpm"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
+      # Single turbo run so lint + typecheck parallelize across packages (faster than two steps).
+      - name: Lint and typecheck
+        run: pnpm exec turbo run lint typecheck
 
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Test (exclude @codalyn/loadout — Playwright runs in its own workflow)
-        run: pnpm exec turbo run test --filter=!@codalyn/loadout
+      # Playwright (loadout) is in .github/workflows/loadout-e2e.yml — Vitest only here.
+      - name: Test (exclude @codalyn/loadout)
+        run: pnpm exec turbo run test --filter='!@codalyn/loadout'
 
       - name: Build
         run: pnpm build

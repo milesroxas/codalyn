@@ -6,12 +6,21 @@ import { getBeaconListTargetComponentOrNull } from "@/features/beacons/model/cre
 
 export type ComposerEligibleList = BeaconOnPage;
 
-export async function listComposerEligibleLists(
-  pageBeacons: BeaconOnPage[]
-): Promise<{ eligible: ComposerEligibleList[]; runtimeOk: boolean; runtimeReason?: string }> {
+export async function listComposerEligibleLists(pageBeacons: BeaconOnPage[]): Promise<{
+  eligible: ComposerEligibleList[];
+  runtimeOk: boolean;
+  runtimeReason?: string;
+  /** Same check as Engine: footer custom code matches this extension build. */
+  pageRuntimeSynced: boolean;
+}> {
   const runtime = await getBeaconPageRuntimeSyncStatus();
   if (!runtime.synced) {
-    return { eligible: [], runtimeOk: false, runtimeReason: runtime.reason };
+    return {
+      eligible: [],
+      runtimeOk: false,
+      runtimeReason: runtime.reason,
+      pageRuntimeSynced: false,
+    };
   }
 
   const eligible: ComposerEligibleList[] = [];
@@ -32,5 +41,5 @@ export async function listComposerEligibleLists(
     eligible.push(b);
   }
 
-  return { eligible, runtimeOk: true };
+  return { eligible, runtimeOk: true, pageRuntimeSynced: true };
 }

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
 import type { BeaconCompositionDraftRow } from "@/features/beacons/model/site-components";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -25,6 +25,11 @@ type BeaconComposerStudioPanelProps = {
   onBack: () => void;
   onSave: () => void;
   savePending: boolean;
+  pageRuntimeStatusLoading: boolean;
+  pageRuntimeSynced: boolean;
+  pageRuntimeSyncReason?: string;
+  embedSyncPending: boolean;
+  onSyncInstallEmbed: () => void;
 };
 
 export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps) {
@@ -47,12 +52,42 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
     onBack,
     onSave,
     savePending,
+    pageRuntimeStatusLoading,
+    pageRuntimeSynced,
+    pageRuntimeSyncReason,
+    embedSyncPending,
+    onSyncInstallEmbed,
   } = props;
 
-  const busy = savePending || addPending;
+  const busy = savePending || addPending || embedSyncPending;
 
   return (
     <div className="space-y-4" data-slot="beacon_composer_studio">
+      {!pageRuntimeStatusLoading && !pageRuntimeSynced ? (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/8 px-2 py-1.5"
+          data-slot="beacon_composer_runtime_alert"
+          role="alert"
+        >
+          <div className="flex min-w-0 items-center gap-1.5">
+            <AlertTriangle className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+            <p className="text-xs text-muted-foreground">
+              {pageRuntimeSyncReason ?? "Sync page script before saving."}
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="shrink-0"
+            disabled={embedSyncPending}
+            aria-busy={embedSyncPending}
+            onClick={() => void onSyncInstallEmbed()}
+          >
+            {embedSyncPending ? "Syncing…" : "Sync"}
+          </Button>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-medium">Studio</p>
@@ -69,8 +104,7 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
       </div>
 
       <p className="text-xs leading-snug text-muted-foreground">
-        Arrange tiles in the order visitors should see. Save updates the canvas list, the list-target preview, and page
-        footer runtime (publish for the live site).
+        Order is visitor order. Save updates canvas and preview; publish for live.
       </p>
 
       <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2" aria-label="Composition tiles">

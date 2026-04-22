@@ -37,10 +37,24 @@ function inlineScriptVersion(): string {
 
 type PageCustomScript = {
   id: string;
-  location: "header" | "footer";
+  location: "header" | "footer" | string;
   version: string;
   attributes?: Record<string, string>;
 };
+
+/** Webflow sometimes returns different casing for `location` / `attributes` keys. */
+function scriptLocation(s: PageCustomScript): string {
+  return String(s.location ?? "").toLowerCase();
+}
+
+function scriptAttrCI(attrs: Record<string, string> | undefined, name: string): string | undefined {
+  if (!attrs) return undefined;
+  const want = name.toLowerCase();
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.toLowerCase() === want) return v;
+  }
+  return undefined;
+}
 
 async function readJson<T>(res: Response): Promise<T | null> {
   try {
@@ -134,7 +148,9 @@ async function putPageCustomScripts(pageId: string, scripts: PageCustomScript[])
 }
 
 function withoutBeaconMarkedScripts(scripts: PageCustomScript[]): PageCustomScript[] {
-  return scripts.filter((s) => s.attributes?.[BEACON_PAGE_SCRIPT_MARKER_ATTR] !== BEACON_PAGE_SCRIPT_MARKER_VALUE);
+  return scripts.filter(
+    (s) => scriptAttrCI(s.attributes, BEACON_PAGE_SCRIPT_MARKER_ATTR) !== BEACON_PAGE_SCRIPT_MARKER_VALUE
+  );
 }
 
 /**
@@ -178,7 +194,7 @@ function formatRuntimeStatusError(err: unknown): string {
     return (err as { message: string }).message;
   }
   if (err instanceof Error) return err.message;
-  return "Could not verify beacon runtime on this page.";
+  return "Could not verify page script.";
 }
 
 /**
@@ -197,19 +213,20 @@ export async function getBeaconPageRuntimeSyncStatus(): Promise<{ synced: boolea
     const existing = await getPageCustomScripts(pageId);
     const beacon = existing.find(
       (s) =>
-        s.location === "footer" && s.attributes?.[BEACON_PAGE_SCRIPT_MARKER_ATTR] === BEACON_PAGE_SCRIPT_MARKER_VALUE
+        scriptLocation(s) === "footer" &&
+        scriptAttrCI(s.attributes, BEACON_PAGE_SCRIPT_MARKER_ATTR) === BEACON_PAGE_SCRIPT_MARKER_VALUE
     );
     if (beacon == null) {
       return {
         synced: false,
-        reason: "Beacon runtime is not on this page’s footer. Use Sync page script in Engine.",
+        reason: "No beacon script in footer — sync from Engine.",
       };
     }
-    const applied = beacon.attributes?.[BEACON_PAGE_SCRIPT_HASH_ATTR];
+    const applied = scriptAttrCI(beacon.attributes, BEACON_PAGE_SCRIPT_HASH_ATTR);
     if (applied !== expectedHash) {
       return {
         synced: false,
-        reason: "Beacon runtime on this page is out of date. Use Sync page script in Engine.",
+        reason: "Beacon script out of date — sync from Engine.",
       };
     }
     return { synced: true };

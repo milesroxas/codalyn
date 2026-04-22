@@ -1,6 +1,5 @@
 import { Loader2 } from "lucide-react";
 import type { ComposerEligibleList } from "@/features/beacons/model/beacon-composer-eligible";
-import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 
 function displayLabelForDataList(dataList: string): string {
@@ -15,7 +14,8 @@ type BeaconComposerListPanelProps = {
   beaconsWrapperInstalled: boolean;
   loading: boolean;
   runtimeOk: boolean;
-  runtimeReason: string | undefined;
+  /** Footer hash OK but Engine changed beacon contents since last Sync. */
+  engineCompositionStale: boolean;
   eligible: ComposerEligibleList[];
   openingKey: string | null;
   onOpenList: (b: ComposerEligibleList) => void;
@@ -28,7 +28,7 @@ export function BeaconComposerListPanel(props: BeaconComposerListPanelProps) {
     beaconsWrapperInstalled,
     loading,
     runtimeOk,
-    runtimeReason,
+    engineCompositionStale,
     eligible,
     openingKey,
     onOpenList,
@@ -64,16 +64,16 @@ export function BeaconComposerListPanel(props: BeaconComposerListPanelProps) {
         </Button>
       </div>
 
-      {!runtimeOk && runtimeReason ? (
-        <Alert variant="destructive" className="items-start">
-          <AlertDescription className="text-balance">{runtimeReason}</AlertDescription>
-        </Alert>
+      {engineCompositionStale && !loading && !pageScanLoading ? (
+        <p className="text-sm text-amber-800 dark:text-amber-200" data-slot="beacon_composer_engine_stale">
+          Beacon list changed in Engine — sync page script there first.
+        </p>
       ) : null}
 
       {runtimeOk && eligible.length === 0 && !loading && !pageScanLoading ? (
         <p className="text-sm text-muted-foreground">
-          No lists ready yet. In <span className="font-medium text-foreground">Engine</span>, sync page script (no
-          drift), add at least one component to a beacon, and place its list target on the canvas.
+          No lists yet — in <span className="font-medium text-foreground">Engine</span>, sync page script, add
+          components to a beacon, place the list target.
         </p>
       ) : null}
 

@@ -167,7 +167,7 @@ async function runBuildPipeline({ appPath, pkg, channel, recipient }) {
   }
 
   s.message(`${progressBar(STEPS[2].pct)}  ${STEPS[2].label}…`);
-  const bundleResult = await run("webflow", ["extension", "bundle"], { cwd: appPath });
+  const bundleResult = await run("pnpm", ["exec", "webflow", "extension", "bundle"], { cwd: appPath });
   if (bundleResult.status !== 0) {
     s.stop(color.red("Webflow bundle failed"));
     p.log.error(bundleResult.stdout || bundleResult.stderr || "Unknown error");

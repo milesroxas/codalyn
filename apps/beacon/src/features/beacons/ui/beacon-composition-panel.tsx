@@ -1,5 +1,6 @@
 import { HelpCircle, Loader2, Trash2 } from "lucide-react";
 import type { HydratedBeaconComponent } from "@/features/beacons/model/beacon-page-targets";
+import { BeaconEmbedSyncStrip } from "@/features/beacons/ui/beacon-embed-sync-strip";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -32,6 +33,9 @@ type BeaconCompositionPanelProps = {
   listTargetPlaceOnCanvasPending: boolean;
   embedSyncPending: boolean;
   onSyncInstallEmbed: () => void;
+  pageRuntimeStatusLoading: boolean;
+  pageRuntimeSynced: boolean;
+  pageRuntimeSyncReason?: string;
 };
 
 type BeaconListTargetActionsProps = {
@@ -186,6 +190,9 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
     listTargetOnCanvasCount,
     embedSyncPending,
     onSyncInstallEmbed,
+    pageRuntimeStatusLoading,
+    pageRuntimeSynced,
+    pageRuntimeSyncReason,
   } = props;
 
   const listTargetActionBusy =
@@ -233,26 +240,20 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
 
       <ListTargetCanvasStatusHint listTargetPhase={listTargetPhase} count={listTargetOnCanvasCount} />
 
-      <div
-        className="flex flex-col gap-2 rounded-lg border border-border/80 bg-muted/15 px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between"
-        data-slot="beacon_embed_sync"
-      >
-        <p className="text-xs leading-snug text-muted-foreground">
-          Sync re-registers the beacon runtime as page footer custom code (Tower + Webflow OAuth with custom code
-          scopes). Publish after syncing.
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          disabled={embedSyncPending}
-          aria-busy={embedSyncPending}
-          onClick={() => void onSyncInstallEmbed()}
-        >
-          {embedSyncPending ? "Syncing…" : "Sync page script"}
-        </Button>
-      </div>
+      <BeaconEmbedSyncStrip
+        dataSlot="beacon_embed_sync"
+        embedSyncPending={embedSyncPending}
+        disableButton={false}
+        onSyncInstallEmbed={onSyncInstallEmbed}
+        pageRuntimeStatusLoading={pageRuntimeStatusLoading}
+        pageRuntimeSynced={pageRuntimeSynced}
+        pageRuntimeSyncReason={pageRuntimeSyncReason}
+        copy={{
+          loading: "Checking…",
+          synced: "Footer JS OK · publish for live.",
+          unsyncedFallback: "Footer script missing or outdated.",
+        }}
+      />
 
       <div className="space-y-2" data-slot="beacon_list">
         <Label htmlFor={searchFieldId}>Components</Label>

@@ -1,0 +1,68 @@
+# Playwright for @codalyn/loadout only — default CI runs Vitest everywhere else.
+# This workflow: path-filtered PRs + main, weekly smoke (lockfile/ runner drift), manual.
+# See packages/loadout/playwright.config.ts
+name: Loadout E2E
+
+on:
+  pull_request:
+    paths:
+      - "packages/loadout/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/loadout-e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packages/loadout/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/loadout-e2e.yml"
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+
+concurrency:
+  group: loadout-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: packages/loadout
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: ${{ github.workspace }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browser (chromium)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: "${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}"
+
+      - name: Install Playwright with system deps
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run E2E
+        run: pnpm test
+        env:
+          CI: "true"

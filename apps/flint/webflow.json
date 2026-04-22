@@ -2,5 +2,12 @@
   "name": "flint",
   "publicDir": "dist",
   "size": "custom",
-  "apiVersion": "2"
+  "apiVersion": "2",
+  "telemetry": {
+    "global": {
+      "allowTelemetry": true,
+      "lastPrompted": 1776882962029,
+      "version": "1.15.0"
+    }
+  }
 }

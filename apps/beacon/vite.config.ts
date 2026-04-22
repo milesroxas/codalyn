@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import fs from "node:fs";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -54,6 +55,47 @@ function resolveTowerOrigin(mode: string): string {
   return `http://${host}:${port}`;
 }
 
+/** CORS for `/__webflow` when the Designer is HTTPS and the dev server is http://localhost (Chrome PNA). */
+function resolveWebflowDevCorsHeaders(req: IncomingMessage): Record<string, string> {
+  const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
+  const acrh = req.headers["access-control-request-headers"] as string | string[] | undefined;
+  const allowHeaders = Array.isArray(acrh) ? acrh.join(", ") : (acrh ?? "*");
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Origin": origin ?? "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": allowHeaders,
+    "Access-Control-Allow-Private-Network": "true",
+    "Access-Control-Max-Age": "86400",
+  };
+  if (origin) {
+    headers.Vary = "Origin";
+  }
+  return headers;
+}
+
+function webflowJsonDevMiddleware(configPath: string) {
+  return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    const pathOnly = req.url?.split("?")[0]?.split("#")[0]?.replace(/\/$/, "") ?? "";
+    if (pathOnly !== "/__webflow") {
+      next();
+      return;
+    }
+    const cors = resolveWebflowDevCorsHeaders(req);
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, cors);
+      res.end();
+      return;
+    }
+    if (req.method === "GET") {
+      res.writeHead(200, { ...cors, "Content-Type": "application/json" });
+      res.end(fs.readFileSync(configPath, "utf-8"));
+      return;
+    }
+    res.statusCode = 405;
+    res.end();
+  };
+}
+
 const wfDesignerExtensionPlugin = (): Plugin => {
   let webflowHTML = "";
   const configPath = path.join("./webflow.json");
@@ -89,33 +131,7 @@ const wfDesignerExtensionPlugin = (): Plugin => {
     },
 
     configureServer(server) {
-      const webflowCors = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "*",
-      } as const;
-      server.middlewares.use((req, res, next) => {
-        const pathOnly = req.url?.split("?")[0]?.split("#")[0];
-        if (pathOnly !== "/__webflow") {
-          next();
-          return;
-        }
-        if (req.method === "OPTIONS") {
-          res.writeHead(204, webflowCors);
-          res.end();
-          return;
-        }
-        if (req.method === "GET") {
-          res.writeHead(200, {
-            ...webflowCors,
-            "Content-Type": "application/json",
-          });
-          res.end(fs.readFileSync(configPath, "utf-8"));
-          return;
-        }
-        res.statusCode = 405;
-        res.end();
-      });
+      server.middlewares.use(webflowJsonDevMiddleware(configPath));
     },
   };
 };

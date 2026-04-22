@@ -2,17 +2,10 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
+import { resolveWebflowOAuthAppUrl, resolveWebflowOAuthRedirectUri } from "@/server/webflow-oauth-config";
 import { exchangeWebflowAuthorizationCode, type WebflowOAuthTokenResponse } from "@/server/webflow-oauth-exchange";
 import { db } from "@/shared/lib/db";
 import { webflowOAuthToken, webflowOauthAuthorizeState } from "@/shared/lib/db/auth-schema";
-
-function resolveAppUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.BETTER_AUTH_URL?.trim() ||
-    "http://localhost:3100"
-  ).replace(/\/$/, "");
-}
 
 function oauthErrorRedirect(
   appUrl: string,
@@ -59,7 +52,8 @@ async function persistWebflowOAuthToken(userId: string, tokenResponse: WebflowOA
 }
 
 export async function GET(request: Request) {
-  const appUrl = resolveAppUrl();
+  const appUrl = resolveWebflowOAuthAppUrl();
+  const redirectUri = resolveWebflowOAuthRedirectUri();
   const { searchParams } = new URL(request.url);
   const cookieStore = await cookies();
   // Dashboard GET authorize flow sets the `wf_oauth_state` cookie; POST (Beacon popup)
@@ -111,7 +105,7 @@ export async function GET(request: Request) {
 
   let tokenResponse: WebflowOAuthTokenResponse;
   try {
-    tokenResponse = await exchangeWebflowAuthorizationCode(code);
+    tokenResponse = await exchangeWebflowAuthorizationCode(code, redirectUri);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "token_exchange_failed";
     return oauthErrorRedirect(

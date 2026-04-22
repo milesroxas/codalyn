@@ -1,3 +1,5 @@
+import { resolveWebflowOAuthRedirectUri } from "@/server/webflow-oauth-config";
+
 const TOKEN_URL = "https://api.webflow.com/oauth/access_token";
 
 export type WebflowOAuthTokenResponse = {
@@ -13,10 +15,12 @@ type WebflowOAuthErrorBody = {
   error_description?: string;
 };
 
-export async function exchangeWebflowAuthorizationCode(code: string): Promise<WebflowOAuthTokenResponse> {
+export async function exchangeWebflowAuthorizationCode(
+  code: string,
+  redirectUri: string = resolveWebflowOAuthRedirectUri()
+): Promise<WebflowOAuthTokenResponse> {
   const clientId = process.env.WEBFLOW_CLIENT_ID?.trim();
   const clientSecret = process.env.WEBFLOW_CLIENT_SECRET?.trim();
-  const redirectUri = process.env.WEBFLOW_REDIRECT_URI?.trim();
   if (!clientId || !clientSecret || !redirectUri) {
     throw new Error("WEBFLOW_CLIENT_ID, WEBFLOW_CLIENT_SECRET, and WEBFLOW_REDIRECT_URI are required");
   }

@@ -14,7 +14,7 @@ async function forward(req: Request, segments: string[]) {
         error: "No Webflow access token available",
         hint: hasWebflowOAuthCredentials()
           ? "Sign in to Tower and connect Webflow (POST /api/integrations/webflow/authorize from Beacon, or the dashboard flow) so an access token is stored for your user."
-          : "Configure Webflow OAuth (WEBFLOW_CLIENT_ID, WEBFLOW_CLIENT_SECRET, WEBFLOW_REDIRECT_URI) and connect your account from Beacon.",
+          : "Configure Webflow OAuth (WEBFLOW_CLIENT_ID, WEBFLOW_CLIENT_SECRET, optional WEBFLOW_REDIRECT_URI override) and connect your account from Beacon.",
       },
       { status: 503 }
     );
@@ -44,7 +44,9 @@ async function forward(req: Request, segments: string[]) {
   }
 
   const res = await fetch(target, init);
-  return new Response(res.body, { status: res.status, headers: res.headers });
+  const responseHeaders = new Headers(res.headers);
+  responseHeaders.set("Cache-Control", "no-store");
+  return new Response(res.body, { status: res.status, headers: responseHeaders });
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {

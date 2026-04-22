@@ -49,7 +49,7 @@ Tower has its **own** Compose project name, image name, container name, and netw
 | --------- | ---------- |
 | **Dev on 3100 + Postgres in Docker** | From `apps/tower`: `docker compose up -d postgres`. Keep host `DATABASE_URL` on `127.0.0.1:${POSTGRES_PORT:-35432}` (see `.env` / `.env.local`). Run **`pnpm app tower db:migrate:local`** when the DB is up. |
 | **Full stack in Docker on 3100** | Stop **`pnpm app tower dev`**, then `pnpm app tower docker:up` (or `docker compose up --build -d` from `apps/tower`). |
-| **Containerized Next and dev at the same time** | Set **`TOWER_PORT`** (e.g. **3101**) in `apps/tower/.env` and set **`BETTER_AUTH_URL`**, **`NEXT_PUBLIC_APP_URL`**, and **`WEBFLOW_REDIRECT_URI`** in `.env.docker` to that same origin (e.g. `http://localhost:3101`). |
+| **Containerized Next and dev at the same time** | Set **`TOWER_PORT`** (e.g. **3101**) in `apps/tower/.env` and set **`BETTER_AUTH_URL`** and **`NEXT_PUBLIC_APP_URL`** in `.env.docker` to that same origin (e.g. `http://localhost:3101`). Set **`WEBFLOW_REDIRECT_URI`** only if you need an explicit override. |
 
 From the repo root:
 
@@ -105,7 +105,7 @@ The key in `VITE_BEACON_API_KEY` is **bundled in the extension** — acceptable 
 
 Webflow’s [Working with the Data API](https://developers.webflow.com/data/docs/data-clients) overview points to [Authentication](https://developers.webflow.com/data/reference/authentication): every **v2** request uses `Authorization: Bearer YOUR_TOKEN`.
 
-**OAuth (`WEBFLOW_CLIENT_ID` / `WEBFLOW_CLIENT_SECRET` + `WEBFLOW_REDIRECT_URI`):** Beacon “Connect Webflow” stores each signed-in user’s **OAuth access token** in Tower’s DB. **`GET|POST|… /api/v2/webflow/...`** forwards to `https://api.webflow.com/v2/...` using **only** that per-user token (no shared site/workspace env fallback).
+**OAuth (`WEBFLOW_CLIENT_ID` / `WEBFLOW_CLIENT_SECRET` + optional `WEBFLOW_REDIRECT_URI` override):** Beacon “Connect Webflow” stores each signed-in user’s **OAuth access token** in Tower’s DB. **`GET|POST|… /api/v2/webflow/...`** forwards to `https://api.webflow.com/v2/...` using **only** that per-user token (no shared site/workspace env fallback). If `WEBFLOW_REDIRECT_URI` is unset, Tower derives it from `NEXT_PUBLIC_APP_URL`.
 
 **Designer sign-in** (`POST /api/auth/webflow-designer`) may still need **`WEBFLOW_TOKEN_RESOLVE_BEARER`** (or **`WEBFLOW_API_TOKEN`**) with scope `authorized_user:read` until the user has connected Webflow and a stored token exists — see `apps/tower/.env.example`.
 

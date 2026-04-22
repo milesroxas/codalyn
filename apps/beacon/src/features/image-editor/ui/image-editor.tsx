@@ -7,6 +7,11 @@ import {
 import type { DragEvent, SetStateAction } from "react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Area } from "react-easy-crop";
+import { useNavigate } from "react-router-dom";
+import {
+  readBeaconGuestWelcomeComplete,
+  writeBeaconGuestWelcomeComplete,
+} from "@/features/auth/lib/beacon-guest-welcome-preference";
 import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
@@ -51,6 +56,7 @@ type ImageEditorProps = {
 
 export function ImageEditor(props: ImageEditorProps = {}) {
   const { onOnboardingVisibilityChange } = props;
+  const navigate = useNavigate();
   const { settings, updateSettings, canPersistExportDefaults, syncState } = useBeaconAppSettings();
   const baseId = useId();
   const fileInputId = `${baseId}-file`;
@@ -71,7 +77,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   const [replaceLibraryAsset, setReplaceLibraryAsset] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [originalBytes, setOriginalBytes] = useState<number | null>(null);
-  const [guestOnboardingComplete, setGuestOnboardingComplete] = useState(false);
+  const [guestOnboardingComplete, setGuestOnboardingComplete] = useState(readBeaconGuestWelcomeComplete);
   /** True after user picks "Custom (manual)" in preset dropdown; shows format/quality/dimension editors even if values still match a preset. */
   const [exportPresetManualOverride, setExportPresetManualOverride] = useState(false);
   /** Preset chosen from the dropdown; kept while dimensions and format match so quality can differ from the preset target. */
@@ -92,6 +98,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   const guestCmsTemplateRestricted = isConfirmedGuest && cmsCollectionTemplatePage;
   /** Guest onboarding only after Tower session resolves; while pending, show the empty drop zone (no loading interstitial). */
   const showGuestOnboarding = !imageSrc && !towerSessionPending && !towerUser && !guestOnboardingComplete;
+  const prevShowGuestOnboarding = useRef(false);
 
   const {
     assetFolders,
@@ -162,10 +169,6 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   } = useImageDissolveTransition({ setImageSrc, setOriginalBytes, setFileBaseName });
 
   useEffect(() => {
-    void webflow.setExtensionSize({ width: 440, height: 880 });
-  }, []);
-
-  useEffect(() => {
     exportDefaultsHydratedRef.current = !towerUser?.id;
     serverExportDefaultsAppliedRef.current = false;
   }, [towerUser?.id]);
@@ -207,6 +210,13 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   useEffect(() => {
     onOnboardingVisibilityChange?.(showGuestOnboarding);
   }, [onOnboardingVisibilityChange, showGuestOnboarding]);
+
+  useEffect(() => {
+    if (towerUser && prevShowGuestOnboarding.current) {
+      navigate("/home");
+    }
+    prevShowGuestOnboarding.current = showGuestOnboarding;
+  }, [towerUser, showGuestOnboarding, navigate]);
 
   useImageOutputDimensionsOnLoad(
     imageSrc,
@@ -575,7 +585,11 @@ export function ImageEditor(props: ImageEditorProps = {}) {
           <ImageEditorOnboarding
             towerConfigured={towerConfigured}
             onSignInToTower={openTowerEmailSignInPopup}
-            onContinueAsGuest={() => setGuestOnboardingComplete(true)}
+            onContinueAsGuest={() => {
+              writeBeaconGuestWelcomeComplete();
+              setGuestOnboardingComplete(true);
+              navigate("/home");
+            }}
           />
         ) : (
           <EmptyImageSourceSection

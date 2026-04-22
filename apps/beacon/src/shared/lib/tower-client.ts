@@ -24,6 +24,7 @@ export function towerFetch(path: string, init?: RequestInit): Promise<Response> 
   }
   return fetch(url, {
     ...init,
+    cache: init?.cache ?? "no-store",
     headers,
     credentials: init?.credentials ?? "include",
   });

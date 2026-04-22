@@ -1,19 +1,11 @@
-import { useState } from "react";
-import {
-  HashRouter,
-  Navigate,
-  Outlet,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-  useOutletContext,
-} from "react-router-dom";
+import { useEffect, useState } from "react";
+import { HashRouter, Navigate, Outlet, Route, Routes, useNavigate, useOutletContext } from "react-router-dom";
+import { BeaconHomeScreen } from "@/app/ui/beacon-home-screen";
 import Header from "@/app/ui/Header";
-import { CmsEditorScreen } from "@/features/cms-editor";
+import { BeaconsScreen } from "@/features/beacons";
 import { ImageEditor } from "@/features/image-editor";
 import { BeaconAppSettingsProvider, BeaconSettingsScreen } from "@/features/settings";
-import { isBeaconExtendedFeaturesEnabled } from "@/shared/config/beacon-feature-flags";
+import { applyBeaconExtensionSize } from "@/shared/lib/beacon-extension-size";
 import { buildInfo } from "@/shared/lib/build-info";
 import { TooltipProvider } from "@/shared/ui/tooltip";
 
@@ -31,23 +23,18 @@ function BeaconImagesPage() {
   return <ImageEditor onOnboardingVisibilityChange={setOnboardingVisible} />;
 }
 
-function BeaconEditorPage() {
-  if (!isBeaconExtendedFeaturesEnabled()) {
-    return <Navigate to="/images" replace />;
-  }
-  return <CmsEditorScreen />;
+function BeaconBeaconsPage() {
+  return <BeaconsScreen />;
 }
 
 function BeaconShell() {
-  const extended = isBeaconExtendedFeaturesEnabled();
   const [onboardingVisible, setOnboardingVisible] = useState(true);
-  const location = useLocation();
 
-  const showHeader = !onboardingVisible || (extended && location.pathname === "/editor");
+  const showHeader = !onboardingVisible;
 
   return (
     <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-version={buildInfo.version}>
-      {showHeader ? <Header beaconExtendedFeatures={extended} /> : null}
+      {showHeader ? <Header /> : null}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-4">
         <Outlet context={{ setOnboardingVisible }} />
       </div>
@@ -56,6 +43,10 @@ function BeaconShell() {
 }
 
 export function App() {
+  useEffect(() => {
+    applyBeaconExtensionSize();
+  }, []);
+
   return (
     <BeaconAppSettingsProvider>
       <HashRouter>
@@ -63,10 +54,11 @@ export function App() {
           <Routes>
             <Route path="/settings" element={<BeaconSettingsPage />} />
             <Route element={<BeaconShell />}>
-              <Route index element={<Navigate to="/images" replace />} />
+              <Route index element={<Navigate to="/home" replace />} />
+              <Route path="home" element={<BeaconHomeScreen />} />
               <Route path="images" element={<BeaconImagesPage />} />
-              <Route path="editor" element={<BeaconEditorPage />} />
-              <Route path="*" element={<Navigate to="/images" replace />} />
+              <Route path="beacons" element={<BeaconBeaconsPage />} />
+              <Route path="*" element={<Navigate to="/home" replace />} />
             </Route>
           </Routes>
         </TooltipProvider>

@@ -28,6 +28,7 @@ describe("Tower ↔ Beacon settings JSON contract", () => {
     const parsed = parseBeaconAppSettings((envelope as { settings: unknown }).settings);
     expect(parsed.version).toBe(1);
     expect(parsed.theme).toBe(defaults.theme);
+    expect(parsed.cmsLayout.fieldSlug).toBe("");
     expect(envelope.editorExperience).toBe(false);
     expect(envelope.canManageTeamBeaconSettings).toBe(false);
     expect(envelope.restrictToEditorExperience).toBe(false);
@@ -40,10 +41,11 @@ describe("Tower ↔ Beacon settings JSON contract", () => {
   });
 
   it("accepts PUT-style partial patches used by mergeBeaconAppSettings on Tower", () => {
-    const patch = { theme: "dark" as const, defaultExportQuality: 0.5 };
+    const patch = { theme: "dark" as const, defaultExportQuality: 0.5, cmsLayout: { fieldSlug: "layout-json" } };
     const merged = parseBeaconAppSettingsPartial(patch);
     expect(merged.theme).toBe("dark");
     expect(merged.defaultExportQuality).toBe(0.5);
+    expect(merged.cmsLayout?.fieldSlug).toBe("layout-json");
   });
 
   it("does not accept invalid preset rows in the schema (parse falls back to defaults)", () => {

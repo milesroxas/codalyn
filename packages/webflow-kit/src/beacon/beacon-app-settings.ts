@@ -59,6 +59,15 @@ export const beaconAppSettingsSchema = z.object({
    * When true, the crop preview zoom cannot exceed roughly 1:1 source pixels (avoids upscaled blur).
    */
   limitCropZoomToNativeResolution: z.boolean().default(false),
+  /**
+   * CMS layout-composition editor (Tower ↔ Webflow `fieldData`); internal wiring, not shown in Beacon UI.
+   */
+  cmsLayout: z
+    .object({
+      fieldSlug: z.string().default(""),
+      enabledCollections: z.array(z.string().min(1)).default([]),
+    })
+    .default({ fieldSlug: "", enabledCollections: [] }),
 });
 
 export type BeaconAppSettings = z.infer<typeof beaconAppSettingsSchema>;
@@ -74,6 +83,10 @@ export function getDefaultBeaconAppSettings(): BeaconAppSettings {
     designerOnlyImagePresets: [],
     hiddenBuiltinAspectPresets: [],
     limitCropZoomToNativeResolution: false,
+    cmsLayout: {
+      fieldSlug: "",
+      enabledCollections: [],
+    },
   };
 }
 
@@ -149,6 +162,7 @@ export function mergeBeaconAppSettings(base: BeaconAppSettings, patch: Partial<B
     ...clean,
     imagePresets: clean.imagePresets ?? base.imagePresets,
     designerOnlyImagePresets: clean.designerOnlyImagePresets ?? base.designerOnlyImagePresets,
+    cmsLayout: clean.cmsLayout ?? base.cmsLayout,
   });
 }
 

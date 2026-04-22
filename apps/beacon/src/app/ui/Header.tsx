@@ -1,6 +1,6 @@
-import { ChevronDown, ExternalLink, Image as ImageIcon, LogIn, LogOut, Menu, Settings, SquarePen } from "lucide-react";
+import { ChevronDown, ExternalLink, Image as ImageIcon, LogIn, LogOut, Menu, Radio, Settings } from "lucide-react";
 import { useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { cn } from "@/shared/lib/utils";
@@ -119,9 +119,11 @@ function TowerAuthBar({ user, isPending, onOpenTowerEmailPopup, onSignOut }: Tow
 type HeaderLogoProps = {
   /** When false, renders a div so the screen can use a separate page `<h1>` (e.g. Settings). */
   asHeading?: boolean;
+  /** When set, the logo is a link to this route (e.g. home hub). */
+  to?: string;
 };
 
-export function HeaderLogo({ asHeading = true }: HeaderLogoProps) {
+export function HeaderLogo({ asHeading = true, to }: HeaderLogoProps) {
   const className = "m-0 flex shrink-0 items-center justify-center text-lg font-medium leading-widest";
   const inner = (
     <>
@@ -130,15 +132,24 @@ export function HeaderLogo({ asHeading = true }: HeaderLogoProps) {
       <img src={darkLogoSrc} alt="" aria-hidden className="hidden h-4 w-auto dark:block" />
     </>
   );
-  return asHeading ? <h1 className={className}>{inner}</h1> : <div className={className}>{inner}</div>;
+  const block = asHeading ? <h1 className={className}>{inner}</h1> : <div className={className}>{inner}</div>;
+
+  if (to) {
+    return (
+      <Link
+        to={to}
+        className="inline-flex shrink-0 rounded-sm text-foreground outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        aria-label="Beacon home"
+      >
+        {block}
+      </Link>
+    );
+  }
+
+  return block;
 }
 
-type HeaderProps = {
-  /** When extended Beacon features are enabled, the menu includes the Editor route. */
-  beaconExtendedFeatures?: boolean;
-};
-
-function BeaconRoutesMenu({ beaconExtendedFeatures }: { beaconExtendedFeatures: boolean }) {
+function BeaconRoutesMenu() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -164,12 +175,10 @@ function BeaconRoutesMenu({ beaconExtendedFeatures }: { beaconExtendedFeatures: 
           <ImageIcon aria-hidden />
           Images
         </DropdownMenuItem>
-        {beaconExtendedFeatures ? (
-          <DropdownMenuItem className={itemClass("/editor")} onSelect={() => navigate("/editor")}>
-            <SquarePen aria-hidden />
-            Editor
-          </DropdownMenuItem>
-        ) : null}
+        <DropdownMenuItem className={itemClass("/beacons")} onSelect={() => navigate("/beacons")}>
+          <Radio aria-hidden />
+          Beacons
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className={itemClass("/settings")} onSelect={() => navigate("/settings")}>
           <Settings aria-hidden />
@@ -180,7 +189,7 @@ function BeaconRoutesMenu({ beaconExtendedFeatures }: { beaconExtendedFeatures: 
   );
 }
 
-function HeaderWithTower({ beaconExtendedFeatures }: HeaderProps) {
+function HeaderWithTower() {
   const { user, isPending, clearStoredSession } = useBeaconTowerSession();
   const base = getTowerAuthBaseUrl();
 
@@ -208,11 +217,11 @@ function HeaderWithTower({ beaconExtendedFeatures }: HeaderProps) {
             </div>
           </div>
           <div className="flex shrink-0 justify-center px-2">
-            <HeaderLogo />
+            <HeaderLogo to="/home" />
           </div>
           <div className="flex min-w-0 justify-end">
             <div className="flex min-w-0 shrink-0 items-center gap-1 pl-1">
-              <BeaconRoutesMenu beaconExtendedFeatures={Boolean(beaconExtendedFeatures)} />
+              <BeaconRoutesMenu />
             </div>
           </div>
         </div>
@@ -221,11 +230,11 @@ function HeaderWithTower({ beaconExtendedFeatures }: HeaderProps) {
   );
 }
 
-export default function Header({ beaconExtendedFeatures }: HeaderProps) {
+export default function Header() {
   const towerOk = isTowerConfigured();
 
   if (towerOk) {
-    return <HeaderWithTower beaconExtendedFeatures={beaconExtendedFeatures} />;
+    return <HeaderWithTower />;
   }
 
   return (
@@ -236,10 +245,10 @@ export default function Header({ beaconExtendedFeatures }: HeaderProps) {
             <span className="inline-flex h-8 items-center px-2 text-xs text-muted-foreground">Tower unavailable</span>
           </div>
           <div className="flex shrink-0 justify-center px-2">
-            <HeaderLogo />
+            <HeaderLogo to="/home" />
           </div>
           <div className="flex min-w-0 justify-end">
-            <BeaconRoutesMenu beaconExtendedFeatures={Boolean(beaconExtendedFeatures)} />
+            <BeaconRoutesMenu />
           </div>
         </div>
       </header>

@@ -2,26 +2,19 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { towerCorsHeadersFor } from "@/server/tower-cors";
+import { resolveWebflowOAuthAppUrl, resolveWebflowOAuthRedirectUri } from "@/server/webflow-oauth-config";
 import { hasWebflowOAuthCredentials } from "@/server/webflow-proxy-token";
 import { db } from "@/shared/lib/db";
 import { webflowOauthAuthorizeState } from "@/shared/lib/db/auth-schema";
-
-function resolveAppUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.BETTER_AUTH_URL?.trim() ||
-    "http://localhost:3100"
-  ).replace(/\/$/, "");
-}
 
 // cms:write: Data API PATCH collection items (Beacon CMS-bound image replace).
 const DEFAULT_SCOPES = "sites:read pages:read cms:read cms:write assets:read";
 
 function buildWebflowAuthorizeUrl(state: string): string {
   const clientId = process.env.WEBFLOW_CLIENT_ID?.trim();
-  const redirectUri = process.env.WEBFLOW_REDIRECT_URI?.trim();
-  if (!clientId || !redirectUri) {
-    throw new Error("WEBFLOW_CLIENT_ID and WEBFLOW_REDIRECT_URI are required");
+  const redirectUri = resolveWebflowOAuthRedirectUri();
+  if (!clientId) {
+    throw new Error("WEBFLOW_CLIENT_ID is required");
   }
   const scopes = (process.env.WEBFLOW_OAUTH_SCOPES ?? DEFAULT_SCOPES)
     .split(/\s+/)
@@ -57,7 +50,7 @@ export async function GET(request: Request) {
   const session = await auth.api.getSession({
     headers: request.headers,
   });
-  const appUrl = resolveAppUrl();
+  const appUrl = resolveWebflowOAuthAppUrl();
   if (!session) {
     return NextResponse.redirect(
       `${appUrl}/sign-in?callbackUrl=${encodeURIComponent("/api/integrations/webflow/authorize")}`

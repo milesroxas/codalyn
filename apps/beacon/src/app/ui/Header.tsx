@@ -177,7 +177,13 @@ function BeaconRoutesMenu() {
           Images
         </DropdownMenuItem>
         {isBeaconsSurfaceEnabled() ? (
-          <DropdownMenuItem className={itemClass("/beacons")} onSelect={() => navigate("/beacons")}>
+          <DropdownMenuItem
+            className={cn(
+              pathname.startsWith("/beacons") &&
+                "bg-accent text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+            )}
+            onSelect={() => navigate("/beacons/engine")}
+          >
             <Radio aria-hidden />
             Beacons
           </DropdownMenuItem>

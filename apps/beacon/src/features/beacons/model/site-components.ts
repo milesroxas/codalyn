@@ -2,6 +2,9 @@ import type { HydratedBeaconComponent } from "@/features/beacons/model/beacon-pa
 import { BEACON_UTILITIES_COMPONENT_GROUP } from "@/features/beacons/model/create-beacon-list-target-component";
 import { runExclusiveDesignerStyleOp } from "@/features/beacons/model/exclusive-designer-style-op";
 
+/** Site component id + label for the Composer palette (types allowed by Engine for a beacon list). */
+export type BeaconPaletteEntry = { id: string; name: string; group: string | null };
+
 function excludeBeaconUtilitiesGroup(results: ComponentSearchResult[]): ComponentSearchResult[] {
   return results.filter((r) => r.group !== BEACON_UTILITIES_COMPONENT_GROUP);
 }

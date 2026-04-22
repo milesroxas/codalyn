@@ -61,7 +61,8 @@ export function App() {
               <Route index element={<Navigate to="/home" replace />} />
               <Route path="home" element={<BeaconHomeScreen />} />
               <Route path="images" element={<BeaconImagesPage />} />
-              <Route path="beacons" element={<BeaconBeaconsPage />} />
+              <Route path="beacons/:segment" element={<BeaconBeaconsPage />} />
+              <Route path="beacons" element={<Navigate to="/beacons/engine" replace />} />
               <Route path="*" element={<Navigate to="/home" replace />} />
             </Route>
           </Routes>

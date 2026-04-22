@@ -72,8 +72,8 @@ export function BeaconComposerListPanel(props: BeaconComposerListPanelProps) {
 
       {runtimeOk && eligible.length === 0 && !loading && !pageScanLoading ? (
         <p className="text-sm text-muted-foreground">
-          No lists yet — in <span className="font-medium text-foreground">Engine</span>, sync page script, add
-          components to a beacon, place the list target.
+          No lists yet — in <span className="font-medium text-foreground">Engine</span>, sync page script and place the
+          list target for a beacon (the hidden list can be empty; you build it here).
         </p>
       ) : null}
 

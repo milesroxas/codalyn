@@ -1,3 +1,7 @@
+# Monorepo verify: run the full turbo graph (lint, typecheck, test, build). Speed comes from
+# Turborepo task caching, optionally remote: add repo secrets TURBO_TOKEN + TURBO_TEAM (Vercel).
+# Deliberately no "affected only" build filter here — that is easy to get wrong; cache is the
+# standard fix for long CI. See: https://turbo.build/docs/ci-vendors/github-actions
 name: CI
 
 on:
@@ -15,6 +19,9 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

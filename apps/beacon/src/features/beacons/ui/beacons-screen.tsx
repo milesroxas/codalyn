@@ -1,10 +1,12 @@
 import { type MutableRefObject, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { listComposerEligibleLists } from "@/features/beacons/model/beacon-composer-eligible";
 import {
   clearAllBeaconListTargetDesignerPreviewsOnPage,
   resyncAllBeaconListTargetDesignerPreviewsOnPage,
   syncBeaconListTargetDesignerPreview,
 } from "@/features/beacons/model/beacon-list-target-designer-preview";
 import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
+import { syncBeaconPageInlineScript } from "@/features/beacons/model/beacon-page-inline-script";
 import {
   type BeaconOnPage,
   beaconTargetKey,
@@ -28,10 +30,14 @@ import { placeBeaconListTargetOnCanvas } from "@/features/beacons/model/place-be
 import { reconcileBeaconListTargetForOpen } from "@/features/beacons/model/reconcile-beacon-list-target";
 import {
   appendComponentToBeacon,
+  applyBeaconCompositionDraft,
+  type BeaconCompositionDraftRow,
   listSiteComponentsForPicker,
   removeBeaconTargetFromPage,
   removeComponentInstanceFromCanvas,
 } from "@/features/beacons/model/site-components";
+import { BeaconComposerListPanel } from "@/features/beacons/ui/beacon-composer-list-panel";
+import { BeaconComposerStudioPanel } from "@/features/beacons/ui/beacon-composer-studio-panel";
 import { BeaconCompositionPanel } from "@/features/beacons/ui/beacon-composition-panel";
 import { BeaconHomePanel } from "@/features/beacons/ui/beacon-home-panel";
 import {
@@ -43,6 +49,7 @@ import {
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
 import { Button } from "@/shared/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 
 function formatDesignerError(err: unknown): string {
   if (err && typeof err === "object" && "message" in err && typeof (err as { message: unknown }).message === "string") {
@@ -81,6 +88,7 @@ async function runListTargetReconcileOnOpen(
 export function BeaconsScreen() {
   const nameFieldId = useId();
   const searchFieldId = useId();
+  const composerSearchFieldId = useId();
   const [pageBeacons, setPageBeacons] = useState<BeaconOnPage[]>([]);
   const [pageScanLoading, setPageScanLoading] = useState(true);
   const [beaconsWrapperInstalled, setBeaconsWrapperInstalled] = useState(false);
@@ -116,6 +124,20 @@ export function BeaconsScreen() {
   const [deletePendingKey, setDeletePendingKey] = useState<string | null>(null);
   const [embedSyncPending, setEmbedSyncPending] = useState(false);
 
+  const [beaconMainTab, setBeaconMainTab] = useState<"engine" | "composer">("engine");
+  const [composerEligibleLoading, setComposerEligibleLoading] = useState(false);
+  const [composerEligible, setComposerEligible] = useState<BeaconOnPage[]>([]);
+  const [composerRuntimeOk, setComposerRuntimeOk] = useState(false);
+  const [composerRuntimeReason, setComposerRuntimeReason] = useState<string | undefined>(undefined);
+  const [composerStudio, setComposerStudio] = useState<{ beacon: BeaconOnPage; initialSignature: string } | null>(null);
+  const [composerDraft, setComposerDraft] = useState<BeaconCompositionDraftRow[]>([]);
+  const [composerOpeningKey, setComposerOpeningKey] = useState<string | null>(null);
+  const [composerSavePending, setComposerSavePending] = useState(false);
+  const [composerComponentQuery, setComposerComponentQuery] = useState("");
+  const [composerCatalog, setComposerCatalog] = useState<ComponentSearchResult[]>([]);
+  const [composerCatalogLoading, setComposerCatalogLoading] = useState(false);
+  const [composerCatalogError, setComposerCatalogError] = useState<string | null>(null);
+
   const refreshPageBeacons = useCallback(async () => {
     setPageScanLoading(true);
     try {
@@ -136,9 +158,45 @@ export function BeaconsScreen() {
     }
   }, []);
 
+  const loadComposerEligible = useCallback(async () => {
+    setComposerEligibleLoading(true);
+    try {
+      const found = await findBeaconTargetsOnPage();
+      const r = await listComposerEligibleLists(found);
+      setComposerEligible(r.eligible);
+      setComposerRuntimeOk(r.runtimeOk);
+      setComposerRuntimeReason(r.runtimeReason);
+    } catch {
+      setComposerEligible([]);
+      setComposerRuntimeOk(false);
+      setComposerRuntimeReason("Could not load Composer lists.");
+    } finally {
+      setComposerEligibleLoading(false);
+    }
+  }, []);
+
+  const runComposerCatalogLoad = useCallback(async (q: string) => {
+    setComposerCatalogLoading(true);
+    setComposerCatalogError(null);
+    try {
+      const list = await listSiteComponentsForPicker(q);
+      setComposerCatalog(list);
+    } catch (err) {
+      setComposerCatalogError(formatDesignerError(err));
+      setComposerCatalog([]);
+    } finally {
+      setComposerCatalogLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void refreshPageBeacons();
   }, [refreshPageBeacons]);
+
+  useEffect(() => {
+    if (beaconMainTab !== "composer") return;
+    void loadComposerEligible();
+  }, [beaconMainTab, loadComposerEligible]);
 
   useEffect(() => {
     if (typeof webflow.getCurrentMode !== "function" || typeof webflow.subscribe !== "function") {
@@ -174,6 +232,13 @@ export function BeaconsScreen() {
       setActiveDataList(null);
       setSelected([]);
       targetRef.current = null;
+      setBeaconMainTab("engine");
+      setComposerStudio(null);
+      setComposerDraft([]);
+      setComposerComponentQuery("");
+      setComposerCatalog([]);
+      setComposerCatalogError(null);
+      setComposerOpeningKey(null);
       setBeaconName("");
       setListTargetCreatePending(false);
       setListTargetRemovePending(false);
@@ -223,6 +288,15 @@ export function BeaconsScreen() {
     }, delayMs);
     return () => window.clearTimeout(t);
   }, [picking, componentQuery, runCatalogLoad]);
+
+  useEffect(() => {
+    if (composerStudio == null) return;
+    const delayMs = composerComponentQuery.trim() ? 280 : 0;
+    const t = window.setTimeout(() => {
+      void runComposerCatalogLoad(composerComponentQuery);
+    }, delayMs);
+    return () => window.clearTimeout(t);
+  }, [composerStudio, composerComponentQuery, runComposerCatalogLoad]);
 
   useEffect(() => {
     if (!picking || activeDataList == null || activeBeaconKey == null) {
@@ -363,6 +437,113 @@ export function BeaconsScreen() {
 
   const selectedComponentIdSet = useMemo(() => new Set(selected.map((s) => s.componentId)), [selected]);
 
+  const composerSelectedComponentIdSet = useMemo(
+    () => new Set(composerDraft.map((s) => s.componentId)),
+    [composerDraft]
+  );
+
+  const composerDirty = useMemo(() => {
+    if (composerStudio == null) return false;
+    return composerDraft.map((d) => d.componentId).join(",") !== composerStudio.initialSignature;
+  }, [composerDraft, composerStudio]);
+
+  const handleBeaconTabChange = useCallback(
+    (v: string) => {
+      const t = v as "engine" | "composer";
+      if (t === "composer" && picking) return;
+      if (t === "engine" && composerStudio != null) return;
+      setBeaconMainTab(t);
+    },
+    [picking, composerStudio]
+  );
+
+  const handleOpenComposerStudio = async (beacon: BeaconOnPage) => {
+    setComposerOpeningKey(beacon.key);
+    try {
+      const rows = await listInstancesInBeaconTarget(beacon.container);
+      setComposerDraft(rows.map((r) => ({ key: r.key, componentId: r.componentId, name: r.name })));
+      setComposerStudio({ beacon, initialSignature: rows.map((r) => r.componentId).join(",") });
+      setComposerComponentQuery("");
+      setComposerCatalog([]);
+      setComposerCatalogError(null);
+    } catch (err) {
+      const message = formatDesignerError(err);
+      void webflow.notify({ type: "Error", message });
+    } finally {
+      setComposerOpeningKey(null);
+    }
+  };
+
+  const handleComposerStudioBack = useCallback(() => {
+    setComposerStudio(null);
+    setComposerDraft([]);
+    setComposerComponentQuery("");
+    setComposerCatalog([]);
+    setComposerCatalogError(null);
+  }, []);
+
+  const handleComposerAddComponent = useCallback(
+    (c: ComponentSearchResult) => {
+      if (composerSelectedComponentIdSet.has(c.id)) return;
+      setComposerDraft((prev) => [...prev, { key: crypto.randomUUID(), componentId: c.id, name: c.name }]);
+    },
+    [composerSelectedComponentIdSet]
+  );
+
+  const handleComposerMoveUp = useCallback((key: string) => {
+    setComposerDraft((prev) => {
+      const idx = prev.findIndex((r) => r.key === key);
+      if (idx <= 0) return prev;
+      const next = [...prev];
+      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+      return next;
+    });
+  }, []);
+
+  const handleComposerMoveDown = useCallback((key: string) => {
+    setComposerDraft((prev) => {
+      const idx = prev.findIndex((r) => r.key === key);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      const next = [...prev];
+      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+      return next;
+    });
+  }, []);
+
+  const handleComposerRemoveDraft = useCallback((key: string) => {
+    setComposerDraft((prev) => prev.filter((r) => r.key !== key));
+  }, []);
+
+  const handleComposerSave = async () => {
+    if (composerSavePending || composerStudio == null) return;
+    const { beacon } = composerStudio;
+    if (composerDraft.length === 0) {
+      void webflow.notify({ type: "Error", message: "Add at least one component before saving." });
+      return;
+    }
+    setComposerSavePending(true);
+    try {
+      const hydrated = await applyBeaconCompositionDraft(beacon.container, composerDraft);
+      await syncBeaconListTargetDesignerPreview(beacon.dataList, beacon.container);
+      await syncBeaconPageInlineScript();
+      setComposerDraft(hydrated.map((h) => ({ key: h.key, componentId: h.componentId, name: h.name })));
+      setComposerStudio((prev) =>
+        prev ? { ...prev, initialSignature: hydrated.map((h) => h.componentId).join(",") } : null
+      );
+      void webflow.notify({
+        type: "Success",
+        message: "Composition saved. Preview and page script updated — publish for the live site.",
+      });
+      void refreshPageBeacons();
+      void loadComposerEligible();
+    } catch (err) {
+      const message = formatDesignerError(err);
+      void webflow.notify({ type: "Error", message });
+    } finally {
+      setComposerSavePending(false);
+    }
+  };
+
   const handleAddComponent = async (c: ComponentSearchResult) => {
     if (selectedComponentIdSet.has(c.id)) return;
     const container = targetRef.current;
@@ -389,6 +570,9 @@ export function BeaconsScreen() {
         type: "Success",
         message: "Page custom code updated. Publish the site to apply on the live site.",
       });
+      if (beaconMainTab === "composer") {
+        void loadComposerEligible();
+      }
     } catch (err) {
       const message = formatDesignerError(err);
       void webflow.notify({ type: "Error", message });
@@ -580,58 +764,108 @@ export function BeaconsScreen() {
 
       <div className="min-h-0 min-w-0 flex-1 overflow-auto px-3 py-3">
         <div className="mx-auto w-full max-w-lg space-y-4">
-          {!picking && (
-            <BeaconHomePanel
-              nameFieldId={nameFieldId}
-              beaconsWrapperInstalled={beaconsWrapperInstalled}
-              installPending={installPending}
-              onInstallWrapper={handleInstallWrapper}
-              legacyBeaconsOnBody={legacyBeaconsOnBody}
-              pageBeacons={pageBeacons}
-              pageScanLoading={pageScanLoading}
-              beaconName={beaconName}
-              setBeaconName={setBeaconName}
-              createPending={createPending}
-              createFormOpen={createFormOpen}
-              setCreateFormOpen={setCreateFormOpen}
-              onCreate={handleCreate}
-              onOpenBeacon={handleOpenBeacon}
-              openingBeaconKey={openingBeaconKey}
-              onRequestDelete={(b) => setBeaconToDelete(b)}
-              deletePendingKey={deletePendingKey}
-              embedSyncPending={embedSyncPending}
-              onSyncInstallEmbed={handleSyncInstallEmbed}
-            />
-          )}
+          <Tabs value={beaconMainTab} onValueChange={handleBeaconTabChange} className="gap-4">
+            <TabsList variant="line" className="h-auto w-full min-w-0 flex-wrap justify-start gap-1 bg-transparent p-0">
+              <TabsTrigger value="engine" disabled={composerStudio != null} className="flex-none">
+                Engine
+              </TabsTrigger>
+              <TabsTrigger value="composer" disabled={picking} className="flex-none">
+                Composer
+              </TabsTrigger>
+            </TabsList>
 
-          {picking && (
-            <BeaconCompositionPanel
-              searchFieldId={searchFieldId}
-              activeDataList={activeDataList}
-              onBackToList={exitToList}
-              componentQuery={componentQuery}
-              setComponentQuery={setComponentQuery}
-              catalogLoading={catalogLoading}
-              catalogError={catalogError}
-              componentCatalog={componentCatalog}
-              selected={selected}
-              selectedComponentIdSet={selectedComponentIdSet}
-              addPending={addPending}
-              onAddComponent={handleAddComponent}
-              onRemove={handleRemove}
-              removingKey={removingKey}
-              listTargetPhase={listTargetPhase}
-              listTargetOnCanvasCount={listTargetOnCanvasCount}
-              onCreateListTarget={handleCreateListTarget}
-              onRequestRemoveListTarget={handleRequestRemoveListTarget}
-              onPlaceListTargetOnCanvas={handlePlaceListTargetOnCanvas}
-              listTargetCreatePending={listTargetCreatePending}
-              listTargetRemovePending={listTargetRemovePending}
-              listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
-              embedSyncPending={embedSyncPending}
-              onSyncInstallEmbed={handleSyncInstallEmbed}
-            />
-          )}
+            <TabsContent value="engine" className="mt-0 space-y-4 outline-none">
+              {!picking && (
+                <BeaconHomePanel
+                  nameFieldId={nameFieldId}
+                  beaconsWrapperInstalled={beaconsWrapperInstalled}
+                  installPending={installPending}
+                  onInstallWrapper={handleInstallWrapper}
+                  legacyBeaconsOnBody={legacyBeaconsOnBody}
+                  pageBeacons={pageBeacons}
+                  pageScanLoading={pageScanLoading}
+                  beaconName={beaconName}
+                  setBeaconName={setBeaconName}
+                  createPending={createPending}
+                  createFormOpen={createFormOpen}
+                  setCreateFormOpen={setCreateFormOpen}
+                  onCreate={handleCreate}
+                  onOpenBeacon={handleOpenBeacon}
+                  openingBeaconKey={openingBeaconKey}
+                  onRequestDelete={(b) => setBeaconToDelete(b)}
+                  deletePendingKey={deletePendingKey}
+                  embedSyncPending={embedSyncPending}
+                  onSyncInstallEmbed={handleSyncInstallEmbed}
+                />
+              )}
+
+              {picking && (
+                <BeaconCompositionPanel
+                  searchFieldId={searchFieldId}
+                  activeDataList={activeDataList}
+                  onBackToList={exitToList}
+                  componentQuery={componentQuery}
+                  setComponentQuery={setComponentQuery}
+                  catalogLoading={catalogLoading}
+                  catalogError={catalogError}
+                  componentCatalog={componentCatalog}
+                  selected={selected}
+                  selectedComponentIdSet={selectedComponentIdSet}
+                  addPending={addPending}
+                  onAddComponent={handleAddComponent}
+                  onRemove={handleRemove}
+                  removingKey={removingKey}
+                  listTargetPhase={listTargetPhase}
+                  listTargetOnCanvasCount={listTargetOnCanvasCount}
+                  onCreateListTarget={handleCreateListTarget}
+                  onRequestRemoveListTarget={handleRequestRemoveListTarget}
+                  onPlaceListTargetOnCanvas={handlePlaceListTargetOnCanvas}
+                  listTargetCreatePending={listTargetCreatePending}
+                  listTargetRemovePending={listTargetRemovePending}
+                  listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
+                  embedSyncPending={embedSyncPending}
+                  onSyncInstallEmbed={handleSyncInstallEmbed}
+                />
+              )}
+            </TabsContent>
+
+            <TabsContent value="composer" className="mt-0 space-y-4 outline-none">
+              {composerStudio == null ? (
+                <BeaconComposerListPanel
+                  pageScanLoading={pageScanLoading}
+                  beaconsWrapperInstalled={beaconsWrapperInstalled}
+                  loading={composerEligibleLoading}
+                  runtimeOk={composerRuntimeOk}
+                  runtimeReason={composerRuntimeReason}
+                  eligible={composerEligible}
+                  openingKey={composerOpeningKey}
+                  onOpenList={(b) => void handleOpenComposerStudio(b)}
+                  onRefresh={() => void loadComposerEligible()}
+                />
+              ) : (
+                <BeaconComposerStudioPanel
+                  searchFieldId={composerSearchFieldId}
+                  activeDataList={composerStudio.beacon.dataList}
+                  draft={composerDraft}
+                  dirty={composerDirty}
+                  componentQuery={composerComponentQuery}
+                  setComponentQuery={setComposerComponentQuery}
+                  catalogLoading={composerCatalogLoading}
+                  catalogError={composerCatalogError}
+                  componentCatalog={composerCatalog}
+                  selectedComponentIdSet={composerSelectedComponentIdSet}
+                  addPending={composerSavePending}
+                  onAddComponent={handleComposerAddComponent}
+                  onMoveUp={handleComposerMoveUp}
+                  onMoveDown={handleComposerMoveDown}
+                  onRemove={handleComposerRemoveDraft}
+                  onBack={handleComposerStudioBack}
+                  onSave={() => void handleComposerSave()}
+                  savePending={composerSavePending}
+                />
+              )}
+            </TabsContent>
+          </Tabs>
 
           <AlertDialog open={beaconToDelete != null} onOpenChange={(o) => !o && setBeaconToDelete(null)}>
             <AlertDialogContent size="default">

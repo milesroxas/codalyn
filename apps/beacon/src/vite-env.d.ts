@@ -9,4 +9,6 @@ interface ImportMetaEnv {
   readonly VITE_BUNDLE_RECIPIENT?: string;
   readonly VITE_TOWER_ORIGIN?: string;
   readonly VITE_BEACON_API_KEY?: string;
+  /** When `"true"` in production builds, enables the Beacons composer surface (`#/beacons`). */
+  readonly VITE_BEACONS_SURFACE_ENABLED?: string;
 }

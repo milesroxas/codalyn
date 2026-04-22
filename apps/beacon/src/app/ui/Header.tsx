@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import {
@@ -175,10 +176,12 @@ function BeaconRoutesMenu() {
           <ImageIcon aria-hidden />
           Images
         </DropdownMenuItem>
-        <DropdownMenuItem className={itemClass("/beacons")} onSelect={() => navigate("/beacons")}>
-          <Radio aria-hidden />
-          Beacons
-        </DropdownMenuItem>
+        {isBeaconsSurfaceEnabled() ? (
+          <DropdownMenuItem className={itemClass("/beacons")} onSelect={() => navigate("/beacons")}>
+            <Radio aria-hidden />
+            Beacons
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem className={itemClass("/settings")} onSelect={() => navigate("/settings")}>
           <Settings aria-hidden />

@@ -8,6 +8,7 @@ import {
 import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
+import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 
@@ -56,7 +57,12 @@ export function BeaconHomeScreen() {
       <div className="mx-auto flex w-full max-w-lg flex-col gap-2">
         <h2 className="text-lg font-semibold text-foreground">Tools</h2>
       </div>
-      <ul className="mx-auto mt-6 grid w-full max-w-lg grid-cols-1 gap-3 sm:grid-cols-2">
+      <ul
+        className={cn(
+          "mx-auto mt-6 grid w-full max-w-lg gap-3",
+          isBeaconsSurfaceEnabled() ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
+        )}
+      >
         <li>
           <Button
             type="button"
@@ -73,22 +79,24 @@ export function BeaconHomeScreen() {
             <span className="text-base font-semibold text-foreground">Images</span>
           </Button>
         </li>
-        <li>
-          <Button
-            type="button"
-            variant="outline"
-            className={cn(
-              "h-auto w-full flex-col items-stretch gap-2 rounded-xl border-border/80 py-5 text-left shadow-sm",
-              "hover:border-primary/40 hover:bg-muted/40"
-            )}
-            onClick={() => navigate("/beacons")}
-          >
-            <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Radio aria-hidden className="size-5" />
-            </span>
-            <span className="text-base font-semibold text-foreground">Beacons</span>
-          </Button>
-        </li>
+        {isBeaconsSurfaceEnabled() ? (
+          <li>
+            <Button
+              type="button"
+              variant="outline"
+              className={cn(
+                "h-auto w-full flex-col items-stretch gap-2 rounded-xl border-border/80 py-5 text-left shadow-sm",
+                "hover:border-primary/40 hover:bg-muted/40"
+              )}
+              onClick={() => navigate("/beacons")}
+            >
+              <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Radio aria-hidden className="size-5" />
+              </span>
+              <span className="text-base font-semibold text-foreground">Beacons</span>
+            </Button>
+          </li>
+        ) : null}
       </ul>
     </div>
   );

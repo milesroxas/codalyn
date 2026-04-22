@@ -6,6 +6,7 @@ import { BeaconsScreen } from "@/features/beacons";
 import { ImageEditor } from "@/features/image-editor";
 import { BeaconAppSettingsProvider, BeaconSettingsScreen } from "@/features/settings";
 import { applyBeaconExtensionSize } from "@/shared/lib/beacon-extension-size";
+import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
 import { buildInfo } from "@/shared/lib/build-info";
 import { TooltipProvider } from "@/shared/ui/tooltip";
 
@@ -24,6 +25,9 @@ function BeaconImagesPage() {
 }
 
 function BeaconBeaconsPage() {
+  if (!isBeaconsSurfaceEnabled()) {
+    return <Navigate to="/home" replace />;
+  }
   return <BeaconsScreen />;
 }
 

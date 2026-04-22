@@ -1,4 +1,6 @@
+import type { HydratedBeaconComponent } from "@/features/beacons/model/beacon-page-targets";
 import { BEACON_UTILITIES_COMPONENT_GROUP } from "@/features/beacons/model/create-beacon-list-target-component";
+import { runExclusiveDesignerStyleOp } from "@/features/beacons/model/exclusive-designer-style-op";
 
 function excludeBeaconUtilitiesGroup(results: ComponentSearchResult[]): ComponentSearchResult[] {
   return results.filter((r) => r.group !== BEACON_UTILITIES_COMPONENT_GROUP);
@@ -52,4 +54,36 @@ export async function removeComponentInstanceFromCanvas(instance: ComponentEleme
  */
 export async function removeBeaconTargetFromPage(container: BlockElement): Promise<void> {
   await container.remove();
+}
+
+export type BeaconCompositionDraftRow = {
+  key: string;
+  componentId: string;
+  name: string;
+};
+
+/**
+ * Replaces all component instances inside a beacon list container so their types and order match `draft`.
+ * Used by Composer save so the hidden list, designer preview, and published runtime stay aligned.
+ */
+export async function applyBeaconCompositionDraft(
+  container: BlockElement,
+  draft: Array<{ componentId: string }>
+): Promise<HydratedBeaconComponent[]> {
+  return runExclusiveDesignerStyleOp(async () => {
+    const children = await container.getChildren();
+    for (const ch of children) {
+      if (ch.type === "ComponentInstance") {
+        await (ch as ComponentElement).remove();
+      }
+    }
+    const out: HydratedBeaconComponent[] = [];
+    for (const row of draft) {
+      const instance = await appendComponentToBeacon(container, row.componentId);
+      const comp = await webflow.getComponent(row.componentId);
+      const name = await comp.getName();
+      out.push({ key: crypto.randomUUID(), componentId: row.componentId, name, instance });
+    }
+    return out;
+  });
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const verifyTowerApiRequest = vi.fn();
 const resolveWebflowBearerToken = vi.fn();
@@ -23,7 +23,10 @@ vi.mock("@/server/beacon-cms-layout", () => ({
 }));
 
 describe("POST /api/v1/beacon/cms-layout/save", () => {
+  const prevBeaconsSurface = process.env.NEXT_PUBLIC_BEACONS_SURFACE_ENABLED;
+
   beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_BEACONS_SURFACE_ENABLED;
     verifyTowerApiRequest.mockReset();
     resolveWebflowBearerToken.mockReset();
     parseCmsLayoutSaveRequest.mockReset();
@@ -31,6 +34,31 @@ describe("POST /api/v1/beacon/cms-layout/save", () => {
     resolveUserCmsLayoutFieldSlug.mockReset();
     webflowCmsItemUrl.mockReset();
     vi.restoreAllMocks();
+  });
+
+  afterAll(() => {
+    if (prevBeaconsSurface === undefined) {
+      delete process.env.NEXT_PUBLIC_BEACONS_SURFACE_ENABLED;
+    } else {
+      process.env.NEXT_PUBLIC_BEACONS_SURFACE_ENABLED = prevBeaconsSurface;
+    }
+  });
+
+  it("returns 404 when the Beacons surface flag is off", async () => {
+    process.env.NEXT_PUBLIC_BEACONS_SURFACE_ENABLED = "false";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    const { POST } = await import("./route");
+    const res = await POST(
+      new Request("http://localhost/api/v1/beacon/cms-layout/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ any: "body" }),
+      })
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ code: "NOT_FOUND", message: "Not found." });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(verifyTowerApiRequest).not.toHaveBeenCalled();
   });
 
   it("patches the configured field slug with serialized composition JSON", async () => {

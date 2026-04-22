@@ -4,6 +4,19 @@ import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
 export const BEACON_PAGE_SCRIPT_MARKER_ATTR = "data-codalyn-beacon";
 export const BEACON_PAGE_SCRIPT_MARKER_VALUE = "runtime";
 
+/** Fingerprint of {@link getBeaconPageInlineScriptSource} so we can detect drift vs the page footer script. */
+export const BEACON_PAGE_SCRIPT_HASH_ATTR = "data-codalyn-beacon-src-hash";
+
+/** 32-bit FNV-1a → 8 hex chars (stable across browsers for the same source string). */
+export function hashBeaconRuntimeSource(source: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < source.length; i++) {
+    h ^= source.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
 const REGISTER_DISPLAY_NAME = "CodalynBeaconRuntime";
 
 /**
@@ -150,9 +163,57 @@ export async function syncBeaconPageInlineScript(): Promise<void> {
       id: registered.id,
       location: "footer",
       version: registered.version,
-      attributes: { [BEACON_PAGE_SCRIPT_MARKER_ATTR]: BEACON_PAGE_SCRIPT_MARKER_VALUE },
+      attributes: {
+        [BEACON_PAGE_SCRIPT_MARKER_ATTR]: BEACON_PAGE_SCRIPT_MARKER_VALUE,
+        [BEACON_PAGE_SCRIPT_HASH_ATTR]: hashBeaconRuntimeSource(sourceCode),
+      },
     },
   ];
 
   await putPageCustomScripts(pageId, merged);
+}
+
+function formatRuntimeStatusError(err: unknown): string {
+  if (err && typeof err === "object" && "message" in err && typeof (err as { message: unknown }).message === "string") {
+    return (err as { message: string }).message;
+  }
+  if (err instanceof Error) return err.message;
+  return "Could not verify beacon runtime on this page.";
+}
+
+/**
+ * `true` when the current page’s footer includes the Codalyn beacon runtime and its hash matches the extension build.
+ * Composer only lists beacons when this is satisfied so live/preview match the expected cloning script.
+ */
+export async function getBeaconPageRuntimeSyncStatus(): Promise<{ synced: boolean; reason?: string }> {
+  if (!getTowerOrigin()) {
+    return { synced: false, reason: "Tower is not configured." };
+  }
+
+  const expectedHash = hashBeaconRuntimeSource(getBeaconPageInlineScriptSource());
+
+  try {
+    const pageId = (await webflow.getCurrentPage()).id as string;
+    const existing = await getPageCustomScripts(pageId);
+    const beacon = existing.find(
+      (s) =>
+        s.location === "footer" && s.attributes?.[BEACON_PAGE_SCRIPT_MARKER_ATTR] === BEACON_PAGE_SCRIPT_MARKER_VALUE
+    );
+    if (beacon == null) {
+      return {
+        synced: false,
+        reason: "Beacon runtime is not on this page’s footer. Use Sync page script in Engine.",
+      };
+    }
+    const applied = beacon.attributes?.[BEACON_PAGE_SCRIPT_HASH_ATTR];
+    if (applied !== expectedHash) {
+      return {
+        synced: false,
+        reason: "Beacon runtime on this page is out of date. Use Sync page script in Engine.",
+      };
+    }
+    return { synced: true };
+  } catch (e) {
+    return { synced: false, reason: formatRuntimeStatusError(e) };
+  }
 }

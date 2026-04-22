@@ -8,10 +8,14 @@ import {
 } from "@/server/beacon-cms-layout";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
+import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  if (!isBeaconsSurfaceEnabled()) {
+    return Response.json({ code: "NOT_FOUND", message: "Not found." }, { status: 404 });
+  }
   const auth = await verifyTowerApiRequest(req);
   if (!auth.ok) {
     return auth.response;

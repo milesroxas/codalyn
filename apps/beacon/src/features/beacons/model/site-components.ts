@@ -1,9 +1,16 @@
+import { BEACON_UTILITIES_COMPONENT_GROUP } from "@/features/beacons/model/create-beacon-list-target-component";
+
+function excludeBeaconUtilitiesGroup(results: ComponentSearchResult[]): ComponentSearchResult[] {
+  return results.filter((r) => r.group !== BEACON_UTILITIES_COMPONENT_GROUP);
+}
+
 /**
  * All site components, optionally filtered the same way as the Components panel (when available).
+ * Excludes the Beacon Utilities group (internal list-target / helper definitions).
  */
 export async function listSiteComponentsForPicker(query: string): Promise<ComponentSearchResult[]> {
   if (typeof webflow.searchComponents === "function") {
-    return webflow.searchComponents({ q: query });
+    return excludeBeaconUtilitiesGroup(await webflow.searchComponents({ q: query }));
   }
   const components = await webflow.getAllComponents();
   const rows = await Promise.all(
@@ -22,9 +29,10 @@ export async function listSiteComponentsForPicker(query: string): Promise<Compon
       } satisfies ComponentSearchResult;
     })
   );
+  const withoutUtilities = excludeBeaconUtilitiesGroup(rows);
   const q = query.trim().toLowerCase();
-  if (!q) return rows;
-  return rows.filter((r) => r.name.toLowerCase().includes(q) || r.group.toLowerCase().includes(q));
+  if (!q) return withoutUtilities;
+  return withoutUtilities.filter((r) => r.name.toLowerCase().includes(q) || r.group.toLowerCase().includes(q));
 }
 
 /**

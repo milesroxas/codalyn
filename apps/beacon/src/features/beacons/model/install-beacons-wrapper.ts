@@ -1,4 +1,6 @@
+import { syncBeaconPageInlineScript } from "@/features/beacons/model/beacon-page-inline-script";
 import type { BeaconOnPage } from "@/features/beacons/model/beacon-page-targets";
+import { runExclusiveDesignerStyleOp } from "@/features/beacons/model/exclusive-designer-style-op";
 
 type BodyWithAppend = AnyElement & {
   append: (preset: ElementPreset<AnyElement>) => Promise<AnyElement>;
@@ -28,23 +30,21 @@ export async function findBeaconsWrapperOnPage(): Promise<BlockElement | null> {
   return null;
 }
 
-async function ensureBeaconsWrapperHiddenStyle(): Promise<Style> {
-  const all = await webflow.getAllStyles();
-  for (const s of all) {
-    if ((await s.getName()) === BEACON_WRAPPER_STYLE_NAME) {
-      return s;
+function ensureBeaconsWrapperHiddenStyle(): Promise<Style> {
+  return runExclusiveDesignerStyleOp(async () => {
+    const all = await webflow.getAllStyles();
+    for (const s of all) {
+      if ((await s.getName()) === BEACON_WRAPPER_STYLE_NAME) {
+        return s;
+      }
     }
-  }
-  const created = await webflow.createStyle(BEACON_WRAPPER_STYLE_NAME);
-  await created.setProperty("display", "none");
-  return created;
+    const created = await webflow.createStyle(BEACON_WRAPPER_STYLE_NAME);
+    await created.setProperty("display", "none");
+    return created;
+  });
 }
 
-async function reparentBodyDirectBeaconsInto(
-  body: BodyWithAppend,
-  wrapper: BlockElement,
-  embed: HtmlEmbedElement
-): Promise<number> {
+async function reparentBodyDirectBeaconsInto(body: BodyWithAppend, wrapper: BlockElement): Promise<number> {
   let reparented = 0;
   for (const ch of await body.getChildren()) {
     if (ch === wrapper) continue;
@@ -54,7 +54,7 @@ async function reparentBodyDirectBeaconsInto(
     const list = await block.getCustomAttribute("data-list");
     if (target !== "beacons" || list == null || !list.startsWith("beacon-")) continue;
     try {
-      await embed.before(ch);
+      await wrapper.append(ch);
       reparented += 1;
     } catch {
       /* Designer may block some moves; leave target on body */
@@ -63,46 +63,21 @@ async function reparentBodyDirectBeaconsInto(
   return reparented;
 }
 
-async function ensureHtmlEmbedInWrapper(wrapper: BlockElement): Promise<HtmlEmbedElement> {
-  const kids = await wrapper.getChildren();
-  const existing = kids.find((c): c is HtmlEmbedElement => c.type === "HtmlEmbed");
-  if (existing) return existing;
-  try {
-    return (await wrapper.append(webflow.elementPresets.HtmlEmbed)) as HtmlEmbedElement;
-  } catch {
-    throw new Error("The Beacons container cannot hold an HTML embed.");
-  }
-}
-
-/** Beacon list divs stay before the install HTML embed; move embed to the end if needed. */
-async function ensureEmbedIsLastChild(wrapper: BlockElement, embed: HtmlEmbedElement): Promise<void> {
-  const kids = await wrapper.getChildren();
-  if (kids.length === 0) return;
-  if (kids[kids.length - 1] === embed) return;
-  try {
-    await wrapper.append(embed);
-  } catch {
-    /* leave order unchanged if Designer blocks the move */
-  }
-}
-
 /**
  * Installs a hidden **`beacons-wrapper`** div (class style `beacons-wrapper`, `display: none`) at the end of
- * the page body, with an **HTML embed** as the **last** child. Beacon list divs are **before** the embed.
- * Existing beacon targets that were direct children of Body are moved into the wrapper (before the embed).
- * Idempotent: returns the existing wrapper if already present.
+ * the page body. Beacon list blocks that were direct children of Body are moved into the wrapper.
+ * Pushes the beacon runtime to the page via Webflow Data API **inline custom code** (footer). Idempotent for the
+ * wrapper; custom code is refreshed on each install/sync.
  */
 export async function installBeaconsWrapperOnPage(): Promise<{
   wrapper: BlockElement;
-  embed: HtmlEmbedElement;
   created: boolean;
   reparented: number;
 }> {
   const found = await findBeaconsWrapperOnPage();
   if (found) {
-    const embed = await ensureHtmlEmbedInWrapper(found);
-    await ensureEmbedIsLastChild(found, embed);
-    return { wrapper: found, embed, created: false, reparented: 0 };
+    await syncBeaconPageInlineScript();
+    return { wrapper: found, created: false, reparented: 0 };
   }
 
   const all = await webflow.getAllElements();
@@ -111,27 +86,34 @@ export async function installBeaconsWrapperOnPage(): Promise<{
     throw new Error("Could not find Body on this page. Open a page in the Designer and try again.");
   }
 
-  const hidden = await ensureBeaconsWrapperHiddenStyle();
   const wrapper = (await body.append(webflow.elementPresets.DivBlock)) as BlockElement;
   await wrapper.setTag("div");
-  await wrapper.setStyles([hidden]);
+  await runExclusiveDesignerStyleOp(async () => {
+    const hidden = await ensureBeaconsWrapperHiddenStyle();
+    await wrapper.setStyles([hidden]);
+  });
   await wrapper.setCustomAttribute(BEACON_WRAPPER_ATTR, BEACON_WRAPPER_ATTR_VALUE);
-  let embed: HtmlEmbedElement;
-  try {
-    embed = (await wrapper.append(webflow.elementPresets.HtmlEmbed)) as HtmlEmbedElement;
-  } catch {
-    await wrapper.remove();
-    throw new Error("Beacon could not create the Beacons container on this page.");
-  }
 
-  const reparented = await reparentBodyDirectBeaconsInto(body, wrapper, embed);
-  await ensureEmbedIsLastChild(wrapper, embed);
-  return { wrapper, embed, created: true, reparented };
+  const reparented = await reparentBodyDirectBeaconsInto(body, wrapper);
+  await syncBeaconPageInlineScript();
+  return { wrapper, created: true, reparented };
 }
 
 /** `true` when this page has the `beacons-wrapper` install (beacons must be created inside it). */
 export async function isBeaconsWrapperInstalledOnPage(): Promise<boolean> {
   return (await findBeaconsWrapperOnPage()) != null;
+}
+
+/**
+ * Re-registers the beacon inline script and applies it to the **current page** (Webflow Data API). Requires Tower +
+ * Webflow OAuth with custom code scopes. Publish the site for live traffic.
+ */
+export async function syncBeaconsInstallEmbedOnPage(): Promise<void> {
+  const wrapper = await findBeaconsWrapperOnPage();
+  if (!wrapper) {
+    throw new Error("Install beacons on this page first.");
+  }
+  await syncBeaconPageInlineScript();
 }
 
 /**

@@ -21,9 +21,144 @@ type BeaconCompositionPanelProps = {
   onAddComponent: (c: ComponentSearchResult) => void;
   onRemove: (row: HydratedBeaconComponent) => void;
   removingKey: string | null;
+  listTargetPhase: "loading" | "absent" | "synced" | "updating";
+  /** How many list-render target instances for this list exist on the current page. */
+  listTargetOnCanvasCount: number;
   onCreateListTarget: () => void;
-  listTargetPending: boolean;
+  onRequestRemoveListTarget: () => void;
+  onPlaceListTargetOnCanvas: () => void;
+  listTargetCreatePending: boolean;
+  listTargetRemovePending: boolean;
+  listTargetPlaceOnCanvasPending: boolean;
+  embedSyncPending: boolean;
+  onSyncInstallEmbed: () => void;
 };
+
+type BeaconListTargetActionsProps = {
+  activeDataList: string | null;
+  removingKey: string | null;
+  listTargetPhase: "loading" | "absent" | "synced" | "updating";
+  listTargetActionBusy: boolean;
+  listTargetCreatePending: boolean;
+  listTargetRemovePending: boolean;
+  listTargetPlaceOnCanvasPending: boolean;
+  listTargetOnCanvasCount: number;
+  onBackToList: () => void;
+  onCreateListTarget: () => void;
+  onRequestRemoveListTarget: () => void;
+  onPlaceListTargetOnCanvas: () => void;
+};
+
+function BeaconListTargetActionsBar(props: BeaconListTargetActionsProps) {
+  const {
+    activeDataList,
+    removingKey,
+    listTargetPhase,
+    listTargetActionBusy,
+    listTargetCreatePending,
+    listTargetRemovePending,
+    listTargetPlaceOnCanvasPending,
+    listTargetOnCanvasCount,
+    onBackToList,
+    onCreateListTarget,
+    onRequestRemoveListTarget,
+    onPlaceListTargetOnCanvas,
+  } = props;
+  const ctaDisabled = listTargetActionBusy || removingKey !== null || activeDataList == null;
+  const placeOrFocusLabel = listTargetOnCanvasCount > 0 ? "Focus on canvas" : "Place on canvas";
+  const placeOrFocusPendingLabel = listTargetOnCanvasCount > 0 ? "Focusing…" : "Placing…";
+  return (
+    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+      {listTargetPhase === "synced" ? (
+        <>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            disabled={ctaDisabled}
+            aria-busy={listTargetRemovePending}
+            onClick={() => void onRequestRemoveListTarget()}
+          >
+            Remove target
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => void onBackToList()}>
+            Back to list
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={ctaDisabled}
+            aria-busy={listTargetPlaceOnCanvasPending}
+            onClick={() => void onPlaceListTargetOnCanvas()}
+          >
+            {listTargetPlaceOnCanvasPending ? placeOrFocusPendingLabel : placeOrFocusLabel}
+          </Button>
+        </>
+      ) : listTargetPhase === "absent" ? (
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={ctaDisabled}
+            aria-busy={listTargetCreatePending}
+            onClick={() => void onCreateListTarget()}
+          >
+            {listTargetCreatePending ? "Creating…" : "Create target"}
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => void onBackToList()}>
+            Back to list
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button type="button" variant="secondary" size="sm" disabled aria-busy>
+            {listTargetPhase === "updating" ? "Updating…" : "Checking…"}
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => void onBackToList()}>
+            Back to list
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ListTargetCanvasStatusHint(props: {
+  listTargetPhase: BeaconCompositionPanelProps["listTargetPhase"];
+  count: number;
+}) {
+  const { listTargetPhase, count } = props;
+  if (listTargetPhase !== "synced") {
+    return null;
+  }
+  if (count > 0) {
+    return (
+      <div
+        className="flex items-start gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/8 px-2.5 py-2 text-xs text-foreground"
+        data-slot="beacon_list_target_on_canvas"
+        role="status"
+      >
+        <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+        <div className="min-w-0 space-y-0.5">
+          <p className="font-medium text-emerald-900 dark:text-emerald-200">
+            {count === 1 ? "List target is on this page" : `${count} list targets on this page`}
+          </p>
+          <p className="text-[0.7rem] leading-snug text-muted-foreground">
+            {count === 1
+              ? "Use Focus on canvas to select it in the Designer. Only one target per list is used — extra copies can be removed on the canvas."
+              : "Use Focus on canvas to select the first one. Remove extras so a single list target remains on the page."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <p className="text-xs leading-snug text-muted-foreground" data-slot="beacon_list_target_place_hint">
+      No list target on this page yet. Use Place on canvas to add it; only one is allowed per list.
+    </p>
+  );
+}
 
 export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
   const {
@@ -41,9 +176,24 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
     onAddComponent,
     onRemove,
     removingKey,
+    listTargetPhase,
     onCreateListTarget,
-    listTargetPending,
+    onRequestRemoveListTarget,
+    onPlaceListTargetOnCanvas,
+    listTargetCreatePending,
+    listTargetRemovePending,
+    listTargetPlaceOnCanvasPending,
+    listTargetOnCanvasCount,
+    embedSyncPending,
+    onSyncInstallEmbed,
   } = props;
+
+  const listTargetActionBusy =
+    listTargetCreatePending ||
+    listTargetRemovePending ||
+    listTargetPlaceOnCanvasPending ||
+    listTargetPhase === "loading" ||
+    listTargetPhase === "updating";
 
   return (
     <>
@@ -60,25 +210,48 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              Inside beacons-wrapper (beacon lists first; HTML embed last for your published site if needed).
+              Inside beacons-wrapper. The published runtime is injected as page footer custom code (Webflow Data API),
+              not an HTML embed.
             </TooltipContent>
           </Tooltip>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={listTargetPending || removingKey !== null || activeDataList == null}
-            aria-busy={listTargetPending}
-            onClick={() => void onCreateListTarget()}
-          >
-            {listTargetPending ? "Creating…" : "Create target"}
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => void onBackToList()}>
-            Back to list
-          </Button>
-        </div>
+        <BeaconListTargetActionsBar
+          activeDataList={activeDataList}
+          removingKey={removingKey}
+          listTargetPhase={listTargetPhase}
+          listTargetActionBusy={listTargetActionBusy}
+          listTargetCreatePending={listTargetCreatePending}
+          listTargetRemovePending={listTargetRemovePending}
+          listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
+          listTargetOnCanvasCount={listTargetOnCanvasCount}
+          onBackToList={onBackToList}
+          onCreateListTarget={onCreateListTarget}
+          onRequestRemoveListTarget={onRequestRemoveListTarget}
+          onPlaceListTargetOnCanvas={onPlaceListTargetOnCanvas}
+        />
+      </div>
+
+      <ListTargetCanvasStatusHint listTargetPhase={listTargetPhase} count={listTargetOnCanvasCount} />
+
+      <div
+        className="flex flex-col gap-2 rounded-lg border border-border/80 bg-muted/15 px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between"
+        data-slot="beacon_embed_sync"
+      >
+        <p className="text-xs leading-snug text-muted-foreground">
+          Sync re-registers the beacon runtime as page footer custom code (Tower + Webflow OAuth with custom code
+          scopes). Publish after syncing.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          disabled={embedSyncPending}
+          aria-busy={embedSyncPending}
+          onClick={() => void onSyncInstallEmbed()}
+        >
+          {embedSyncPending ? "Syncing…" : "Sync page script"}
+        </Button>
       </div>
 
       <div className="space-y-2" data-slot="beacon_list">
@@ -161,7 +334,7 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
                   variant="ghost"
                   className="shrink-0 text-destructive hover:bg-destructive/10"
                   aria-label={`Remove ${row.name}`}
-                  disabled={removingKey !== null || listTargetPending}
+                  disabled={removingKey !== null || listTargetActionBusy}
                   onClick={() => void onRemove(row)}
                 >
                   {removingKey === row.key ? (

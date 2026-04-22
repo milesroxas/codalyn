@@ -6,7 +6,8 @@ function hasGetChildren(e: AnyElement): e is ElementWithChildren {
   return typeof (e as { getChildren?: unknown }).getChildren === "function";
 }
 
-function beaconTargetKey(container: BlockElement): string {
+/** Stable key for a beacon list container (page / tree identity). */
+export function beaconTargetKey(container: BlockElement): string {
   return `${container.id.component}:${container.id.element}`;
 }
 

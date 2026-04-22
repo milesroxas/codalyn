@@ -8,7 +8,8 @@ import { db } from "@/shared/lib/db";
 import { webflowOauthAuthorizeState } from "@/shared/lib/db/auth-schema";
 
 // cms:write: Data API PATCH collection items (Beacon CMS-bound image replace).
-const DEFAULT_SCOPES = "sites:read pages:read cms:read cms:write assets:read";
+// custom_code:*: Beacon page inline script (registered_scripts + page custom_code).
+const DEFAULT_SCOPES = "sites:read pages:read cms:read cms:write assets:read custom_code:read custom_code:write";
 
 function buildWebflowAuthorizeUrl(state: string): string {
   const clientId = process.env.WEBFLOW_CLIENT_ID?.trim();

@@ -1,10 +1,9 @@
+import { runExclusiveDesignerStyleOp } from "@/features/beacons/model/exclusive-designer-style-op";
 import { findBeaconsWrapperOnPage } from "@/features/beacons/model/install-beacons-wrapper";
 
 type ParentWithPrepend = AnyElement & {
   prepend: (preset: ElementPreset<AnyElement>) => Promise<AnyElement>;
 };
-
-const BEACON_TARGET_HIDDEN_STYLE_NAME = "beacon_list";
 
 function canPrependPreset(el: AnyElement): el is ParentWithPrepend {
   return (
@@ -24,16 +23,20 @@ export function dataListValueForBeaconName(name: string): string {
   return `beacon-${slug}`;
 }
 
-async function ensureBeaconTargetHiddenStyle(): Promise<Style> {
-  const all = await webflow.getAllStyles();
-  for (const s of all) {
-    if ((await s.getName()) === BEACON_TARGET_HIDDEN_STYLE_NAME) {
-      return s;
+const BEACON_WRAPPER_LIST_BLOCK_STYLE_NAME = "beacon_list";
+
+function ensureBeaconWrapperListBlockHiddenStyle(): Promise<Style> {
+  return runExclusiveDesignerStyleOp(async () => {
+    const all = await webflow.getAllStyles();
+    for (const s of all) {
+      if ((await s.getName()) === BEACON_WRAPPER_LIST_BLOCK_STYLE_NAME) {
+        return s;
+      }
     }
-  }
-  const created = await webflow.createStyle(BEACON_TARGET_HIDDEN_STYLE_NAME);
-  await created.setProperty("display", "none");
-  return created;
+    const created = await webflow.createStyle(BEACON_WRAPPER_LIST_BLOCK_STYLE_NAME);
+    await created.setProperty("display", "none");
+    return created;
+  });
 }
 
 /**
@@ -54,8 +57,10 @@ export async function createBeaconTargetOnPage(name: string): Promise<{ containe
   const el = (await (parent as ParentWithPrepend).prepend(webflow.elementPresets.DivBlock)) as BlockElement;
   await el.setTag("div");
 
-  const hidden = await ensureBeaconTargetHiddenStyle();
-  await el.setStyles([hidden]);
+  await runExclusiveDesignerStyleOp(async () => {
+    const hidden = await ensureBeaconWrapperListBlockHiddenStyle();
+    await el.setStyles([hidden]);
+  });
 
   await el.setCustomAttribute("data-target", "beacons");
   await el.setCustomAttribute("data-list", dataList);

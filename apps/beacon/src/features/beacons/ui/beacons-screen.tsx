@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type MutableRefObject, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  clearAllBeaconListTargetDesignerPreviewsOnPage,
+  resyncAllBeaconListTargetDesignerPreviewsOnPage,
+  syncBeaconListTargetDesignerPreview,
+} from "@/features/beacons/model/beacon-list-target-designer-preview";
+import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
 import {
   type BeaconOnPage,
+  beaconTargetKey,
   findBeaconTargetsOnPage,
   type HydratedBeaconComponent,
   listInstancesInBeaconTarget,
@@ -8,13 +15,17 @@ import {
 import {
   BEACON_UTILITIES_COMPONENT_GROUP,
   createBeaconListTargetComponent,
+  getBeaconListTargetComponentOrNull,
 } from "@/features/beacons/model/create-beacon-list-target-component";
 import { createBeaconTargetOnPage } from "@/features/beacons/model/create-beacon-target";
 import {
   installBeaconsWrapperOnPage,
   isBeaconsWrapperInstalledOnPage,
   listBeaconsOrphanedOnBody,
+  syncBeaconsInstallEmbedOnPage,
 } from "@/features/beacons/model/install-beacons-wrapper";
+import { placeBeaconListTargetOnCanvas } from "@/features/beacons/model/place-beacon-list-target-on-canvas";
+import { reconcileBeaconListTargetForOpen } from "@/features/beacons/model/reconcile-beacon-list-target";
 import {
   appendComponentToBeacon,
   listSiteComponentsForPicker,
@@ -41,6 +52,32 @@ function formatDesignerError(err: unknown): string {
   return "Something went wrong. Check that you can edit the current page.";
 }
 
+async function runListTargetReconcileOnOpen(
+  myGen: number,
+  listTargetResolveGen: MutableRefObject<number>,
+  activeDataList: string,
+  listContainer: BlockElement,
+  setListTargetPhase: (p: "loading" | "absent" | "synced" | "updating") => void,
+  setListTargetRegisteredName: (n: string | null) => void
+) {
+  const stale = () => listTargetResolveGen.current !== myGen;
+  setListTargetPhase("updating");
+  try {
+    if (stale()) return;
+    const o = await reconcileBeaconListTargetForOpen(activeDataList, listContainer);
+    if (stale()) return;
+    for (const t of o.toasts) {
+      void webflow.notify(t);
+    }
+    setListTargetRegisteredName(o.displayName);
+    setListTargetPhase(o.phase);
+  } catch (e) {
+    if (stale()) return;
+    setListTargetPhase("absent");
+    void webflow.notify({ type: "Error", message: formatDesignerError(e) });
+  }
+}
+
 export function BeaconsScreen() {
   const nameFieldId = useId();
   const searchFieldId = useId();
@@ -65,10 +102,19 @@ export function BeaconsScreen() {
   const [addPending, setAddPending] = useState(false);
   const [selected, setSelected] = useState<HydratedBeaconComponent[]>([]);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
-  const [listTargetPending, setListTargetPending] = useState(false);
+  const [listTargetCreatePending, setListTargetCreatePending] = useState(false);
+  const [listTargetRemovePending, setListTargetRemovePending] = useState(false);
+  const [listTargetPlaceOnCanvasPending, setListTargetPlaceOnCanvasPending] = useState(false);
+  const [listTargetPhase, setListTargetPhase] = useState<"loading" | "absent" | "synced" | "updating">("loading");
+  const [listTargetRegisteredName, setListTargetRegisteredName] = useState<string | null>(null);
+  const [listTargetOnCanvasCount, setListTargetOnCanvasCount] = useState(0);
+  const [removeListTargetDialogOpen, setRemoveListTargetDialogOpen] = useState(false);
+  const [activeBeaconKey, setActiveBeaconKey] = useState<string | null>(null);
+  const listTargetResolveGen = useRef(0);
   const [openingBeaconKey, setOpeningBeaconKey] = useState<string | null>(null);
   const [beaconToDelete, setBeaconToDelete] = useState<BeaconOnPage | null>(null);
   const [deletePendingKey, setDeletePendingKey] = useState<string | null>(null);
+  const [embedSyncPending, setEmbedSyncPending] = useState(false);
 
   const refreshPageBeacons = useCallback(async () => {
     setPageScanLoading(true);
@@ -95,6 +141,32 @@ export function BeaconsScreen() {
   }, [refreshPageBeacons]);
 
   useEffect(() => {
+    if (typeof webflow.getCurrentMode !== "function" || typeof webflow.subscribe !== "function") {
+      return undefined;
+    }
+    const applyMode = () => {
+      void (async () => {
+        try {
+          if ((await webflow.getCurrentMode()) === "preview") {
+            await clearAllBeaconListTargetDesignerPreviewsOnPage();
+          } else {
+            await resyncAllBeaconListTargetDesignerPreviewsOnPage();
+          }
+        } catch {
+          /* designer preview is best-effort */
+        }
+      })();
+    };
+    applyMode();
+    const unsubMode = webflow.subscribe("currentappmode", () => {
+      applyMode();
+    });
+    return () => {
+      unsubMode();
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof webflow.subscribe !== "function") return undefined;
     return webflow.subscribe("currentpage", () => {
       setPicking(false);
@@ -103,8 +175,29 @@ export function BeaconsScreen() {
       setSelected([]);
       targetRef.current = null;
       setBeaconName("");
-      setListTargetPending(false);
+      setListTargetCreatePending(false);
+      setListTargetRemovePending(false);
+      setListTargetPlaceOnCanvasPending(false);
+      setListTargetPhase("loading");
+      setListTargetRegisteredName(null);
+      setListTargetOnCanvasCount(0);
+      setRemoveListTargetDialogOpen(false);
+      setActiveBeaconKey(null);
+      listTargetResolveGen.current += 1;
       void refreshPageBeacons();
+      if (typeof webflow.getCurrentMode === "function") {
+        void (async () => {
+          try {
+            if ((await webflow.getCurrentMode()) === "preview") {
+              await clearAllBeaconListTargetDesignerPreviewsOnPage();
+            } else {
+              await resyncAllBeaconListTargetDesignerPreviewsOnPage();
+            }
+          } catch {
+            /* best-effort */
+          }
+        })();
+      }
     });
   }, [refreshPageBeacons]);
 
@@ -131,6 +224,30 @@ export function BeaconsScreen() {
     return () => window.clearTimeout(t);
   }, [picking, componentQuery, runCatalogLoad]);
 
+  useEffect(() => {
+    if (!picking || activeDataList == null || activeBeaconKey == null) {
+      return;
+    }
+    const listContainer = targetRef.current;
+    if (!listContainer) {
+      setListTargetPhase("absent");
+      return;
+    }
+
+    const myGen = ++listTargetResolveGen.current;
+    setListTargetPhase("loading");
+    setListTargetRegisteredName(null);
+
+    void runListTargetReconcileOnOpen(
+      myGen,
+      listTargetResolveGen,
+      activeDataList,
+      listContainer,
+      setListTargetPhase,
+      setListTargetRegisteredName
+    );
+  }, [picking, activeDataList, activeBeaconKey]);
+
   const exitToList = useCallback(() => {
     setPicking(false);
     setActiveDataList(null);
@@ -141,9 +258,64 @@ export function BeaconsScreen() {
     setCatalogError(null);
     setBeaconName("");
     setCreateFormOpen(false);
-    setListTargetPending(false);
+    setListTargetCreatePending(false);
+    setListTargetRemovePending(false);
+    setListTargetPlaceOnCanvasPending(false);
+    setListTargetPhase("loading");
+    setListTargetRegisteredName(null);
+    setListTargetOnCanvasCount(0);
+    setRemoveListTargetDialogOpen(false);
+    setActiveBeaconKey(null);
+    listTargetResolveGen.current += 1;
     void refreshPageBeacons();
   }, [refreshPageBeacons]);
+
+  useEffect(() => {
+    if (!picking || listTargetPhase !== "synced" || activeDataList == null || activeBeaconKey == null) {
+      setListTargetOnCanvasCount(0);
+      return;
+    }
+    const listContainer = targetRef.current;
+    if (listContainer == null) {
+      setListTargetOnCanvasCount(0);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const list = await listBeaconListTargetInstancesOnPage(activeDataList, listContainer);
+        if (!cancelled) {
+          setListTargetOnCanvasCount(list.length);
+        }
+      } catch {
+        if (!cancelled) {
+          setListTargetOnCanvasCount(0);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [picking, listTargetPhase, activeDataList, activeBeaconKey]);
+
+  useEffect(() => {
+    if (!picking || listTargetPhase !== "synced" || activeDataList == null) {
+      return;
+    }
+    const listContainer = targetRef.current;
+    if (listContainer == null) {
+      return;
+    }
+    const compositionSignature = `${activeDataList}|${selected.map((s) => s.componentId).join(",")}|${listTargetOnCanvasCount}`;
+    void compositionSignature;
+    void (async () => {
+      try {
+        await syncBeaconListTargetDesignerPreview(activeDataList, listContainer);
+      } catch {
+        /* best-effort */
+      }
+    })();
+  }, [picking, listTargetPhase, activeDataList, selected, listTargetOnCanvasCount]);
 
   const handleOpenBeacon = async (beacon: BeaconOnPage) => {
     setCreateFormOpen(false);
@@ -152,6 +324,7 @@ export function BeaconsScreen() {
       const rows = await listInstancesInBeaconTarget(beacon.container);
       targetRef.current = beacon.container;
       setActiveDataList(beacon.dataList);
+      setActiveBeaconKey(beacon.key);
       setSelected(rows);
       setPicking(true);
     } catch (err) {
@@ -174,6 +347,7 @@ export function BeaconsScreen() {
       const { container, dataList } = await createBeaconTargetOnPage(trimmed);
       targetRef.current = container;
       setActiveDataList(dataList);
+      setActiveBeaconKey(beaconTargetKey(container));
       setSelected([]);
       setPicking(true);
       setCreateFormOpen(false);
@@ -203,6 +377,23 @@ export function BeaconsScreen() {
       void webflow.notify({ type: "Error", message });
     } finally {
       setAddPending(false);
+    }
+  };
+
+  const handleSyncInstallEmbed = async () => {
+    if (embedSyncPending) return;
+    setEmbedSyncPending(true);
+    try {
+      await syncBeaconsInstallEmbedOnPage();
+      void webflow.notify({
+        type: "Success",
+        message: "Page custom code updated. Publish the site to apply on the live site.",
+      });
+    } catch (err) {
+      const message = formatDesignerError(err);
+      void webflow.notify({ type: "Error", message });
+    } finally {
+      setEmbedSyncPending(false);
     }
   };
 
@@ -265,16 +456,20 @@ export function BeaconsScreen() {
   };
 
   const handleCreateListTarget = async () => {
-    if (listTargetPending || activeDataList == null) return;
+    if (listTargetCreatePending || listTargetRemovePending || activeDataList == null) return;
+    if (listTargetPhase !== "absent") return;
     const listContainer = targetRef.current;
     if (!listContainer) return;
-    setListTargetPending(true);
+    listTargetResolveGen.current += 1;
+    setListTargetCreatePending(true);
     try {
       const created = await createBeaconListTargetComponent({
         dataList: activeDataList,
         listContainer,
       });
       const registeredName = await created.getName();
+      setListTargetRegisteredName(registeredName);
+      setListTargetPhase("synced");
       void webflow.notify({
         type: "Success",
         message: `List target “${registeredName}” added under ${BEACON_UTILITIES_COMPONENT_GROUP}.`,
@@ -283,7 +478,79 @@ export function BeaconsScreen() {
       const message = formatDesignerError(err);
       void webflow.notify({ type: "Error", message });
     } finally {
-      setListTargetPending(false);
+      setListTargetCreatePending(false);
+    }
+  };
+
+  const handlePlaceListTargetOnCanvas = async () => {
+    if (
+      listTargetPlaceOnCanvasPending ||
+      listTargetCreatePending ||
+      listTargetRemovePending ||
+      listTargetPhase !== "synced" ||
+      activeDataList == null
+    ) {
+      return;
+    }
+    const listContainer = targetRef.current;
+    if (!listContainer) return;
+    setListTargetPlaceOnCanvasPending(true);
+    try {
+      const { instance, alreadyExisted } = await placeBeaconListTargetOnCanvas(activeDataList, listContainer);
+      try {
+        await webflow.setSelectedElement(instance);
+      } catch {
+        /* selection is optional */
+      }
+      try {
+        const list = await listBeaconListTargetInstancesOnPage(activeDataList, listContainer);
+        setListTargetOnCanvasCount(list.length);
+      } catch {
+        setListTargetOnCanvasCount(0);
+      }
+      void webflow.notify({
+        type: "Success",
+        message: alreadyExisted ? "Selected the list target on the canvas." : "List target placed on the canvas.",
+      });
+    } catch (err) {
+      const message = formatDesignerError(err);
+      void webflow.notify({ type: "Error", message });
+    } finally {
+      setListTargetPlaceOnCanvasPending(false);
+    }
+  };
+
+  const handleRequestRemoveListTarget = () => {
+    if (listTargetPhase !== "synced" || listTargetCreatePending || listTargetRemovePending) return;
+    setRemoveListTargetDialogOpen(true);
+  };
+
+  const handleConfirmRemoveListTarget = async () => {
+    if (listTargetRemovePending || activeDataList == null) return;
+    const listContainer = targetRef.current;
+    if (!listContainer) return;
+    setListTargetRemovePending(true);
+    try {
+      const comp = await getBeaconListTargetComponentOrNull(activeDataList, listContainer);
+      if (comp == null) {
+        void webflow.notify({
+          type: "Warning",
+          message:
+            "No matching list target component found. It may have been renamed, moved, or deleted in the Components panel.",
+        });
+      } else {
+        await webflow.unregisterComponent(comp);
+        void webflow.notify({ type: "Success", message: "List target removed from the site." });
+      }
+      listTargetResolveGen.current += 1;
+      setListTargetRegisteredName(null);
+      setListTargetPhase("absent");
+      setRemoveListTargetDialogOpen(false);
+    } catch (err) {
+      const message = formatDesignerError(err);
+      void webflow.notify({ type: "Error", message });
+    } finally {
+      setListTargetRemovePending(false);
     }
   };
 
@@ -332,6 +599,8 @@ export function BeaconsScreen() {
               openingBeaconKey={openingBeaconKey}
               onRequestDelete={(b) => setBeaconToDelete(b)}
               deletePendingKey={deletePendingKey}
+              embedSyncPending={embedSyncPending}
+              onSyncInstallEmbed={handleSyncInstallEmbed}
             />
           )}
 
@@ -351,8 +620,16 @@ export function BeaconsScreen() {
               onAddComponent={handleAddComponent}
               onRemove={handleRemove}
               removingKey={removingKey}
+              listTargetPhase={listTargetPhase}
+              listTargetOnCanvasCount={listTargetOnCanvasCount}
               onCreateListTarget={handleCreateListTarget}
-              listTargetPending={listTargetPending}
+              onRequestRemoveListTarget={handleRequestRemoveListTarget}
+              onPlaceListTargetOnCanvas={handlePlaceListTargetOnCanvas}
+              listTargetCreatePending={listTargetCreatePending}
+              listTargetRemovePending={listTargetRemovePending}
+              listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
+              embedSyncPending={embedSyncPending}
+              onSyncInstallEmbed={handleSyncInstallEmbed}
             />
           )}
 
@@ -387,6 +664,50 @@ export function BeaconsScreen() {
                   onClick={() => void handleConfirmDeleteBeacon()}
                 >
                   {deletePendingKey != null ? "Deleting…" : "Delete"}
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog
+            open={removeListTargetDialogOpen}
+            onOpenChange={(o) => {
+              if (!o && !listTargetRemovePending) {
+                setRemoveListTargetDialogOpen(false);
+              }
+            }}
+          >
+            <AlertDialogContent size="default">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove list target?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently deletes the site component
+                  {listTargetRegisteredName != null && (
+                    <>
+                      {" "}
+                      <code className="font-mono text-[0.85em] text-foreground">{listTargetRegisteredName}</code>
+                    </>
+                  )}{" "}
+                  from <span className="text-foreground">{BEACON_UTILITIES_COMPONENT_GROUP}</span>. Any instances on the
+                  canvas become plain elements. This can&apos;t be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={listTargetRemovePending}
+                  onClick={() => setRemoveListTargetDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={listTargetRemovePending}
+                  onClick={() => void handleConfirmRemoveListTarget()}
+                >
+                  {listTargetRemovePending ? "Removing…" : "Remove target"}
                 </Button>
               </AlertDialogFooter>
             </AlertDialogContent>

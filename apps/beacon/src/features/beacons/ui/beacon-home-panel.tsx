@@ -199,6 +199,8 @@ type BeaconHomePanelProps = {
   onRequestDelete: (b: BeaconOnPage) => void;
   openingBeaconKey: string | null;
   deletePendingKey: string | null;
+  embedSyncPending: boolean;
+  onSyncInstallEmbed: () => void;
 };
 
 export function BeaconHomePanel(props: BeaconHomePanelProps) {
@@ -220,6 +222,8 @@ export function BeaconHomePanel(props: BeaconHomePanelProps) {
     onRequestDelete,
     openingBeaconKey,
     deletePendingKey,
+    embedSyncPending,
+    onSyncInstallEmbed,
   } = props;
 
   if (!beaconsWrapperInstalled) {
@@ -245,6 +249,26 @@ export function BeaconHomePanel(props: BeaconHomePanelProps) {
       ) : null}
 
       {legacyBeaconsOnBody.length > 0 ? <Separator /> : null}
+
+      <div
+        className="flex flex-col gap-2 rounded-lg border border-border/80 bg-muted/15 px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between"
+        data-slot="beacon_embed_sync_home"
+      >
+        <p className="text-xs leading-snug text-muted-foreground">
+          Sync updates page footer custom code with the beacon runtime (Webflow Data API). Publish to go live.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          disabled={embedSyncPending || pageScanLoading}
+          aria-busy={embedSyncPending}
+          onClick={() => void onSyncInstallEmbed()}
+        >
+          {embedSyncPending ? "Syncing…" : "Sync page script"}
+        </Button>
+      </div>
 
       <OnThisPageSection
         nameFieldId={nameFieldId}

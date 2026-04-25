@@ -2,11 +2,8 @@ import { type MutableRefObject, useCallback, useEffect, useId, useMemo, useRef, 
 import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { listComposerEligibleLists } from "@/features/beacons/model/beacon-composer-eligible";
 import {
-  BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR,
-  BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR,
-  ensureBeaconListTargetCmsPlainTextField,
+  ensureBeaconListCmsTextFieldOnList,
   getBeaconListTargetCmsFieldIdFromListContainer,
-  getCmsTemplateCollectionIdFromCurrentPage,
   resolveBeaconListTargetCmsCollectionIdForCleanup,
   tryDeleteBeaconListTargetCmsPlainTextField,
 } from "@/features/beacons/model/beacon-list-target-cms-text-binding";
@@ -623,6 +620,9 @@ export function BeaconsScreen() {
     engineListCompositionStale
   );
 
+  /** Page script sync only matters once the wrapper is installed and at least one beacon list exists. */
+  const showPageRuntimeSyncHeader = beaconsWrapperInstalled && pageBeacons.length > 0;
+
   useEffect(() => {
     void beaconToDelete;
     setUninstallWithLastBeaconDelete(false);
@@ -766,6 +766,7 @@ export function BeaconsScreen() {
     try {
       listTargetDefinitionIdRef.current = null;
       const { container, dataList } = await createBeaconTargetOnPage(trimmed);
+      await ensureBeaconListCmsTextFieldOnList(container, dataList);
       await writeBeaconEngineConfiguredComponentIds(container, []);
       targetRef.current = container;
       setActiveDataList(dataList);
@@ -1030,18 +1031,6 @@ export function BeaconsScreen() {
           registeredName,
         };
       }
-      try {
-        const collectionId = await getCmsTemplateCollectionIdFromCurrentPage();
-        if (collectionId != null) {
-          const ensured = await ensureBeaconListTargetCmsPlainTextField(collectionId, activeDataList);
-          if (ensured != null) {
-            await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR, ensured.collectionId);
-            await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR, ensured.fieldId);
-          }
-        }
-      } catch {
-        /* Tower / Data API optional */
-      }
       void webflow.notify({
         type: "Success",
         message: `List target “${registeredName}” added under ${BEACON_UTILITIES_COMPONENT_GROUP}.`,
@@ -1194,11 +1183,13 @@ export function BeaconsScreen() {
                 </span>
               </div>
             ) : null}
-            <BeaconPageRuntimeHeaderStatus
-              loading={pageRuntimeStatusLoading}
-              synced={syncShellOk}
-              reason={syncShellReason}
-            />
+            {showPageRuntimeSyncHeader ? (
+              <BeaconPageRuntimeHeaderStatus
+                loading={pageRuntimeStatusLoading}
+                synced={syncShellOk}
+                reason={syncShellReason}
+              />
+            ) : null}
           </div>
         </div>
       </div>

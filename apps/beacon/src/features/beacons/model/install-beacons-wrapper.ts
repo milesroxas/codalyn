@@ -2,7 +2,7 @@ import {
   removeBeaconPageRuntimeFromPage,
   syncBeaconPageInlineScript,
 } from "@/features/beacons/model/beacon-page-inline-script";
-import { findBeaconTargetsOnPage, type BeaconOnPage } from "@/features/beacons/model/beacon-page-targets";
+import { type BeaconOnPage, findBeaconTargetsOnPage } from "@/features/beacons/model/beacon-page-targets";
 import { runExclusiveDesignerStyleOp } from "@/features/beacons/model/exclusive-designer-style-op";
 
 type BodyWithAppend = AnyElement & {

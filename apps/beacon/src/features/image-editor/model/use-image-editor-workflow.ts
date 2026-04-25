@@ -1,7 +1,7 @@
 import type { SetStateAction, TransitionEvent } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Area } from "react-easy-crop";
-import { editorAspectLabel, type EditorAspectSelection } from "@/features/image-editor/lib/aspect-preset";
+import { type EditorAspectSelection, editorAspectLabel } from "@/features/image-editor/lib/aspect-preset";
 import {
   getImageEditorStepOrder,
   type ImageEditorFlowStep,

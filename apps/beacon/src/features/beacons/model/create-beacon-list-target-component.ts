@@ -61,10 +61,7 @@ async function beaconListTargetDefinitionMatchesList(
  * we still need to treat that definition as *this* list: same `data-list` + `data-target` on the registered root.
  * Full list identity is then re-applied via {@link applyBeaconListTargetSync}.
  */
-async function beaconListTargetRootMatchesDataList(
-  comp: Component,
-  dataList: string
-): Promise<boolean> {
+async function beaconListTargetRootMatchesDataList(comp: Component, dataList: string): Promise<boolean> {
   const root = await comp.getRootElement();
   if (root == null || root.type !== "DOM") {
     return false;
@@ -80,44 +77,41 @@ async function beaconListTargetRootMatchesDataList(
 }
 
 /**
- * Resolves the list-target **component definition** by its deterministic name under
- * {@link BEACON_UTILITIES_COMPONENT_GROUP} (encodes `data-list` + list container). No separate storage: look up
- * the project’s registered components the same way the Components panel does.
- *
- * @param preferredDefinitionId When set (e.g. immediately after {@link createBeaconListTargetComponent}), prefer
- *   `webflow.getComponent(id)` first so placement is not blocked by a brief post-register index delay for
- *   `getComponentByName` / search.
+ * Tries `webflow.getComponent(preferredDefinitionId)` and sync/validation; `null` = fall back to name search.
+ * Uses {@link applyBeaconListTargetSync} (declared below; safe at call time).
  */
-export async function getBeaconListTargetComponentOrNull(
+async function tryGetBeaconListTargetByPreferredDefinitionId(
+  preferredDefinitionId: string,
   dataList: string,
-  listContainer: BlockElement,
-  preferredDefinitionId?: string | null
+  listContainer: BlockElement
 ): Promise<Component | null> {
-  const name = uniqueBeaconListTargetComponentName(dataList, listContainer);
-  const hint = preferredDefinitionId?.trim();
-  if (hint) {
-    try {
-      const byId = await webflow.getComponent(hint);
+  try {
+    const byId = await webflow.getComponent(preferredDefinitionId);
+    if (await beaconListTargetDefinitionMatchesList(byId, dataList, listContainer)) {
+      return byId;
+    }
+    if (await beaconListTargetRootMatchesDataList(byId, dataList)) {
+      try {
+        await applyBeaconListTargetSync(byId, dataList, listContainer);
+      } catch (e) {
+        logListTargetDebug("applyBeaconListTargetSync (preferredDefinitionId) failed, falling back to name search", e);
+      }
       if (await beaconListTargetDefinitionMatchesList(byId, dataList, listContainer)) {
         return byId;
       }
-      if (await beaconListTargetRootMatchesDataList(byId, dataList)) {
-        try {
-          await applyBeaconListTargetSync(byId, dataList, listContainer);
-        } catch (e) {
-          logListTargetDebug("applyBeaconListTargetSync (preferredDefinitionId) failed, falling back to name search", e);
-        }
-        if (await beaconListTargetDefinitionMatchesList(byId, dataList, listContainer)) {
-          return byId;
-        }
-      }
-    } catch (e) {
-      if (webflowDesignerErrorCauseTag(e) !== "ResourceMissing") {
-        throw e;
-      }
+    }
+  } catch (e) {
+    if (webflowDesignerErrorCauseTag(e) !== "ResourceMissing") {
+      throw e;
     }
   }
+  return null;
+}
 
+/**
+ * `getComponentByName`, then `searchComponents` (Components panel name lookup).
+ */
+async function getBeaconListTargetComponentByNameOrSearch(name: string): Promise<Component | null> {
   try {
     return await webflow.getComponentByName(BEACON_UTILITIES_COMPONENT_GROUP, name);
   } catch (e) {
@@ -138,6 +132,31 @@ export async function getBeaconListTargetComponentOrNull(
     }
     throw e;
   }
+}
+
+/**
+ * Resolves the list-target **component definition** by its deterministic name under
+ * {@link BEACON_UTILITIES_COMPONENT_GROUP} (encodes `data-list` + list container). No separate storage: look up
+ * the project’s registered components the same way the Components panel does.
+ *
+ * @param preferredDefinitionId When set (e.g. immediately after {@link createBeaconListTargetComponent}), prefer
+ *   `webflow.getComponent(id)` first so placement is not blocked by a brief post-register index delay for
+ *   `getComponentByName` / search.
+ */
+export async function getBeaconListTargetComponentOrNull(
+  dataList: string,
+  listContainer: BlockElement,
+  preferredDefinitionId?: string | null
+): Promise<Component | null> {
+  const name = uniqueBeaconListTargetComponentName(dataList, listContainer);
+  const hint = preferredDefinitionId?.trim();
+  if (hint) {
+    const fromHint = await tryGetBeaconListTargetByPreferredDefinitionId(hint, dataList, listContainer);
+    if (fromHint != null) {
+      return fromHint;
+    }
+  }
+  return getBeaconListTargetComponentByNameOrSearch(name);
 }
 
 /** Data attributes the list-target component root should carry (and match for “in sync” checks). */

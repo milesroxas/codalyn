@@ -1,20 +1,25 @@
 import { getBeaconListTargetTextPropId } from "@/features/beacons/model/beacon-list-target-text-field";
 import { towerFetch } from "@/shared/lib/tower-client";
 
-const LOG_PREFIX = "[beacon list target CMS]";
+const LOG_PREFIX = "[beacon list CMS]";
 
 /**
- * On the **hidden beacon list** block, set when a CMS Plain Text field is ensured so cleanup can
- * `DELETE` that field by collection + **field** id even if the current Designer page is not the collection template.
+ * On the **hidden beacon list** block (one per `data-list`): `collectionId` + `fieldId` for the **CMS Plain Text
+ * field owned by the list**. Render targets only **bind** to this; they do not create collection fields.
  */
 export const BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR = "data-beacon-cms-collection-id";
 
-/** PlainText field id from the Data API — used to `DELETE /collections/{id}/fields/{fieldId}` on beacon delete. */
+/** `fieldId` for {@link BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR} (Data API; delete on beacon remove). */
 export const BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR = "data-beacon-cms-field-id";
 
-/** Display name used to find or create the Plain Text field (one per `data-list`). */
-export function beaconListTargetCmsPlainTextDisplayName(dataList: string): string {
+/** Display name for the **beacon list** CMS Plain Text field (not the render-target component). */
+export function beaconListCmsPlainTextFieldDisplayName(dataList: string): string {
   return `Beacon list target text · ${dataList}`;
+}
+
+/** @deprecated Use {@link beaconListCmsPlainTextFieldDisplayName}. */
+export function beaconListTargetCmsPlainTextDisplayName(dataList: string): string {
+  return beaconListCmsPlainTextFieldDisplayName(dataList);
 }
 
 /**
@@ -63,7 +68,7 @@ function isPlainTextFieldType(t: string | undefined): boolean {
 /** Normalizes for comparison when Webflow normalizes middle dots or spacing in display names. */
 function fieldDisplayNameLikelyForBeaconListTarget(displayName: string | undefined, dataList: string): boolean {
   if (displayName == null) return false;
-  const want = beaconListTargetCmsPlainTextDisplayName(dataList);
+  const want = beaconListCmsPlainTextFieldDisplayName(dataList);
   if (displayName === want) {
     return true;
   }
@@ -93,14 +98,14 @@ function parseCreatedFieldId(data: unknown): string | null {
 }
 
 /**
- * Ensures a **PlainText** field exists for this beacon list (matched by display name), creates it via Data API when
- * missing. Returns `null` when Tower is unavailable, the collection is unreadable, or creation fails.
+ * Data API: find or create the **beacon list** Plain Text field in a collection (see {@link beaconListCmsPlainTextFieldDisplayName}).
+ * Call only from {@link ensureBeaconListCmsTextFieldOnList} — not from render-target placement.
  */
 export async function ensureBeaconListTargetCmsPlainTextField(
   collectionId: string,
   dataList: string
 ): Promise<{ collectionId: string; fieldId: string } | null> {
-  const displayName = beaconListTargetCmsPlainTextDisplayName(dataList);
+  const displayName = beaconListCmsPlainTextFieldDisplayName(dataList);
   const getCollection = async (): Promise<unknown | null> => {
     const getRes = await towerFetch(`/api/v2/webflow/collections/${encodeURIComponent(collectionId)}`);
     if (!getRes.ok) {
@@ -134,7 +139,7 @@ export async function ensureBeaconListTargetCmsPlainTextField(
     body: JSON.stringify({
       type: "PlainText",
       displayName,
-      helpText: "Used by Codalyn Beacon for this list target’s Text binding.",
+      helpText: "Codalyn Beacon: CMS text for this beacon list; list targets bind their Text prop here.",
     }),
   });
   if (!postRes.ok) {
@@ -188,6 +193,39 @@ export async function getBeaconListTargetCmsFieldIdFromListContainer(
     return null;
   }
   return String(raw).trim();
+}
+
+/**
+ * **Single place** that may create the CMS Plain Text field for a **beacon list** and persist
+ * `data-beacon-cms-*` on the hidden list block. Reads existing attrs first (source of truth on the list).
+ * Creates only when attributes are missing and the Designer is on a CMS collection template (Data API + Tower).
+ */
+export async function ensureBeaconListCmsTextFieldOnList(
+  listContainer: BlockElement,
+  dataList: string
+): Promise<{ collectionId: string; fieldId: string } | null> {
+  const existingC = await getBeaconListTargetCmsCollectionIdFromListContainer(listContainer);
+  const existingF = await getBeaconListTargetCmsFieldIdFromListContainer(listContainer);
+  if (existingC != null && existingF != null) {
+    return { collectionId: existingC, fieldId: existingF };
+  }
+
+  const collectionId = await getCmsTemplateCollectionIdFromCurrentPage();
+  if (collectionId == null) {
+    return null;
+  }
+  const ensured = await ensureBeaconListTargetCmsPlainTextField(collectionId, dataList);
+  if (ensured == null) {
+    return null;
+  }
+  try {
+    await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR, ensured.collectionId);
+    await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR, ensured.fieldId);
+  } catch (e) {
+    console.warn(LOG_PREFIX, "set cms id attrs on list block", e);
+    return null;
+  }
+  return ensured;
 }
 
 /**
@@ -258,7 +296,7 @@ function cmsBindingMatches(value: unknown, expected: { collectionId: string; fie
 }
 
 /**
- * Binds the list target instance’s **Text** prop to the given CMS field when it is not already bound there.
+ * Binds a **render target** instance’s **Text** prop to the **beacon list’s** CMS field (`collectionId` + `fieldId`).
  */
 export async function tryBindBeaconListTargetInstanceTextToCms(
   instance: ComponentElement,
@@ -322,10 +360,10 @@ function mergeListTargetInstancesForCmsBinding(
 }
 
 /**
- * When the current page is a CMS template, ensures the Plain Text field exists and binds every list-target instance
- * on the page to it.
+ * Binds each **list render target** instance’s Text prop to the **beacon list’s** CMS field (see
+ * {@link ensureBeaconListCmsTextFieldOnList}). Does not create a separate collection field per render target.
  */
-export async function ensureBeaconListTargetCmsTextBindingForPageInstances(options: {
+export async function bindBeaconListTargetInstancesToListCmsText(options: {
   dataList: string;
   listContainer: BlockElement;
   def: Component;
@@ -333,22 +371,12 @@ export async function ensureBeaconListTargetCmsTextBindingForPageInstances(optio
   /** Placed or focused instance — always merged first so bind runs even if the page scan lags. */
   priorityInstances?: readonly ComponentElement[];
 }): Promise<void> {
-  const collectionId = await getCmsTemplateCollectionIdFromCurrentPage();
-  if (collectionId == null) {
+  const binding = await ensureBeaconListCmsTextFieldOnList(options.listContainer, options.dataList);
+  if (binding == null) {
     return;
-  }
-  const ensured = await ensureBeaconListTargetCmsPlainTextField(collectionId, options.dataList);
-  if (ensured == null) {
-    return;
-  }
-  try {
-    await options.listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR, ensured.collectionId);
-    await options.listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR, ensured.fieldId);
-  } catch (e) {
-    console.warn(LOG_PREFIX, "set cms id attrs on list block", e);
   }
   const toBind = mergeListTargetInstancesForCmsBinding(options.priorityInstances, options.instances);
   for (const inst of toBind) {
-    await tryBindBeaconListTargetInstanceTextToCms(inst, options.def, ensured);
+    await tryBindBeaconListTargetInstanceTextToCms(inst, options.def, binding);
   }
 }

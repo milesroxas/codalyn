@@ -10,7 +10,7 @@ import {
   parseOutputDimensionStrict,
   WEBFLOW_IMAGE_ELEMENT_TYPE,
 } from "@/features/image-editor/lib/apply-cropped-export";
-import { type AspectPreset, type EditorAspectSelection, aspectLabels } from "@/features/image-editor/lib/aspect-preset";
+import { type AspectPreset, aspectLabels, type EditorAspectSelection } from "@/features/image-editor/lib/aspect-preset";
 import type { AssetFolderRow } from "@/features/image-editor/lib/asset-folder-row";
 import type { ElementCmsBindingResolution } from "@/features/image-editor/lib/cms-primary-upload-context";
 import type { ComponentImagePropOption } from "@/features/image-editor/lib/component-image-prop";
@@ -91,7 +91,7 @@ function maxZoomForNativeResolutionCap(media: MediaSize | null, limit: boolean):
 /** Aspect ratio templates vs. W×H-driven crop frame (same slot in the UI). */
 export type CropFrameMode = "aspect" | "custom";
 
-export type { AspectPreset, EditorAspectSelection, AssetFolderRow, ComponentImagePropOption };
+export type { AspectPreset, AssetFolderRow, ComponentImagePropOption, EditorAspectSelection };
 
 export type ImageEditorCropExportPanelProps = {
   baseId: string;
@@ -442,6 +442,223 @@ type CropStageProps = {
   onExportMaxWidthBlur?: () => void;
 };
 
+type CropShapeControlsSectionProps = Pick<
+  CropStageProps,
+  | "baseId"
+  | "belowCropEntered"
+  | "exportSizeUsesAspectAndMaxWidth"
+  | "cropFrameMode"
+  | "setCropFrameMode"
+  | "aspectPreset"
+  | "setAspectPreset"
+  | "visibleBuiltinAspectPresets"
+  | "widthStr"
+  | "setWidthStr"
+  | "outputWidth"
+  | "setOutputWidth"
+  | "heightStr"
+  | "setHeightStr"
+  | "outputHeight"
+  | "setOutputHeight"
+  | "onExportMaxWidthBlur"
+  | "strictOutputDimensionInputs"
+>;
+
+function CropShapeControlsSection(p: CropShapeControlsSectionProps) {
+  const {
+    baseId,
+    belowCropEntered,
+    exportSizeUsesAspectAndMaxWidth,
+    cropFrameMode,
+    setCropFrameMode,
+    aspectPreset,
+    setAspectPreset,
+    visibleBuiltinAspectPresets,
+    widthStr,
+    setWidthStr,
+    outputWidth,
+    setOutputWidth,
+    heightStr,
+    setHeightStr,
+    outputHeight,
+    setOutputHeight,
+    onExportMaxWidthBlur,
+    strictOutputDimensionInputs = false,
+  } = p;
+
+  return (
+    <div className={staggerBelowCropClass(belowCropEntered, 90)}>
+      <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+        <div className="flex items-center gap-1">
+          <Label className="text-xs font-medium" htmlFor={`${baseId}-frame-mode`}>
+            Crop shape
+          </Label>
+          <InfoTip
+            ariaLabel="About crop shape"
+            text={
+              exportSizeUsesAspectAndMaxWidth
+                ? "Aspect ratios lock the crop mask. Set max width; export height follows the ratio."
+                : "Aspect ratios lock the crop mask. Custom uses the width and height fields below for the crop shape."
+            }
+          />
+        </div>
+        <ToggleGroup
+          id={`${baseId}-frame-mode`}
+          className="grid w-full min-w-0 grid-cols-2 gap-0"
+          type="single"
+          value={cropFrameMode}
+          onValueChange={(v) => {
+            if (v) {
+              setCropFrameMode(v as CropFrameMode);
+            }
+          }}
+          variant="outline"
+          size="sm"
+          spacing={0}
+        >
+          <ToggleGroupItem value="aspect" className="min-w-0 shrink whitespace-normal text-center leading-tight">
+            Aspect ratios
+          </ToggleGroupItem>
+          <ToggleGroupItem value="custom" className="min-w-0 shrink whitespace-normal text-center leading-tight">
+            Custom
+          </ToggleGroupItem>
+        </ToggleGroup>
+        {cropFrameMode === "aspect" ? (
+          <>
+            <ToggleGroup
+              id={`${baseId}-aspect`}
+              className="grid w-full min-w-0 grid-cols-3 gap-0"
+              type="single"
+              value={aspectPreset === "unset" ? undefined : aspectPreset}
+              onValueChange={(v) => {
+                if (v) {
+                  setAspectPreset(v as AspectPreset);
+                }
+              }}
+              variant="outline"
+              size="sm"
+              spacing={0}
+            >
+              {visibleBuiltinAspectPresets.map((preset) => (
+                <ToggleGroupItem
+                  key={preset}
+                  value={preset}
+                  className="min-w-0 shrink whitespace-normal text-center leading-tight"
+                >
+                  {aspectLabels[preset]}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            {exportSizeUsesAspectAndMaxWidth ? (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs" htmlFor={`${baseId}-aspect-max-w`}>
+                      Max width (px)
+                    </Label>
+                    <InfoTip
+                      ariaLabel="About max width"
+                      text="Export width in pixels. Height is computed from the aspect and max width."
+                    />
+                  </div>
+                  <Input
+                    id={`${baseId}-aspect-max-w`}
+                    aria-label="Max export width in pixels"
+                    inputMode="numeric"
+                    type="text"
+                    value={widthStr}
+                    onChange={(e) => setWidthStr(e.target.value)}
+                    onBlur={() => {
+                      onExportMaxWidthBlur?.();
+                    }}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs text-muted-foreground" htmlFor={`${baseId}-aspect-derived-h`}>
+                    Height (px)
+                  </Label>
+                  <Input
+                    id={`${baseId}-aspect-derived-h`}
+                    aria-label="Export height in pixels, from aspect and max width"
+                    inputMode="numeric"
+                    type="text"
+                    readOnly
+                    tabIndex={-1}
+                    className="bg-muted/40 tabular-nums"
+                    value={heightStr}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs" htmlFor={`${baseId}-ow`}>
+                    Width (px)
+                  </Label>
+                  <InfoTip ariaLabel="About output dimensions" text="Use values from 1 to 8192 px per side." />
+                </div>
+                <Input
+                  id={`${baseId}-ow`}
+                  aria-label="Output width in pixels"
+                  inputMode="numeric"
+                  type="text"
+                  value={widthStr}
+                  onChange={(e) => setWidthStr(e.target.value)}
+                  onBlur={() => {
+                    if (strictOutputDimensionInputs) {
+                      const w = parseOutputDimensionStrict(widthStr);
+                      if (w == null) {
+                        return;
+                      }
+                      setOutputWidth(w);
+                      setWidthStr(String(w));
+                      return;
+                    }
+                    const w = parseOutputDimension(widthStr, outputWidth);
+                    setOutputWidth(w);
+                    setWidthStr(String(w));
+                  }}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs" htmlFor={`${baseId}-oh`}>
+                  Height (px)
+                </Label>
+                <Input
+                  id={`${baseId}-oh`}
+                  aria-label="Output height in pixels"
+                  inputMode="numeric"
+                  type="text"
+                  value={heightStr}
+                  onChange={(e) => setHeightStr(e.target.value)}
+                  onBlur={() => {
+                    if (strictOutputDimensionInputs) {
+                      const h = parseOutputDimensionStrict(heightStr);
+                      if (h == null) {
+                        return;
+                      }
+                      setOutputHeight(h);
+                      setHeightStr(String(h));
+                      return;
+                    }
+                    const h = parseOutputDimension(heightStr, outputHeight);
+                    setOutputHeight(h);
+                    setHeightStr(String(h));
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CropStageSection(p: CropStageProps) {
   const {
     baseId,
@@ -550,181 +767,26 @@ function CropStageSection(p: CropStageProps) {
           </div>
 
           {positionOnly && !exportSizeUsesAspectAndMaxWidth ? null : (
-            <div className={staggerBelowCropClass(belowCropEntered, 90)}>
-              <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
-                <div className="flex items-center gap-1">
-                  <Label className="text-xs font-medium" htmlFor={`${baseId}-frame-mode`}>
-                    Crop shape
-                  </Label>
-                  <InfoTip
-                    ariaLabel="About crop shape"
-                    text={
-                      exportSizeUsesAspectAndMaxWidth
-                        ? "Aspect ratios lock the crop mask. Set max width; export height follows the ratio."
-                        : "Aspect ratios lock the crop mask. Custom uses the width and height fields below for the crop shape."
-                    }
-                  />
-                </div>
-                <ToggleGroup
-                  id={`${baseId}-frame-mode`}
-                  className="grid w-full min-w-0 grid-cols-2 gap-0"
-                  type="single"
-                  value={cropFrameMode}
-                  onValueChange={(v) => {
-                    if (v) {
-                      setCropFrameMode(v as CropFrameMode);
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                  spacing={0}
-                >
-                  <ToggleGroupItem
-                    value="aspect"
-                    className="min-w-0 shrink whitespace-normal text-center leading-tight"
-                  >
-                    Aspect ratios
-                  </ToggleGroupItem>
-                  <ToggleGroupItem
-                    value="custom"
-                    className="min-w-0 shrink whitespace-normal text-center leading-tight"
-                  >
-                    Custom
-                  </ToggleGroupItem>
-                </ToggleGroup>
-                {cropFrameMode === "aspect" ? (
-                  <>
-                    <ToggleGroup
-                      id={`${baseId}-aspect`}
-                      className="grid w-full min-w-0 grid-cols-3 gap-0"
-                      type="single"
-                      value={aspectPreset === "unset" ? undefined : aspectPreset}
-                      onValueChange={(v) => {
-                        if (v) {
-                          setAspectPreset(v as AspectPreset);
-                        }
-                      }}
-                      variant="outline"
-                      size="sm"
-                      spacing={0}
-                    >
-                      {visibleBuiltinAspectPresets.map((preset) => (
-                        <ToggleGroupItem
-                          key={preset}
-                          value={preset}
-                          className="min-w-0 shrink whitespace-normal text-center leading-tight"
-                        >
-                          {aspectLabels[preset]}
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
-                    {exportSizeUsesAspectAndMaxWidth ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-1">
-                            <Label className="text-xs" htmlFor={`${baseId}-aspect-max-w`}>
-                              Max width (px)
-                            </Label>
-                            <InfoTip
-                              ariaLabel="About max width"
-                              text="Export width in pixels. Height is computed from the aspect and max width."
-                            />
-                          </div>
-                          <Input
-                            id={`${baseId}-aspect-max-w`}
-                            aria-label="Max export width in pixels"
-                            inputMode="numeric"
-                            type="text"
-                            value={widthStr}
-                            onChange={(e) => setWidthStr(e.target.value)}
-                            onBlur={() => {
-                              onExportMaxWidthBlur?.();
-                            }}
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                          <Label className="text-xs text-muted-foreground" htmlFor={`${baseId}-aspect-derived-h`}>
-                            Height (px)
-                          </Label>
-                          <Input
-                            id={`${baseId}-aspect-derived-h`}
-                            aria-label="Export height in pixels, from aspect and max width"
-                            inputMode="numeric"
-                            type="text"
-                            readOnly
-                            tabIndex={-1}
-                            className="bg-muted/40 tabular-nums"
-                            value={heightStr}
-                          />
-                        </div>
-                      </div>
-                    ) : null}
-                  </>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center gap-1">
-                          <Label className="text-xs" htmlFor={`${baseId}-ow`}>
-                            Width (px)
-                          </Label>
-                          <InfoTip ariaLabel="About output dimensions" text="Use values from 1 to 8192 px per side." />
-                        </div>
-                        <Input
-                          id={`${baseId}-ow`}
-                          aria-label="Output width in pixels"
-                          inputMode="numeric"
-                          type="text"
-                          value={widthStr}
-                          onChange={(e) => setWidthStr(e.target.value)}
-                          onBlur={() => {
-                            if (strictOutputDimensionInputs) {
-                              const w = parseOutputDimensionStrict(widthStr);
-                              if (w == null) {
-                                return;
-                              }
-                              setOutputWidth(w);
-                              setWidthStr(String(w));
-                              return;
-                            }
-                            const w = parseOutputDimension(widthStr, outputWidth);
-                            setOutputWidth(w);
-                            setWidthStr(String(w));
-                          }}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <Label className="text-xs" htmlFor={`${baseId}-oh`}>
-                          Height (px)
-                        </Label>
-                        <Input
-                          id={`${baseId}-oh`}
-                          aria-label="Output height in pixels"
-                          inputMode="numeric"
-                          type="text"
-                          value={heightStr}
-                          onChange={(e) => setHeightStr(e.target.value)}
-                          onBlur={() => {
-                            if (strictOutputDimensionInputs) {
-                              const h = parseOutputDimensionStrict(heightStr);
-                              if (h == null) {
-                                return;
-                              }
-                              setOutputHeight(h);
-                              setHeightStr(String(h));
-                              return;
-                            }
-                            const h = parseOutputDimension(heightStr, outputHeight);
-                            setOutputHeight(h);
-                            setHeightStr(String(h));
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <CropShapeControlsSection
+              baseId={baseId}
+              belowCropEntered={belowCropEntered}
+              exportSizeUsesAspectAndMaxWidth={exportSizeUsesAspectAndMaxWidth}
+              cropFrameMode={cropFrameMode}
+              setCropFrameMode={setCropFrameMode}
+              aspectPreset={aspectPreset}
+              setAspectPreset={setAspectPreset}
+              visibleBuiltinAspectPresets={visibleBuiltinAspectPresets}
+              widthStr={widthStr}
+              setWidthStr={setWidthStr}
+              outputWidth={outputWidth}
+              setOutputWidth={setOutputWidth}
+              heightStr={heightStr}
+              setHeightStr={setHeightStr}
+              outputHeight={outputHeight}
+              setOutputHeight={setOutputHeight}
+              onExportMaxWidthBlur={onExportMaxWidthBlur}
+              strictOutputDimensionInputs={strictOutputDimensionInputs}
+            />
           )}
         </CardContent>
       </Card>

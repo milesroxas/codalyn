@@ -1,4 +1,4 @@
-import { ensureBeaconListTargetCmsTextBindingForPageInstances } from "@/features/beacons/model/beacon-list-target-cms-text-binding";
+import { bindBeaconListTargetInstancesToListCmsText } from "@/features/beacons/model/beacon-list-target-cms-text-binding";
 import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
 import { ensureBeaconListTargetTextProp } from "@/features/beacons/model/beacon-list-target-text-field";
 import { getBeaconListTargetComponentOrNull } from "@/features/beacons/model/create-beacon-list-target-component";
@@ -149,53 +149,74 @@ async function ensureListTargetTextPropForPlace(
   }
 }
 
-export async function placeBeaconListTargetOnCanvas(
+const LIST_TARGET_COMPONENT_MISSING = "No list target component. Create a list target first.";
+
+const PLACEMENT_FAILED =
+  "Could not place the list target. Select a valid container in the canvas or try another location.";
+
+/**
+ * `append` / `after` need the registration id from {@link createBeaconListTargetComponent} in some projects;
+ * `getComponent` by that id can return a handle whose `getProps()` does not list the “Text” field the same way
+ * as the definition resolved by name. Keep two handles: placement vs Text prop + CMS bind.
+ */
+async function resolveListTargetDefAndPlacementDef(
   dataList: string,
   listContainer: BlockElement,
-  preferredDefinitionId?: string | null
-): Promise<PlaceBeaconListTargetOnCanvasResult> {
-  await ensurePageCanvasForListTargetPlacement();
-
+  preferredDefinitionId: string | null | undefined
+): Promise<{ resolvedDef: Component; placementDef: Component }> {
   let resolvedDef = await getBeaconListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
   if (resolvedDef == null) {
-    throw new Error("No list target component. Create a list target first.");
+    throw new Error(LIST_TARGET_COMPONENT_MISSING);
   }
-
-  /**
-   * `append` / `after` need the registration id from {@link createBeaconListTargetComponent} in some projects;
-   * `getComponent` by that id can return a handle whose `getProps()` does not list the “Text” field the same way
-   * as the definition resolved by name. Keep two handles: placement vs Text prop + CMS bind.
-   */
   const definitionIdToFetch = preferredDefinitionId?.trim() || resolvedDef.id;
   let placementDef: Component = resolvedDef;
   try {
     placementDef = await webflow.getComponent(definitionIdToFetch);
   } catch (e) {
-    if (webflowDesignerErrorCauseTag(e) === "ResourceMissing") {
-      resolvedDef = await getBeaconListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
-      if (resolvedDef == null) {
-        throw new Error("No list target component. Create a list target first.");
-      }
-      try {
-        placementDef = await webflow.getComponent(preferredDefinitionId?.trim() || resolvedDef.id);
-      } catch (e2) {
-        if (webflowDesignerErrorCauseTag(e2) === "ResourceMissing") {
-          throw new Error("No list target component. Create a list target first.");
-        }
-        throw e2;
-      }
-    } else {
+    if (webflowDesignerErrorCauseTag(e) !== "ResourceMissing") {
       throw e;
     }
+    resolvedDef = await getBeaconListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
+    if (resolvedDef == null) {
+      throw new Error(LIST_TARGET_COMPONENT_MISSING);
+    }
+    try {
+      placementDef = await webflow.getComponent(preferredDefinitionId?.trim() || resolvedDef.id);
+    } catch (e2) {
+      if (webflowDesignerErrorCauseTag(e2) === "ResourceMissing") {
+        throw new Error(LIST_TARGET_COMPONENT_MISSING);
+      }
+      throw e2;
+    }
   }
+  return { resolvedDef, placementDef };
+}
 
-  await ensureListTargetTextPropForPlace(resolvedDef, dataList, listContainer);
+async function tryPlaceNewListTargetInstance(placementDef: Component): Promise<ComponentElement | null> {
+  const selected = await webflow.getSelectedElement();
+  if (selected) {
+    return placeFromSelection(selected, placementDef);
+  }
+  return placeOnBodyWhenNoSelection(placementDef);
+}
 
-  const bindCmsForAllListTargetInstancesOnPage = async (priority: ComponentElement | null): Promise<void> => {
+/**
+ * The “Text” `textContent` prop is ensured **after** placement when this is the first on-page instance:
+ * {@link ensureBeaconListTargetTextProp} can `enterComponent` an existing instance; if none exists yet, direct
+ * `createProps` on the definition must succeed — running ensure only once an instance is placed makes the
+ * instance path reliable. CMS bind runs after so the prop id exists for `setProps`.
+ */
+function makeListTargetCmsBinder(
+  dataList: string,
+  listContainer: BlockElement,
+  resolvedDef: Component,
+  preferredDefinitionId: string | null | undefined
+): (priority: ComponentElement | null) => Promise<void> {
+  return async (priority: ComponentElement | null): Promise<void> => {
     const allOnPage = await listBeaconListTargetInstancesOnPage(dataList, listContainer, {
       preferredDefinitionId,
     });
-    await ensureBeaconListTargetCmsTextBindingForPageInstances({
+    await bindBeaconListTargetInstancesToListCmsText({
       dataList,
       listContainer,
       def: resolvedDef,
@@ -203,30 +224,36 @@ export async function placeBeaconListTargetOnCanvas(
       priorityInstances: priority != null ? [priority] : undefined,
     });
   };
+}
+
+export async function placeBeaconListTargetOnCanvas(
+  dataList: string,
+  listContainer: BlockElement,
+  preferredDefinitionId?: string | null
+): Promise<PlaceBeaconListTargetOnCanvasResult> {
+  await ensurePageCanvasForListTargetPlacement();
+  const { resolvedDef, placementDef } = await resolveListTargetDefAndPlacementDef(
+    dataList,
+    listContainer,
+    preferredDefinitionId
+  );
+  const bindCms = makeListTargetCmsBinder(dataList, listContainer, resolvedDef, preferredDefinitionId);
 
   const existing = await listBeaconListTargetInstancesOnPage(dataList, listContainer, {
     preferredDefinitionId,
   });
   const firstExisting = existing[0];
   if (firstExisting != null) {
-    await bindCmsForAllListTargetInstancesOnPage(firstExisting);
+    await ensureListTargetTextPropForPlace(resolvedDef, dataList, listContainer);
+    await bindCms(firstExisting);
     return { instance: firstExisting, alreadyExisted: true };
   }
 
-  const selected = await webflow.getSelectedElement();
-  if (selected) {
-    const fromSelection = await placeFromSelection(selected, placementDef);
-    if (fromSelection) {
-      await bindCmsForAllListTargetInstancesOnPage(fromSelection);
-      return { instance: fromSelection, alreadyExisted: false };
-    }
-  } else {
-    const onBody = await placeOnBodyWhenNoSelection(placementDef);
-    if (onBody) {
-      await bindCmsForAllListTargetInstancesOnPage(onBody);
-      return { instance: onBody, alreadyExisted: false };
-    }
+  const placed = await tryPlaceNewListTargetInstance(placementDef);
+  if (placed == null) {
+    throw new Error(PLACEMENT_FAILED);
   }
-
-  throw new Error("Could not place the list target. Select a valid container in the canvas or try another location.");
+  await ensureListTargetTextPropForPlace(resolvedDef, dataList, listContainer);
+  await bindCms(placed);
+  return { instance: placed, alreadyExisted: false };
 }

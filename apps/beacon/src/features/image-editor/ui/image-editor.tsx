@@ -15,7 +15,7 @@ import {
   parseOutputDimension,
   parseOutputDimensionStrict,
 } from "@/features/image-editor/lib/apply-cropped-export";
-import { type EditorAspectSelection, aspectValue } from "@/features/image-editor/lib/aspect-preset";
+import { aspectValue, type EditorAspectSelection } from "@/features/image-editor/lib/aspect-preset";
 import { isCmsPrimaryUploadContext } from "@/features/image-editor/lib/cms-primary-upload-context";
 import { dimensionsFromMaxWidthAndAspect } from "@/features/image-editor/lib/export-dimensions-from-aspect";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";

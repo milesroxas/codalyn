@@ -1,9 +1,9 @@
+import { removeAllBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
 import type { HydratedBeaconComponent } from "@/features/beacons/model/beacon-page-targets";
 import {
   BEACON_UTILITIES_COMPONENT_GROUP,
   getBeaconListTargetComponentOrNull,
 } from "@/features/beacons/model/create-beacon-list-target-component";
-import { removeAllBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
 import { runExclusiveDesignerStyleOp } from "@/features/beacons/model/exclusive-designer-style-op";
 
 /** Site component id + label for the Composer palette (types allowed by Engine for a beacon list). */

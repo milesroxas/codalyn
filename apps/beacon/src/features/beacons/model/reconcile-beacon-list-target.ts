@@ -1,4 +1,4 @@
-import { ensureBeaconListTargetCmsTextBindingForPageInstances } from "@/features/beacons/model/beacon-list-target-cms-text-binding";
+import { bindBeaconListTargetInstancesToListCmsText } from "@/features/beacons/model/beacon-list-target-cms-text-binding";
 import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
 import { ensureBeaconListTargetTextProp } from "@/features/beacons/model/beacon-list-target-text-field";
 import {
@@ -60,7 +60,7 @@ export async function reconcileBeaconListTarget(
       const comp = await getBeaconListTargetComponentOrNull(dataList, listContainer);
       if (comp != null) {
         const instances = await listBeaconListTargetInstancesOnPage(dataList, listContainer);
-        await ensureBeaconListTargetCmsTextBindingForPageInstances({
+        await bindBeaconListTargetInstancesToListCmsText({
           dataList,
           listContainer,
           def: comp,

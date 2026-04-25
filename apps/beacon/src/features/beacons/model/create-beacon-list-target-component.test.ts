@@ -5,8 +5,8 @@ vi.mock("@/features/beacons/model/beacon-list-target-slot-style", () => ({
 }));
 
 import {
-  BEACON_UTILITIES_COMPONENT_GROUP,
   BEACON_LIST_RENDER_TAG,
+  BEACON_UTILITIES_COMPONENT_GROUP,
   getBeaconListTargetComponentOrNull,
   uniqueBeaconListTargetComponentName,
 } from "./create-beacon-list-target-component";
@@ -31,9 +31,7 @@ function installWebflow(overrides: {
  * In-memory `data-*` on the list-target root; `applyBeaconListTargetSync` updates these to match
  * a current {@link listContainer} when ids are stale.
  */
-function makeListTargetDomRoot(
-  initial: Record<string, string>
-): {
+function makeListTargetDomRoot(initial: Record<string, string>): {
   getTag: ReturnType<typeof vi.fn>;
   setTag: ReturnType<typeof vi.fn>;
   getAttribute: ReturnType<typeof vi.fn>;
@@ -45,11 +43,9 @@ function makeListTargetDomRoot(
     getTag: vi.fn().mockImplementation(async () => BEACON_LIST_RENDER_TAG),
     setTag: vi.fn().mockResolvedValue(undefined),
     getAttribute: vi.fn().mockImplementation(async (k: string) => (k in attrs ? attrs[k] : null)),
-    setAttribute: vi
-      .fn()
-      .mockImplementation(async (k: string, v: string) => {
-        attrs[k] = v;
-      }),
+    setAttribute: vi.fn().mockImplementation(async (k: string, v: string) => {
+      attrs[k] = v;
+    }),
     setStyles: vi.fn().mockResolvedValue(undefined),
   };
 }
@@ -164,7 +160,10 @@ describe("getBeaconListTargetComponentOrNull", () => {
 
     const out = await getBeaconListTargetComponentOrNull(DATA_LIST, listContainer, "def-wrong");
     expect(out).toBe(byName);
-    expect(getComponentByName).toHaveBeenCalledWith(BEACON_UTILITIES_COMPONENT_GROUP, uniqueBeaconListTargetComponentName(DATA_LIST, listContainer));
+    expect(getComponentByName).toHaveBeenCalledWith(
+      BEACON_UTILITIES_COMPONENT_GROUP,
+      uniqueBeaconListTargetComponentName(DATA_LIST, listContainer)
+    );
   });
 
   it("on ResourceMissing for hint, falls back to getComponentByName", async () => {

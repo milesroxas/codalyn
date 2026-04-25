@@ -5,8 +5,12 @@ import type { Area, MediaSize } from "react-easy-crop";
 import Cropper from "react-easy-crop";
 
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
-import { parseOutputDimension, WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
-import { type AspectPreset, aspectLabels } from "@/features/image-editor/lib/aspect-preset";
+import {
+  parseOutputDimension,
+  parseOutputDimensionStrict,
+  WEBFLOW_IMAGE_ELEMENT_TYPE,
+} from "@/features/image-editor/lib/apply-cropped-export";
+import { type AspectPreset, type EditorAspectSelection, aspectLabels } from "@/features/image-editor/lib/aspect-preset";
 import type { AssetFolderRow } from "@/features/image-editor/lib/asset-folder-row";
 import type { ElementCmsBindingResolution } from "@/features/image-editor/lib/cms-primary-upload-context";
 import type { ComponentImagePropOption } from "@/features/image-editor/lib/component-image-prop";
@@ -87,7 +91,7 @@ function maxZoomForNativeResolutionCap(media: MediaSize | null, limit: boolean):
 /** Aspect ratio templates vs. W×H-driven crop frame (same slot in the UI). */
 export type CropFrameMode = "aspect" | "custom";
 
-export type { AspectPreset, AssetFolderRow, ComponentImagePropOption };
+export type { AspectPreset, EditorAspectSelection, AssetFolderRow, ComponentImagePropOption };
 
 export type ImageEditorCropExportPanelProps = {
   baseId: string;
@@ -100,8 +104,8 @@ export type ImageEditorCropExportPanelProps = {
   onCropComplete: (c: Area, px: Area) => void;
   cropFrameMode: CropFrameMode;
   setCropFrameMode: (m: CropFrameMode) => void;
-  aspectPreset: AspectPreset;
-  setAspectPreset: (p: AspectPreset) => void;
+  aspectPreset: EditorAspectSelection;
+  setAspectPreset: (p: EditorAspectSelection) => void;
   visibleBuiltinAspectPresets: AspectPreset[];
   widthStr: string;
   setWidthStr: (s: string) => void;
@@ -157,6 +161,12 @@ export type ImageEditorCropExportPanelProps = {
   onApplyToCanvas: () => void | Promise<void>;
   /** When set, primary export is disabled. */
   exportPlaceBlockedLabel: string | null;
+  /** When set, export is blocked (e.g. aspect / width not chosen yet for untagged targets). */
+  exportSizeBlockedMessage: string | null;
+  /** When false, “Next: review & save” on the two-step path stays disabled. */
+  exportDimensionsReady?: boolean;
+  /** When true, empty W×H fields are invalid (no numeric fallback) on blur. */
+  strictOutputDimensionInputs?: boolean;
   parsedExportWidth: number;
   parsedExportHeight: number;
   effectiveExportWidth: number;
@@ -169,6 +179,12 @@ export type ImageEditorCropExportPanelProps = {
   /** Auto path: one screen (crop + encode + folder + place); no placement step — target was chosen earlier. */
   unifiedPositionAndSave?: boolean;
   frameSummary: string;
+  /**
+   * No designer export attributes on the image: show aspect presets plus max width; height is derived from the
+   * chosen aspect and max width.
+   */
+  exportSizeUsesAspectAndMaxWidth?: boolean;
+  onExportMaxWidthBlur?: () => void;
 };
 
 /** Fade + slide down into place; `delayMs` staggers rows below the crop preview. */
@@ -255,8 +271,9 @@ function placeButtonStateIfDownloadExport(p: {
   return { disabled: false, label: "Download image", busy: false };
 }
 
-function placeButtonStateForPlacement(p: {
+type PlaceButtonPlacementGates = {
   exportPlaceBlockedLabel: string | null;
+  exportSizeBlockedMessage: string | null;
   busy: boolean;
   foldersLoading: boolean;
   assetFolderCount: number;
@@ -269,25 +286,27 @@ function placeButtonStateForPlacement(p: {
   componentImagePropsResolving: boolean;
   componentImagePropCount: number;
   selectedComponentImagePropId: string | null;
-}): PlaceButtonState {
+};
+
+function placeButtonStateBeforePlacementReadiness(p: PlaceButtonPlacementGates): PlaceButtonState | null {
   const {
     exportPlaceBlockedLabel,
+    exportSizeBlockedMessage,
     busy,
     foldersLoading,
     assetFolderCount,
     selectedAssetFolderId,
     cmsPrimaryUpload,
     elementCmsBindingLoading,
-    completedCrop,
     placement,
     selectedElementType,
-    componentImagePropsResolving,
-    componentImagePropCount,
-    selectedComponentImagePropId,
   } = p;
-
   if (busy) {
     return { disabled: true, label: "Saving…", busy: true };
+  }
+
+  if (exportSizeBlockedMessage) {
+    return { disabled: true, label: exportSizeBlockedMessage, busy: false };
   }
 
   if (exportPlaceBlockedLabel) {
@@ -295,21 +314,21 @@ function placeButtonStateForPlacement(p: {
   }
 
   const downloadState = placeButtonStateIfDownloadExport({
-    placement,
-    completedCrop,
-    selectedElementType,
-    componentImagePropsResolving,
-    componentImagePropCount,
-    selectedComponentImagePropId,
+    placement: p.placement,
+    completedCrop: p.completedCrop,
+    selectedElementType: p.selectedElementType,
+    componentImagePropsResolving: p.componentImagePropsResolving,
+    componentImagePropCount: p.componentImagePropCount,
+    selectedComponentImagePropId: p.selectedComponentImagePropId,
   });
   if (downloadState) {
     return downloadState;
   }
 
-  if (foldersLoading) {
+  if (foldersLoading && !cmsPrimaryUpload) {
     return { disabled: true, label: "Loading folders…", busy: false };
   }
-  if (assetFolderCount === 0) {
+  if (assetFolderCount === 0 && !cmsPrimaryUpload) {
     return { disabled: true, label: "Create an Assets folder", busy: false };
   }
 
@@ -328,6 +347,24 @@ function placeButtonStateForPlacement(p: {
   if (selectedAssetFolderId === null && !cmsPrimaryUpload) {
     return { disabled: true, label: "Choose a folder", busy: false };
   }
+
+  return null;
+}
+
+function placeButtonStateForPlacement(p: PlaceButtonPlacementGates): PlaceButtonState {
+  const gated = placeButtonStateBeforePlacementReadiness(p);
+  if (gated) {
+    return gated;
+  }
+
+  const {
+    completedCrop,
+    placement,
+    selectedElementType,
+    componentImagePropsResolving,
+    componentImagePropCount,
+    selectedComponentImagePropId,
+  } = p;
 
   const readiness = getImageEditorPlacementReadiness({
     placement,
@@ -384,8 +421,8 @@ type CropStageProps = {
   belowCropEntered: boolean;
   cropFrameMode: CropFrameMode;
   setCropFrameMode: (m: CropFrameMode) => void;
-  aspectPreset: AspectPreset;
-  setAspectPreset: (p: AspectPreset) => void;
+  aspectPreset: EditorAspectSelection;
+  setAspectPreset: (p: EditorAspectSelection) => void;
   visibleBuiltinAspectPresets: AspectPreset[];
   widthStr: string;
   setWidthStr: (s: string) => void;
@@ -397,9 +434,12 @@ type CropStageProps = {
   setOutputHeight: (n: number) => void;
   limitCropZoomToNativeResolution: boolean;
   positionOnly: boolean;
+  strictOutputDimensionInputs?: boolean;
   /** When `positionOnly`, show a step badge (e.g. Auto path single screen). */
   showPositionStepBadge?: boolean;
   frameSummary: string;
+  exportSizeUsesAspectAndMaxWidth?: boolean;
+  onExportMaxWidthBlur?: () => void;
 };
 
 function CropStageSection(p: CropStageProps) {
@@ -430,6 +470,9 @@ function CropStageSection(p: CropStageProps) {
     positionOnly,
     showPositionStepBadge = false,
     frameSummary,
+    exportSizeUsesAspectAndMaxWidth = false,
+    onExportMaxWidthBlur,
+    strictOutputDimensionInputs = false,
   } = p;
 
   const [cropMediaSize, setCropMediaSize] = useState<MediaSize | null>(null);
@@ -506,7 +549,7 @@ function CropStageSection(p: CropStageProps) {
             </div>
           </div>
 
-          {positionOnly ? null : (
+          {positionOnly && !exportSizeUsesAspectAndMaxWidth ? null : (
             <div className={staggerBelowCropClass(belowCropEntered, 90)}>
               <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
                 <div className="flex items-center gap-1">
@@ -515,7 +558,11 @@ function CropStageSection(p: CropStageProps) {
                   </Label>
                   <InfoTip
                     ariaLabel="About crop shape"
-                    text="Aspect ratios lock the crop mask. Custom uses the width and height fields below for the crop shape."
+                    text={
+                      exportSizeUsesAspectAndMaxWidth
+                        ? "Aspect ratios lock the crop mask. Set max width; export height follows the ratio."
+                        : "Aspect ratios lock the crop mask. Custom uses the width and height fields below for the crop shape."
+                    }
                   />
                 </div>
                 <ToggleGroup
@@ -546,30 +593,73 @@ function CropStageSection(p: CropStageProps) {
                   </ToggleGroupItem>
                 </ToggleGroup>
                 {cropFrameMode === "aspect" ? (
-                  <ToggleGroup
-                    id={`${baseId}-aspect`}
-                    className="grid w-full min-w-0 grid-cols-3 gap-0"
-                    type="single"
-                    value={aspectPreset}
-                    onValueChange={(v) => {
-                      if (v) {
-                        setAspectPreset(v as AspectPreset);
-                      }
-                    }}
-                    variant="outline"
-                    size="sm"
-                    spacing={0}
-                  >
-                    {visibleBuiltinAspectPresets.map((preset) => (
-                      <ToggleGroupItem
-                        key={preset}
-                        value={preset}
-                        className="min-w-0 shrink whitespace-normal text-center leading-tight"
-                      >
-                        {aspectLabels[preset]}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
+                  <>
+                    <ToggleGroup
+                      id={`${baseId}-aspect`}
+                      className="grid w-full min-w-0 grid-cols-3 gap-0"
+                      type="single"
+                      value={aspectPreset === "unset" ? undefined : aspectPreset}
+                      onValueChange={(v) => {
+                        if (v) {
+                          setAspectPreset(v as AspectPreset);
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                      spacing={0}
+                    >
+                      {visibleBuiltinAspectPresets.map((preset) => (
+                        <ToggleGroupItem
+                          key={preset}
+                          value={preset}
+                          className="min-w-0 shrink whitespace-normal text-center leading-tight"
+                        >
+                          {aspectLabels[preset]}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                    {exportSizeUsesAspectAndMaxWidth ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-1">
+                            <Label className="text-xs" htmlFor={`${baseId}-aspect-max-w`}>
+                              Max width (px)
+                            </Label>
+                            <InfoTip
+                              ariaLabel="About max width"
+                              text="Export width in pixels. Height is computed from the aspect and max width."
+                            />
+                          </div>
+                          <Input
+                            id={`${baseId}-aspect-max-w`}
+                            aria-label="Max export width in pixels"
+                            inputMode="numeric"
+                            type="text"
+                            value={widthStr}
+                            onChange={(e) => setWidthStr(e.target.value)}
+                            onBlur={() => {
+                              onExportMaxWidthBlur?.();
+                            }}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <Label className="text-xs text-muted-foreground" htmlFor={`${baseId}-aspect-derived-h`}>
+                            Height (px)
+                          </Label>
+                          <Input
+                            id={`${baseId}-aspect-derived-h`}
+                            aria-label="Export height in pixels, from aspect and max width"
+                            inputMode="numeric"
+                            type="text"
+                            readOnly
+                            tabIndex={-1}
+                            className="bg-muted/40 tabular-nums"
+                            value={heightStr}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
                 ) : (
                   <div className="flex flex-col gap-2">
                     <div className="grid grid-cols-2 gap-2">
@@ -588,6 +678,15 @@ function CropStageSection(p: CropStageProps) {
                           value={widthStr}
                           onChange={(e) => setWidthStr(e.target.value)}
                           onBlur={() => {
+                            if (strictOutputDimensionInputs) {
+                              const w = parseOutputDimensionStrict(widthStr);
+                              if (w == null) {
+                                return;
+                              }
+                              setOutputWidth(w);
+                              setWidthStr(String(w));
+                              return;
+                            }
                             const w = parseOutputDimension(widthStr, outputWidth);
                             setOutputWidth(w);
                             setWidthStr(String(w));
@@ -606,6 +705,15 @@ function CropStageSection(p: CropStageProps) {
                           value={heightStr}
                           onChange={(e) => setHeightStr(e.target.value)}
                           onBlur={() => {
+                            if (strictOutputDimensionInputs) {
+                              const h = parseOutputDimensionStrict(heightStr);
+                              if (h == null) {
+                                return;
+                              }
+                              setOutputHeight(h);
+                              setHeightStr(String(h));
+                              return;
+                            }
                             const h = parseOutputDimension(heightStr, outputHeight);
                             setOutputHeight(h);
                             setHeightStr(String(h));
@@ -1126,9 +1234,7 @@ function AssetDestinationCard(p: AssetFolderCardProps) {
     stepBadgeNumber = 3,
   } = p;
 
-  const hideCardForCmsAutoFile = cmsPrimaryUpload && assetFolders.length > 0 && !foldersLoading;
-
-  if (hideCardForCmsAutoFile) {
+  if (cmsPrimaryUpload) {
     return null;
   }
 
@@ -1362,6 +1468,9 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     busy,
     onApplyToCanvas,
     exportPlaceBlockedLabel,
+    exportSizeBlockedMessage,
+    exportDimensionsReady = true,
+    strictOutputDimensionInputs = false,
     parsedExportWidth,
     parsedExportHeight,
     effectiveExportWidth,
@@ -1372,6 +1481,8 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     onContinueToSave,
     unifiedPositionAndSave = false,
     frameSummary,
+    exportSizeUsesAspectAndMaxWidth = false,
+    onExportMaxWidthBlur,
   } = props;
 
   const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
@@ -1418,6 +1529,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     () =>
       placeButtonStateForPlacement({
         exportPlaceBlockedLabel,
+        exportSizeBlockedMessage,
         busy,
         foldersLoading,
         assetFolderCount: assetFolders.length,
@@ -1433,6 +1545,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
       }),
     [
       exportPlaceBlockedLabel,
+      exportSizeBlockedMessage,
       busy,
       foldersLoading,
       assetFolders.length,
@@ -1499,6 +1612,9 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
           positionOnly
           showPositionStepBadge
           frameSummary={frameSummary}
+          exportSizeUsesAspectAndMaxWidth={exportSizeUsesAspectAndMaxWidth}
+          onExportMaxWidthBlur={onExportMaxWidthBlur}
+          strictOutputDimensionInputs={strictOutputDimensionInputs}
         />
         <ExportEncodeCard
           baseId={baseId}
@@ -1596,9 +1712,17 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
           limitCropZoomToNativeResolution={limitCropZoomToNativeResolution}
           positionOnly
           frameSummary={frameSummary}
+          exportSizeUsesAspectAndMaxWidth={exportSizeUsesAspectAndMaxWidth}
+          onExportMaxWidthBlur={onExportMaxWidthBlur}
+          strictOutputDimensionInputs={strictOutputDimensionInputs}
         />
         <div className="mt-4 flex flex-col gap-2 px-4">
-          <Button type="button" className="w-full" disabled={!completedCrop} onClick={onContinueToSave}>
+          <Button
+            type="button"
+            className="w-full"
+            disabled={!completedCrop || !exportDimensionsReady}
+            onClick={onContinueToSave}
+          >
             Next: review &amp; save
           </Button>
         </div>

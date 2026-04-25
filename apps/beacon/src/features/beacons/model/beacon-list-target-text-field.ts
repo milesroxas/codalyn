@@ -17,6 +17,12 @@ function listTargetTextFieldProp(props: readonly Prop[]): Prop | undefined {
   );
 }
 
+/** Resolves the “Text” prop id for CMS / instance bindings; `null` when the prop is missing. */
+export async function getBeaconListTargetTextPropId(def: Component): Promise<string | null> {
+  const p = listTargetTextFieldProp(await def.getProps());
+  return p?.id ?? null;
+}
+
 function beaconListTargetTextContentPropOptions() {
   return {
     type: "textContent" as const,

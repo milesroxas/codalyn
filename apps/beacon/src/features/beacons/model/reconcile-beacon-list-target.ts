@@ -1,3 +1,5 @@
+import { ensureBeaconListTargetCmsTextBindingForPageInstances } from "@/features/beacons/model/beacon-list-target-cms-text-binding";
+import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
 import { ensureBeaconListTargetTextProp } from "@/features/beacons/model/beacon-list-target-text-field";
 import {
   applyBeaconListTargetSync,
@@ -27,7 +29,7 @@ export async function reconcileBeaconListTarget(
   dataList: string,
   listContainer: BlockElement
 ): Promise<ReconcileBeaconListTargetResult> {
-  return runExclusiveDesignerStyleOp(async () => {
+  const opResult = await runExclusiveDesignerStyleOp(async (): Promise<ReconcileBeaconListTargetResult> => {
     const comp = await getBeaconListTargetComponentOrNull(dataList, listContainer);
     if (comp == null) {
       return { type: "absent" };
@@ -52,6 +54,25 @@ export async function reconcileBeaconListTarget(
     const name = await comp.getName();
     return { type: "ready", name, listWasUpdated: needs };
   });
+
+  if (opResult.type === "ready") {
+    try {
+      const comp = await getBeaconListTargetComponentOrNull(dataList, listContainer);
+      if (comp != null) {
+        const instances = await listBeaconListTargetInstancesOnPage(dataList, listContainer);
+        await ensureBeaconListTargetCmsTextBindingForPageInstances({
+          dataList,
+          listContainer,
+          def: comp,
+          instances,
+        });
+      }
+    } catch (e) {
+      console.warn("[beacon] CMS text bind (reconcile):", e);
+    }
+  }
+
+  return opResult;
 }
 
 export type BeaconListTargetOpenReconcile = {

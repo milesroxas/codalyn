@@ -30,6 +30,19 @@ export function parseOutputDimension(input: string, fallback: number): number {
   return clampEdge(n);
 }
 
+/** Like `parseOutputDimension` but no fallback — used when export size must be entered explicitly. */
+export function parseOutputDimensionStrict(input: string): number | null {
+  const t = input.trim();
+  if (t === "") {
+    return null;
+  }
+  const n = Number(t);
+  if (Number.isNaN(n)) {
+    return null;
+  }
+  return clampEdge(n);
+}
+
 /**
  * Pixel dimensions for export so the output matches the crop aspect ratio (no stretch).
  * Uses the larger of the resolved width/height as the long edge, then derives the other side.
@@ -265,7 +278,8 @@ async function tryApplyComponentInstanceImageProp(
   instance: ComponentElement,
   asset: Asset,
   componentImagePropId: string | null | undefined,
-  currentCmsItemId: string | null | undefined
+  currentCmsItemId: string | null | undefined,
+  targetFolder: AssetFolder | null
 ): Promise<ExportResult | null> {
   const imageProps = await searchComponentInstanceImageProps(instance);
   if (imageProps.length === 0) {
@@ -303,6 +317,10 @@ async function tryApplyComponentInstanceImageProp(
     return result;
   }
 
+  if (!targetFolder) {
+    return { kind: "error", message: "Create an Assets folder first." };
+  }
+  await applyAssetFolder(asset, targetFolder);
   await instance.setProps([{ propId, value: asset.id }]);
   return {
     kind: "success",
@@ -333,7 +351,7 @@ async function handleReplaceWithLibraryAsset(options: {
 async function handleReplacePlacement(options: {
   selectedElement: AnyElement | null;
   file: File;
-  targetFolder: AssetFolder;
+  targetFolder: AssetFolder | null;
   replaceLibraryAsset: boolean;
   currentCmsItemId: string | null | undefined;
 }): Promise<ExportResult> {
@@ -352,7 +370,12 @@ async function handleReplacePlacement(options: {
   }
   if (cmsBinding) {
     const asset = await webflow.createAsset(file);
-    await applyAssetFolder(asset, targetFolder);
+    if (!currentCmsItemId) {
+      if (!targetFolder) {
+        return { kind: "error", message: "Create an Assets folder first." };
+      }
+      await applyAssetFolder(asset, targetFolder);
+    }
     const result = await applyCmsBindingWithAsset({
       binding: cmsBinding.binding,
       label: cmsBinding.label,
@@ -365,9 +388,15 @@ async function handleReplacePlacement(options: {
   }
 
   if (replaceLibraryAsset) {
+    if (!targetFolder) {
+      return { kind: "error", message: "Create an Assets folder first." };
+    }
     return handleReplaceWithLibraryAsset({ img, file, targetFolder });
   }
 
+  if (!targetFolder) {
+    return { kind: "error", message: "Create an Assets folder first." };
+  }
   const asset = await webflow.createAsset(file);
   await applyAssetFolder(asset, targetFolder);
   await img.setAsset(asset);
@@ -378,20 +407,20 @@ async function handleReplacePlacement(options: {
 async function handleSelectionPlacement(options: {
   selectedElement: AnyElement | null;
   file: File;
-  targetFolder: AssetFolder;
+  targetFolder: AssetFolder | null;
   componentImagePropId: string | null | undefined;
   currentCmsItemId: string | null | undefined;
 }): Promise<ExportResult> {
   const { selectedElement, file, targetFolder, componentImagePropId, currentCmsItemId } = options;
   const asset = await webflow.createAsset(file);
-  await applyAssetFolder(asset, targetFolder);
 
   if (selectedElement?.type === "ComponentInstance") {
     const applied = await tryApplyComponentInstanceImageProp(
       selectedElement as ComponentElement,
       asset,
       componentImagePropId,
-      currentCmsItemId
+      currentCmsItemId,
+      targetFolder
     );
     if (applied) {
       return applied;
@@ -418,6 +447,10 @@ async function handleSelectionPlacement(options: {
     }
   }
 
+  if (!targetFolder) {
+    return { kind: "error", message: "Create an Assets folder first." };
+  }
+  await applyAssetFolder(asset, targetFolder);
   await placeImageOnCanvasWithAsset(asset, false);
   return { kind: "success", message: "Image placed." };
 }
@@ -435,7 +468,8 @@ export async function applyCroppedImageToWebflow(options: {
   componentImagePropId?: string | null;
   /** Current CMS item id from Designer `currentcmsitem` subscription. */
   currentCmsItemId?: string | null;
-  targetFolder: AssetFolder;
+  /** `null` is allowed for CMS field uploads that skip library folder placement, or when no folders exist in primary-CMS context. */
+  targetFolder: AssetFolder | null;
   placement: PlacementMode;
   /** Only for `placement === "replace"`: update the existing Assets file instead of uploading a new asset. */
   replaceLibraryAsset: boolean;
@@ -465,12 +499,18 @@ export async function applyCroppedImageToWebflow(options: {
     const selectedElement = await webflow.getSelectedElement();
 
     if (placement === "library") {
+      if (!targetFolder) {
+        return { kind: "error", message: "Create an Assets folder first." };
+      }
       const asset = await webflow.createAsset(file);
       await applyAssetFolder(asset, targetFolder);
       return { kind: "success", message: "Saved to Assets." };
     }
 
     if (placement === "canvas") {
+      if (!targetFolder) {
+        return { kind: "error", message: "Create an Assets folder first." };
+      }
       const asset = await webflow.createAsset(file);
       await applyAssetFolder(asset, targetFolder);
       await placeImageOnCanvasAtBody(asset);

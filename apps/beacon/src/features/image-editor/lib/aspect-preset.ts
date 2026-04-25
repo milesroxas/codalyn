@@ -1,5 +1,10 @@
 export type AspectPreset = "free" | "1" | "16-9" | "4-3" | "3-2" | "9-16";
 
+/**
+ * `unset` — user has not chosen a crop aspect yet (image editor only; not persisted in settings).
+ */
+export type EditorAspectSelection = AspectPreset | "unset";
+
 export const aspectLabels: Record<AspectPreset, string> = {
   free: "Free",
   "1": "1:1",
@@ -8,6 +13,13 @@ export const aspectLabels: Record<AspectPreset, string> = {
   "3-2": "3:2",
   "9-16": "9:16",
 };
+
+export function editorAspectLabel(selection: EditorAspectSelection): string {
+  if (selection === "unset") {
+    return "—";
+  }
+  return aspectLabels[selection];
+}
 
 export function aspectValue(preset: AspectPreset): number | undefined {
   switch (preset) {

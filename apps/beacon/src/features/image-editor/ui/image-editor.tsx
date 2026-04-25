@@ -10,14 +10,16 @@ import {
 import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
-import { outputDimensionsMatchingCrop, parseOutputDimension } from "@/features/image-editor/lib/apply-cropped-export";
-import { type AspectPreset, aspectValue } from "@/features/image-editor/lib/aspect-preset";
-import { isCmsPrimaryUploadContext } from "@/features/image-editor/lib/cms-primary-upload-context";
 import {
-  type ExportDimensionInferenceSource,
-  inferExportDimensionsForTarget,
-} from "@/features/image-editor/lib/infer-image-target-dimensions";
+  outputDimensionsMatchingCrop,
+  parseOutputDimension,
+  parseOutputDimensionStrict,
+} from "@/features/image-editor/lib/apply-cropped-export";
+import { type EditorAspectSelection, aspectValue } from "@/features/image-editor/lib/aspect-preset";
+import { isCmsPrimaryUploadContext } from "@/features/image-editor/lib/cms-primary-upload-context";
+import { dimensionsFromMaxWidthAndAspect } from "@/features/image-editor/lib/export-dimensions-from-aspect";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
+import { readBeaconDesignerExportForTarget } from "@/features/image-editor/lib/read-beacon-designer-export-for-target";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { useApplyCroppedToWebflow } from "@/features/image-editor/model/use-apply-cropped-to-webflow";
 import { useCmsCollectionTemplatePage } from "@/features/image-editor/model/use-cms-collection-template-page";
@@ -44,6 +46,22 @@ import { cn } from "@/shared/lib/utils";
 
 const TOWER_EMAIL_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";
 
+function shouldShowAutoPageSelectionChoice(
+  pathMode: string,
+  flowStep: string,
+  autoDiscoverySettled: boolean,
+  dismissedCanvasSelectionPrompt: boolean,
+  autoSelectionHintKind: string
+): boolean {
+  return (
+    pathMode === "auto" &&
+    flowStep === "autoElement" &&
+    autoDiscoverySettled &&
+    !dismissedCanvasSelectionPrompt &&
+    (autoSelectionHintKind === "image" || autoSelectionHintKind === "component")
+  );
+}
+
 type ImageEditorProps = {
   onOnboardingVisibilityChange?: (visible: boolean) => void;
 };
@@ -63,13 +81,13 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [aspectPreset, setAspectPreset] = useState<AspectPreset>(settings.defaultAspectPreset);
+  const [aspectPreset, setAspectPreset] = useState<EditorAspectSelection>("unset");
   const [cropFrameMode, setCropFrameMode] = useState<CropFrameMode>("aspect");
   const [completedCrop, setCompletedCrop] = useState<Area | null>(null);
-  const [outputWidth, setOutputWidth] = useState(1200);
-  const [outputHeight, setOutputHeight] = useState(1200);
-  const [widthStr, setWidthStr] = useState("1200");
-  const [heightStr, setHeightStr] = useState("1200");
+  const [outputWidth, setOutputWidth] = useState(0);
+  const [outputHeight, setOutputHeight] = useState(0);
+  const [widthStr, setWidthStr] = useState("");
+  const [heightStr, setHeightStr] = useState("");
   const [fileBaseName, setFileBaseName] = useState("edited");
   const [quality, setQuality] = useState(settings.defaultExportQuality);
   const [exportFormat, setExportFormat] = useState<ImageExportFormat>(settings.defaultExportFormat);
@@ -83,9 +101,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
     setImageSrcInternal(action);
   }, []);
   const [autoPageTarget, setAutoPageTarget] = useState<ImagePageTarget | null>(null);
-  const [autoExportInferenceSource, setAutoExportInferenceSource] = useState<ExportDimensionInferenceSource | null>(
-    null
-  );
+  const [autoTargetHasDesignerExportTag, setAutoTargetHasDesignerExportTag] = useState(false);
   const [dismissedCanvasSelectionPrompt, setDismissedCanvasSelectionPrompt] = useState(false);
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
   const exportDefaultsHydratedRef = useRef(!towerUser?.id);
@@ -121,11 +137,36 @@ export function ImageEditor(props: ImageEditorProps = {}) {
 
   const visibleBuiltinAspectPresets = useMemo(() => getVisibleBuiltinAspectPresets(settings), [settings]);
 
+  const useManualAspectAndMaxWidth = !autoTargetHasDesignerExportTag;
+
+  const aspectPresetsForCrop = useMemo(() => {
+    if (useManualAspectAndMaxWidth) {
+      const withoutFree = visibleBuiltinAspectPresets.filter((p) => p !== "free");
+      return withoutFree.length > 0 ? withoutFree : visibleBuiltinAspectPresets;
+    }
+    return visibleBuiltinAspectPresets;
+  }, [useManualAspectAndMaxWidth, visibleBuiltinAspectPresets]);
+
+  const autoTargetExportSizeLabel = useMemo((): "tag" | "manual" | null => {
+    if (autoPageTarget == null) {
+      return null;
+    }
+    return autoTargetHasDesignerExportTag ? "tag" : "manual";
+  }, [autoPageTarget, autoTargetHasDesignerExportTag]);
+
+  const widthStrRef = useRef(widthStr);
+  widthStrRef.current = widthStr;
+  const outputWidthRef = useRef(outputWidth);
+  outputWidthRef.current = outputWidth;
+
   useEffect(() => {
     if (visibleBuiltinAspectPresets.length === 0) {
       return;
     }
-    if (!visibleBuiltinAspectPresets.includes(aspectPreset)) {
+    if (aspectPreset === "unset") {
+      return;
+    }
+    if (!visibleBuiltinAspectPresets.includes(aspectPreset as (typeof visibleBuiltinAspectPresets)[number])) {
       const next = visibleBuiltinAspectPresets[0];
       if (next !== undefined) {
         setAspectPreset(next);
@@ -140,6 +181,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
         placement,
         selectedElementType,
         elementCmsBinding,
+        elementCmsBindingLoading,
         componentImagePropsResolving,
         componentImageProps,
         selectedComponentImagePropId,
@@ -149,6 +191,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
       placement,
       selectedElementType,
       elementCmsBinding,
+      elementCmsBindingLoading,
       componentImagePropsResolving,
       componentImageProps,
       selectedComponentImagePropId,
@@ -178,7 +221,6 @@ export function ImageEditor(props: ImageEditorProps = {}) {
     serverExportDefaultsAppliedRef.current = true;
     setExportFormat(settings.defaultExportFormat);
     setQuality(settings.defaultExportQuality);
-    setAspectPreset(settings.defaultAspectPreset);
     exportDefaultsHydratedRef.current = true;
   }, [towerUser?.id, syncState, settings]);
 
@@ -189,9 +231,8 @@ export function ImageEditor(props: ImageEditorProps = {}) {
     updateSettings({
       defaultExportFormat: exportFormat,
       defaultExportQuality: quality,
-      defaultAspectPreset: aspectPreset,
     });
-  }, [exportFormat, quality, aspectPreset, canPersistExportDefaults, updateSettings]);
+  }, [exportFormat, quality, canPersistExportDefaults, updateSettings]);
 
   useEffect(() => {
     if (!allowAvifEncoding && exportFormat === "avif") {
@@ -218,8 +259,19 @@ export function ImageEditor(props: ImageEditorProps = {}) {
 
   useRevokeBlobUrlOnChange(imageSrc);
 
-  const parsedOutputW = useMemo(() => parseOutputDimension(widthStr, outputWidth), [widthStr, outputWidth]);
-  const parsedOutputH = useMemo(() => parseOutputDimension(heightStr, outputHeight), [heightStr, outputHeight]);
+  const parsedOutputW = useMemo(() => {
+    if (autoTargetHasDesignerExportTag) {
+      return parseOutputDimension(widthStr, outputWidth);
+    }
+    return parseOutputDimensionStrict(widthStr) ?? 0;
+  }, [widthStr, outputWidth, autoTargetHasDesignerExportTag]);
+
+  const parsedOutputH = useMemo(() => {
+    if (autoTargetHasDesignerExportTag) {
+      return parseOutputDimension(heightStr, outputHeight);
+    }
+    return parseOutputDimensionStrict(heightStr) ?? 0;
+  }, [heightStr, outputHeight, autoTargetHasDesignerExportTag]);
 
   const { effectiveOutputW, effectiveOutputH } = useMemo(() => {
     if (!completedCrop) {
@@ -229,6 +281,28 @@ export function ImageEditor(props: ImageEditorProps = {}) {
     return { effectiveOutputW: width, effectiveOutputH: height };
   }, [completedCrop, parsedOutputW, parsedOutputH]);
 
+  const exportDimensionsReady = useMemo((): boolean => {
+    if (autoTargetHasDesignerExportTag) {
+      return true;
+    }
+    if (cropFrameMode === "custom") {
+      return parseOutputDimensionStrict(widthStr) != null && parseOutputDimensionStrict(heightStr) != null;
+    }
+    if (aspectPreset === "unset") {
+      return false;
+    }
+    const w = parseOutputDimensionStrict(widthStr);
+    const r = aspectValue(aspectPreset);
+    if (r == null || w == null || w < 1) {
+      return false;
+    }
+    return true;
+  }, [autoTargetHasDesignerExportTag, cropFrameMode, widthStr, heightStr, aspectPreset]);
+
+  const exportSizeBlockedMessage: string | null = exportDimensionsReady
+    ? null
+    : "Choose export width and height (aspect + max width, or Custom) before placing";
+
   const cropAspect = useMemo(() => {
     if (cropFrameMode === "custom") {
       const h = effectiveOutputH;
@@ -236,6 +310,9 @@ export function ImageEditor(props: ImageEditorProps = {}) {
         return undefined;
       }
       return effectiveOutputW / h;
+    }
+    if (aspectPreset === "unset") {
+      return undefined;
     }
     return aspectValue(aspectPreset);
   }, [cropFrameMode, effectiveOutputW, effectiveOutputH, aspectPreset]);
@@ -319,7 +396,8 @@ export function ImageEditor(props: ImageEditorProps = {}) {
     parsedOutputW,
     parsedOutputH,
     autoTargetLabel: autoPageTarget?.label ?? null,
-    autoExportInferenceSource,
+    autoTargetExportSizeLabel,
+    exportDimensionsReady,
     isWorkspaceDesigner,
   });
 
@@ -364,6 +442,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
 
   const applyAutoPageTarget = useCallback(
     async (t: ImagePageTarget) => {
+      setAutoTargetHasDesignerExportTag(false);
       try {
         await webflow.setSelectedElement(t.element);
       } catch {
@@ -373,29 +452,94 @@ export function ImageEditor(props: ImageEditorProps = {}) {
         setSelectedComponentImagePropId(t.imagePropId);
       }
       setPlacement(t.kind === "image" ? "replace" : "selection");
-      setCropFrameMode("custom");
-      const dims = await inferExportDimensionsForTarget(t);
-      setAutoExportInferenceSource(dims.inferenceSource);
-      setOutputWidth(dims.width);
-      setOutputHeight(dims.height);
-      setWidthStr(String(dims.width));
-      setHeightStr(String(dims.height));
-      setAspectPreset("free");
+      const tagged = await readBeaconDesignerExportForTarget(t);
+      if (tagged) {
+        setAutoTargetHasDesignerExportTag(true);
+        setCropFrameMode("custom");
+        setOutputWidth(tagged.width);
+        setOutputHeight(tagged.height);
+        setWidthStr(String(tagged.width));
+        setHeightStr(String(tagged.height));
+        setAspectPreset("free");
+        return;
+      }
+      setCropFrameMode("aspect");
+      setAspectPreset("unset");
+      setOutputWidth(0);
+      setOutputHeight(0);
+      setWidthStr("");
+      setHeightStr("");
     },
     [setSelectedComponentImagePropId]
   );
 
+  const onExportMaxWidthBlur = useCallback(() => {
+    if (!useManualAspectAndMaxWidth || cropFrameMode !== "aspect") {
+      return;
+    }
+    if (aspectPreset === "unset") {
+      return;
+    }
+    const ar = aspectValue(aspectPreset);
+    if (ar == null) {
+      return;
+    }
+    const w = parseOutputDimensionStrict(widthStr);
+    if (w == null) {
+      return;
+    }
+    const { width, height } = dimensionsFromMaxWidthAndAspect(w, ar);
+    setOutputWidth(width);
+    setOutputHeight(height);
+    setWidthStr(String(width));
+    setHeightStr(String(height));
+  }, [useManualAspectAndMaxWidth, cropFrameMode, aspectPreset, widthStr]);
+
+  useEffect(() => {
+    if (!useManualAspectAndMaxWidth || cropFrameMode !== "aspect") {
+      return;
+    }
+    if (aspectPreset === "unset") {
+      return;
+    }
+    const ar = aspectValue(aspectPreset);
+    if (ar == null) {
+      return;
+    }
+    const w = parseOutputDimensionStrict(widthStrRef.current);
+    if (w == null) {
+      return;
+    }
+    const { width, height } = dimensionsFromMaxWidthAndAspect(w, ar);
+    setOutputWidth(width);
+    setOutputHeight(height);
+    setWidthStr(String(width));
+    setHeightStr(String(height));
+  }, [useManualAspectAndMaxWidth, cropFrameMode, aspectPreset]);
+
   const onChooseAddImageEntry = useCallback(() => {
     setAutoPageTarget(null);
-    setAutoExportInferenceSource(null);
+    setAutoTargetHasDesignerExportTag(false);
     setDismissedCanvasSelectionPrompt(false);
+    setAspectPreset("unset");
+    setCropFrameMode("aspect");
+    setWidthStr("");
+    setHeightStr("");
+    setOutputWidth(0);
+    setOutputHeight(0);
     chooseAutoPath();
   }, [chooseAutoPath]);
 
   const onChooseConfigureEntry = useCallback(() => {
     setAutoPageTarget(null);
-    setAutoExportInferenceSource(null);
+    setAutoTargetHasDesignerExportTag(false);
     setDismissedCanvasSelectionPrompt(false);
+    setAspectPreset("unset");
+    setCropFrameMode("aspect");
+    setWidthStr("");
+    setHeightStr("");
+    setOutputWidth(0);
+    setOutputHeight(0);
     chooseConfigurePath();
   }, [chooseConfigurePath]);
 
@@ -427,15 +571,22 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   const onAutoChooseAnotherOnPage = useCallback(() => {
     setDismissedCanvasSelectionPrompt(true);
     setAutoPageTarget(null);
-    setAutoExportInferenceSource(null);
+    setAutoTargetHasDesignerExportTag(false);
+    setAspectPreset("unset");
+    setCropFrameMode("aspect");
+    setWidthStr("");
+    setHeightStr("");
+    setOutputWidth(0);
+    setOutputHeight(0);
   }, []);
 
-  const autoShowSelectionChoice =
-    pathMode === "auto" &&
-    flowStep === "autoElement" &&
-    autoDiscoverySettled &&
-    !dismissedCanvasSelectionPrompt &&
-    (autoSelectionHint.kind === "image" || autoSelectionHint.kind === "component");
+  const autoShowSelectionChoice = shouldShowAutoPageSelectionChoice(
+    pathMode,
+    flowStep,
+    autoDiscoverySettled,
+    dismissedCanvasSelectionPrompt,
+    autoSelectionHint.kind
+  );
 
   const showAutoPageTargetList = autoDiscoverySettled && !autoShowSelectionChoice;
 
@@ -449,8 +600,14 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   useEffect(() => {
     if (pathMode === "unset" && flowStep === "entry") {
       setAutoPageTarget(null);
-      setAutoExportInferenceSource(null);
+      setAutoTargetHasDesignerExportTag(false);
       setDismissedCanvasSelectionPrompt(false);
+      setAspectPreset("unset");
+      setCropFrameMode("aspect");
+      setWidthStr("");
+      setHeightStr("");
+      setOutputWidth(0);
+      setOutputHeight(0);
     }
   }, [pathMode, flowStep]);
 
@@ -531,8 +688,13 @@ export function ImageEditor(props: ImageEditorProps = {}) {
       >
         <ImageEditorCropExportPanel
           exportPlaceBlockedLabel={exportPlaceBlockedLabelForApply}
+          exportSizeBlockedMessage={exportSizeBlockedMessage}
+          exportDimensionsReady={exportDimensionsReady}
+          strictOutputDimensionInputs={!autoTargetHasDesignerExportTag}
           aspectPreset={aspectPreset}
-          visibleBuiltinAspectPresets={visibleBuiltinAspectPresets}
+          visibleBuiltinAspectPresets={aspectPresetsForCrop}
+          exportSizeUsesAspectAndMaxWidth={useManualAspectAndMaxWidth}
+          onExportMaxWidthBlur={onExportMaxWidthBlur}
           assetFolders={assetFolders}
           baseId={baseId}
           busy={busy}

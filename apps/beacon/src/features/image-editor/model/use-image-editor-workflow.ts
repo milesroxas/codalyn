@@ -1,15 +1,13 @@
 import type { SetStateAction, TransitionEvent } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Area } from "react-easy-crop";
-import type { AspectPreset } from "@/features/image-editor/lib/aspect-preset";
-import { aspectLabels } from "@/features/image-editor/lib/aspect-preset";
+import { editorAspectLabel, type EditorAspectSelection } from "@/features/image-editor/lib/aspect-preset";
 import {
   getImageEditorStepOrder,
   type ImageEditorFlowStep,
   type ImageEditorPathMode,
   imageEditorIncludeEntryInStepOrder,
 } from "@/features/image-editor/lib/image-editor-flow-step";
-import type { ExportDimensionInferenceSource } from "@/features/image-editor/lib/infer-export-dimensions-compute";
 
 type UseImageEditorWorkflowOptions = {
   imageSrc: string | null;
@@ -20,14 +18,16 @@ type UseImageEditorWorkflowOptions = {
   setCompletedCrop: (v: SetStateAction<Area | null>) => void;
   setCrop: (v: { x: number; y: number }) => void;
   setZoom: (v: number) => void;
-  aspectPreset: AspectPreset;
+  aspectPreset: EditorAspectSelection;
   cropFrameMode: "aspect" | "custom";
   parsedOutputW: number;
   parsedOutputH: number;
   /** Set when the user picked a canvas target in Auto path (for the position step). */
   autoTargetLabel: string | null;
-  /** How export W×H was chosen from the canvas target (tagged size vs layout inference). */
-  autoExportInferenceSource: ExportDimensionInferenceSource | null;
+  /** `tag` — data-beacon-export-* on the image; `manual` — user max width + aspect; `null` — no target. */
+  autoTargetExportSizeLabel: "tag" | "manual" | null;
+  /** `false` until aspect + max width (or custom W×H) are set when not using a tagged size. */
+  exportDimensionsReady: boolean;
   isWorkspaceDesigner: boolean;
 };
 
@@ -46,7 +46,8 @@ export function useImageEditorWorkflow(options: UseImageEditorWorkflowOptions) {
     parsedOutputW,
     parsedOutputH,
     autoTargetLabel,
-    autoExportInferenceSource,
+    autoTargetExportSizeLabel,
+    exportDimensionsReady,
     isWorkspaceDesigner,
   } = options;
 
@@ -126,15 +127,32 @@ export function useImageEditorWorkflow(options: UseImageEditorWorkflowOptions) {
   }, []);
 
   const frameSummary = useMemo(() => {
-    if (pathMode === "auto" && autoTargetLabel) {
-      const from = autoExportInferenceSource === "designer-tag" ? "tagged size" : "layout";
-      return `${autoTargetLabel} · ${parsedOutputW}×${parsedOutputH}px (${from}) — pan and zoom.`;
+    if (pathMode === "auto" && autoTargetLabel && autoTargetExportSizeLabel != null) {
+      if (autoTargetExportSizeLabel === "manual" && !exportDimensionsReady) {
+        return `${autoTargetLabel} — choose an aspect ratio and max export width (or Custom W×H), or tag a designer preset to this image in Beacon, then pan and zoom.`;
+      }
+      if (autoTargetExportSizeLabel === "tag") {
+        return `${autoTargetLabel} · ${parsedOutputW}×${parsedOutputH}px (tagged) — pan and zoom.`;
+      }
+      return `${autoTargetLabel} · ${parsedOutputW}×${parsedOutputH}px — pan and zoom.`;
     }
     if (cropFrameMode === "aspect") {
-      return `${aspectLabels[aspectPreset]} — pan and zoom to frame your shot.`;
+      if (aspectPreset === "unset") {
+        return "Choose an aspect ratio and max export width (or Custom W×H), then pan and zoom to frame your shot.";
+      }
+      return `${editorAspectLabel(aspectPreset)} — pan and zoom to frame your shot.`;
     }
     return `${parsedOutputW}×${parsedOutputH}px — pan and zoom to frame your shot.`;
-  }, [pathMode, autoTargetLabel, cropFrameMode, aspectPreset, parsedOutputW, parsedOutputH, autoExportInferenceSource]);
+  }, [
+    pathMode,
+    autoTargetLabel,
+    autoTargetExportSizeLabel,
+    exportDimensionsReady,
+    cropFrameMode,
+    aspectPreset,
+    parsedOutputW,
+    parsedOutputH,
+  ]);
 
   const onExitToUploadTransitionEnd = useCallback(
     (e: TransitionEvent<HTMLDivElement>) => {

@@ -2,10 +2,22 @@ import { type MutableRefObject, useCallback, useEffect, useId, useMemo, useRef, 
 import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { listComposerEligibleLists } from "@/features/beacons/model/beacon-composer-eligible";
 import {
+  BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR,
+  BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR,
+  ensureBeaconListTargetCmsPlainTextField,
+  getBeaconListTargetCmsFieldIdFromListContainer,
+  getCmsTemplateCollectionIdFromCurrentPage,
+  resolveBeaconListTargetCmsCollectionIdForCleanup,
+  tryDeleteBeaconListTargetCmsPlainTextField,
+} from "@/features/beacons/model/beacon-list-target-cms-text-binding";
+import {
   clearAllBeaconListTargetDesignerPreviewsOnPage,
   syncBeaconListTargetDesignerPreview,
 } from "@/features/beacons/model/beacon-list-target-designer-preview";
-import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
+import {
+  listBeaconListTargetInstancesOnPage,
+  removeAllBeaconListTargetInstancesOnPage,
+} from "@/features/beacons/model/beacon-list-target-instances-on-page";
 import {
   getBeaconPageRuntimeSyncStatus,
   syncBeaconPageInlineScript,
@@ -30,7 +42,9 @@ import {
   installBeaconsWrapperOnPage,
   isBeaconsWrapperInstalledOnPage,
   listBeaconsOrphanedOnBody,
+  removeBeaconsWrapperIfNoBeaconTargetsOnPage,
   syncBeaconsInstallEmbedOnPage,
+  uninstallBeaconsPageInstall,
 } from "@/features/beacons/model/install-beacons-wrapper";
 import { placeBeaconListTargetOnCanvas } from "@/features/beacons/model/place-beacon-list-target-on-canvas";
 import {
@@ -38,8 +52,8 @@ import {
   applyBeaconCompositionDraft,
   type BeaconCompositionDraftRow,
   type BeaconPaletteEntry,
+  deleteBeaconAndListTargetDefinition,
   listSiteComponentsForPicker,
-  removeBeaconTargetFromPage,
   removeComponentInstanceFromCanvas,
 } from "@/features/beacons/model/site-components";
 import { BeaconComposerListPanel } from "@/features/beacons/ui/beacon-composer-list-panel";
@@ -57,6 +71,8 @@ import {
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
 import { Button } from "@/shared/ui/button";
+import { Checkbox } from "@/shared/ui/checkbox";
+import { Label } from "@/shared/ui/label";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
 function formatDesignerError(err: unknown): string {
@@ -79,6 +95,7 @@ async function runListTargetReconcileOnOpen(
   listTargetResolveGen: MutableRefObject<number>,
   activeDataList: string,
   listContainer: BlockElement,
+  listTargetDefinitionIdRef: MutableRefObject<string | null>,
   setListTargetPhase: (p: "loading" | "absent" | "synced" | "updating") => void,
   setListTargetRegisteredName: (n: string | null) => void,
   onSettled?: (result: { phase: "synced" | "absent"; registeredName: string | null }) => void,
@@ -87,7 +104,11 @@ async function runListTargetReconcileOnOpen(
   const stale = () => listTargetResolveGen.current !== myGen;
   setListTargetPhase("updating");
   try {
-    const comp = await getBeaconListTargetComponentOrNull(activeDataList, listContainer);
+    const comp = await getBeaconListTargetComponentOrNull(
+      activeDataList,
+      listContainer,
+      listTargetDefinitionIdRef.current
+    );
     if (stale()) return;
     if (comp == null) {
       setListTargetRegisteredName(null);
@@ -388,6 +409,7 @@ function useListTargetReconcileWhenPicking(
       listTargetResolveGen,
       activeDataList,
       listContainer,
+      listTargetDefinitionIdRef,
       setListTargetPhase,
       setListTargetRegisteredName,
       (result) => {
@@ -469,6 +491,7 @@ function useListTargetOnCanvasCountWhenSynced(
 export function BeaconsScreen() {
   const nameFieldId = useId();
   const searchFieldId = useId();
+  const lastBeaconUninstallChoiceId = useId();
   const { segment: segmentParam } = useParams();
   const { pathname: routePathname, hash: routeHash } = useLocation();
   const segmentFromPath = parseBeaconsRouteSegment(routePathname, routeHash);
@@ -513,6 +536,7 @@ export function BeaconsScreen() {
   const listTargetReconcileCacheRef = useRef<ListTargetReconcileCacheEntry | null>(null);
   const [openingBeaconKey, setOpeningBeaconKey] = useState<string | null>(null);
   const [beaconToDelete, setBeaconToDelete] = useState<BeaconOnPage | null>(null);
+  const [uninstallWithLastBeaconDelete, setUninstallWithLastBeaconDelete] = useState(false);
   const [deletePendingKey, setDeletePendingKey] = useState<string | null>(null);
   const [embedSyncPending, setEmbedSyncPending] = useState(false);
   const [pageRuntimeStatusLoading, setPageRuntimeStatusLoading] = useState(true);
@@ -598,6 +622,16 @@ export function BeaconsScreen() {
     pageRuntimeSyncReason,
     engineListCompositionStale
   );
+
+  useEffect(() => {
+    void beaconToDelete;
+    setUninstallWithLastBeaconDelete(false);
+  }, [beaconToDelete]);
+
+  const isLastBeaconOnPageForDelete = useMemo(() => {
+    if (beaconToDelete == null) return false;
+    return pageBeacons.length === 1 && pageBeacons[0]?.key === beaconToDelete.key;
+  }, [beaconToDelete, pageBeacons]);
 
   useEffect(() => {
     void refreshPageBeacons();
@@ -914,11 +948,29 @@ export function BeaconsScreen() {
     if (deletePendingKey != null) return;
     const target = beaconToDelete;
     if (!target) return;
+    const shouldUninstallPage = uninstallWithLastBeaconDelete;
     setDeletePendingKey(target.key);
     try {
-      await removeBeaconTargetFromPage(target.container);
+      const cmsCollectionIdForCleanup = await resolveBeaconListTargetCmsCollectionIdForCleanup(target.container);
+      const cmsFieldIdForCleanup = await getBeaconListTargetCmsFieldIdFromListContainer(target.container);
+      await deleteBeaconAndListTargetDefinition(target.dataList, target.container);
+      if (cmsCollectionIdForCleanup != null) {
+        await tryDeleteBeaconListTargetCmsPlainTextField(
+          cmsCollectionIdForCleanup,
+          target.dataList,
+          cmsFieldIdForCleanup
+        );
+      }
+      if (shouldUninstallPage) {
+        await uninstallBeaconsPageInstall();
+      }
+      await removeBeaconsWrapperIfNoBeaconTargetsOnPage();
       setBeaconToDelete(null);
-      void webflow.notify({ type: "Success", message: "Beacon removed." });
+      setUninstallWithLastBeaconDelete(false);
+      void webflow.notify({
+        type: "Success",
+        message: shouldUninstallPage ? "Beacon removed. Beacons page install cleared." : "Beacon removed.",
+      });
       setEngineListCompositionStale(true);
       void refreshPageBeacons();
     } catch (err) {
@@ -977,6 +1029,18 @@ export function BeaconsScreen() {
           phase: "synced",
           registeredName,
         };
+      }
+      try {
+        const collectionId = await getCmsTemplateCollectionIdFromCurrentPage();
+        if (collectionId != null) {
+          const ensured = await ensureBeaconListTargetCmsPlainTextField(collectionId, activeDataList);
+          if (ensured != null) {
+            await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR, ensured.collectionId);
+            await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR, ensured.fieldId);
+          }
+        }
+      } catch {
+        /* Tower / Data API optional */
       }
       void webflow.notify({
         type: "Success",
@@ -1070,8 +1134,9 @@ export function BeaconsScreen() {
     const listContainer = targetRef.current;
     if (!listContainer) return;
     setListTargetRemovePending(true);
+    const preferredId = listTargetDefinitionIdRef.current;
     try {
-      const comp = await getBeaconListTargetComponentOrNull(activeDataList, listContainer);
+      const comp = await getBeaconListTargetComponentOrNull(activeDataList, listContainer, preferredId);
       if (comp == null) {
         void webflow.notify({
           type: "Warning",
@@ -1079,6 +1144,9 @@ export function BeaconsScreen() {
             "No matching list target component found. It may have been renamed, moved, or deleted in the Components panel.",
         });
       } else {
+        await removeAllBeaconListTargetInstancesOnPage(activeDataList, listContainer, {
+          preferredDefinitionId: preferredId,
+        });
         await webflow.unregisterComponent(comp);
         void webflow.notify({ type: "Success", message: "List target removed from the site." });
       }
@@ -1095,6 +1163,7 @@ export function BeaconsScreen() {
         };
       }
       setRemoveListTargetDialogOpen(false);
+      void refreshPageBeacons();
     } catch (err) {
       const message = formatDesignerError(err);
       void webflow.notify({ type: "Error", message });
@@ -1278,16 +1347,45 @@ export function BeaconsScreen() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete this beacon?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This removes the hidden block
+                  This unregisters the list-target site component in{" "}
+                  <span className="text-foreground">{BEACON_UTILITIES_COMPONENT_GROUP}</span> (if it exists), then
+                  removes the hidden list block
                   {beaconToDelete != null && (
                     <>
                       {" "}
                       <code className="font-mono text-[0.85em] text-foreground">{beaconToDelete.dataList}</code>
                     </>
                   )}{" "}
-                  and any component instances inside it. This can&apos;t be undone.
+                  and any component instances inside it, including their Text and CMS field bindings. This can&apos;t be
+                  undone.
+                  {isLastBeaconOnPageForDelete ? (
+                    <span>
+                      {" "}
+                      This is the only beacon list on the page; you can optionally remove the page install as well.
+                    </span>
+                  ) : null}
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              {isLastBeaconOnPageForDelete ? (
+                <div
+                  className="flex max-w-sm gap-2.5 rounded-lg border border-border/70 bg-muted/25 p-2.5 sm:max-w-none"
+                  data-slot="beacon_delete_uninstall_page"
+                >
+                  <Checkbox
+                    id={lastBeaconUninstallChoiceId}
+                    checked={uninstallWithLastBeaconDelete}
+                    disabled={deletePendingKey != null}
+                    onCheckedChange={(v) => setUninstallWithLastBeaconDelete(v === true)}
+                  />
+                  <div className="min-w-0">
+                    <Label htmlFor={lastBeaconUninstallChoiceId}>Also uninstall Beacons on this page</Label>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Removes the hidden beacons install wrapper, if any, and the footer beacon script when Tower is
+                      configured. Publish the site for the live page to match.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
               <AlertDialogFooter>
                 <Button
                   type="button"

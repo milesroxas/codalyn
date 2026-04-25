@@ -89,7 +89,7 @@ async function exportWebflowPlacement(args: {
   componentImageProps: ComponentImagePropOption[];
   selectedComponentImagePropId: string | null;
   currentCmsItemId: string | null;
-  targetFolder: AssetFolder;
+  targetFolder: AssetFolder | null;
   placement: PlacementMode;
   replaceLibraryAsset: boolean;
 }): Promise<void> {
@@ -226,7 +226,7 @@ export function useApplyCroppedToWebflow(options: {
     const targetFolder = resolveAssetFolderHandleForExport(selectedAssetFolderId, assetFolders, {
       useDefaultWhenUnpicked: cmsPrimaryUpload,
     });
-    if (!targetFolder) {
+    if (!targetFolder && !cmsPrimaryUpload) {
       await webflow.notify({
         type: "Warning",
         message: folderMissingMessage(assetFolders),
@@ -246,7 +246,7 @@ export function useApplyCroppedToWebflow(options: {
       componentImageProps,
       selectedComponentImagePropId,
       currentCmsItemId,
-      targetFolder,
+      targetFolder: targetFolder ?? null,
       placement,
       replaceLibraryAsset,
     });

@@ -9,6 +9,7 @@ export function isCmsPrimaryUploadContext(options: {
   placement: PlacementMode;
   selectedElementType: string | null;
   elementCmsBinding: ElementCmsBindingResolution;
+  elementCmsBindingLoading: boolean;
   componentImagePropsResolving: boolean;
   componentImageProps: ComponentImagePropOption[];
   selectedComponentImagePropId: string | null;
@@ -18,6 +19,7 @@ export function isCmsPrimaryUploadContext(options: {
     placement,
     selectedElementType,
     elementCmsBinding,
+    elementCmsBindingLoading,
     componentImagePropsResolving,
     componentImageProps,
     selectedComponentImagePropId,
@@ -27,8 +29,16 @@ export function isCmsPrimaryUploadContext(options: {
     return false;
   }
 
+  if (elementCmsBinding === "multiple") {
+    return false;
+  }
+
   if (placement === "replace") {
-    return selectedElementType === WEBFLOW_IMAGE_ELEMENT_TYPE && elementCmsBinding === "single";
+    if (selectedElementType !== WEBFLOW_IMAGE_ELEMENT_TYPE || elementCmsBindingLoading) {
+      return false;
+    }
+    // Collection item is open: push file into the item via Data API (v2) / Designer replace — no Asset folder step.
+    return true;
   }
 
   if (placement !== "selection") {
@@ -41,6 +51,14 @@ export function isCmsPrimaryUploadContext(options: {
     }
     const prop = componentImageProps.find((p) => p.propId === selectedComponentImagePropId);
     return prop?.isCmsBinding === true;
+  }
+
+  if (selectedElementType === WEBFLOW_IMAGE_ELEMENT_TYPE) {
+    if (elementCmsBindingLoading) {
+      return false;
+    }
+    // Bound field may not surface as a single "single" from searchSettings; still prefer the live item (Data API).
+    return true;
   }
 
   return elementCmsBinding === "single";

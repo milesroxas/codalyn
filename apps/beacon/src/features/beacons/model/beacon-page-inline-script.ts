@@ -189,6 +189,24 @@ export async function syncBeaconPageInlineScript(): Promise<void> {
   await putPageCustomScripts(pageId, merged);
 }
 
+/**
+ * Removes the Codalyn beacon **footer** custom code from the current page (Tower + Data API). No-op if Tower is
+ * not configured or the page has no matching script.
+ */
+export async function removeBeaconPageRuntimeFromPage(): Promise<void> {
+  if (!getTowerOrigin()) {
+    return;
+  }
+
+  const pageId = (await webflow.getCurrentPage()).id as string;
+  const existing = await getPageCustomScripts(pageId);
+  const next = withoutBeaconMarkedScripts(existing);
+  if (next.length === existing.length) {
+    return;
+  }
+  await putPageCustomScripts(pageId, next);
+}
+
 function formatRuntimeStatusError(err: unknown): string {
   if (err && typeof err === "object" && "message" in err && typeof (err as { message: unknown }).message === "string") {
     return (err as { message: string }).message;

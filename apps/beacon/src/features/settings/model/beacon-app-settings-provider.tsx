@@ -17,9 +17,13 @@ export type BeaconSettingsSyncState = "idle" | "loading" | "synced" | "error";
 
 export type BeaconTowerWorkspace = { id: string; name: string };
 
+export type BeaconAppSettingsPatch =
+  | Partial<BeaconAppSettings>
+  | ((prev: BeaconAppSettings) => Partial<BeaconAppSettings>);
+
 type BeaconAppSettingsContextValue = {
   settings: BeaconAppSettings;
-  updateSettings: (patch: Partial<BeaconAppSettings>) => void;
+  updateSettings: (patch: BeaconAppSettingsPatch) => void;
   syncState: BeaconSettingsSyncState;
   /** Re-fetch settings from Tower (no-op when signed out). */
   refreshBeaconSettings: () => void;
@@ -246,17 +250,20 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
   }, [user?.id, pullSettingsFromTower]);
 
   const updateSettings = useCallback(
-    (patch: Partial<BeaconAppSettings>) => {
+    (patch: BeaconAppSettingsPatch) => {
+      let resolved: Partial<BeaconAppSettings> | undefined;
       setSettings((prev) => {
-        const next = mergeBeaconAppSettings(prev, patch);
+        const toMerge = typeof patch === "function" ? patch(prev) : patch;
+        resolved = toMerge;
+        const next = mergeBeaconAppSettings(prev, toMerge);
         writeLocal(next);
         return next;
       });
-      if (user?.id) {
+      if (user?.id && resolved !== undefined) {
         void towerFetch("/api/v1/beacon/settings", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(patch),
+          body: JSON.stringify(resolved),
         }).then(async (r) => {
           if (!r.ok) {
             return;

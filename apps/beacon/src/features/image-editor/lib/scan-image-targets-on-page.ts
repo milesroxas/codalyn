@@ -1,5 +1,30 @@
 import { WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
 import { searchComponentInstanceImageProps } from "@/features/image-editor/lib/search-component-instance-image-props";
+import { webflowTreeNodeKey } from "@/features/image-editor/lib/webflow-element-id-key";
+
+type WithChildren = { getChildren?: () => Promise<AnyElement[] | null> };
+type SlotList = Awaited<ReturnType<ComponentElement["getSlots"]>>;
+
+async function getChildList(node: WithChildren | null | undefined): Promise<AnyElement[]> {
+  if (node == null || typeof node.getChildren !== "function") {
+    return [];
+  }
+  const ch = await node.getChildren();
+  return ch ?? [];
+}
+
+/** Descendants to traverse from a component: main children + each slot’s children. */
+async function collectComponentInstanceDescendantsToQueue(inst: ComponentElement, queue: AnyElement[]) {
+  for (const c of await getChildList(inst as WithChildren)) {
+    queue.push(c);
+  }
+  const slots: SlotList = await inst.getSlots().catch(() => [] as SlotList);
+  for (const slot of slots) {
+    for (const c of await getChildList(slot as unknown as WithChildren)) {
+      queue.push(c);
+    }
+  }
+}
 
 export type ImagePageTarget = {
   id: string;
@@ -61,14 +86,46 @@ async function tryPushScannedImageTarget(el: AnyElement, out: ImagePageTarget[])
 }
 
 /**
+ * Every canvas node we should consider for image targets, including **nested** component
+ * instances and **slot** content — those are not always present in
+ * {@link webflow.getAllElements} alone (see parent-graph notes in
+ * `webflow-page-parent-map.ts`).
+ */
+async function collectAllPageElementsForImageScan(): Promise<AnyElement[]> {
+  const seed = await webflow.getAllElements();
+  const seen = new Set<string>();
+  const out: AnyElement[] = [];
+  const queue: AnyElement[] = [...seed];
+
+  while (queue.length > 0) {
+    const el = queue.pop();
+    if (el == null) {
+      continue;
+    }
+    const k = webflowTreeNodeKey(el as { id: object });
+    if (seen.has(k)) {
+      continue;
+    }
+    seen.add(k);
+    out.push(el);
+
+    if (el.type === "ComponentInstance") {
+      await collectComponentInstanceDescendantsToQueue(el as ComponentElement, queue);
+    }
+  }
+
+  return out;
+}
+
+/**
  * Lists Image elements and component instances with at least one image-capable prop
  * (`imageAsset`, `cmsImage`, `image`, `imageSet`) on the current page.
  *
- * Uses {@link webflow.getAllElements} so instances are not missed when a tree
- * walk from `Body` omits nodes (e.g. slots or nested structures).
+ * Merges {@link webflow.getAllElements} with each instance’s public children and **slot**
+ * children so image-capable components inside slots or other instances are not skipped.
  */
 export async function scanImageTargetsOnPage(): Promise<ImagePageTarget[]> {
-  const all = await webflow.getAllElements();
+  const all = await collectAllPageElementsForImageScan();
   const out: ImagePageTarget[] = [];
 
   for (const el of all) {

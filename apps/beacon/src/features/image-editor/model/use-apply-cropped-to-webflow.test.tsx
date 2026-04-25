@@ -113,4 +113,24 @@ describe("useApplyCroppedToWebflow", () => {
     );
     expect(applyCroppedImageToWebflow).not.toHaveBeenCalled();
   });
+
+  it("allows null target folder for CMS primary upload when the library has no folders", async () => {
+    const { result } = renderHook(() =>
+      useApplyCroppedToWebflow(
+        options({
+          assetFolders: [],
+          selectedAssetFolderId: null,
+          placement: "selection",
+          cmsPrimaryUpload: true,
+          currentCmsItemId: "item-1",
+        }) as Parameters<typeof useApplyCroppedToWebflow>[0]
+      )
+    );
+    await act(async () => {
+      await result.current.applyToCanvas();
+    });
+    expect(applyCroppedImageToWebflow).toHaveBeenCalled();
+    const arg = vi.mocked(applyCroppedImageToWebflow).mock.calls[0][0];
+    expect(arg.targetFolder).toBeNull();
+  });
 });

@@ -1,5 +1,9 @@
 import type { HydratedBeaconComponent } from "@/features/beacons/model/beacon-page-targets";
-import { BEACON_UTILITIES_COMPONENT_GROUP } from "@/features/beacons/model/create-beacon-list-target-component";
+import {
+  BEACON_UTILITIES_COMPONENT_GROUP,
+  getBeaconListTargetComponentOrNull,
+} from "@/features/beacons/model/create-beacon-list-target-component";
+import { removeAllBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
 import { runExclusiveDesignerStyleOp } from "@/features/beacons/model/exclusive-designer-style-op";
 
 /** Site component id + label for the Composer palette (types allowed by Engine for a beacon list). */
@@ -57,6 +61,21 @@ export async function removeComponentInstanceFromCanvas(instance: ComponentEleme
  */
 export async function removeBeaconTargetFromPage(container: BlockElement): Promise<void> {
   await container.remove();
+}
+
+/**
+ * If a Beacon list-target **site component** exists for this list (in {@link BEACON_UTILITIES_COMPONENT_GROUP}),
+ * removes its **page instances** (Placed on canvas), unregisters the definition, then removes the hidden beacon list
+ * block. Order: resolve definition from `container` → remove instances → `unregisterComponent` → remove the block so
+ * Webflow is not left with orphan list-target nodes or a definition that still references removed structure.
+ */
+export async function deleteBeaconAndListTargetDefinition(dataList: string, container: BlockElement): Promise<void> {
+  const comp = await getBeaconListTargetComponentOrNull(dataList, container);
+  if (comp != null) {
+    await removeAllBeaconListTargetInstancesOnPage(dataList, container);
+    await webflow.unregisterComponent(comp);
+  }
+  await removeBeaconTargetFromPage(container);
 }
 
 export type BeaconCompositionDraftRow = {

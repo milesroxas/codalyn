@@ -1,3 +1,4 @@
+import { ensureBeaconListTargetCmsTextBindingForPageInstances } from "@/features/beacons/model/beacon-list-target-cms-text-binding";
 import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
 import { ensureBeaconListTargetTextProp } from "@/features/beacons/model/beacon-list-target-text-field";
 import { getBeaconListTargetComponentOrNull } from "@/features/beacons/model/create-beacon-list-target-component";
@@ -155,43 +156,74 @@ export async function placeBeaconListTargetOnCanvas(
 ): Promise<PlaceBeaconListTargetOnCanvasResult> {
   await ensurePageCanvasForListTargetPlacement();
 
-  let comp = await getBeaconListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
-  if (comp == null) {
+  let resolvedDef = await getBeaconListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
+  if (resolvedDef == null) {
     throw new Error("No list target component. Create a list target first.");
   }
 
+  /**
+   * `append` / `after` need the registration id from {@link createBeaconListTargetComponent} in some projects;
+   * `getComponent` by that id can return a handle whose `getProps()` does not list the “Text” field the same way
+   * as the definition resolved by name. Keep two handles: placement vs Text prop + CMS bind.
+   */
+  const definitionIdToFetch = preferredDefinitionId?.trim() || resolvedDef.id;
+  let placementDef: Component = resolvedDef;
   try {
-    comp = await webflow.getComponent(comp.id);
+    placementDef = await webflow.getComponent(definitionIdToFetch);
   } catch (e) {
     if (webflowDesignerErrorCauseTag(e) === "ResourceMissing") {
-      comp = await getBeaconListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
-      if (comp == null) {
+      resolvedDef = await getBeaconListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
+      if (resolvedDef == null) {
         throw new Error("No list target component. Create a list target first.");
+      }
+      try {
+        placementDef = await webflow.getComponent(preferredDefinitionId?.trim() || resolvedDef.id);
+      } catch (e2) {
+        if (webflowDesignerErrorCauseTag(e2) === "ResourceMissing") {
+          throw new Error("No list target component. Create a list target first.");
+        }
+        throw e2;
       }
     } else {
       throw e;
     }
   }
 
-  await ensureListTargetTextPropForPlace(comp, dataList, listContainer);
+  await ensureListTargetTextPropForPlace(resolvedDef, dataList, listContainer);
+
+  const bindCmsForAllListTargetInstancesOnPage = async (priority: ComponentElement | null): Promise<void> => {
+    const allOnPage = await listBeaconListTargetInstancesOnPage(dataList, listContainer, {
+      preferredDefinitionId,
+    });
+    await ensureBeaconListTargetCmsTextBindingForPageInstances({
+      dataList,
+      listContainer,
+      def: resolvedDef,
+      instances: allOnPage,
+      priorityInstances: priority != null ? [priority] : undefined,
+    });
+  };
 
   const existing = await listBeaconListTargetInstancesOnPage(dataList, listContainer, {
     preferredDefinitionId,
   });
   const firstExisting = existing[0];
   if (firstExisting != null) {
+    await bindCmsForAllListTargetInstancesOnPage(firstExisting);
     return { instance: firstExisting, alreadyExisted: true };
   }
 
   const selected = await webflow.getSelectedElement();
   if (selected) {
-    const fromSelection = await placeFromSelection(selected, comp);
+    const fromSelection = await placeFromSelection(selected, placementDef);
     if (fromSelection) {
+      await bindCmsForAllListTargetInstancesOnPage(fromSelection);
       return { instance: fromSelection, alreadyExisted: false };
     }
   } else {
-    const onBody = await placeOnBodyWhenNoSelection(comp);
+    const onBody = await placeOnBodyWhenNoSelection(placementDef);
     if (onBody) {
+      await bindCmsForAllListTargetInstancesOnPage(onBody);
       return { instance: onBody, alreadyExisted: false };
     }
   }

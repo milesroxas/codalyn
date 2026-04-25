@@ -1,5 +1,8 @@
-import { syncBeaconPageInlineScript } from "@/features/beacons/model/beacon-page-inline-script";
-import type { BeaconOnPage } from "@/features/beacons/model/beacon-page-targets";
+import {
+  removeBeaconPageRuntimeFromPage,
+  syncBeaconPageInlineScript,
+} from "@/features/beacons/model/beacon-page-inline-script";
+import { findBeaconTargetsOnPage, type BeaconOnPage } from "@/features/beacons/model/beacon-page-targets";
 import { runExclusiveDesignerStyleOp } from "@/features/beacons/model/exclusive-designer-style-op";
 
 type BodyWithAppend = AnyElement & {
@@ -120,6 +123,33 @@ export async function syncBeaconsInstallEmbedOnPage(): Promise<void> {
  * Beacons that are still direct children of Body (e.g. reparent into the install wrapper failed). Empty when there is
  * no issue.
  */
+/**
+ * Removes the hidden `beacons-wrapper` block (if present) and the beacon **footer** runtime script from the
+ * current page. Use after the last beacon list is deleted, when the user opts to uninstall the page install.
+ */
+export async function uninstallBeaconsPageInstall(): Promise<void> {
+  const wrapper = await findBeaconsWrapperOnPage();
+  if (wrapper != null) {
+    await wrapper.remove();
+  }
+  await removeBeaconPageRuntimeFromPage();
+}
+
+/**
+ * When no `data-target="beacons"` lists remain, removes the hidden `beacons-wrapper` block so an empty install
+ * shell is not left on the body.
+ */
+export async function removeBeaconsWrapperIfNoBeaconTargetsOnPage(): Promise<void> {
+  const targets = await findBeaconTargetsOnPage();
+  if (targets.length > 0) {
+    return;
+  }
+  const wrapper = await findBeaconsWrapperOnPage();
+  if (wrapper != null) {
+    await wrapper.remove();
+  }
+}
+
 export async function listBeaconsOrphanedOnBody(): Promise<BeaconOnPage[]> {
   const bodyRow = (await webflow.getAllElements()).find((e) => e.type === "Body");
   if (!bodyRow) {

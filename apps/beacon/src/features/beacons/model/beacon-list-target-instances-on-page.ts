@@ -62,6 +62,26 @@ export async function listBeaconListTargetInstancesOnPage(
 }
 
 /**
+ * Deletes every list-target (Beacon Utilities) **instance** on the current page for this beacon list. Call **before**
+ * {@link webflow.unregisterComponent} on that list-target definition so the canvas is not left with broken instances
+ * and a new list target can be registered cleanly.
+ */
+export async function removeAllBeaconListTargetInstancesOnPage(
+  dataList: string,
+  listContainer: BlockElement,
+  options?: ListBeaconListTargetInstancesOnPageOptions
+): Promise<void> {
+  const instances = await listBeaconListTargetInstancesOnPage(dataList, listContainer, options);
+  for (const inst of instances) {
+    try {
+      await inst.remove();
+    } catch (e) {
+      console.warn("[beacon] remove list target instance failed (non-fatal):", e);
+    }
+  }
+}
+
+/**
  * True when a component instance on the current page matches the list-target by name/group.
  * Skips the mirror-surface check (no `enterComponent` / `exitComponent`) — for Composer list eligibility
  * and other read-only gating. Engine flows that need a precise match use

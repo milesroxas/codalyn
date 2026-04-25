@@ -61,6 +61,56 @@ function renderTargetButtonLabel(isPending: boolean): string {
   return isPending ? "Rendering…" : "Render target";
 }
 
+function BeaconListTargetSyncedActions(p: {
+  ctaDisabled: boolean;
+  listTargetRemovePending: boolean;
+  listTargetPlaceOnCanvasPending: boolean;
+  listTargetPreviewSyncPending: boolean;
+  placeOrFocusLabel: string;
+  placeOrFocusPendingLabel: string;
+  onBackToList: () => void;
+  onRequestRemoveListTarget: () => void;
+  onPlaceListTargetOnCanvas: () => void;
+  onSyncListTargetPreview: () => void;
+}) {
+  return (
+    <>
+      <Button
+        type="button"
+        variant="destructive"
+        size="sm"
+        disabled={p.ctaDisabled}
+        aria-busy={p.listTargetRemovePending}
+        onClick={() => void p.onRequestRemoveListTarget()}
+      >
+        Remove target
+      </Button>
+      <Button type="button" variant="outline" size="sm" onClick={() => void p.onBackToList()}>
+        Back to list
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        disabled={p.ctaDisabled}
+        aria-busy={p.listTargetPlaceOnCanvasPending}
+        onClick={() => void p.onPlaceListTargetOnCanvas()}
+      >
+        {p.listTargetPlaceOnCanvasPending ? p.placeOrFocusPendingLabel : p.placeOrFocusLabel}
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        disabled={p.ctaDisabled}
+        aria-busy={p.listTargetPreviewSyncPending}
+        onClick={() => void p.onSyncListTargetPreview()}
+      >
+        {renderTargetButtonLabel(p.listTargetPreviewSyncPending)}
+      </Button>
+    </>
+  );
+}
+
 function BeaconListTargetActionsBar(props: BeaconListTargetActionsProps) {
   const {
     activeDataList,
@@ -84,40 +134,18 @@ function BeaconListTargetActionsBar(props: BeaconListTargetActionsProps) {
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
       {listTargetPhase === "synced" ? (
-        <>
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            disabled={ctaDisabled}
-            aria-busy={listTargetRemovePending}
-            onClick={() => void onRequestRemoveListTarget()}
-          >
-            Remove target
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => void onBackToList()}>
-            Back to list
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            disabled={ctaDisabled}
-            aria-busy={listTargetPlaceOnCanvasPending}
-            onClick={() => void onPlaceListTargetOnCanvas()}
-          >
-            {listTargetPlaceOnCanvasPending ? placeOrFocusPendingLabel : placeOrFocusLabel}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={ctaDisabled}
-            aria-busy={listTargetPreviewSyncPending}
-            onClick={() => void onSyncListTargetPreview()}
-          >
-            {renderTargetButtonLabel(listTargetPreviewSyncPending)}
-          </Button>
-        </>
+        <BeaconListTargetSyncedActions
+          ctaDisabled={ctaDisabled}
+          listTargetRemovePending={listTargetRemovePending}
+          listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
+          listTargetPreviewSyncPending={listTargetPreviewSyncPending}
+          placeOrFocusLabel={placeOrFocusLabel}
+          placeOrFocusPendingLabel={placeOrFocusPendingLabel}
+          onBackToList={onBackToList}
+          onRequestRemoveListTarget={onRequestRemoveListTarget}
+          onPlaceListTargetOnCanvas={onPlaceListTargetOnCanvas}
+          onSyncListTargetPreview={onSyncListTargetPreview}
+        />
       ) : listTargetPhase === "absent" ? (
         <>
           <Button

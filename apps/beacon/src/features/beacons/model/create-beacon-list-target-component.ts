@@ -56,6 +56,30 @@ async function beaconListTargetDefinitionMatchesList(
 }
 
 /**
+ * When {@link preferredDefinitionId} resolves but the root’s `data-beacon-list-*` ids are stale (e.g. the hidden list
+ * block was duplicated or the Designer reports a different `BlockElement` id on CMS template / collection pages),
+ * we still need to treat that definition as *this* list: same `data-list` + `data-target` on the registered root.
+ * Full list identity is then re-applied via {@link applyBeaconListTargetSync}.
+ */
+async function beaconListTargetRootMatchesDataList(
+  comp: Component,
+  dataList: string
+): Promise<boolean> {
+  const root = await comp.getRootElement();
+  if (root == null || root.type !== "DOM") {
+    return false;
+  }
+  const dom = root as DOMElement;
+  if ((await dom.getTag()) !== BEACON_LIST_RENDER_TAG) {
+    return false;
+  }
+  if ((await dom.getAttribute("data-target")) !== "beacons") {
+    return false;
+  }
+  return (await dom.getAttribute("data-list")) === dataList;
+}
+
+/**
  * Resolves the list-target **component definition** by its deterministic name under
  * {@link BEACON_UTILITIES_COMPONENT_GROUP} (encodes `data-list` + list container). No separate storage: look up
  * the project’s registered components the same way the Components panel does.
@@ -76,6 +100,16 @@ export async function getBeaconListTargetComponentOrNull(
       const byId = await webflow.getComponent(hint);
       if (await beaconListTargetDefinitionMatchesList(byId, dataList, listContainer)) {
         return byId;
+      }
+      if (await beaconListTargetRootMatchesDataList(byId, dataList)) {
+        try {
+          await applyBeaconListTargetSync(byId, dataList, listContainer);
+        } catch (e) {
+          logListTargetDebug("applyBeaconListTargetSync (preferredDefinitionId) failed, falling back to name search", e);
+        }
+        if (await beaconListTargetDefinitionMatchesList(byId, dataList, listContainer)) {
+          return byId;
+        }
       }
     } catch (e) {
       if (webflowDesignerErrorCauseTag(e) !== "ResourceMissing") {

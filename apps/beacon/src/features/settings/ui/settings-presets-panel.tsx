@@ -351,15 +351,15 @@ export function SettingsPresetsPanel() {
     if (!canRemoveBuiltin || hiddenSet.has(aspect)) {
       return;
     }
-    updateSettings({
-      hiddenBuiltinAspectPresets: [...settings.hiddenBuiltinAspectPresets, aspect],
-    });
+    updateSettings((prev) => ({
+      hiddenBuiltinAspectPresets: [...prev.hiddenBuiltinAspectPresets, aspect],
+    }));
   };
 
   const showBuiltin = (aspect: AspectPreset) => {
-    updateSettings({
-      hiddenBuiltinAspectPresets: settings.hiddenBuiltinAspectPresets.filter((a) => a !== aspect),
-    });
+    updateSettings((prev) => ({
+      hiddenBuiltinAspectPresets: prev.hiddenBuiltinAspectPresets.filter((a) => a !== aspect),
+    }));
   };
 
   const aspectTileClass =
@@ -870,9 +870,9 @@ function BeaconExportPresetsSection() {
       maxFileSizeBytes,
     };
     if (createPresetScope === "designer") {
-      updateSettings({ designerOnlyImagePresets: [...settings.designerOnlyImagePresets, row] });
+      updateSettings((prev) => ({ designerOnlyImagePresets: [...prev.designerOnlyImagePresets, row] }));
     } else {
-      updateSettings({ imagePresets: [...settings.imagePresets, row] });
+      updateSettings((prev) => ({ imagePresets: [...prev.imagePresets, row] }));
     }
     setCreateFormOpen(false);
     setDraftName("");
@@ -885,9 +885,11 @@ function BeaconExportPresetsSection() {
 
   const removePreset = (id: string, scope: PresetScope) => {
     if (scope === "designer") {
-      updateSettings({ designerOnlyImagePresets: settings.designerOnlyImagePresets.filter((p) => p.id !== id) });
+      updateSettings((prev) => ({
+        designerOnlyImagePresets: prev.designerOnlyImagePresets.filter((p) => p.id !== id),
+      }));
     } else {
-      updateSettings({ imagePresets: settings.imagePresets.filter((p) => p.id !== id) });
+      updateSettings((prev) => ({ imagePresets: prev.imagePresets.filter((p) => p.id !== id) }));
     }
     if (editingPreset?.id === id) {
       setEditingPreset(null);
@@ -900,13 +902,13 @@ function BeaconExportPresetsSection() {
     patch: Partial<Pick<BeaconImagePresetRow, "name" | "width" | "height" | "exportFormat" | "maxFileSizeBytes">>
   ) => {
     if (scope === "designer") {
-      updateSettings({
-        designerOnlyImagePresets: settings.designerOnlyImagePresets.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-      });
+      updateSettings((prev) => ({
+        designerOnlyImagePresets: prev.designerOnlyImagePresets.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+      }));
     } else {
-      updateSettings({
-        imagePresets: settings.imagePresets.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-      });
+      updateSettings((prev) => ({
+        imagePresets: prev.imagePresets.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+      }));
     }
   };
 

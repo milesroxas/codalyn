@@ -1,5 +1,4 @@
 import { clampExportDimensionsToMaxEdge } from "@/features/image-editor/lib/clamp-export-dimensions";
-import type { ExportDimensions } from "@/features/image-editor/lib/infer-export-dimensions-compute";
 
 /** Set on the Image in Webflow (Settings → Custom attributes) so Beacon uses these export pixels in Auto. */
 export const BEACON_EXPORT_WIDTH_ATTR = "data-beacon-export-width";
@@ -18,7 +17,7 @@ function parsePositivePx(s: string | null): number | null {
 
 /**
  * When **both** custom attributes are set on the image, returns clamped width/height for export.
- * If either is missing or invalid, returns `null` and Beacon keeps using layout/aspect inference.
+ * If either is missing or invalid, returns `null`.
  */
 export async function readBeaconDesignerExportDimensionsFromImage(
   image: ImageElement
@@ -36,19 +35,4 @@ export async function readBeaconDesignerExportDimensionsFromImage(
     return null;
   }
   return clampExportDimensionsToMaxEdge(w, h);
-}
-
-export function buildDesignerTaggedExportDimensions(width: number, height: number): ExportDimensions {
-  const clamped = clampExportDimensionsToMaxEdge(width, height);
-  const aspect = clamped.width / Math.max(1, clamped.height);
-  return {
-    width: clamped.width,
-    height: clamped.height,
-    note: `Preferred export size from custom attributes on the image (${BEACON_EXPORT_WIDTH_ATTR}, ${BEACON_EXPORT_HEIGHT_ATTR})`,
-    aspect,
-    aspectSource: "designer-tag",
-    longEdge: Math.max(clamped.width, clamped.height),
-    longEdgeSource: "designer-tag",
-    inferenceSource: "designer-tag",
-  };
 }

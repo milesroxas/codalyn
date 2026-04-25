@@ -1,9 +1,16 @@
 import { type MutableRefObject, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  type BeaconComposerCmsSource,
+  draftToHiddenListIndices,
+  resolveComposerTargetOrder,
+} from "@/features/beacons/model/beacon-composer-cms-draft";
 import { listComposerEligibleLists } from "@/features/beacons/model/beacon-composer-eligible";
+import { saveBeaconListRuntimePayloadToCmsItem } from "@/features/beacons/model/beacon-list-cms-composition-save";
 import {
   ensureBeaconListCmsTextFieldOnList,
   getBeaconListTargetCmsFieldIdFromListContainer,
+  getCmsTemplateCollectionIdFromCurrentPage,
   resolveBeaconListTargetCmsCollectionIdForCleanup,
   tryDeleteBeaconListTargetCmsPlainTextField,
 } from "@/features/beacons/model/beacon-list-target-cms-text-binding";
@@ -58,9 +65,11 @@ import { BeaconComposerStudioPanel } from "@/features/beacons/ui/beacon-composer
 import { BeaconCompositionPanel } from "@/features/beacons/ui/beacon-composition-panel";
 import { BeaconHomePanel } from "@/features/beacons/ui/beacon-home-panel";
 import { BeaconPageRuntimeHeaderStatus } from "@/features/beacons/ui/beacon-page-runtime-header-status";
+import { getTowerOrigin } from "@/shared/lib/tower-client";
 import { cn } from "@/shared/lib/utils";
 import {
   AlertDialog,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -79,6 +88,9 @@ function formatDesignerError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return "Something went wrong. Check that you can edit the current page.";
 }
+
+const LIST_TARGET_COMPONENT_NOT_FOUND_MESSAGE =
+  "No matching list target component found. It may have been renamed, moved, or deleted in the Components panel.";
 
 type ListTargetReconcileCacheEntry = {
   beaconKey: string;
@@ -241,6 +253,7 @@ type BeaconsPageChangeReset = {
   setBeaconName: (v: string) => void;
   setListTargetCreatePending: (v: boolean) => void;
   setListTargetRemovePending: (v: boolean) => void;
+  setListTargetRemoveBusyKind: (v: "canvas" | "delete" | null) => void;
   setListTargetPlaceOnCanvasPending: (v: boolean) => void;
   setListTargetPhase: (v: "loading" | "absent" | "synced" | "updating") => void;
   setListTargetRegisteredName: (v: string | null) => void;
@@ -306,6 +319,7 @@ function useBeaconsPageChangeReset(
         reset.setBeaconName("");
         reset.setListTargetCreatePending(false);
         reset.setListTargetRemovePending(false);
+        reset.setListTargetRemoveBusyKind(null);
         reset.setListTargetPlaceOnCanvasPending(false);
         reset.setListTargetPhase("loading");
         reset.setListTargetRegisteredName(null);
@@ -521,6 +535,7 @@ export function BeaconsScreen() {
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [listTargetCreatePending, setListTargetCreatePending] = useState(false);
   const [listTargetRemovePending, setListTargetRemovePending] = useState(false);
+  const [listTargetRemoveBusyKind, setListTargetRemoveBusyKind] = useState<"canvas" | "delete" | null>(null);
   const [listTargetPlaceOnCanvasPending, setListTargetPlaceOnCanvasPending] = useState(false);
   const [listTargetPhase, setListTargetPhase] = useState<"loading" | "absent" | "synced" | "updating">("loading");
   const [listTargetRegisteredName, setListTargetRegisteredName] = useState<string | null>(null);
@@ -552,6 +567,13 @@ export function BeaconsScreen() {
   const [composerAllowedPalette, setComposerAllowedPalette] = useState<BeaconPaletteEntry[]>([]);
   const [composerOpeningKey, setComposerOpeningKey] = useState<string | null>(null);
   const [composerSavePending, setComposerSavePending] = useState(false);
+  const [composerCmsSource, setComposerCmsSource] = useState<BeaconComposerCmsSource>("static_list");
+  const [currentCmsItemId, setCurrentCmsItemId] = useState<string | null>(null);
+  const composerStudioRef = useRef<{
+    beacon: BeaconOnPage;
+    initialSignature: string;
+  } | null>(null);
+  composerStudioRef.current = composerStudio;
 
   const refreshPageBeacons = useCallback(async () => {
     setPageScanLoading(true);
@@ -644,6 +666,60 @@ export function BeaconsScreen() {
     void loadComposerEligible();
   }, [isComposer, loadComposerEligible]);
 
+  useEffect(() => {
+    if (typeof webflow.subscribe !== "function") {
+      return undefined;
+    }
+    const unsub = webflow.subscribe("currentcmsitem", (id) => {
+      setCurrentCmsItemId(id != null && String(id).trim() !== "" ? String(id) : null);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!isComposer) {
+      return undefined;
+    }
+    const studio = composerStudioRef.current;
+    if (studio == null) {
+      return undefined;
+    }
+    const beacon = studio.beacon;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await listInstancesInBeaconTarget(beacon.container);
+        const configuredComponentIds = await resolveBeaconEngineConfiguredComponentIds(beacon.container, rows);
+        const engineScopedRows = filterHydratedBeaconComponentsByComponentIds(rows, configuredComponentIds);
+        const allowedPalette = await beaconPaletteFromConfiguredComponentIds(configuredComponentIds, rows);
+        if (cancelled) {
+          return;
+        }
+        setComposerAllowedPalette(allowedPalette);
+        const { draft, initialSignature, cmsSource } = await resolveComposerTargetOrder({
+          listContainer: beacon.container,
+          engineScopedRows,
+          currentCmsItemId,
+        });
+        if (cancelled) {
+          return;
+        }
+        setComposerDraft(draft);
+        setComposerCmsSource(cmsSource);
+        setComposerStudio((prev) =>
+          prev == null || prev.beacon.key !== beacon.key ? prev : { ...prev, initialSignature }
+        );
+      } catch (e) {
+        if (!cancelled) {
+          console.warn("[beacon] composer context reload", e);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isComposer, currentCmsItemId]);
+
   useBeaconsListTargetPreviewOnModeChange();
 
   const beaconsPageChangeResetRef = useRef<BeaconsPageChangeReset | null>(null);
@@ -659,6 +735,7 @@ export function BeaconsScreen() {
     setBeaconName,
     setListTargetCreatePending,
     setListTargetRemovePending,
+    setListTargetRemoveBusyKind,
     setListTargetPlaceOnCanvasPending,
     setListTargetPhase,
     setListTargetRegisteredName,
@@ -715,6 +792,7 @@ export function BeaconsScreen() {
     setCreateFormOpen(false);
     setListTargetCreatePending(false);
     setListTargetRemovePending(false);
+    setListTargetRemoveBusyKind(null);
     setListTargetPlaceOnCanvasPending(false);
     setListTargetPhase("loading");
     setListTargetRegisteredName(null);
@@ -791,6 +869,24 @@ export function BeaconsScreen() {
     return composerDraft.map((d) => d.componentId).join(",") !== composerStudio.initialSignature;
   }, [composerDraft, composerStudio]);
 
+  const composerEmptyTargetOrderHint = useMemo(() => {
+    if (composerStudio == null) {
+      return null;
+    }
+    switch (composerCmsSource) {
+      case "cms_no_item":
+        return "Select a collection item in the Designer to load or edit a per-entry order for this list.";
+      case "cms_no_tower":
+        return "Connect Codalyn to Tower to load each entry’s order from the CMS text field for this list.";
+      case "cms_no_field":
+        return "The beacon list is missing a CMS text field. Create and sync a list target for this list, then return.";
+      case "cms_field_empty":
+        return "No saved order for this item yet. Add components from the palette to build a layout.";
+      default:
+        return null;
+    }
+  }, [composerStudio, composerCmsSource]);
+
   const handleOpenComposerStudio = async (beacon: BeaconOnPage) => {
     setComposerOpeningKey(beacon.key);
     try {
@@ -798,9 +894,15 @@ export function BeaconsScreen() {
       const configuredComponentIds = await resolveBeaconEngineConfiguredComponentIds(beacon.container, rows);
       const engineScopedRows = filterHydratedBeaconComponentsByComponentIds(rows, configuredComponentIds);
       const allowedPalette = await beaconPaletteFromConfiguredComponentIds(configuredComponentIds, rows);
-      setComposerDraft(engineScopedRows.map((r) => ({ key: r.key, componentId: r.componentId, name: r.name })));
       setComposerAllowedPalette(allowedPalette);
-      setComposerStudio({ beacon, initialSignature: engineScopedRows.map((r) => r.componentId).join(",") });
+      const { draft, initialSignature, cmsSource } = await resolveComposerTargetOrder({
+        listContainer: beacon.container,
+        engineScopedRows,
+        currentCmsItemId,
+      });
+      setComposerDraft(draft);
+      setComposerCmsSource(cmsSource);
+      setComposerStudio({ beacon, initialSignature });
     } catch (err) {
       const message = formatDesignerError(err);
       void webflow.notify({ type: "Error", message });
@@ -813,6 +915,7 @@ export function BeaconsScreen() {
     setComposerStudio(null);
     setComposerDraft([]);
     setComposerAllowedPalette([]);
+    setComposerCmsSource("static_list");
   }, []);
 
   const handleComposerAddFromPalette = useCallback((c: BeaconPaletteEntry) => {
@@ -852,17 +955,82 @@ export function BeaconsScreen() {
     }
     setComposerSavePending(true);
     try {
-      const hydrated = await applyBeaconCompositionDraft(beacon.container, draftToApply);
-      await syncBeaconPageInlineScript();
-      const hydratedScoped = hydrated.filter((row) => allowedComponentIdSet.has(row.componentId));
-      setComposerDraft(hydratedScoped.map((h) => ({ key: h.key, componentId: h.componentId, name: h.name })));
-      setComposerStudio((prev) =>
-        prev ? { ...prev, initialSignature: hydratedScoped.map((h) => h.componentId).join(",") } : null
-      );
-      void webflow.notify({
-        type: "Success",
-        message: "Composition saved. Page script updated — publish for the live site.",
-      });
+      const rows = await listInstancesInBeaconTarget(beacon.container);
+      const configuredComponentIds = await resolveBeaconEngineConfiguredComponentIds(beacon.container, rows);
+      const engineScopedRows = filterHydratedBeaconComponentsByComponentIds(rows, configuredComponentIds);
+      const mapped = draftToHiddenListIndices(engineScopedRows, draftToApply);
+      if (!mapped.ok) {
+        void webflow.notify({
+          type: "Error",
+          message:
+            "Your order uses component types that are not available in the Engine list (or not enough instances). Add them in Engine, then try again.",
+        });
+        return;
+      }
+
+      const onCmsTemplate = (await getCmsTemplateCollectionIdFromCurrentPage()) != null;
+
+      if (onCmsTemplate) {
+        if (!getTowerOrigin().trim() || currentCmsItemId == null) {
+          void webflow.notify({
+            type: "Error",
+            message:
+              "On a collection template, select a collection item in the Designer and connect Codalyn to Tower. The layout is saved only to the CMS field — the Engine list on the page is not changed.",
+          });
+          return;
+        }
+        const binding = await ensureBeaconListCmsTextFieldOnList(beacon.container, beacon.dataList);
+        if (binding == null) {
+          void webflow.notify({
+            type: "Error",
+            message:
+              "Could not use the list CMS text field. Create and sync a list target for this list, then try again.",
+          });
+          return;
+        }
+        let cmsLayoutSaveFailed = false;
+        try {
+          await saveBeaconListRuntimePayloadToCmsItem({
+            collectionId: binding.collectionId,
+            fieldId: binding.fieldId,
+            cmsItemId: currentCmsItemId,
+            hiddenListIndices: mapped.indices,
+          });
+        } catch (e) {
+          cmsLayoutSaveFailed = true;
+          console.warn("[beacon] CMS list text save", e);
+        }
+        await syncBeaconPageInlineScript();
+        setComposerDraft(draftToApply);
+        setComposerStudio((prev) =>
+          prev ? { ...prev, initialSignature: draftToApply.map((r) => r.componentId).join(",") } : null
+        );
+        if (cmsLayoutSaveFailed) {
+          void webflow.notify({
+            type: "Warning",
+            message: "Page script updated, but the CMS list text field was not saved. Check Tower and try again.",
+          });
+        } else {
+          void webflow.notify({
+            type: "Success",
+            message:
+              "Layout saved to the current CMS item’s text field. Page script updated — publish for the live site. The Engine reference list was not changed.",
+          });
+          setComposerCmsSource("cms_from_field");
+        }
+      } else {
+        const hydrated = await applyBeaconCompositionDraft(beacon.container, draftToApply);
+        await syncBeaconPageInlineScript();
+        const hydratedScoped = hydrated.filter((row) => allowedComponentIdSet.has(row.componentId));
+        setComposerDraft(hydratedScoped.map((h) => ({ key: h.key, componentId: h.componentId, name: h.name })));
+        setComposerStudio((prev) =>
+          prev ? { ...prev, initialSignature: hydratedScoped.map((h) => h.componentId).join(",") } : null
+        );
+        void webflow.notify({
+          type: "Success",
+          message: "Composition saved. Page script updated — publish for the live site.",
+        });
+      }
       setEngineListCompositionStale(false);
       void refreshPageBeacons();
       void loadComposerEligible();
@@ -1118,26 +1286,67 @@ export function BeaconsScreen() {
     setRemoveListTargetDialogOpen(true);
   };
 
-  const handleConfirmRemoveListTarget = async () => {
+  const handleRemoveListTargetFromCanvasOnly = async () => {
     if (listTargetRemovePending || activeDataList == null) return;
     const listContainer = targetRef.current;
     if (!listContainer) return;
+    setListTargetRemoveBusyKind("canvas");
     setListTargetRemovePending(true);
     const preferredId = listTargetDefinitionIdRef.current;
     try {
       const comp = await getBeaconListTargetComponentOrNull(activeDataList, listContainer, preferredId);
       if (comp == null) {
-        void webflow.notify({
-          type: "Warning",
-          message:
-            "No matching list target component found. It may have been renamed, moved, or deleted in the Components panel.",
+        void webflow.notify({ type: "Warning", message: LIST_TARGET_COMPONENT_NOT_FOUND_MESSAGE });
+      } else {
+        await removeAllBeaconListTargetInstancesOnPage(activeDataList, listContainer, {
+          preferredDefinitionId: preferredId,
         });
+        void webflow.notify({
+          type: "Success",
+          message:
+            "List target removed from the canvas. The component stays in Components → Beacon Utilities — use Place on canvas to add it again.",
+        });
+      }
+      setRemoveListTargetDialogOpen(false);
+      try {
+        const list = await listBeaconListTargetInstancesOnPage(activeDataList, listContainer, {
+          preferredDefinitionId: listTargetDefinitionIdRef.current,
+        });
+        setListTargetOnCanvasCount(list.length);
+      } catch {
+        setListTargetOnCanvasCount(0);
+      }
+      void refreshPageBeacons();
+    } catch (err) {
+      const message = formatDesignerError(err);
+      void webflow.notify({ type: "Error", message });
+    } finally {
+      setListTargetRemovePending(false);
+      setListTargetRemoveBusyKind(null);
+    }
+  };
+
+  const handleConfirmDeleteListTargetCompletely = async () => {
+    if (listTargetRemovePending || activeDataList == null) return;
+    const listContainer = targetRef.current;
+    if (!listContainer) return;
+    setListTargetRemoveBusyKind("delete");
+    setListTargetRemovePending(true);
+    const preferredId = listTargetDefinitionIdRef.current;
+    try {
+      const comp = await getBeaconListTargetComponentOrNull(activeDataList, listContainer, preferredId);
+      if (comp == null) {
+        void webflow.notify({ type: "Warning", message: LIST_TARGET_COMPONENT_NOT_FOUND_MESSAGE });
       } else {
         await removeAllBeaconListTargetInstancesOnPage(activeDataList, listContainer, {
           preferredDefinitionId: preferredId,
         });
         await webflow.unregisterComponent(comp);
-        void webflow.notify({ type: "Success", message: "List target removed from the site." });
+        void webflow.notify({
+          type: "Success",
+          message:
+            "List target component removed from the site. The CMS plain text field for this beacon list is unchanged — delete the beacon list to remove that field.",
+        });
       }
       listTargetDefinitionIdRef.current = null;
       listTargetResolveGen.current += 1;
@@ -1158,6 +1367,7 @@ export function BeaconsScreen() {
       void webflow.notify({ type: "Error", message });
     } finally {
       setListTargetRemovePending(false);
+      setListTargetRemoveBusyKind(null);
     }
   };
 
@@ -1316,6 +1526,7 @@ export function BeaconsScreen() {
                   activeDataList={composerStudio.beacon.dataList}
                   draft={composerDraft}
                   dirty={composerDirty}
+                  emptyTargetOrderHint={composerEmptyTargetOrderHint}
                   allowedPalette={composerAllowedPalette}
                   onAddFromPalette={handleComposerAddFromPalette}
                   onReorder={handleComposerReorderDraft}
@@ -1403,40 +1614,61 @@ export function BeaconsScreen() {
             onOpenChange={(o) => {
               if (!o && !listTargetRemovePending) {
                 setRemoveListTargetDialogOpen(false);
+                setListTargetRemoveBusyKind(null);
               }
             }}
           >
             <AlertDialogContent size="default">
               <AlertDialogHeader>
-                <AlertDialogTitle>Remove list target?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This permanently deletes the site component
-                  {listTargetRegisteredName != null && (
-                    <>
-                      {" "}
-                      <code className="font-mono text-[0.85em] text-foreground">{listTargetRegisteredName}</code>
-                    </>
-                  )}{" "}
-                  from <span className="text-foreground">{BEACON_UTILITIES_COMPONENT_GROUP}</span>. Any instances on the
-                  canvas become plain elements. This can&apos;t be undone.
+                <AlertDialogTitle>Remove list target</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-3 text-sm text-muted-foreground">
+                    <p>
+                      Choose how to remove
+                      {listTargetRegisteredName != null && (
+                        <>
+                          {" "}
+                          <code className="font-mono text-[0.85em] text-foreground">{listTargetRegisteredName}</code>
+                        </>
+                      )}
+                      . The beacon list&apos;s CMS plain text field (layout JSON) is only deleted when you delete the
+                      beacon list itself — not from this dialog.
+                    </p>
+                    <ul className="list-inside list-disc space-y-1.5 text-left">
+                      <li>
+                        <span className="text-foreground">Remove from canvas</span> — deletes instances on this page.
+                        The component stays in{" "}
+                        <span className="text-foreground">{BEACON_UTILITIES_COMPONENT_GROUP}</span>.
+                      </li>
+                      <li>
+                        <span className="text-foreground">Delete target</span> — also unregisters that site component.
+                        Canvas instances are removed first. This cannot be undone.
+                      </li>
+                    </ul>
+                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter>
+              <AlertDialogFooter className="sm:flex-wrap">
+                <AlertDialogCancel type="button" disabled={listTargetRemovePending}>
+                  Cancel
+                </AlertDialogCancel>
                 <Button
                   type="button"
                   variant="outline"
                   disabled={listTargetRemovePending}
-                  onClick={() => setRemoveListTargetDialogOpen(false)}
+                  onClick={() => void handleRemoveListTargetFromCanvasOnly()}
                 >
-                  Cancel
+                  {listTargetRemovePending && listTargetRemoveBusyKind === "canvas"
+                    ? "Removing…"
+                    : "Remove from canvas"}
                 </Button>
                 <Button
                   type="button"
                   variant="destructive"
                   disabled={listTargetRemovePending}
-                  onClick={() => void handleConfirmRemoveListTarget()}
+                  onClick={() => void handleConfirmDeleteListTargetCompletely()}
                 >
-                  {listTargetRemovePending ? "Removing…" : "Remove target"}
+                  {listTargetRemovePending && listTargetRemoveBusyKind === "delete" ? "Deleting…" : "Delete target"}
                 </Button>
               </AlertDialogFooter>
             </AlertDialogContent>

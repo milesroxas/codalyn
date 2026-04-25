@@ -9,6 +9,8 @@ type BeaconComposerStudioPanelProps = {
   activeDataList: string;
   draft: BeaconCompositionDraftRow[];
   dirty: boolean;
+  /** Shown in Target order when the list is empty and CMS state calls for a specific explanation. */
+  emptyTargetOrderHint: string | null;
   /** Component types present in the Engine-defined beacon list; Composer can only add from this set. */
   allowedPalette: BeaconPaletteEntry[];
   onAddFromPalette: (c: BeaconPaletteEntry) => void;
@@ -68,6 +70,7 @@ function ComposerDropTarget(props: ComposerDropTargetProps) {
 
 type ComposerOrderSectionProps = {
   draft: BeaconCompositionDraftRow[];
+  emptyWhenNoSavedOrderHint: string | null;
   allowedPaletteCount: number;
   busy: boolean;
   dragActive: boolean;
@@ -83,6 +86,7 @@ type ComposerOrderSectionProps = {
 function ComposerOrderSection(props: ComposerOrderSectionProps) {
   const {
     draft,
+    emptyWhenNoSavedOrderHint,
     allowedPaletteCount,
     busy,
     dragActive,
@@ -109,9 +113,13 @@ function ComposerOrderSection(props: ComposerOrderSectionProps) {
 
       {draft.length === 0 ? (
         <div className="rounded-md border border-dashed border-border bg-background px-2.5 py-3 text-sm text-muted-foreground">
-          {allowedPaletteCount > 0
-            ? "Add components from the palette below."
-            : "No component types in this list yet. Add list items in Engine first."}
+          {emptyWhenNoSavedOrderHint != null && emptyWhenNoSavedOrderHint !== "" ? (
+            <span className="block leading-snug">{emptyWhenNoSavedOrderHint}</span>
+          ) : allowedPaletteCount > 0 ? (
+            "Add components from the palette below."
+          ) : (
+            "No component types in this list yet. Add list items in Engine first."
+          )}
         </div>
       ) : (
         <ScrollArea className="h-[min(48vh,22rem)] rounded-md border border-border/70 bg-background">
@@ -223,6 +231,7 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
     activeDataList,
     draft,
     dirty,
+    emptyTargetOrderHint,
     allowedPalette,
     onAddFromPalette,
     onReorder,
@@ -328,11 +337,13 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
       </div>
 
       <p className="text-xs leading-snug text-muted-foreground">
-        Drag to set order. Remove items with trash. Save updates target, preview, and page script.
+        Drag to set order. Remove items with trash. On a CMS collection template, Save writes the order to the current
+        item’s CMS text field and page script — it does not add or rearrange components in the Engine reference list.
       </p>
 
       <ComposerOrderSection
         draft={draft}
+        emptyWhenNoSavedOrderHint={emptyTargetOrderHint}
         allowedPaletteCount={allowedPalette.length}
         busy={busy}
         dragActive={dragActive}

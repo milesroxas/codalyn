@@ -331,6 +331,9 @@ export async function tryBindBeaconListTargetInstanceTextToCms(
   }
   try {
     await instance.setProps([{ propId, value: input }]);
+    if (typeof webflow.setSelectedElement === "function") {
+      await webflow.setSelectedElement(instance);
+    }
   } catch (e) {
     console.warn(LOG_PREFIX, "setProps CMS bind", e);
   }
@@ -378,5 +381,13 @@ export async function bindBeaconListTargetInstancesToListCmsText(options: {
   const toBind = mergeListTargetInstancesForCmsBinding(options.priorityInstances, options.instances);
   for (const inst of toBind) {
     await tryBindBeaconListTargetInstanceTextToCms(inst, options.def, binding);
+  }
+  const refocus = options.priorityInstances?.find(Boolean);
+  if (refocus != null && typeof webflow.setSelectedElement === "function") {
+    try {
+      await webflow.setSelectedElement(refocus);
+    } catch {
+      /* selection is optional */
+    }
   }
 }

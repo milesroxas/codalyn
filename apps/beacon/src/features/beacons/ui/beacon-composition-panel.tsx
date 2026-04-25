@@ -83,7 +83,7 @@ function BeaconListTargetSyncedActions(p: {
         aria-busy={p.listTargetRemovePending}
         onClick={() => void p.onRequestRemoveListTarget()}
       >
-        Remove target
+        Remove target…
       </Button>
       <Button type="button" variant="outline" size="sm" onClick={() => void p.onBackToList()}>
         Back to list

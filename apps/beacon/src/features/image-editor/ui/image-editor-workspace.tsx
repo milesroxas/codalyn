@@ -3,7 +3,6 @@ import type { DragEvent, ReactNode, RefObject, TransitionEvent } from "react";
 import type { ImageDissolveState } from "@/features/image-editor/model/use-image-dissolve-transition";
 import { ImageEditorDissolveBranch } from "@/features/image-editor/ui/image-editor-dissolve-branch";
 import { EmptyImageSourceSection } from "@/features/image-editor/ui/image-editor-source-sections";
-import { ScrollArea } from "@/shared/ui/scroll-area";
 
 export type ImageEditorWorkspaceProps = {
   fileInputRef: RefObject<HTMLInputElement | null>;
@@ -46,10 +45,20 @@ export function ImageEditorWorkspace(props: ImageEditorWorkspaceProps) {
     finishDissolve,
   } = props;
 
+  const emptyNoImage = !dissolving && !imageSrc;
+
   return (
-    <ScrollArea className="h-full min-h-0 min-w-0 flex-1">
-      <div className="flex min-w-0 flex-col gap-0 pb-1">
-        <section className="flex min-w-0 flex-col gap-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex h-full min-h-0 w-full min-w-0 max-w-full flex-1 flex-col gap-0 overflow-hidden pb-1">
+        <section
+          className={
+            emptyNoImage
+              ? "flex h-full min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden"
+              : dissolving
+                ? "flex min-h-0 w-full min-w-0 flex-1 flex-col gap-3 overflow-y-auto"
+                : "flex w-full min-w-0 shrink-0 flex-col gap-3"
+          }
+        >
           <input
             ref={fileInputRef}
             disabled={dissolving}
@@ -61,11 +70,12 @@ export function ImageEditorWorkspace(props: ImageEditorWorkspaceProps) {
             onChange={(e) => queueFile(e.target.files?.[0])}
           />
           {dissolving ? (
-            <div className="relative flex min-w-0 flex-col gap-3">
+            <div className="relative flex min-w-0 flex-1 flex-col gap-3">
               <ImageEditorDissolveBranch
                 beginOutgoingFade={beginOutgoingFade}
                 dissolve={dissolve}
                 dropZoneLabelClass={dropZoneLabelClass}
+                emptyStateWhenNoImage={emptyStateContent}
                 fileInputId={fileInputId}
                 finishDissolve={finishDissolve}
                 handleDrag={handleDrag}
@@ -78,7 +88,7 @@ export function ImageEditorWorkspace(props: ImageEditorWorkspaceProps) {
               />
             </div>
           ) : !imageSrc ? (
-            <div className="px-4 pt-4">
+            <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-4 pt-4 pb-4">
               {emptyStateContent ?? (
                 <EmptyImageSourceSection
                   dropZoneLabelClass={dropZoneLabelClass}
@@ -93,11 +103,11 @@ export function ImageEditorWorkspace(props: ImageEditorWorkspaceProps) {
         </section>
 
         {imageSrc && !dissolving ? (
-          <div key={imageSrc} className="min-w-0">
+          <div key={imageSrc} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
             {loadedEditor}
           </div>
         ) : null}
       </div>
-    </ScrollArea>
+    </div>
   );
 }

@@ -2,12 +2,19 @@ import type { BeaconAppSettings } from "@codalyn/webflow-kit";
 
 export type BeaconTheme = BeaconAppSettings["theme"];
 
-const THEME_ORDER: readonly BeaconTheme[] = ["system", "light", "dark"];
-
-export function nextCycledBeaconTheme(current: string | undefined): BeaconTheme {
-  const cur = current === "light" || current === "dark" || current === "system" ? current : "system";
-  const idx = THEME_ORDER.indexOf(cur);
-  return THEME_ORDER[(idx + 1) % THEME_ORDER.length];
+/**
+ * Binary light/dark toggle for a single control. Avoids a 3-step cycle
+ * (system → light → dark) where "system" can match the previous step visually
+ * when OS preference equals the last explicit mode.
+ */
+export function toggledLightDarkTheme(
+  current: string | undefined,
+  resolved: "light" | "dark" | undefined
+): Extract<BeaconTheme, "light" | "dark"> {
+  if (current === "light") return "dark";
+  if (current === "dark") return "light";
+  if (resolved === "dark") return "light";
+  return "dark";
 }
 
 /** Fire-and-forget sync to Tower user Beacon payload (no-op if request fails). */

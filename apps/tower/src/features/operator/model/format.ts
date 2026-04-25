@@ -1,3 +1,20 @@
+/** Single character for avatar chips; prefers given name, then full name, then email. */
+export function avatarLetterFromUser(opts: { firstName?: string | null; name?: string | null; email: string }): string {
+  const given = opts.firstName?.trim();
+  if (given && given.length > 0) {
+    return given.charAt(0).toUpperCase();
+  }
+  const full = opts.name?.trim();
+  if (full && full.length > 0) {
+    return full.charAt(0).toUpperCase();
+  }
+  const e = opts.email.trim();
+  if (e.length > 0) {
+    return e.charAt(0).toUpperCase();
+  }
+  return "?";
+}
+
 export function initialsFor(nameOrEmail: string | null | undefined): string {
   if (!nameOrEmail) {
     return "·";

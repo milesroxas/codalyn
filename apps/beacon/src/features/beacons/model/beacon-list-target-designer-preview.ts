@@ -3,7 +3,12 @@ import {
   withListTargetMirrorSurface,
 } from "@/features/beacons/model/beacon-list-target-instance-surface";
 import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
-import { findBeaconTargetsOnPage, listInstancesInBeaconTarget } from "@/features/beacons/model/beacon-page-targets";
+import {
+  filterHydratedBeaconComponentsByComponentIds,
+  findBeaconTargetsOnPage,
+  listInstancesInBeaconTarget,
+  resolveBeaconEngineConfiguredComponentIds,
+} from "@/features/beacons/model/beacon-page-targets";
 import { getBeaconListTargetComponentOrNull } from "@/features/beacons/model/create-beacon-list-target-component";
 import { runExclusiveDesignerStyleOp } from "@/features/beacons/model/exclusive-designer-style-op";
 
@@ -25,8 +30,20 @@ async function applyListTargetInstancePreview(
   dataList: string,
   listContainer: BlockElement
 ): Promise<boolean> {
-  return withListTargetMirrorSurface(instance, dataList, listContainer, async (contentRoot) => {
-    for (const c of await contentRoot.getChildren()) {
+  const expected = sourceRows.map((r) => r.componentId);
+  let didChange = false;
+  const ok = await withListTargetMirrorSurface(instance, dataList, listContainer, async (contentRoot) => {
+    const children = await contentRoot.getChildren();
+    const instanceChildren = children.filter((c): c is ComponentElement => c.type === "ComponentInstance");
+    const actual: string[] = [];
+    for (const c of instanceChildren) {
+      actual.push((await c.getComponent()).id);
+    }
+    if (actual.length === expected.length && actual.every((id, i) => id === expected[i])) {
+      return;
+    }
+    didChange = true;
+    for (const c of instanceChildren) {
       await c.remove();
     }
     for (const row of sourceRows) {
@@ -34,6 +51,7 @@ async function applyListTargetInstancePreview(
       await contentRoot.append(def);
     }
   });
+  return ok && didChange;
 }
 
 async function clearListTargetInstancePreview(
@@ -46,6 +64,7 @@ async function clearListTargetInstancePreview(
 
 /**
  * Mirrors the hidden beacon list’s components into the list target while mirroring is enabled.
+ * When the list target already shows the same component instances in order, skips DOM churn.
  * @returns true when instances were updated; false when mirroring was skipped (no-op).
  */
 export async function syncBeaconListTargetDesignerPreview(
@@ -62,7 +81,9 @@ export async function syncBeaconListTargetDesignerPreview(
   if (instances.length === 0) {
     return false;
   }
-  const sourceRows = await listInstancesInBeaconTarget(listContainer);
+  const allRows = await listInstancesInBeaconTarget(listContainer);
+  const configuredComponentIds = await resolveBeaconEngineConfiguredComponentIds(listContainer, allRows);
+  const sourceRows = filterHydratedBeaconComponentsByComponentIds(allRows, configuredComponentIds);
   let mirrored = false;
   await runExclusiveDesignerStyleOp(async () => {
     for (const inst of instances) {
@@ -109,7 +130,9 @@ export async function resyncAllBeaconListTargetDesignerPreviewsOnPage(): Promise
       if (instances.length === 0) {
         continue;
       }
-      const sourceRows = await listInstancesInBeaconTarget(b.container);
+      const allRows = await listInstancesInBeaconTarget(b.container);
+      const configuredComponentIds = await resolveBeaconEngineConfiguredComponentIds(b.container, allRows);
+      const sourceRows = filterHydratedBeaconComponentsByComponentIds(allRows, configuredComponentIds);
       for (const inst of instances) {
         await applyListTargetInstancePreview(inst, sourceRows, b.dataList, b.container);
       }

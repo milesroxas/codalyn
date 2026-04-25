@@ -41,42 +41,49 @@ export type DesignerSessionResult =
   | { ok: true; user: unknown; token: string }
   | { ok: false; status: number; message: string };
 
-export async function establishDesignerBetterAuthSession(
+async function signUpNewDesignerUser(
   request: Request,
-  resolved: WebflowResolvedDesignerUser
+  resolved: WebflowResolvedDesignerUser,
+  password: string
 ): Promise<DesignerSessionResult> {
-  const password = deriveWebflowDesignerCredentialPassword(resolved.id);
-  const row = await findOrLinkRow(resolved, password);
-
-  if (row === "conflict") {
-    return { ok: false, status: 409, message: "webflow_user_mismatch" };
-  }
-
-  if (!row) {
-    const displayName = [resolved.firstName, resolved.lastName].filter(Boolean).join(" ").trim() || resolved.email;
-    try {
-      const signedUp = await auth.api.signUpEmail({
-        body: {
-          name: displayName,
-          email: resolved.email,
-          password,
-          rememberMe: true,
-        },
-        headers: request.headers,
-      });
-      await db.update(user).set({ webflowAuthorizedUserId: resolved.id }).where(eq(user.email, resolved.email));
-      if (!signedUp.token) {
-        return { ok: false, status: 500, message: "session_not_issued" };
-      }
-      return { ok: true, user: signedUp.user, token: signedUp.token };
-    } catch (e: unknown) {
-      if (isAPIError(e)) {
-        return { ok: false, status: 400, message: (e as Error).message ?? "sign_up_failed" };
-      }
-      throw e;
+  const displayName = [resolved.firstName, resolved.lastName].filter(Boolean).join(" ").trim() || resolved.email;
+  try {
+    const signedUp = await auth.api.signUpEmail({
+      body: {
+        name: displayName,
+        email: resolved.email,
+        password,
+        rememberMe: true,
+        firstName: resolved.firstName ?? undefined,
+        lastName: resolved.lastName ?? undefined,
+      },
+      headers: request.headers,
+    });
+    await db
+      .update(user)
+      .set({
+        webflowAuthorizedUserId: resolved.id,
+        firstName: resolved.firstName,
+        lastName: resolved.lastName,
+      })
+      .where(eq(user.email, resolved.email));
+    if (!signedUp.token) {
+      return { ok: false, status: 500, message: "session_not_issued" };
     }
+    return { ok: true, user: signedUp.user, token: signedUp.token };
+  } catch (e: unknown) {
+    if (isAPIError(e)) {
+      return { ok: false, status: 400, message: (e as Error).message ?? "sign_up_failed" };
+    }
+    throw e;
   }
+}
 
+async function signInExistingDesignerUser(
+  request: Request,
+  resolved: WebflowResolvedDesignerUser,
+  password: string
+): Promise<DesignerSessionResult> {
   try {
     const signedIn = await auth.api.signInEmail({
       body: {
@@ -93,4 +100,22 @@ export async function establishDesignerBetterAuthSession(
     }
     throw e;
   }
+}
+
+export async function establishDesignerBetterAuthSession(
+  request: Request,
+  resolved: WebflowResolvedDesignerUser
+): Promise<DesignerSessionResult> {
+  const password = deriveWebflowDesignerCredentialPassword(resolved.id);
+  const row = await findOrLinkRow(resolved, password);
+
+  if (row === "conflict") {
+    return { ok: false, status: 409, message: "webflow_user_mismatch" };
+  }
+
+  if (!row) {
+    return signUpNewDesignerUser(request, resolved, password);
+  }
+
+  return signInExistingDesignerUser(request, resolved, password);
 }

@@ -11,6 +11,7 @@ import {
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { formatDateTime, formatRelative, initialsFor } from "@/features/operator/model/format";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch, OperatorWorkspaceRow } from "@/server/operator/types";
@@ -127,8 +128,11 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
         setBillingPlanDraft(next.billingPlan ?? "");
         setSubscriptionStatusDraft(next.subscriptionStatus ?? "");
         onUpdated?.(detailToRow(next));
+        toast.success("Workspace updated");
       } catch (err) {
-        setError(err instanceof OperatorApiError ? err.message : "Update failed");
+        const msg = err instanceof OperatorApiError ? err.message : "Update failed";
+        setError(msg);
+        toast.error(msg);
       } finally {
         setPatchBusy(false);
       }
@@ -170,7 +174,9 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
     }
     const n = Number(raw);
     if (!Number.isFinite(n) || n < 1) {
-      setError("Seat limit must be a positive number or blank for unlimited.");
+      const msg = "Seat limit must be a positive number or blank for unlimited.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     void patch({ seatLimit: Math.floor(n) });
@@ -191,16 +197,18 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
     setError(null);
     try {
       await operatorApi.deleteWorkspace(detail.id, deleteConfirm);
+      toast.success("Workspace deleted");
       onDeleted?.(detail.id);
       onOpenChange(false);
     } catch (err) {
-      setError(
+      const msg =
         err instanceof OperatorApiError
           ? err.message === "confirm_mismatch"
             ? "Slug does not match."
             : err.message
-          : "Delete failed"
-      );
+          : "Delete failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setDeleteBusy(false);
     }

@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useId, useState } from "react";
-import { tryFinishBeaconTowerAuthPopup } from "@/features/auth/lib/beacon-opener-auth";
+import {
+  syncExistingTowerSessionToBeaconIfPopup,
+  tryFinishBeaconTowerAuthPopup,
+} from "@/features/auth/lib/beacon-opener-auth";
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { authClient } from "@/features/auth/model/auth-client";
@@ -64,11 +67,13 @@ function SignUpForm() {
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const beaconOrigin = searchParams.get("beaconOrigin");
   const operatorInviteParam = searchParams.get("invite");
-  const nameId = useId();
+  const firstNameId = useId();
+  const lastNameId = useId();
   const emailId = useId();
   const passwordId = useId();
   const teamWorkspaceId = useId();
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [startWithTeamWorkspace, setStartWithTeamWorkspace] = useState(false);
@@ -106,6 +111,13 @@ function SignUpForm() {
     };
   }, [operatorInviteParam, beaconOrigin]);
 
+  useEffect(() => {
+    if (!beaconOrigin) {
+      return;
+    }
+    void syncExistingTowerSessionToBeaconIfPopup(beaconOrigin);
+  }, [beaconOrigin]);
+
   async function finishSignUp(data: Parameters<typeof resolveUserAndTokenAfterEmailAuth>[0]) {
     const { user: u, token } = await resolveUserAndTokenAfterEmailAuth(data);
     if (tryFinishBeaconTowerAuthPopup(beaconOrigin, u ? userToBeaconPayload(u) : undefined, token)) {
@@ -119,10 +131,14 @@ function SignUpForm() {
     e.preventDefault();
     setError(null);
     setPending(true);
+    const displayName =
+      [firstName.trim(), lastName.trim()].filter(Boolean).join(" ").trim() || email.split("@")[0] || "User";
     const { data, error: err } = await authClient.signUp.email({
       email,
       password,
-      name: name || email.split("@")[0] || "User",
+      name: displayName,
+      firstName: firstName.trim() || undefined,
+      lastName: lastName.trim() || undefined,
       ...(beaconOrigin ? {} : { callbackURL: callbackUrl }),
     });
     setPending(false);
@@ -153,16 +169,29 @@ function SignUpForm() {
         </CardHeader>
         <CardContent className="pt-4">
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={nameId}>Name</Label>
-              <Input
-                id={nameId}
-                type="text"
-                autoComplete="name"
-                value={name}
-                onChange={(ev) => setName(ev.target.value)}
-                className={inputClass}
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={firstNameId}>First name</Label>
+                <Input
+                  id={firstNameId}
+                  type="text"
+                  autoComplete="given-name"
+                  value={firstName}
+                  onChange={(ev) => setFirstName(ev.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={lastNameId}>Last name</Label>
+                <Input
+                  id={lastNameId}
+                  type="text"
+                  autoComplete="family-name"
+                  value={lastName}
+                  onChange={(ev) => setLastName(ev.target.value)}
+                  className={inputClass}
+                />
+              </div>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor={emailId}>Email</Label>

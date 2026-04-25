@@ -28,9 +28,11 @@ type BeaconCompositionPanelProps = {
   onCreateListTarget: () => void;
   onRequestRemoveListTarget: () => void;
   onPlaceListTargetOnCanvas: () => void;
+  onSyncListTargetPreview: () => void;
   listTargetCreatePending: boolean;
   listTargetRemovePending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
+  listTargetPreviewSyncPending: boolean;
   embedSyncPending: boolean;
   onSyncInstallEmbed: () => void;
   pageRuntimeStatusLoading: boolean;
@@ -46,12 +48,18 @@ type BeaconListTargetActionsProps = {
   listTargetCreatePending: boolean;
   listTargetRemovePending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
+  listTargetPreviewSyncPending: boolean;
   listTargetOnCanvasCount: number;
   onBackToList: () => void;
   onCreateListTarget: () => void;
   onRequestRemoveListTarget: () => void;
   onPlaceListTargetOnCanvas: () => void;
+  onSyncListTargetPreview: () => void;
 };
+
+function renderTargetButtonLabel(isPending: boolean): string {
+  return isPending ? "Rendering…" : "Render target";
+}
 
 function BeaconListTargetActionsBar(props: BeaconListTargetActionsProps) {
   const {
@@ -62,11 +70,13 @@ function BeaconListTargetActionsBar(props: BeaconListTargetActionsProps) {
     listTargetCreatePending,
     listTargetRemovePending,
     listTargetPlaceOnCanvasPending,
+    listTargetPreviewSyncPending,
     listTargetOnCanvasCount,
     onBackToList,
     onCreateListTarget,
     onRequestRemoveListTarget,
     onPlaceListTargetOnCanvas,
+    onSyncListTargetPreview,
   } = props;
   const ctaDisabled = listTargetActionBusy || removingKey !== null || activeDataList == null;
   const placeOrFocusLabel = listTargetOnCanvasCount > 0 ? "Focus on canvas" : "Place on canvas";
@@ -96,6 +106,16 @@ function BeaconListTargetActionsBar(props: BeaconListTargetActionsProps) {
             onClick={() => void onPlaceListTargetOnCanvas()}
           >
             {listTargetPlaceOnCanvasPending ? placeOrFocusPendingLabel : placeOrFocusLabel}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={ctaDisabled}
+            aria-busy={listTargetPreviewSyncPending}
+            onClick={() => void onSyncListTargetPreview()}
+          >
+            {renderTargetButtonLabel(listTargetPreviewSyncPending)}
           </Button>
         </>
       ) : listTargetPhase === "absent" ? (
@@ -164,6 +184,21 @@ function ListTargetCanvasStatusHint(props: {
   );
 }
 
+function ListTargetTextFieldHint(props: { listTargetPhase: BeaconCompositionPanelProps["listTargetPhase"] }) {
+  if (props.listTargetPhase !== "synced") {
+    return null;
+  }
+  return (
+    <p
+      className="rounded-lg border border-border/60 bg-muted/15 px-2.5 py-2 text-xs text-muted-foreground"
+      data-slot="beacon_list_target_text_field_hint"
+    >
+      <span className="font-medium text-foreground">Text</span> is created on the list target for you. Select a list
+      target instance on the canvas to edit it in the right panel (optional copy / CMS).
+    </p>
+  );
+}
+
 export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
   const {
     searchFieldId,
@@ -184,9 +219,11 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
     onCreateListTarget,
     onRequestRemoveListTarget,
     onPlaceListTargetOnCanvas,
+    onSyncListTargetPreview,
     listTargetCreatePending,
     listTargetRemovePending,
     listTargetPlaceOnCanvasPending,
+    listTargetPreviewSyncPending,
     listTargetOnCanvasCount,
     embedSyncPending,
     onSyncInstallEmbed,
@@ -199,6 +236,7 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
     listTargetCreatePending ||
     listTargetRemovePending ||
     listTargetPlaceOnCanvasPending ||
+    listTargetPreviewSyncPending ||
     listTargetPhase === "loading" ||
     listTargetPhase === "updating";
 
@@ -230,13 +268,17 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
           listTargetCreatePending={listTargetCreatePending}
           listTargetRemovePending={listTargetRemovePending}
           listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
+          listTargetPreviewSyncPending={listTargetPreviewSyncPending}
           listTargetOnCanvasCount={listTargetOnCanvasCount}
           onBackToList={onBackToList}
           onCreateListTarget={onCreateListTarget}
           onRequestRemoveListTarget={onRequestRemoveListTarget}
           onPlaceListTargetOnCanvas={onPlaceListTargetOnCanvas}
+          onSyncListTargetPreview={onSyncListTargetPreview}
         />
       </div>
+
+      <ListTargetTextFieldHint listTargetPhase={listTargetPhase} />
 
       <ListTargetCanvasStatusHint listTargetPhase={listTargetPhase} count={listTargetOnCanvasCount} />
 

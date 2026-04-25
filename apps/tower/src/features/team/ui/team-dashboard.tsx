@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { BeaconEditorExperienceSection } from "@/features/team/ui/beacon-editor-experience-section";
 import { TeamWorkspacePanel } from "@/features/team/ui/team-workspace-panel";
-import { TeamWorkspaceSwitcher } from "@/features/team/ui/team-workspace-switcher";
 import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
-import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import {
   isTowerTeamAdminRole,
   TOWER_TEAM_ROLES,
@@ -15,18 +14,9 @@ import {
 } from "@/shared/lib/membership/tower-organization-access";
 import { Button } from "@/shared/ui/button";
 
-function slugify(name: string): string {
-  const s = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-  return s.length > 0 ? s : "team";
-}
-
 export function TeamDashboard() {
   const { data: session, isPending: sessionPending } = authClient.useSession();
-  const { data: orgs, isPending: orgsPending, refetch: refetchOrgs } = authClient.useListOrganizations();
+  const { refetch: refetchOrgs } = authClient.useListOrganizations();
   const {
     data: activeOrg,
     isPending: activeOrgPending,
@@ -34,19 +24,13 @@ export function TeamDashboard() {
   } = authClient.useActiveOrganization();
   const { data: activeMember, refetch: refetchActiveMember } = authClient.useActiveMember();
 
-  const [orgName, setOrgName] = useState("");
   const [activeTeamNameEdit, setActiveTeamNameEdit] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<string>(TOWER_TEAM_ROLES[1]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [resendingInvitationId, setResendingInvitationId] = useState<string | null>(null);
-
-  const isProductAdmin = isProductAdminAppRole(session?.user?.role);
   const canManageTeam = isTowerTeamAdminRole(activeMember?.role);
-  const canCreateTeam =
-    isProductAdmin ||
-    Boolean((session?.user as { canCreateOrganization?: boolean } | undefined)?.canCreateOrganization);
 
   const refreshTeam = useCallback(async () => {
     await Promise.all([refetchOrgs(), refetchActiveOrg(), refetchActiveMember()]);
@@ -57,41 +41,6 @@ export function TeamDashboard() {
       setActiveTeamNameEdit(activeOrg.name);
     }
   }, [activeOrg]);
-
-  const onCreateOrg = async (e: FormEvent): Promise<boolean> => {
-    e.preventDefault();
-    setError(null);
-    const name = orgName.trim();
-    if (!name) {
-      return false;
-    }
-    setBusy(true);
-    const slug = slugify(name);
-    const res = await authClient.organization.create({
-      name,
-      slug,
-    });
-    setBusy(false);
-    if (res.error) {
-      setError(res.error.message ?? "Could not create team");
-      return false;
-    }
-    setOrgName("");
-    await refreshTeam();
-    return true;
-  };
-
-  const onSetActive = async (organizationId: string) => {
-    setError(null);
-    setBusy(true);
-    const res = await authClient.organization.setActive({ organizationId });
-    setBusy(false);
-    if (res.error) {
-      setError(res.error.message ?? "Could not switch team");
-      return;
-    }
-    await refreshTeam();
-  };
 
   const onUpdateActiveTeamName = async (e: FormEvent) => {
     e.preventDefault();
@@ -110,10 +59,13 @@ export function TeamDashboard() {
     });
     setBusy(false);
     if (res.error) {
-      setError(res.error.message ?? "Could not update team name");
+      const msg = res.error.message ?? "Could not update team name";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     await refreshTeam();
+    toast.success("Team name updated");
   };
 
   const onInvite = async (e: FormEvent) => {
@@ -130,11 +82,14 @@ export function TeamDashboard() {
     });
     setBusy(false);
     if (res.error) {
-      setError(res.error.message ?? "Could not send invite");
+      const msg = res.error.message ?? "Could not send invite";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     setInviteEmail("");
     await refreshTeam();
+    toast.success("Invitation sent");
   };
 
   const onResendInvite = async (inv: InvitationRow) => {
@@ -147,10 +102,13 @@ export function TeamDashboard() {
     });
     setResendingInvitationId(null);
     if (res.error) {
-      setError(res.error.message ?? "Could not resend invite");
+      const msg = res.error.message ?? "Could not resend invite";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     await refreshTeam();
+    toast.success("Invitation resent");
   };
 
   const onCancelInvite = async (invitationId: string) => {
@@ -159,10 +117,13 @@ export function TeamDashboard() {
     const res = await authClient.organization.cancelInvitation({ invitationId });
     setBusy(false);
     if (res.error) {
-      setError(res.error.message ?? "Could not revoke invite");
+      const msg = res.error.message ?? "Could not revoke invite";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     await refreshTeam();
+    toast.success("Invitation revoked");
   };
 
   const onUpdateMemberRole = async (memberId: string, role: string) => {
@@ -174,10 +135,13 @@ export function TeamDashboard() {
     });
     setBusy(false);
     if (res.error) {
-      setError(res.error.message ?? "Could not update role");
+      const msg = res.error.message ?? "Could not update role";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     await refreshTeam();
+    toast.success("Member role updated");
   };
 
   const onRemoveMember = async (memberId: string) => {
@@ -186,10 +150,13 @@ export function TeamDashboard() {
     const res = await authClient.organization.removeMember({ memberIdOrEmail: memberId });
     setBusy(false);
     if (res.error) {
-      setError(res.error.message ?? "Could not remove member");
+      const msg = res.error.message ?? "Could not remove member";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     await refreshTeam();
+    toast.success("Member removed");
   };
 
   const members = useMemo(() => (activeOrg?.members ?? []) as MemberRow[], [activeOrg?.members]);
@@ -207,20 +174,6 @@ export function TeamDashboard() {
           : undefined,
     })) as InvitationRow[];
   }, [activeOrg?.invitations]);
-
-  const workspaceTriggerLabel = useMemo(() => {
-    if (orgsPending) {
-      return "Loading workspaces…";
-    }
-    const orgList = orgs ?? [];
-    if (orgList.length === 0) {
-      return "No workspace";
-    }
-    if (activeOrg?.name) {
-      return activeOrg.name;
-    }
-    return "Select workspace";
-  }, [orgsPending, orgs, activeOrg?.name]);
 
   if (sessionPending) {
     return (
@@ -260,19 +213,7 @@ export function TeamDashboard() {
               workspace.
             </p>
           </div>
-          <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
-            <TeamWorkspaceSwitcher
-              orgs={orgs}
-              orgsPending={orgsPending}
-              activeOrgId={activeOrg?.id}
-              triggerLabel={workspaceTriggerLabel}
-              busy={busy}
-              canCreateTeam={canCreateTeam}
-              orgName={orgName}
-              onOrgNameChange={setOrgName}
-              onCreateOrg={onCreateOrg}
-              onSetActive={onSetActive}
-            />
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void refreshTeam()}>
               Sync
             </Button>

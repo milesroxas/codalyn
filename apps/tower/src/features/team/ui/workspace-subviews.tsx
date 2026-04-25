@@ -3,6 +3,7 @@
 import { IconClockHour4, IconCopy, IconMailForward, IconTrash, IconUserPlus, IconUsers } from "@tabler/icons-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { formatInvitationExpiry } from "@/features/team/ui/workspace-invitation-utils";
 import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
 import { TOWER_TEAM_ROLES } from "@/shared/lib/membership/tower-organization-access";
@@ -61,6 +62,7 @@ function WorkspaceIdentityCard(props: {
             onClick={() => {
               void navigator.clipboard.writeText(activeOrg.slug);
               setSlugCopied(true);
+              toast.success("Slug copied");
             }}
           >
             <IconCopy className="size-3.5" aria-hidden />
@@ -218,7 +220,7 @@ function WorkspaceInvitesTab(props: {
           </CardHeader>
           <CardContent>
             <form
-              className="flex flex-col gap-4 lg:flex-row lg:items-end"
+              className="flex flex-col gap-4 lg:flex-row lg:items-start"
               onSubmit={(ev) => {
                 void onInvite(ev);
               }}
@@ -252,9 +254,14 @@ function WorkspaceInvitesTab(props: {
                   </select>
                 </div>
               </div>
-              <Button type="submit" disabled={busy} className="shrink-0">
-                Send invite
-              </Button>
+              <div className="flex min-w-0 flex-col space-y-2 lg:shrink-0">
+                <span className="hidden text-sm font-medium leading-none select-none lg:block lg:invisible" aria-hidden>
+                  &nbsp;
+                </span>
+                <Button type="submit" disabled={busy} className="w-full shrink-0 lg:w-auto">
+                  Send invite
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>

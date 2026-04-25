@@ -4,6 +4,9 @@ import {
   resolveUserCmsLayoutFieldSlug,
   webflowCmsItemUrl,
 } from "@/server/beacon-cms-layout";
+import { resolveTowerEntitlement } from "@/server/billing/entitlements";
+import { getActiveOrganizationIdForApiRequest } from "@/server/billing/session-org";
+import { consumeWebflowRequest } from "@/server/billing/usage-gate";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
@@ -50,6 +53,13 @@ export async function POST(req: Request) {
   const webflowToken = await resolveWebflowBearerToken({ userId: auth.userId });
   if (!webflowToken) {
     return Response.json({ code: "NO_WEBFLOW_TOKEN", message: "Connect Webflow in Tower first." }, { status: 503 });
+  }
+
+  const activeOrg = await getActiveOrganizationIdForApiRequest(req);
+  const entitlement = await resolveTowerEntitlement(auth.userId, activeOrg);
+  const usage = await consumeWebflowRequest(auth.userId, entitlement);
+  if (!usage.ok) {
+    return usage.response;
   }
 
   const upstream = await fetch(webflowCmsItemUrl(body.collectionId, body.itemId), {

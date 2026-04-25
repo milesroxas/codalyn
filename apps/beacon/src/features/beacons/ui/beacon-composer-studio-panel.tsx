@@ -43,11 +43,11 @@ function ComposerDropTarget(props: ComposerDropTargetProps) {
         aria-hidden={!dragActive}
         className={cn(
           "relative block h-2 w-full rounded-sm transition-colors",
-          dragActive ? "opacity-100" : "pointer-events-none opacity-0",
+          dragActive ? "opacity-100" : "opacity-0",
           highlighted && "bg-primary/12"
         )}
         onDragOver={(e: DragEvent<HTMLButtonElement>) => {
-          if (!dragActive || busy) return;
+          if (busy) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
           onSetDropSlot(slot);
@@ -274,6 +274,17 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
     e.dataTransfer.effectAllowed = "move";
   };
 
+  const handleDragEnd = () => {
+    if (typeof window === "undefined") {
+      resetDragState();
+      return;
+    }
+    // In embedded Designer contexts, `dragend` can fire before `drop`; defer clear by one frame.
+    window.requestAnimationFrame(() => {
+      resetDragState();
+    });
+  };
+
   return (
     <div className="space-y-3" data-slot="beacon_composer_studio">
       {!pageRuntimeStatusLoading && !pageRuntimeSynced ? (
@@ -330,7 +341,7 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
         onSetDropSlot={setDropSlotIndex}
         onDropAtSlot={handleDropAtSlot}
         onDragStart={handleDragStart}
-        onDragEnd={resetDragState}
+        onDragEnd={handleDragEnd}
         onRemove={onRemove}
       />
 

@@ -1,11 +1,6 @@
-import {
-  type BeaconImagePresetRow,
-  getBeaconExportImagePresets,
-  getVisibleBuiltinAspectPresets,
-  type ImageExportFormat,
-} from "@codalyn/webflow-kit";
+import { getVisibleBuiltinAspectPresets, type ImageExportFormat } from "@codalyn/webflow-kit";
 import type { DragEvent, SetStateAction } from "react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Area } from "react-easy-crop";
 import { useNavigate } from "react-router-dom";
 import {
@@ -19,12 +14,11 @@ import { outputDimensionsMatchingCrop, parseOutputDimension } from "@/features/i
 import { type AspectPreset, aspectValue } from "@/features/image-editor/lib/aspect-preset";
 import { isCmsPrimaryUploadContext } from "@/features/image-editor/lib/cms-primary-upload-context";
 import {
-  type ExportPresetDefaults,
-  resolvePresetExportFormat,
-  resolvePresetExportQuality,
-} from "@/features/image-editor/lib/export-preset";
-import { formatFileSize } from "@/features/image-editor/lib/format-file-size";
+  type ExportDimensionInferenceSource,
+  inferExportDimensionsForTarget,
+} from "@/features/image-editor/lib/infer-image-target-dimensions";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
+import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { useApplyCroppedToWebflow } from "@/features/image-editor/model/use-apply-cropped-to-webflow";
 import { useCmsCollectionTemplatePage } from "@/features/image-editor/model/use-cms-collection-template-page";
 import { useComponentInstanceImageProps } from "@/features/image-editor/model/use-component-instance-image-props";
@@ -32,6 +26,8 @@ import { useExportByteEstimate } from "@/features/image-editor/model/use-export-
 import { useExportQualityPreview } from "@/features/image-editor/model/use-export-quality-preview";
 import { useImageDissolveTransition } from "@/features/image-editor/model/use-image-dissolve-transition";
 import { useImageEditorAssetFolders } from "@/features/image-editor/model/use-image-editor-asset-folders";
+import { useImageEditorAutoTargets } from "@/features/image-editor/model/use-image-editor-auto-targets";
+import { useImageEditorWorkflow } from "@/features/image-editor/model/use-image-editor-workflow";
 import { useImageOutputDimensionsOnLoad } from "@/features/image-editor/model/use-image-output-dimensions-on-load";
 import { useQualityPopoutBridge } from "@/features/image-editor/model/use-quality-popout-bridge";
 import { useRevokeBlobUrlOnChange } from "@/features/image-editor/model/use-revoke-blob-url";
@@ -39,11 +35,9 @@ import {
   type CropFrameMode,
   ImageEditorCropExportPanel,
 } from "@/features/image-editor/ui/image-editor-crop-export-panel";
+import { ImageEditorLoadedColumn } from "@/features/image-editor/ui/image-editor-loaded-column";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
-import {
-  EmptyImageSourceSection,
-  LoadedImageSourceSection,
-} from "@/features/image-editor/ui/image-editor-source-sections";
+import { ImageEditorPreimageColumn } from "@/features/image-editor/ui/image-editor-preimage-column";
 import { ImageEditorWorkspace } from "@/features/image-editor/ui/image-editor-workspace";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { cn } from "@/shared/lib/utils";
@@ -57,7 +51,13 @@ type ImageEditorProps = {
 export function ImageEditor(props: ImageEditorProps = {}) {
   const { onOnboardingVisibilityChange } = props;
   const navigate = useNavigate();
-  const { settings, updateSettings, canPersistExportDefaults, syncState } = useBeaconAppSettings();
+  const { settings, updateSettings, canPersistExportDefaults, syncState, workspaceMemberRole, isTowerUser } =
+    useBeaconAppSettings();
+  const roleReady = useMemo(() => !isTowerUser || syncState === "synced", [isTowerUser, syncState]);
+  const isWorkspaceDesigner = useMemo(
+    () => Boolean(roleReady && workspaceMemberRole?.toLowerCase() === "designer"),
+    [roleReady, workspaceMemberRole]
+  );
   const baseId = useId();
   const fileInputId = `${baseId}-file`;
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,16 +78,15 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   const [dragActive, setDragActive] = useState(false);
   const [originalBytes, setOriginalBytes] = useState<number | null>(null);
   const [guestOnboardingComplete, setGuestOnboardingComplete] = useState(readBeaconGuestWelcomeComplete);
-  /** True after user picks "Custom (manual)" in preset dropdown; shows format/quality/dimension editors even if values still match a preset. */
-  const [exportPresetManualOverride, setExportPresetManualOverride] = useState(false);
-  /** Preset chosen from the dropdown; kept while dimensions and format match so quality can differ from the preset target. */
-  const [selectedExportPresetId, setSelectedExportPresetId] = useState<string | null>(null);
   const [imageSrc, setImageSrcInternal] = useState<string | null>(null);
   const setImageSrc = useCallback((action: SetStateAction<string | null>) => {
-    setExportPresetManualOverride(false);
-    setSelectedExportPresetId(null);
     setImageSrcInternal(action);
   }, []);
+  const [autoPageTarget, setAutoPageTarget] = useState<ImagePageTarget | null>(null);
+  const [autoExportInferenceSource, setAutoExportInferenceSource] = useState<ExportDimensionInferenceSource | null>(
+    null
+  );
+  const [dismissedCanvasSelectionPrompt, setDismissedCanvasSelectionPrompt] = useState(false);
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
   const exportDefaultsHydratedRef = useRef(!towerUser?.id);
   const serverExportDefaultsAppliedRef = useRef(false);
@@ -121,7 +120,6 @@ export function ImageEditor(props: ImageEditorProps = {}) {
   } = useComponentInstanceImageProps();
 
   const visibleBuiltinAspectPresets = useMemo(() => getVisibleBuiltinAspectPresets(settings), [settings]);
-  const exportImagePresets = useMemo(() => getBeaconExportImagePresets(settings), [settings]);
 
   useEffect(() => {
     if (visibleBuiltinAspectPresets.length === 0) {
@@ -218,120 +216,10 @@ export function ImageEditor(props: ImageEditorProps = {}) {
     prevShowGuestOnboarding.current = showGuestOnboarding;
   }, [towerUser, showGuestOnboarding, navigate]);
 
-  useImageOutputDimensionsOnLoad(
-    imageSrc,
-    setOutputWidth,
-    setOutputHeight,
-    setWidthStr,
-    setHeightStr,
-    setCrop,
-    setZoom,
-    setCompletedCrop,
-    setImageSrc
-  );
-
   useRevokeBlobUrlOnChange(imageSrc);
 
   const parsedOutputW = useMemo(() => parseOutputDimension(widthStr, outputWidth), [widthStr, outputWidth]);
   const parsedOutputH = useMemo(() => parseOutputDimension(heightStr, outputHeight), [heightStr, outputHeight]);
-
-  const exportPresetDefaults: ExportPresetDefaults = useMemo(
-    () => ({
-      exportFormat: settings.defaultExportFormat,
-      exportQuality: settings.defaultExportQuality,
-    }),
-    [settings.defaultExportFormat, settings.defaultExportQuality]
-  );
-
-  const applyExportPreset = useCallback(
-    (preset: BeaconImagePresetRow) => {
-      setExportPresetManualOverride(false);
-      setSelectedExportPresetId(preset.id);
-      const fmtRaw = resolvePresetExportFormat(preset, exportPresetDefaults);
-      const fmt = !allowAvifEncoding && fmtRaw === "avif" ? "webp" : fmtRaw;
-      const qual = resolvePresetExportQuality(preset, exportPresetDefaults);
-      setExportFormat(fmt);
-      setQuality(qual);
-      setOutputWidth(preset.width);
-      setOutputHeight(preset.height);
-      setWidthStr(String(preset.width));
-      setHeightStr(String(preset.height));
-      setCropFrameMode("custom");
-    },
-    [allowAvifEncoding, exportPresetDefaults]
-  );
-
-  const formatForPresetMatch = useMemo(
-    () => (f: ImageExportFormat) => (!allowAvifEncoding && f === "avif" ? "webp" : f),
-    [allowAvifEncoding]
-  );
-
-  const selectedExportPresetRow = useMemo(
-    () => (selectedExportPresetId ? exportImagePresets.find((p) => p.id === selectedExportPresetId) : undefined),
-    [selectedExportPresetId, exportImagePresets]
-  );
-
-  const selectedExportPresetValid = useMemo(() => {
-    if (!selectedExportPresetRow) {
-      return false;
-    }
-    if (parsedOutputW !== selectedExportPresetRow.width || parsedOutputH !== selectedExportPresetRow.height) {
-      return false;
-    }
-    const pf = resolvePresetExportFormat(selectedExportPresetRow, exportPresetDefaults);
-    return formatForPresetMatch(pf) === formatForPresetMatch(exportFormat);
-  }, [selectedExportPresetRow, parsedOutputW, parsedOutputH, exportFormat, exportPresetDefaults, formatForPresetMatch]);
-
-  useEffect(() => {
-    if (!selectedExportPresetId || !selectedExportPresetRow) {
-      if (selectedExportPresetId && !selectedExportPresetRow) {
-        setSelectedExportPresetId(null);
-      }
-      return;
-    }
-    if (!selectedExportPresetValid) {
-      setSelectedExportPresetId(null);
-    }
-  }, [selectedExportPresetId, selectedExportPresetRow, selectedExportPresetValid]);
-
-  const lockCropOutputForPreset = selectedExportPresetValid && !exportPresetManualOverride && !isConfirmedGuest;
-
-  const exportPresetEncodingSummary = useMemo(() => {
-    if (!lockCropOutputForPreset || !selectedExportPresetRow) {
-      return null;
-    }
-    const f = resolvePresetExportFormat(selectedExportPresetRow, exportPresetDefaults);
-    return `${selectedExportPresetRow.name} · ${f.toUpperCase()} · max ${formatFileSize(selectedExportPresetRow.maxFileSizeBytes)}`;
-  }, [lockCropOutputForPreset, selectedExportPresetRow, exportPresetDefaults]);
-
-  const exportPresetFileLimit = useMemo(() => {
-    if (!selectedExportPresetValid || !selectedExportPresetRow || isConfirmedGuest) {
-      return null;
-    }
-    return {
-      presetName: selectedExportPresetRow.name,
-      maxFileSizeBytes: selectedExportPresetRow.maxFileSizeBytes,
-      format: resolvePresetExportFormat(selectedExportPresetRow, exportPresetDefaults),
-    };
-  }, [selectedExportPresetValid, selectedExportPresetRow, exportPresetDefaults, isConfirmedGuest]);
-
-  const activePresetMaxFileBytes = useMemo(
-    () => exportPresetFileLimit?.maxFileSizeBytes ?? null,
-    [exportPresetFileLimit]
-  );
-
-  const exportPresetSelectValue = useMemo(() => {
-    if (exportPresetManualOverride) {
-      return "__custom__";
-    }
-    if (!selectedExportPresetId) {
-      return "__custom__";
-    }
-    if (!exportImagePresets.some((p) => p.id === selectedExportPresetId)) {
-      return "__custom__";
-    }
-    return selectedExportPresetId;
-  }, [exportPresetManualOverride, selectedExportPresetId, exportImagePresets]);
 
   const { effectiveOutputW, effectiveOutputH } = useMemo(() => {
     if (!completedCrop) {
@@ -361,33 +249,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
     exportFormat,
   });
 
-  const exportPlaceBlockedLabel = useMemo(() => {
-    if (!selectedExportPresetValid || !selectedExportPresetRow || isConfirmedGuest) {
-      return null;
-    }
-    const maxB = selectedExportPresetRow.maxFileSizeBytes;
-    if (!completedCrop) {
-      return null;
-    }
-    if (estimatePending || estimatedBytes === null) {
-      return "Estimating size…";
-    }
-    if (estimateNonce === 0) {
-      return "Release quality to estimate";
-    }
-    if (estimatedBytes > maxB) {
-      return "Over preset file limit";
-    }
-    return null;
-  }, [
-    selectedExportPresetValid,
-    selectedExportPresetRow,
-    isConfirmedGuest,
-    completedCrop,
-    estimatePending,
-    estimatedBytes,
-    estimateNonce,
-  ]);
+  const exportPlaceBlockedLabel = null;
 
   const { originalPreviewUrl, compressedPreviewUrl, previewPending, getPopoutPreviewBlobs } = useExportQualityPreview({
     imageSrc,
@@ -428,6 +290,170 @@ export function ImageEditor(props: ImageEditorProps = {}) {
     }
   }, [getPopoutPreviewBlobs, effectiveOutputW, effectiveOutputH, quality]);
 
+  const {
+    pathMode,
+    flowStep,
+    setFlowStep,
+    goToStep,
+    chooseAutoPath,
+    chooseConfigurePath,
+    finishConfigurePath,
+    exitToUploadFade,
+    onExitToUploadTransitionEnd,
+    beginAutoToUpload,
+    frameSummary,
+    currentStepForNav,
+    showFlowStepNav,
+    includeEntryStep,
+  } = useImageEditorWorkflow({
+    imageSrc,
+    dissolving,
+    showGuestOnboarding,
+    setImageSrcInternal,
+    setOriginalBytes,
+    setCompletedCrop,
+    setCrop,
+    setZoom,
+    aspectPreset,
+    cropFrameMode,
+    parsedOutputW,
+    parsedOutputH,
+    autoTargetLabel: autoPageTarget?.label ?? null,
+    autoExportInferenceSource,
+    isWorkspaceDesigner,
+  });
+
+  useLayoutEffect(() => {
+    if (showGuestOnboarding) {
+      return;
+    }
+    if (!roleReady) {
+      return;
+    }
+    if (isWorkspaceDesigner) {
+      return;
+    }
+    chooseAutoPath();
+  }, [showGuestOnboarding, roleReady, isWorkspaceDesigner, chooseAutoPath]);
+
+  useImageOutputDimensionsOnLoad(
+    imageSrc,
+    setOutputWidth,
+    setOutputHeight,
+    setWidthStr,
+    setHeightStr,
+    setCrop,
+    setZoom,
+    setCompletedCrop,
+    setImageSrc,
+    { applyNaturalImageDimensions: false }
+  );
+
+  const {
+    targets: autoScanTargets,
+    scanPending: autoScanPending,
+    scanError: autoScanError,
+    rescan: onAutoRescan,
+    selectionHint: autoSelectionHint,
+    discoverySettled: autoDiscoverySettled,
+  } = useImageEditorAutoTargets({
+    flowStep,
+    pathMode,
+    dismissedCanvasSelectionPrompt,
+  });
+
+  const applyAutoPageTarget = useCallback(
+    async (t: ImagePageTarget) => {
+      try {
+        await webflow.setSelectedElement(t.element);
+      } catch {
+        /* selection may fail in edge cases */
+      }
+      if (t.kind === "component" && t.imagePropId != null) {
+        setSelectedComponentImagePropId(t.imagePropId);
+      }
+      setPlacement(t.kind === "image" ? "replace" : "selection");
+      setCropFrameMode("custom");
+      const dims = await inferExportDimensionsForTarget(t);
+      setAutoExportInferenceSource(dims.inferenceSource);
+      setOutputWidth(dims.width);
+      setOutputHeight(dims.height);
+      setWidthStr(String(dims.width));
+      setHeightStr(String(dims.height));
+      setAspectPreset("free");
+    },
+    [setSelectedComponentImagePropId]
+  );
+
+  const onChooseAddImageEntry = useCallback(() => {
+    setAutoPageTarget(null);
+    setAutoExportInferenceSource(null);
+    setDismissedCanvasSelectionPrompt(false);
+    chooseAutoPath();
+  }, [chooseAutoPath]);
+
+  const onChooseConfigureEntry = useCallback(() => {
+    setAutoPageTarget(null);
+    setAutoExportInferenceSource(null);
+    setDismissedCanvasSelectionPrompt(false);
+    chooseConfigurePath();
+  }, [chooseConfigurePath]);
+
+  const onAutoSelectTarget = useCallback(
+    (t: ImagePageTarget) => {
+      setAutoPageTarget(t);
+      void applyAutoPageTarget(t);
+    },
+    [applyAutoPageTarget]
+  );
+
+  const onAutoUseCanvasSelection = useCallback(() => {
+    if (autoSelectionHint.kind === "none") {
+      return;
+    }
+    const t =
+      autoSelectionHint.kind === "image"
+        ? autoSelectionHint.target
+        : autoSelectionHint.kind === "component"
+          ? autoSelectionHint.target
+          : null;
+    if (t) {
+      setAutoPageTarget(t);
+      void applyAutoPageTarget(t);
+      beginAutoToUpload();
+    }
+  }, [autoSelectionHint, applyAutoPageTarget, beginAutoToUpload]);
+
+  const onAutoChooseAnotherOnPage = useCallback(() => {
+    setDismissedCanvasSelectionPrompt(true);
+    setAutoPageTarget(null);
+    setAutoExportInferenceSource(null);
+  }, []);
+
+  const autoShowSelectionChoice =
+    pathMode === "auto" &&
+    flowStep === "autoElement" &&
+    autoDiscoverySettled &&
+    !dismissedCanvasSelectionPrompt &&
+    (autoSelectionHint.kind === "image" || autoSelectionHint.kind === "component");
+
+  const showAutoPageTargetList = autoDiscoverySettled && !autoShowSelectionChoice;
+
+  const exportPlaceBlockedLabelForApply = useMemo(() => {
+    if (pathMode === "auto" && isConfirmedGuest && currentCmsItemId) {
+      return "Sign in to Tower to place images in this collection";
+    }
+    return exportPlaceBlockedLabel;
+  }, [pathMode, isConfirmedGuest, currentCmsItemId]);
+
+  useEffect(() => {
+    if (pathMode === "unset" && flowStep === "entry") {
+      setAutoPageTarget(null);
+      setAutoExportInferenceSource(null);
+      setDismissedCanvasSelectionPrompt(false);
+    }
+  }, [pathMode, flowStep]);
+
   const { busy, applyToCanvas } = useApplyCroppedToWebflow({
     imageSrc,
     completedCrop,
@@ -449,7 +475,7 @@ export function ImageEditor(props: ImageEditorProps = {}) {
     placement,
     replaceLibraryAsset,
     cmsPrimaryUpload,
-    exportPlaceBlockedLabel,
+    exportPlaceBlockedLabel: exportPlaceBlockedLabelForApply,
   });
 
   const onCropComplete = useCallback((_c: Area, px: Area) => {
@@ -492,131 +518,162 @@ export function ImageEditor(props: ImageEditorProps = {}) {
 
   const loadedEditor =
     imageSrc != null ? (
-      <div className="flex min-w-0 flex-col gap-3">
-        <LoadedImageSourceSection busy={busy} fileBaseName={fileBaseName} fileInputRef={fileInputRef} />
-        <div className="flex min-w-0 flex-col gap-3 px-4">
-          <ImageEditorCropExportPanel
-            exportPresets={isConfirmedGuest ? [] : exportImagePresets}
-            onApplyExportPreset={applyExportPreset}
-            onExportPresetChooseCustom={() => {
-              setExportPresetManualOverride(true);
-              setSelectedExportPresetId(null);
-            }}
-            exportPresetSelectValue={exportPresetSelectValue}
-            lockCropOutputForPreset={lockCropOutputForPreset}
-            exportPresetEncodingSummary={exportPresetEncodingSummary}
-            exportPresetFileLimit={exportPresetFileLimit}
-            activePresetMaxFileBytes={activePresetMaxFileBytes}
-            exportPlaceBlockedLabel={exportPlaceBlockedLabel}
-            aspectPreset={aspectPreset}
-            visibleBuiltinAspectPresets={visibleBuiltinAspectPresets}
-            assetFolders={assetFolders}
-            baseId={baseId}
-            busy={busy}
-            completedCrop={completedCrop}
-            componentImageProps={componentImageProps}
-            crop={crop}
-            cropAspect={cropAspect}
-            cropFrameMode={cropFrameMode}
-            estimateNonce={estimateNonce}
-            estimatePending={estimatePending}
-            estimatedBytes={estimatedBytes}
-            fileBaseName={fileBaseName}
-            folderActionBusy={folderActionBusy}
-            foldersLoading={foldersLoading}
-            heightStr={heightStr}
-            imageSrc={imageSrc}
-            onApplyToCanvas={applyToCanvas}
-            onCreateAssetFolder={createAssetFolderNamed}
-            onCropComplete={onCropComplete}
-            onQualityCommit={onQualityCommit}
-            originalBytes={originalBytes}
-            originalPreviewUrl={originalPreviewUrl}
-            compressedPreviewUrl={compressedPreviewUrl}
-            previewPending={previewPending}
-            outputHeight={outputHeight}
-            outputWidth={outputWidth}
-            placement={placement}
-            quality={quality}
-            replaceLibraryAsset={replaceLibraryAsset}
-            selectedAssetFolderId={selectedAssetFolderId}
-            selectedComponentImagePropId={selectedComponentImagePropId}
-            selectedElementType={selectedElementType}
-            componentImagePropsResolving={componentImagePropsResolving}
-            cmsPrimaryUpload={cmsPrimaryUpload}
-            elementCmsBindingLoading={elementCmsBindingLoading}
-            elementCmsBinding={elementCmsBinding}
-            guestCmsTemplateRestricted={guestCmsTemplateRestricted}
-            setAspectPreset={setAspectPreset}
-            setCrop={setCrop}
-            setCropFrameMode={setCropFrameMode}
-            setFileBaseName={setFileBaseName}
-            setHeightStr={setHeightStr}
-            setOutputHeight={setOutputHeight}
-            setOutputWidth={setOutputWidth}
-            setPlacement={setPlacement}
-            setQuality={setQuality}
-            exportFormat={exportFormat}
-            allowAvifEncoding={allowAvifEncoding}
-            setExportFormat={setExportFormat}
-            onExportFormatCommit={onQualityCommit}
-            setReplaceLibraryAsset={setReplaceLibraryAsset}
-            setSelectedAssetFolderId={setSelectedAssetFolderId}
-            setSelectedComponentImagePropId={setSelectedComponentImagePropId}
-            setWidthStr={setWidthStr}
-            setZoom={setZoom}
-            widthStr={widthStr}
-            zoom={zoom}
-            parsedExportWidth={parsedOutputW}
-            parsedExportHeight={parsedOutputH}
-            effectiveExportWidth={effectiveOutputW}
-            effectiveExportHeight={effectiveOutputH}
-            onOpenQualityPopout={openQualityPopout}
-            limitCropZoomToNativeResolution={settings.limitCropZoomToNativeResolution}
-          />
-        </div>
-      </div>
+      <ImageEditorLoadedColumn
+        busy={busy}
+        currentStepForNav={currentStepForNav}
+        fileBaseName={fileBaseName}
+        fileInputRef={fileInputRef}
+        flowStep={flowStep}
+        goToStep={goToStep}
+        includeEntryStep={includeEntryStep}
+        pathMode={pathMode}
+        showFlowStepNav={showFlowStepNav}
+      >
+        <ImageEditorCropExportPanel
+          exportPlaceBlockedLabel={exportPlaceBlockedLabelForApply}
+          aspectPreset={aspectPreset}
+          visibleBuiltinAspectPresets={visibleBuiltinAspectPresets}
+          assetFolders={assetFolders}
+          baseId={baseId}
+          busy={busy}
+          completedCrop={completedCrop}
+          componentImageProps={componentImageProps}
+          crop={crop}
+          cropAspect={cropAspect}
+          cropFrameMode={cropFrameMode}
+          estimateNonce={estimateNonce}
+          estimatePending={estimatePending}
+          estimatedBytes={estimatedBytes}
+          fileBaseName={fileBaseName}
+          folderActionBusy={folderActionBusy}
+          foldersLoading={foldersLoading}
+          heightStr={heightStr}
+          imageSrc={imageSrc}
+          onApplyToCanvas={applyToCanvas}
+          onCreateAssetFolder={createAssetFolderNamed}
+          onCropComplete={onCropComplete}
+          onQualityCommit={onQualityCommit}
+          originalBytes={originalBytes}
+          originalPreviewUrl={originalPreviewUrl}
+          compressedPreviewUrl={compressedPreviewUrl}
+          previewPending={previewPending}
+          outputHeight={outputHeight}
+          outputWidth={outputWidth}
+          placement={placement}
+          quality={quality}
+          replaceLibraryAsset={replaceLibraryAsset}
+          selectedAssetFolderId={selectedAssetFolderId}
+          selectedComponentImagePropId={selectedComponentImagePropId}
+          selectedElementType={selectedElementType}
+          componentImagePropsResolving={componentImagePropsResolving}
+          cmsPrimaryUpload={cmsPrimaryUpload}
+          elementCmsBindingLoading={elementCmsBindingLoading}
+          elementCmsBinding={elementCmsBinding}
+          guestCmsTemplateRestricted={guestCmsTemplateRestricted}
+          setAspectPreset={setAspectPreset}
+          setCrop={setCrop}
+          setCropFrameMode={setCropFrameMode}
+          setFileBaseName={setFileBaseName}
+          setHeightStr={setHeightStr}
+          setOutputHeight={setOutputHeight}
+          setOutputWidth={setOutputWidth}
+          setPlacement={setPlacement}
+          setQuality={setQuality}
+          exportFormat={exportFormat}
+          allowAvifEncoding={allowAvifEncoding}
+          setExportFormat={setExportFormat}
+          onExportFormatCommit={onQualityCommit}
+          setReplaceLibraryAsset={setReplaceLibraryAsset}
+          setSelectedAssetFolderId={setSelectedAssetFolderId}
+          setSelectedComponentImagePropId={setSelectedComponentImagePropId}
+          setWidthStr={setWidthStr}
+          setZoom={setZoom}
+          widthStr={widthStr}
+          zoom={zoom}
+          parsedExportWidth={parsedOutputW}
+          parsedExportHeight={parsedOutputH}
+          effectiveExportWidth={effectiveOutputW}
+          effectiveExportHeight={effectiveOutputH}
+          onOpenQualityPopout={openQualityPopout}
+          limitCropZoomToNativeResolution={settings.limitCropZoomToNativeResolution}
+          flowPhase={pathMode === "auto" ? "position" : flowStep === "position" ? "position" : "save"}
+          unifiedPositionAndSave={pathMode === "auto"}
+          onContinueToSave={() => {
+            setFlowStep("save");
+          }}
+          frameSummary={frameSummary}
+        />
+      </ImageEditorLoadedColumn>
     ) : null;
 
   return (
-    <ImageEditorWorkspace
-      emptyStateContent={
-        showGuestOnboarding ? (
-          <ImageEditorOnboarding
-            towerConfigured={towerConfigured}
-            onSignInToTower={openTowerEmailSignInPopup}
-            onContinueAsGuest={() => {
-              writeBeaconGuestWelcomeComplete();
-              setGuestOnboardingComplete(true);
-              navigate("/home");
-            }}
-          />
-        ) : (
-          <EmptyImageSourceSection
-            dropZoneLabelClass={dropZoneLabelClass}
-            fileInputId={fileInputId}
-            handleDrag={handleDrag}
-            handleDragState={handleDragState}
-            handleDrop={handleDrop}
-          />
-        )
-      }
-      beginOutgoingFade={beginOutgoingFade}
-      dissolve={dissolve}
-      dissolving={dissolving}
-      dropZoneLabelClass={dropZoneLabelClass}
-      fileInputId={fileInputId}
-      fileInputRef={fileInputRef}
-      finishDissolve={finishDissolve}
-      handleDrag={handleDrag}
-      handleDragState={handleDragState}
-      handleDrop={handleDrop}
-      handleOutgoingFadeComplete={handleOutgoingFadeComplete}
-      imageSrc={imageSrc}
-      incomingEnter={incomingEnter}
-      loadedEditor={loadedEditor}
-      queueFile={queueFile}
-      showIncomingPreview={showIncomingPreview}
-    />
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+      <ImageEditorWorkspace
+        emptyStateContent={
+          showGuestOnboarding ? (
+            <ImageEditorOnboarding
+              towerConfigured={towerConfigured}
+              onSignInToTower={openTowerEmailSignInPopup}
+              onContinueAsGuest={() => {
+                writeBeaconGuestWelcomeComplete();
+                setGuestOnboardingComplete(true);
+                navigate("/home");
+              }}
+            />
+          ) : (
+            <ImageEditorPreimageColumn
+              autoScanError={autoScanError}
+              autoScanPending={autoScanPending}
+              autoSelectedTarget={autoPageTarget}
+              autoSelectionHint={autoSelectionHint}
+              autoDiscoverySettled={autoDiscoverySettled}
+              autoShowPageTargetList={showAutoPageTargetList}
+              autoShowSelectionChoice={autoShowSelectionChoice}
+              autoTargets={autoScanTargets}
+              beginAutoToUpload={beginAutoToUpload}
+              currentStepForNav={currentStepForNav}
+              dropZoneLabelClass={dropZoneLabelClass}
+              exitToUploadFade={exitToUploadFade}
+              fileInputId={fileInputId}
+              onDoneConfiguringPresets={finishConfigurePath}
+              flowStep={flowStep}
+              goToStep={goToStep}
+              handleDrag={handleDrag}
+              handleDragState={handleDragState}
+              handleDrop={handleDrop}
+              includeEntryStep={includeEntryStep}
+              isConfirmedGuest={isConfirmedGuest}
+              isTowerUser={isTowerUser}
+              isWorkspaceDesigner={isWorkspaceDesigner}
+              onAutoChooseAnotherOnPage={onAutoChooseAnotherOnPage}
+              onAutoRescan={onAutoRescan}
+              onAutoSelectTarget={onAutoSelectTarget}
+              onAutoUseCanvasSelection={onAutoUseCanvasSelection}
+              onChooseAddImage={onChooseAddImageEntry}
+              onChooseConfigure={onChooseConfigureEntry}
+              onExitToUploadTransitionEnd={onExitToUploadTransitionEnd}
+              pathMode={pathMode}
+              roleReady={roleReady}
+            />
+          )
+        }
+        beginOutgoingFade={beginOutgoingFade}
+        dissolve={dissolve}
+        dissolving={dissolving}
+        dropZoneLabelClass={dropZoneLabelClass}
+        fileInputId={fileInputId}
+        fileInputRef={fileInputRef}
+        finishDissolve={finishDissolve}
+        handleDrag={handleDrag}
+        handleDragState={handleDragState}
+        handleDrop={handleDrop}
+        handleOutgoingFadeComplete={handleOutgoingFadeComplete}
+        imageSrc={imageSrc}
+        incomingEnter={incomingEnter}
+        loadedEditor={loadedEditor}
+        queueFile={queueFile}
+        showIncomingPreview={showIncomingPreview}
+      />
+    </div>
   );
 }

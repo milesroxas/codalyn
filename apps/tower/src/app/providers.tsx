@@ -2,7 +2,7 @@
 
 import { ThemeProvider } from "next-themes";
 import type * as React from "react";
-import { TowerBeaconThemeSync } from "@/features/beacon/ui/tower-beacon-theme-sync";
+import { Toaster } from "@/shared/ui/sonner";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -13,7 +13,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
       storageKey="tower-ui-theme"
     >
-      <TowerBeaconThemeSync>{children}</TowerBeaconThemeSync>
+      {children}
+      <Toaster />
     </ThemeProvider>
   );
 }

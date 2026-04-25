@@ -1,3 +1,4 @@
+import { ensureBeaconListTargetTextProp } from "@/features/beacons/model/beacon-list-target-text-field";
 import {
   applyBeaconListTargetSync,
   beaconListTargetNeedsSync,
@@ -40,12 +41,16 @@ export async function reconcileBeaconListTarget(
         const name = await comp.getName().catch(() => null);
         return { type: "update_apply_failed", name, errorMessage: formatReconcileError(e) };
       }
-      const name = await comp.getName();
-      return { type: "ready", name, listWasUpdated: true };
+    }
+
+    try {
+      await ensureBeaconListTargetTextProp(comp, { dataList, listContainer });
+    } catch {
+      /* List target is still usable; Text field is added on create/place in normal cases. */
     }
 
     const name = await comp.getName();
-    return { type: "ready", name, listWasUpdated: false };
+    return { type: "ready", name, listWasUpdated: needs };
   });
 }
 

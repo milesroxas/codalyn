@@ -21,7 +21,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
-import { nextCycledBeaconTheme, persistBeaconThemePreference } from "@/features/beacon/lib/beacon-theme-preference";
+import { persistBeaconThemePreference, toggledLightDarkTheme } from "@/features/beacon/lib/beacon-theme-preference";
 import { initialsFor } from "@/features/operator/model/format";
 import { OperatorCommandPalette } from "@/features/operator/ui/operator-command-palette";
 import { cn } from "@/shared/lib/utils";
@@ -63,7 +63,8 @@ export function OperatorShell({ userEmail, userName, children }: OperatorShellPr
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = authClient.useSession();
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
+  const effectiveResolved: "light" | "dark" = resolvedTheme === "dark" ? "dark" : "light";
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -94,12 +95,14 @@ export function OperatorShell({ userEmail, userName, children }: OperatorShellPr
   }, [router]);
 
   const cycleTheme = useCallback(() => {
-    const next = nextCycledBeaconTheme(theme);
-    setTheme(next);
-    if (session?.user) {
-      persistBeaconThemePreference(next);
-    }
-  }, [theme, setTheme, session?.user]);
+    setTheme((current) => {
+      const next = toggledLightDarkTheme(current, effectiveResolved);
+      if (session?.user) {
+        persistBeaconThemePreference(next);
+      }
+      return next;
+    });
+  }, [setTheme, session?.user, effectiveResolved]);
 
   const brand = (
     <Link

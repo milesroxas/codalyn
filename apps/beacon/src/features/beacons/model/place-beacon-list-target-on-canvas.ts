@@ -1,5 +1,27 @@
 import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
+import { ensureBeaconListTargetTextProp } from "@/features/beacons/model/beacon-list-target-text-field";
 import { getBeaconListTargetComponentOrNull } from "@/features/beacons/model/create-beacon-list-target-component";
+import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
+
+const MAX_PLACEMENT_EXIT_STEPS = 8;
+
+/**
+ * Placing a list-target **instance** runs against the current **page** tree (`getAllElements`, `append` on body,
+ * etc.). If the user is still in a **component definition** context ({@link webflow.getCurrentComponent} non-null),
+ * exit to the page first — same idea as other beacon helpers (e.g. list-target mirror).
+ */
+async function ensurePageCanvasForListTargetPlacement(): Promise<void> {
+  if (typeof webflow.getCurrentComponent !== "function" || typeof webflow.exitComponent !== "function") {
+    return;
+  }
+  for (let step = 0; step < MAX_PLACEMENT_EXIT_STEPS; step += 1) {
+    const current = await webflow.getCurrentComponent();
+    if (current == null) {
+      return;
+    }
+    await webflow.exitComponent();
+  }
+}
 
 /** O(1) per Webflow docs: only elements with `children: true` support append/prepend. */
 function hasChildrenFlag(el: AnyElement): el is AnyElement & { append: (c: Component) => Promise<ComponentElement> } {
@@ -10,17 +32,12 @@ function elementTreeKey(el: AnyElement): string {
   return `${el.id.component}:${el.id.element}`;
 }
 
-function designerErrorTag(err: unknown): string | undefined {
-  const t = (err as { cause?: { tag?: string } } | null | undefined)?.cause?.tag;
-  return typeof t === "string" ? t : undefined;
-}
-
 async function tryAppendComponent(el: AnyElement, comp: Component): Promise<ComponentElement | null> {
   if (!hasChildrenFlag(el)) return null;
   try {
     return (await el.append(comp)) as ComponentElement;
   } catch (e) {
-    if (designerErrorTag(e) === "InvalidElementPlacement") return null;
+    if (webflowDesignerErrorCauseTag(e) === "InvalidElementPlacement") return null;
     throw e;
   }
 }
@@ -29,7 +46,7 @@ async function tryAfterComponent(el: AnyElement, comp: Component): Promise<Compo
   try {
     return (await el.after(comp)) as ComponentElement;
   } catch (e) {
-    if (designerErrorTag(e) === "InvalidElementPlacement") return null;
+    if (webflowDesignerErrorCauseTag(e) === "InvalidElementPlacement") return null;
     throw e;
   }
 }
@@ -119,16 +136,48 @@ export type PlaceBeaconListTargetOnCanvasResult = {
  * first in tree order and does **not** add another. Otherwise adds a new instance using the current selection
  * (append, sibling, ancestor, or body) — same placement rules as before.
  */
-export async function placeBeaconListTargetOnCanvas(
+async function ensureListTargetTextPropForPlace(
+  comp: Component,
   dataList: string,
   listContainer: BlockElement
+): Promise<void> {
+  try {
+    await ensureBeaconListTargetTextProp(comp, { dataList, listContainer });
+  } catch (e) {
+    console.warn("[beacon] ensureBeaconListTargetTextProp (place on canvas):", e);
+  }
+}
+
+export async function placeBeaconListTargetOnCanvas(
+  dataList: string,
+  listContainer: BlockElement,
+  preferredDefinitionId?: string | null
 ): Promise<PlaceBeaconListTargetOnCanvasResult> {
-  const comp = await getBeaconListTargetComponentOrNull(dataList, listContainer);
+  await ensurePageCanvasForListTargetPlacement();
+
+  let comp = await getBeaconListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
   if (comp == null) {
     throw new Error("No list target component. Create a list target first.");
   }
 
-  const existing = await listBeaconListTargetInstancesOnPage(dataList, listContainer);
+  try {
+    comp = await webflow.getComponent(comp.id);
+  } catch (e) {
+    if (webflowDesignerErrorCauseTag(e) === "ResourceMissing") {
+      comp = await getBeaconListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
+      if (comp == null) {
+        throw new Error("No list target component. Create a list target first.");
+      }
+    } else {
+      throw e;
+    }
+  }
+
+  await ensureListTargetTextPropForPlace(comp, dataList, listContainer);
+
+  const existing = await listBeaconListTargetInstancesOnPage(dataList, listContainer, {
+    preferredDefinitionId,
+  });
   const firstExisting = existing[0];
   if (firstExisting != null) {
     return { instance: firstExisting, alreadyExisted: true };

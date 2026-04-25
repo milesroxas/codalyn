@@ -2,6 +2,7 @@
 
 import { IconShieldLock } from "@tabler/icons-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
 import { OperatorShell } from "@/features/operator/ui/operator-shell";
@@ -10,8 +11,10 @@ import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 export function OperatorGate({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
   const isProductAdmin = isProductAdminAppRole(session?.user?.role);
+  const operatorSignInHref = `/sign-in?callbackUrl=${encodeURIComponent(pathname || "/console")}`;
 
   if (isPending) {
     return (
@@ -37,7 +40,7 @@ export function OperatorGate({ children }: { children: ReactNode }) {
         </div>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Button asChild>
-            <Link href="/sign-in?callbackUrl=/console">Sign in</Link>
+            <Link href={operatorSignInHref}>Sign in</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link href="/">Back to Tower</Link>

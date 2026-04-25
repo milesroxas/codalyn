@@ -6,6 +6,8 @@ const parseCmsLayoutSaveRequest = vi.fn();
 const readUpstreamErrorMessage = vi.fn();
 const resolveUserCmsLayoutFieldSlug = vi.fn();
 const webflowCmsItemUrl = vi.fn();
+const resolveTowerEntitlement = vi.fn();
+const getActiveOrganizationIdForApiRequest = vi.fn();
 
 vi.mock("@/server/tower-api-auth", () => ({
   verifyTowerApiRequest,
@@ -22,6 +24,14 @@ vi.mock("@/server/beacon-cms-layout", () => ({
   webflowCmsItemUrl,
 }));
 
+vi.mock("@/server/billing/entitlements", () => ({
+  resolveTowerEntitlement,
+}));
+
+vi.mock("@/server/billing/session-org", () => ({
+  getActiveOrganizationIdForApiRequest,
+}));
+
 describe("POST /api/v1/beacon/cms-layout/save", () => {
   const prevBeaconsSurface = process.env.NEXT_PUBLIC_BEACONS_SURFACE_ENABLED;
 
@@ -33,6 +43,8 @@ describe("POST /api/v1/beacon/cms-layout/save", () => {
     readUpstreamErrorMessage.mockReset();
     resolveUserCmsLayoutFieldSlug.mockReset();
     webflowCmsItemUrl.mockReset();
+    resolveTowerEntitlement.mockReset();
+    getActiveOrganizationIdForApiRequest.mockReset();
     vi.restoreAllMocks();
   });
 
@@ -66,6 +78,8 @@ describe("POST /api/v1/beacon/cms-layout/save", () => {
       v: 1 as const,
       blocks: [{ id: "b_a1b2", type: "hero", props: { heading: "Hello" } }],
     };
+    getActiveOrganizationIdForApiRequest.mockResolvedValue(null);
+    resolveTowerEntitlement.mockResolvedValue({ tier: "pro", source: "user_stripe" });
     verifyTowerApiRequest.mockResolvedValue({ ok: true, userId: "user_1" });
     parseCmsLayoutSaveRequest.mockReturnValue({
       collectionId: "col_1",

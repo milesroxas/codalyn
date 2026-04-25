@@ -89,6 +89,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/beacon/src/features/beacons/ui/beacons-screen.tsx"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off"
+          }
+        }
+      }
     }
   ]
 }

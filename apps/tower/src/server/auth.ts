@@ -47,6 +47,16 @@ export const auth = betterAuth({
   },
   user: {
     additionalFields: {
+      firstName: {
+        type: "string",
+        required: false,
+        input: true,
+      },
+      lastName: {
+        type: "string",
+        required: false,
+        input: true,
+      },
       webflowAuthorizedUserId: {
         type: "string",
         required: false,
@@ -56,6 +66,11 @@ export const auth = betterAuth({
         type: "boolean",
         required: false,
         defaultValue: false,
+        input: false,
+      },
+      preferredOrganizationId: {
+        type: "string",
+        required: false,
         input: false,
       },
     },

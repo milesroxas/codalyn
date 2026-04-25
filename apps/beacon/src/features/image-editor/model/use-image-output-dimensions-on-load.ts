@@ -5,6 +5,14 @@ import type { Area } from "react-easy-crop";
 import { MAX_EDGE } from "@/features/image-editor/lib/apply-cropped-export";
 import { loadImage } from "@/features/image-editor/lib/load-image";
 
+type UseImageOutputDimensionsOnLoadOptions = {
+  /**
+   * When false, output width/height are not replaced from the image’s natural
+   * size (e.g. Auto path already set export size from the canvas target).
+   */
+  applyNaturalImageDimensions?: boolean;
+};
+
 export function useImageOutputDimensionsOnLoad(
   imageSrc: string | null,
   setOutputWidth: Dispatch<SetStateAction<number>>,
@@ -14,20 +22,24 @@ export function useImageOutputDimensionsOnLoad(
   setCrop: Dispatch<SetStateAction<{ x: number; y: number }>>,
   setZoom: Dispatch<SetStateAction<number>>,
   setCompletedCrop: Dispatch<SetStateAction<Area | null>>,
-  setImageSrc: Dispatch<SetStateAction<string | null>>
+  setImageSrc: Dispatch<SetStateAction<string | null>>,
+  options?: UseImageOutputDimensionsOnLoadOptions
 ) {
+  const applyNatural = options?.applyNaturalImageDimensions !== false;
   useEffect(() => {
     if (!imageSrc) {
       return;
     }
     void loadImage(imageSrc)
       .then((img) => {
-        const w = Math.min(MAX_EDGE, img.naturalWidth);
-        const h = Math.min(MAX_EDGE, img.naturalHeight);
-        setOutputWidth(w);
-        setOutputHeight(h);
-        setWidthStr(String(w));
-        setHeightStr(String(h));
+        if (applyNatural) {
+          const w = Math.min(MAX_EDGE, img.naturalWidth);
+          const h = Math.min(MAX_EDGE, img.naturalHeight);
+          setOutputWidth(w);
+          setOutputHeight(h);
+          setWidthStr(String(w));
+          setHeightStr(String(h));
+        }
         setCrop({ x: 0, y: 0 });
         setZoom(1);
         setCompletedCrop(null);
@@ -38,6 +50,7 @@ export function useImageOutputDimensionsOnLoad(
         }
       });
   }, [
+    applyNatural,
     imageSrc,
     setOutputWidth,
     setOutputHeight,

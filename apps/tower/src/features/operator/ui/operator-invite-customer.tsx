@@ -2,6 +2,7 @@
 
 import { IconCopy, IconMailForward } from "@tabler/icons-react";
 import { type FormEvent, useState } from "react";
+import { toast } from "sonner";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { Button } from "@/shared/ui/button";
 import {
@@ -48,7 +49,9 @@ export function OperatorInviteCustomer({ onInvited, trigger }: OperatorInviteCus
     reset();
     const value = email.trim().toLowerCase();
     if (!value) {
-      setError("Enter an email address.");
+      const msg = "Enter an email address.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     setBusy(true);
@@ -57,7 +60,9 @@ export function OperatorInviteCustomer({ onInvited, trigger }: OperatorInviteCus
       handleInviteSuccess(res);
       onInvited?.();
     } catch (err) {
-      setError(messageForInviteError(err));
+      const msg = messageForInviteError(err);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -65,13 +70,16 @@ export function OperatorInviteCustomer({ onInvited, trigger }: OperatorInviteCus
 
   function handleInviteSuccess(res: Awaited<ReturnType<typeof operatorApi.inviteCustomer>>) {
     if (res.kind === "existing_user") {
-      setMessage(
-        "That user already has an account. They now can create a team workspace (email sent if mail is configured)."
-      );
+      const text =
+        "That user already has an account. They now can create a team workspace (email sent if mail is configured).";
+      setMessage(text);
+      toast.success("Customer invite processed");
       setEmail("");
       return;
     }
-    setMessage("Invite ready. Email sent if mail is configured — copy the link below as a fallback.");
+    const text = "Invite ready. Email sent if mail is configured — copy the link below as a fallback.";
+    setMessage(text);
+    toast.success("Invite sent");
     setInviteLink(res.inviteUrl ?? null);
     setEmail("");
   }
@@ -133,7 +141,10 @@ export function OperatorInviteCustomer({ onInvited, trigger }: OperatorInviteCus
                 variant="outline"
                 size="sm"
                 className="gap-1.5"
-                onClick={() => void navigator.clipboard.writeText(inviteLink)}
+                onClick={() => {
+                  void navigator.clipboard.writeText(inviteLink);
+                  toast.success("Invite link copied");
+                }}
               >
                 <IconCopy className="size-3.5" />
                 Copy link

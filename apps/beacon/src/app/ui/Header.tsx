@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, Image as ImageIcon, LogIn, LogOut, Menu, Radio, Settings } from "lucide-react";
+import { ExternalLink, Image as ImageIcon, LogIn, LogOut, Menu, Radio, Settings } from "lucide-react";
 import { useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
@@ -71,49 +71,59 @@ function TowerAuthBar({ user, isPending, onOpenTowerEmailPopup, onSignOut }: Tow
 
   const accountLabel = getAccountLabel(user.name, user.email);
   const initials = getAccountInitials(accountLabel);
+  const imageUrl = user.image?.trim() ? user.image : null;
 
   return (
-    <div className="inline-flex max-w-full">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button type="button" variant="ghost" size="sm" className="max-w-[220px] min-w-0 justify-start">
-            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="overflow-hidden rounded-full p-0"
+          aria-label={`Account menu, ${accountLabel}`}
+        >
+          {imageUrl ? (
+            <img src={imageUrl} alt="" className="size-full object-cover" />
+          ) : (
+            <span
+              className="inline-flex size-full items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary"
+              aria-hidden
+            >
               {initials}
             </span>
-            <span className="truncate">{accountLabel}</span>
-            <ChevronDown aria-hidden className="ml-1 size-3.5 text-muted-foreground" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="min-w-60">
-          <DropdownMenuLabel>
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="text-xs font-normal text-muted-foreground">Signed in as</span>
-              <span className="truncate text-sm font-medium text-foreground">{user.email}</span>
-            </div>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={() => {
-              const origin = getTowerAuthBaseUrl();
-              if (origin) window.open(origin, "_blank", "noopener,noreferrer");
-            }}
-          >
-            <ExternalLink aria-hidden />
-            Open Tower
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={() => {
-              onSignOut();
-            }}
-          >
-            <LogOut aria-hidden />
-            Sign out
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-60">
+        <DropdownMenuLabel>
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="text-xs font-normal text-muted-foreground">Signed in as</span>
+            <span className="truncate text-sm font-medium text-foreground">{user.email}</span>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={() => {
+            const origin = getTowerAuthBaseUrl();
+            if (origin) window.open(origin, "_blank", "noopener,noreferrer");
+          }}
+        >
+          <ExternalLink aria-hidden />
+          Open Tower
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          onSelect={() => {
+            onSignOut();
+          }}
+        >
+          <LogOut aria-hidden />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -170,7 +180,7 @@ function BeaconRoutesMenu() {
           <Menu aria-hidden className="size-4 stroke-[2.1]" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-44">
+      <DropdownMenuContent align="start" className="min-w-44">
         <DropdownMenuLabel>Tools</DropdownMenuLabel>
         <DropdownMenuItem className={itemClass("/images")} onSelect={() => navigate("/images")}>
           <ImageIcon aria-hidden />
@@ -215,22 +225,22 @@ function HeaderWithTower() {
     <div className="shrink-0">
       <header className="supports-backdrop-filter:bg-background/75 border-b border-border/70 bg-background/90 px-3 py-2 backdrop-blur">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2">
+          <div className="flex min-w-0 justify-start">
+            <div className="flex min-w-0 shrink-0 items-center gap-1 pr-1">
+              <BeaconRoutesMenu />
+            </div>
+          </div>
+          <div className="flex shrink-0 justify-center px-2">
+            <HeaderLogo to="/home" />
+          </div>
           <div className="min-w-0 overflow-hidden">
-            <div className="max-w-full">
+            <div className="flex max-w-full justify-end">
               <TowerAuthBar
                 user={user}
                 isPending={isPending}
                 onOpenTowerEmailPopup={openTowerEmailSignInPopup}
                 onSignOut={signOut}
               />
-            </div>
-          </div>
-          <div className="flex shrink-0 justify-center px-2">
-            <HeaderLogo to="/home" />
-          </div>
-          <div className="flex min-w-0 justify-end">
-            <div className="flex min-w-0 shrink-0 items-center gap-1 pl-1">
-              <BeaconRoutesMenu />
             </div>
           </div>
         </div>
@@ -250,14 +260,14 @@ export default function Header() {
     <div className="shrink-0">
       <header className="supports-backdrop-filter:bg-background/75 border-b border-border/70 bg-background/90 px-3 py-2 backdrop-blur">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2">
-          <div className="min-w-0 overflow-hidden">
-            <span className="inline-flex h-8 items-center px-2 text-xs text-muted-foreground">Tower unavailable</span>
+          <div className="flex min-w-0 justify-start">
+            <BeaconRoutesMenu />
           </div>
           <div className="flex shrink-0 justify-center px-2">
             <HeaderLogo to="/home" />
           </div>
           <div className="flex min-w-0 justify-end">
-            <BeaconRoutesMenu />
+            <span className="inline-flex h-8 items-center px-2 text-xs text-muted-foreground">Tower unavailable</span>
           </div>
         </div>
       </header>

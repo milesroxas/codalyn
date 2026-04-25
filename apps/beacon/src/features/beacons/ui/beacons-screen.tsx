@@ -3,7 +3,6 @@ import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { listComposerEligibleLists } from "@/features/beacons/model/beacon-composer-eligible";
 import {
   clearAllBeaconListTargetDesignerPreviewsOnPage,
-  resyncAllBeaconListTargetDesignerPreviewsOnPage,
   syncBeaconListTargetDesignerPreview,
 } from "@/features/beacons/model/beacon-list-target-designer-preview";
 import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
@@ -14,9 +13,12 @@ import {
 import {
   type BeaconOnPage,
   beaconTargetKey,
+  filterHydratedBeaconComponentsByComponentIds,
   findBeaconTargetsOnPage,
   type HydratedBeaconComponent,
   listInstancesInBeaconTarget,
+  resolveBeaconEngineConfiguredComponentIds,
+  writeBeaconEngineConfiguredComponentIds,
 } from "@/features/beacons/model/beacon-page-targets";
 import {
   BEACON_UTILITIES_COMPONENT_GROUP,
@@ -31,7 +33,6 @@ import {
   syncBeaconsInstallEmbedOnPage,
 } from "@/features/beacons/model/install-beacons-wrapper";
 import { placeBeaconListTargetOnCanvas } from "@/features/beacons/model/place-beacon-list-target-on-canvas";
-import { reconcileBeaconListTargetForOpen } from "@/features/beacons/model/reconcile-beacon-list-target";
 import {
   appendComponentToBeacon,
   applyBeaconCompositionDraft,
@@ -66,40 +67,79 @@ function formatDesignerError(err: unknown): string {
   return "Something went wrong. Check that you can edit the current page.";
 }
 
+type ListTargetReconcileCacheEntry = {
+  beaconKey: string;
+  dataList: string;
+  phase: "synced" | "absent";
+  registeredName: string | null;
+};
+
 async function runListTargetReconcileOnOpen(
   myGen: number,
   listTargetResolveGen: MutableRefObject<number>,
   activeDataList: string,
   listContainer: BlockElement,
   setListTargetPhase: (p: "loading" | "absent" | "synced" | "updating") => void,
-  setListTargetRegisteredName: (n: string | null) => void
+  setListTargetRegisteredName: (n: string | null) => void,
+  onSettled?: (result: { phase: "synced" | "absent"; registeredName: string | null }) => void,
+  onAbsent?: () => void
 ) {
   const stale = () => listTargetResolveGen.current !== myGen;
   setListTargetPhase("updating");
   try {
+    const comp = await getBeaconListTargetComponentOrNull(activeDataList, listContainer);
     if (stale()) return;
-    const o = await reconcileBeaconListTargetForOpen(activeDataList, listContainer);
-    if (stale()) return;
-    for (const t of o.toasts) {
-      void webflow.notify(t);
+    if (comp == null) {
+      setListTargetRegisteredName(null);
+      setListTargetPhase("absent");
+      if (!stale()) {
+        onSettled?.({ phase: "absent", registeredName: null });
+      }
+      return;
     }
-    setListTargetRegisteredName(o.displayName);
-    setListTargetPhase(o.phase);
+    const name = await comp.getName();
+    if (stale()) return;
+    setListTargetRegisteredName(name);
+    setListTargetPhase("synced");
+    if (!stale()) {
+      onSettled?.({ phase: "synced", registeredName: name });
+    }
   } catch (e) {
     if (stale()) return;
+    onAbsent?.();
     setListTargetPhase("absent");
     void webflow.notify({ type: "Error", message: formatDesignerError(e) });
   }
 }
 
-function beaconPaletteFromInstances(rows: HydratedBeaconComponent[]): BeaconPaletteEntry[] {
-  const byId = new Map<string, BeaconPaletteEntry>();
-  for (const r of rows) {
-    if (!byId.has(r.componentId)) {
-      byId.set(r.componentId, { id: r.componentId, name: r.name, group: null });
+async function beaconPaletteFromConfiguredComponentIds(
+  componentIds: readonly string[],
+  rows: HydratedBeaconComponent[]
+): Promise<BeaconPaletteEntry[]> {
+  const paletteById = new Map<string, BeaconPaletteEntry>();
+  for (const row of rows) {
+    if (!paletteById.has(row.componentId)) {
+      paletteById.set(row.componentId, { id: row.componentId, name: row.name, group: null });
     }
   }
-  return [...byId.values()];
+
+  const out: BeaconPaletteEntry[] = [];
+  for (const componentId of componentIds) {
+    const fromRows = paletteById.get(componentId);
+    if (fromRows != null) {
+      out.push(fromRows);
+      continue;
+    }
+    try {
+      const comp = await webflow.getComponent(componentId);
+      const name = await comp.getName();
+      const group = (await comp.getSettings()).group;
+      out.push({ id: componentId, name, group });
+    } catch {
+      /* component can be deleted; skip stale ids */
+    }
+  }
+  return out;
 }
 
 /**
@@ -117,7 +157,315 @@ function parseBeaconsRouteSegment(pathname: string, locationHash: string): "engi
   return null;
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: single orchestration surface
+function useBeaconsInvalidSegmentRedirect(
+  segmentFromPath: "engine" | "composer" | null,
+  routePathname: string,
+  routeHash: string,
+  navigate: (to: string, options?: { replace?: boolean }) => void
+) {
+  useEffect(() => {
+    if (segmentFromPath != null) return;
+    for (const raw of [routePathname, routeHash.replace(/^#/, "")].filter(Boolean)) {
+      const p = raw.startsWith("/") ? raw : `/${raw}`;
+      const m = /^\/beacons\/([^/]+)\/?$/.exec(p);
+      if (m != null && m[1] !== "engine" && m[1] !== "composer") {
+        void navigate("/beacons/engine", { replace: true });
+        return;
+      }
+    }
+  }, [segmentFromPath, routePathname, routeHash, navigate]);
+}
+
+function useBeaconsListTargetPreviewOnModeChange() {
+  const lastDesignerAppModeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof webflow.getCurrentMode !== "function" || typeof webflow.subscribe !== "function") {
+      return undefined;
+    }
+
+    const syncPreviewsForCurrentMode = async () => {
+      try {
+        const mode = await webflow.getCurrentMode();
+        const key = String(mode);
+        if (lastDesignerAppModeRef.current === key) {
+          return;
+        }
+        lastDesignerAppModeRef.current = key;
+        if (mode === "preview") {
+          await clearAllBeaconListTargetDesignerPreviewsOnPage();
+        }
+      } catch {
+        /* designer preview is best-effort */
+      }
+    };
+
+    void syncPreviewsForCurrentMode();
+    const unsubMode = webflow.subscribe("currentappmode", () => {
+      void syncPreviewsForCurrentMode();
+    });
+    return () => {
+      lastDesignerAppModeRef.current = null;
+      unsubMode();
+    };
+  }, []);
+}
+
+type BeaconsPageChangeReset = {
+  setPicking: (v: boolean) => void;
+  setCreateFormOpen: (v: boolean) => void;
+  setActiveDataList: (v: string | null) => void;
+  setSelected: (v: HydratedBeaconComponent[]) => void;
+  setComposerStudio: (v: { beacon: BeaconOnPage; initialSignature: string } | null) => void;
+  setComposerDraft: (v: BeaconCompositionDraftRow[]) => void;
+  setComposerAllowedPalette: (v: BeaconPaletteEntry[]) => void;
+  setComposerOpeningKey: (v: string | null) => void;
+  setBeaconName: (v: string) => void;
+  setListTargetCreatePending: (v: boolean) => void;
+  setListTargetRemovePending: (v: boolean) => void;
+  setListTargetPlaceOnCanvasPending: (v: boolean) => void;
+  setListTargetPhase: (v: "loading" | "absent" | "synced" | "updating") => void;
+  setListTargetRegisteredName: (v: string | null) => void;
+  setListTargetOnCanvasCount: (v: number) => void;
+  setListTargetPreviewSyncPending: (v: boolean) => void;
+  setRemoveListTargetDialogOpen: (v: boolean) => void;
+  setActiveBeaconKey: (v: string | null) => void;
+  setEngineListCompositionStale: (v: boolean) => void;
+  targetRef: MutableRefObject<BlockElement | null>;
+  listTargetResolveGen: MutableRefObject<number>;
+  listTargetReconcileCacheRef: MutableRefObject<ListTargetReconcileCacheEntry | null>;
+  listTargetDefinitionIdRef: MutableRefObject<string | null>;
+};
+
+function useBeaconsPageChangeReset(
+  refreshPageBeacons: () => void | Promise<void>,
+  navigate: (to: string, options?: { replace?: boolean }) => void,
+  resetRef: MutableRefObject<BeaconsPageChangeReset | null>
+) {
+  const lastDesignerPageIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof webflow.subscribe !== "function" || typeof webflow.getCurrentPage !== "function") {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let unsubPage: (() => void) | undefined;
+
+    void (async () => {
+      try {
+        const initial = await webflow.getCurrentPage();
+        if (cancelled) return;
+        lastDesignerPageIdRef.current = String(initial.id);
+      } catch {
+        if (cancelled) return;
+        lastDesignerPageIdRef.current = null;
+      }
+
+      if (cancelled) return;
+
+      unsubPage = webflow.subscribe("currentpage", (page) => {
+        const reset = resetRef.current;
+        if (reset == null) {
+          return;
+        }
+        const id = String(page.id);
+        if (lastDesignerPageIdRef.current === id) {
+          return;
+        }
+        lastDesignerPageIdRef.current = id;
+
+        reset.setPicking(false);
+        reset.setCreateFormOpen(false);
+        reset.setActiveDataList(null);
+        reset.setSelected([]);
+        reset.targetRef.current = null;
+        void navigate("/beacons/engine", { replace: true });
+        reset.setComposerStudio(null);
+        reset.setComposerDraft([]);
+        reset.setComposerAllowedPalette([]);
+        reset.setComposerOpeningKey(null);
+        reset.setBeaconName("");
+        reset.setListTargetCreatePending(false);
+        reset.setListTargetRemovePending(false);
+        reset.setListTargetPlaceOnCanvasPending(false);
+        reset.setListTargetPhase("loading");
+        reset.setListTargetRegisteredName(null);
+        reset.setListTargetOnCanvasCount(0);
+        reset.setListTargetPreviewSyncPending(false);
+        reset.setRemoveListTargetDialogOpen(false);
+        reset.setActiveBeaconKey(null);
+        reset.listTargetResolveGen.current += 1;
+        reset.listTargetReconcileCacheRef.current = null;
+        reset.listTargetDefinitionIdRef.current = null;
+        reset.setEngineListCompositionStale(false);
+        void refreshPageBeacons();
+        if (typeof webflow.getCurrentMode === "function") {
+          void (async () => {
+            try {
+              if ((await webflow.getCurrentMode()) === "preview") {
+                await clearAllBeaconListTargetDesignerPreviewsOnPage();
+              }
+            } catch {
+              /* best-effort */
+            }
+          })();
+        }
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      unsubPage?.();
+    };
+  }, [refreshPageBeacons, navigate, resetRef]);
+}
+
+function useBeaconSyncShellLabels(
+  pageRuntimeSynced: boolean,
+  pageRuntimeSyncReason: string | undefined,
+  engineListCompositionStale: boolean
+) {
+  return useMemo(() => {
+    if (!pageRuntimeSynced) {
+      return { syncShellOk: false as const, syncShellReason: pageRuntimeSyncReason };
+    }
+    if (engineListCompositionStale) {
+      return {
+        syncShellOk: false as const,
+        syncShellReason: "Beacon list changed in Engine — sync page script." as const,
+      };
+    }
+    return { syncShellOk: true as const, syncShellReason: undefined };
+  }, [pageRuntimeSynced, pageRuntimeSyncReason, engineListCompositionStale]);
+}
+
+function useDebounceComponentCatalog(picking: boolean, componentQuery: string, runCatalogLoad: (q: string) => void) {
+  useEffect(() => {
+    if (!picking) return;
+    const delayMs = componentQuery.trim() ? 280 : 0;
+    const t = window.setTimeout(() => {
+      void runCatalogLoad(componentQuery);
+    }, delayMs);
+    return () => window.clearTimeout(t);
+  }, [picking, componentQuery, runCatalogLoad]);
+}
+
+function useListTargetReconcileWhenPicking(
+  picking: boolean,
+  activeDataList: string | null,
+  activeBeaconKey: string | null,
+  setListTargetPhase: (p: "loading" | "absent" | "synced" | "updating") => void,
+  setListTargetRegisteredName: (n: string | null) => void,
+  targetRef: MutableRefObject<BlockElement | null>,
+  listTargetReconcileCacheRef: MutableRefObject<ListTargetReconcileCacheEntry | null>,
+  listTargetResolveGen: MutableRefObject<number>,
+  listTargetDefinitionIdRef: MutableRefObject<string | null>
+) {
+  useEffect(() => {
+    if (!picking || activeDataList == null || activeBeaconKey == null) {
+      return;
+    }
+    const listContainer = targetRef.current;
+    if (!listContainer) {
+      setListTargetPhase("absent");
+      return;
+    }
+
+    const cache = listTargetReconcileCacheRef.current;
+    if (cache != null && cache.beaconKey === activeBeaconKey && cache.dataList === activeDataList) {
+      setListTargetPhase(cache.phase);
+      setListTargetRegisteredName(cache.registeredName);
+      return;
+    }
+
+    const myGen = ++listTargetResolveGen.current;
+    setListTargetPhase("loading");
+    setListTargetRegisteredName(null);
+
+    void runListTargetReconcileOnOpen(
+      myGen,
+      listTargetResolveGen,
+      activeDataList,
+      listContainer,
+      setListTargetPhase,
+      setListTargetRegisteredName,
+      (result) => {
+        listTargetReconcileCacheRef.current = {
+          beaconKey: activeBeaconKey,
+          dataList: activeDataList,
+          phase: result.phase,
+          registeredName: result.registeredName,
+        };
+        if (result.phase === "absent") {
+          listTargetDefinitionIdRef.current = null;
+        }
+      },
+      () => {
+        listTargetDefinitionIdRef.current = null;
+      }
+    );
+  }, [
+    picking,
+    activeDataList,
+    activeBeaconKey,
+    setListTargetPhase,
+    setListTargetRegisteredName,
+    targetRef,
+    listTargetReconcileCacheRef,
+    listTargetResolveGen,
+    listTargetDefinitionIdRef,
+  ]);
+}
+
+function useListTargetOnCanvasCountWhenSynced(
+  picking: boolean,
+  listTargetPhase: "loading" | "absent" | "synced" | "updating",
+  activeDataList: string | null,
+  activeBeaconKey: string | null,
+  targetRef: MutableRefObject<BlockElement | null>,
+  listTargetDefinitionIdRef: MutableRefObject<string | null>,
+  setListTargetOnCanvasCount: (n: number) => void
+) {
+  useEffect(() => {
+    if (!picking || listTargetPhase !== "synced" || activeDataList == null || activeBeaconKey == null) {
+      setListTargetOnCanvasCount(0);
+      return;
+    }
+    const listContainer = targetRef.current;
+    if (listContainer == null) {
+      setListTargetOnCanvasCount(0);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const list = await listBeaconListTargetInstancesOnPage(activeDataList, listContainer, {
+          preferredDefinitionId: listTargetDefinitionIdRef.current,
+        });
+        if (!cancelled) {
+          setListTargetOnCanvasCount(list.length);
+        }
+      } catch {
+        if (!cancelled) {
+          setListTargetOnCanvasCount(0);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    picking,
+    listTargetPhase,
+    activeDataList,
+    activeBeaconKey,
+    targetRef,
+    listTargetDefinitionIdRef,
+    setListTargetOnCanvasCount,
+  ]);
+}
+
 export function BeaconsScreen() {
   const nameFieldId = useId();
   const searchFieldId = useId();
@@ -142,6 +490,8 @@ export function BeaconsScreen() {
   const [activeDataList, setActiveDataList] = useState<string | null>(null);
 
   const targetRef = useRef<BlockElement | null>(null);
+  /** Definition id from the last successful “Create list target” — avoids lookup race before Webflow indexes the new component. */
+  const listTargetDefinitionIdRef = useRef<string | null>(null);
   const [componentQuery, setComponentQuery] = useState("");
   const [componentCatalog, setComponentCatalog] = useState<ComponentSearchResult[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -155,12 +505,12 @@ export function BeaconsScreen() {
   const [listTargetPhase, setListTargetPhase] = useState<"loading" | "absent" | "synced" | "updating">("loading");
   const [listTargetRegisteredName, setListTargetRegisteredName] = useState<string | null>(null);
   const [listTargetOnCanvasCount, setListTargetOnCanvasCount] = useState(0);
-  /** False until list-target instance count has been fetched for the current synced session (avoids duplicate preview sync). */
-  const [listTargetCanvasCountReady, setListTargetCanvasCountReady] = useState(false);
+  const [listTargetPreviewSyncPending, setListTargetPreviewSyncPending] = useState(false);
   const [removeListTargetDialogOpen, setRemoveListTargetDialogOpen] = useState(false);
   const [activeBeaconKey, setActiveBeaconKey] = useState<string | null>(null);
   const listTargetResolveGen = useRef(0);
-  const lastListPreviewSyncSigRef = useRef<string | null>(null);
+  /** Last known list target registration for a beacon; avoids re-querying Webflow on repeat opens. */
+  const listTargetReconcileCacheRef = useRef<ListTargetReconcileCacheEntry | null>(null);
   const [openingBeaconKey, setOpeningBeaconKey] = useState<string | null>(null);
   const [beaconToDelete, setBeaconToDelete] = useState<BeaconOnPage | null>(null);
   const [deletePendingKey, setDeletePendingKey] = useState<string | null>(null);
@@ -243,150 +593,52 @@ export function BeaconsScreen() {
     }
   }, []);
 
-  const syncShellOk = useMemo(
-    () => pageRuntimeSynced && !engineListCompositionStale,
-    [pageRuntimeSynced, engineListCompositionStale]
-  );
-
-  const syncShellReason = useMemo(
-    () =>
-      !pageRuntimeSynced
-        ? pageRuntimeSyncReason
-        : engineListCompositionStale
-          ? "Beacon list changed in Engine — sync page script."
-          : undefined,
-    [pageRuntimeSynced, pageRuntimeSyncReason, engineListCompositionStale]
+  const { syncShellOk, syncShellReason } = useBeaconSyncShellLabels(
+    pageRuntimeSynced,
+    pageRuntimeSyncReason,
+    engineListCompositionStale
   );
 
   useEffect(() => {
     void refreshPageBeacons();
   }, [refreshPageBeacons]);
 
-  useEffect(() => {
-    if (segmentFromPath != null) return;
-    for (const raw of [routePathname, routeHash.replace(/^#/, "")].filter(Boolean)) {
-      const p = raw.startsWith("/") ? raw : `/${raw}`;
-      const m = /^\/beacons\/([^/]+)\/?$/.exec(p);
-      if (m != null && m[1] !== "engine" && m[1] !== "composer") {
-        void navigate("/beacons/engine", { replace: true });
-        return;
-      }
-    }
-  }, [segmentFromPath, routePathname, routeHash, navigate]);
+  useBeaconsInvalidSegmentRedirect(segmentFromPath, routePathname, routeHash, navigate);
 
   useEffect(() => {
     if (!isComposer) return;
     void loadComposerEligible();
   }, [isComposer, loadComposerEligible]);
 
-  const lastDesignerAppModeRef = useRef<string | null>(null);
+  useBeaconsListTargetPreviewOnModeChange();
 
-  useEffect(() => {
-    if (typeof webflow.getCurrentMode !== "function" || typeof webflow.subscribe !== "function") {
-      return undefined;
-    }
-
-    const syncPreviewsForCurrentMode = async () => {
-      try {
-        const mode = await webflow.getCurrentMode();
-        const key = String(mode);
-        if (lastDesignerAppModeRef.current === key) {
-          return;
-        }
-        lastDesignerAppModeRef.current = key;
-        if (mode === "preview") {
-          await clearAllBeaconListTargetDesignerPreviewsOnPage();
-        } else {
-          await resyncAllBeaconListTargetDesignerPreviewsOnPage();
-        }
-      } catch {
-        /* designer preview is best-effort */
-      }
-    };
-
-    void syncPreviewsForCurrentMode();
-    const unsubMode = webflow.subscribe("currentappmode", () => {
-      void syncPreviewsForCurrentMode();
-    });
-    return () => {
-      lastDesignerAppModeRef.current = null;
-      unsubMode();
-    };
-  }, []);
-
-  const lastDesignerPageIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (typeof webflow.subscribe !== "function" || typeof webflow.getCurrentPage !== "function") {
-      return undefined;
-    }
-
-    let cancelled = false;
-    let unsubPage: (() => void) | undefined;
-
-    void (async () => {
-      try {
-        const initial = await webflow.getCurrentPage();
-        if (cancelled) return;
-        lastDesignerPageIdRef.current = String(initial.id);
-      } catch {
-        if (cancelled) return;
-        lastDesignerPageIdRef.current = null;
-      }
-
-      if (cancelled) return;
-
-      unsubPage = webflow.subscribe("currentpage", (page) => {
-        const id = String(page.id);
-        if (lastDesignerPageIdRef.current === id) {
-          return;
-        }
-        lastDesignerPageIdRef.current = id;
-
-        setPicking(false);
-        setCreateFormOpen(false);
-        setActiveDataList(null);
-        setSelected([]);
-        targetRef.current = null;
-        void navigate("/beacons/engine", { replace: true });
-        setComposerStudio(null);
-        setComposerDraft([]);
-        setComposerAllowedPalette([]);
-        setComposerOpeningKey(null);
-        setBeaconName("");
-        setListTargetCreatePending(false);
-        setListTargetRemovePending(false);
-        setListTargetPlaceOnCanvasPending(false);
-        setListTargetPhase("loading");
-        setListTargetRegisteredName(null);
-        setListTargetOnCanvasCount(0);
-        setListTargetCanvasCountReady(false);
-        setRemoveListTargetDialogOpen(false);
-        setActiveBeaconKey(null);
-        listTargetResolveGen.current += 1;
-        setEngineListCompositionStale(false);
-        void refreshPageBeacons();
-        if (typeof webflow.getCurrentMode === "function") {
-          void (async () => {
-            try {
-              if ((await webflow.getCurrentMode()) === "preview") {
-                await clearAllBeaconListTargetDesignerPreviewsOnPage();
-              } else {
-                await resyncAllBeaconListTargetDesignerPreviewsOnPage();
-              }
-            } catch {
-              /* best-effort */
-            }
-          })();
-        }
-      });
-    })();
-
-    return () => {
-      cancelled = true;
-      unsubPage?.();
-    };
-  }, [refreshPageBeacons, navigate]);
+  const beaconsPageChangeResetRef = useRef<BeaconsPageChangeReset | null>(null);
+  beaconsPageChangeResetRef.current = {
+    setPicking,
+    setCreateFormOpen,
+    setActiveDataList,
+    setSelected,
+    setComposerStudio,
+    setComposerDraft,
+    setComposerAllowedPalette,
+    setComposerOpeningKey,
+    setBeaconName,
+    setListTargetCreatePending,
+    setListTargetRemovePending,
+    setListTargetPlaceOnCanvasPending,
+    setListTargetPhase,
+    setListTargetRegisteredName,
+    setListTargetOnCanvasCount,
+    setListTargetPreviewSyncPending,
+    setRemoveListTargetDialogOpen,
+    setActiveBeaconKey,
+    setEngineListCompositionStale,
+    targetRef,
+    listTargetResolveGen,
+    listTargetReconcileCacheRef,
+    listTargetDefinitionIdRef,
+  };
+  useBeaconsPageChangeReset(refreshPageBeacons, navigate, beaconsPageChangeResetRef);
 
   const runCatalogLoad = useCallback(async (q: string) => {
     setCatalogLoading(true);
@@ -402,43 +654,25 @@ export function BeaconsScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!picking) return;
-    const delayMs = componentQuery.trim() ? 280 : 0;
-    const t = window.setTimeout(() => {
-      void runCatalogLoad(componentQuery);
-    }, delayMs);
-    return () => window.clearTimeout(t);
-  }, [picking, componentQuery, runCatalogLoad]);
+  useDebounceComponentCatalog(picking, componentQuery, runCatalogLoad);
 
-  useEffect(() => {
-    if (!picking || activeDataList == null || activeBeaconKey == null) {
-      return;
-    }
-    const listContainer = targetRef.current;
-    if (!listContainer) {
-      setListTargetPhase("absent");
-      return;
-    }
-
-    const myGen = ++listTargetResolveGen.current;
-    setListTargetPhase("loading");
-    setListTargetRegisteredName(null);
-
-    void runListTargetReconcileOnOpen(
-      myGen,
-      listTargetResolveGen,
-      activeDataList,
-      listContainer,
-      setListTargetPhase,
-      setListTargetRegisteredName
-    );
-  }, [picking, activeDataList, activeBeaconKey]);
+  useListTargetReconcileWhenPicking(
+    picking,
+    activeDataList,
+    activeBeaconKey,
+    setListTargetPhase,
+    setListTargetRegisteredName,
+    targetRef,
+    listTargetReconcileCacheRef,
+    listTargetResolveGen,
+    listTargetDefinitionIdRef
+  );
 
   const exitToList = useCallback(() => {
     setPicking(false);
     setActiveDataList(null);
     targetRef.current = null;
+    listTargetDefinitionIdRef.current = null;
     setComponentQuery("");
     setComponentCatalog([]);
     setSelected([]);
@@ -451,102 +685,29 @@ export function BeaconsScreen() {
     setListTargetPhase("loading");
     setListTargetRegisteredName(null);
     setListTargetOnCanvasCount(0);
-    setListTargetCanvasCountReady(false);
+    setListTargetPreviewSyncPending(false);
     setRemoveListTargetDialogOpen(false);
     setActiveBeaconKey(null);
     listTargetResolveGen.current += 1;
     void refreshPageBeacons();
   }, [refreshPageBeacons]);
 
-  useEffect(() => {
-    if (!picking || listTargetPhase !== "synced" || activeDataList == null || activeBeaconKey == null) {
-      setListTargetOnCanvasCount(0);
-      setListTargetCanvasCountReady(false);
-      return;
-    }
-    const listContainer = targetRef.current;
-    if (listContainer == null) {
-      setListTargetOnCanvasCount(0);
-      setListTargetCanvasCountReady(false);
-      return;
-    }
-    setListTargetCanvasCountReady(false);
-    let cancelled = false;
-    void (async () => {
-      try {
-        const list = await listBeaconListTargetInstancesOnPage(activeDataList, listContainer);
-        if (!cancelled) {
-          setListTargetOnCanvasCount(list.length);
-          setListTargetCanvasCountReady(true);
-        }
-      } catch {
-        if (!cancelled) {
-          setListTargetOnCanvasCount(0);
-          setListTargetCanvasCountReady(true);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [picking, listTargetPhase, activeDataList, activeBeaconKey]);
-
-  useEffect(() => {
-    if (!picking || activeDataList == null || activeBeaconKey == null) {
-      lastListPreviewSyncSigRef.current = null;
-      return;
-    }
-    if (listTargetPhase !== "synced" || !listTargetCanvasCountReady) {
-      if (listTargetPhase !== "synced") {
-        lastListPreviewSyncSigRef.current = null;
-      }
-      return;
-    }
-    const listContainer = targetRef.current;
-    if (listContainer == null) {
-      return;
-    }
-
-    const compositionSignature = [
-      activeBeaconKey,
-      activeDataList,
-      selected.map((s) => s.componentId).join("\0"),
-      String(listTargetOnCanvasCount),
-    ].join("|");
-
-    if (lastListPreviewSyncSigRef.current === compositionSignature) {
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const didMirror = await syncBeaconListTargetDesignerPreview(activeDataList, listContainer);
-        if (!cancelled && didMirror) {
-          lastListPreviewSyncSigRef.current = compositionSignature;
-        }
-      } catch {
-        /* best-effort */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
+  useListTargetOnCanvasCountWhenSynced(
     picking,
     listTargetPhase,
     activeDataList,
     activeBeaconKey,
-    selected,
-    listTargetOnCanvasCount,
-    listTargetCanvasCountReady,
-  ]);
+    targetRef,
+    listTargetDefinitionIdRef,
+    setListTargetOnCanvasCount
+  );
 
   const handleOpenBeacon = async (beacon: BeaconOnPage) => {
     setCreateFormOpen(false);
     setOpeningBeaconKey(beacon.key);
     try {
       const rows = await listInstancesInBeaconTarget(beacon.container);
+      listTargetDefinitionIdRef.current = null;
       targetRef.current = beacon.container;
       setActiveDataList(beacon.dataList);
       setActiveBeaconKey(beacon.key);
@@ -569,7 +730,9 @@ export function BeaconsScreen() {
     }
     setCreatePending(true);
     try {
+      listTargetDefinitionIdRef.current = null;
       const { container, dataList } = await createBeaconTargetOnPage(trimmed);
+      await writeBeaconEngineConfiguredComponentIds(container, []);
       targetRef.current = container;
       setActiveDataList(dataList);
       setActiveBeaconKey(beaconTargetKey(container));
@@ -597,9 +760,12 @@ export function BeaconsScreen() {
     setComposerOpeningKey(beacon.key);
     try {
       const rows = await listInstancesInBeaconTarget(beacon.container);
-      setComposerDraft(rows.map((r) => ({ key: r.key, componentId: r.componentId, name: r.name })));
-      setComposerAllowedPalette(beaconPaletteFromInstances(rows));
-      setComposerStudio({ beacon, initialSignature: rows.map((r) => r.componentId).join(",") });
+      const configuredComponentIds = await resolveBeaconEngineConfiguredComponentIds(beacon.container, rows);
+      const engineScopedRows = filterHydratedBeaconComponentsByComponentIds(rows, configuredComponentIds);
+      const allowedPalette = await beaconPaletteFromConfiguredComponentIds(configuredComponentIds, rows);
+      setComposerDraft(engineScopedRows.map((r) => ({ key: r.key, componentId: r.componentId, name: r.name })));
+      setComposerAllowedPalette(allowedPalette);
+      setComposerStudio({ beacon, initialSignature: engineScopedRows.map((r) => r.componentId).join(",") });
     } catch (err) {
       const message = formatDesignerError(err);
       void webflow.notify({ type: "Error", message });
@@ -640,19 +806,27 @@ export function BeaconsScreen() {
       void webflow.notify({ type: "Error", message: "Add at least one component before saving." });
       return;
     }
+    const allowedComponentIdSet = new Set(composerAllowedPalette.map((entry) => entry.id));
+    const draftToApply = composerDraft.filter((row) => allowedComponentIdSet.has(row.componentId));
+    if (draftToApply.length === 0) {
+      void webflow.notify({
+        type: "Error",
+        message: "This list only allows component types configured in Engine.",
+      });
+      return;
+    }
     setComposerSavePending(true);
     try {
-      const hydrated = await applyBeaconCompositionDraft(beacon.container, composerDraft);
-      await syncBeaconListTargetDesignerPreview(beacon.dataList, beacon.container);
+      const hydrated = await applyBeaconCompositionDraft(beacon.container, draftToApply);
       await syncBeaconPageInlineScript();
-      setComposerDraft(hydrated.map((h) => ({ key: h.key, componentId: h.componentId, name: h.name })));
-      setComposerAllowedPalette(beaconPaletteFromInstances(hydrated));
+      const hydratedScoped = hydrated.filter((row) => allowedComponentIdSet.has(row.componentId));
+      setComposerDraft(hydratedScoped.map((h) => ({ key: h.key, componentId: h.componentId, name: h.name })));
       setComposerStudio((prev) =>
-        prev ? { ...prev, initialSignature: hydrated.map((h) => h.componentId).join(",") } : null
+        prev ? { ...prev, initialSignature: hydratedScoped.map((h) => h.componentId).join(",") } : null
       );
       void webflow.notify({
         type: "Success",
-        message: "Composition saved. Preview and page script updated — publish for the live site.",
+        message: "Composition saved. Page script updated — publish for the live site.",
       });
       setEngineListCompositionStale(false);
       void refreshPageBeacons();
@@ -672,7 +846,12 @@ export function BeaconsScreen() {
     setAddPending(true);
     try {
       const instance = await appendComponentToBeacon(container, c.id);
-      setSelected((prev) => [...prev, { key: crypto.randomUUID(), componentId: c.id, name: c.name, instance }]);
+      const nextSelected = [...selected, { key: crypto.randomUUID(), componentId: c.id, name: c.name, instance }];
+      setSelected(nextSelected);
+      await writeBeaconEngineConfiguredComponentIds(
+        container,
+        nextSelected.map((row) => row.componentId)
+      );
       setEngineListCompositionStale(true);
       void refreshPageBeacons();
     } catch (err) {
@@ -752,10 +931,17 @@ export function BeaconsScreen() {
 
   const handleRemove = async (row: HydratedBeaconComponent) => {
     if (removingKey) return;
+    const container = targetRef.current;
+    if (!container) return;
     setRemovingKey(row.key);
     try {
       await removeComponentInstanceFromCanvas(row.instance);
-      setSelected((prev) => prev.filter((p) => p.key !== row.key));
+      const nextSelected = selected.filter((p) => p.key !== row.key);
+      setSelected(nextSelected);
+      await writeBeaconEngineConfiguredComponentIds(
+        container,
+        nextSelected.map((entry) => entry.componentId)
+      );
       setEngineListCompositionStale(true);
       void refreshPageBeacons();
     } catch (err) {
@@ -767,20 +953,31 @@ export function BeaconsScreen() {
   };
 
   const handleCreateListTarget = async () => {
-    if (listTargetCreatePending || listTargetRemovePending || activeDataList == null) return;
+    if (listTargetCreatePending || listTargetRemovePending || activeDataList == null) {
+      return;
+    }
     if (listTargetPhase !== "absent") return;
     const listContainer = targetRef.current;
     if (!listContainer) return;
     listTargetResolveGen.current += 1;
     setListTargetCreatePending(true);
     try {
-      const created = await createBeaconListTargetComponent({
+      const { component: created, definitionId } = await createBeaconListTargetComponent({
         dataList: activeDataList,
         listContainer,
       });
+      listTargetDefinitionIdRef.current = definitionId;
       const registeredName = await created.getName();
       setListTargetRegisteredName(registeredName);
       setListTargetPhase("synced");
+      if (activeBeaconKey != null) {
+        listTargetReconcileCacheRef.current = {
+          beaconKey: activeBeaconKey,
+          dataList: activeDataList,
+          phase: "synced",
+          registeredName,
+        };
+      }
       void webflow.notify({
         type: "Success",
         message: `List target “${registeredName}” added under ${BEACON_UTILITIES_COMPONENT_GROUP}.`,
@@ -807,14 +1004,20 @@ export function BeaconsScreen() {
     if (!listContainer) return;
     setListTargetPlaceOnCanvasPending(true);
     try {
-      const { instance, alreadyExisted } = await placeBeaconListTargetOnCanvas(activeDataList, listContainer);
+      const { instance, alreadyExisted } = await placeBeaconListTargetOnCanvas(
+        activeDataList,
+        listContainer,
+        listTargetDefinitionIdRef.current
+      );
       try {
         await webflow.setSelectedElement(instance);
       } catch {
         /* selection is optional */
       }
       try {
-        const list = await listBeaconListTargetInstancesOnPage(activeDataList, listContainer);
+        const list = await listBeaconListTargetInstancesOnPage(activeDataList, listContainer, {
+          preferredDefinitionId: listTargetDefinitionIdRef.current,
+        });
         setListTargetOnCanvasCount(list.length);
       } catch {
         setListTargetOnCanvasCount(0);
@@ -831,8 +1034,34 @@ export function BeaconsScreen() {
     }
   };
 
+  const handleSyncListTargetPreview = async () => {
+    if (
+      listTargetPreviewSyncPending ||
+      listTargetPlaceOnCanvasPending ||
+      listTargetCreatePending ||
+      listTargetRemovePending ||
+      listTargetPhase !== "synced" ||
+      activeDataList == null
+    ) {
+      return;
+    }
+    const listContainer = targetRef.current;
+    if (!listContainer) return;
+    setListTargetPreviewSyncPending(true);
+    try {
+      await syncBeaconListTargetDesignerPreview(activeDataList, listContainer);
+    } catch (err) {
+      const message = formatDesignerError(err);
+      void webflow.notify({ type: "Error", message });
+    } finally {
+      setListTargetPreviewSyncPending(false);
+    }
+  };
+
   const handleRequestRemoveListTarget = () => {
-    if (listTargetPhase !== "synced" || listTargetCreatePending || listTargetRemovePending) return;
+    if (listTargetPhase !== "synced" || listTargetCreatePending || listTargetRemovePending) {
+      return;
+    }
     setRemoveListTargetDialogOpen(true);
   };
 
@@ -853,9 +1082,18 @@ export function BeaconsScreen() {
         await webflow.unregisterComponent(comp);
         void webflow.notify({ type: "Success", message: "List target removed from the site." });
       }
+      listTargetDefinitionIdRef.current = null;
       listTargetResolveGen.current += 1;
       setListTargetRegisteredName(null);
       setListTargetPhase("absent");
+      if (activeBeaconKey != null) {
+        listTargetReconcileCacheRef.current = {
+          beaconKey: activeBeaconKey,
+          dataList: activeDataList,
+          phase: "absent",
+          registeredName: null,
+        };
+      }
       setRemoveListTargetDialogOpen(false);
     } catch (err) {
       const message = formatDesignerError(err);
@@ -986,9 +1224,11 @@ export function BeaconsScreen() {
                   onCreateListTarget={handleCreateListTarget}
                   onRequestRemoveListTarget={handleRequestRemoveListTarget}
                   onPlaceListTargetOnCanvas={handlePlaceListTargetOnCanvas}
+                  onSyncListTargetPreview={handleSyncListTargetPreview}
                   listTargetCreatePending={listTargetCreatePending}
                   listTargetRemovePending={listTargetRemovePending}
                   listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
+                  listTargetPreviewSyncPending={listTargetPreviewSyncPending}
                   embedSyncPending={embedSyncPending}
                   onSyncInstallEmbed={handleSyncInstallEmbed}
                   pageRuntimeStatusLoading={pageRuntimeStatusLoading}

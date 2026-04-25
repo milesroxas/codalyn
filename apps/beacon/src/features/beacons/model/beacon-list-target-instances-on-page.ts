@@ -11,6 +11,8 @@ export type ListBeaconListTargetInstancesOnPageOptions = {
    * {@link instanceMatchesBeaconListTargetSurface}).
    */
   maxMatches?: number;
+  /** Same as {@link getBeaconListTargetComponentOrNull} third argument (fresh id after create). */
+  preferredDefinitionId?: string | null;
 };
 
 /**
@@ -23,7 +25,7 @@ export async function listBeaconListTargetInstancesOnPage(
   listContainer: BlockElement,
   options?: ListBeaconListTargetInstancesOnPageOptions
 ): Promise<ComponentElement[]> {
-  const listTarget = await getBeaconListTargetComponentOrNull(dataList, listContainer);
+  const listTarget = await getBeaconListTargetComponentOrNull(dataList, listContainer, options?.preferredDefinitionId);
   if (listTarget == null) {
     return [];
   }

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
+import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import {
   AlertDialog,
@@ -25,12 +26,20 @@ export function AccountSettingsScreen() {
   const router = useRouter();
   const { data: session, isPending: sessionPending, refetch: refetchSession } = authClient.useSession();
 
+  const firstNameId = useId();
+  const lastNameId = useId();
   const emailNewId = useId();
   const curPassId = useId();
   const newPassId = useId();
   const confirmPassId = useId();
   const deletePassId = useId();
   const deleteConfirmPhraseId = useId();
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<string | null>(null);
+  const [profileErr, setProfileErr] = useState<string | null>(null);
 
   const [newEmail, setNewEmail] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
@@ -59,6 +68,15 @@ export function AccountSettingsScreen() {
     }
   }, [session?.user, sessionPending, router]);
 
+  useEffect(() => {
+    const u = session?.user as { firstName?: string | null; lastName?: string | null } | undefined;
+    if (!u) {
+      return;
+    }
+    setFirstName(u.firstName?.trim() ?? "");
+    setLastName(u.lastName?.trim() ?? "");
+  }, [session?.user]);
+
   const appCallbackUrl = useCallback((path: string) => {
     const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
     if (base) {
@@ -69,6 +87,40 @@ export function AccountSettingsScreen() {
     }
     return path;
   }, []);
+
+  async function onUpdateProfile(e: FormEvent) {
+    e.preventDefault();
+    if (!session?.user) {
+      return;
+    }
+    setProfileErr(null);
+    setProfileMsg(null);
+    setProfileBusy(true);
+    const fn = firstName.trim();
+    const ln = lastName.trim();
+    const displayName =
+      [fn, ln].filter(Boolean).join(" ").trim() ||
+      session.user.name?.trim() ||
+      session.user.email.split("@")[0] ||
+      "User";
+    const { error } = await authClient.updateUser({
+      firstName: fn,
+      lastName: ln,
+      name: displayName,
+      fetchOptions: { credentials: "include" },
+    });
+    setProfileBusy(false);
+    if (error) {
+      const msg = error.message ?? "Could not update profile";
+      setProfileErr(msg);
+      toast.error(msg);
+      return;
+    }
+    const msg = "Profile updated.";
+    setProfileMsg(msg);
+    toast.success(msg);
+    void refetchSession();
+  }
 
   async function onChangeEmail(e: FormEvent) {
     e.preventDefault();
@@ -82,10 +134,14 @@ export function AccountSettingsScreen() {
     });
     setEmailBusy(false);
     if (error) {
-      setEmailErr(error.message ?? "Could not start email change");
+      const msg = error.message ?? "Could not start email change";
+      setEmailErr(msg);
+      toast.error(msg);
       return;
     }
-    setEmailMsg("Check your email for a link to finish this change.");
+    const msg = "Check your email for a link to finish this change.";
+    setEmailMsg(msg);
+    toast.success(msg);
     setNewEmail("");
     void refetchSession();
   }
@@ -107,10 +163,14 @@ export function AccountSettingsScreen() {
     });
     setPassBusy(false);
     if (error) {
-      setPassErr(error.message ?? "Could not update password");
+      const msg = error.message ?? "Could not update password";
+      setPassErr(msg);
+      toast.error(msg);
       return;
     }
-    setPassMsg("Password updated. Other sessions were signed out.");
+    const msg = "Password updated. Other sessions were signed out.";
+    setPassMsg(msg);
+    toast.success(msg);
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
@@ -132,9 +192,12 @@ export function AccountSettingsScreen() {
     });
     setDeleteBusy(false);
     if (error) {
-      setDeleteErr(error.message ?? "Could not delete account");
+      const msg = error.message ?? "Could not delete account";
+      setDeleteErr(msg);
+      toast.error(msg);
       return;
     }
+    toast.success("Account deleted");
     setDeleteDialogOpen(false);
     router.push("/");
     router.refresh();
@@ -170,6 +233,54 @@ export function AccountSettingsScreen() {
       <Separator className="my-8" />
 
       <div className="space-y-8">
+        <Card className="border-border/80">
+          <CardHeader>
+            <CardTitle className="text-lg">Profile</CardTitle>
+            <CardDescription>Your name appears in Tower and in the account menu.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={onUpdateProfile} className="flex flex-col gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor={firstNameId}>First name</Label>
+                  <Input
+                    id={firstNameId}
+                    type="text"
+                    autoComplete="given-name"
+                    value={firstName}
+                    onChange={(ev) => setFirstName(ev.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor={lastNameId}>Last name</Label>
+                  <Input
+                    id={lastNameId}
+                    type="text"
+                    autoComplete="family-name"
+                    value={lastName}
+                    onChange={(ev) => setLastName(ev.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+              {profileErr ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {profileErr}
+                </p>
+              ) : null}
+              {profileMsg ? (
+                <p className="text-sm text-muted-foreground" role="status">
+                  {profileMsg}
+                </p>
+              ) : null}
+              <Button type="submit" disabled={profileBusy} className="h-10 w-fit rounded-lg font-medium">
+                {profileBusy ? "Saving…" : "Save profile"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
         <Card className="border-border/80">
           <CardHeader>
             <CardTitle className="text-lg">Email</CardTitle>

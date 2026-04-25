@@ -1,5 +1,6 @@
 import {
   BEACON_LIST_RENDER_TAG,
+  BEACON_LIST_TARGET_HINT_ATTR,
   beaconListTargetDataAttributes,
 } from "@/features/beacons/model/create-beacon-list-target-component";
 
@@ -24,6 +25,22 @@ function asSlotMirrorParent(slot: SlotInstanceElement): ListTargetMirrorParent {
     getChildren: () => slot.getChildren(),
     append: (c) => slot.append(c),
   };
+}
+
+async function isBeaconListTargetHintNode(el: AnyElement): Promise<boolean> {
+  if (el.type === "Paragraph") {
+    const mark = await (el as ParagraphElement).getCustomAttribute(BEACON_LIST_TARGET_HINT_ATTR);
+    return mark != null && mark !== "";
+  }
+  if (el.type === "DOM") {
+    const dom = el as DOMElement;
+    if ((await dom.getTag()) !== "p") {
+      return false;
+    }
+    const mark = await dom.getAttribute(BEACON_LIST_TARGET_HINT_ATTR);
+    return mark != null && mark !== "";
+  }
+  return false;
 }
 
 /** True when this DOM node is the registered list-target root for this beacon list (not Body / page chrome). */
@@ -52,18 +69,27 @@ export async function verifyBeaconListTargetDomRoot(
 }
 
 /**
- * Mirror only ever inserts `ComponentInstance` nodes. If we see Blocks/Sections/etc., this is not the real
- * list-target inner surface (or Designer returned an unexpected context) — do not bulk-remove children.
+ * Mirror only ever inserts `ComponentInstance` nodes (plus an optional Codalyn hint `<p>`). If we see
+ * other node types, this is not the real list-target inner surface — do not bulk-remove children.
  */
 export async function mirrorChildrenAreOnlyComponentInstances(contentRoot: ListTargetMirrorParent): Promise<boolean> {
   const ch = await contentRoot.getChildren();
+  let hintNodes = 0;
   for (const c of ch) {
     if (FORBIDDEN_MIRROR_CONTEXT_TYPES.has(c.type)) {
       return false;
     }
-    if (c.type !== "ComponentInstance") {
-      return false;
+    if (c.type === "ComponentInstance") {
+      continue;
     }
+    if (await isBeaconListTargetHintNode(c)) {
+      hintNodes += 1;
+      if (hintNodes > 1) {
+        return false;
+      }
+      continue;
+    }
+    return false;
   }
   return true;
 }

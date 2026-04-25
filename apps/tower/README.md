@@ -111,6 +111,10 @@ Webflow’s [Working with the Data API](https://developers.webflow.com/data/docs
 
 **Images:** `POST /api/v1/images/optimize?format=webp` (default) or `format=avif` (WebP stays default for Designer-safe pipelines).
 
+## Stripe billing (optional)
+
+**[docs/stripe.md](docs/stripe.md)** — Checkout, Customer Portal, webhooks, `TOWER_BILLING_ENABLED` flag, env vars, and local testing with the Stripe CLI. **Disabled by default** until you set the flag and keys.
+
 ## Regenerating Better Auth Drizzle schema
 
 If Better Auth’s core tables change, add a temporary `auth.config.ts` with `memoryAdapter()`, run:

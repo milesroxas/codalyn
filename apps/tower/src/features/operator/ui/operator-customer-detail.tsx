@@ -14,6 +14,7 @@ import {
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import {
   appRoleLabel,
@@ -142,11 +143,14 @@ export function OperatorCustomerDetail(props: OperatorCustomerDetailProps) {
         const next = await operatorApi.patchUser(state.detail.id, update);
         setState((s) => ({ ...s, patchBusy: false, detail: next, banReasonDraft: next.banReason ?? "" }));
         onUpdated?.(detailToRow(next));
+        toast.success("Customer updated");
       } catch (err) {
+        const msg = err instanceof OperatorApiError ? err.message : "Update failed";
+        toast.error(msg);
         setState((s) => ({
           ...s,
           patchBusy: false,
-          error: err instanceof OperatorApiError ? err.message : "Update failed",
+          error: msg,
         }));
       }
     },
@@ -184,18 +188,21 @@ export function OperatorCustomerDetail(props: OperatorCustomerDetailProps) {
     setState((s) => ({ ...s, deleteBusy: true, error: null }));
     try {
       await operatorApi.deleteUser(state.detail.id, state.deleteConfirm);
+      toast.success("Customer deleted");
       onDeleted?.(state.detail.id);
       onOpenChange(false);
     } catch (err) {
+      const msg =
+        err instanceof OperatorApiError
+          ? err.message === "confirm_mismatch"
+            ? "Email does not match."
+            : err.message
+          : "Delete failed";
+      toast.error(msg);
       setState((s) => ({
         ...s,
         deleteBusy: false,
-        error:
-          err instanceof OperatorApiError
-            ? err.message === "confirm_mismatch"
-              ? "Email does not match."
-              : err.message
-            : "Delete failed",
+        error: msg,
       }));
     }
   }, [state.detail, state.deleteConfirm, onDeleted, onOpenChange]);

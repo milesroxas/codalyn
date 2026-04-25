@@ -22,6 +22,8 @@ type ImageEditorDissolveBranchProps = {
   handleDrop: (e: DragEvent) => void;
   handleOutgoingFadeComplete: (e: TransitionEvent<HTMLDivElement>) => void;
   finishDissolve: () => void;
+  /** When `loadedEditor` is null, shown instead of the default drop zone (e.g. multistep upload UI). */
+  emptyStateWhenNoImage?: ReactNode;
 };
 
 export function ImageEditorDissolveBranch(props: ImageEditorDissolveBranchProps) {
@@ -38,7 +40,18 @@ export function ImageEditorDissolveBranch(props: ImageEditorDissolveBranchProps)
     handleDrop,
     handleOutgoingFadeComplete,
     finishDissolve,
+    emptyStateWhenNoImage,
   } = props;
+
+  const emptyOrDefault = emptyStateWhenNoImage ?? (
+    <EmptyImageSourceSection
+      dropZoneLabelClass={dropZoneLabelClass}
+      fileInputId={fileInputId}
+      handleDrag={handleDrag}
+      handleDragState={handleDragState}
+      handleDrop={handleDrop}
+    />
+  );
 
   if (!showIncomingPreview) {
     return (
@@ -50,19 +63,7 @@ export function ImageEditorDissolveBranch(props: ImageEditorDissolveBranchProps)
         )}
         onTransitionEnd={handleOutgoingFadeComplete}
       >
-        {loadedEditor ? (
-          loadedEditor
-        ) : (
-          <div className="px-4 pt-4">
-            <EmptyImageSourceSection
-              dropZoneLabelClass={dropZoneLabelClass}
-              fileInputId={fileInputId}
-              handleDrag={handleDrag}
-              handleDragState={handleDragState}
-              handleDrop={handleDrop}
-            />
-          </div>
-        )}
+        {loadedEditor ? loadedEditor : <div className="px-4 pt-4">{emptyOrDefault}</div>}
       </div>
     );
   }

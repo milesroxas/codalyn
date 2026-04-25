@@ -132,7 +132,7 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
     <div className="mt-8 space-y-6">
       <div className="flex flex-wrap gap-2">
         {canManage ? <Badge>Designer</Badge> : <Badge variant="secondary">View only</Badge>}
-        {teamPresetsLocked ? <Badge variant="outline">Editor experience · presets locked</Badge> : null}
+        {teamPresetsLocked ? <Badge variant="outline">Designer features off · locked</Badge> : null}
       </div>
 
       {!canManage ? (
@@ -143,8 +143,7 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
       ) : null}
       {canManage && teamPresetsLocked ? (
         <p className="text-sm text-muted-foreground">
-          Team presets cannot be changed while your account uses Beacon editor mode. Adjust this under Team, or in
-          Beacon settings.
+          Team presets are read-only while designer features are off. Turn them on under Team, or in Beacon settings.
         </p>
       ) : null}
 
@@ -369,7 +368,7 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
         <Card>
           <CardHeader>
             <CardTitle>Designer presets</CardTitle>
-            <CardDescription>Not shown to members in Beacon editor mode.</CardDescription>
+            <CardDescription>Hidden in Beacon for members without designer features.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {designerPresets.length === 0 && !loading ? (

@@ -5,6 +5,8 @@ import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex }
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
   email: text("email").notNull().unique(),
   /** Webflow Data API `authorized_user` id from Designer `getIdToken` + `/beta/token/resolve`. */
   webflowAuthorizedUserId: text("webflow_authorized_user_id").unique(),
@@ -20,6 +22,23 @@ export const user = pgTable("user", {
   banExpires: timestamp("ban_expires"),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
+  /** Stripe customer for individual (non-operator) Pro checkout; optional until checkout. */
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  /**
+   * User-level product: `free` (default) or `pro`. Operator-managed org billing uses `organization.billing_plan`.
+   * Webhook-synced; do not set from the client.
+   */
+  subscriptionPlan: text("subscription_plan").default("free").notNull(),
+  /** Stripe subscription `status` (e.g. `active`, `canceled`); null when no Stripe sub. */
+  subscriptionStatus: text("subscription_status"),
+  /**
+   * Default team workspace for Tower UI when the user belongs to several orgs.
+   * Cleared server-side if the org is deleted (`ON DELETE SET NULL`).
+   */
+  preferredOrganizationId: text("preferred_organization_id").references(() => organization.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -163,10 +182,10 @@ export const member = pgTable(
     /** Team roles: `admin`, `designer`, `editor` (see `tower-organization-access.ts`). */
     role: text("role").notNull(),
     /**
-     * Team admins only: when true, Beacon hides designer tooling and uses team presets like an editor.
-     * Default false.
+     * Team admins only: when true, Beacon hides designer features (team presets, manual controls, and related options).
+     * Default true: designer features off until explicitly enabled in Team settings.
      */
-    beaconRestrictToEditorExperience: boolean("beacon_restrict_to_editor_experience").default(false).notNull(),
+    beaconRestrictToEditorExperience: boolean("beacon_restrict_to_editor_experience").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -198,6 +217,25 @@ export const invitation = pgTable(
   ]
 );
 
+/** Monthly Vercel-side usage for metering (Beacon API + proxy); resets by calendar month. */
+export const towerUsageMonth = pgTable(
+  "tower_usage_month",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** `YYYY-MM` (UTC) */
+    yearMonth: text("year_month").notNull(),
+    webflowRequestCount: integer("webflow_request_count").notNull().default(0),
+    imageOptimizeCount: integer("image_optimize_count").notNull().default(0),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [uniqueIndex("tower_usage_month_user_ym").on(table.userId, table.yearMonth)]
+);
+
 export const userRelations = relations(user, ({ many, one }) => ({
   sessions: many(session),
   accounts: many(account),
@@ -205,6 +243,7 @@ export const userRelations = relations(user, ({ many, one }) => ({
   webflowOauthAuthorizeStates: many(webflowOauthAuthorizeState),
   beaconAppSettings: one(beaconAppSettings),
   members: many(member),
+  towerUsageMonths: many(towerUsageMonth),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({

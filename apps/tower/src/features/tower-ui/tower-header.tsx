@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  IconChevronDown,
+  IconCreditCard,
   IconHome,
   IconLogout,
   IconMoon,
@@ -17,8 +17,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
-import { nextCycledBeaconTheme, persistBeaconThemePreference } from "@/features/beacon/lib/beacon-theme-preference";
-import { initialsFor } from "@/features/operator/model/format";
+import { persistBeaconThemePreference, toggledLightDarkTheme } from "@/features/beacon/lib/beacon-theme-preference";
+import { avatarLetterFromUser } from "@/features/operator/model/format";
+import { TowerHeaderWorkspaceSwitcher } from "@/features/tower-ui/tower-header-workspace-switcher";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Badge } from "@/shared/ui/badge";
@@ -35,11 +36,12 @@ import {
 
 const publicLoggedOutSurfaces = new Set(["/", "/sign-in", "/sign-up"]);
 
-export function TowerHeader() {
+export function TowerHeader({ billingEnabled = false }: { billingEnabled?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
+  const effectiveResolved: "light" | "dark" = resolvedTheme === "dark" ? "dark" : "light";
   const [mounted, setMounted] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
@@ -56,12 +58,14 @@ export function TowerHeader() {
   }, [router]);
 
   const cycleTheme = useCallback(() => {
-    const next = nextCycledBeaconTheme(theme);
-    setTheme(next);
-    if (session?.user) {
-      persistBeaconThemePreference(next);
-    }
-  }, [theme, setTheme, session?.user]);
+    setTheme((current) => {
+      const next = toggledLightDarkTheme(current, effectiveResolved);
+      if (session?.user) {
+        persistBeaconThemePreference(next);
+      }
+      return next;
+    });
+  }, [setTheme, session?.user, effectiveResolved]);
 
   const hideAppChrome = !session?.user && publicLoggedOutSurfaces.has(pathname);
   if (hideAppChrome) {
@@ -97,7 +101,18 @@ export function TowerHeader() {
                 Beacon
               </Link>
             </Button>
+            {billingEnabled ? (
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/billing" className="inline-flex items-center gap-1.5">
+                  <IconCreditCard aria-hidden className="size-4 shrink-0" stroke={1.5} />
+                  Billing
+                </Link>
+              </Button>
+            ) : null}
           </nav>
+          <div className="min-w-0">
+            <TowerHeaderWorkspaceSwitcher />
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {mounted ? (
@@ -110,6 +125,7 @@ export function TowerHeader() {
             </Button>
           ) : null}
           <AuthSection
+            billingEnabled={billingEnabled}
             isPending={isPending}
             user={user}
             isProductAdmin={isProductAdmin}
@@ -122,15 +138,30 @@ export function TowerHeader() {
   );
 }
 
-type AuthUser = { email: string; name?: string | null };
+type AuthUser = {
+  email: string;
+  name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+};
+
+function displayNameForMenu(user: AuthUser): string {
+  const parts = [user.firstName?.trim(), user.lastName?.trim()].filter(Boolean);
+  if (parts.length > 0) {
+    return parts.join(" ");
+  }
+  return user.name?.trim() || user.email;
+}
 
 function AuthSection({
+  billingEnabled,
   isPending,
   user,
   isProductAdmin,
   signingOut,
   onSignOut,
 }: {
+  billingEnabled: boolean;
   isPending: boolean;
   user: AuthUser | null | undefined;
   isProductAdmin: boolean;
@@ -160,18 +191,22 @@ function AuthSection({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" className="gap-2 pl-1.5 pr-1.5" aria-label="Account menu">
-          <Avatar className="size-6">
-            <AvatarFallback>{initialsFor(user.name || user.email)}</AvatarFallback>
+        <Button type="button" variant="ghost" size="icon-sm" className="rounded-full" aria-label="Account menu">
+          <Avatar className="size-8">
+            <AvatarFallback className="text-xs font-medium">
+              {avatarLetterFromUser({
+                firstName: user.firstName,
+                name: user.name,
+                email: user.email,
+              })}
+            </AvatarFallback>
           </Avatar>
-          <span className="hidden max-w-40 truncate text-sm md:inline">{user.email}</span>
-          <IconChevronDown className="size-3.5 opacity-60" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel className="normal-case">
           <div className="flex flex-col gap-0.5">
-            <span className="truncate text-sm font-medium text-foreground">{user.name || user.email}</span>
+            <span className="truncate text-sm font-medium text-foreground">{displayNameForMenu(user)}</span>
             <span className="truncate text-xs text-muted-foreground">{user.email}</span>
             {isProductAdmin ? (
               <span className="mt-1">
@@ -191,6 +226,14 @@ function AuthSection({
               Account settings
             </Link>
           </DropdownMenuItem>
+          {billingEnabled ? (
+            <DropdownMenuItem asChild>
+              <Link href="/billing" className="gap-2">
+                <IconCreditCard className="size-4" />
+                Billing
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
           {isProductAdmin ? (
             <DropdownMenuItem asChild>
               <Link href="/console" className="gap-2">

@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useId, useState } from "react";
-import { tryFinishBeaconTowerAuthPopup } from "@/features/auth/lib/beacon-opener-auth";
+import {
+  syncExistingTowerSessionToBeaconIfPopup,
+  tryFinishBeaconTowerAuthPopup,
+} from "@/features/auth/lib/beacon-opener-auth";
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { authClient } from "@/features/auth/model/auth-client";
@@ -81,6 +84,13 @@ function SignInForm() {
       cancelled = true;
     };
   }, [operatorInviteParam, beaconOrigin]);
+
+  useEffect(() => {
+    if (!beaconOrigin) {
+      return;
+    }
+    void syncExistingTowerSessionToBeaconIfPopup(beaconOrigin);
+  }, [beaconOrigin]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

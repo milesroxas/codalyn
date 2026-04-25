@@ -3,6 +3,7 @@
 import type { BeaconAppSettings, BeaconImagePresetRow, ImageExportFormat } from "@codalyn/webflow-kit";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
+import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { draftToMaxBytes, type MaxSizeUnit, parsePresetOutputDimension } from "@/features/beacon/lib/preset-dimensions";
 import { TowerBeaconPresetsPanel } from "@/features/beacon/ui/tower-beacon-presets-panel";
@@ -93,8 +94,11 @@ export function TowerBeaconScreen() {
         }
         const data = (await res.json()) as BeaconApiPayload;
         setPayload(data);
+        toast.success("Beacon settings saved");
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Save failed");
+        const msg = e instanceof Error ? e.message : "Save failed";
+        setError(msg);
+        toast.error(msg);
       } finally {
         setSaving(false);
       }
@@ -203,8 +207,8 @@ export function TowerBeaconScreen() {
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Beacon</p>
         <h1 className="text-2xl font-semibold tracking-tight">Workspace presets</h1>
         <p className="max-w-2xl text-muted-foreground">
-          Workspace export presets and crop shortcuts sync to every member; designer-only presets stay hidden from
-          editor-mode members. Beacon picks up changes when the app reloads settings (tab focus or reopen).
+          Presets and crop shortcuts sync to every member. Designer-only presets are hidden in Beacon for members
+          without designer features. Changes apply when settings reload (tab focus or reopen).
         </p>
       </div>
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 
 function AcceptInvitationContent() {
@@ -31,17 +32,22 @@ function AcceptInvitationContent() {
       .then((result) => {
         setWorking(false);
         if (result.error) {
-          setError(result.error.message ?? "Could not accept invitation");
+          const msg = result.error.message ?? "Could not accept invitation";
+          setError(msg);
+          toast.error(msg);
           attempted.current = false;
           return;
         }
+        toast.success("You joined the team");
         router.push("/");
         router.refresh();
       })
       .catch((e: unknown) => {
         setWorking(false);
         attempted.current = false;
-        setError(e instanceof Error ? e.message : "Could not accept invitation");
+        const msg = e instanceof Error ? e.message : "Could not accept invitation";
+        setError(msg);
+        toast.error(msg);
       });
   }, [invitationId, session?.user, sessionPending, router]);
 

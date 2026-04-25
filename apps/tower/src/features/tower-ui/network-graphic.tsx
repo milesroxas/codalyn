@@ -1322,7 +1322,8 @@ export function NetworkGraphic() {
   const armsInitializedRef = useRef(false);
   const firstPaintAfterInitRef = useRef(true);
   const rafRef = useRef(0);
-  const visibleRef = useRef(true);
+  const remeasureRetryRafRef = useRef(0);
+  const remeasureRetryCountRef = useRef(0);
   const { resolvedTheme } = useTheme();
 
   const paint = useCallback(() => {
@@ -1392,33 +1393,38 @@ export function NetworkGraphic() {
         rafRef.current = 0;
         return;
       }
-      const needFrames = visibleRef.current;
-
-      if (needFrames) {
-        rafRef.current = requestAnimationFrame(loop);
-      } else {
+      if (typeof document !== "undefined" && document.hidden) {
         rafRef.current = 0;
+        return;
       }
+      rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
   }, [paint]);
 
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        const e = entries[0];
-        if (!e) return;
-        visibleRef.current = e.isIntersecting;
-        if (e.isIntersecting) scheduleLoop();
-      },
-      { threshold: 0, rootMargin: "80px 0px 80px 0px" }
-    );
-    io.observe(el);
-    const ro = new ResizeObserver(() => {
+  const remeasureAndRepaint = useCallback(
+    (fromRetry = false) => {
+      if (remeasureRetryRafRef.current !== 0) {
+        cancelAnimationFrame(remeasureRetryRafRef.current);
+        remeasureRetryRafRef.current = 0;
+      }
+      if (!fromRetry) {
+        remeasureRetryCountRef.current = 0;
+      }
+      const el = containerRef.current;
+      if (!el) return;
       const rect = el.getBoundingClientRect();
-      if (rect.width < 2 || rect.height < 2) return;
+      if (rect.width < 2 || rect.height < 2) {
+        if (remeasureRetryCountRef.current < 90) {
+          remeasureRetryCountRef.current += 1;
+          remeasureRetryRafRef.current = requestAnimationFrame(() => {
+            remeasureRetryRafRef.current = 0;
+            remeasureAndRepaint(true);
+          });
+        }
+        return;
+      }
+      remeasureRetryCountRef.current = 0;
       armsInitializedRef.current = false;
       firstPaintAfterInitRef.current = true;
       lastHubRef.current = { hubI: -99, hubJ: -99 };
@@ -1434,13 +1440,57 @@ export function NetworkGraphic() {
       armSnapAtRef.current.fill(0);
       paint();
       scheduleLoop();
+    },
+    [paint, scheduleLoop]
+  );
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      remeasureAndRepaint();
     });
     ro.observe(el);
     return () => {
-      io.disconnect();
       ro.disconnect();
     };
-  }, [paint, scheduleLoop]);
+  }, [remeasureAndRepaint]);
+
+  useEffect(() => {
+    const onPageShow = () => {
+      remeasureAndRepaint();
+    };
+    const onVisibility = () => {
+      if (!document.hidden) {
+        remeasureAndRepaint();
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [remeasureAndRepaint]);
+
+  useEffect(() => {
+    const onResize = () => {
+      remeasureAndRepaint();
+    };
+    window.addEventListener("resize", onResize);
+    let rafOuter = 0;
+    let rafInner = 0;
+    rafOuter = requestAnimationFrame(() => {
+      rafInner = requestAnimationFrame(() => {
+        remeasureAndRepaint();
+      });
+    });
+    return () => {
+      window.removeEventListener("resize", onResize);
+      cancelAnimationFrame(rafOuter);
+      cancelAnimationFrame(rafInner);
+    };
+  }, [remeasureAndRepaint]);
 
   useEffect(() => {
     const onPointerMove = (e: PointerEvent) => {
@@ -1448,7 +1498,6 @@ export function NetworkGraphic() {
       if (!el) return;
       const r = el.getBoundingClientRect();
       const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-      document.body.style.cursor = inside ? "none" : "";
       insideRef.current = inside;
       mouseRef.current = {
         x: Math.max(0, Math.min(r.width, e.clientX - r.left)),
@@ -1456,15 +1505,9 @@ export function NetworkGraphic() {
       };
       scheduleLoop();
     };
-    const clearCursor = () => {
-      document.body.style.cursor = "";
-    };
-    document.addEventListener("pointermove", onPointerMove, { passive: true });
-    window.addEventListener("blur", clearCursor);
+    document.addEventListener("pointermove", onPointerMove, { passive: true, capture: true });
     return () => {
-      document.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("blur", clearCursor);
-      clearCursor();
+      document.removeEventListener("pointermove", onPointerMove, { capture: true });
     };
   }, [scheduleLoop]);
 
@@ -1475,6 +1518,7 @@ export function NetworkGraphic() {
   useEffect(() => {
     return () => {
       if (rafRef.current !== 0) cancelAnimationFrame(rafRef.current);
+      if (remeasureRetryRafRef.current !== 0) cancelAnimationFrame(remeasureRetryRafRef.current);
     };
   }, []);
 

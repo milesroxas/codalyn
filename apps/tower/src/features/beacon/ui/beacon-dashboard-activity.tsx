@@ -196,7 +196,7 @@ export function BeaconDashboardActivity() {
           <div>
             <CardTitle>Workspace export presets</CardTitle>
             <CardDescription className="mt-1.5">
-              Synced for this workspace in Beacon. Designer-only rows are omitted in editor mode.
+              Synced for this workspace in Beacon. Designer-only rows are hidden without designer features.
             </CardDescription>
           </div>
         </CardHeader>

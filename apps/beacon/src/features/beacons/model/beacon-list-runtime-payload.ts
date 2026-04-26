@@ -10,7 +10,8 @@
  *
  * v2: `i` = clone order (indices into the hidden list’s children), `p` = parallel array of per-row `propId` → string.
  * `p` keys are **only** propIds the Engine had marked `exposed` in the slot file (not every Webflow prop on the
- * component). The footer runtime only applies those keys to `data-codalyn-beacon-prop` nodes in each cloned row.
+ * component). The footer runtime applies those keys to `data-codalyn-beacon-prop` nodes in each cloned row; a missing
+ * key or empty/whitespace-only value sets `hidden` on that node (placeholders are not shown).
  */
 export const BEACON_LIST_RUNTIME_JSON_VERSION = 2 as const;
 /** Backward compatible reader for old CMS data. */

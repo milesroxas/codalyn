@@ -15,6 +15,7 @@ import {
   resolveComposerTargetOrder,
 } from "@/features/beacons/model/beacon-composer-cms-draft";
 import { listComposerEligibleLists } from "@/features/beacons/model/beacon-composer-eligible";
+import type { BeaconComposerRowMeta } from "@/features/beacons/model/beacon-composer-row-meta";
 import { syncEngineCodalynBeaconPropAttributes } from "@/features/beacons/model/beacon-engine-codalyn-attr-sync";
 import {
   type BeaconEngineSlotPropsFile,
@@ -43,6 +44,7 @@ import {
   listBeaconListTargetInstancesOnPage,
   removeAllBeaconListTargetInstancesOnPage,
 } from "@/features/beacons/model/beacon-list-target-instances-on-page";
+import type { BeaconListTargetPhase } from "@/features/beacons/model/beacon-list-target-phase";
 import {
   getBeaconPageRuntimeSyncStatus,
   syncBeaconPageInlineScript,
@@ -82,7 +84,7 @@ import {
   removeComponentInstanceFromCanvas,
 } from "@/features/beacons/model/site-components";
 import { BeaconComposerListPanel } from "@/features/beacons/ui/beacon-composer-list-panel";
-import { BeaconComposerStudioPanel } from "@/features/beacons/ui/beacon-composer-studio-panel";
+import { BeaconComposerStudioPanel } from "@/features/beacons/ui/beacon-composer-studio";
 import { BeaconCompositionPanel } from "@/features/beacons/ui/beacon-composition-panel";
 import { BeaconHomePanel } from "@/features/beacons/ui/beacon-home-panel";
 import { BeaconPageRuntimeHeaderStatus } from "@/features/beacons/ui/beacon-page-runtime-header-status";
@@ -126,7 +128,7 @@ async function runListTargetReconcileOnOpen(
   activeDataList: string,
   listContainer: BlockElement,
   listTargetDefinitionIdRef: MutableRefObject<string | null>,
-  setListTargetPhase: (p: "loading" | "absent" | "synced" | "updating") => void,
+  setListTargetPhase: (p: BeaconListTargetPhase) => void,
   setListTargetRegisteredName: (n: string | null) => void,
   onSettled?: (result: { phase: "synced" | "absent"; registeredName: string | null }) => void,
   onAbsent?: () => void
@@ -280,7 +282,7 @@ type BeaconsPageChangeReset = {
   setListTargetRemovePending: (v: boolean) => void;
   setListTargetRemoveBusyKind: (v: "canvas" | "delete" | null) => void;
   setListTargetPlaceOnCanvasPending: (v: boolean) => void;
-  setListTargetPhase: (v: "loading" | "absent" | "synced" | "updating") => void;
+  setListTargetPhase: (v: BeaconListTargetPhase) => void;
   setListTargetRegisteredName: (v: string | null) => void;
   setListTargetOnCanvasCount: (v: number) => void;
   setListTargetPreviewSyncPending: (v: boolean) => void;
@@ -416,7 +418,7 @@ function useListTargetReconcileWhenPicking(
   picking: boolean,
   activeDataList: string | null,
   activeBeaconKey: string | null,
-  setListTargetPhase: (p: "loading" | "absent" | "synced" | "updating") => void,
+  setListTargetPhase: (p: BeaconListTargetPhase) => void,
   setListTargetRegisteredName: (n: string | null) => void,
   targetRef: MutableRefObject<BlockElement | null>,
   listTargetReconcileCacheRef: MutableRefObject<ListTargetReconcileCacheEntry | null>,
@@ -482,7 +484,7 @@ function useListTargetReconcileWhenPicking(
 
 function useListTargetOnCanvasCountWhenSynced(
   picking: boolean,
-  listTargetPhase: "loading" | "absent" | "synced" | "updating",
+  listTargetPhase: BeaconListTargetPhase,
   activeDataList: string | null,
   activeBeaconKey: string | null,
   targetRef: MutableRefObject<BlockElement | null>,
@@ -567,7 +569,7 @@ export function BeaconsScreen() {
   const [listTargetRemovePending, setListTargetRemovePending] = useState(false);
   const [listTargetRemoveBusyKind, setListTargetRemoveBusyKind] = useState<"canvas" | "delete" | null>(null);
   const [listTargetPlaceOnCanvasPending, setListTargetPlaceOnCanvasPending] = useState(false);
-  const [listTargetPhase, setListTargetPhase] = useState<"loading" | "absent" | "synced" | "updating">("loading");
+  const [listTargetPhase, setListTargetPhase] = useState<BeaconListTargetPhase>("loading");
   const [listTargetRegisteredName, setListTargetRegisteredName] = useState<string | null>(null);
   const [listTargetOnCanvasCount, setListTargetOnCanvasCount] = useState(0);
   const [listTargetPreviewSyncPending, setListTargetPreviewSyncPending] = useState(false);
@@ -923,7 +925,7 @@ export function BeaconsScreen() {
     return beaconCompositionSignature(composerDraft) !== composerStudio.initialSignature;
   }, [composerDraft, composerStudio]);
 
-  const composerRowMeta = useMemo(() => {
+  const composerRowMeta = useMemo((): BeaconComposerRowMeta[] => {
     if (composerSlotProps == null || composerEngineRows.length === 0) {
       return composerDraft.map((row) => ({ row, exposed: [] as ComposableInstancePropMeta[] }));
     }

@@ -1,12 +1,13 @@
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
+import type { BeaconEmbedSyncStripCopy } from "@/features/beacons/model/beacon-embed-sync";
 import { Button } from "@/shared/ui/button";
-
-export type BeaconEmbedSyncStripCopy = {
-  loading: string;
-  synced: string;
-  unsyncedFallback: string;
-};
+import {
+  BEACON_EMBED_SYNC_PHASE_BORDER,
+  type BeaconEmbedSyncPhase,
+  beaconEmbedSyncPhaseStatusText,
+  resolveEmbedPhase,
+} from "./phase";
 
 type BeaconEmbedSyncStripProps = {
   dataSlot: string;
@@ -19,32 +20,7 @@ type BeaconEmbedSyncStripProps = {
   copy: BeaconEmbedSyncStripCopy;
 };
 
-type EmbedPhase = "loading" | "synced" | "unsynced";
-
-function resolveEmbedPhase(loading: boolean, synced: boolean): EmbedPhase {
-  if (loading) return "loading";
-  if (synced) return "synced";
-  return "unsynced";
-}
-
-const PHASE_BORDER: Record<EmbedPhase, string> = {
-  loading: "border-border/80 bg-muted/15",
-  synced: "border-border/60 bg-muted/10",
-  unsynced: "border-amber-500/30 bg-amber-500/8",
-};
-
-function phaseStatusText(phase: EmbedPhase, copy: BeaconEmbedSyncStripCopy, reason?: string): string {
-  switch (phase) {
-    case "loading":
-      return copy.loading;
-    case "synced":
-      return copy.synced;
-    case "unsynced":
-      return reason ?? copy.unsyncedFallback;
-  }
-}
-
-function PhaseIcon({ phase }: { phase: EmbedPhase }): ReactNode {
+function PhaseIcon({ phase }: { phase: BeaconEmbedSyncPhase }): ReactNode {
   switch (phase) {
     case "loading":
       return <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />;
@@ -68,9 +44,9 @@ export function BeaconEmbedSyncStrip(props: BeaconEmbedSyncStripProps) {
   } = props;
 
   const phase = resolveEmbedPhase(pageRuntimeStatusLoading, pageRuntimeSynced);
-  const borderClass = PHASE_BORDER[phase];
+  const borderClass = BEACON_EMBED_SYNC_PHASE_BORDER[phase];
   const alignClass = phase === "unsynced" ? "sm:items-start" : "sm:items-center";
-  const statusText = phaseStatusText(phase, copy, pageRuntimeSyncReason);
+  const statusText = beaconEmbedSyncPhaseStatusText(phase, copy, pageRuntimeSyncReason);
   const padClass = phase === "synced" ? "px-2 py-1.5" : "px-2.5 py-2";
 
   return (

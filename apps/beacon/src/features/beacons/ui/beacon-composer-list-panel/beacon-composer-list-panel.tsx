@@ -1,13 +1,7 @@
 import { Loader2 } from "lucide-react";
 import type { ComposerEligibleList } from "@/features/beacons/model/beacon-composer-eligible";
+import { displayLabelForDataList } from "@/features/beacons/model/beacon-data-list-display";
 import { Button } from "@/shared/ui/button";
-
-function displayLabelForDataList(dataList: string): string {
-  if (dataList.startsWith("beacon-")) {
-    return dataList.slice("beacon-".length);
-  }
-  return dataList;
-}
 
 type BeaconComposerListPanelProps = {
   pageScanLoading: boolean;

@@ -1,48 +1,9 @@
 import { Loader2, Trash2 } from "lucide-react";
+import { displayLabelForDataList } from "@/features/beacons/model/beacon-data-list-display";
 import type { BeaconOnPage } from "@/features/beacons/model/beacon-page-targets";
-import { BeaconEmbedSyncStrip } from "@/features/beacons/ui/beacon-embed-sync-strip";
-import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { Separator } from "@/shared/ui/separator";
-
-function displayLabelForDataList(dataList: string): string {
-  if (dataList.startsWith("beacon-")) {
-    return dataList.slice("beacon-".length);
-  }
-  return dataList;
-}
-
-type InstallBlockProps = {
-  installPending: boolean;
-  pageScanLoading: boolean;
-  onInstallWrapper: () => void;
-};
-
-function BeaconPreInstallBlock(props: InstallBlockProps) {
-  const { installPending, pageScanLoading, onInstallWrapper } = props;
-  return (
-    <div className="mx-auto w-full max-w-sm space-y-3" data-slot="beacon_install">
-      <p className="text-sm font-medium">Install</p>
-      <Button
-        type="button"
-        className="w-full"
-        disabled={installPending || pageScanLoading}
-        onClick={() => void onInstallWrapper()}
-      >
-        {installPending ? (
-          <>
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-            Installing…
-          </>
-        ) : (
-          "Install beacons on this page"
-        )}
-      </Button>
-    </div>
-  );
-}
 
 type OnThisPageSectionProps = {
   nameFieldId: string;
@@ -60,7 +21,7 @@ type OnThisPageSectionProps = {
   deletePendingKey: string | null;
 };
 
-function OnThisPageSection(props: OnThisPageSectionProps) {
+export function OnThisPageSection(props: OnThisPageSectionProps) {
   const {
     nameFieldId,
     pageBeacons,
@@ -178,115 +139,6 @@ function OnThisPageSection(props: OnThisPageSectionProps) {
           ))}
         </ul>
       ) : null}
-    </div>
-  );
-}
-
-type BeaconHomePanelProps = {
-  nameFieldId: string;
-  beaconsWrapperInstalled: boolean;
-  installPending: boolean;
-  onInstallWrapper: () => void;
-  legacyBeaconsOnBody: BeaconOnPage[];
-  pageBeacons: BeaconOnPage[];
-  pageScanLoading: boolean;
-  beaconName: string;
-  setBeaconName: (v: string) => void;
-  createPending: boolean;
-  createFormOpen: boolean;
-  setCreateFormOpen: (v: boolean) => void;
-  onCreate: () => void;
-  onOpenBeacon: (b: BeaconOnPage) => void;
-  onRequestDelete: (b: BeaconOnPage) => void;
-  openingBeaconKey: string | null;
-  deletePendingKey: string | null;
-  embedSyncPending: boolean;
-  onSyncInstallEmbed: () => void;
-  pageRuntimeStatusLoading: boolean;
-  pageRuntimeSynced: boolean;
-  pageRuntimeSyncReason?: string;
-};
-
-export function BeaconHomePanel(props: BeaconHomePanelProps) {
-  const {
-    nameFieldId,
-    beaconsWrapperInstalled,
-    installPending,
-    onInstallWrapper,
-    legacyBeaconsOnBody,
-    pageBeacons,
-    pageScanLoading,
-    beaconName,
-    setBeaconName,
-    createPending,
-    createFormOpen,
-    setCreateFormOpen,
-    onCreate,
-    onOpenBeacon,
-    onRequestDelete,
-    openingBeaconKey,
-    deletePendingKey,
-    embedSyncPending,
-    onSyncInstallEmbed,
-    pageRuntimeStatusLoading,
-    pageRuntimeSynced,
-    pageRuntimeSyncReason,
-  } = props;
-
-  if (!beaconsWrapperInstalled) {
-    return (
-      <div className="flex min-h-[40vh] flex-col items-stretch justify-center py-4" data-slot="beacon_install_prompt">
-        <BeaconPreInstallBlock
-          installPending={installPending}
-          pageScanLoading={pageScanLoading}
-          onInstallWrapper={onInstallWrapper}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4" data-slot="beacon_home_installed">
-      {legacyBeaconsOnBody.length > 0 ? (
-        <Alert variant="destructive" className="items-start">
-          <AlertDescription className="text-balance">
-            {legacyBeaconsOnBody.length} on body, not in wrapper. Move in Navigator or recreate.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      {legacyBeaconsOnBody.length > 0 ? <Separator /> : null}
-
-      <BeaconEmbedSyncStrip
-        dataSlot="beacon_embed_sync_home"
-        embedSyncPending={embedSyncPending}
-        disableButton={pageScanLoading}
-        onSyncInstallEmbed={onSyncInstallEmbed}
-        pageRuntimeStatusLoading={pageRuntimeStatusLoading}
-        pageRuntimeSynced={pageRuntimeSynced}
-        pageRuntimeSyncReason={pageRuntimeSyncReason}
-        copy={{
-          loading: "Checking…",
-          synced: "Footer JS OK · publish for live.",
-          unsyncedFallback: "Footer script missing or outdated.",
-        }}
-      />
-
-      <OnThisPageSection
-        nameFieldId={nameFieldId}
-        pageBeacons={pageBeacons}
-        pageScanLoading={pageScanLoading}
-        createFormOpen={createFormOpen}
-        setCreateFormOpen={setCreateFormOpen}
-        beaconName={beaconName}
-        setBeaconName={setBeaconName}
-        createPending={createPending}
-        onCreate={onCreate}
-        onOpenBeacon={onOpenBeacon}
-        onRequestDelete={onRequestDelete}
-        openingBeaconKey={openingBeaconKey}
-        deletePendingKey={deletePendingKey}
-      />
     </div>
   );
 }

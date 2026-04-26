@@ -1,9 +1,20 @@
 import { AlertTriangle, GripVertical, Plus, Trash2 } from "lucide-react";
-import { type DragEvent, Fragment, useState } from "react";
+import { type DragEvent, Fragment, useCallback, useRef, useState } from "react";
 import type { BeaconCompositionDraftRow, BeaconPaletteEntry } from "@/features/beacons/model/site-components";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
+
+/** Carried in dataTransfer; some embedded / iframe DnD contexts are flaky with `text/plain` only. */
+const DND_MIME = "application/x-codalyn-beacon-composer-reorder";
+
+function readDraggedKeyFromTransfer(t: DataTransfer | null, fallback: string | null) {
+  if (t == null) return fallback;
+  const a = t.getData("text/plain");
+  if (a) return a;
+  const b = t.getData(DND_MIME);
+  return b || fallback;
+}
 
 type BeaconComposerStudioPanelProps = {
   activeDataList: string;
@@ -29,6 +40,8 @@ type BeaconComposerStudioPanelProps = {
 type ComposerDropTargetProps = {
   slot: number;
   dragActive: boolean;
+  /** Ref-backed; true before React re-renders after drag start (avoids a dead first frame on gaps). */
+  reorderInProgress: () => boolean;
   highlighted: boolean;
   busy: boolean;
   onSetDropSlot: (slot: number) => void;
@@ -36,20 +49,24 @@ type ComposerDropTargetProps = {
 };
 
 function ComposerDropTarget(props: ComposerDropTargetProps) {
-  const { slot, dragActive, highlighted, busy, onSetDropSlot, onDropAtSlot } = props;
+  const { slot, dragActive, reorderInProgress, highlighted, busy, onSetDropSlot, onDropAtSlot } = props;
+  const showReorderChrome = dragActive || reorderInProgress();
   return (
-    <li data-slot="beacon_composer_drop_target">
+    <li data-slot="beacon_composer_drop_target" className="shrink-0 list-none">
       <button
         type="button"
         tabIndex={-1}
-        aria-hidden={!dragActive}
+        aria-hidden={!showReorderChrome}
         className={cn(
-          "relative block h-2 w-full rounded-sm transition-colors",
-          dragActive ? "opacity-100" : "opacity-0",
-          highlighted && "bg-primary/12"
+          "relative block w-full rounded-md transition-colors",
+          /* Larger hit target while dragging; thin spacer when idle */
+          showReorderChrome ? "min-h-4 border-2 border-dashed py-0.5" : "min-h-1.5 border-0 p-0 pointer-events-none",
+          showReorderChrome && !highlighted && "border-border/80 bg-muted/30",
+          highlighted && "border-primary bg-primary/15 shadow-sm"
         )}
         onDragOver={(e: DragEvent<HTMLButtonElement>) => {
           if (busy) return;
+          if (!reorderInProgress()) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
           onSetDropSlot(slot);
@@ -58,9 +75,9 @@ function ComposerDropTarget(props: ComposerDropTargetProps) {
       >
         <span
           className={cn(
-            "absolute inset-x-1 top-1/2 h-px -translate-y-1/2 rounded-full transition-colors",
-            dragActive ? "bg-border" : "bg-transparent",
-            highlighted && "h-0.5 bg-primary"
+            "pointer-events-none block min-h-px w-full rounded-full transition-all",
+            showReorderChrome && !highlighted && "h-0.5 bg-border/90",
+            highlighted && "h-1 bg-primary"
           )}
         />
       </button>
@@ -76,6 +93,8 @@ type ComposerOrderSectionProps = {
   dragActive: boolean;
   draggingKey: string | null;
   dropSlotIndex: number | null;
+  /** True while a handle-initiated reorder drag is in progress (read synchronously; not React state). */
+  isReorderInProgress: () => boolean;
   onSetDropSlot: (slot: number) => void;
   onDropAtSlot: (slot: number, e: DragEvent<HTMLElement>) => void;
   onDragStart: (key: string, index: number, e: DragEvent<HTMLButtonElement>) => void;
@@ -92,6 +111,7 @@ function ComposerOrderSection(props: ComposerOrderSectionProps) {
     dragActive,
     draggingKey,
     dropSlotIndex,
+    isReorderInProgress,
     onSetDropSlot,
     onDropAtSlot,
     onDragStart,
@@ -129,12 +149,31 @@ function ComposerOrderSection(props: ComposerOrderSectionProps) {
                 <ComposerDropTarget
                   slot={index}
                   dragActive={dragActive}
+                  reorderInProgress={isReorderInProgress}
                   highlighted={dropSlotIndex === index}
                   busy={busy}
                   onSetDropSlot={onSetDropSlot}
                   onDropAtSlot={onDropAtSlot}
                 />
-                <li>
+                <li
+                  className="shrink-0"
+                  onDragOver={(e: DragEvent<HTMLLIElement>) => {
+                    if (busy) return;
+                    if (!isReorderInProgress()) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    const r = e.currentTarget.getBoundingClientRect();
+                    const before = e.clientY - r.top < r.height / 2;
+                    onSetDropSlot(before ? index : index + 1);
+                  }}
+                  onDrop={(e: DragEvent<HTMLLIElement>) => {
+                    if (busy) return;
+                    e.preventDefault();
+                    const r = e.currentTarget.getBoundingClientRect();
+                    const before = e.clientY - r.top < r.height / 2;
+                    onDropAtSlot(before ? index : index + 1, e);
+                  }}
+                >
                   <div
                     className={cn(
                       "flex items-center gap-2 rounded-md border border-border/70 bg-card px-2 py-1.5",
@@ -171,6 +210,7 @@ function ComposerOrderSection(props: ComposerOrderSectionProps) {
             <ComposerDropTarget
               slot={draft.length}
               dragActive={dragActive}
+              reorderInProgress={isReorderInProgress}
               highlighted={dropSlotIndex === draft.length}
               busy={busy}
               onSetDropSlot={onSetDropSlot}
@@ -251,15 +291,24 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
   const [dropSlotIndex, setDropSlotIndex] = useState<number | null>(null);
   const dragActive = draggingKey != null;
 
-  const resetDragState = () => {
+  /** Synchronous drag identity; React state in drop can lag a frame. */
+  const dragKeyRef = useRef<string | null>(null);
+  /** `drop` ran (even if it was a no-op). Cleared after dragend handles cancel vs success. */
+  const dropEventHandledRef = useRef(false);
+
+  const isReorderInProgress = useCallback(() => dragKeyRef.current != null, []);
+
+  const resetDragState = useCallback(() => {
+    dragKeyRef.current = null;
     setDraggingKey(null);
     setDropSlotIndex(null);
-  };
+  }, []);
 
   const handleDropAtSlot = (slot: number, e: DragEvent<HTMLElement>) => {
     if (busy) return;
     e.preventDefault();
-    const fromKey = e.dataTransfer.getData("text/plain") || draggingKey;
+    dropEventHandledRef.current = true;
+    const fromKey = readDraggedKeyFromTransfer(e.dataTransfer, dragKeyRef.current);
     if (!fromKey) {
       resetDragState();
       return;
@@ -277,9 +326,12 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
   };
 
   const handleDragStart = (key: string, index: number, e: DragEvent<HTMLButtonElement>) => {
+    dropEventHandledRef.current = false;
+    dragKeyRef.current = key;
     setDraggingKey(key);
     setDropSlotIndex(index);
     e.dataTransfer.setData("text/plain", key);
+    e.dataTransfer.setData(DND_MIME, key);
     e.dataTransfer.effectAllowed = "move";
   };
 
@@ -288,9 +340,13 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
       resetDragState();
       return;
     }
-    // In embedded Designer contexts, `dragend` can fire before `drop`; defer clear by one frame.
-    window.requestAnimationFrame(() => {
-      resetDragState();
+    // `drop` must run in the same task before microtasks; if not (some embedded hosts), we still
+    // must not clear `dragKeyRef` until after a microtask so a late `drop` can read it.
+    queueMicrotask(() => {
+      if (!dropEventHandledRef.current) {
+        resetDragState();
+      }
+      dropEventHandledRef.current = false;
     });
   };
 
@@ -349,6 +405,7 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
         dragActive={dragActive}
         draggingKey={draggingKey}
         dropSlotIndex={dropSlotIndex}
+        isReorderInProgress={isReorderInProgress}
         onSetDropSlot={setDropSlotIndex}
         onDropAtSlot={handleDropAtSlot}
         onDragStart={handleDragStart}

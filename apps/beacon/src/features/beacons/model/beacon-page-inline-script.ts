@@ -1,3 +1,4 @@
+import { BEACON_LIST_RENDER_TARGET_SLOT_STYLE_NAME } from "@/features/beacons/model/beacon-list-target-slot-style";
 import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
 
 /** Matches `attributes` on the applied page script so we can replace it on sync. */
@@ -25,8 +26,9 @@ const REGISTER_DISPLAY_NAME = "CodalynBeaconRuntime";
 export function getBeaconPageInlineScriptSource(): string {
   // List target Text = CMS “Beacon list target text” for this item; that string is the payload (same JSON
   // Composer writes per entry). Read `i` = indices into hidden `beacon_list` children, in order. If
-  // missing/invalid, clone all source children in DOM order.
-  return '(function(){function a(e){var t=e.getAttribute("data-list");return t&&0===t.indexOf("beacon-")?t:null}function b(w,e){if(e.parentElement!==w)return!1;if("beacons"!==e.getAttribute("data-target"))return!1;if("list"===e.getAttribute("data-beacon-target"))return!1;return null!=a(e)}function c(){var w=document.querySelector(\'[data-beacon-wrapper="beacons-wrapper"]\');if(!w)return;for(var t={},n=0;n<w.children.length;n++){var e=w.children[n];if(b(w,e)){var r=a(e);r&&(t[r]=e)}}for(var o=document.querySelectorAll(\'[data-beacon-target="list"][data-list]\'),d=0;d<o.length;d++){var i=o[d],l=a(i);if(l){var s=t[l];if(s){var f=(i.textContent||"").trim();for(;i.firstChild;)i.removeChild(i.firstChild);var p=null,g=!1;try{var h=JSON.parse(f);h&&1===h.v&&"[object Array]"===Object.prototype.toString.call(h.i)&&(p=h.i,g=!0)}catch(x){}var y=s.children;if(g)for(var u=0;u<p.length;u++){var m=+p[u];m===m&&0<=m&&m%1==0&&m<y.length&&i.appendChild(y[m].cloneNode(!0))}else for(u=0;u<y.length;u++)i.appendChild(y[u].cloneNode(!0))}}}}"loading"===document.readyState?document.addEventListener("DOMContentLoaded",c):c()})();';
+  // missing/invalid, clone all source children in DOM order. Removes the Designer-only
+  // `beacon_list_render` class from the target root so published markup has no empty-slot chrome.
+  return `(function(){function a(e){var t=e.getAttribute("data-list");return t&&0===t.indexOf("beacon-")?t:null}function b(w,e){if(e.parentElement!==w)return!1;if("beacons"!==e.getAttribute("data-target"))return!1;if("list"===e.getAttribute("data-beacon-target"))return!1;return null!=a(e)}function c(){var w=document.querySelector('[data-beacon-wrapper="beacons-wrapper"]');if(!w)return;for(var t={},n=0;n<w.children.length;n++){var e=w.children[n];if(b(w,e)){var r=a(e);r&&(t[r]=e)}}for(var o=document.querySelectorAll('[data-beacon-target="list"][data-list]'),d=0;d<o.length;d++){var i=o[d],l=a(i);if(l){var s=t[l];if(s){i.classList.remove("${BEACON_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");var f=(i.textContent||"").trim();for(;i.firstChild;)i.removeChild(i.firstChild);var p=null,g=!1;try{var h=JSON.parse(f);h&&1===h.v&&"[object Array]"===Object.prototype.toString.call(h.i)&&(p=h.i,g=!0)}catch(x){}var y=s.children;if(g)for(var u=0;u<p.length;u++){var m=+p[u];m===m&&0<=m&&m%1==0&&m<y.length&&i.appendChild(y[m].cloneNode(!0))}else for(u=0;u<y.length;u++)i.appendChild(y[u].cloneNode(!0))}}}}"loading"===document.readyState?document.addEventListener("DOMContentLoaded",c):c()})();`;
 }
 
 function inlineScriptVersion(): string {

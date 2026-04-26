@@ -1,12 +1,37 @@
-import { AlertTriangle, GripVertical, Plus, Trash2 } from "lucide-react";
-import { type DragEvent, Fragment, useCallback, useRef, useState } from "react";
+import { AlertTriangle, Copy, GripVertical, Plus, Trash2 } from "lucide-react";
+import { type DragEvent, Fragment, type ReactElement, useCallback, useMemo, useRef, useState } from "react";
+import {
+  type BeaconStudioPropFieldKind,
+  beaconStudioFieldKindForValueType,
+  type ComposableInstancePropMeta,
+} from "@/features/beacons/model/beacon-composable-props";
 import type { BeaconCompositionDraftRow, BeaconPaletteEntry } from "@/features/beacons/model/site-components";
 import { cn } from "@/shared/lib/utils";
+import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
+import { Checkbox } from "@/shared/ui/checkbox";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
 import { ScrollArea } from "@/shared/ui/scroll-area";
+import { Textarea } from "@/shared/ui/textarea";
 
 /** Carried in dataTransfer; some embedded / iframe DnD contexts are flaky with `text/plain` only. */
 const DND_MIME = "application/x-codalyn-beacon-composer-reorder";
+
+async function copyBeaconInstancePropId(propId: string): Promise<void> {
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
+      await navigator.clipboard.writeText(propId);
+    }
+    if (typeof webflow !== "undefined" && typeof webflow.notify === "function") {
+      void webflow.notify({ type: "Success", message: "Prop id copied to clipboard." });
+    }
+  } catch {
+    if (typeof webflow !== "undefined" && typeof webflow.notify === "function") {
+      void webflow.notify({ type: "Error", message: "Could not copy — select and copy the id text manually." });
+    }
+  }
+}
 
 function readDraggedKeyFromTransfer(t: DataTransfer | null, fallback: string | null) {
   if (t == null) return fallback;
@@ -35,6 +60,11 @@ type BeaconComposerStudioPanelProps = {
   pageRuntimeSyncReason?: string;
   embedSyncPending: boolean;
   onSyncInstallEmbed: () => void;
+  rowMeta: Array<{
+    row: BeaconCompositionDraftRow;
+    exposed: ComposableInstancePropMeta[];
+  }>;
+  onChangePropValue: (rowKey: string, propId: string, value: string) => void;
 };
 
 type ComposerDropTargetProps = {
@@ -87,6 +117,11 @@ function ComposerDropTarget(props: ComposerDropTargetProps) {
 
 type ComposerOrderSectionProps = {
   draft: BeaconCompositionDraftRow[];
+  rowMeta: Array<{
+    row: BeaconCompositionDraftRow;
+    exposed: ComposableInstancePropMeta[];
+  }>;
+  onChangePropValue: (rowKey: string, propId: string, value: string) => void;
   emptyWhenNoSavedOrderHint: string | null;
   allowedPaletteCount: number;
   busy: boolean;
@@ -102,9 +137,235 @@ type ComposerOrderSectionProps = {
   onRemove: (key: string) => void;
 };
 
+function parseBoolString(s: string): boolean {
+  const t = s.trim().toLowerCase();
+  return t === "1" || t === "true" || t === "yes" || t === "on";
+}
+
+function colorInputValue(s: string): string {
+  const t = s.trim();
+  if (/^#[0-9A-Fa-f]{6}$/i.test(t)) {
+    return t;
+  }
+  if (/^#[0-9A-Fa-f]{3}$/i.test(t)) {
+    return `#${t[1]}${t[1]}${t[2]}${t[2]}${t[3]}${t[3]}`;
+  }
+  return "#000000";
+}
+
+/** Normalize stored strings for `<input type="date">` (accepts YYYY-MM-DD or parseable dates). */
+function dateInputValue(s: string): string {
+  const t = s.trim();
+  if (t.length === 0) {
+    return "";
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) {
+    return t.slice(0, 10);
+  }
+  const d = Date.parse(t);
+  if (Number.isNaN(d)) {
+    return "";
+  }
+  return new Date(d).toISOString().slice(0, 10);
+}
+
+type StudioPropValueFieldProps = {
+  inputId: string;
+  ep: ComposableInstancePropMeta;
+  value: string;
+  busy: boolean;
+  onChange: (v: string) => void;
+};
+
+function StudioPropSelectField(
+  p: StudioPropValueFieldProps & { options: NonNullable<ComposableInstancePropMeta["selectOptions"]> }
+) {
+  const { inputId, ep, value, busy, onChange, options } = p;
+  const hasValue = value.trim() !== "";
+  const valueInList = options.some((o) => o.value === value);
+  return (
+    <select
+      id={inputId}
+      className={cn(
+        "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30",
+        "md:text-sm"
+      )}
+      value={value}
+      disabled={busy}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label={ep.label}
+    >
+      {!hasValue ? <option value="">—</option> : null}
+      {hasValue && !valueInList ? (
+        <option value={value}>
+          {value}
+          {" · not in list"}
+        </option>
+      ) : null}
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+const STUDIO_PROP_VALUE_BY_KIND: Record<BeaconStudioPropFieldKind, (p: StudioPropValueFieldProps) => ReactElement> = {
+  boolean: ({ inputId, value, busy, onChange }) => (
+    <div className="flex items-center gap-2 py-0.5">
+      <Checkbox
+        id={inputId}
+        checked={parseBoolString(value)}
+        disabled={busy}
+        onCheckedChange={(c) => {
+          if (c === "indeterminate") return;
+          onChange(c === true ? "true" : "false");
+        }}
+      />
+      <span className="text-xs text-muted-foreground">{parseBoolString(value) ? "Yes" : "No"}</span>
+    </div>
+  ),
+  number: ({ inputId, value, busy, onChange }) => (
+    <Input
+      id={inputId}
+      className="text-sm"
+      type="number"
+      value={value}
+      disabled={busy}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+  url: ({ inputId, value, busy, onChange }) => (
+    <Input
+      id={inputId}
+      className="text-sm"
+      type="url"
+      inputMode="url"
+      autoComplete="url"
+      placeholder="https://…"
+      value={value}
+      disabled={busy}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+  email: ({ inputId, value, busy, onChange }) => (
+    <Input
+      id={inputId}
+      className="text-sm"
+      type="email"
+      inputMode="email"
+      autoComplete="email"
+      value={value}
+      disabled={busy}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+  tel: ({ inputId, value, busy, onChange }) => (
+    <Input
+      id={inputId}
+      className="text-sm"
+      type="tel"
+      inputMode="tel"
+      autoComplete="tel"
+      value={value}
+      disabled={busy}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+  image: ({ inputId, ep, value, busy, onChange }) => {
+    const fileLike = ep.valueType === "file";
+    return (
+      <Input
+        id={inputId}
+        className="text-sm"
+        type="text"
+        inputMode="url"
+        placeholder={fileLike ? "File URL or site asset id" : "Image URL or site asset id"}
+        value={value}
+        disabled={busy}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  },
+  date: ({ inputId, value, busy, onChange }) => (
+    <Input
+      id={inputId}
+      className="text-sm"
+      type="date"
+      value={dateInputValue(value)}
+      disabled={busy}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+  color: ({ inputId, ep, value, busy, onChange }) => (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        id={inputId}
+        className="size-8 cursor-pointer border border-input bg-background disabled:cursor-not-allowed"
+        type="color"
+        value={colorInputValue(value)}
+        disabled={busy}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={ep.label}
+      />
+      <Input
+        className="min-w-32 flex-1 text-sm"
+        type="text"
+        placeholder="#RRGGBB"
+        value={value}
+        disabled={busy}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  ),
+  multiline: ({ inputId, value, busy, onChange }) => (
+    <Textarea
+      id={inputId}
+      className="min-h-16 max-h-40 resize-y text-sm"
+      value={value}
+      disabled={busy}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+  line: ({ inputId, value, busy, onChange }) => (
+    <Input
+      id={inputId}
+      className="text-sm"
+      type="text"
+      value={value}
+      disabled={busy}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+};
+
+function StudioPropValueField(props: StudioPropValueFieldProps) {
+  const { inputId, ep, value, busy, onChange } = props;
+  const kind = beaconStudioFieldKindForValueType(ep.valueType);
+  const options = ep.selectOptions;
+
+  if (options != null && options.length > 0) {
+    return (
+      <StudioPropSelectField
+        inputId={inputId}
+        ep={ep}
+        value={value}
+        busy={busy}
+        onChange={onChange}
+        options={options}
+      />
+    );
+  }
+
+  return STUDIO_PROP_VALUE_BY_KIND[kind](props);
+}
+
 function ComposerOrderSection(props: ComposerOrderSectionProps) {
   const {
     draft,
+    rowMeta,
+    onChangePropValue,
     emptyWhenNoSavedOrderHint,
     allowedPaletteCount,
     busy,
@@ -144,69 +405,123 @@ function ComposerOrderSection(props: ComposerOrderSectionProps) {
       ) : (
         <ScrollArea className="h-[min(48vh,22rem)] rounded-md border border-border/70 bg-background">
           <ul className="m-0 list-none p-2" aria-label="Composition order">
-            {draft.map((row, index) => (
-              <Fragment key={row.key}>
-                <ComposerDropTarget
-                  slot={index}
-                  dragActive={dragActive}
-                  reorderInProgress={isReorderInProgress}
-                  highlighted={dropSlotIndex === index}
-                  busy={busy}
-                  onSetDropSlot={onSetDropSlot}
-                  onDropAtSlot={onDropAtSlot}
-                />
-                <li
-                  className="shrink-0"
-                  onDragOver={(e: DragEvent<HTMLLIElement>) => {
-                    if (busy) return;
-                    if (!isReorderInProgress()) return;
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                    const r = e.currentTarget.getBoundingClientRect();
-                    const before = e.clientY - r.top < r.height / 2;
-                    onSetDropSlot(before ? index : index + 1);
-                  }}
-                  onDrop={(e: DragEvent<HTMLLIElement>) => {
-                    if (busy) return;
-                    e.preventDefault();
-                    const r = e.currentTarget.getBoundingClientRect();
-                    const before = e.clientY - r.top < r.height / 2;
-                    onDropAtSlot(before ? index : index + 1, e);
-                  }}
-                >
-                  <div
-                    className={cn(
-                      "flex items-center gap-2 rounded-md border border-border/70 bg-card px-2 py-1.5",
-                      draggingKey === row.key && "border-primary/50 bg-primary/5 opacity-70"
-                    )}
+            {draft.map((row, index) => {
+              const meta = rowMeta[index];
+              const exposed = meta?.exposed ?? [];
+              const pvals = row.propValues ?? {};
+              return (
+                <Fragment key={row.key}>
+                  <ComposerDropTarget
+                    slot={index}
+                    dragActive={dragActive}
+                    reorderInProgress={isReorderInProgress}
+                    highlighted={dropSlotIndex === index}
+                    busy={busy}
+                    onSetDropSlot={onSetDropSlot}
+                    onDropAtSlot={onDropAtSlot}
+                  />
+                  <li
+                    className="shrink-0"
+                    onDragOver={(e: DragEvent<HTMLLIElement>) => {
+                      if (busy) return;
+                      if (!isReorderInProgress()) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      const r = e.currentTarget.getBoundingClientRect();
+                      const before = e.clientY - r.top < r.height / 2;
+                      onSetDropSlot(before ? index : index + 1);
+                    }}
+                    onDrop={(e: DragEvent<HTMLLIElement>) => {
+                      if (busy) return;
+                      e.preventDefault();
+                      const r = e.currentTarget.getBoundingClientRect();
+                      const before = e.clientY - r.top < r.height / 2;
+                      onDropAtSlot(before ? index : index + 1, e);
+                    }}
                   >
-                    <button
-                      type="button"
-                      className="flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing disabled:pointer-events-none disabled:opacity-40"
-                      disabled={busy}
-                      draggable={!busy}
-                      aria-label={`Drag to reorder ${row.name}`}
-                      onDragStart={(e: DragEvent<HTMLButtonElement>) => onDragStart(row.key, index, e)}
-                      onDragEnd={onDragEnd}
+                    <div
+                      className={cn(
+                        "space-y-1.5 rounded-md border border-border/70 bg-card px-2 py-1.5",
+                        draggingKey === row.key && "border-primary/50 bg-primary/5 opacity-70"
+                      )}
                     >
-                      <GripVertical className="size-4" aria-hidden />
-                    </button>
-                    <p className="min-w-0 flex-1 truncate text-sm font-medium">{row.name}</p>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      className="shrink-0 text-destructive hover:bg-destructive/10"
-                      aria-label={`Remove ${row.name}`}
-                      disabled={busy}
-                      onClick={() => onRemove(row.key)}
-                    >
-                      <Trash2 className="size-3.5" aria-hidden />
-                    </Button>
-                  </div>
-                </li>
-              </Fragment>
-            ))}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing disabled:pointer-events-none disabled:opacity-40"
+                          disabled={busy}
+                          draggable={!busy}
+                          aria-label={`Drag to reorder ${row.name}`}
+                          onDragStart={(e: DragEvent<HTMLButtonElement>) => onDragStart(row.key, index, e)}
+                          onDragEnd={onDragEnd}
+                        >
+                          <GripVertical className="size-4" aria-hidden />
+                        </button>
+                        <p className="min-w-0 flex-1 truncate text-sm font-medium">{row.name}</p>
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="ghost"
+                          className="shrink-0 text-destructive hover:bg-destructive/10"
+                          aria-label={`Remove ${row.name}`}
+                          disabled={busy}
+                          onClick={() => onRemove(row.key)}
+                        >
+                          <Trash2 className="size-3.5" aria-hidden />
+                        </Button>
+                      </div>
+                      {exposed.length > 0 ? (
+                        <div
+                          className="space-y-1.5 border-t border-border/50 pt-1.5"
+                          data-slot="beacon_studio_prop_fields"
+                        >
+                          {exposed.map((ep) => {
+                            const v = pvals[ep.propId] ?? "";
+                            const fieldId = `beacon-studio-${row.key}-${ep.propId}`;
+                            return (
+                              <div key={ep.propId} className="space-y-0.5">
+                                <div className="flex items-start justify-between gap-1.5">
+                                  <Label className="text-xs text-muted-foreground" htmlFor={fieldId}>
+                                    {ep.label}
+                                    <span className="ml-1.5 font-mono text-[0.6rem] font-normal text-muted-foreground/90">
+                                      {ep.valueType}
+                                    </span>
+                                  </Label>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    className="shrink-0 text-muted-foreground"
+                                    disabled={busy}
+                                    aria-label={`Copy prop id for ${ep.label}`}
+                                    onClick={() => void copyBeaconInstancePropId(ep.propId)}
+                                  >
+                                    <Copy className="size-3.5" aria-hidden />
+                                  </Button>
+                                </div>
+                                <p
+                                  className="truncate font-mono text-[0.6rem] text-muted-foreground/90"
+                                  title={ep.propId}
+                                >
+                                  {ep.propId}
+                                </p>
+                                <StudioPropValueField
+                                  inputId={fieldId}
+                                  ep={ep}
+                                  value={v}
+                                  busy={busy}
+                                  onChange={(next) => onChangePropValue(row.key, ep.propId, next)}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  </li>
+                </Fragment>
+              );
+            })}
             <ComposerDropTarget
               slot={draft.length}
               dragActive={dragActive}
@@ -284,9 +599,12 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
     pageRuntimeSyncReason,
     embedSyncPending,
     onSyncInstallEmbed,
+    rowMeta,
+    onChangePropValue,
   } = props;
 
   const busy = savePending || embedSyncPending;
+  const showPublishedAttrHint = useMemo(() => rowMeta.some((m) => (m.exposed?.length ?? 0) > 0), [rowMeta]);
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
   const [dropSlotIndex, setDropSlotIndex] = useState<number | null>(null);
   const dragActive = draggingKey != null;
@@ -393,12 +711,34 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
       </div>
 
       <p className="text-xs leading-snug text-muted-foreground">
-        Drag to set order. Remove items with trash. On a CMS collection template, Save writes the order to the current
-        item’s CMS text field and page script — it does not add or rearrange components in the Engine reference list.
+        Drag to set order, fill content for fields your designer exposed in Engine, and save. On a collection template,
+        the JSON (order + text) is written to the list CMS text field; the Engine reference list is unchanged.
       </p>
+
+      {showPublishedAttrHint ? (
+        <Alert
+          data-slot="beacon_studio_codalyn_attr_hint"
+          className="border-amber-500/35 bg-amber-500/8 py-2 [&>div]:text-xs"
+          variant="default"
+        >
+          <AlertDescription className="text-balance text-muted-foreground">
+            <span className="font-medium text-foreground">Published / live site:</span> Beacon only injects text (or
+            URLs, etc.) into elements inside your component that have a Webflow{" "}
+            <span className="font-medium text-foreground">Custom attribute</span>{" "}
+            <code className="rounded bg-muted px-0.5 font-mono text-[0.65rem] text-foreground">
+              data-codalyn-beacon-prop
+            </code>{" "}
+            with value equal to the field’s prop id (use copy on each field). If your browser console shows{" "}
+            <code className="font-mono text-[0.65rem]">nodes 0</code> in applyProps, that attribute is still missing in
+            the component for that slot.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <ComposerOrderSection
         draft={draft}
+        rowMeta={rowMeta}
+        onChangePropValue={onChangePropValue}
         emptyWhenNoSavedOrderHint={emptyTargetOrderHint}
         allowedPaletteCount={allowedPalette.length}
         busy={busy}

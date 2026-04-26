@@ -1,7 +1,12 @@
 import { HelpCircle, Loader2, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { ComposableInstancePropMeta } from "@/features/beacons/model/beacon-composable-props";
+import { listComposableMetaByInstanceKey } from "@/features/beacons/model/beacon-composable-props";
+import type { BeaconEngineSlotPropsFile } from "@/features/beacons/model/beacon-engine-slot-props";
 import type { HydratedBeaconComponent } from "@/features/beacons/model/beacon-page-targets";
 import { BeaconEmbedSyncStrip } from "@/features/beacons/ui/beacon-embed-sync-strip";
 import { Button } from "@/shared/ui/button";
+import { Checkbox } from "@/shared/ui/checkbox";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { ScrollArea } from "@/shared/ui/scroll-area";
@@ -38,6 +43,11 @@ type BeaconCompositionPanelProps = {
   pageRuntimeStatusLoading: boolean;
   pageRuntimeSynced: boolean;
   pageRuntimeSyncReason?: string;
+  engineSlotProps: BeaconEngineSlotPropsFile;
+  onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
+  /** Re-apply `data-codalyn-beacon-prop` on the component definition from current Engine “Expose” + bindings. */
+  onResyncEngineSlotAttrs: (slotIndex: number) => void;
+  resyncingEngineSlotKey: string | null;
 };
 
 type BeaconListTargetActionsProps = {
@@ -227,6 +237,117 @@ function ListTargetTextFieldHint(props: { listTargetPhase: BeaconCompositionPane
   );
 }
 
+type BeaconEngineSelectedRowProps = {
+  row: HydratedBeaconComponent;
+  slotIndex: number;
+  available: ComposableInstancePropMeta[];
+  slotExposed: ComposableInstancePropMeta[];
+  composableLoading: boolean;
+  removingKey: string | null;
+  listTargetActionBusy: boolean;
+  resyncingEngineSlotKey: string | null;
+  onRemove: (row: HydratedBeaconComponent) => void;
+  onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
+  onResyncEngineSlotAttrs: (slotIndex: number) => void;
+};
+
+function BeaconEngineSelectedRow(props: BeaconEngineSelectedRowProps) {
+  const {
+    row,
+    slotIndex,
+    available,
+    slotExposed,
+    composableLoading,
+    removingKey,
+    listTargetActionBusy,
+    resyncingEngineSlotKey,
+    onRemove,
+    onSetSlotExposed,
+    onResyncEngineSlotAttrs,
+  } = props;
+  return (
+    <li className="space-y-1.5 rounded-lg border border-border bg-muted/30 px-2 py-1.5">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 text-sm wrap-break-word">{row.name}</span>
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          className="shrink-0 text-destructive hover:bg-destructive/10"
+          aria-label={`Remove ${row.name}`}
+          disabled={removingKey !== null || listTargetActionBusy}
+          onClick={() => void onRemove(row)}
+        >
+          {removingKey === row.key ? <span className="text-xs">…</span> : <Trash2 aria-hidden className="size-3.5" />}
+        </Button>
+      </div>
+      <div className="space-y-1 border-t border-border/60 pt-1.5" data-slot="beacon_engine_exposed_props">
+        <p className="text-xs text-muted-foreground">Expose to Studio (optional)</p>
+        {composableLoading && available.length === 0 ? (
+          <p className="text-xs text-muted-foreground" role="status">
+            <Loader2 className="mr-1 inline size-3 animate-spin align-middle" aria-hidden />
+            Loading…
+          </p>
+        ) : available.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No component props on this instance.</p>
+        ) : (
+          <ul className="m-0 max-h-28 list-none space-y-1.5 overflow-y-auto p-0 pr-0.5" aria-label="Studio props">
+            {available.map((p) => {
+              const on = slotExposed.some((e) => e.propId === p.propId);
+              return (
+                <li key={p.propId} className="flex items-center gap-2 text-xs">
+                  <Checkbox
+                    id={`beacon-expose-${row.key}-${p.propId}`}
+                    checked={on}
+                    disabled={removingKey !== null || listTargetActionBusy || resyncingEngineSlotKey !== null}
+                    onCheckedChange={(v) => {
+                      if (v === "indeterminate") {
+                        return;
+                      }
+                      const want = v === true;
+                      const byId = new Map(slotExposed.map((e) => [e.propId, e]));
+                      if (want) {
+                        byId.set(p.propId, p);
+                      } else {
+                        byId.delete(p.propId);
+                      }
+                      onSetSlotExposed(slotIndex, [...byId.values()]);
+                    }}
+                  />
+                  <label
+                    className="min-w-0 flex-1 cursor-pointer leading-snug"
+                    htmlFor={`beacon-expose-${row.key}-${p.propId}`}
+                  >
+                    {p.label}
+                    <span className="ml-1 font-mono text-[0.6rem] text-muted-foreground">{p.valueType}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      <div className="mt-0.5 space-y-1 border-t border-border/50 pt-1.5">
+        <p className="text-[0.65rem] leading-snug text-muted-foreground">
+          Adds <code className="font-mono text-[0.6rem]">data-codalyn-beacon-prop</code> on elements in the component
+          that are <span className="text-foreground">bound</span> to the props above (per variant when needed).
+        </p>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="h-7 w-full text-xs"
+          disabled={removingKey !== null || resyncingEngineSlotKey !== null}
+          aria-busy={resyncingEngineSlotKey === row.key}
+          onClick={() => onResyncEngineSlotAttrs(slotIndex)}
+        >
+          {resyncingEngineSlotKey === row.key ? "Tagging…" : "Tag data attributes on component"}
+        </Button>
+      </div>
+    </li>
+  );
+}
+
 export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
   const {
     searchFieldId,
@@ -258,6 +379,10 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
     pageRuntimeStatusLoading,
     pageRuntimeSynced,
     pageRuntimeSyncReason,
+    engineSlotProps,
+    onSetSlotExposed,
+    onResyncEngineSlotAttrs,
+    resyncingEngineSlotKey,
   } = props;
 
   const listTargetActionBusy =
@@ -267,6 +392,23 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
     listTargetPreviewSyncPending ||
     listTargetPhase === "loading" ||
     listTargetPhase === "updating";
+
+  const [composableByKey, setComposableByKey] = useState<Record<string, ComposableInstancePropMeta[]>>({});
+  const [composableLoading, setComposableLoading] = useState(false);
+
+  useEffect(() => {
+    let cancel = false;
+    setComposableLoading(true);
+    void (async () => {
+      const next = await listComposableMetaByInstanceKey(selected);
+      if (cancel) return;
+      setComposableByKey(next);
+      setComposableLoading(false);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [selected]);
 
   return (
     <>
@@ -371,7 +513,9 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
                     >
                       <span
                         className={
-                          isAlreadyAdded ? "font-medium break-words text-muted-foreground" : "font-medium break-words"
+                          isAlreadyAdded
+                            ? "font-medium wrap-break-word text-muted-foreground"
+                            : "font-medium wrap-break-word"
                         }
                       >
                         {c.name}
@@ -393,28 +537,21 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
           <p className="text-sm text-muted-foreground">None</p>
         ) : (
           <ul className="space-y-1.5" aria-label="Selected components">
-            {selected.map((row) => (
-              <li
+            {selected.map((row, slotIndex) => (
+              <BeaconEngineSelectedRow
                 key={row.key}
-                className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-2 py-1.5"
-              >
-                <span className="min-w-0 flex-1 text-sm break-words">{row.name}</span>
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  className="shrink-0 text-destructive hover:bg-destructive/10"
-                  aria-label={`Remove ${row.name}`}
-                  disabled={removingKey !== null || listTargetActionBusy}
-                  onClick={() => void onRemove(row)}
-                >
-                  {removingKey === row.key ? (
-                    <span className="text-xs">…</span>
-                  ) : (
-                    <Trash2 aria-hidden className="size-3.5" />
-                  )}
-                </Button>
-              </li>
+                row={row}
+                slotIndex={slotIndex}
+                available={composableByKey[row.key] ?? []}
+                slotExposed={engineSlotProps.slots[slotIndex]?.exposed ?? []}
+                composableLoading={composableLoading}
+                removingKey={removingKey}
+                listTargetActionBusy={listTargetActionBusy}
+                resyncingEngineSlotKey={resyncingEngineSlotKey}
+                onRemove={onRemove}
+                onSetSlotExposed={onSetSlotExposed}
+                onResyncEngineSlotAttrs={onResyncEngineSlotAttrs}
+              />
             ))}
           </ul>
         )}

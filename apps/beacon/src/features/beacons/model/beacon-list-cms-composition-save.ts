@@ -1,4 +1,7 @@
 import { serializeBeaconListRuntimePayload } from "@/features/beacons/model/beacon-list-runtime-payload";
+import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
+import { getBeaconListTargetTextPropId } from "@/features/beacons/model/beacon-list-target-text-field";
+import { getBeaconListTargetComponentOrNull } from "@/features/beacons/model/create-beacon-list-target-component";
 import { towerFetch } from "@/shared/lib/tower-client";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -127,9 +130,10 @@ async function patchBeaconListCmsTextFieldData(options: {
 
 /**
  * Persists the runtime JSON to the **Beacon list target text** field created for this list
- * (see `beaconListCmsPlainTextFieldDisplayName` + list target CMS bind). **One array entry** in the
- * v2 `items` payload = **one** collection entry. List targets read this field; the page inline script
- * uses the rendered value on the list target root to pick clone order.
+ * (see `beaconListCmsPlainTextFieldDisplayName` + list target Text prop CMS bind). Staged + **live** patches so
+ * the **published** page sees the same payload the list target Text renders. One CMS item id ⇒ one v2
+ * `{v,i,p}`; `p` holds every Studio prop value (including `""`) for that entry — see
+ * {@link serializeBeaconListRuntimePayload}.
  */
 export async function saveBeaconListRuntimePayloadToCmsItem(options: {
   collectionId: string;
@@ -137,14 +141,51 @@ export async function saveBeaconListRuntimePayloadToCmsItem(options: {
   cmsItemId: string;
   /** Ordered indices into the hidden beacon list block’s `children` (what the site runtime will clone by index). */
   hiddenListIndices: readonly number[];
+  /** One entry per `hiddenListIndices` item; per-row `propId` → string (Engine-exposed props from Studio). */
+  propValueRows?: readonly Readonly<Record<string, string>>[] | null;
 }): Promise<void> {
   if (!options.cmsItemId.trim()) {
     throw new Error("Missing CMS item id.");
   }
   const fieldSlug = await resolveCmsFieldSlug(options.collectionId, options.fieldId);
-  const text = serializeBeaconListRuntimePayload([...options.hiddenListIndices]);
+  const text = serializeBeaconListRuntimePayload([...options.hiddenListIndices], options.propValueRows);
   const id = options.cmsItemId.trim();
   const cid = options.collectionId;
   await patchBeaconListCmsTextFieldData({ collectionId: cid, cmsItemId: id, fieldSlug, text, kind: "staged" });
   await patchBeaconListCmsTextFieldData({ collectionId: cid, cmsItemId: id, fieldSlug, text, kind: "live" });
+}
+
+/**
+ * On **static** (non–collection-template) pages the list target Text is not fed by a CMS item. The published footer
+ * runtime reads JSON from that Text — this writes the same v2 string as
+ * {@link saveBeaconListRuntimePayloadToCmsItem} so live matches Composer Studio.
+ */
+export async function setBeaconListTargetInstancesStaticRuntimeText(options: {
+  dataList: string;
+  listContainer: BlockElement;
+  preferredDefinitionId: string | null;
+  text: string;
+}): Promise<void> {
+  const def = await getBeaconListTargetComponentOrNull(
+    options.dataList,
+    options.listContainer,
+    options.preferredDefinitionId
+  );
+  if (def == null) {
+    return;
+  }
+  const propId = await getBeaconListTargetTextPropId(def);
+  if (propId == null) {
+    return;
+  }
+  const instances = await listBeaconListTargetInstancesOnPage(options.dataList, options.listContainer, {
+    preferredDefinitionId: options.preferredDefinitionId,
+  });
+  for (const inst of instances) {
+    try {
+      await inst.setProps([{ propId, value: options.text }]);
+    } catch (e) {
+      console.warn("[beacon] set list target static runtime text (non-fatal)", e);
+    }
+  }
 }

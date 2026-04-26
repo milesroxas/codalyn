@@ -9,6 +9,9 @@ export const runtime = "nodejs";
 /** Large PNG in → AVIF out can exceed default limits on some hosts; adjust per deployment. */
 export const maxDuration = 60;
 
+/** Reject unbounded `arrayBuffer()` reads (availability). Typical designer exports stay well under this. */
+const MAX_INPUT_BYTES = 32 * 1024 * 1024;
+
 export async function POST(req: Request) {
   const auth = await verifyTowerApiRequest(req);
   if (!auth.ok) {
@@ -43,6 +46,9 @@ export async function POST(req: Request) {
   const buf = Buffer.from(await req.arrayBuffer());
   if (buf.length === 0) {
     return Response.json({ error: "Empty body" }, { status: 400 });
+  }
+  if (buf.length > MAX_INPUT_BYTES) {
+    return Response.json({ error: "Body too large", code: "PAYLOAD_TOO_LARGE" }, { status: 413 });
   }
 
   const { buffer, mimeType } = await optimizeImageBuffer(buf, format, Number.isFinite(quality) ? quality : 80);

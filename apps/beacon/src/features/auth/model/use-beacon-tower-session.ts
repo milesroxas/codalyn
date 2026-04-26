@@ -22,7 +22,10 @@ function persistTowerSessionToken(token: unknown): void {
 }
 
 function handleTowerMessage(event: MessageEvent, towerOrigin: string, onSessionChanged: () => void): void {
-  if (towerOrigin && event.origin !== towerOrigin) {
+  if (!towerOrigin.trim()) {
+    return;
+  }
+  if (event.origin !== towerOrigin) {
     return;
   }
   const data = event.data as Record<string, unknown> | null;
@@ -102,6 +105,9 @@ export function useBeaconTowerSession(): {
   }, [refetch, towerOrigin]);
 
   useEffect(() => {
+    if (!towerOrigin.trim()) {
+      return;
+    }
     function onMessage(ev: MessageEvent) {
       handleTowerMessage(ev, towerOrigin, () => {
         void refetch();

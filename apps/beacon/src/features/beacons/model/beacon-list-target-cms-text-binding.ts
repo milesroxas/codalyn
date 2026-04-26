@@ -195,22 +195,67 @@ export async function getBeaconListTargetCmsFieldIdFromListContainer(
   return String(raw).trim();
 }
 
+async function persistCmsListAttrsOnListBlock(
+  listContainer: BlockElement,
+  binding: { collectionId: string; fieldId: string },
+  logOnFail: string
+): Promise<boolean> {
+  try {
+    await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR, binding.collectionId);
+    await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR, binding.fieldId);
+    return true;
+  } catch (e) {
+    console.warn(LOG_PREFIX, logOnFail, e);
+    return false;
+  }
+}
+
+/** When the Designer is not on a collection page but `data-beacon-cms-collection-id` is already set, resolve field ids via Tower. */
+async function tryEnsureCmsTextFieldFromListAttrCollection(
+  listContainer: BlockElement,
+  dataList: string,
+  collectionIdFromListAttr: string
+): Promise<{ collectionId: string; fieldId: string } | null> {
+  const fromAttr = String(collectionIdFromListAttr).trim();
+  if (fromAttr === "") {
+    return null;
+  }
+  const repaired = await ensureBeaconListTargetCmsPlainTextField(fromAttr, dataList);
+  if (repaired == null) {
+    return null;
+  }
+  if (!(await persistCmsListAttrsOnListBlock(listContainer, repaired, "set cms id attrs (stored collection)"))) {
+    return null;
+  }
+  return repaired;
+}
+
 /**
  * **Single place** that may create the CMS Plain Text field for a **beacon list** and persist
- * `data-beacon-cms-*` on the hidden list block. Reads existing attrs first (source of truth on the list).
- * Creates only when attributes are missing and the Designer is on a CMS collection template (Data API + Tower).
+ * `data-beacon-cms-*` on the hidden list block. Uses stored attrs when they still match the **current**
+ * collection template; if the page is a different collection (or first edit after copy), re-resolves
+ * the field in that collection and updates attributes (Data API + Tower).
  */
 export async function ensureBeaconListCmsTextFieldOnList(
   listContainer: BlockElement,
   dataList: string
 ): Promise<{ collectionId: string; fieldId: string } | null> {
+  const currentPageCollectionId = await getCmsTemplateCollectionIdFromCurrentPage();
   const existingC = await getBeaconListTargetCmsCollectionIdFromListContainer(listContainer);
   const existingF = await getBeaconListTargetCmsFieldIdFromListContainer(listContainer);
   if (existingC != null && existingF != null) {
-    return { collectionId: existingC, fieldId: existingF };
+    const onCmsTemplate = currentPageCollectionId != null;
+    const listMatchesThisTemplate = !onCmsTemplate || currentPageCollectionId === existingC;
+    if (listMatchesThisTemplate) {
+      return { collectionId: existingC, fieldId: existingF };
+    }
   }
 
-  const collectionId = await getCmsTemplateCollectionIdFromCurrentPage();
+  if (currentPageCollectionId == null && existingC != null) {
+    return tryEnsureCmsTextFieldFromListAttrCollection(listContainer, dataList, existingC);
+  }
+
+  const collectionId = currentPageCollectionId;
   if (collectionId == null) {
     return null;
   }
@@ -218,11 +263,7 @@ export async function ensureBeaconListCmsTextFieldOnList(
   if (ensured == null) {
     return null;
   }
-  try {
-    await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR, ensured.collectionId);
-    await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR, ensured.fieldId);
-  } catch (e) {
-    console.warn(LOG_PREFIX, "set cms id attrs on list block", e);
+  if (!(await persistCmsListAttrsOnListBlock(listContainer, ensured, "set cms id attrs on list block"))) {
     return null;
   }
   return ensured;
@@ -297,6 +338,7 @@ function cmsBindingMatches(value: unknown, expected: { collectionId: string; fie
 
 /**
  * Binds a **render target** instance’s **Text** prop to the **beacon list’s** CMS field (`collectionId` + `fieldId`).
+ * Uses `searchProps` for the pre-check so binding matches the full `InstanceProp` shape (getProps summaries omit detail).
  */
 export async function tryBindBeaconListTargetInstanceTextToCms(
   instance: ComponentElement,
@@ -308,13 +350,13 @@ export async function tryBindBeaconListTargetInstanceTextToCms(
     return;
   }
   try {
-    const summaries = await instance.getProps();
-    const row = summaries.find((s) => s.propId === propId);
-    if (row?.value != null && cmsBindingMatches(row.value, binding)) {
+    const full = await instance.searchProps();
+    const p = full.find((x) => x.propId === propId);
+    if (p != null && cmsBindingMatches(p.value, binding)) {
       return;
     }
   } catch (e) {
-    console.warn(LOG_PREFIX, "getProps (pre-bind)", e);
+    console.warn(LOG_PREFIX, "searchProps (pre-bind)", e);
   }
 
   const input: CmsBindingInput = {
@@ -365,6 +407,7 @@ function mergeListTargetInstancesForCmsBinding(
 /**
  * Binds each **list render target** instance’s Text prop to the **beacon list’s** CMS field (see
  * {@link ensureBeaconListCmsTextFieldOnList}). Does not create a separate collection field per render target.
+ * Pass `resolvedBinding` when you already called {@link ensureBeaconListCmsTextFieldOnList} (avoids duplicate work).
  */
 export async function bindBeaconListTargetInstancesToListCmsText(options: {
   dataList: string;
@@ -373,8 +416,11 @@ export async function bindBeaconListTargetInstancesToListCmsText(options: {
   instances: ComponentElement[];
   /** Placed or focused instance — always merged first so bind runs even if the page scan lags. */
   priorityInstances?: readonly ComponentElement[];
+  /** From a prior `ensure` — required after collection/field attrs change or list target still points at an old field. */
+  resolvedBinding?: { collectionId: string; fieldId: string } | null;
 }): Promise<void> {
-  const binding = await ensureBeaconListCmsTextFieldOnList(options.listContainer, options.dataList);
+  const binding =
+    options.resolvedBinding ?? (await ensureBeaconListCmsTextFieldOnList(options.listContainer, options.dataList));
   if (binding == null) {
     return;
   }

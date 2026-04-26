@@ -82,6 +82,11 @@ export type BeaconCompositionDraftRow = {
   key: string;
   componentId: string;
   name: string;
+  /**
+   * Studio-only values for engine-exposed component props, keyed by `propId`.
+   * Saved in the list target CMS JSON as {@link import("@/features/beacons/model/beacon-list-runtime-payload").BeaconListRuntimePayload.p}.
+   */
+  propValues?: Record<string, string>;
 };
 
 /**

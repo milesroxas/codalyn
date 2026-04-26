@@ -171,6 +171,8 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
   const canPersistExportDefaults = !isTowerUser || syncState === "synced";
 
   const abortRef = useRef<AbortController | null>(null);
+  /** Throttle refetch on tab focus to avoid bursty duplicate Tower load. */
+  const lastVisibilityPullAtRef = useRef(0);
 
   const pullSettingsFromTower = useCallback(() => {
     if (!user?.id) {
@@ -202,6 +204,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
           setActiveOrganizationName,
         });
         setSyncState("synced");
+        lastVisibilityPullAtRef.current = Date.now();
       })
       .catch(() => {
         if (ac.signal.aborted) {
@@ -214,6 +217,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
   useEffect(() => {
     if (!user?.id) {
       abortRef.current?.abort();
+      lastVisibilityPullAtRef.current = 0;
       setSettings(readLocal());
       setSyncState("idle");
       setEditorExperience(false);
@@ -238,10 +242,17 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
     if (!user?.id) {
       return;
     }
+    const minIntervalMs = 60_000;
     const onResume = () => {
-      if (document.visibilityState === "visible") {
-        pullSettingsFromTower();
+      if (document.visibilityState !== "visible") {
+        return;
       }
+      const now = Date.now();
+      const last = lastVisibilityPullAtRef.current;
+      if (last > 0 && now - last < minIntervalMs) {
+        return;
+      }
+      pullSettingsFromTower();
     };
     document.addEventListener("visibilitychange", onResume);
     return () => {

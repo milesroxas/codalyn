@@ -5,7 +5,7 @@ import { user } from "@/shared/lib/db/auth-schema";
 
 /**
  * Sets `user.role` to `product_admin` for every email in `TOWER_PRODUCT_ADMIN_EMAILS`.
- * Runs on server startup (see `src/instrumentation.ts`). Users must exist in the DB first.
+ * Invoked on first `GET /api/health` per server process (see `.env.example`). On Vercel each cold instance can run once. Users must exist in the DB first.
  */
 export async function syncProductAdminRolesFromEnv(): Promise<void> {
   const emails = parseProductAdminEmailsNormalized();

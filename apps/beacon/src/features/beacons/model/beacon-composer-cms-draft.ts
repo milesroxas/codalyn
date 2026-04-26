@@ -1,3 +1,9 @@
+import {
+  type ComposableInstancePropMeta,
+  mergeComposableMetaWithLiveResolved,
+  pickRemappedPropValue,
+} from "@/features/beacons/model/beacon-composable-props";
+import type { BeaconEngineSlotPropsFile } from "@/features/beacons/model/beacon-engine-slot-props";
 import { fetchBeaconListCmsTextForItem } from "@/features/beacons/model/beacon-list-cms-composition-save";
 import { parseBeaconListRuntimePayload } from "@/features/beacons/model/beacon-list-runtime-payload";
 import {
@@ -17,8 +23,18 @@ export type BeaconComposerCmsSource =
   | "cms_field_empty"
   | "cms_from_field";
 
-function toSignature(draft: ReadonlyArray<{ componentId: string }>): string {
-  return draft.map((r) => r.componentId).join(",");
+/**
+ * Order + per-row prop string values (Studio). Used for dirty detection vs. initial CMS/static load.
+ */
+export function beaconCompositionSignature(draft: ReadonlyArray<BeaconCompositionDraftRow>): string {
+  return draft
+    .map((r) => {
+      const pv = r.propValues ?? {};
+      const keys = Object.keys(pv).sort();
+      const part = keys.map((k) => `${k}:${pv[k] ?? ""}`).join("\u0001");
+      return `${r.componentId}\u0002${part}`;
+    })
+    .join("\u0003");
 }
 
 /**
@@ -51,12 +67,50 @@ export function draftToHiddenListIndices(
   return { ok: true, indices };
 }
 
+/**
+ * Re-keys each row’s `propValues` to current Webflow `searchProps` `propId`s (aliases, label rematch, case), and drops
+ * keys that no longer map to an exposed field.
+ */
+export function normalizeComposerDraftPropValues(
+  draft: readonly BeaconCompositionDraftRow[],
+  poolIndexPerRow: readonly number[],
+  engineRows: readonly HydratedBeaconComponent[],
+  slotProps: BeaconEngineSlotPropsFile,
+  liveByInstanceKey: Readonly<Record<string, ComposableInstancePropMeta[]>>
+): BeaconCompositionDraftRow[] {
+  return draft.map((row, j) => {
+    const poolI = poolIndexPerRow[j];
+    if (poolI == null || poolI < 0) {
+      return { ...row };
+    }
+    const eng = engineRows[poolI];
+    if (eng == null) {
+      return { ...row };
+    }
+    const rawEx = slotProps.slots[poolI]?.exposed ?? [];
+    const { metas, aliasToCanonical } = mergeComposableMetaWithLiveResolved(rawEx, liveByInstanceKey[eng.key]);
+    if (row.propValues == null || Object.keys(row.propValues).length === 0) {
+      return { ...row, propValues: { ...row.propValues } };
+    }
+    const next: Record<string, string> = {};
+    for (const ep of metas) {
+      const v = pickRemappedPropValue(ep.propId, row.propValues, aliasToCanonical);
+      if (v !== undefined) {
+        next[ep.propId] = v;
+      }
+    }
+    return { ...row, propValues: next };
+  });
+}
+
 function draftFromPayloadRows(
   engineScopedRows: readonly HydratedBeaconComponent[],
-  indices: readonly number[]
+  indices: readonly number[],
+  propRows: ReadonlyArray<Readonly<Record<string, string>>>
 ): BeaconCompositionDraftRow[] {
   const out: BeaconCompositionDraftRow[] = [];
-  for (const n of indices) {
+  for (let u = 0; u < indices.length; u++) {
+    const n = indices[u];
     if (n < 0 || n >= engineScopedRows.length) {
       continue;
     }
@@ -64,7 +118,8 @@ function draftFromPayloadRows(
     if (r == null) {
       continue;
     }
-    out.push({ key: crypto.randomUUID(), componentId: r.componentId, name: r.name });
+    const pr = propRows[u] ?? {};
+    out.push({ key: crypto.randomUUID(), componentId: r.componentId, name: r.name, propValues: { ...pr } });
   }
   return out;
 }
@@ -90,7 +145,7 @@ export async function resolveComposerTargetOrder(input: {
       componentId: r.componentId,
       name: r.name,
     }));
-    return { draft: d, initialSignature: toSignature(d), cmsSource: "static_list" };
+    return { draft: d, initialSignature: beaconCompositionSignature(d), cmsSource: "static_list" };
   }
 
   if (input.currentCmsItemId == null) {
@@ -125,9 +180,9 @@ export async function resolveComposerTargetOrder(input: {
   if (parsed == null || parsed.i.length === 0) {
     return { draft: [], initialSignature: "", cmsSource: "cms_field_empty" };
   }
-  const d = draftFromPayloadRows(input.engineScopedRows, parsed.i);
+  const d = draftFromPayloadRows(input.engineScopedRows, parsed.i, parsed.p);
   if (d.length === 0) {
     return { draft: [], initialSignature: "", cmsSource: "cms_field_empty" };
   }
-  return { draft: d, initialSignature: toSignature(d), cmsSource: "cms_from_field" };
+  return { draft: d, initialSignature: beaconCompositionSignature(d), cmsSource: "cms_from_field" };
 }

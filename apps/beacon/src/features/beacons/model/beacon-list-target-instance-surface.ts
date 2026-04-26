@@ -69,6 +69,22 @@ export async function verifyBeaconListTargetDomRoot(
 }
 
 /**
+ * Clears the mirror surface so clones can be appended. Removes all children and clears root `textContent` when the
+ * list-target root is a DOM node so bound CMS JSON is not left as visible text next to mirrored instances.
+ */
+async function clearListTargetMirrorContentForResync(
+  contentRoot: ListTargetMirrorParent,
+  listTargetRoot: AnyElement
+): Promise<void> {
+  for (const c of await contentRoot.getChildren()) {
+    await c.remove();
+  }
+  if (listTargetRoot.type === "DOM" && typeof (listTargetRoot as DOMElement).setTextContent === "function") {
+    await (listTargetRoot as DOMElement).setTextContent("");
+  }
+}
+
+/**
  * Mirror only ever inserts `ComponentInstance` nodes (plus an optional Codalyn hint `<p>`). If we see
  * other node types, this is not the real list-target inner surface — do not bulk-remove children.
  */
@@ -138,6 +154,9 @@ export async function withListTargetMirrorSurface(
       return false;
     }
     if (!(await mirrorChildrenAreOnlyComponentInstances(contentRoot))) {
+      await clearListTargetMirrorContentForResync(contentRoot, root);
+    }
+    if (!(await mirrorChildrenAreOnlyComponentInstances(contentRoot))) {
       return false;
     }
     await fn(contentRoot);
@@ -173,6 +192,9 @@ export async function clearListTargetMirrorSurfaceComponentInstances(
       if (c.type === "ComponentInstance") {
         await c.remove();
       }
+    }
+    if (root != null && root.type === "DOM" && typeof (root as DOMElement).setTextContent === "function") {
+      await (root as DOMElement).setTextContent("");
     }
   } finally {
     await webflow.exitComponent();

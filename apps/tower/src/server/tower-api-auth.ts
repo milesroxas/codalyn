@@ -1,9 +1,20 @@
+import { timingSafeEqual } from "node:crypto";
+
 import { auth } from "@/server/auth";
 
 function parseBearerToken(request: Request): string | undefined {
   const value = request.headers.get("authorization");
   const match = value?.match(/^Bearer\s+(.+)$/i);
   return match?.[1]?.trim();
+}
+
+function timingSafeEqualString(a: string, b: string): boolean {
+  const ab = Buffer.from(a, "utf8");
+  const bb = Buffer.from(b, "utf8");
+  if (ab.length !== bb.length) {
+    return false;
+  }
+  return timingSafeEqual(ab, bb);
 }
 
 export type TowerApiAuthResult = { ok: true; userId?: string } | { ok: false; response: Response };
@@ -29,7 +40,7 @@ export async function verifyTowerApiRequest(request: Request): Promise<TowerApiA
   const apiKey = process.env.BEACON_API_KEY?.trim();
   if (apiKey) {
     const bearer = parseBearerToken(request);
-    if (bearer === apiKey) {
+    if (bearer && timingSafeEqualString(bearer, apiKey)) {
       return { ok: true };
     }
   }

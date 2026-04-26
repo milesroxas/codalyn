@@ -1,3 +1,4 @@
+import SparkMD5 from "spark-md5";
 import { BEACON_LIST_RENDER_TARGET_SLOT_STYLE_NAME } from "@/features/beacons/model/beacon-list-target-slot-style";
 import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
 
@@ -21,14 +22,49 @@ export function hashBeaconRuntimeSource(source: string): string {
 const REGISTER_DISPLAY_NAME = "CodalynBeaconRuntime";
 
 /**
- * Minified IIFE (&lt;2000 chars) for Webflow inline script registration (`sourceCode` is raw JS, no &lt;script&gt; tag).
+ * Minified IIFE for the Beacon runtime source uploaded as a Webflow Asset.
+ * Live-site debug: set `window.CODALYN_BEACON_DEBUG = true` (before load) or
+ * `localStorage.setItem("codalyn-beacon-debug", "1")` then reload — watch console for `[codalyn-beacon]`.
  */
 export function getBeaconPageInlineScriptSource(): string {
-  // List target Text = CMS “Beacon list target text” for this item; that string is the payload (same JSON
-  // Composer writes per entry). Read `i` = indices into hidden `beacon_list` children, in order. If
-  // missing/invalid, clone all source children in DOM order. Removes the Designer-only
-  // `beacon_list_render` class from the target root so published markup has no empty-slot chrome.
-  return `(function(){function a(e){var t=e.getAttribute("data-list");return t&&0===t.indexOf("beacon-")?t:null}function b(w,e){if(e.parentElement!==w)return!1;if("beacons"!==e.getAttribute("data-target"))return!1;if("list"===e.getAttribute("data-beacon-target"))return!1;return null!=a(e)}function c(){var w=document.querySelector('[data-beacon-wrapper="beacons-wrapper"]');if(!w)return;for(var t={},n=0;n<w.children.length;n++){var e=w.children[n];if(b(w,e)){var r=a(e);r&&(t[r]=e)}}for(var o=document.querySelectorAll('[data-beacon-target="list"][data-list]'),d=0;d<o.length;d++){var i=o[d],l=a(i);if(l){var s=t[l];if(s){i.classList.remove("${BEACON_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");var f=(i.textContent||"").trim();for(;i.firstChild;)i.removeChild(i.firstChild);var p=null,g=!1;try{var h=JSON.parse(f);h&&1===h.v&&"[object Array]"===Object.prototype.toString.call(h.i)&&(p=h.i,g=!0)}catch(x){}var y=s.children;if(g)for(var u=0;u<p.length;u++){var m=+p[u];m===m&&0<=m&&m%1==0&&m<y.length&&i.appendChild(y[m].cloneNode(!0))}else for(u=0;u<y.length;u++)i.appendChild(y[u].cloneNode(!0))}}}}"loading"===document.readyState?document.addEventListener("DOMContentLoaded",c):c()})();`;
+  return `(function(){
+function bDbg(){try{return(typeof globalThis!=="undefined"&&!!globalThis.CODALYN_BEACON_DEBUG)||(typeof localStorage!=="undefined"&&localStorage.getItem("codalyn-beacon-debug")==="1")}catch(e){return false}}
+function bLog(){if(!bDbg())return;console.log.apply(console,["[codalyn-beacon]"].concat([].slice.call(arguments)))}
+function listKey(el){var t=String(el.getAttribute("data-list")||"").toLowerCase();return t&&t.indexOf("beacon-")===0?t:null}
+function isSource(el){return String(el.getAttribute("data-target")||"").toLowerCase()==="beacons"&&String(el.getAttribute("data-beacon-target")||"").toLowerCase()!=="list"&&listKey(el)!=null}
+function applyValue(el,v){v=String(v==null?"":v);var tag=String(el.tagName||"").toUpperCase();if(tag==="IMG"||tag==="SOURCE"){el.setAttribute("src",v);el.removeAttribute&&el.removeAttribute("srcset");return}if(tag==="A"){el.setAttribute("href",v);return}if(tag==="IFRAME"||tag==="EMBED"){el.setAttribute("src",v);return}if(tag==="INPUT"){var type=String(el.type||"").toLowerCase();if(type==="checkbox"||type==="radio"){el.checked=!!(v&&v!=="0"&&v!=="false"&&v.toLowerCase()!=="off")}else{el.value=v}return}if(tag==="TEXTAREA"||tag==="SELECT"){el.value=v;return}el.textContent=v}
+function pickP(ps,k){if(!k||!ps||typeof ps!=="object")return;var a=String(k);if(Object.prototype.hasOwnProperty.call(ps,a))return ps[a];var al=a.toLowerCase();for(var x in ps)if(Object.prototype.hasOwnProperty.call(ps,x)&&x.toLowerCase()===al)return ps[x]}
+function applyProps(target,payload){if(!payload||!payload.p||!payload.i||+payload.v<2)return;var d=bDbg(),i,j,row,props,nodes,node,rawP,segs,si,seg,pv,ra,rs,totA=0,totS=0;for(i=0;i<payload.i.length;i++){row=target.children[i];props=payload.p[i];if(!row||!props||typeof props!=="object"){if(d)bLog("row missing",i);continue}nodes=row.querySelectorAll("[data-codalyn-beacon-prop]");ra=0;rs=0;for(j=0;j<nodes.length;j++){node=nodes[j];rawP=node.getAttribute("data-codalyn-beacon-prop")||"";if(!rawP)continue;segs=String(rawP).split("|");pv=null;for(si=0;si<segs.length;si++){seg=segs[si].trim();if(!seg)continue;pv=pickP(props,seg);if(pv!=null)break}if(pv==null){rs++;if(d)bLog("no payload for attr",i,rawP,"keys",Object.keys(props));continue}applyValue(node,String(pv));ra++}totA+=ra;totS+=rs;if(d)bLog("row",i,"nodes",nodes.length,"applied",ra,"unmatched",rs)}if(d)bLog("applyProps",totA,"applied",totS,"unmatched attr nodes")}
+function reapply(target,payload){bLog("reapply 1/3 sync");applyProps(target,payload);setTimeout(function(){bLog("reapply 2/3 +0ms");applyProps(target,payload);setTimeout(function(){bLog("reapply 3/3 +100ms");applyProps(target,payload)},100)},0)}
+function run(){
+bLog("run",document.readyState);
+var sourcesByList={},sources=document.querySelectorAll("[data-target=beacons][data-list]");
+for(var i=0;i<sources.length;i++){var source=sources[i];if(isSource(source)){var key=listKey(source);if(key)sourcesByList[key]=source}}
+bLog("hidden list keys",Object.keys(sourcesByList));
+var targets=document.querySelectorAll("[data-beacon-target][data-list]");
+bLog("list target elements",targets.length);
+for(var t=0;t<targets.length;t++){
+var target=targets[t],targetKey=listKey(target);
+if(!targetKey||String(target.getAttribute("data-beacon-target")||"").toLowerCase()!=="list")continue;
+var sourceNode=sourcesByList[targetKey];
+if(!sourceNode){for(i=0;i<sources.length;i++){source=sources[i];if(isSource(source)&&listKey(source)===targetKey){sourceNode=source;break}}}
+if(!sourceNode){bLog("skip (no source)",targetKey);continue}
+target.classList.remove("${BEACON_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");
+var raw=String(target.textContent||"").trim();
+bLog("list",targetKey,"sourceChildren",sourceNode.children.length,"rawChars",raw.length,"rawStart",raw.slice(0,200));
+target.textContent="";
+var payload=null,ok=false,indices=null,v=0,pe=null;
+try{payload=JSON.parse(raw);ok=!!(payload&&(payload.v===1||payload.v===2)&&Array.isArray(payload.i));if(ok){indices=payload.i;v=+payload.v||1}}catch(e){ok=false;pe=String((e&&e.message)||e)}
+bLog("parse",ok,pe?{err:pe}:null,"v",v,"vPayload",payload?payload.v:null,"i",indices?indices.length:0,"p",payload&&payload.p?payload.p.length:0);
+var children=sourceNode.children,cloned=0;
+if(ok){for(var u=0;u<indices.length;u++){var idx=+indices[u];if(idx===idx&&idx>=0&&idx%1===0&&idx<children.length){target.appendChild(children[idx].cloneNode(true));cloned++}}}else{for(var u=0;u<children.length;u++)target.appendChild(children[u].cloneNode(true))}
+bLog("cloned rows",ok?"byIndex":"allChildren",ok?cloned:target.children.length,"targetChildren",target.children.length);
+if(v>=2&&ok&&payload&&payload.p)reapply(target,payload);
+else bLog("skip reapply (need v>=2, ok, p[])",v,ok,!!(payload&&payload.p))}
+bLog("run done")
+}
+if(document.readyState==="complete")run();else addEventListener("load",run);
+})();`;
 }
 
 function inlineScriptVersion(): string {
@@ -74,7 +110,13 @@ async function assertTowerOk(res: Response, action: string): Promise<void> {
     return;
   }
   let msg = `${action} failed (${res.status})`;
-  const j = await readJson<{ message?: string; error?: string; hint?: string }>(res);
+  const j = await readJson<{
+    message?: string;
+    error?: string;
+    hint?: string;
+    code?: string;
+    details?: unknown;
+  }>(res);
   if (typeof j?.message === "string" && j.message.length > 0) {
     msg = j.message;
   } else if (typeof j?.error === "string" && j.error.length > 0) {
@@ -82,30 +124,134 @@ async function assertTowerOk(res: Response, action: string): Promise<void> {
   } else if (typeof j?.hint === "string" && j.hint.length > 0) {
     msg = j.hint;
   }
+  const scopeContext = `${msg} ${String(j?.code ?? "")} ${JSON.stringify(j?.details ?? "")}`.toLowerCase();
+  if (
+    scopeContext.includes("missing_scope") ||
+    scopeContext.includes("missing scopes") ||
+    scopeContext.includes("missing_scopes") ||
+    scopeContext.includes("assets:write") ||
+    scopeContext.includes("custom_code:write")
+  ) {
+    msg += " Reconnect Webflow in Tower so the OAuth token includes assets:write and custom_code:write.";
+  }
   throw new Error(msg);
 }
 
-async function registerInlineScript(
-  siteId: string,
-  sourceCode: string,
-  version: string
-): Promise<{ id: string; version: string }> {
-  const res = await towerFetch(`/api/v2/webflow/sites/${encodeURIComponent(siteId)}/registered_scripts/inline`, {
+function arrayBufferToBase64(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) {
+    out += String.fromCharCode(bytes[i]);
+  }
+  return btoa(out);
+}
+
+function sourceToBytes(sourceCode: string): Uint8Array {
+  return new TextEncoder().encode(sourceCode);
+}
+
+function sourceToBlob(sourceCode: string): Blob {
+  return new Blob([sourceCode], { type: "application/javascript; charset=utf-8" });
+}
+
+function sourceMd5Hex(sourceCode: string): string {
+  const bytes = sourceToBytes(sourceCode);
+  const copy = new Uint8Array(bytes.length);
+  copy.set(bytes);
+  return SparkMD5.ArrayBuffer.hash(copy.buffer);
+}
+
+async function sourceSRIHash(sourceCode: string): Promise<string> {
+  const bytes = sourceToBytes(sourceCode);
+  const copy = new Uint8Array(bytes.length);
+  copy.set(bytes);
+  const digest = await crypto.subtle.digest("SHA-384", copy.buffer);
+  return `sha384-${arrayBufferToBase64(new Uint8Array(digest))}`;
+}
+
+type CreatedWebflowAsset = {
+  uploadDetails?: Record<string, string>;
+  uploadUrl?: string;
+  hostedUrl?: string;
+  assetUrl?: string;
+};
+
+async function createRuntimeAsset(siteId: string, fileName: string, sourceCode: string): Promise<CreatedWebflowAsset> {
+  const res = await towerFetch(`/api/v2/webflow/sites/${encodeURIComponent(siteId)}/assets`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
-      sourceCode,
+      fileName,
+      fileHash: sourceMd5Hex(sourceCode),
+    }),
+  });
+  await assertTowerOk(res, "Create runtime asset");
+  const data = await readJson<CreatedWebflowAsset>(res);
+  if (!data || typeof data.uploadUrl !== "string" || !data.uploadDetails || typeof data.uploadDetails !== "object") {
+    throw new Error("Create runtime asset: unexpected response.");
+  }
+  return data;
+}
+
+async function uploadRuntimeAsset(
+  uploadUrl: string,
+  uploadDetails: Record<string, string>,
+  sourceCode: string
+): Promise<void> {
+  const form = new FormData();
+  for (const [k, v] of Object.entries(uploadDetails)) {
+    form.append(k, String(v));
+  }
+  form.append("file", sourceToBlob(sourceCode), "runtime.js");
+  const res = await fetch(uploadUrl, { method: "POST", body: form });
+  if (!res.ok) {
+    throw new Error(`Upload runtime asset failed (${res.status})`);
+  }
+}
+
+async function registerHostedScript(
+  siteId: string,
+  hostedLocation: string,
+  integrityHash: string,
+  version: string
+): Promise<{ id: string; version: string }> {
+  const res = await towerFetch(`/api/v2/webflow/sites/${encodeURIComponent(siteId)}/registered_scripts/hosted`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      hostedLocation,
+      integrityHash,
       version,
       displayName: REGISTER_DISPLAY_NAME,
       canCopy: true,
     }),
   });
-  await assertTowerOk(res, "Register inline script");
+  await assertTowerOk(res, "Register hosted script");
   const data = await readJson<{ id?: string; version?: string }>(res);
   if (typeof data?.id !== "string" || typeof data?.version !== "string") {
-    throw new Error("Register inline script: unexpected response.");
+    throw new Error("Register hosted script: unexpected response.");
   }
   return { id: data.id, version: data.version };
+}
+
+async function registerHostedRuntimeScript(
+  siteId: string,
+  sourceCode: string,
+  version: string
+): Promise<{ id: string; version: string }> {
+  const runtimeHash = hashBeaconRuntimeSource(sourceCode);
+  const fileName = `codalyn-beacon-runtime-${runtimeHash}.js`;
+  const asset = await createRuntimeAsset(siteId, fileName, sourceCode);
+  const uploadUrl = typeof asset.uploadUrl === "string" ? asset.uploadUrl : "";
+  const uploadDetails = asset.uploadDetails;
+  if (uploadUrl.length === 0 || uploadDetails == null) {
+    throw new Error("Create runtime asset: missing upload payload.");
+  }
+  await uploadRuntimeAsset(uploadUrl, uploadDetails, sourceCode);
+  const hostedLocation = asset.hostedUrl ?? asset.assetUrl;
+  if (typeof hostedLocation !== "string" || hostedLocation.length === 0) {
+    throw new Error("Create runtime asset: missing hosted URL.");
+  }
+  return registerHostedScript(siteId, hostedLocation, await sourceSRIHash(sourceCode), version);
 }
 
 async function getPageCustomScripts(pageId: string): Promise<PageCustomScript[]> {
@@ -159,9 +305,9 @@ function withoutBeaconMarkedScripts(scripts: PageCustomScript[]): PageCustomScri
 }
 
 /**
- * Registers the beacon list-cloning runtime as Webflow **inline** custom code and applies it to the **current Designer
- * page** (footer). Requires Tower + Webflow OAuth with `custom_code:read` and `custom_code:write`. Re-publish the site
- * for changes to affect the live site.
+ * Uploads the Beacon runtime to Webflow Assets, registers it as a hosted script, and applies it to the current page
+ * footer custom code. Requires Tower + Webflow OAuth with `assets:write`, `custom_code:read`, and
+ * `custom_code:write`. Re-publish the site for changes to affect the live site.
  */
 export async function syncBeaconPageInlineScript(): Promise<void> {
   if (!getTowerOrigin()) {
@@ -169,14 +315,11 @@ export async function syncBeaconPageInlineScript(): Promise<void> {
   }
 
   const sourceCode = getBeaconPageInlineScriptSource();
-  if (sourceCode.length > 2000) {
-    throw new Error("Beacon runtime exceeds Webflow inline script size limit.");
-  }
 
   const siteId = (await webflow.getSiteInfo()).siteId;
   const pageId = (await webflow.getCurrentPage()).id as string;
 
-  const registered = await registerInlineScript(siteId, sourceCode, inlineScriptVersion());
+  const registered = await registerHostedRuntimeScript(siteId, sourceCode, inlineScriptVersion());
   const existing = await getPageCustomScripts(pageId);
   const merged: PageCustomScript[] = [
     ...withoutBeaconMarkedScripts(existing),

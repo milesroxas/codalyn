@@ -1,13 +1,34 @@
 import { type MutableRefObject, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
+import type { ComposableInstancePropMeta } from "@/features/beacons/model/beacon-composable-props";
+import {
+  buildBeaconRuntimePropRow,
+  listComposableMetaByInstanceKey,
+  mergeComposableMetaWithLive,
+  mergeComposableMetaWithLiveResolved,
+} from "@/features/beacons/model/beacon-composable-props";
 import {
   type BeaconComposerCmsSource,
+  beaconCompositionSignature,
   draftToHiddenListIndices,
+  normalizeComposerDraftPropValues,
   resolveComposerTargetOrder,
 } from "@/features/beacons/model/beacon-composer-cms-draft";
 import { listComposerEligibleLists } from "@/features/beacons/model/beacon-composer-eligible";
-import { saveBeaconListRuntimePayloadToCmsItem } from "@/features/beacons/model/beacon-list-cms-composition-save";
+import { syncEngineCodalynBeaconPropAttributes } from "@/features/beacons/model/beacon-engine-codalyn-attr-sync";
 import {
+  type BeaconEngineSlotPropsFile,
+  mergeSlotFileAfterListRebuild,
+  readBeaconEngineSlotPropsFile,
+  writeBeaconEngineSlotPropsFile,
+} from "@/features/beacons/model/beacon-engine-slot-props";
+import {
+  saveBeaconListRuntimePayloadToCmsItem,
+  setBeaconListTargetInstancesStaticRuntimeText,
+} from "@/features/beacons/model/beacon-list-cms-composition-save";
+import { serializeBeaconListRuntimePayload } from "@/features/beacons/model/beacon-list-runtime-payload";
+import {
+  bindBeaconListTargetInstancesToListCmsText,
   ensureBeaconListCmsTextFieldOnList,
   getBeaconListTargetCmsFieldIdFromListContainer,
   getCmsTemplateCollectionIdFromCurrentPage,
@@ -249,6 +270,10 @@ type BeaconsPageChangeReset = {
   setComposerStudio: (v: { beacon: BeaconOnPage; initialSignature: string } | null) => void;
   setComposerDraft: (v: BeaconCompositionDraftRow[]) => void;
   setComposerAllowedPalette: (v: BeaconPaletteEntry[]) => void;
+  setComposerEngineRows: (v: HydratedBeaconComponent[]) => void;
+  setComposerEngineComposable: (v: Record<string, ComposableInstancePropMeta[]>) => void;
+  setComposerSlotProps: (v: BeaconEngineSlotPropsFile | null) => void;
+  setEngineListSlotFile: (v: BeaconEngineSlotPropsFile | null) => void;
   setComposerOpeningKey: (v: string | null) => void;
   setBeaconName: (v: string) => void;
   setListTargetCreatePending: (v: boolean) => void;
@@ -315,6 +340,10 @@ function useBeaconsPageChangeReset(
         reset.setComposerStudio(null);
         reset.setComposerDraft([]);
         reset.setComposerAllowedPalette([]);
+        reset.setComposerEngineRows([]);
+        reset.setComposerEngineComposable({});
+        reset.setComposerSlotProps(null);
+        reset.setEngineListSlotFile(null);
         reset.setComposerOpeningKey(null);
         reset.setBeaconName("");
         reset.setListTargetCreatePending(false);
@@ -533,6 +562,7 @@ export function BeaconsScreen() {
   const [addPending, setAddPending] = useState(false);
   const [selected, setSelected] = useState<HydratedBeaconComponent[]>([]);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
+  const [resyncingEngineSlotKey, setResyncingEngineSlotKey] = useState<string | null>(null);
   const [listTargetCreatePending, setListTargetCreatePending] = useState(false);
   const [listTargetRemovePending, setListTargetRemovePending] = useState(false);
   const [listTargetRemoveBusyKind, setListTargetRemoveBusyKind] = useState<"canvas" | "delete" | null>(null);
@@ -564,8 +594,14 @@ export function BeaconsScreen() {
   const [composerRuntimeOk, setComposerRuntimeOk] = useState(false);
   const [composerStudio, setComposerStudio] = useState<{ beacon: BeaconOnPage; initialSignature: string } | null>(null);
   const [composerDraft, setComposerDraft] = useState<BeaconCompositionDraftRow[]>([]);
+  const [composerEngineRows, setComposerEngineRows] = useState<HydratedBeaconComponent[]>([]);
+  const [composerEngineComposable, setComposerEngineComposable] = useState<
+    Record<string, ComposableInstancePropMeta[]>
+  >({});
+  const [composerSlotProps, setComposerSlotProps] = useState<BeaconEngineSlotPropsFile | null>(null);
   const [composerAllowedPalette, setComposerAllowedPalette] = useState<BeaconPaletteEntry[]>([]);
   const [composerOpeningKey, setComposerOpeningKey] = useState<string | null>(null);
+  const [engineListSlotFile, setEngineListSlotFile] = useState<BeaconEngineSlotPropsFile | null>(null);
   const [composerSavePending, setComposerSavePending] = useState(false);
   const [composerCmsSource, setComposerCmsSource] = useState<BeaconComposerCmsSource>("static_list");
   const [currentCmsItemId, setCurrentCmsItemId] = useState<string | null>(null);
@@ -696,6 +732,17 @@ export function BeaconsScreen() {
           return;
         }
         setComposerAllowedPalette(allowedPalette);
+        setComposerEngineRows(engineScopedRows);
+        const byKey = await listComposableMetaByInstanceKey(engineScopedRows);
+        if (cancelled) {
+          return;
+        }
+        setComposerEngineComposable(byKey);
+        const sp = await readBeaconEngineSlotPropsFile(beacon.container, engineScopedRows.length);
+        if (cancelled) {
+          return;
+        }
+        setComposerSlotProps(sp);
         const { draft, initialSignature, cmsSource } = await resolveComposerTargetOrder({
           listContainer: beacon.container,
           engineScopedRows,
@@ -731,6 +778,10 @@ export function BeaconsScreen() {
     setComposerStudio,
     setComposerDraft,
     setComposerAllowedPalette,
+    setComposerEngineRows,
+    setComposerEngineComposable,
+    setComposerSlotProps,
+    setEngineListSlotFile,
     setComposerOpeningKey,
     setBeaconName,
     setListTargetCreatePending,
@@ -800,6 +851,7 @@ export function BeaconsScreen() {
     setListTargetPreviewSyncPending(false);
     setRemoveListTargetDialogOpen(false);
     setActiveBeaconKey(null);
+    setEngineListSlotFile(null);
     listTargetResolveGen.current += 1;
     void refreshPageBeacons();
   }, [refreshPageBeacons]);
@@ -824,6 +876,8 @@ export function BeaconsScreen() {
       setActiveDataList(beacon.dataList);
       setActiveBeaconKey(beacon.key);
       setSelected(rows);
+      const f = await readBeaconEngineSlotPropsFile(beacon.container, rows.length);
+      setEngineListSlotFile(f);
       setPicking(true);
     } catch (err) {
       const message = formatDesignerError(err);
@@ -866,8 +920,28 @@ export function BeaconsScreen() {
 
   const composerDirty = useMemo(() => {
     if (composerStudio == null) return false;
-    return composerDraft.map((d) => d.componentId).join(",") !== composerStudio.initialSignature;
+    return beaconCompositionSignature(composerDraft) !== composerStudio.initialSignature;
   }, [composerDraft, composerStudio]);
+
+  const composerRowMeta = useMemo(() => {
+    if (composerSlotProps == null || composerEngineRows.length === 0) {
+      return composerDraft.map((row) => ({ row, exposed: [] as ComposableInstancePropMeta[] }));
+    }
+    const map = draftToHiddenListIndices(composerEngineRows, composerDraft);
+    if (!map.ok) {
+      return composerDraft.map((row) => ({ row, exposed: [] as ComposableInstancePropMeta[] }));
+    }
+    return composerDraft.map((row, j) => {
+      const idx = map.indices[j];
+      const raw = idx != null ? (composerSlotProps.slots[idx]?.exposed ?? []) : [];
+      const engineRow = idx != null ? composerEngineRows[idx] : undefined;
+      const live = engineRow != null ? composerEngineComposable[engineRow.key] : undefined;
+      return {
+        row,
+        exposed: mergeComposableMetaWithLive(raw, live),
+      };
+    });
+  }, [composerDraft, composerEngineRows, composerEngineComposable, composerSlotProps]);
 
   const composerEmptyTargetOrderHint = useMemo(() => {
     if (composerStudio == null) {
@@ -895,11 +969,21 @@ export function BeaconsScreen() {
       const engineScopedRows = filterHydratedBeaconComponentsByComponentIds(rows, configuredComponentIds);
       const allowedPalette = await beaconPaletteFromConfiguredComponentIds(configuredComponentIds, rows);
       setComposerAllowedPalette(allowedPalette);
-      const { draft, initialSignature, cmsSource } = await resolveComposerTargetOrder({
+      setComposerEngineRows(engineScopedRows);
+      const liveComposable = await listComposableMetaByInstanceKey(engineScopedRows);
+      setComposerEngineComposable(liveComposable);
+      const sp = await readBeaconEngineSlotPropsFile(beacon.container, engineScopedRows.length);
+      setComposerSlotProps(sp);
+      const { draft: rawDraft, cmsSource } = await resolveComposerTargetOrder({
         listContainer: beacon.container,
         engineScopedRows,
         currentCmsItemId,
       });
+      const mapped = draftToHiddenListIndices(engineScopedRows, rawDraft);
+      const draft = mapped.ok
+        ? normalizeComposerDraftPropValues(rawDraft, mapped.indices, engineScopedRows, sp, liveComposable)
+        : rawDraft;
+      const initialSignature = beaconCompositionSignature(draft);
       setComposerDraft(draft);
       setComposerCmsSource(cmsSource);
       setComposerStudio({ beacon, initialSignature });
@@ -914,13 +998,78 @@ export function BeaconsScreen() {
   const handleComposerStudioBack = useCallback(() => {
     setComposerStudio(null);
     setComposerDraft([]);
+    setComposerEngineRows([]);
+    setComposerEngineComposable({});
+    setComposerSlotProps(null);
     setComposerAllowedPalette([]);
     setComposerCmsSource("static_list");
   }, []);
 
   const handleComposerAddFromPalette = useCallback((c: BeaconPaletteEntry) => {
-    setComposerDraft((prev) => [...prev, { key: crypto.randomUUID(), componentId: c.id, name: c.name }]);
+    setComposerDraft((prev) => [
+      ...prev,
+      { key: crypto.randomUUID(), componentId: c.id, name: c.name, propValues: {} },
+    ]);
   }, []);
+
+  const handleComposerSetPropValue = useCallback((rowKey: string, propId: string, value: string) => {
+    setComposerDraft((prev) =>
+      prev.map((r) => (r.key === rowKey ? { ...r, propValues: { ...(r.propValues ?? {}), [propId]: value } } : r))
+    );
+  }, []);
+
+  const handleSetEngineSlotExposed = useCallback(
+    async (slotIndex: number, exposed: ComposableInstancePropMeta[]) => {
+      const container = targetRef.current;
+      if (container == null) return;
+      const n = selected.length;
+      const f = await readBeaconEngineSlotPropsFile(container, n);
+      const nextSlots = f.slots.slice(0, n);
+      while (nextSlots.length < n) {
+        nextSlots.push({ exposed: [] });
+      }
+      nextSlots[slotIndex] = { exposed: [...exposed] };
+      const out: BeaconEngineSlotPropsFile = { v: 1, slots: nextSlots };
+      await writeBeaconEngineSlotPropsFile(container, out);
+      setEngineListSlotFile(out);
+      setEngineListCompositionStale(true);
+    },
+    [selected]
+  );
+
+  const handleResyncEngineSlotAttrs = useCallback(
+    async (slotIndex: number) => {
+      const row = selected[slotIndex];
+      if (row == null) return;
+      const container = targetRef.current;
+      if (container == null) return;
+      setResyncingEngineSlotKey(row.key);
+      try {
+        const f = await readBeaconEngineSlotPropsFile(container, selected.length);
+        const exposed = f.slots[slotIndex]?.exposed ?? [];
+        const r = await syncEngineCodalynBeaconPropAttributes(row.instance, exposed);
+        if (r.errors.length > 0) {
+          void webflow.notify({ type: "Warning", message: r.errors[0] });
+        } else if (r.tagged === 0 && r.removed === 0 && exposed.length > 0) {
+          void webflow.notify({
+            type: "Info",
+            message:
+              "No elements were tagged. Open the main component and bind headings, images, or links to the exposed props, then try again.",
+          });
+        } else {
+          void webflow.notify({
+            type: "Success",
+            message: `Updated ${r.tagged} data attribute(s), removed ${r.removed} stale. Publish the site for the live page.`,
+          });
+        }
+      } catch (e) {
+        void webflow.notify({ type: "Error", message: formatDesignerError(e) });
+      } finally {
+        setResyncingEngineSlotKey(null);
+      }
+    },
+    [selected]
+  );
 
   const handleComposerReorderDraft = useCallback((fromIndex: number, toIndex: number) => {
     setComposerDraft((prev) => {
@@ -968,7 +1117,25 @@ export function BeaconsScreen() {
         return;
       }
 
+      const slotF = await readBeaconEngineSlotPropsFile(beacon.container, engineScopedRows.length);
+      const propValueRows: Array<Record<string, string>> = draftToApply.map((d, j) => {
+        const poolI = j < mapped.indices.length ? mapped.indices[j] : undefined;
+        if (poolI == null) {
+          return {};
+        }
+        const engineRow = engineScopedRows[poolI];
+        const rawEx = slotF.slots[poolI]?.exposed ?? [];
+        const { metas, aliasToCanonical } = mergeComposableMetaWithLiveResolved(
+          rawEx,
+          engineRow != null ? composerEngineComposable[engineRow.key] : undefined
+        );
+        return buildBeaconRuntimePropRow(d, metas, aliasToCanonical);
+      });
+
       const onCmsTemplate = (await getCmsTemplateCollectionIdFromCurrentPage()) != null;
+      /** After a static save the hidden list is rebuilt in draft order, so clone indices are 0..n-1. CMS leaves the Engine list as-is, so we keep greedy pool indices. */
+      const hiddenListIndicesForRuntime = onCmsTemplate ? mapped.indices : draftToApply.map((_, u) => u);
+      const runtimeText = serializeBeaconListRuntimePayload(hiddenListIndicesForRuntime, propValueRows);
 
       if (onCmsTemplate) {
         if (!getTowerOrigin().trim() || currentCmsItemId == null) {
@@ -988,13 +1155,31 @@ export function BeaconsScreen() {
           });
           return;
         }
+        const listTargetDef = await getBeaconListTargetComponentOrNull(
+          beacon.dataList,
+          beacon.container,
+          listTargetDefinitionIdRef.current
+        );
+        if (listTargetDef != null) {
+          const listTargetOnPage = await listBeaconListTargetInstancesOnPage(beacon.dataList, beacon.container, {
+            preferredDefinitionId: listTargetDefinitionIdRef.current,
+          });
+          await bindBeaconListTargetInstancesToListCmsText({
+            dataList: beacon.dataList,
+            listContainer: beacon.container,
+            def: listTargetDef,
+            instances: listTargetOnPage,
+            resolvedBinding: binding,
+          });
+        }
         let cmsLayoutSaveFailed = false;
         try {
           await saveBeaconListRuntimePayloadToCmsItem({
             collectionId: binding.collectionId,
             fieldId: binding.fieldId,
             cmsItemId: currentCmsItemId,
-            hiddenListIndices: mapped.indices,
+            hiddenListIndices: hiddenListIndicesForRuntime,
+            propValueRows,
           });
         } catch (e) {
           cmsLayoutSaveFailed = true;
@@ -1003,7 +1188,7 @@ export function BeaconsScreen() {
         await syncBeaconPageInlineScript();
         setComposerDraft(draftToApply);
         setComposerStudio((prev) =>
-          prev ? { ...prev, initialSignature: draftToApply.map((r) => r.componentId).join(",") } : null
+          prev ? { ...prev, initialSignature: beaconCompositionSignature(draftToApply) } : null
         );
         if (cmsLayoutSaveFailed) {
           void webflow.notify({
@@ -1019,13 +1204,54 @@ export function BeaconsScreen() {
           setComposerCmsSource("cms_from_field");
         }
       } else {
+        const beforePoolIds = engineScopedRows.map((r) => r.componentId);
+        const oldFile = await readBeaconEngineSlotPropsFile(beacon.container, engineScopedRows.length);
         const hydrated = await applyBeaconCompositionDraft(beacon.container, draftToApply);
+        const newFile = mergeSlotFileAfterListRebuild(beforePoolIds, oldFile, draftToApply);
+        await writeBeaconEngineSlotPropsFile(beacon.container, newFile);
+        await setBeaconListTargetInstancesStaticRuntimeText({
+          dataList: beacon.dataList,
+          listContainer: beacon.container,
+          preferredDefinitionId: listTargetDefinitionIdRef.current,
+          text: runtimeText,
+        });
         await syncBeaconPageInlineScript();
         const hydratedScoped = hydrated.filter((row) => allowedComponentIdSet.has(row.componentId));
-        setComposerDraft(hydratedScoped.map((h) => ({ key: h.key, componentId: h.componentId, name: h.name })));
-        setComposerStudio((prev) =>
-          prev ? { ...prev, initialSignature: hydratedScoped.map((h) => h.componentId).join(",") } : null
+        setComposerDraft(
+          draftToApply.map((d, j) => {
+            const h = hydratedScoped[j];
+            return {
+              key: d.key,
+              componentId: d.componentId,
+              name: h?.name ?? d.name,
+              propValues: d.propValues,
+            };
+          })
         );
+        setComposerStudio((prev) =>
+          prev
+            ? {
+                ...prev,
+                initialSignature: beaconCompositionSignature(
+                  draftToApply.map((d, j) => {
+                    const h = hydratedScoped[j];
+                    return {
+                      key: d.key,
+                      componentId: d.componentId,
+                      name: h?.name ?? d.name,
+                      propValues: d.propValues,
+                    };
+                  })
+                ),
+              }
+            : null
+        );
+        const rows2 = await listInstancesInBeaconTarget(beacon.container);
+        const c2 = await resolveBeaconEngineConfiguredComponentIds(beacon.container, rows2);
+        const e2 = filterHydratedBeaconComponentsByComponentIds(rows2, c2);
+        setComposerEngineRows(e2);
+        setComposerEngineComposable(await listComposableMetaByInstanceKey(e2));
+        setComposerSlotProps(await readBeaconEngineSlotPropsFile(beacon.container, e2.length));
         void webflow.notify({
           type: "Success",
           message: "Composition saved. Page script updated — publish for the live site.",
@@ -1055,6 +1281,9 @@ export function BeaconsScreen() {
         container,
         nextSelected.map((row) => row.componentId)
       );
+      const slotF = await readBeaconEngineSlotPropsFile(container, nextSelected.length);
+      await writeBeaconEngineSlotPropsFile(container, slotF);
+      setEngineListSlotFile(slotF);
       setEngineListCompositionStale(true);
       void refreshPageBeacons();
     } catch (err) {
@@ -1158,11 +1387,17 @@ export function BeaconsScreen() {
     try {
       await removeComponentInstanceFromCanvas(row.instance);
       const nextSelected = selected.filter((p) => p.key !== row.key);
+      const removeIdx = selected.findIndex((p) => p.key === row.key);
       setSelected(nextSelected);
       await writeBeaconEngineConfiguredComponentIds(
         container,
         nextSelected.map((entry) => entry.componentId)
       );
+      const f = await readBeaconEngineSlotPropsFile(container, selected.length);
+      const nextSlots = removeIdx >= 0 ? f.slots.filter((_, j) => j !== removeIdx) : f.slots;
+      const out: BeaconEngineSlotPropsFile = { v: 1, slots: nextSlots };
+      await writeBeaconEngineSlotPropsFile(container, out);
+      setEngineListSlotFile(out);
       setEngineListCompositionStale(true);
       void refreshPageBeacons();
     } catch (err) {
@@ -1504,6 +1739,10 @@ export function BeaconsScreen() {
                   pageRuntimeStatusLoading={pageRuntimeStatusLoading}
                   pageRuntimeSynced={syncShellOk}
                   pageRuntimeSyncReason={syncShellReason}
+                  engineSlotProps={engineListSlotFile ?? { v: 1, slots: [] }}
+                  onSetSlotExposed={handleSetEngineSlotExposed}
+                  onResyncEngineSlotAttrs={handleResyncEngineSlotAttrs}
+                  resyncingEngineSlotKey={resyncingEngineSlotKey}
                 />
               )}
             </div>
@@ -1539,6 +1778,8 @@ export function BeaconsScreen() {
                   pageRuntimeSyncReason={syncShellReason}
                   embedSyncPending={embedSyncPending}
                   onSyncInstallEmbed={handleSyncInstallEmbed}
+                  rowMeta={composerRowMeta}
+                  onChangePropValue={handleComposerSetPropValue}
                 />
               )}
             </div>

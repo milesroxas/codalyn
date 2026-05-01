@@ -1,6 +1,23 @@
 import type { ComposableInstancePropMeta } from "@/features/beacons/model/beacon-composable-props";
 import { runExclusiveDesignerStyleOp } from "@/features/beacons/model/exclusive-designer-style-op";
 import { exitCurrentComponentIfAny } from "@/features/image-editor/lib/with-image-element-for-page-target";
+import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
+
+/** Filter Designer console DevTools with this string to trace Engine “Tag data attributes on component”. */
+export const BEACON_TAG_ATTRS_DEBUG_PREFIX = "[Beacon tag attrs]" as const;
+
+function debugTagAttrsLog(stage: string, detail?: Record<string, unknown>): void {
+  console.log(BEACON_TAG_ATTRS_DEBUG_PREFIX, stage, detail ?? {});
+}
+
+function debugTagAttrsErr(stage: string, err: unknown, extra?: Record<string, unknown>): void {
+  console.error(BEACON_TAG_ATTRS_DEBUG_PREFIX, stage, {
+    ...extra,
+    message: err instanceof Error ? err.message : String(err),
+    causeTag: webflowDesignerErrorCauseTag(err),
+    err,
+  });
+}
 
 const MAX_NESTED_COMPONENT_EXITS = 8;
 
@@ -21,7 +38,7 @@ export type EngineCodalynAttrSyncResult = {
   tagged: number;
   /** Elements that had our attribute removed (left expose list) */
   removed: number;
-  /** Component variants the Designer allowed us to process */
+  /** Passes over component variant trees (always 1: current canvas variant only) */
   variantsWalked: number;
   errors: string[];
 };
@@ -30,15 +47,30 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
+/**
+ * Webflow `getSettings()` values are usually setting rows: `{ valueType?, value: { sourceType, propId } }`.
+ * Some responses use a flat `{ sourceType: "prop", propId }` — accept both (mirrors image-editor binding reads).
+ */
 function bindingPropIdFromSettingValue(v: unknown): string | null {
   if (!isRecord(v)) {
     return null;
   }
-  if (v.sourceType !== "prop") {
+  const fromBindingShape = (row: Record<string, unknown>): string | null => {
+    if (row.sourceType !== "prop") {
+      return null;
+    }
+    const id = row.propId;
+    return typeof id === "string" && id.length > 0 ? id : null;
+  };
+  const direct = fromBindingShape(v);
+  if (direct != null) {
+    return direct;
+  }
+  const inner = v.value;
+  if (!isRecord(inner)) {
     return null;
   }
-  const id = v.propId;
-  return typeof id === "string" && id.length > 0 ? id : null;
+  return fromBindingShape(inner);
 }
 
 function attrValueStillWanted(value: string, exposedIds: ReadonlySet<string>): boolean {
@@ -97,6 +129,17 @@ async function stripStaleCodalynAttr(
   }
 }
 
+function collectAllPropBindingPropIds(settings: Record<string, unknown>): string[] {
+  const ids: string[] = [];
+  for (const v of Object.values(settings)) {
+    const pid = bindingPropIdFromSettingValue(v);
+    if (pid != null) {
+      ids.push(pid);
+    }
+  }
+  return ids;
+}
+
 function collectExposedPropIdsFromSettings(
   settings: Record<string, unknown>,
   exposedIds: ReadonlySet<string>
@@ -111,14 +154,27 @@ function collectExposedPropIdsFromSettings(
   return fromExpose;
 }
 
+/** When set, records how many eligible elements we saw and every `propId` from `sourceType: prop` bindings on them. */
+export type PropTagWalkDiag = {
+  eligibleNodesChecked: number;
+  designerBoundPropIds: Set<string>;
+};
+
 async function applyCodalynAttrForBindings(
   ael: CustomAttrOps,
   sel: SettingsOps,
   exposedIds: ReadonlySet<string>,
-  out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">
+  out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">,
+  diag?: PropTagWalkDiag
 ): Promise<void> {
   try {
     const settings = await sel.getSettings();
+    if (diag != null) {
+      diag.eligibleNodesChecked += 1;
+      for (const pid of collectAllPropBindingPropIds(settings)) {
+        diag.designerBoundPropIds.add(pid);
+      }
+    }
     const fromExpose = collectExposedPropIdsFromSettings(settings, exposedIds);
     const uniq = [...new Set(fromExpose)].sort();
     if (uniq.length === 0) {
@@ -138,7 +194,8 @@ async function applyCodalynAttrForBindings(
 async function walk(
   el: AnyElement,
   exposedIds: ReadonlySet<string>,
-  out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">
+  out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">,
+  diag?: PropTagWalkDiag
 ): Promise<void> {
   const canAttr = hasCustomAttributes(el);
   const canSettings = hasElementSettings(el);
@@ -146,46 +203,85 @@ async function walk(
     await stripStaleCodalynAttr(asCustomAttrEl(el), exposedIds, out);
   }
   if (canSettings && canAttr) {
-    await applyCodalynAttrForBindings(asCustomAttrEl(el), asSettingsEl(el), exposedIds, out);
+    await applyCodalynAttrForBindings(asCustomAttrEl(el), asSettingsEl(el), exposedIds, out, diag);
   }
   if (hasChildren(el)) {
     const kids = await el.getChildren();
     for (const ch of kids) {
-      await walk(ch, exposedIds, out);
+      await walk(ch, exposedIds, out, diag);
     }
   }
 }
 
-async function forEachVariantRoot(comp: Component, visit: (root: AnyElement) => Promise<void>): Promise<number> {
-  const variants = await comp.getVariants();
-  let previousId: string | null = null;
-  for (const v of variants) {
-    if (v.isSelected) {
-      previousId = v.id;
-      break;
-    }
+function logDiagWhenNothingTagged(
+  diag: PropTagWalkDiag,
+  out: EngineCodalynAttrSyncResult,
+  exposedIds: ReadonlySet<string>
+): void {
+  if (out.tagged !== 0 || out.removed !== 0 || exposedIds.size === 0) {
+    return;
   }
-  let variantsWalked = 0;
-  for (const v of variants) {
-    try {
-      await comp.setSelectedVariant({ id: v.id });
-    } catch {
-      continue;
-    }
-    variantsWalked += 1;
-    const root = await comp.getRootElement();
-    if (root) {
-      await visit(root);
-    }
+  const overlap = [...exposedIds].filter((id) => diag.designerBoundPropIds.has(id));
+  const stage =
+    diag.eligibleNodesChecked === 0
+      ? "no tags: no elements combined component prop bindings + Custom attributes API on this variant"
+      : overlap.length === 0
+        ? "no tags: Expose IDs do not match any prop binding on eligible elements — link elements to props in Component"
+        : "no writes: overlaps exist but ATTR unchanged (already synced?) — check idsInExposeAndOnBindings";
+  debugTagAttrsLog(stage, {
+    eligibleNodesHadSettingsAndCustomAttrs: diag.eligibleNodesChecked,
+    designerBoundPropIds: [...diag.designerBoundPropIds].sort(),
+    exposedPropIds: [...exposedIds].sort(),
+    idsInExposeAndOnBindings: overlap,
+  });
+}
+
+type TagSyncEnteredGate = { entered: boolean };
+
+/**
+ * Leaves nested components, enters `instance`, walks prop tags, sets `gate.entered` only after successful `enterComponent`.
+ */
+async function enterComponentDefinitionsAndWalk(
+  instance: ComponentElement,
+  comp: Component,
+  exposedIds: Set<string>,
+  out: EngineCodalynAttrSyncResult,
+  gate: TagSyncEnteredGate
+): Promise<void> {
+  debugTagAttrsLog("exit nested scopes (prep for enterComponent)");
+  await exitUntilPageForInstanceEnter();
+
+  debugTagAttrsLog("enterComponent(instance)");
+  try {
+    await webflow.enterComponent(instance);
+  } catch (e) {
+    debugTagAttrsErr("enterComponent failed", e);
+    throw e;
   }
-  if (previousId != null) {
-    try {
-      await comp.setSelectedVariant({ id: previousId });
-    } catch {
-      /* no-op */
+  gate.entered = true;
+
+  const root = await comp.getRootElement();
+  debugTagAttrsLog("getRootElement", {
+    rootElementType: root?.type ?? null,
+    missingRoot: root == null,
+  });
+
+  if (root) {
+    const diag: PropTagWalkDiag | undefined =
+      exposedIds.size > 0 ? { eligibleNodesChecked: 0, designerBoundPropIds: new Set<string>() } : undefined;
+    await walk(root, exposedIds, out, diag);
+    if (diag != null) {
+      logDiagWhenNothingTagged(diag, out, exposedIds);
     }
+  } else {
+    debugTagAttrsLog("skipped walk: no root element for current variant");
   }
-  return variantsWalked;
+  out.variantsWalked = 1;
+  debugTagAttrsLog("walk done", {
+    tagged: out.tagged,
+    removed: out.removed,
+    walkErrors: out.errors.slice(),
+  });
 }
 
 /**
@@ -193,7 +289,9 @@ async function forEachVariantRoot(comp: Component, visit: (root: AnyElement) => 
  * - sets `data-codalyn-beacon-prop` on any element that has a **property binding** to an id in `exposed` (pipe-joins
  *   multiple); required for the published footer runtime to find targets.
  * - removes that attribute if it was set but the prop is no longer exposed.
- * Iterates all **variants** so every variant’s layout is tagged when possible.
+ *
+ * Only the **currently selected component variant** is walked (no variant switching). If bindings live only in
+ * another variant, open that variant in the component editor and run sync again.
  */
 export function syncEngineCodalynBeaconPropAttributes(
   instance: ComponentElement,
@@ -203,18 +301,29 @@ export function syncEngineCodalynBeaconPropAttributes(
     const exposedIds = new Set(exposed.map((e) => e.propId));
     const out: EngineCodalynAttrSyncResult = { tagged: 0, removed: 0, variantsWalked: 0, errors: [] };
     const comp = await instance.getComponent();
-    let entered = false;
+    let compName: string | undefined;
     try {
-      await exitUntilPageForInstanceEnter();
-      await webflow.enterComponent(instance);
-      entered = true;
-      out.variantsWalked = await forEachVariantRoot(comp, async (root) => {
-        await walk(root, exposedIds, out);
-      });
+      compName = await comp.getName();
+    } catch (e) {
+      debugTagAttrsErr("getComponent().getName failed (non-fatal)", e);
+    }
+    debugTagAttrsLog("sync start", {
+      definitionComponentId: comp.id,
+      definitionName: compName,
+      exposedPropIds: [...exposedIds],
+    });
+
+    const gate: TagSyncEnteredGate = { entered: false };
+    try {
+      await enterComponentDefinitionsAndWalk(instance, comp, exposedIds, out, gate);
+    } catch (e) {
+      debugTagAttrsErr("sync aborted (rethrow)", e);
+      throw e;
     } finally {
-      if (entered) {
-        await webflow.exitComponent().catch(() => {
-          /* best effort */
+      if (gate.entered) {
+        debugTagAttrsLog("exitComponent");
+        await webflow.exitComponent().catch((e) => {
+          debugTagAttrsErr("exitComponent failed (ignored)", e);
         });
       }
     }

@@ -9,30 +9,22 @@ type BeaconListTargetActionsBarProps = {
   listTargetCreatePending: boolean;
   listTargetRemovePending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
-  listTargetPreviewSyncPending: boolean;
   listTargetOnCanvasCount: number;
   onBackToList: () => void;
   onCreateListTarget: () => void;
   onRequestRemoveListTarget: () => void;
   onPlaceListTargetOnCanvas: () => void;
-  onSyncListTargetPreview: () => void;
 };
-
-function renderTargetButtonLabel(isPending: boolean): string {
-  return isPending ? "Rendering…" : "Render target";
-}
 
 function BeaconListTargetSyncedActions(p: {
   ctaDisabled: boolean;
   listTargetRemovePending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
-  listTargetPreviewSyncPending: boolean;
   placeOrFocusLabel: string;
   placeOrFocusPendingLabel: string;
   onBackToList: () => void;
   onRequestRemoveListTarget: () => void;
   onPlaceListTargetOnCanvas: () => void;
-  onSyncListTargetPreview: () => void;
 }) {
   return (
     <>
@@ -58,16 +50,6 @@ function BeaconListTargetSyncedActions(p: {
       >
         {p.listTargetPlaceOnCanvasPending ? p.placeOrFocusPendingLabel : p.placeOrFocusLabel}
       </Button>
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        disabled={p.ctaDisabled}
-        aria-busy={p.listTargetPreviewSyncPending}
-        onClick={() => void p.onSyncListTargetPreview()}
-      >
-        {renderTargetButtonLabel(p.listTargetPreviewSyncPending)}
-      </Button>
     </>
   );
 }
@@ -81,13 +63,11 @@ export function BeaconListTargetActionsBar(props: BeaconListTargetActionsBarProp
     listTargetCreatePending,
     listTargetRemovePending,
     listTargetPlaceOnCanvasPending,
-    listTargetPreviewSyncPending,
     listTargetOnCanvasCount,
     onBackToList,
     onCreateListTarget,
     onRequestRemoveListTarget,
     onPlaceListTargetOnCanvas,
-    onSyncListTargetPreview,
   } = props;
   const ctaDisabled = listTargetActionBusy || removingKey !== null || activeDataList == null;
   const placeOrFocusLabel = listTargetOnCanvasCount > 0 ? "Focus on canvas" : "Place on canvas";
@@ -99,13 +79,11 @@ export function BeaconListTargetActionsBar(props: BeaconListTargetActionsBarProp
           ctaDisabled={ctaDisabled}
           listTargetRemovePending={listTargetRemovePending}
           listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
-          listTargetPreviewSyncPending={listTargetPreviewSyncPending}
           placeOrFocusLabel={placeOrFocusLabel}
           placeOrFocusPendingLabel={placeOrFocusPendingLabel}
           onBackToList={onBackToList}
           onRequestRemoveListTarget={onRequestRemoveListTarget}
           onPlaceListTargetOnCanvas={onPlaceListTargetOnCanvas}
-          onSyncListTargetPreview={onSyncListTargetPreview}
         />
       ) : listTargetPhase === "absent" ? (
         <>

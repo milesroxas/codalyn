@@ -174,13 +174,19 @@ export async function setBeaconListTargetInstancesStaticRuntimeText(options: {
   if (def == null) {
     return;
   }
-  const propId = await getBeaconListTargetTextPropId(def);
-  if (propId == null) {
-    return;
-  }
   const instances = await listBeaconListTargetInstancesOnPage(options.dataList, options.listContainer, {
     preferredDefinitionId: options.preferredDefinitionId,
   });
+  let instDef: Component | undefined;
+  try {
+    instDef = instances.length > 0 ? await instances[0].getComponent() : undefined;
+  } catch {
+    /* use definition lookup only */
+  }
+  const propId = await getBeaconListTargetTextPropId(instDef ?? def);
+  if (propId == null) {
+    return;
+  }
   for (const inst of instances) {
     try {
       await inst.setProps([{ propId, value: options.text }]);

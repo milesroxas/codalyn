@@ -33,7 +33,8 @@ export function ListTargetCanvasStatusHint(props: ListTargetCanvasStatusHintProp
   }
   return (
     <p className="text-xs leading-snug text-muted-foreground" data-slot="beacon_list_target_place_hint">
-      No list target on this page yet. Use Place on canvas to add it; only one is allowed per list.
+      No list target on this page yet. Adding a component from the catalog places it automatically, or use Place on
+      canvas. Only one target per list is used on the page.
     </p>
   );
 }

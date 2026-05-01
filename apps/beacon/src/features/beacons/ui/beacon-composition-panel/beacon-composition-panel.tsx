@@ -34,11 +34,9 @@ export type BeaconCompositionPanelProps = {
   onCreateListTarget: () => void;
   onRequestRemoveListTarget: () => void;
   onPlaceListTargetOnCanvas: () => void;
-  onSyncListTargetPreview: () => void;
   listTargetCreatePending: boolean;
   listTargetRemovePending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
-  listTargetPreviewSyncPending: boolean;
   embedSyncPending: boolean;
   onSyncInstallEmbed: () => void;
   pageRuntimeStatusLoading: boolean;
@@ -71,11 +69,9 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
     onCreateListTarget,
     onRequestRemoveListTarget,
     onPlaceListTargetOnCanvas,
-    onSyncListTargetPreview,
     listTargetCreatePending,
     listTargetRemovePending,
     listTargetPlaceOnCanvasPending,
-    listTargetPreviewSyncPending,
     listTargetOnCanvasCount,
     embedSyncPending,
     onSyncInstallEmbed,
@@ -92,7 +88,6 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
     listTargetCreatePending ||
     listTargetRemovePending ||
     listTargetPlaceOnCanvasPending ||
-    listTargetPreviewSyncPending ||
     listTargetPhase === "loading" ||
     listTargetPhase === "updating";
 
@@ -126,13 +121,11 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
           listTargetCreatePending={listTargetCreatePending}
           listTargetRemovePending={listTargetRemovePending}
           listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
-          listTargetPreviewSyncPending={listTargetPreviewSyncPending}
           listTargetOnCanvasCount={listTargetOnCanvasCount}
           onBackToList={onBackToList}
           onCreateListTarget={onCreateListTarget}
           onRequestRemoveListTarget={onRequestRemoveListTarget}
           onPlaceListTargetOnCanvas={onPlaceListTargetOnCanvas}
-          onSyncListTargetPreview={onSyncListTargetPreview}
         />
       </div>
 

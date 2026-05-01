@@ -37,6 +37,15 @@ describe("parseBeaconListRuntimePayload", () => {
     expect(p).toEqual({ v: BEACON_LIST_RUNTIME_JSON_VERSION, i: [0, 1], p: [{}, {}] });
   });
 
+  it("accepts string v like CMS round-trips sometimes emit", () => {
+    const p = parseBeaconListRuntimePayload('{"v":"2","i":[0],"p":[{"a":"x"}]}');
+    expect(p).toEqual({
+      v: BEACON_LIST_RUNTIME_JSON_VERSION,
+      i: [0],
+      p: [{ a: "x" }],
+    });
+  });
+
   it("serializes empty strings in p so CMS + runtime can clear overrides", () => {
     const s = serializeBeaconListRuntimePayload([0, 1], [{ "prop-a": "hello", "prop-b": "" }, { x: "0" }]);
     const parsed = parseBeaconListRuntimePayload(s);

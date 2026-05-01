@@ -97,7 +97,8 @@ export function BeaconEngineSelectedRow(props: BeaconEngineSelectedRowProps) {
       <div className="mt-0.5 space-y-1 border-t border-border/50 pt-1.5">
         <p className="text-[0.65rem] leading-snug text-muted-foreground">
           Adds <code className="font-mono text-[0.6rem]">data-codalyn-beacon-prop</code> on elements in the component
-          that are <span className="text-foreground">bound</span> to the props above (per variant when needed).
+          that are <span className="text-foreground">bound</span> to the props above for the variant open in Component
+          mode (repeat after switching variants if layouts differ).
         </p>
         <Button
           type="button"

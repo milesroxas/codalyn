@@ -15,6 +15,28 @@ import type { HydratedBeaconComponent } from "@/features/beacons/model/beacon-pa
 import type { BeaconCompositionDraftRow } from "@/features/beacons/model/site-components";
 import { getTowerOrigin } from "@/shared/lib/tower-client";
 
+/** Prefer an unused pool slot; if the type repeats more times than slots, reuse the first matching index. */
+function findHiddenListIndexForRow(
+  pool: ReadonlyArray<{ componentId: string }>,
+  componentId: string,
+  used: Set<number>
+): number {
+  for (let i = 0; i < pool.length; i++) {
+    if (used.has(i)) {
+      continue;
+    }
+    if (pool[i].componentId === componentId) {
+      return i;
+    }
+  }
+  for (let i = 0; i < pool.length; i++) {
+    if (pool[i].componentId === componentId) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 export type BeaconComposerCmsSource =
   | "static_list"
   | "cms_no_item"
@@ -39,7 +61,9 @@ export function beaconCompositionSignature(draft: ReadonlyArray<BeaconCompositio
 
 /**
  * Map Composer rows (in order) to indices into the **Engine** hidden list in DOM order, matching
- * `componentId` with greedy “next unused” instances so duplicate types get distinct slots.
+ * `componentId` with greedy “next unused” instances when the Engine has multiple of that type. If the
+ * draft repeats a type more times than the pool has distinct children, the **same** pool index is
+ * reused (published runtime clones the same child multiple times; each row still gets its own `p[]`).
  */
 export function draftToHiddenListIndices(
   pool: ReadonlyArray<{ componentId: string }>,
@@ -48,16 +72,7 @@ export function draftToHiddenListIndices(
   const used = new Set<number>();
   const indices: number[] = [];
   for (const row of draft) {
-    let found = -1;
-    for (let i = 0; i < pool.length; i++) {
-      if (used.has(i)) {
-        continue;
-      }
-      if (pool[i].componentId === row.componentId) {
-        found = i;
-        break;
-      }
-    }
+    const found = findHiddenListIndexForRow(pool, row.componentId, used);
     if (found < 0) {
       return { ok: false };
     }

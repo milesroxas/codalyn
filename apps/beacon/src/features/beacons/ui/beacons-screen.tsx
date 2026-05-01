@@ -16,7 +16,10 @@ import {
 } from "@/features/beacons/model/beacon-composer-cms-draft";
 import { listComposerEligibleLists } from "@/features/beacons/model/beacon-composer-eligible";
 import type { BeaconComposerRowMeta } from "@/features/beacons/model/beacon-composer-row-meta";
-import { syncEngineCodalynBeaconPropAttributes } from "@/features/beacons/model/beacon-engine-codalyn-attr-sync";
+import {
+  BEACON_TAG_ATTRS_DEBUG_PREFIX,
+  syncEngineCodalynBeaconPropAttributes,
+} from "@/features/beacons/model/beacon-engine-codalyn-attr-sync";
 import {
   type BeaconEngineSlotPropsFile,
   mergeSlotFileAfterListRebuild,
@@ -36,10 +39,7 @@ import {
   resolveBeaconListTargetCmsCollectionIdForCleanup,
   tryDeleteBeaconListTargetCmsPlainTextField,
 } from "@/features/beacons/model/beacon-list-target-cms-text-binding";
-import {
-  clearAllBeaconListTargetDesignerPreviewsOnPage,
-  syncBeaconListTargetDesignerPreview,
-} from "@/features/beacons/model/beacon-list-target-designer-preview";
+import { clearAllBeaconListTargetDesignerPreviewsOnPage } from "@/features/beacons/model/beacon-list-target-designer-preview";
 import {
   listBeaconListTargetInstancesOnPage,
   removeAllBeaconListTargetInstancesOnPage,
@@ -90,6 +90,7 @@ import { BeaconHomePanel } from "@/features/beacons/ui/beacon-home-panel";
 import { BeaconPageRuntimeHeaderStatus } from "@/features/beacons/ui/beacon-page-runtime-header-status";
 import { getTowerOrigin } from "@/shared/lib/tower-client";
 import { cn } from "@/shared/lib/utils";
+import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -285,7 +286,6 @@ type BeaconsPageChangeReset = {
   setListTargetPhase: (v: BeaconListTargetPhase) => void;
   setListTargetRegisteredName: (v: string | null) => void;
   setListTargetOnCanvasCount: (v: number) => void;
-  setListTargetPreviewSyncPending: (v: boolean) => void;
   setRemoveListTargetDialogOpen: (v: boolean) => void;
   setActiveBeaconKey: (v: string | null) => void;
   setEngineListCompositionStale: (v: boolean) => void;
@@ -355,7 +355,6 @@ function useBeaconsPageChangeReset(
         reset.setListTargetPhase("loading");
         reset.setListTargetRegisteredName(null);
         reset.setListTargetOnCanvasCount(0);
-        reset.setListTargetPreviewSyncPending(false);
         reset.setRemoveListTargetDialogOpen(false);
         reset.setActiveBeaconKey(null);
         reset.listTargetResolveGen.current += 1;
@@ -572,7 +571,6 @@ export function BeaconsScreen() {
   const [listTargetPhase, setListTargetPhase] = useState<BeaconListTargetPhase>("loading");
   const [listTargetRegisteredName, setListTargetRegisteredName] = useState<string | null>(null);
   const [listTargetOnCanvasCount, setListTargetOnCanvasCount] = useState(0);
-  const [listTargetPreviewSyncPending, setListTargetPreviewSyncPending] = useState(false);
   const [removeListTargetDialogOpen, setRemoveListTargetDialogOpen] = useState(false);
   const [activeBeaconKey, setActiveBeaconKey] = useState<string | null>(null);
   const listTargetResolveGen = useRef(0);
@@ -793,7 +791,6 @@ export function BeaconsScreen() {
     setListTargetPhase,
     setListTargetRegisteredName,
     setListTargetOnCanvasCount,
-    setListTargetPreviewSyncPending,
     setRemoveListTargetDialogOpen,
     setActiveBeaconKey,
     setEngineListCompositionStale,
@@ -850,7 +847,6 @@ export function BeaconsScreen() {
     setListTargetPhase("loading");
     setListTargetRegisteredName(null);
     setListTargetOnCanvasCount(0);
-    setListTargetPreviewSyncPending(false);
     setRemoveListTargetDialogOpen(false);
     setActiveBeaconKey(null);
     setEngineListSlotFile(null);
@@ -900,14 +896,33 @@ export function BeaconsScreen() {
     try {
       listTargetDefinitionIdRef.current = null;
       const { container, dataList } = await createBeaconTargetOnPage(trimmed);
-      await ensureBeaconListCmsTextFieldOnList(container, dataList);
+      const { component: listTargetComponent, definitionId } = await createBeaconListTargetComponent({
+        dataList,
+        listContainer: container,
+      });
+      listTargetDefinitionIdRef.current = definitionId;
+      const listTargetRegisteredName = await listTargetComponent.getName();
+      setListTargetPhase("synced");
+      setListTargetRegisteredName(listTargetRegisteredName);
       await writeBeaconEngineConfiguredComponentIds(container, []);
+      await placeBeaconListTargetOnCanvas(dataList, container, definitionId);
+      const listTargetOnPage = await listBeaconListTargetInstancesOnPage(dataList, container, {
+        preferredDefinitionId: definitionId,
+      });
       targetRef.current = container;
       setActiveDataList(dataList);
-      setActiveBeaconKey(beaconTargetKey(container));
+      const beaconKey = beaconTargetKey(container);
+      setActiveBeaconKey(beaconKey);
       setSelected([]);
       setPicking(true);
       setCreateFormOpen(false);
+      setListTargetOnCanvasCount(listTargetOnPage.length);
+      listTargetReconcileCacheRef.current = {
+        beaconKey,
+        dataList,
+        phase: "synced",
+        registeredName: listTargetRegisteredName,
+      };
       void webflow.notify({ type: "Success", message: "Beacon created." });
       void refreshPageBeacons();
     } catch (err) {
@@ -1041,15 +1056,75 @@ export function BeaconsScreen() {
 
   const handleResyncEngineSlotAttrs = useCallback(
     async (slotIndex: number) => {
-      const row = selected[slotIndex];
-      if (row == null) return;
+      const labelRow = selected[slotIndex];
+      if (labelRow == null) {
+        console.log(BEACON_TAG_ATTRS_DEBUG_PREFIX, "aborted: no labelRow at slotIndex", slotIndex);
+        return;
+      }
       const container = targetRef.current;
-      if (container == null) return;
-      setResyncingEngineSlotKey(row.key);
+      if (container == null) {
+        console.log(BEACON_TAG_ATTRS_DEBUG_PREFIX, "aborted: targetRef container is null");
+        return;
+      }
+      console.log(BEACON_TAG_ATTRS_DEBUG_PREFIX, "handleResyncEngineSlotAttrs", {
+        slotIndex,
+        labelRow: { componentId: labelRow.componentId, name: labelRow.name, key: labelRow.key },
+      });
+      setResyncingEngineSlotKey(labelRow.key);
       try {
-        const f = await readBeaconEngineSlotPropsFile(container, selected.length);
+        const freshRows = await listInstancesInBeaconTarget(container);
+        const configuredIds = await resolveBeaconEngineConfiguredComponentIds(container, freshRows);
+        const scoped = filterHydratedBeaconComponentsByComponentIds(freshRows, configuredIds);
+        console.log(BEACON_TAG_ATTRS_DEBUG_PREFIX, "canvas + engine filter", {
+          freshInstancesCount: freshRows.length,
+          freshInstances: freshRows.map((x) => ({ componentId: x.componentId, name: x.name })),
+          configuredIds,
+          scopedCount: scoped.length,
+          scoped: scoped.map((x) => ({ componentId: x.componentId, name: x.name })),
+        });
+
+        const row = scoped[slotIndex];
+        if (row == null) {
+          console.error(BEACON_TAG_ATTRS_DEBUG_PREFIX, "scoped[slotIndex] missing — slot/UI out of sync", {
+            slotIndex,
+            scopedLength: scoped.length,
+          });
+          void webflow.notify({
+            type: "Error",
+            message:
+              "That slot no longer matches the beacon list on the page. Close and reopen this beacon, then try tagging again.",
+          });
+          return;
+        }
+
+        const f = await readBeaconEngineSlotPropsFile(container, scoped.length);
         const exposed = f.slots[slotIndex]?.exposed ?? [];
+        console.log(BEACON_TAG_ATTRS_DEBUG_PREFIX, "resolved row + exposed props", {
+          rowComponentId: row.componentId,
+          rowName: row.name,
+          exposedPropIds: exposed.map((e) => e.propId),
+        });
+
         const r = await syncEngineCodalynBeaconPropAttributes(row.instance, exposed);
+        console.log(BEACON_TAG_ATTRS_DEBUG_PREFIX, "sync result", {
+          ...r,
+          notifyPath:
+            r.errors.length > 0
+              ? "Warning (walk errors)"
+              : r.tagged === 0 && r.removed === 0 && exposed.length > 0
+                ? "Info (nothing tagged)"
+                : "Success",
+        });
+
+        setSelected((prev) => {
+          if (prev.length !== scoped.length) {
+            return scoped.map((s) => ({ ...s, key: crypto.randomUUID() }));
+          }
+          return scoped.map((s, i) => ({
+            ...s,
+            key: prev[i]?.componentId === s.componentId ? prev[i].key : crypto.randomUUID(),
+          }));
+        });
         if (r.errors.length > 0) {
           void webflow.notify({ type: "Warning", message: r.errors[0] });
         } else if (r.tagged === 0 && r.removed === 0 && exposed.length > 0) {
@@ -1065,6 +1140,11 @@ export function BeaconsScreen() {
           });
         }
       } catch (e) {
+        console.error(BEACON_TAG_ATTRS_DEBUG_PREFIX, "handler catch (same message as Designer toast)", {
+          formatted: formatDesignerError(e),
+          causeTag: webflowDesignerErrorCauseTag(e),
+          err: e,
+        });
         void webflow.notify({ type: "Error", message: formatDesignerError(e) });
       } finally {
         setResyncingEngineSlotKey(null);
@@ -1288,6 +1368,42 @@ export function BeaconsScreen() {
       setEngineListSlotFile(slotF);
       setEngineListCompositionStale(true);
       void refreshPageBeacons();
+
+      const dataList = activeDataList;
+      if (dataList != null) {
+        try {
+          const comp = await getBeaconListTargetComponentOrNull(dataList, container, listTargetDefinitionIdRef.current);
+          if (comp == null) {
+            const { component: created, definitionId } = await createBeaconListTargetComponent({
+              dataList,
+              listContainer: container,
+            });
+            listTargetDefinitionIdRef.current = definitionId;
+            const registeredName = await created.getName();
+            setListTargetPhase("synced");
+            setListTargetRegisteredName(registeredName);
+            if (activeBeaconKey != null) {
+              listTargetReconcileCacheRef.current = {
+                beaconKey: activeBeaconKey,
+                dataList,
+                phase: "synced",
+                registeredName,
+              };
+            }
+          }
+          await placeBeaconListTargetOnCanvas(dataList, container, listTargetDefinitionIdRef.current);
+          try {
+            const list = await listBeaconListTargetInstancesOnPage(dataList, container, {
+              preferredDefinitionId: listTargetDefinitionIdRef.current,
+            });
+            setListTargetOnCanvasCount(list.length);
+          } catch {
+            setListTargetOnCanvasCount(0);
+          }
+        } catch (e) {
+          console.warn("[beacon] list target after add component:", e);
+        }
+      }
     } catch (err) {
       const message = formatDesignerError(err);
       void webflow.notify({ type: "Error", message });
@@ -1334,6 +1450,7 @@ export function BeaconsScreen() {
       } catch {
         /* selection is optional */
       }
+      setCreateFormOpen(true);
       setEngineListCompositionStale(false);
       void refreshPageBeacons();
     } catch (err) {
@@ -1363,8 +1480,8 @@ export function BeaconsScreen() {
       }
       if (shouldUninstallPage) {
         await uninstallBeaconsPageInstall();
+        await removeBeaconsWrapperIfNoBeaconTargetsOnPage();
       }
-      await removeBeaconsWrapperIfNoBeaconTargetsOnPage();
       setBeaconToDelete(null);
       setUninstallWithLastBeaconDelete(false);
       void webflow.notify({
@@ -1489,30 +1606,6 @@ export function BeaconsScreen() {
       void webflow.notify({ type: "Error", message });
     } finally {
       setListTargetPlaceOnCanvasPending(false);
-    }
-  };
-
-  const handleSyncListTargetPreview = async () => {
-    if (
-      listTargetPreviewSyncPending ||
-      listTargetPlaceOnCanvasPending ||
-      listTargetCreatePending ||
-      listTargetRemovePending ||
-      listTargetPhase !== "synced" ||
-      activeDataList == null
-    ) {
-      return;
-    }
-    const listContainer = targetRef.current;
-    if (!listContainer) return;
-    setListTargetPreviewSyncPending(true);
-    try {
-      await syncBeaconListTargetDesignerPreview(activeDataList, listContainer);
-    } catch (err) {
-      const message = formatDesignerError(err);
-      void webflow.notify({ type: "Error", message });
-    } finally {
-      setListTargetPreviewSyncPending(false);
     }
   };
 
@@ -1731,11 +1824,9 @@ export function BeaconsScreen() {
                   onCreateListTarget={handleCreateListTarget}
                   onRequestRemoveListTarget={handleRequestRemoveListTarget}
                   onPlaceListTargetOnCanvas={handlePlaceListTargetOnCanvas}
-                  onSyncListTargetPreview={handleSyncListTargetPreview}
                   listTargetCreatePending={listTargetCreatePending}
                   listTargetRemovePending={listTargetRemovePending}
                   listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
-                  listTargetPreviewSyncPending={listTargetPreviewSyncPending}
                   embedSyncPending={embedSyncPending}
                   onSyncInstallEmbed={handleSyncInstallEmbed}
                   pageRuntimeStatusLoading={pageRuntimeStatusLoading}

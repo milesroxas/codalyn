@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
 import {
   BEACON_LIST_TARGET_TEXT_PROP_NAME,
   beaconListTargetHasTextProp,
@@ -8,66 +7,34 @@ import {
 } from "@/features/beacons/model/beacon-list-target-text-field";
 import { BEACON_COMPONENT_STRING_PROPS_GROUP } from "@/shared/lib/beacon-component-string-prop";
 
-vi.mock("@/features/beacons/model/beacon-list-target-instances-on-page", () => ({
-  listBeaconListTargetInstancesOnPage: vi.fn(),
-}));
-
-vi.mock("@/features/image-editor/lib/with-image-element-for-page-target", () => ({
-  exitCurrentComponentIfAny: vi.fn().mockResolvedValue(undefined),
-}));
-
-const listInstances = vi.mocked(listBeaconListTargetInstancesOnPage);
-
-/** Webflow’s mode key used by `webflow.appModes.canModifyComponents` in the Designer. */
 const CAN_MODIFY_COMPONENTS = "canModifyComponents" as const;
 
 type PropRow = Pick<Prop, "id" | "name" | "type" | "valueType">;
 
 function textContentTextProp(id = "prop-text"): PropRow {
-  return {
-    id,
-    name: BEACON_LIST_TARGET_TEXT_PROP_NAME,
-    type: "textContent",
-    valueType: "textContent",
-  };
+  return { id, name: BEACON_LIST_TARGET_TEXT_PROP_NAME, type: "textContent", valueType: "textContent" };
 }
 
 function legacyStringTextProp(id = "prop-str"): PropRow {
-  return {
-    id,
-    name: BEACON_LIST_TARGET_TEXT_PROP_NAME,
-    type: "string",
-    valueType: "string",
-  };
+  return { id, name: BEACON_LIST_TARGET_TEXT_PROP_NAME, type: "string", valueType: "string" };
 }
 
-function installWebflowStub(
-  overrides: { canModify?: boolean; getCurrentComponent?: () => Promise<Component | null> } = {}
-): void {
+function installWebflowStub(overrides: { canModify?: boolean } = {}): void {
   const canModify = overrides.canModify ?? true;
   (globalThis as unknown as { webflow: WebflowApi }).webflow = {
     appModes: { canModifyComponents: CAN_MODIFY_COMPONENTS } as WebflowApi["appModes"],
-    canForAppMode: vi.fn().mockResolvedValue({
-      [CAN_MODIFY_COMPONENTS]: canModify,
-    }),
-    getCurrentComponent: overrides.getCurrentComponent ?? vi.fn().mockResolvedValue(null),
-    enterComponent: vi.fn().mockResolvedValue(undefined),
-    exitComponent: vi.fn().mockResolvedValue(undefined),
+    canForAppMode: vi.fn().mockResolvedValue({ [CAN_MODIFY_COMPONENTS]: canModify }),
   } as unknown as WebflowApi;
 }
 
 describe("beaconListTargetHasTextProp", () => {
   it("is true for a textContent prop named Text", async () => {
-    const comp = {
-      getProps: vi.fn().mockResolvedValue([textContentTextProp()]),
-    };
+    const comp = { getProps: vi.fn().mockResolvedValue([textContentTextProp()]) };
     expect(await beaconListTargetHasTextProp(comp as unknown as Component)).toBe(true);
   });
 
   it("is true for legacy string prop named Text", async () => {
-    const comp = {
-      getProps: vi.fn().mockResolvedValue([legacyStringTextProp()]),
-    };
+    const comp = { getProps: vi.fn().mockResolvedValue([legacyStringTextProp()]) };
     expect(await beaconListTargetHasTextProp(comp as unknown as Component)).toBe(true);
   });
 
@@ -78,7 +45,7 @@ describe("beaconListTargetHasTextProp", () => {
     expect(await beaconListTargetHasTextProp(comp as unknown as Component)).toBe(false);
   });
 
-  it("is false when name matches but type is not textContent or string", async () => {
+  it("is false when name matches but type is neither textContent nor string", async () => {
     const comp = {
       getProps: vi
         .fn()
@@ -89,23 +56,18 @@ describe("beaconListTargetHasTextProp", () => {
 });
 
 describe("tryAddBeaconListTargetTextPropDirectToDefinition", () => {
-  let webflowPrev: unknown;
-
+  let prev: unknown;
   beforeEach(() => {
-    webflowPrev = (globalThis as { webflow?: unknown }).webflow;
-    listInstances.mockResolvedValue([]);
+    prev = (globalThis as { webflow?: unknown }).webflow;
   });
-
   afterEach(() => {
-    (globalThis as { webflow?: unknown }).webflow = webflowPrev;
+    (globalThis as { webflow?: unknown }).webflow = prev;
   });
 
-  it("returns true and only re-binds when Text already exists (can modify)", async () => {
+  it("returns true and re-binds when Text already exists (can modify)", async () => {
     installWebflowStub({ canModify: true });
     const setSettings = vi.fn().mockResolvedValue(null);
-    const searchSettings = vi.fn().mockResolvedValue({
-      body: { canBind: true, valueType: "textContent" },
-    });
+    const searchSettings = vi.fn().mockResolvedValue({ body: { canBind: true, valueType: "textContent" } });
     const root = {
       type: "DOM" as const,
       textContent: true,
@@ -122,9 +84,7 @@ describe("tryAddBeaconListTargetTextPropDirectToDefinition", () => {
     const ok = await tryAddBeaconListTargetTextPropDirectToDefinition(def as unknown as Component);
     expect(ok).toBe(true);
     expect(def.createProps).not.toHaveBeenCalled();
-    expect(setSettings).toHaveBeenCalledWith({
-      body: { sourceType: "prop", propId: "prop-text" },
-    });
+    expect(setSettings).toHaveBeenCalledWith({ body: { sourceType: "prop", propId: "prop-text" } });
   });
 
   it("returns true without binding when Text exists and cannot modify", async () => {
@@ -139,14 +99,11 @@ describe("tryAddBeaconListTargetTextPropDirectToDefinition", () => {
     expect(def.getRootElement).not.toHaveBeenCalled();
   });
 
-  it("creates textContent prop, then binds to first bindable text setting", async () => {
+  it("creates the textContent prop and binds it to the first bindable text setting", async () => {
     installWebflowStub({ canModify: true });
     const setSettings = vi.fn().mockResolvedValue(null);
     const searchSettings = vi.fn().mockImplementation(async (opts: { valueType: string }) => {
-      if (opts.valueType === "textContent") {
-        return { field: { canBind: true, valueType: "textContent" } };
-      }
-      return {};
+      return opts.valueType === "textContent" ? { field: { canBind: true, valueType: "textContent" } } : {};
     });
     const root = {
       type: "DOM" as const,
@@ -172,18 +129,11 @@ describe("tryAddBeaconListTargetTextPropDirectToDefinition", () => {
           },
         ]);
       });
-    const def = {
-      id: "def-1",
-      getProps,
-      getRootElement: vi.fn().mockResolvedValue(root),
-      createProps,
-    };
+    const def = { id: "def-1", getProps, getRootElement: vi.fn().mockResolvedValue(root), createProps };
     const ok = await tryAddBeaconListTargetTextPropDirectToDefinition(def as unknown as Component);
     expect(ok).toBe(true);
     expect(createProps).toHaveBeenCalledTimes(1);
-    expect(setSettings).toHaveBeenCalledWith({
-      field: { sourceType: "prop", propId: "new-id" },
-    });
+    expect(setSettings).toHaveBeenCalledWith({ field: { sourceType: "prop", propId: "new-id" } });
   });
 
   it("returns false when createProps throws", async () => {
@@ -198,10 +148,7 @@ describe("tryAddBeaconListTargetTextPropDirectToDefinition", () => {
 
   it("returns false when canModifyComponents is false and prop is missing", async () => {
     installWebflowStub({ canModify: false });
-    const def = {
-      getProps: vi.fn().mockResolvedValue([]),
-      createProps: vi.fn(),
-    };
+    const def = { getProps: vi.fn().mockResolvedValue([]), createProps: vi.fn() };
     const ok = await tryAddBeaconListTargetTextPropDirectToDefinition(def as unknown as Component);
     expect(ok).toBe(false);
     expect(def.createProps).not.toHaveBeenCalled();
@@ -209,23 +156,18 @@ describe("tryAddBeaconListTargetTextPropDirectToDefinition", () => {
 });
 
 describe("ensureBeaconListTargetTextProp", () => {
-  let webflowPrev: unknown;
-
+  let prev: unknown;
   beforeEach(() => {
-    webflowPrev = (globalThis as { webflow?: unknown }).webflow;
-    listInstances.mockResolvedValue([]);
+    prev = (globalThis as { webflow?: unknown }).webflow;
   });
-
   afterEach(() => {
-    (globalThis as { webflow?: unknown }).webflow = webflowPrev;
+    (globalThis as { webflow?: unknown }).webflow = prev;
   });
 
-  it("resolves when tryAdd path succeeds (no list scan)", async () => {
+  it("resolves when the prop already exists", async () => {
     installWebflowStub({ canModify: true });
     const setSettings = vi.fn().mockResolvedValue(null);
-    const searchSettings = vi.fn().mockResolvedValue({
-      k: { canBind: true, valueType: "textContent" },
-    });
+    const searchSettings = vi.fn().mockResolvedValue({ k: { canBind: true, valueType: "textContent" } });
     const root = {
       type: "DOM" as const,
       textContent: true,
@@ -239,28 +181,17 @@ describe("ensureBeaconListTargetTextProp", () => {
       getRootElement: vi.fn().mockResolvedValue(root),
       createProps: vi.fn(),
     };
-    const listContainer = { id: { element: "e", component: "c" } } as BlockElement;
-    await ensureBeaconListTargetTextProp(def as unknown as Component, { dataList: "my-list", listContainer });
-    expect(listInstances).not.toHaveBeenCalled();
+    await expect(ensureBeaconListTargetTextProp(def as unknown as Component)).resolves.toBeUndefined();
   });
 
-  it("invokes on-page list-target lookup when direct create failed (no instance, path exits quietly)", async () => {
+  it("throws an actionable error when the prop is missing and createProps fails", async () => {
     installWebflowStub({ canModify: true });
     const def = {
       id: "def-2",
-      getName: vi.fn().mockResolvedValue("List target A"),
       getProps: vi.fn().mockResolvedValue([]),
       createProps: vi.fn().mockRejectedValue(new Error("direct create not available")),
       getRootElement: vi.fn(),
     };
-    listInstances.mockResolvedValue([]);
-    const listContainer = { id: { element: "el", component: "co" } } as BlockElement;
-    await expect(
-      ensureBeaconListTargetTextProp(def as unknown as Component, { dataList: "L", listContainer })
-    ).resolves.toBeUndefined();
-    expect(listInstances).toHaveBeenCalledWith("L", listContainer, {
-      maxMatches: 1,
-      preferredDefinitionId: "def-2",
-    });
+    await expect(ensureBeaconListTargetTextProp(def as unknown as Component)).rejects.toThrow(/Text/);
   });
 });

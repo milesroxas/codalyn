@@ -1,15 +1,16 @@
-import { listBeaconListTargetInstancesOnPage } from "@/features/beacons/model/beacon-list-target-instances-on-page";
-import { exitCurrentComponentIfAny } from "@/features/image-editor/lib/with-image-element-for-page-target";
 import { BEACON_COMPONENT_STRING_PROPS_GROUP } from "@/shared/lib/beacon-component-string-prop";
 
-const MAX_NESTED_COMPONENT_EXITS = 8;
-const LOG_PREFIX = "[beacon list target text]";
-
 /**
- * List-target copy field: a **`textContent`** component prop, bound to the root div’s text so instance controls
- * match Webflow’s text binding (a plain `string` prop is not connected to the canvas text).
+ * List-target copy field: a `textContent` component prop bound to the root div’s text setting so per-instance
+ * values drive the same DOM the data attributes are on. A plain `string` prop is not connected to canvas text;
+ * legacy components may still expose `string` so reads tolerate both.
  */
 export const BEACON_LIST_TARGET_TEXT_PROP_NAME = "Text" as const;
+
+export type BeaconListTargetTextProp = {
+  id: string;
+  valueType: BindableValueType;
+};
 
 function listTargetTextFieldProp(props: readonly Prop[]): Prop | undefined {
   return props.find(
@@ -17,10 +18,21 @@ function listTargetTextFieldProp(props: readonly Prop[]): Prop | undefined {
   );
 }
 
-/** Resolves the “Text” prop id for CMS / instance bindings; `null` when the prop is missing. */
-export async function getBeaconListTargetTextPropId(def: Component): Promise<string | null> {
-  const p = listTargetTextFieldProp(await def.getProps());
-  return p?.id ?? null;
+/**
+ * `{id, valueType}` for the Text prop, or `null` when missing.
+ */
+export async function getBeaconListTargetTextProp(component: Component): Promise<BeaconListTargetTextProp | null> {
+  const found = listTargetTextFieldProp(await component.getProps());
+  return found != null ? { id: found.id, valueType: found.valueType } : null;
+}
+
+/** Back-compat shorthand for callers that only need the prop id. */
+export async function getBeaconListTargetTextPropId(component: Component): Promise<string | null> {
+  return (await getBeaconListTargetTextProp(component))?.id ?? null;
+}
+
+export async function beaconListTargetHasTextProp(component: Component): Promise<boolean> {
+  return listTargetTextFieldProp(await component.getProps()) != null;
 }
 
 function beaconListTargetTextContentPropOptions() {
@@ -32,18 +44,7 @@ function beaconListTargetTextContentPropOptions() {
   };
 }
 
-/**
- * True when a **definition** has a “Text” field (`textContent` or legacy `string`).
- */
-export async function beaconListTargetHasTextProp(component: Component): Promise<boolean> {
-  return listTargetTextFieldProp(await component.getProps()) != null;
-}
-
-/**
- * Binds the list-target root div’s text setting to the “Text” component prop so per-instance values drive the
- * same DOM the data attributes are on.
- */
-async function tryBindListTargetTextPropToRootDom(def: Component): Promise<void> {
+async function bindListTargetTextPropToRootDom(def: Component, prop: Prop): Promise<void> {
   const root = await def.getRootElement();
   if (root == null || root.type !== "DOM") {
     return;
@@ -52,42 +53,42 @@ async function tryBindListTargetTextPropToRootDom(def: Component): Promise<void>
   if (typeof dom.searchSettings !== "function") {
     return;
   }
-  const p = listTargetTextFieldProp(await def.getProps());
-  if (p == null) {
-    return;
-  }
 
-  let map = await dom.searchSettings({ valueType: p.valueType });
+  let map = await dom.searchSettings({ valueType: prop.valueType });
   if (Object.keys(map).length === 0 && dom.textContent === true) {
     await dom.setTextContent("");
-    map = await dom.searchSettings({ valueType: p.valueType });
+    map = await dom.searchSettings({ valueType: prop.valueType });
   }
-  if (Object.keys(map).length === 0 && p.valueType !== "textContent") {
+  if (Object.keys(map).length === 0 && prop.valueType !== "textContent") {
     map = await dom.searchSettings({ valueType: "textContent" });
   }
 
-  for (const [key, se] of Object.entries(map)) {
-    if (se.canBind) {
-      const input: SetSettingsInput = { [key]: { sourceType: "prop", propId: p.id } };
+  for (const [key, setting] of Object.entries(map)) {
+    if (setting.canBind) {
+      const input: SetSettingsInput = { [key]: { sourceType: "prop", propId: prop.id } };
       await dom.setSettings(input);
       return;
     }
   }
 }
 
+async function userCanModifyComponents(): Promise<boolean> {
+  const perms = await webflow.canForAppMode([webflow.appModes.canModifyComponents]);
+  return perms[webflow.appModes.canModifyComponents];
+}
+
 /**
- * Creates the `textContent` “Text” prop (when missing) and binds it to the root. Call after the builder root has
- * `setTextContent` in {@link createBeaconListTargetComponent}.
- * @returns `true` if the field exists after the call (or already existed), `false` if creation is not allowed or failed.
+ * Idempotent: returns `true` when the Text prop exists (creating + binding it to the root if needed) and `false`
+ * when the user lacks `canModifyComponents` and the prop is still missing. Throws only on unexpected errors from
+ * the Designer API; `createProps` failures are surfaced as `false` so callers can decide whether to escalate.
  */
 export async function tryAddBeaconListTargetTextPropDirectToDefinition(def: Component): Promise<boolean> {
-  const has = listTargetTextFieldProp(await def.getProps()) != null;
-  const perms = await webflow.canForAppMode([webflow.appModes.canModifyComponents]);
-  const canModify = perms[webflow.appModes.canModifyComponents];
+  const existing = listTargetTextFieldProp(await def.getProps());
+  const canModify = await userCanModifyComponents();
 
-  if (has) {
+  if (existing != null) {
     if (canModify) {
-      await tryBindListTargetTextPropToRootDom(def);
+      await bindListTargetTextPropToRootDom(def, existing);
     }
     return true;
   }
@@ -99,106 +100,24 @@ export async function tryAddBeaconListTargetTextPropDirectToDefinition(def: Comp
   } catch {
     return false;
   }
-  if (listTargetTextFieldProp(await def.getProps()) == null) {
+  const created = listTargetTextFieldProp(await def.getProps());
+  if (created == null) {
     return false;
   }
-  await tryBindListTargetTextPropToRootDom(def);
+  await bindListTargetTextPropToRootDom(def, created);
   return true;
 }
 
-async function exitUntilPageForInstanceEnter(): Promise<void> {
-  for (let step = 0; step < MAX_NESTED_COMPONENT_EXITS; step += 1) {
-    await exitCurrentComponentIfAny();
-    if ((await webflow.getCurrentComponent().catch(() => null)) == null) {
-      return;
-    }
-  }
-}
-
 /**
- * When direct `createProps` on the definition is not available, use the same pattern as image export: page context →
- * `enterComponent` → `getCurrentComponent` → `createProps` → `exitComponent`.
+ * Ensures the `textContent` Text prop exists on a list-target definition we own (registered via
+ * {@link createBeaconListTargetComponent}). Throws when the prop can’t be added so callers can surface a clear
+ * error instead of silently binding to nothing.
  */
-async function addListTargetTextPropByEnteringInstance(
-  def: Component,
-  input: { dataList: string; listContainer: BlockElement }
-): Promise<void> {
-  if (listTargetTextFieldProp(await def.getProps()) != null) {
-    await tryBindListTargetTextPropToRootDom(def);
-    return;
-  }
-  const perms = await webflow.canForAppMode([webflow.appModes.canModifyComponents]);
-  if (!perms[webflow.appModes.canModifyComponents]) {
-    return;
-  }
-
-  const instances = await listBeaconListTargetInstancesOnPage(input.dataList, input.listContainer, {
-    maxMatches: 1,
-    preferredDefinitionId: def.id,
-  });
-  const instance = instances[0];
-  if (instance == null) {
-    return;
-  }
-
-  await exitUntilPageForInstanceEnter();
-
-  let entered = false;
-  try {
-    await webflow.enterComponent(instance);
-    entered = true;
-  } catch (e) {
-    console.warn(LOG_PREFIX, "enterComponent failed (instance path)", e);
-    return;
-  }
-  try {
-    const editingDef = await webflow.getCurrentComponent();
-    if (editingDef == null || editingDef.id !== def.id) {
-      return;
-    }
-    if (listTargetTextFieldProp(await editingDef.getProps()) != null) {
-      await tryBindListTargetTextPropToRootDom(editingDef);
-      return;
-    }
-    await editingDef.createProps([beaconListTargetTextContentPropOptions()]);
-    await tryBindListTargetTextPropToRootDom(editingDef);
-  } finally {
-    if (entered) {
-      try {
-        await webflow.exitComponent();
-      } catch (e) {
-        console.warn(LOG_PREFIX, "exitComponent failed (non-fatal)", e);
-      }
-    }
-  }
-
-  if (listTargetTextFieldProp(await def.getProps()) != null) {
-    return;
-  }
-  const defName = await def.getName();
-  // “Beacon Utilities” matches `BEACON_UTILITIES_COMPONENT_GROUP` in create-beacon-list-target-component.
-  throw new Error(
-    `Could not add the “Text” field. Open the list target from Components → “Beacon Utilities” → “${defName}” and use Place on canvas, or add a Text (text) field in the component settings.`
-  );
-}
-
-/**
- * Ensures the `textContent` “Text” prop and DOM binding. Tries a direct `createProps` on the definition first, then
- * the image-style `enterComponent` path when the instance is on the page.
- */
-export async function ensureBeaconListTargetTextProp(
-  def: Component,
-  input: { dataList: string; listContainer: BlockElement }
-): Promise<void> {
+export async function ensureBeaconListTargetTextProp(def: Component): Promise<void> {
   if (await tryAddBeaconListTargetTextPropDirectToDefinition(def)) {
     return;
   }
-  try {
-    await addListTargetTextPropByEnteringInstance(def, input);
-  } catch (e) {
-    if (listTargetTextFieldProp(await def.getProps()) != null) {
-      return;
-    }
-    throw e;
-  }
+  throw new Error(
+    "Could not add the “Text” field to the list target. Open the project so it can be edited and try again."
+  );
 }

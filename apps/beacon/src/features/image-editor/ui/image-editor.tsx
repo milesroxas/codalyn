@@ -62,12 +62,7 @@ function shouldShowAutoPageSelectionChoice(
   );
 }
 
-type ImageEditorProps = {
-  onOnboardingVisibilityChange?: (visible: boolean) => void;
-};
-
-export function ImageEditor(props: ImageEditorProps = {}) {
-  const { onOnboardingVisibilityChange } = props;
+export function ImageEditor() {
   const navigate = useNavigate();
   const { settings, updateSettings, canPersistExportDefaults, syncState, workspaceMemberRole, isTowerUser } =
     useBeaconAppSettings();
@@ -245,10 +240,6 @@ export function ImageEditor(props: ImageEditorProps = {}) {
       setGuestOnboardingComplete(true);
     }
   }, [towerUser]);
-
-  useEffect(() => {
-    onOnboardingVisibilityChange?.(showGuestOnboarding);
-  }, [onOnboardingVisibilityChange, showGuestOnboarding]);
 
   useEffect(() => {
     if (towerUser && prevShowGuestOnboarding.current) {

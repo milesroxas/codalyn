@@ -14,9 +14,17 @@ describe("draftToHiddenListIndices", () => {
     expect(r).toEqual({ ok: true, indices: [0, 2, 1] });
   });
 
-  it("fails when an instance is missing", () => {
+  it("reuses a pool index when the draft repeats a type more times than the pool has children", () => {
     const pool = [{ componentId: "a" }];
-    expect(draftToHiddenListIndices(pool, [{ componentId: "a" }, { componentId: "a" }])).toEqual({ ok: false });
+    expect(draftToHiddenListIndices(pool, [{ componentId: "a" }, { componentId: "a" }])).toEqual({
+      ok: true,
+      indices: [0, 0],
+    });
+  });
+
+  it("fails when no pool child matches a draft row", () => {
+    const pool = [{ componentId: "a" }];
+    expect(draftToHiddenListIndices(pool, [{ componentId: "a" }, { componentId: "b" }])).toEqual({ ok: false });
   });
 });
 

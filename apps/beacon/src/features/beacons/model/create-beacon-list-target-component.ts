@@ -246,6 +246,13 @@ export async function createBeaconListTargetComponent(input: {
   listContainer: BlockElement;
 }): Promise<{ component: Component; definitionId: string }> {
   const { dataList, listContainer } = input;
+  const existing = await getBeaconListTargetComponentOrNull(dataList, listContainer);
+  if (existing != null) {
+    await applyBeaconListTargetSync(existing, dataList, listContainer);
+    await tryAddBeaconListTargetTextPropDirectToDefinition(existing);
+    return { component: existing, definitionId: existing.id };
+  }
+
   const name = uniqueBeaconListTargetComponentName(dataList, listContainer);
   const attrs = beaconListTargetDataAttributes(dataList, listContainer);
 

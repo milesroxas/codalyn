@@ -84,6 +84,27 @@ export function serializeSlotPropsFile(f: BeaconEngineSlotPropsFile): string {
   return JSON.stringify(f satisfies BeaconEngineSlotPropsFile);
 }
 
+function findOldPoolIndexForRow(
+  oldPool: readonly { componentId: string; exposed: ComposableInstancePropMeta[] }[],
+  componentId: string,
+  used: Set<number>
+): number {
+  for (let i = 0; i < oldPool.length; i++) {
+    if (used.has(i)) {
+      continue;
+    }
+    if (oldPool[i].componentId === componentId) {
+      return i;
+    }
+  }
+  for (let i = 0; i < oldPool.length; i++) {
+    if (oldPool[i].componentId === componentId) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 /**
  * @param poolComponentIds — component id per hidden list slot, in child order; used to realign on rebuild.
  */
@@ -93,16 +114,7 @@ export function realignExposedByPoolOrder(
 ): BeaconEngineSlotEntry[] {
   const used = new Set<number>();
   return newPool.map((row) => {
-    let found = -1;
-    for (let i = 0; i < oldPool.length; i++) {
-      if (used.has(i)) {
-        continue;
-      }
-      if (oldPool[i].componentId === row.componentId) {
-        found = i;
-        break;
-      }
-    }
+    const found = findOldPoolIndexForRow(oldPool, row.componentId, used);
     if (found < 0) {
       return { exposed: [] };
     }

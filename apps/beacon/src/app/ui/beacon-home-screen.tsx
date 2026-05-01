@@ -1,6 +1,6 @@
 import { Image as ImageIcon, Radio } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useNavigate, useOutletContext } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   readBeaconGuestWelcomeComplete,
   writeBeaconGuestWelcomeComplete,
@@ -13,25 +13,16 @@ import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
-type BeaconShellOutletContext = {
-  setOnboardingVisible: (visible: boolean) => void;
-};
-
 const TOWER_EMAIL_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";
 
 export function BeaconHomeScreen() {
   const navigate = useNavigate();
-  const { setOnboardingVisible } = useOutletContext<BeaconShellOutletContext>();
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
   const towerConfigured = isTowerConfigured();
   const base = getTowerAuthBaseUrl();
 
   const [guestWelcomeDone, setGuestWelcomeDone] = useState(readBeaconGuestWelcomeComplete);
   const showWelcomeGate = !towerSessionPending && !towerUser && !guestWelcomeDone;
-
-  useEffect(() => {
-    setOnboardingVisible(showWelcomeGate);
-  }, [setOnboardingVisible, showWelcomeGate]);
 
   const openTowerEmailSignInPopup = () => {
     const origin = encodeURIComponent(window.location.origin);

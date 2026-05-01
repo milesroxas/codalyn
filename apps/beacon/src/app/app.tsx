@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { HashRouter, Navigate, Outlet, Route, Routes, useNavigate, useOutletContext } from "react-router-dom";
+import { useEffect } from "react";
+import { HashRouter, Navigate, Outlet, Route, Routes, useNavigate } from "react-router-dom";
 import { BeaconHomeScreen } from "@/app/ui/beacon-home-screen";
 import Header from "@/app/ui/Header";
 import { BeaconsScreen } from "@/features/beacons";
@@ -10,18 +10,13 @@ import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
 import { buildInfo } from "@/shared/lib/build-info";
 import { TooltipProvider } from "@/shared/ui/tooltip";
 
-type BeaconShellOutletContext = {
-  setOnboardingVisible: (visible: boolean) => void;
-};
-
 function BeaconSettingsPage() {
   const navigate = useNavigate();
   return <BeaconSettingsScreen onBack={() => navigate(-1)} />;
 }
 
 function BeaconImagesPage() {
-  const { setOnboardingVisible } = useOutletContext<BeaconShellOutletContext>();
-  return <ImageEditor onOnboardingVisibilityChange={setOnboardingVisible} />;
+  return <ImageEditor />;
 }
 
 function BeaconBeaconsPage() {
@@ -32,15 +27,11 @@ function BeaconBeaconsPage() {
 }
 
 function BeaconShell() {
-  const [onboardingVisible, setOnboardingVisible] = useState(true);
-
-  const showHeader = !onboardingVisible;
-
   return (
     <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-version={buildInfo.version}>
-      {showHeader ? <Header /> : null}
+      <Header />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-4">
-        <Outlet context={{ setOnboardingVisible }} />
+        <Outlet />
       </div>
     </main>
   );

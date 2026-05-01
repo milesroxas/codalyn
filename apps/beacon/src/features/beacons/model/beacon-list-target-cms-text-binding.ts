@@ -1,29 +1,38 @@
-import { getBeaconListTargetTextPropId } from "@/features/beacons/model/beacon-list-target-text-field";
+import { getBeaconListTargetTextProp } from "@/features/beacons/model/beacon-list-target-text-field";
 import { towerFetch } from "@/shared/lib/tower-client";
+import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
 
 const LOG_PREFIX = "[beacon list CMS]";
+const MAX_EXIT_COMPONENT_STEPS = 4;
+const FIELD_VISIBILITY_ATTEMPTS = 6;
+const FIELD_VISIBILITY_DELAY_MS = 250;
 
-/**
- * On the **hidden beacon list** block (one per `data-list`): `collectionId` + `fieldId` for the **CMS Plain Text
- * field owned by the list**. Render targets only **bind** to this; they do not create collection fields.
- */
+/** Designer ↔︎ Data API lag after creating or selecting a CMS field; separate from Tower visibility polling. */
+const CMS_BIND_ATTEMPTS = 12;
+const CMS_BIND_RETRY_DELAY_MS = 200;
+/** After `setProps`, `searchProps()` may lag reflecting the CMS binding — poll before treating bind as failed. */
+const CMS_BIND_POLL_ATTEMPTS = 24;
+const CMS_BIND_POLL_MS = 75;
+
+/** Hidden beacon list block: collection id of the CMS Plain Text field this list binds to. */
 export const BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR = "data-beacon-cms-collection-id";
 
-/** `fieldId` for {@link BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR} (Data API; delete on beacon remove). */
+/** Hidden beacon list block: field id companion to {@link BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR}. */
 export const BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR = "data-beacon-cms-field-id";
 
-/** Display name for the **beacon list** CMS Plain Text field (not the render-target component). */
+export type BeaconListCmsBinding = {
+  collectionId: string;
+  fieldId: string;
+};
+
 export function beaconListCmsPlainTextFieldDisplayName(dataList: string): string {
   return `Beacon list target text · ${dataList}`;
 }
 
-/** @deprecated Use {@link beaconListCmsPlainTextFieldDisplayName}. */
-export function beaconListTargetCmsPlainTextDisplayName(dataList: string): string {
-  return beaconListCmsPlainTextFieldDisplayName(dataList);
-}
-
 /**
- * When the Designer is on a **CMS collection template** page, returns that collection’s id; otherwise `null`.
+ * On a CMS collection template page returns that collection’s id; otherwise `null`. The Designer only resolves CMS
+ * bindable sources for the collection whose template the user is currently editing — `null` here means no CMS bind
+ * is possible right now.
  */
 export async function getCmsTemplateCollectionIdFromCurrentPage(): Promise<string | null> {
   if (typeof webflow.getCurrentPage !== "function") {
@@ -41,13 +50,30 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
-function parseCollectionFields(
-  data: unknown
-): Array<{ id?: string; type?: string; displayName?: string; slug?: string }> {
+type ParsedField = { id?: string; type?: string; displayName?: string; slug?: string };
+
+/** Webflow Data API variants: `PlainText`, hyphenated or spaced forms in GET responses. */
+function isPlainTextFieldType(type: unknown): boolean {
+  if (typeof type !== "string") return false;
+  const normalized = type
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+  return normalized === "plaintext";
+}
+
+/** Stored attrs must reference an actual Plain Text field — otherwise Designer rejects CMS binding (“CMS field not found”). */
+function fieldPlainTextById(fields: readonly ParsedField[] | null | undefined, fieldId: string): ParsedField | null {
+  if (fields == null) return null;
+  const f = fields.find((x) => x.id === fieldId);
+  return f != null && isPlainTextFieldType(f.type) ? f : null;
+}
+
+function parseCollectionFields(data: unknown): ParsedField[] {
   if (!isRecord(data) || !Array.isArray(data.fields)) {
     return [];
   }
-  const out: Array<{ id?: string; type?: string; displayName?: string; slug?: string }> = [];
+  const out: ParsedField[] = [];
   for (const f of data.fields) {
     if (!isRecord(f)) continue;
     out.push({
@@ -60,374 +86,488 @@ function parseCollectionFields(
   return out;
 }
 
-function isPlainTextFieldType(t: string | undefined): boolean {
-  if (t == null) return false;
-  return t.toLowerCase() === "plaintext";
-}
-
-/** Normalizes for comparison when Webflow normalizes middle dots or spacing in display names. */
-function fieldDisplayNameLikelyForBeaconListTarget(displayName: string | undefined, dataList: string): boolean {
-  if (displayName == null) return false;
+function findBeaconListTargetField(fields: readonly ParsedField[], dataList: string): ParsedField | null {
   const want = beaconListCmsPlainTextFieldDisplayName(dataList);
-  if (displayName === want) {
-    return true;
-  }
-  const a = displayName.toLowerCase().replace(/\s+/g, " ").replace(/[·•]/g, "·");
-  const b = want.toLowerCase().replace(/\s+/g, " ").replace(/[·•]/g, "·");
-  return a === b || a.includes(dataList);
-}
-
-function findPlainTextFieldIdForDataList(
-  fields: ReturnType<typeof parseCollectionFields>,
-  dataList: string
-): string | null {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").replace(/[·•]/g, "·");
+  const wantNorm = norm(want);
   for (const f of fields) {
-    if (!isPlainTextFieldType(f.type) || f.id == null) {
+    if (f.id == null || !isPlainTextFieldType(f.type) || f.displayName == null) {
       continue;
     }
-    if (fieldDisplayNameLikelyForBeaconListTarget(f.displayName, dataList)) {
-      return f.id;
+    if (f.displayName === want || norm(f.displayName) === wantNorm) {
+      return f;
     }
   }
   return null;
 }
 
-function parseCreatedFieldId(data: unknown): string | null {
-  if (!isRecord(data)) return null;
-  return typeof data.id === "string" && data.id ? data.id : null;
-}
-
-/**
- * Data API: find or create the **beacon list** Plain Text field in a collection (see {@link beaconListCmsPlainTextFieldDisplayName}).
- * Call only from {@link ensureBeaconListCmsTextFieldOnList} — not from render-target placement.
- */
-export async function ensureBeaconListTargetCmsPlainTextField(
-  collectionId: string,
-  dataList: string
-): Promise<{ collectionId: string; fieldId: string } | null> {
-  const displayName = beaconListCmsPlainTextFieldDisplayName(dataList);
-  const getCollection = async (): Promise<unknown | null> => {
-    const getRes = await towerFetch(`/api/v2/webflow/collections/${encodeURIComponent(collectionId)}`);
-    if (!getRes.ok) {
-      console.warn(LOG_PREFIX, "GET collection failed", getRes.status);
-      return null;
-    }
-    try {
-      return await getRes.json();
-    } catch {
-      return null;
-    }
-  };
-
-  const resolveFromGetJson = (getJson: unknown): string | null => {
-    const fields = parseCollectionFields(getJson);
-    return findPlainTextFieldIdForDataList(fields, dataList);
-  };
-
-  let getJson = await getCollection();
-  if (getJson == null) {
+async function readCollectionFields(collectionId: string): Promise<ParsedField[] | null> {
+  const res = await towerFetch(`/api/v2/webflow/collections/${encodeURIComponent(collectionId)}`);
+  if (!res.ok) {
+    console.warn(LOG_PREFIX, "GET collection failed", res.status);
     return null;
   }
-  const existingId = resolveFromGetJson(getJson);
-  if (existingId != null) {
-    return { collectionId, fieldId: existingId };
+  try {
+    return parseCollectionFields(await res.json());
+  } catch {
+    return null;
   }
+}
 
-  const postRes = await towerFetch(`/api/v2/webflow/collections/${encodeURIComponent(collectionId)}/fields`, {
+async function sleepMs(ms: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function waitForFieldVisibility(collectionId: string, fieldId: string): Promise<boolean> {
+  for (let attempt = 1; attempt <= FIELD_VISIBILITY_ATTEMPTS; attempt += 1) {
+    const fields = await readCollectionFields(collectionId);
+    if (fieldPlainTextById(fields, fieldId) != null) {
+      return true;
+    }
+    if (attempt < FIELD_VISIBILITY_ATTEMPTS) {
+      await sleepMs(FIELD_VISIBILITY_DELAY_MS);
+    }
+  }
+  return false;
+}
+
+async function findExistingBeaconListField(collectionId: string, dataList: string): Promise<string | null> {
+  const fields = await readCollectionFields(collectionId);
+  if (fields == null) {
+    return null;
+  }
+  return findBeaconListTargetField(fields, dataList)?.id ?? null;
+}
+
+async function postNewCmsPlainTextField(collectionId: string, dataList: string): Promise<string | null> {
+  const res = await towerFetch(`/api/v2/webflow/collections/${encodeURIComponent(collectionId)}/fields`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
       type: "PlainText",
-      displayName,
+      displayName: beaconListCmsPlainTextFieldDisplayName(dataList),
       helpText: "Codalyn Beacon: CMS text for this beacon list; list targets bind their Text prop here.",
     }),
   });
-  if (!postRes.ok) {
-    if (postRes.status === 409) {
-      getJson = await getCollection();
-      if (getJson != null) {
-        const idAfterConflict = resolveFromGetJson(getJson);
-        if (idAfterConflict != null) {
-          return { collectionId, fieldId: idAfterConflict };
-        }
-      }
-    }
-    console.warn(LOG_PREFIX, "POST field failed", postRes.status);
+  if (res.status === 409) {
+    return findExistingBeaconListField(collectionId, dataList);
+  }
+  if (!res.ok) {
+    console.warn(LOG_PREFIX, "POST field failed", res.status);
     return null;
   }
-  let postJson: unknown;
+  let body: unknown;
   try {
-    postJson = await postRes.json();
+    body = await res.json();
   } catch {
     return null;
   }
-  const fieldId = parseCreatedFieldId(postJson);
-  if (fieldId == null) {
+  const nested = isRecord(body) && isRecord(body.field) && typeof body.field.id === "string" ? body.field.id : null;
+  const top = isRecord(body) && typeof body.id === "string" && body.id ? body.id : null;
+  const newId = top ?? nested;
+  if (newId == null) {
     console.warn(LOG_PREFIX, "POST field: missing id in response");
     return null;
   }
-  return { collectionId, fieldId };
+  if (!(await waitForFieldVisibility(collectionId, newId))) {
+    console.warn(
+      LOG_PREFIX,
+      "POST field: collection GET still lists the Plain Text field as missing or wrong type — using POST response id anyway (Designer may already resolve it)"
+    );
+  }
+  return newId;
 }
 
 /**
- * Reads {@link BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR} from the hidden beacon list block.
+ * Data API: find or create the per-list Plain Text CMS field. List render targets bind their `Text` prop to this
+ * field (one field per beacon list, shared across all render-target instances).
  */
+async function ensureCmsPlainTextField(collectionId: string, dataList: string): Promise<BeaconListCmsBinding | null> {
+  const existing = await findExistingBeaconListField(collectionId, dataList);
+  if (existing != null) {
+    return { collectionId, fieldId: existing };
+  }
+  const created = await postNewCmsPlainTextField(collectionId, dataList);
+  if (created == null) {
+    return null;
+  }
+  return { collectionId, fieldId: created };
+}
+
 export async function getBeaconListTargetCmsCollectionIdFromListContainer(
   listContainer: BlockElement
 ): Promise<string | null> {
   const raw = await listContainer.getCustomAttribute(BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR);
-  if (raw == null || String(raw).trim() === "") {
-    return null;
-  }
-  return String(raw).trim();
+  return raw != null && String(raw).trim() !== "" ? String(raw).trim() : null;
 }
 
-/**
- * Reads {@link BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR} from the hidden beacon list block.
- */
 export async function getBeaconListTargetCmsFieldIdFromListContainer(
   listContainer: BlockElement
 ): Promise<string | null> {
   const raw = await listContainer.getCustomAttribute(BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR);
-  if (raw == null || String(raw).trim() === "") {
-    return null;
-  }
-  return String(raw).trim();
+  return raw != null && String(raw).trim() !== "" ? String(raw).trim() : null;
 }
 
-async function persistCmsListAttrsOnListBlock(
-  listContainer: BlockElement,
-  binding: { collectionId: string; fieldId: string },
-  logOnFail: string
-): Promise<boolean> {
-  try {
-    await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR, binding.collectionId);
-    await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR, binding.fieldId);
-    return true;
-  } catch (e) {
-    console.warn(LOG_PREFIX, logOnFail, e);
-    return false;
-  }
-}
-
-/** When the Designer is not on a collection page but `data-beacon-cms-collection-id` is already set, resolve field ids via Tower. */
-async function tryEnsureCmsTextFieldFromListAttrCollection(
-  listContainer: BlockElement,
-  dataList: string,
-  collectionIdFromListAttr: string
-): Promise<{ collectionId: string; fieldId: string } | null> {
-  const fromAttr = String(collectionIdFromListAttr).trim();
-  if (fromAttr === "") {
-    return null;
-  }
-  const repaired = await ensureBeaconListTargetCmsPlainTextField(fromAttr, dataList);
-  if (repaired == null) {
-    return null;
-  }
-  if (!(await persistCmsListAttrsOnListBlock(listContainer, repaired, "set cms id attrs (stored collection)"))) {
-    return null;
-  }
-  return repaired;
+async function persistCmsAttrsOnListBlock(listContainer: BlockElement, binding: BeaconListCmsBinding): Promise<void> {
+  await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_COLLECTION_ID_ATTR, binding.collectionId);
+  await listContainer.setCustomAttribute(BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR, binding.fieldId);
 }
 
 /**
- * **Single place** that may create the CMS Plain Text field for a **beacon list** and persist
- * `data-beacon-cms-*` on the hidden list block. Uses stored attrs when they still match the **current**
- * collection template; if the page is a different collection (or first edit after copy), re-resolves
- * the field in that collection and updates attributes (Data API + Tower).
+ * Resolves the CMS binding for this list:
+ * - On a CMS template page: ensures the field exists in **that** collection and persists ids on the list block.
+ * - Off-template with stored attrs: re-validates the stored field still exists in the stored collection.
+ * - Otherwise: `null` (no CMS bind possible right now).
+ *
+ * The Designer only exposes CMS bindable sources on the matching template page, so callers should treat `null`
+ * here as "skip bind" rather than retry forever.
  */
 export async function ensureBeaconListCmsTextFieldOnList(
   listContainer: BlockElement,
   dataList: string
-): Promise<{ collectionId: string; fieldId: string } | null> {
-  const currentPageCollectionId = await getCmsTemplateCollectionIdFromCurrentPage();
-  const existingC = await getBeaconListTargetCmsCollectionIdFromListContainer(listContainer);
-  const existingF = await getBeaconListTargetCmsFieldIdFromListContainer(listContainer);
-  if (existingC != null && existingF != null) {
-    const onCmsTemplate = currentPageCollectionId != null;
-    const listMatchesThisTemplate = !onCmsTemplate || currentPageCollectionId === existingC;
-    if (listMatchesThisTemplate) {
-      return { collectionId: existingC, fieldId: existingF };
+): Promise<BeaconListCmsBinding | null> {
+  const pageCollection = await getCmsTemplateCollectionIdFromCurrentPage();
+  const storedCollection = await getBeaconListTargetCmsCollectionIdFromListContainer(listContainer);
+  const storedField = await getBeaconListTargetCmsFieldIdFromListContainer(listContainer);
+
+  if (pageCollection != null) {
+    if (storedCollection === pageCollection && storedField != null) {
+      const fields = await readCollectionFields(pageCollection);
+      if (fieldPlainTextById(fields, storedField) != null) {
+        return { collectionId: pageCollection, fieldId: storedField };
+      }
+    }
+    const ensured = await ensureCmsPlainTextField(pageCollection, dataList);
+    if (ensured == null) {
+      return null;
+    }
+    await persistCmsAttrsOnListBlock(listContainer, ensured);
+    return ensured;
+  }
+
+  if (storedCollection != null && storedField != null) {
+    const fields = await readCollectionFields(storedCollection);
+    if (fieldPlainTextById(fields, storedField) != null) {
+      return { collectionId: storedCollection, fieldId: storedField };
     }
   }
 
-  if (currentPageCollectionId == null && existingC != null) {
-    return tryEnsureCmsTextFieldFromListAttrCollection(listContainer, dataList, existingC);
-  }
-
-  const collectionId = currentPageCollectionId;
-  if (collectionId == null) {
-    return null;
-  }
-  const ensured = await ensureBeaconListTargetCmsPlainTextField(collectionId, dataList);
-  if (ensured == null) {
-    return null;
-  }
-  if (!(await persistCmsListAttrsOnListBlock(listContainer, ensured, "set cms id attrs on list block"))) {
-    return null;
-  }
-  return ensured;
+  return null;
 }
 
-/**
- * Resolves the collection to use for CMS field cleanup: persisted attribute on the list block, else the
- * current page’s collection when the Designer is on a template.
- */
 export async function resolveBeaconListTargetCmsCollectionIdForCleanup(
   listContainer: BlockElement
 ): Promise<string | null> {
   const fromAttr = await getBeaconListTargetCmsCollectionIdFromListContainer(listContainer);
-  if (fromAttr != null) {
-    return fromAttr;
-  }
-  return getCmsTemplateCollectionIdFromCurrentPage();
+  return fromAttr ?? (await getCmsTemplateCollectionIdFromCurrentPage());
 }
 
 /**
- * Best-effort: removes the **PlainText** field for this beacon list. Prefer `fieldId` (from
- * {@link BEACON_LIST_TARGET_CMS_FIELD_ID_ATTR}) and `DELETE .../fields/{fieldId}`; otherwise resolves by display
- * name from a collection GET. No-op when the field is missing or Tower / API fails (logged).
+ * Best-effort delete of the per-list Plain Text field. Prefer `fieldId` (from the list block); fall back to
+ * resolving by display name. No-op when the field is already gone or Tower / API fails (logged).
  */
 export async function tryDeleteBeaconListTargetCmsPlainTextField(
   collectionId: string,
   dataList: string,
   fieldId?: string | null
 ): Promise<void> {
-  const fromAttr = fieldId != null && String(fieldId).trim() !== "" ? String(fieldId).trim() : null;
-  if (fromAttr != null) {
-    const delById = await towerFetch(
-      `/api/v2/webflow/collections/${encodeURIComponent(collectionId)}/fields/${encodeURIComponent(fromAttr)}`,
+  const direct = fieldId != null && String(fieldId).trim() !== "" ? String(fieldId).trim() : null;
+  if (direct != null) {
+    const res = await towerFetch(
+      `/api/v2/webflow/collections/${encodeURIComponent(collectionId)}/fields/${encodeURIComponent(direct)}`,
       { method: "DELETE", headers: { Accept: "application/json" } }
     );
-    if (delById.ok || delById.status === 404) {
+    if (res.ok || res.status === 404) {
       return;
     }
-    console.warn(LOG_PREFIX, "DELETE field by id failed; falling back to name lookup", delById.status);
+    console.warn(LOG_PREFIX, "DELETE field by id failed; falling back to name lookup", res.status);
   }
-
-  const getRes = await towerFetch(`/api/v2/webflow/collections/${encodeURIComponent(collectionId)}`);
-  if (!getRes.ok) {
-    console.warn(LOG_PREFIX, "GET collection (delete field) failed", getRes.status);
+  const fields = await readCollectionFields(collectionId);
+  const resolved = fields != null ? (findBeaconListTargetField(fields, dataList)?.id ?? null) : null;
+  if (resolved == null) {
     return;
   }
-  let getJson: unknown;
-  try {
-    getJson = await getRes.json();
-  } catch {
-    return;
-  }
-  const resolvedId = findPlainTextFieldIdForDataList(parseCollectionFields(getJson), dataList);
-  if (resolvedId == null) {
-    return;
-  }
-  const delRes = await towerFetch(
-    `/api/v2/webflow/collections/${encodeURIComponent(collectionId)}/fields/${encodeURIComponent(resolvedId)}`,
+  const res = await towerFetch(
+    `/api/v2/webflow/collections/${encodeURIComponent(collectionId)}/fields/${encodeURIComponent(resolved)}`,
     { method: "DELETE", headers: { Accept: "application/json" } }
   );
-  if (!delRes.ok && delRes.status !== 404) {
-    console.warn(LOG_PREFIX, "DELETE field failed", delRes.status);
+  if (!res.ok && res.status !== 404) {
+    console.warn(LOG_PREFIX, "DELETE field failed", res.status);
   }
 }
 
-function cmsBindingMatches(value: unknown, expected: { collectionId: string; fieldId: string }): boolean {
-  if (!isRecord(value) || value.sourceType !== "cms") {
+async function exitToPageCanvas(): Promise<void> {
+  if (typeof webflow.getCurrentComponent !== "function" || typeof webflow.exitComponent !== "function") {
+    return;
+  }
+  for (let step = 0; step < MAX_EXIT_COMPONENT_STEPS; step += 1) {
+    const current = await webflow.getCurrentComponent().catch(() => null);
+    if (current == null) {
+      return;
+    }
+    await webflow.exitComponent().catch(() => undefined);
+  }
+}
+
+type CmsBindingValue = {
+  sourceType: "cms";
+  collectionId: string;
+  fieldId: string;
+};
+
+function isCmsBindingValue(value: unknown): value is CmsBindingValue {
+  if (value == null || typeof value !== "object") {
+    return false;
+  }
+  const row = value as Record<string, unknown>;
+  return (
+    row.sourceType === "cms" &&
+    typeof row.collectionId === "string" &&
+    typeof row.fieldId === "string" &&
+    row.collectionId.trim() !== "" &&
+    row.fieldId.trim() !== ""
+  );
+}
+
+function matchesCmsBinding(value: unknown, expected: BeaconListCmsBinding): boolean {
+  if (!isCmsBindingValue(value)) {
     return false;
   }
   return value.collectionId === expected.collectionId && value.fieldId === expected.fieldId;
 }
 
+/** Concatenate nested Designer error messages (`cause`, etc.) — wording varies by Webflow release / locale. */
+function extractDesignerErrorText(err: unknown): string {
+  const seen = new Set<unknown>();
+  const parts: string[] = [];
+  const walk = (e: unknown): void => {
+    if (typeof e === "string") {
+      parts.push(e);
+      return;
+    }
+    if (e == null || typeof e !== "object") {
+      return;
+    }
+    if (seen.has(e)) {
+      return;
+    }
+    seen.add(e);
+    const o = e as Record<string, unknown>;
+    if (typeof o.message === "string") {
+      parts.push(o.message);
+    }
+    if ("cause" in o) {
+      walk(o.cause);
+    }
+    if (typeof o.details === "string") {
+      parts.push(o.details);
+    }
+  };
+  walk(err);
+  return parts.join("\n").toLowerCase();
+}
+
+/** True when repeating `setProps` may succeed — wording/tags vary (“CMS field not found”, “field not found”, nested causes). */
+function isTransientBeaconListCmsBindFailure(err: unknown): boolean {
+  const tag = webflowDesignerErrorCauseTag(err);
+  if (tag === "ResourceMissing") {
+    return true;
+  }
+  const m = extractDesignerErrorText(err);
+  if (!m.trim()) {
+    return tag === "InvalidRequest";
+  }
+  if (/cms\s+field/i.test(m) && /not\s+found|could\s+not\s+find|unknown|missing|invalid/i.test(m)) {
+    return true;
+  }
+  if (/field.*not\s+found|not\s+found.*field/i.test(m)) {
+    return true;
+  }
+  if (/(cannot|unable\s+to)\s+(find|resolve|load)/i.test(m) && /field|cms|collection/i.test(m)) {
+    return true;
+  }
+  // Designer sometimes surfaces stale-binding issues as InvalidRequest until CMS schema catches up.
+  return tag === "InvalidRequest" && /cms|field|collection|bind/i.test(m);
+}
+
+async function yieldDesignerBeforeCmsBind(): Promise<void> {
+  await sleepMs(0);
+  if (typeof requestAnimationFrame !== "function") {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resolve();
+      });
+    });
+  });
+}
+
+async function verifyCmsBindingApplied(
+  instance: ComponentElement,
+  propId: string,
+  binding: BeaconListCmsBinding
+): Promise<void> {
+  const rows = await instance.searchProps();
+  const bound = rows.find((row) => row.propId === propId);
+  if (bound != null && matchesCmsBinding(bound.value, binding)) {
+    return;
+  }
+
+  const diagnostic = {
+    instanceId: instance.id,
+    propId,
+    expected: { sourceType: "cms", collectionId: binding.collectionId, fieldId: binding.fieldId },
+    observedValue: bound?.value ?? null,
+    searchablePropIds: rows.map((row) => row.propId),
+  };
+  throw new Error(`List target Text CMS binding verification failed after setProps: ${JSON.stringify(diagnostic)}`);
+}
+
+/** Poll after `setProps`; wrong CMS ids fail fast via {@link verifyCmsBindingApplied}. Returns whether binding matched. */
+async function pollUntilListTargetCmsBindingMatches(
+  instance: ComponentElement,
+  propId: string,
+  binding: BeaconListCmsBinding
+): Promise<boolean> {
+  for (let poll = 1; poll <= CMS_BIND_POLL_ATTEMPTS; poll += 1) {
+    const rows = await instance.searchProps();
+    const bound = rows.find((row) => row.propId === propId);
+    if (bound != null && matchesCmsBinding(bound.value, binding)) {
+      return true;
+    }
+    // Wrong CMS ids won’t heal by polling — fail immediately so tests don’t spin on intentional mismatches.
+    if (bound != null && isCmsBindingValue(bound.value)) {
+      await verifyCmsBindingApplied(instance, propId, binding);
+    }
+    if (poll < CMS_BIND_POLL_ATTEMPTS) {
+      await sleepMs(CMS_BIND_POLL_MS);
+    }
+  }
+  return false;
+}
+
+async function applyBeaconListTargetCmsBindingLoop(
+  instance: ComponentElement,
+  propId: string,
+  binding: BeaconListCmsBinding,
+  cmsBindPayload: {
+    propId: string;
+    value: { sourceType: "cms"; collectionId: string; fieldId: string };
+  }
+): Promise<void> {
+  for (let outer = 1; outer <= CMS_BIND_ATTEMPTS; outer += 1) {
+    try {
+      await instance.setProps([cmsBindPayload]);
+    } catch (e) {
+      const retry = outer < CMS_BIND_ATTEMPTS && isTransientBeaconListCmsBindFailure(e);
+      if (!retry) {
+        throw e;
+      }
+      await sleepMs(CMS_BIND_RETRY_DELAY_MS);
+      continue;
+    }
+
+    const matched = await pollUntilListTargetCmsBindingMatches(instance, propId, binding);
+    if (matched) {
+      return;
+    }
+
+    if (outer < CMS_BIND_ATTEMPTS) {
+      await sleepMs(CMS_BIND_RETRY_DELAY_MS);
+      continue;
+    }
+
+    await verifyCmsBindingApplied(instance, propId, binding);
+  }
+}
+
 /**
- * Binds a **render target** instance’s **Text** prop to the **beacon list’s** CMS field (`collectionId` + `fieldId`).
- * Uses `searchProps` for the pre-check so binding matches the full `InstanceProp` shape (getProps summaries omit detail).
+ * Binds a render-target instance’s `Text` prop to the per-list CMS field. Canonical Webflow flow:
+ * 1. Exit any open component context (CMS bindings only resolve on the page canvas).
+ * 2. Resolve the prop id + valueType from the instance’s definition.
+ * 3. Call `setProps([{ propId, value: { sourceType: "cms", collectionId, fieldId } }])` with the slim
+ *    `CmsBindingInput` shape.
+ * 4. Verify once via `searchProps()` that the prop now reflects the expected CMS binding.
+ *
+ * Throws when the prop can’t be resolved or post-set verification fails so callers can surface actionable diagnostics.
  */
 export async function tryBindBeaconListTargetInstanceTextToCms(
   instance: ComponentElement,
   def: Component,
-  binding: { collectionId: string; fieldId: string }
+  binding: BeaconListCmsBinding
 ): Promise<void> {
-  const propId = await getBeaconListTargetTextPropId(def);
-  if (propId == null) {
-    return;
-  }
-  try {
-    const full = await instance.searchProps();
-    const p = full.find((x) => x.propId === propId);
-    if (p != null && cmsBindingMatches(p.value, binding)) {
-      return;
-    }
-  } catch (e) {
-    console.warn(LOG_PREFIX, "searchProps (pre-bind)", e);
-  }
+  await exitToPageCanvas();
 
-  const input: CmsBindingInput = {
-    sourceType: "cms",
-    collectionId: binding.collectionId,
-    fieldId: binding.fieldId,
-  };
+  let instDef: Component | undefined;
   try {
-    if (typeof webflow.setSelectedElement === "function") {
-      await webflow.setSelectedElement(instance);
-    }
+    instDef = await instance.getComponent();
   } catch {
-    /* selection is optional */
+    /* fall back to the definition handle the caller passed in */
   }
-  try {
-    await instance.setProps([{ propId, value: input }]);
-    if (typeof webflow.setSelectedElement === "function") {
+  const prop = await getBeaconListTargetTextProp(instDef ?? def);
+  if (prop == null) {
+    throw new Error("List target Text prop is missing, so CMS binding could not be applied.");
+  }
+
+  if (typeof webflow.setSelectedElement === "function") {
+    try {
       await webflow.setSelectedElement(instance);
+    } catch {
+      /* selection is optional; binding works without it */
     }
-  } catch (e) {
-    console.warn(LOG_PREFIX, "setProps CMS bind", e);
   }
-}
 
-function componentInstanceKey(el: ComponentElement): string {
-  return `${el.id.component}:${el.id.element}`;
+  await yieldDesignerBeforeCmsBind();
+
+  const cmsBindPayload = {
+    propId: prop.id,
+    value: { sourceType: "cms" as const, collectionId: binding.collectionId, fieldId: binding.fieldId },
+  };
+
+  await applyBeaconListTargetCmsBindingLoop(instance, prop.id, binding, cmsBindPayload);
 }
 
 /**
- * Merges `priorityInstances` first (e.g. a node just returned from `append`), then the rest, deduping by id so a
- * newly placed instance is always included even if the page scan has not yet listed it.
- */
-function mergeListTargetInstancesForCmsBinding(
-  priority: readonly ComponentElement[] | undefined,
-  fromPage: readonly ComponentElement[]
-): ComponentElement[] {
-  const seen = new Set<string>();
-  const out: ComponentElement[] = [];
-  for (const el of [...(priority ?? []), ...fromPage]) {
-    const k = componentInstanceKey(el);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(el);
-  }
-  return out;
-}
-
-/**
- * Binds each **list render target** instance’s Text prop to the **beacon list’s** CMS field (see
- * {@link ensureBeaconListCmsTextFieldOnList}). Does not create a separate collection field per render target.
- * Pass `resolvedBinding` when you already called {@link ensureBeaconListCmsTextFieldOnList} (avoids duplicate work).
+ * Binds every list-target instance’s Text prop to the per-list CMS field. Pass `resolvedBinding` when the caller
+ * already ran {@link ensureBeaconListCmsTextFieldOnList}; pass `null` to skip; omit to ensure inside.
  */
 export async function bindBeaconListTargetInstancesToListCmsText(options: {
   dataList: string;
   listContainer: BlockElement;
   def: Component;
-  instances: ComponentElement[];
-  /** Placed or focused instance — always merged first so bind runs even if the page scan lags. */
+  instances: readonly ComponentElement[];
+  /** Placed or focused instance — bound first so a brand-new node is wired before the page-scan results. */
   priorityInstances?: readonly ComponentElement[];
-  /** From a prior `ensure` — required after collection/field attrs change or list target still points at an old field. */
-  resolvedBinding?: { collectionId: string; fieldId: string } | null;
+  /** From a prior `ensure` call. Pass `null` to skip when the caller already knows there’s no field. */
+  resolvedBinding?: BeaconListCmsBinding | null;
 }): Promise<void> {
-  const binding =
-    options.resolvedBinding ?? (await ensureBeaconListCmsTextFieldOnList(options.listContainer, options.dataList));
+  let binding: BeaconListCmsBinding | null;
+  if (options.resolvedBinding !== undefined) {
+    binding = options.resolvedBinding;
+  } else {
+    binding = await ensureBeaconListCmsTextFieldOnList(options.listContainer, options.dataList);
+  }
   if (binding == null) {
     return;
   }
-  const toBind = mergeListTargetInstancesForCmsBinding(options.priorityInstances, options.instances);
-  for (const inst of toBind) {
+
+  const seen = new Set<string>();
+  const ordered: ComponentElement[] = [];
+  for (const el of [...(options.priorityInstances ?? []), ...options.instances]) {
+    const key = `${el.id.component}:${el.id.element}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ordered.push(el);
+  }
+
+  for (const inst of ordered) {
     await tryBindBeaconListTargetInstanceTextToCms(inst, options.def, binding);
   }
+
   const refocus = options.priorityInstances?.find(Boolean);
   if (refocus != null && typeof webflow.setSelectedElement === "function") {
     try {

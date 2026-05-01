@@ -33,6 +33,19 @@ export type BeaconListRuntimePayload = {
   p: Array<Record<string, string>>;
 };
 
+/** CMS/API may stringify `v`; footer runtime uses loose `+payload.v` — keep Composer parsing aligned. */
+function normalizeBeaconPayloadVersion(v: unknown): number | null {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.trim()) : NaN;
+  if (!Number.isFinite(n)) {
+    return null;
+  }
+  const iv = Math.round(n);
+  if (iv === BEACON_LIST_RUNTIME_JSON_VERSION || iv === BEACON_LIST_RUNTIME_JSON_VERSION_LEGACY) {
+    return iv;
+  }
+  return null;
+}
+
 function isIndexArray(x: unknown): x is number[] {
   if (!Array.isArray(x)) {
     return false;
@@ -79,9 +92,10 @@ export function parseBeaconListRuntimePayload(raw: string, childCount?: number):
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     return null;
   }
-  const v = (parsed as { v?: unknown }).v;
+  const vRaw = (parsed as { v?: unknown }).v;
+  const v = normalizeBeaconPayloadVersion(vRaw);
   const i = (parsed as { i?: unknown }).i;
-  if ((v !== BEACON_LIST_RUNTIME_JSON_VERSION && v !== BEACON_LIST_RUNTIME_JSON_VERSION_LEGACY) || !isIndexArray(i)) {
+  if (v == null || !isIndexArray(i)) {
     return null;
   }
   const pRaw = (parsed as { p?: unknown }).p;

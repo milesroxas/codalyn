@@ -46,7 +46,7 @@ export async function reconcileBeaconListTarget(
     }
 
     try {
-      await ensureBeaconListTargetTextProp(comp, { dataList, listContainer });
+      await ensureBeaconListTargetTextProp(comp);
     } catch {
       /* List target is still usable; Text field is added on create/place in normal cases. */
     }

@@ -4,7 +4,6 @@ import { Button } from "@/shared/ui/button";
 import { BeaconComposerRuntimeSyncAlert } from "./beacon-composer-runtime-sync-alert";
 import { ComposerOrderSection } from "./composer-order-section";
 import { ComposerPaletteSection } from "./composer-palette-section";
-import { useComposerReorderDnd } from "./use-composer-reorder-dnd";
 
 export type BeaconComposerStudioPanelProps = {
   activeDataList: string;
@@ -52,7 +51,6 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
   } = props;
 
   const busy = savePending || embedSyncPending;
-  const dnd = useComposerReorderDnd({ draft, onReorder, busy });
 
   return (
     <div className="space-y-3" data-slot="beacon_composer_studio">
@@ -91,14 +89,7 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
         emptyWhenNoSavedOrderHint={emptyTargetOrderHint}
         allowedPaletteCount={allowedPalette.length}
         busy={busy}
-        dragActive={dnd.dragActive}
-        draggingKey={dnd.draggingKey}
-        dropSlotIndex={dnd.dropSlotIndex}
-        isReorderInProgress={dnd.isReorderInProgress}
-        onSetDropSlot={dnd.setDropSlotIndex}
-        onDropAtSlot={dnd.handleDropAtSlot}
-        onDragStart={dnd.handleDragStart}
-        onDragEnd={dnd.handleDragEnd}
+        onReorder={onReorder}
         onRemove={onRemove}
       />
 

@@ -36,7 +36,6 @@ export function BeaconCompositionComponentsCatalog(props: BeaconCompositionCompo
         id={searchFieldId}
         value={componentQuery}
         onChange={(e) => setComponentQuery(e.target.value)}
-        placeholder="Search components"
         autoComplete="off"
         aria-busy={catalogLoading}
       />
@@ -45,7 +44,7 @@ export function BeaconCompositionComponentsCatalog(props: BeaconCompositionCompo
           {catalogError}
         </p>
       ) : null}
-      <div className="relative h-40 rounded-lg border border-border">
+      <div className="relative h-40 rounded-sm border border-border">
         {catalogLoading ? (
           <div
             className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-[1px]"
@@ -58,38 +57,38 @@ export function BeaconCompositionComponentsCatalog(props: BeaconCompositionCompo
           </div>
         ) : null}
         <ScrollArea className="h-full min-h-0 pr-0.5 pl-0" data-state={catalogLoading ? "loading" : "idle"}>
-          <ul className="p-1.5" aria-label="Components">
-            {componentCatalog.length === 0 && !catalogLoading ? (
-              <li className="px-2 py-4 text-center text-sm text-muted-foreground">None</li>
-            ) : null}
-            {componentCatalog.map((c) => {
-              const isAlreadyAdded = selectedComponentIdSet.has(c.id);
-              return (
-                <li key={c.id} className="p-0.5">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-auto w-full min-w-0 flex-col items-stretch py-1.5 text-left"
-                    onClick={() => void onAddComponent(c)}
-                    disabled={addPending || catalogLoading || isAlreadyAdded}
-                    aria-disabled={isAlreadyAdded}
-                  >
-                    <span
-                      className={
-                        isAlreadyAdded
-                          ? "font-medium wrap-break-word text-muted-foreground"
-                          : "font-medium wrap-break-word"
-                      }
+          {componentCatalog.length === 0 && !catalogLoading ? (
+            <div className="min-h-28" aria-hidden />
+          ) : (
+            <ul className="p-1.5" aria-label="Components">
+              {componentCatalog.map((c) => {
+                const isAlreadyAdded = selectedComponentIdSet.has(c.id);
+                return (
+                  <li key={c.id} className="p-0.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-auto w-full min-w-0 flex-col items-stretch py-1.5 text-left"
+                      onClick={() => void onAddComponent(c)}
+                      disabled={addPending || catalogLoading || isAlreadyAdded}
+                      aria-disabled={isAlreadyAdded}
                     >
-                      {c.name}
-                      {isAlreadyAdded ? <span className="ml-1.5 text-xs text-muted-foreground">(added)</span> : null}
-                    </span>
-                    {c.group ? <span className="text-xs text-muted-foreground">{c.group}</span> : null}
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
+                      <span
+                        className={
+                          isAlreadyAdded
+                            ? "font-medium wrap-break-word text-muted-foreground"
+                            : "font-medium wrap-break-word"
+                        }
+                      >
+                        {c.name}
+                      </span>
+                      {c.group ? <span className="text-xs text-muted-foreground">{c.group}</span> : null}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </ScrollArea>
       </div>
     </div>

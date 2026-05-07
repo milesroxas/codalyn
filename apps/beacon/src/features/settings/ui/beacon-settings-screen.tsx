@@ -10,6 +10,7 @@ import {
   type SettingsSectionId,
   SettingsSectionNav,
 } from "@/features/settings/ui/settings-section-nav";
+import { beaconAppRouteSurfaceClass } from "@/shared/lib/beacon-app-route-surface";
 import { Button } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
@@ -64,7 +65,7 @@ export function BeaconSettingsScreen(props: BeaconSettingsScreenProps) {
   }, [allowPresetsSection, section]);
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <div className={beaconAppRouteSurfaceClass}>
       <header className="supports-backdrop-filter:bg-background/75 relative border-b border-border/70 bg-background/90 px-3 pt-2 pb-0 backdrop-blur">
         <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2">
           <div className="flex min-w-0 items-center gap-2 overflow-hidden">

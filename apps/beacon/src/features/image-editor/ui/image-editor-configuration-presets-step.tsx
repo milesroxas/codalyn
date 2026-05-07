@@ -451,7 +451,7 @@ function ImageEditorConfigurationPresetsListView(props: {
             {workspaceRows.map((p) => (
               <li
                 key={p.id}
-                className="flex min-w-0 items-center gap-2 rounded-lg border border-border/80 bg-muted/20 px-3 py-2"
+                className="flex min-w-0 items-center gap-2 rounded-sm border border-border/80 bg-muted/20 px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium leading-snug">{p.name}</p>
@@ -494,7 +494,7 @@ function ImageEditorConfigurationPresetsListView(props: {
                 {designerRows.map((p) => (
                   <li
                     key={p.id}
-                    className="text-muted-foreground flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2 text-xs"
+                    className="text-muted-foreground flex min-w-0 items-center justify-between gap-2 rounded-sm border border-border/60 px-3 py-2 text-xs"
                   >
                     <span className="min-w-0 font-medium text-foreground">{p.name}</span>
                     <span className="tabular-nums">
@@ -699,7 +699,7 @@ function ImageEditorConfigurationPresetsFormView(props: {
 
         {formSubStep === 3 ? (
           <>
-            <div className="space-y-3 rounded-lg border border-border/80 bg-muted/20 p-3 text-sm">
+            <div className="space-y-3 rounded-sm border border-border/80 bg-muted/20 p-3 text-sm">
               <div className="space-y-0.5">
                 <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">Surface</p>
                 <p className="min-w-0 wrap-break-word leading-snug">

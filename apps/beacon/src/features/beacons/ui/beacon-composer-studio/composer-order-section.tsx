@@ -14,24 +14,14 @@ type ComposerOrderSectionProps = {
   draft: BeaconCompositionDraftRow[];
   rowMeta: BeaconComposerRowMeta[];
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
-  emptyWhenNoSavedOrderHint: string | null;
-  allowedPaletteCount: number;
   busy: boolean;
   onReorder: (fromIndex: number, toIndex: number) => void;
+  onRenameSlot: (rowKey: string, name: string) => void;
   onRemove: (key: string) => void;
 };
 
 export function ComposerOrderSection(props: ComposerOrderSectionProps) {
-  const {
-    draft,
-    rowMeta,
-    onChangePropValue,
-    emptyWhenNoSavedOrderHint,
-    allowedPaletteCount,
-    busy,
-    onReorder,
-    onRemove,
-  } = props;
+  const { draft, rowMeta, onChangePropValue, busy, onReorder, onRenameSlot, onRemove } = props;
 
   const [fieldsOpenByKey, setFieldsOpenByKey] = useState<Record<string, boolean>>({});
 
@@ -50,23 +40,8 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
 
   return (
     <section className="space-y-2" data-slot="beacon_composer_order">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Target order</p>
-        <p className="text-xs text-muted-foreground">
-          {draft.length} {draft.length === 1 ? "item" : "items"}
-        </p>
-      </div>
-
       {draft.length === 0 ? (
-        <div className="rounded-md border border-dashed border-border px-2.5 py-3 text-sm text-muted-foreground">
-          {emptyWhenNoSavedOrderHint != null && emptyWhenNoSavedOrderHint !== "" ? (
-            <span className="block leading-snug">{emptyWhenNoSavedOrderHint}</span>
-          ) : allowedPaletteCount > 0 ? (
-            "Add components from the palette below."
-          ) : (
-            "No component types in this list yet. Add list items in Engine first."
-          )}
-        </div>
+        <div className="min-h-24 rounded-sm border border-dashed border-border bg-muted/10" aria-hidden />
       ) : (
         <DndContext
           sensors={sensors}
@@ -91,6 +66,7 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
                       fieldsOpen={hasFields ? fieldsOpen : false}
                       onFieldsOpenChange={(open) => setFieldsOpen(row.key, open)}
                       onChangePropValue={onChangePropValue}
+                      onRenameSlot={onRenameSlot}
                       onRemove={onRemove}
                     />
                   );

@@ -207,7 +207,7 @@ function AccessModeChip({ label, tooltip }: { label: string; tooltip: ReactNode 
         type="button"
         tabIndex={0}
         aria-describedby={undefined}
-        className="inline-flex h-5 cursor-help items-center rounded-full bg-muted/60 px-2 text-xs font-normal text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex h-5 cursor-help items-center rounded-sm bg-muted/60 px-2 text-xs font-normal text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         {label}
       </TooltipTrigger>
@@ -290,11 +290,11 @@ function SignedInAccountSections({
             <img
               src={user.image}
               alt=""
-              className="size-10 shrink-0 rounded-full object-cover ring-1 ring-inset ring-border"
+              className="size-10 shrink-0 rounded-sm object-cover ring-1 ring-inset ring-border"
             />
           ) : (
             <div
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground ring-1 ring-inset ring-border"
+              className="flex size-10 shrink-0 items-center justify-center rounded-sm bg-muted text-xs font-semibold text-muted-foreground ring-1 ring-inset ring-border"
               aria-hidden
             >
               {userInitials(user)}
@@ -348,7 +348,7 @@ function SignedInAccountSections({
               </Button>
             ) : null}
             <Badge variant="outline" className="gap-1.5 font-normal">
-              <span aria-hidden className={cn("size-1.5 rounded-full", syncStatusMeta(syncState).dotClass)} />
+              <span aria-hidden className={cn("size-1.5 rounded-sm", syncStatusMeta(syncState).dotClass)} />
               {syncStatusMeta(syncState).label}
             </Badge>
           </div>

@@ -33,7 +33,7 @@ export function BeaconEngineSelectedRow(props: BeaconEngineSelectedRowProps) {
     onResyncEngineSlotAttrs,
   } = props;
   return (
-    <li className="space-y-1.5 rounded-lg border border-border bg-muted/30 px-2 py-1.5">
+    <li className="space-y-1.5 rounded-sm border border-border bg-muted/30 px-2 py-1.5">
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 text-sm wrap-break-word">{row.name}</span>
         <Button
@@ -49,15 +49,12 @@ export function BeaconEngineSelectedRow(props: BeaconEngineSelectedRowProps) {
         </Button>
       </div>
       <div className="space-y-1 border-t border-border/60 pt-1.5" data-slot="beacon_engine_exposed_props">
-        <p className="text-xs text-muted-foreground">Expose to Studio (optional)</p>
         {composableLoading && available.length === 0 ? (
           <p className="text-xs text-muted-foreground" role="status">
             <Loader2 className="mr-1 inline size-3 animate-spin align-middle" aria-hidden />
             Loading…
           </p>
-        ) : available.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No component props on this instance.</p>
-        ) : (
+        ) : available.length === 0 ? null : (
           <ul className="m-0 max-h-28 list-none space-y-1.5 overflow-y-auto p-0 pr-0.5" aria-label="Studio props">
             {available.map((p) => {
               const on = slotExposed.some((e) => e.propId === p.propId);
@@ -94,12 +91,7 @@ export function BeaconEngineSelectedRow(props: BeaconEngineSelectedRowProps) {
           </ul>
         )}
       </div>
-      <div className="mt-0.5 space-y-1 border-t border-border/50 pt-1.5">
-        <p className="text-[0.65rem] leading-snug text-muted-foreground">
-          Adds <code className="font-mono text-[0.6rem]">data-codalyn-beacon-prop</code> on elements in the component
-          that are <span className="text-foreground">bound</span> to the props above for the variant open in Component
-          mode (repeat after switching variants if layouts differ).
-        </p>
+      <div className="mt-0.5 border-t border-border/50 pt-1.5">
         <Button
           type="button"
           variant="secondary"
@@ -109,7 +101,7 @@ export function BeaconEngineSelectedRow(props: BeaconEngineSelectedRowProps) {
           aria-busy={resyncingEngineSlotKey === row.key}
           onClick={() => onResyncEngineSlotAttrs(slotIndex)}
         >
-          {resyncingEngineSlotKey === row.key ? "Tagging…" : "Tag data attributes on component"}
+          {resyncingEngineSlotKey === row.key ? "Tagging…" : "Tag data attributes"}
         </Button>
       </div>
     </li>

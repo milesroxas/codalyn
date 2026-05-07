@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/shared/ui/separator";
 
 const themeTileClass =
-  "relative flex min-h-0 min-w-0 cursor-pointer flex-col items-center gap-1 rounded-md border border-border/80 bg-muted/20 p-2 pt-5 text-center transition-colors hover:bg-muted/35 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-muted/40 has-[[data-state=checked]]:shadow-sm";
+  "relative flex min-h-0 min-w-0 cursor-pointer flex-col items-center gap-1 rounded-sm border border-border/80 bg-muted/20 p-2 pt-5 text-center transition-colors hover:bg-muted/35 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-muted/40 has-[[data-state=checked]]:shadow-sm";
 
 export function SettingsPreferencesPanel() {
   const baseId = useId();

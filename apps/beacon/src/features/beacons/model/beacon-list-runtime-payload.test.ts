@@ -23,13 +23,30 @@ describe("parseBeaconListRuntimePayload", () => {
     expect(parseBeaconListRuntimePayload('{"v":3,"i":[0]}')).toBeNull();
   });
 
-  it("round-trips and drops out-of-range indices when child count is set", () => {
-    const s = serializeBeaconListRuntimePayload([1, 0, 2], [{ a: "x" }, {}, { y: "z" }]);
+  it("round-trips parallel slot labels in n", () => {
+    const s = serializeBeaconListRuntimePayload([0, 1], [{ a: "" }, {}], ["Alpha", "Beta"]);
     const a = parseBeaconListRuntimePayload(s);
-    expect(a).toEqual({ v: BEACON_LIST_RUNTIME_JSON_VERSION, i: [1, 0, 2], p: [{ a: "x" }, {}, { y: "z" }] });
+    expect(a).toEqual({
+      v: BEACON_LIST_RUNTIME_JSON_VERSION,
+      i: [0, 1],
+      p: [{ a: "" }, {}],
+      n: ["Alpha", "Beta"],
+    });
+  });
+
+  it("round-trips and drops out-of-range indices when child count is set", () => {
+    const s = serializeBeaconListRuntimePayload([1, 0, 2], [{ a: "x" }, {}, { y: "z" }], ["L1", "L2", "L3"]);
+    const a = parseBeaconListRuntimePayload(s);
+    expect(a).toEqual({
+      v: BEACON_LIST_RUNTIME_JSON_VERSION,
+      i: [1, 0, 2],
+      p: [{ a: "x" }, {}, { y: "z" }],
+      n: ["L1", "L2", "L3"],
+    });
     const b = parseBeaconListRuntimePayload(s, 2);
     expect(b?.i).toEqual([1, 0]);
     expect(b?.p).toEqual([{ a: "x" }, {}]);
+    expect(b?.n).toEqual(["L1", "L2"]);
   });
 
   it("accepts v1 payload without p", () => {

@@ -1,4 +1,3 @@
-import { Image as ImageIcon, Radio } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -8,18 +7,65 @@ import {
 import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
+import { BEACON_HOME_TILE_CSS_VARS } from "@/shared/lib/beacon-app-backgrounds";
 import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
+import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { cn } from "@/shared/lib/utils";
-import { Button } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
 const TOWER_EMAIL_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";
+
+type BeaconHomeTileCssVar = (typeof BEACON_HOME_TILE_CSS_VARS)[keyof typeof BEACON_HOME_TILE_CSS_VARS];
+
+function BeaconHomeLaunchTile(props: {
+  title: string;
+  description?: string;
+  decorationVar: BeaconHomeTileCssVar;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  const { title, description, decorationVar, onClick, disabled } = props;
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-disabled={disabled}
+      aria-label={disabled ? `${title} (unavailable)` : description ? `${title}: ${description}` : title}
+      onClick={disabled ? undefined : onClick}
+      className={cn(
+        "group relative flex min-h-[13.5rem] w-full shrink-0 flex-col overflow-hidden rounded-sm border border-border/50 text-left outline-none shadow-lg shadow-foreground/10 ring-1 ring-border/40 backdrop-blur-[1px] sm:h-full sm:min-h-0",
+        "transition-[transform,border-color,opacity] hover:border-primary/35 focus-visible:ring-4 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none",
+        disabled ? "opacity-60" : "active:translate-y-px"
+      )}
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-cover bg-center"
+        style={{
+          backgroundImage: `var(${decorationVar})`,
+        }}
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-linear-to-t from-background/90 via-background/20 to-transparent"
+      />
+      <span className="relative z-1 mt-auto flex flex-col gap-1 border-t border-border/50 bg-card/50 px-4 py-4 text-card-foreground backdrop-blur-md supports-[backdrop-filter]:bg-card/40">
+        <span className="font-semibold tracking-tight">{title}</span>
+        {description ? (
+          <span className="text-[0.8125rem] leading-snug font-normal text-muted-foreground">{description}</span>
+        ) : null}
+      </span>
+    </button>
+  );
+}
 
 export function BeaconHomeScreen() {
   const navigate = useNavigate();
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
   const towerConfigured = isTowerConfigured();
   const base = getTowerAuthBaseUrl();
+  const beaconsEnabled = isBeaconsSurfaceEnabled();
 
   const [guestWelcomeDone, setGuestWelcomeDone] = useState(readBeaconGuestWelcomeComplete);
   const showWelcomeGate = !towerSessionPending && !towerUser && !guestWelcomeDone;
@@ -48,51 +94,20 @@ export function BeaconHomeScreen() {
 
   return (
     <ScrollArea className="min-h-0 min-w-0 flex-1">
-      <div className="flex min-w-0 flex-col px-4 py-6">
-        <div className="mx-auto flex w-full max-w-lg flex-col gap-2">
-          <h2 className="text-lg font-semibold text-foreground">Tools</h2>
+      <div className="flex min-h-full min-w-0 flex-col justify-center px-4 py-8">
+        <div className="mx-auto grid w-full max-w-160 grid-cols-1 gap-4 sm:auto-rows-fr sm:grid-cols-2 sm:gap-5 sm:min-h-[17rem]">
+          <BeaconHomeLaunchTile
+            title={CMS_SLOTS_FEATURE_NAME}
+            decorationVar={BEACON_HOME_TILE_CSS_VARS.cmsSlot}
+            disabled={!beaconsEnabled}
+            onClick={() => navigate("/beacons/engine")}
+          />
+          <BeaconHomeLaunchTile
+            title="Image Upload"
+            decorationVar={BEACON_HOME_TILE_CSS_VARS.imageUpload}
+            onClick={() => navigate("/images")}
+          />
         </div>
-        <ul
-          className={cn(
-            "mx-auto mt-6 grid w-full max-w-lg gap-3",
-            isBeaconsSurfaceEnabled() ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
-          )}
-        >
-          <li>
-            <Button
-              type="button"
-              variant="outline"
-              className={cn(
-                "h-auto w-full flex-col items-stretch gap-2 rounded-xl border-border/80 py-5 text-left shadow-sm",
-                "hover:border-primary/40 hover:bg-muted/40"
-              )}
-              onClick={() => navigate("/images")}
-            >
-              <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <ImageIcon aria-hidden className="size-5" />
-              </span>
-              <span className="text-base font-semibold text-foreground">Images</span>
-            </Button>
-          </li>
-          {isBeaconsSurfaceEnabled() ? (
-            <li>
-              <Button
-                type="button"
-                variant="outline"
-                className={cn(
-                  "h-auto w-full flex-col items-stretch gap-2 rounded-xl border-border/80 py-5 text-left shadow-sm",
-                  "hover:border-primary/40 hover:bg-muted/40"
-                )}
-                onClick={() => navigate("/beacons/engine")}
-              >
-                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Radio aria-hidden className="size-5" />
-                </span>
-                <span className="text-base font-semibold text-foreground">Beacons</span>
-              </Button>
-            </li>
-          ) : null}
-        </ul>
       </div>
     </ScrollArea>
   );

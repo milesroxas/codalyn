@@ -1,7 +1,22 @@
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { displayLabelForDataList } from "@/features/beacons/model/beacon-data-list-display";
+import { BEACON_SLOT_NAME_MAX } from "@/features/beacons/model/beacon-list-runtime-payload";
 import type { BeaconOnPage } from "@/features/beacons/model/beacon-page-targets";
+import {
+  CMS_SLOTS_ADD_SLOT_LABEL,
+  CMS_SLOTS_PAGE_LIST_ARIA_LABEL,
+  CMS_SLOTS_SCAN_ARIA_LABEL,
+} from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/shared/ui/drawer";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
@@ -39,70 +54,82 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
   } = props;
 
   const hasBeacons = pageBeacons.length > 0;
-  const showEmpty = !pageScanLoading && !hasBeacons && !createFormOpen;
+  const nameLen = beaconName.length > BEACON_SLOT_NAME_MAX ? BEACON_SLOT_NAME_MAX : beaconName.length;
 
   return (
     <div className="space-y-3" data-slot="beacon_on_page">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          {pageScanLoading ? (
-            <Loader2
-              className="size-4 shrink-0 animate-spin text-muted-foreground"
-              aria-label="Scanning page for beacons"
-            />
-          ) : null}
-          <h3 className="text-sm font-medium">On this page</h3>
+      {pageScanLoading ? (
+        <div className="flex justify-center py-1">
+          <Loader2
+            className="size-4 shrink-0 animate-spin text-muted-foreground"
+            aria-label={CMS_SLOTS_SCAN_ARIA_LABEL}
+          />
         </div>
-        <Button
-          type="button"
-          size="sm"
-          disabled={pageScanLoading || createFormOpen}
-          onClick={() => setCreateFormOpen(true)}
-        >
-          Add
-        </Button>
-      </div>
+      ) : null}
 
-      {createFormOpen ? (
-        <div className="space-y-2 rounded-md border border-border/80 bg-muted/20 px-3 py-3" data-slot="beacon_add_form">
-          <div className="space-y-2">
-            <Label htmlFor={nameFieldId}>Name</Label>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <Input
-                id={nameFieldId}
-                value={beaconName}
-                onChange={(e) => setBeaconName(e.target.value)}
-                placeholder="e.g. Home hero"
-                autoComplete="off"
-                className="min-w-0 sm:flex-1"
-              />
-              <div className="flex shrink-0 gap-2">
-                <Button
-                  type="button"
-                  className="flex-1 sm:flex-initial"
-                  disabled={createPending || !beaconName.trim()}
-                  onClick={() => void onCreate()}
-                >
-                  {createPending ? "Creating…" : "Create"}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setCreateFormOpen(false)}>
-                  Cancel
-                </Button>
-              </div>
+      <Drawer open={createFormOpen} onOpenChange={setCreateFormOpen} dismissible>
+        <DrawerTrigger asChild>
+          <Button
+            type="button"
+            variant="cmsSlotsCard"
+            size="cmsSlotsCard"
+            disabled={pageScanLoading}
+            aria-busy={pageScanLoading}
+            aria-expanded={createFormOpen}
+            aria-haspopup="dialog"
+          >
+            <span>{CMS_SLOTS_ADD_SLOT_LABEL}</span>
+            <Plus aria-hidden strokeWidth={2.25} />
+          </Button>
+        </DrawerTrigger>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>{CMS_SLOTS_ADD_SLOT_LABEL}</DrawerTitle>
+            <DrawerDescription className="sr-only">Choose a display name for the new CMS slot.</DrawerDescription>
+          </DrawerHeader>
+          <div className="space-y-2 pb-2">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor={nameFieldId} className="text-xs text-muted-foreground">
+                Slot name
+              </Label>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {nameLen}/{BEACON_SLOT_NAME_MAX}
+              </span>
             </div>
+            <Input
+              id={nameFieldId}
+              value={beaconName}
+              maxLength={BEACON_SLOT_NAME_MAX}
+              onChange={(e) => setBeaconName(e.target.value)}
+              autoComplete="off"
+              name="beacon-slot-name"
+              onPointerDown={(e) => e.stopPropagation()}
+            />
           </div>
-        </div>
-      ) : null}
-
-      {showEmpty ? (
-        <p className="text-sm text-muted-foreground">
-          Click <span className="font-medium text-foreground">Add</span> for a hidden beacon, then open it to add
-          components.
-        </p>
-      ) : null}
+          <DrawerFooter className="gap-2">
+            <Button
+              type="button"
+              className="w-full"
+              disabled={createPending || !beaconName.trim()}
+              onClick={() => void onCreate()}
+            >
+              {createPending ? "Creating…" : "Create"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={createPending}
+              onClick={() => setCreateFormOpen(false)}
+            >
+              Cancel
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
 
       {hasBeacons ? (
-        <ul className="divide-y divide-border" aria-label="Beacons on this page">
+        <ul className="divide-y divide-border" aria-label={CMS_SLOTS_PAGE_LIST_ARIA_LABEL}>
           {pageBeacons.map((b) => (
             <li key={b.key} className="flex items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
               <div className="min-w-0">

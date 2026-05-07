@@ -9,6 +9,7 @@ import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
 import { Label } from "@/shared/ui/label";
+import { ComposerSlotNameDrawer } from "./composer-slot-name-drawer";
 import { StudioPropValueField } from "./studio-prop-value-field";
 
 export type ComposerOrderSortableRowProps = {
@@ -18,11 +19,12 @@ export type ComposerOrderSortableRowProps = {
   fieldsOpen: boolean;
   onFieldsOpenChange: (open: boolean) => void;
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
+  onRenameSlot: (rowKey: string, name: string) => void;
   onRemove: (key: string) => void;
 };
 
 export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
-  const { row, meta, busy, fieldsOpen, onFieldsOpenChange, onChangePropValue, onRemove } = props;
+  const { row, meta, busy, fieldsOpen, onFieldsOpenChange, onChangePropValue, onRenameSlot, onRemove } = props;
   const exposed = meta?.exposed ?? [];
   const pvals = row.propValues ?? {};
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -41,7 +43,7 @@ export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
       <button
         type="button"
         className={cn(
-          "flex size-7 shrink-0 touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 active:cursor-grabbing disabled:pointer-events-none disabled:opacity-40",
+          "flex size-7 shrink-0 touch-none items-center justify-center rounded-sm text-muted-foreground hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 active:cursor-grabbing disabled:pointer-events-none disabled:opacity-40",
           "cursor-grab"
         )}
         aria-label={`Drag to reorder ${row.name}`}
@@ -69,7 +71,7 @@ export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
           </Button>
         </CollapsibleTrigger>
       ) : null}
-      <p className="min-w-0 flex-1 truncate text-sm font-medium">{row.name}</p>
+      <ComposerSlotNameDrawer row={row} disabled={busy} onRename={onRenameSlot} />
       <Button
         type="button"
         size="icon-sm"
@@ -145,7 +147,7 @@ export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
       ref={setNodeRef}
       style={style}
       data-slot="beacon_composer_row"
-      className="relative list-none rounded-md border border-border/70 bg-card shadow-sm"
+      className="relative list-none rounded-sm border border-border/70 bg-card shadow-sm"
     >
       {cardInner}
     </li>

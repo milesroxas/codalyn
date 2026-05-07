@@ -36,7 +36,7 @@ export function SettingsSectionNav({ value, onValueChange, showPresetsSection }:
                 <button
                   type="button"
                   className={cn(
-                    "inline-flex h-7 items-center rounded-md px-2 py-0 text-xs font-medium text-muted-foreground transition-colors",
+                    "inline-flex h-7 items-center rounded-sm px-2 py-0 text-xs font-medium text-muted-foreground transition-colors",
                     value === item.id && "bg-background text-foreground"
                   )}
                   onClick={() => {

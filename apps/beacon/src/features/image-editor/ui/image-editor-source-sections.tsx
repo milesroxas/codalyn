@@ -35,7 +35,7 @@ export function IncomingDissolvePreview(props: {
       <div
         className={cn(
           INCOMING_STAGGER_BASE_CLASS,
-          "aspect-video overflow-hidden rounded-xl bg-muted/50 ring-1 ring-foreground/10",
+          "aspect-video overflow-hidden rounded-sm bg-muted/50 ring-1 ring-foreground/10",
           entered
             ? "translate-y-0 opacity-100 [transition-delay:90ms]"
             : "translate-y-3 opacity-0 [transition-delay:0ms]"
@@ -74,7 +74,7 @@ function DropzoneCard(props: {
       <span className="flex flex-col items-center gap-2 text-center">
         <Upload aria-hidden className="size-8 text-muted-foreground" />
         <span className="text-muted-foreground text-xs">Drop an image, or browse.</span>
-        <span className="inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-primary px-2.5 py-1 text-[0.8rem] font-medium text-primary-foreground">
+        <span className="inline-flex items-center gap-1.5 rounded-sm border border-transparent bg-primary px-2.5 py-1 text-[0.8rem] font-medium text-primary-foreground">
           <FileImage aria-hidden className="size-3.5" />
           Browse files
         </span>

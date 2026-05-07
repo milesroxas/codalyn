@@ -12,8 +12,13 @@
  * `p` keys are **only** propIds the Engine had marked `exposed` in the slot file (not every Webflow prop on the
  * component). The footer runtime applies those keys to `data-codalyn-beacon-prop` nodes in each cloned row; a missing
  * key or empty/whitespace-only value sets `hidden` on that node (placeholders are not shown).
+ *
+ * Optional `n` (parallel to `i`/`p`) stores Composer-only **slot display names**. The footer runtime ignores `n`; it is
+ * for Studio UX persistence in the same JSON blob.
  */
 export const BEACON_LIST_RUNTIME_JSON_VERSION = 2 as const;
+/** Max length for a Composer slot display name persisted in payload `n[]`. */
+export const BEACON_SLOT_NAME_MAX = 80 as const;
 /** Backward compatible reader for old CMS data. */
 export const BEACON_LIST_RUNTIME_JSON_VERSION_LEGACY = 1 as const;
 
@@ -31,6 +36,8 @@ export type BeaconListRuntimePayload = {
    * (Text, image URL / asset id, `true`/`false`, decimal numbers, hex colors, etc.)
    */
   p: Array<Record<string, string>>;
+  /** Optional parallel slot labels (Composer); ignored by footer runtime. */
+  n?: string[];
 };
 
 /** CMS/API may stringify `v`; footer runtime uses loose `+payload.v` — keep Composer parsing aligned. */
@@ -75,6 +82,51 @@ function isStringRecordArray(x: unknown, len: number): x is Array<Record<string,
   return true;
 }
 
+export function sanitizeSlotLabelForPayload(s: string): string {
+  const t = s.trim();
+  if (t === "") return "";
+  return t.length <= BEACON_SLOT_NAME_MAX ? t : t.slice(0, BEACON_SLOT_NAME_MAX);
+}
+
+function resolvePayloadPropList(
+  normalizedVersion: number,
+  pRaw: unknown,
+  indices: readonly number[]
+): Array<Record<string, string>> {
+  let pList: Array<Record<string, string>> =
+    normalizedVersion === BEACON_LIST_RUNTIME_JSON_VERSION && isStringRecordArray(pRaw, indices.length)
+      ? pRaw.map((row) => ({ ...row }))
+      : indices.map(() => ({}));
+  if (pList.length !== indices.length) {
+    pList = indices.map(() => ({}));
+  }
+  return pList;
+}
+
+function filterRuntimePayloadLists(input: {
+  rawIndices: readonly number[];
+  propRows: readonly Record<string, string>[];
+  childCount?: number;
+  slotSource: readonly string[] | null;
+}): { indices: number[]; p: Array<Record<string, string>>; nAligned: string[] } {
+  const { rawIndices, propRows, childCount, slotSource } = input;
+  const indices: number[] = [];
+  const p: Array<Record<string, string>> = [];
+  const nAligned: string[] = [];
+  for (let u = 0; u < rawIndices.length; u++) {
+    const idx = rawIndices[u];
+    if (childCount != null && childCount > 0 && idx >= childCount) {
+      continue;
+    }
+    indices.push(idx);
+    p.push(propRows[u] ?? {});
+    if (slotSource != null) {
+      nAligned.push(sanitizeSlotLabelForPayload(slotSource[u]));
+    }
+  }
+  return { indices, p, nAligned };
+}
+
 /**
  * @param childCount — used to clamp invalid indices; omit or use `0` to skip clamping
  */
@@ -99,24 +151,29 @@ export function parseBeaconListRuntimePayload(raw: string, childCount?: number):
     return null;
   }
   const pRaw = (parsed as { p?: unknown }).p;
-  let pList: Array<Record<string, string>> =
-    v === BEACON_LIST_RUNTIME_JSON_VERSION && isStringRecordArray(pRaw, i.length)
-      ? pRaw.map((row) => ({ ...row }))
-      : i.map(() => ({}));
-  if (pList.length !== i.length) {
-    pList = i.map(() => ({}));
+  const pList = resolvePayloadPropList(v, pRaw, i);
+  const nSrcRaw = (parsed as { n?: unknown }).n;
+  const slotSource: readonly string[] | null =
+    v === BEACON_LIST_RUNTIME_JSON_VERSION &&
+    Array.isArray(nSrcRaw) &&
+    nSrcRaw.length === i.length &&
+    nSrcRaw.every((x): x is string => typeof x === "string")
+      ? nSrcRaw
+      : null;
+  const includeSlotLabels = slotSource !== null;
+
+  const { indices, p, nAligned } = filterRuntimePayloadLists({
+    rawIndices: i,
+    propRows: pList,
+    childCount,
+    slotSource: includeSlotLabels ? slotSource : null,
+  });
+
+  const out: BeaconListRuntimePayload = { v: BEACON_LIST_RUNTIME_JSON_VERSION, i: indices, p };
+  if (includeSlotLabels && nAligned.length === indices.length) {
+    out.n = nAligned;
   }
-  const indices: number[] = [];
-  const p: Array<Record<string, string>> = [];
-  for (let u = 0; u < i.length; u++) {
-    const n = i[u];
-    if (childCount != null && childCount > 0 && n >= childCount) {
-      continue;
-    }
-    indices.push(n);
-    p.push(pList[u] ?? {});
-  }
-  return { v: BEACON_LIST_RUNTIME_JSON_VERSION, i: indices, p };
+  return out;
 }
 
 function serializePropValueRow(src: Readonly<Record<string, string>> | null | undefined): Record<string, string> {
@@ -136,10 +193,12 @@ function serializePropValueRow(src: Readonly<Record<string, string>> | null | un
 /**
  * @param childIndices — 0-based indices of hidden list children, in display order
  * @param propRows — per displayed row, string values for exposed component props
+ * @param slotLabels — parallel Composer slot names (optional); lengths must match `childIndices`
  */
 export function serializeBeaconListRuntimePayload(
   childIndices: readonly number[],
-  propRows?: readonly Readonly<Record<string, string>>[] | null
+  propRows?: readonly Readonly<Record<string, string>>[] | null,
+  slotLabels?: readonly string[] | null
 ): string {
   const i = [...childIndices];
   const p: Array<Record<string, string>> = [];
@@ -147,11 +206,15 @@ export function serializeBeaconListRuntimePayload(
     const pru = propRows != null ? propRows[u] : undefined;
     p.push(serializePropValueRow(pru != null ? pru : null));
   }
-  return JSON.stringify({
+  const base: BeaconListRuntimePayload = {
     v: BEACON_LIST_RUNTIME_JSON_VERSION,
     i,
     p,
-  } satisfies BeaconListRuntimePayload);
+  };
+  if (slotLabels != null && slotLabels.length === i.length && slotLabels.every((_) => typeof _ === "string")) {
+    base.n = slotLabels.map((s) => sanitizeSlotLabelForPayload(s));
+  }
+  return JSON.stringify(base);
 }
 
 /**

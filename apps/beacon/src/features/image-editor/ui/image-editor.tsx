@@ -660,7 +660,7 @@ export function ImageEditor() {
   }, []);
 
   const dropZoneLabelClass = cn(
-    "flex aspect-video w-full cursor-pointer items-center justify-center rounded-xl border-2 border-dashed p-4 transition-colors",
+    "flex aspect-video w-full cursor-pointer items-center justify-center rounded-sm border-2 border-dashed p-4 transition-colors",
     dragActive ? "border-primary bg-accent/40" : "border-border bg-muted/30"
   );
 

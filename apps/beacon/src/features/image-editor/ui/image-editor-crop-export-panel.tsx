@@ -59,7 +59,7 @@ function InfoTip(props: { text: string; ariaLabel: string; className?: string })
       <TooltipTrigger
         type="button"
         className={cn(
-          "text-muted-foreground hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+          "text-muted-foreground hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
           className
         )}
         aria-label={ariaLabel}
@@ -399,7 +399,7 @@ function StepBadge({ n, label }: { n: number; label: string }) {
   return (
     <div className="flex items-center gap-2.5">
       <span
-        className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-[0.7rem] font-semibold text-primary-foreground tabular-nums shadow-sm"
+        className="flex size-7 shrink-0 items-center justify-center rounded-sm bg-primary text-[0.7rem] font-semibold text-primary-foreground tabular-nums shadow-sm"
         aria-hidden
       >
         {n}
@@ -488,7 +488,7 @@ function CropShapeControlsSection(p: CropShapeControlsSectionProps) {
 
   return (
     <div className={staggerBelowCropClass(belowCropEntered, 90)}>
-      <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+      <div className="flex flex-col gap-3 rounded-sm border border-border/70 bg-muted/20 p-3">
         <div className="flex items-center gap-1">
           <Label className="text-xs font-medium" htmlFor={`${baseId}-frame-mode`}>
             Crop shape
@@ -730,7 +730,7 @@ function CropStageSection(p: CropStageProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 pt-0">
-          <div className="relative h-64 w-full overflow-hidden rounded-xl border-2 border-dashed border-border bg-muted/30">
+          <div className="relative h-64 w-full overflow-hidden rounded-sm border-2 border-dashed border-border bg-muted/30">
             <Cropper
               aspect={cropAspect}
               image={imageSrc}
@@ -748,7 +748,7 @@ function CropStageSection(p: CropStageProps) {
           </div>
 
           <div className={staggerBelowCropClass(belowCropEntered, 0)}>
-            <div className="flex flex-col gap-2.5 rounded-lg border border-border/70 bg-muted/20 p-3">
+            <div className="flex flex-col gap-2.5 rounded-sm border border-border/70 bg-muted/20 p-3">
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-xs font-medium" htmlFor={`${baseId}-zoom`}>
                   Zoom
@@ -897,7 +897,7 @@ function ExportEncodeCard(p: ExportCardProps) {
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      className="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                      className="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                       aria-label="When to use WebP vs AVIF"
                     >
                       <Info className="size-3.5" aria-hidden />
@@ -936,7 +936,7 @@ function ExportEncodeCard(p: ExportCardProps) {
               </ToggleGroup>
             ) : (
               <>
-                <div className="text-foreground rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm font-medium">
+                <div className="text-foreground rounded-sm border border-border/60 bg-muted/20 px-3 py-2 text-sm font-medium">
                   WebP
                 </div>
                 <p className="text-muted-foreground text-[10px] leading-snug">Sign in to Tower to enable AVIF.</p>
@@ -955,7 +955,7 @@ function ExportEncodeCard(p: ExportCardProps) {
                 onOpenQualityPopout={onOpenQualityPopout}
               />
             ) : (
-              <div className="flex min-h-[120px] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border/70 bg-muted/15 px-4 py-6 text-center">
+              <div className="flex min-h-[120px] flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-border/70 bg-muted/15 px-4 py-6 text-center">
                 <p className="text-muted-foreground text-xs font-medium">Preview after crop</p>
                 <p className="text-muted-foreground max-w-[16rem] text-[10px] leading-snug">
                   After you finish positioning, the preview and quality compare are available here.
@@ -1189,7 +1189,7 @@ function AssetFolderToolbar(p: AssetFolderToolbarProps) {
               >
                 <label
                   htmlFor={newFolderRootId}
-                  className="flex cursor-pointer items-center gap-2.5 rounded-md border border-transparent p-2 hover:bg-muted/50"
+                  className="flex cursor-pointer items-center gap-2.5 rounded-sm border border-transparent p-2 hover:bg-muted/50"
                 >
                   <RadioGroupItem value="root" id={newFolderRootId} />
                   <span className="text-sm">Top level</span>
@@ -1197,7 +1197,7 @@ function AssetFolderToolbar(p: AssetFolderToolbarProps) {
                 <label
                   htmlFor={newFolderChildId}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-md border border-transparent p-2",
+                    "flex items-center gap-2.5 rounded-sm border border-transparent p-2",
                     hasAvailableParentFolders ? "cursor-pointer hover:bg-muted/50" : "cursor-not-allowed opacity-60"
                   )}
                 >
@@ -1408,7 +1408,7 @@ function PlacementCard(p: PlacementCardProps) {
                 key={opt.value}
                 htmlFor={`${baseId}-place-${opt.value}`}
                 className={cn(
-                  "flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border border-transparent p-2.5 ring-1 ring-foreground/10 transition-colors",
+                  "flex min-w-0 cursor-pointer items-center gap-3 rounded-sm border border-transparent p-2.5 ring-1 ring-foreground/10 transition-colors",
                   placementRadioValue === opt.value ? "bg-accent/50 border-primary/30" : "hover:bg-muted/40"
                 )}
               >
@@ -1442,7 +1442,7 @@ function PlacementCard(p: PlacementCardProps) {
                   {componentImageProps[0].label}
                 </p>
               ) : (
-                <ScrollArea className="max-h-[min(32vh,12rem)] w-full min-h-0 rounded-md border border-border/60 pr-0.5">
+                <ScrollArea className="max-h-[min(32vh,12rem)] w-full min-h-0 rounded-sm border border-border/60 pr-0.5">
                   <RadioGroup
                     className="flex flex-col gap-2 p-1.5"
                     id={`${baseId}-comp-prop`}

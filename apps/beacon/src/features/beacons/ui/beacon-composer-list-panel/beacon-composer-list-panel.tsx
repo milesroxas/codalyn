@@ -1,15 +1,16 @@
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import type { ComposerEligibleList } from "@/features/beacons/model/beacon-composer-eligible";
 import { displayLabelForDataList } from "@/features/beacons/model/beacon-data-list-display";
+import { BeaconPreInstallBlock } from "@/features/beacons/ui/beacon-pre-install-block";
 import { Button } from "@/shared/ui/button";
 
 type BeaconComposerListPanelProps = {
   pageScanLoading: boolean;
   beaconsWrapperInstalled: boolean;
+  installPending: boolean;
+  onInstallWrapper: () => void;
   loading: boolean;
   runtimeOk: boolean;
-  /** Footer hash OK but Engine changed beacon contents since last Sync. */
-  engineCompositionStale: boolean;
   eligible: ComposerEligibleList[];
   openingKey: string | null;
   onOpenList: (b: ComposerEligibleList) => void;
@@ -20,9 +21,10 @@ export function BeaconComposerListPanel(props: BeaconComposerListPanelProps) {
   const {
     pageScanLoading,
     beaconsWrapperInstalled,
+    installPending,
+    onInstallWrapper,
     loading,
     runtimeOk,
-    engineCompositionStale,
     eligible,
     openingKey,
     onOpenList,
@@ -31,45 +33,37 @@ export function BeaconComposerListPanel(props: BeaconComposerListPanelProps) {
 
   if (!beaconsWrapperInstalled) {
     return (
-      <p className="text-sm text-muted-foreground" data-slot="beacon_composer_install_first">
-        Install beacons on this page in <span className="font-medium text-foreground">Engine</span> first.
-      </p>
+      <div
+        className="flex min-h-[min(40vh,16rem)] flex-col items-center justify-center py-4"
+        data-slot="beacon_composer_install_first"
+      >
+        <BeaconPreInstallBlock
+          installPending={installPending}
+          pageScanLoading={pageScanLoading}
+          onInstallWrapper={onInstallWrapper}
+        />
+      </div>
     );
   }
 
   return (
     <div className="space-y-4" data-slot="beacon_composer_list">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          {loading || pageScanLoading ? (
-            <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-label="Loading lists" />
-          ) : null}
-          <p className="text-sm font-medium">Compose a list</p>
-        </div>
+      <div className="flex items-center justify-end gap-2">
+        {loading || pageScanLoading ? (
+          <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-label="Loading lists" />
+        ) : null}
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          size="icon-sm"
           className="shrink-0"
           disabled={loading || pageScanLoading}
+          aria-label="Refresh lists"
           onClick={() => void onRefresh()}
         >
-          Refresh
+          <RefreshCw aria-hidden className="size-4" />
         </Button>
       </div>
-
-      {engineCompositionStale && !loading && !pageScanLoading ? (
-        <p className="text-sm text-amber-800 dark:text-amber-200" data-slot="beacon_composer_engine_stale">
-          Beacon list changed in Engine — sync page script there first.
-        </p>
-      ) : null}
-
-      {runtimeOk && eligible.length === 0 && !loading && !pageScanLoading ? (
-        <p className="text-sm text-muted-foreground">
-          No lists yet — in <span className="font-medium text-foreground">Engine</span>, sync page script and place the
-          list target for a beacon (the hidden list can be empty; you build it here).
-        </p>
-      ) : null}
 
       {runtimeOk && eligible.length > 0 ? (
         <ul className="divide-y divide-border" aria-label="Lists available in Composer">

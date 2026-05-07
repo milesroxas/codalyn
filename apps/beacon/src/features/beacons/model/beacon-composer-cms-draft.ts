@@ -5,7 +5,10 @@ import {
 } from "@/features/beacons/model/beacon-composable-props";
 import type { BeaconEngineSlotPropsFile } from "@/features/beacons/model/beacon-engine-slot-props";
 import { fetchBeaconListCmsTextForItem } from "@/features/beacons/model/beacon-list-cms-composition-save";
-import { parseBeaconListRuntimePayload } from "@/features/beacons/model/beacon-list-runtime-payload";
+import {
+  parseBeaconListRuntimePayload,
+  sanitizeSlotLabelForPayload,
+} from "@/features/beacons/model/beacon-list-runtime-payload";
 import {
   getBeaconListTargetCmsCollectionIdFromListContainer,
   getBeaconListTargetCmsFieldIdFromListContainer,
@@ -54,7 +57,8 @@ export function beaconCompositionSignature(draft: ReadonlyArray<BeaconCompositio
       const pv = r.propValues ?? {};
       const keys = Object.keys(pv).sort();
       const part = keys.map((k) => `${k}:${pv[k] ?? ""}`).join("\u0001");
-      return `${r.componentId}\u0002${part}`;
+      const slot = sanitizeSlotLabelForPayload(r.name);
+      return `${r.componentId}\u0002${part}\u0002${slot}`;
     })
     .join("\u0003");
 }
@@ -121,7 +125,8 @@ export function normalizeComposerDraftPropValues(
 function draftFromPayloadRows(
   engineScopedRows: readonly HydratedBeaconComponent[],
   indices: readonly number[],
-  propRows: ReadonlyArray<Readonly<Record<string, string>>>
+  propRows: ReadonlyArray<Readonly<Record<string, string>>>,
+  slotLabels?: readonly string[] | null
 ): BeaconCompositionDraftRow[] {
   const out: BeaconCompositionDraftRow[] = [];
   for (let u = 0; u < indices.length; u++) {
@@ -134,7 +139,9 @@ function draftFromPayloadRows(
       continue;
     }
     const pr = propRows[u] ?? {};
-    out.push({ key: crypto.randomUUID(), componentId: r.componentId, name: r.name, propValues: { ...pr } });
+    const label = slotLabels != null ? sanitizeSlotLabelForPayload(slotLabels[u] ?? "") : "";
+    const name = label !== "" ? label : r.name;
+    out.push({ key: crypto.randomUUID(), componentId: r.componentId, name, propValues: { ...pr } });
   }
   return out;
 }
@@ -195,7 +202,7 @@ export async function resolveComposerTargetOrder(input: {
   if (parsed == null || parsed.i.length === 0) {
     return { draft: [], initialSignature: "", cmsSource: "cms_field_empty" };
   }
-  const d = draftFromPayloadRows(input.engineScopedRows, parsed.i, parsed.p);
+  const d = draftFromPayloadRows(input.engineScopedRows, parsed.i, parsed.p, parsed.n);
   if (d.length === 0) {
     return { draft: [], initialSignature: "", cmsSource: "cms_field_empty" };
   }

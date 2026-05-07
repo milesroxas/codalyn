@@ -1,16 +1,10 @@
-import { HelpCircle } from "lucide-react";
 import type { ComposableInstancePropMeta } from "@/features/beacons/model/beacon-composable-props";
-import { BEACON_EMBED_SYNC_STRIP_DEFAULT_COPY } from "@/features/beacons/model/beacon-embed-sync";
 import type { BeaconEngineSlotPropsFile } from "@/features/beacons/model/beacon-engine-slot-props";
 import type { BeaconListTargetPhase } from "@/features/beacons/model/beacon-list-target-phase";
 import type { HydratedBeaconComponent } from "@/features/beacons/model/beacon-page-targets";
-import { BeaconEmbedSyncStrip } from "@/features/beacons/ui/beacon-embed-sync-strip";
-import { Button } from "@/shared/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { BeaconCompositionComponentsCatalog } from "./beacon-composition-components-catalog";
 import { BeaconEngineSelectedRow } from "./beacon-engine-selected-row";
 import { BeaconListTargetActionsBar } from "./beacon-list-target-actions-bar";
-import { ListTargetCanvasStatusHint } from "./beacon-list-target-hints";
 import { useCompositionComposableMeta } from "./use-composition-composable-meta";
 
 export type BeaconCompositionPanelProps = {
@@ -37,11 +31,6 @@ export type BeaconCompositionPanelProps = {
   listTargetCreatePending: boolean;
   listTargetRemovePending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
-  embedSyncPending: boolean;
-  onSyncInstallEmbed: () => void;
-  pageRuntimeStatusLoading: boolean;
-  pageRuntimeSynced: boolean;
-  pageRuntimeSyncReason?: string;
   engineSlotProps: BeaconEngineSlotPropsFile;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
   /** Re-apply `data-codalyn-beacon-prop` on the component definition from current Engine “Expose” + bindings. */
@@ -73,11 +62,6 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
     listTargetRemovePending,
     listTargetPlaceOnCanvasPending,
     listTargetOnCanvasCount,
-    embedSyncPending,
-    onSyncInstallEmbed,
-    pageRuntimeStatusLoading,
-    pageRuntimeSynced,
-    pageRuntimeSyncReason,
     engineSlotProps,
     onSetSlotExposed,
     onResyncEngineSlotAttrs,
@@ -96,22 +80,11 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
   return (
     <>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-1.5 text-xs">
           <span className="shrink-0 font-medium text-foreground">Editing</span>
           {activeDataList != null ? (
-            <code className="min-w-0 truncate font-mono text-[0.7rem]">{activeDataList}</code>
+            <code className="min-w-0 truncate font-mono text-[0.7rem] text-muted-foreground">{activeDataList}</code>
           ) : null}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button type="button" variant="ghost" size="icon-sm" className="shrink-0" aria-label="Where this lives">
-                <HelpCircle className="size-3" aria-hidden />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              Inside beacons-wrapper. The published runtime is injected as page footer custom code (Webflow Data API),
-              not an HTML embed.
-            </TooltipContent>
-          </Tooltip>
         </div>
         <BeaconListTargetActionsBar
           activeDataList={activeDataList}
@@ -129,19 +102,6 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
         />
       </div>
 
-      <ListTargetCanvasStatusHint listTargetPhase={listTargetPhase} count={listTargetOnCanvasCount} />
-
-      <BeaconEmbedSyncStrip
-        dataSlot="beacon_embed_sync"
-        embedSyncPending={embedSyncPending}
-        disableButton={false}
-        onSyncInstallEmbed={onSyncInstallEmbed}
-        pageRuntimeStatusLoading={pageRuntimeStatusLoading}
-        pageRuntimeSynced={pageRuntimeSynced}
-        pageRuntimeSyncReason={pageRuntimeSyncReason}
-        copy={BEACON_EMBED_SYNC_STRIP_DEFAULT_COPY}
-      />
-
       <BeaconCompositionComponentsCatalog
         searchFieldId={searchFieldId}
         componentQuery={componentQuery}
@@ -157,7 +117,7 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
       <div className="space-y-2">
         <p className="text-sm font-medium">Selected</p>
         {selected.length === 0 ? (
-          <p className="text-sm text-muted-foreground">None</p>
+          <div className="min-h-16 rounded-sm border border-dashed border-border bg-muted/10" aria-hidden />
         ) : (
           <ul className="space-y-1.5" aria-label="Selected components">
             {selected.map((row, slotIndex) => (

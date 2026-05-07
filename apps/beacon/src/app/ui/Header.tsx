@@ -1,14 +1,27 @@
-import { ExternalLink, Image as ImageIcon, LogIn, LogOut, Menu, Radio, Settings } from "lucide-react";
-import { useCallback } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Image as ImageIcon,
+  LayoutGrid,
+  Loader2,
+  LogIn,
+  LogOut,
+  Radio,
+  Settings,
+} from "lucide-react";
+import { useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
+import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -18,101 +31,66 @@ import {
 const lightLogoSrc = `${import.meta.env.BASE_URL}images/light-logo-beacon.svg`;
 const darkLogoSrc = `${import.meta.env.BASE_URL}images/dark-logo-beacon.svg`;
 
-/** Tower sign-in / sign-up (`max-w-sm` form + errors + Sign up link). */
 const TOWER_EMAIL_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";
 
-function getAccountLabel(name: string | null | undefined, email: string): string {
-  const trimmedName = name?.trim();
-  return trimmedName && trimmedName.length > 0 ? trimmedName : email;
-}
+/** Matches profile row (`size-8` avatar + default item padding). */
+const beaconMenuProfileRowMinClass = "min-h-10";
 
-function getAccountInitials(label: string): string {
-  const parts = label
-    .trim()
-    .split(/[\s@._-]+/)
-    .filter(Boolean);
-
-  if (parts.length === 0) return "U";
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-function TowerAuthBarSignedOut(props: { onOpenTowerEmailPopup: () => void }) {
-  return (
-    <Button type="button" size="sm" variant="ghost" onClick={props.onOpenTowerEmailPopup}>
-      <LogIn aria-hidden />
-      Sign in to Tower
-    </Button>
-  );
-}
-
-type TowerAuthBarProps = {
-  user: BridgedTowerUser | undefined;
-  isPending: boolean;
-  onOpenTowerEmailPopup: () => void;
-  onSignOut: () => void;
-};
-
-function TowerAuthBar({ user, isPending, onOpenTowerEmailPopup, onSignOut }: TowerAuthBarProps) {
-  if (isPending) {
-    return (
-      <span className="inline-flex h-8 items-center gap-2 px-2 text-xs text-muted-foreground">
-        <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-muted-foreground/80" />
-        Checking session
-      </span>
-    );
+function towerUserInitials(user: BridgedTowerUser): string {
+  const n = user.name?.trim();
+  if (n) {
+    const parts = n.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const a = parts[0]?.[0];
+      const b = parts[parts.length - 1]?.[0];
+      if (a && b) {
+        return (a + b).toUpperCase();
+      }
+    }
+    return n.slice(0, 2).toUpperCase();
   }
+  const e = user.email.trim();
+  return e ? e.slice(0, 1).toUpperCase() : "?";
+}
 
-  if (!user) {
-    return <TowerAuthBarSignedOut onOpenTowerEmailPopup={onOpenTowerEmailPopup} />;
+function towerMenuProfileLabel(user: BridgedTowerUser): string {
+  const raw = user.name?.trim();
+  if (raw) {
+    const parts = raw.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0]} ${parts[parts.length - 1]}`;
+    }
   }
+  return user.email.trim();
+}
 
-  const accountLabel = getAccountLabel(user.name, user.email);
-  const initials = getAccountInitials(accountLabel);
-  const imageUrl = user.image?.trim() ? user.image : null;
+function BeaconMenuTowerActionsPane(props: { onBack: () => void; onOpenTower: () => void; onSignOut: () => void }) {
+  const { onBack, onOpenTower, onSignOut } = props;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="overflow-hidden rounded-full p-0"
-          aria-label={`Account menu, ${accountLabel}`}
+    <>
+      <DropdownMenuGroup>
+        <DropdownMenuItem
+          className={beaconMenuProfileRowMinClass}
+          onSelect={(event) => {
+            event.preventDefault();
+            onBack();
+          }}
         >
-          {imageUrl ? (
-            <img src={imageUrl} alt="" className="size-full object-cover" />
-          ) : (
-            <span
-              className="inline-flex size-full items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary"
-              aria-hidden
-            >
-              {initials}
-            </span>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-60">
-        <DropdownMenuLabel>
-          <div className="flex min-w-0 flex-col gap-1">
-            <span className="text-xs font-normal text-muted-foreground">Signed in as</span>
-            <span className="truncate text-sm font-medium text-foreground">{user.email}</span>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
+          <ChevronLeft aria-hidden />
+          Back
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
         <DropdownMenuItem
           onSelect={() => {
-            const origin = getTowerAuthBaseUrl();
-            if (origin) window.open(origin, "_blank", "noopener,noreferrer");
+            onOpenTower();
           }}
         >
           <ExternalLink aria-hidden />
           Open Tower
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
           onSelect={() => {
@@ -122,15 +100,13 @@ function TowerAuthBar({ user, isPending, onOpenTowerEmailPopup, onSignOut }: Tow
           <LogOut aria-hidden />
           Sign out
         </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </DropdownMenuGroup>
+    </>
   );
 }
 
 type HeaderLogoProps = {
-  /** When false, renders a div so the screen can use a separate page `<h1>` (e.g. Settings). */
   asHeading?: boolean;
-  /** When set, the logo is a link to this route (e.g. home hub). */
   to?: string;
 };
 
@@ -139,8 +115,8 @@ export function HeaderLogo({ asHeading = true, to }: HeaderLogoProps) {
   const inner = (
     <>
       <span className="sr-only">Beacon</span>
-      <img src={lightLogoSrc} alt="" aria-hidden className="h-4 w-auto dark:hidden" />
-      <img src={darkLogoSrc} alt="" aria-hidden className="hidden h-4 w-auto dark:block" />
+      <img src={lightLogoSrc} alt="" aria-hidden className="h-5 w-auto dark:hidden" />
+      <img src={darkLogoSrc} alt="" aria-hidden className="hidden h-5 w-auto dark:block" />
     </>
   );
   const block = asHeading ? <h1 className={className}>{inner}</h1> : <div className={className}>{inner}</div>;
@@ -160,51 +136,219 @@ export function HeaderLogo({ asHeading = true, to }: HeaderLogoProps) {
   return block;
 }
 
-function BeaconRoutesMenu() {
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
+function routeActiveClass(path: string, pathname: string) {
+  return cn(
+    pathname === path && "bg-accent font-medium text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+  );
+}
 
-  const itemClass = (path: string) =>
-    cn(pathname === path && "bg-accent text-accent-foreground focus:bg-accent focus:text-accent-foreground");
+type BeaconAppMenuProps = {
+  towerConfigured: boolean;
+  user: BridgedTowerUser | undefined;
+  sessionPending: boolean;
+  onOpenTowerEmailPopup: () => void;
+  onSignOut: () => void;
+};
+
+function BeaconMenuNavigateGroup(props: { pathname: string }) {
+  const { pathname } = props;
+  const navigate = useNavigate();
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 shrink-0 rounded-md border border-transparent px-1.5 text-muted-foreground hover:bg-muted/55 hover:text-foreground aria-expanded:bg-muted/70 aria-expanded:text-foreground"
-          aria-label="Beacon menu"
+    <DropdownMenuGroup>
+      <DropdownMenuLabel className="px-2 pb-1">Navigate</DropdownMenuLabel>
+      {isBeaconsSurfaceEnabled() ? (
+        <DropdownMenuItem
+          className={cn(
+            pathname.startsWith("/beacons") &&
+              "bg-accent font-medium text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+          )}
+          onSelect={() => navigate("/beacons/engine")}
         >
-          <Menu aria-hidden className="size-4 stroke-[2.1]" />
+          <Radio aria-hidden />
+          {CMS_SLOTS_FEATURE_NAME}
+        </DropdownMenuItem>
+      ) : null}
+      <DropdownMenuItem className={routeActiveClass("/images", pathname)} onSelect={() => navigate("/images")}>
+        <ImageIcon aria-hidden />
+        Images
+      </DropdownMenuItem>
+    </DropdownMenuGroup>
+  );
+}
+
+function BeaconMenuAccountGroup(props: {
+  user: BridgedTowerUser | undefined;
+  sessionPending: boolean;
+  onOpenTowerEmailPopup: () => void;
+  onOpenTowerActions: () => void;
+}) {
+  const { user, sessionPending, onOpenTowerEmailPopup, onOpenTowerActions } = props;
+
+  return (
+    <>
+      <DropdownMenuGroup>
+        {sessionPending || !user ? <DropdownMenuLabel className="px-2 pb-1">Account</DropdownMenuLabel> : null}
+        {sessionPending ? (
+          <div
+            className="flex items-center gap-2 px-2 py-2 text-muted-foreground text-sm"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <Loader2 aria-hidden className="size-4 shrink-0 animate-spin opacity-70" />
+            Checking session…
+          </div>
+        ) : !user ? (
+          <div data-slot="beacon-menu-account-guest">
+            <p className="px-2 pb-2 text-muted-foreground text-xs leading-snug">
+              Sign in with Tower to sync presets and workspace settings across devices.
+            </p>
+            <DropdownMenuItem className="font-medium text-foreground" onSelect={() => onOpenTowerEmailPopup()}>
+              <LogIn aria-hidden />
+              Sign in to Tower
+            </DropdownMenuItem>
+          </div>
+        ) : (
+          <DropdownMenuItem
+            className={beaconMenuProfileRowMinClass}
+            data-slot="beacon-menu-account-summary"
+            onSelect={(event) => {
+              event.preventDefault();
+              onOpenTowerActions();
+            }}
+          >
+            <span className="sr-only">Signed in as {user.email}</span>
+            {user.image ? (
+              <img
+                src={user.image}
+                alt=""
+                aria-hidden
+                className="size-8 shrink-0 rounded-full object-cover ring-1 ring-inset ring-border"
+              />
+            ) : (
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted font-semibold text-muted-foreground text-[0.625rem] ring-1 ring-inset ring-border">
+                {towerUserInitials(user)}
+              </div>
+            )}
+            <span className="min-w-0 flex-1 truncate text-left font-normal text-sm text-foreground">
+              {towerMenuProfileLabel(user)}
+            </span>
+            <ChevronRight
+              aria-hidden
+              className="pointer-events-none size-4 shrink-0 text-muted-foreground opacity-70"
+            />
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+    </>
+  );
+}
+
+function BeaconTowerUnavailableBanner() {
+  return (
+    <>
+      <DropdownMenuGroup>
+        <DropdownMenuLabel className="sr-only">Account</DropdownMenuLabel>
+        <div
+          data-slot="beacon-menu-account-banner"
+          className="rounded-sm bg-muted/50 px-2.5 py-2 text-muted-foreground text-xs leading-relaxed"
+        >
+          Tower isn’t configured for this app. Sign-in and preset sync aren’t available.
+        </div>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+    </>
+  );
+}
+
+function BeaconAppMenu({
+  towerConfigured,
+  user,
+  sessionPending,
+  onOpenTowerEmailPopup,
+  onSignOut,
+}: BeaconAppMenuProps) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [towerActionsOpen, setTowerActionsOpen] = useState(false);
+
+  const openTowerApp = useCallback(() => {
+    const origin = getTowerAuthBaseUrl();
+    if (origin) window.open(origin, "_blank", "noopener,noreferrer");
+  }, []);
+
+  return (
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (!open) {
+          setTowerActionsOpen(false);
+        }
+      }}
+    >
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="headerMenu" aria-haspopup="menu">
+          <LayoutGrid aria-hidden className="size-[1.05rem]" strokeWidth={2} />
+          Menu
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-44">
-        <DropdownMenuLabel>Tools</DropdownMenuLabel>
-        <DropdownMenuItem className={itemClass("/images")} onSelect={() => navigate("/images")}>
-          <ImageIcon aria-hidden />
-          Images
-        </DropdownMenuItem>
-        {isBeaconsSurfaceEnabled() ? (
-          <DropdownMenuItem
-            className={cn(
-              pathname.startsWith("/beacons") &&
-                "bg-accent text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-            )}
-            onSelect={() => navigate("/beacons/engine")}
-          >
-            <Radio aria-hidden />
-            Beacons
-          </DropdownMenuItem>
-        ) : null}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className={itemClass("/settings")} onSelect={() => navigate("/settings")}>
-          <Settings aria-hidden />
-          Settings
-        </DropdownMenuItem>
+      <DropdownMenuContent align="end" className="min-w-62 max-w-[min(17.5rem,calc(100vw-2rem))] rounded-sm">
+        {!towerConfigured ? (
+          <>
+            <DropdownMenuItem
+              className={routeActiveClass("/settings", pathname)}
+              onSelect={() => navigate("/settings")}
+            >
+              <Settings aria-hidden />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+
+            <BeaconTowerUnavailableBanner />
+            <BeaconMenuNavigateGroup pathname={pathname} />
+          </>
+        ) : towerActionsOpen ? (
+          <BeaconMenuTowerActionsPane
+            onBack={() => setTowerActionsOpen(false)}
+            onOpenTower={openTowerApp}
+            onSignOut={onSignOut}
+          />
+        ) : (
+          <>
+            <DropdownMenuItem
+              className={routeActiveClass("/settings", pathname)}
+              onSelect={() => navigate("/settings")}
+            >
+              <Settings aria-hidden />
+              Settings
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <BeaconMenuAccountGroup
+              user={user}
+              sessionPending={sessionPending}
+              onOpenTowerEmailPopup={onOpenTowerEmailPopup}
+              onOpenTowerActions={() => setTowerActionsOpen(true)}
+            />
+            <BeaconMenuNavigateGroup pathname={pathname} />
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function HeaderShell(props: BeaconAppMenuProps) {
+  return (
+    <div className="shrink-0">
+      <header data-slot="beacon-app-header" className="border-border/65 border-b bg-background px-4 py-2.5">
+        <div className="flex items-center justify-between gap-4">
+          <HeaderLogo to="/home" />
+          <BeaconAppMenu {...props} />
+        </div>
+      </header>
+    </div>
   );
 }
 
@@ -222,55 +366,28 @@ function HeaderWithTower() {
   }, [clearStoredSession]);
 
   return (
-    <div className="shrink-0">
-      <header className="supports-backdrop-filter:bg-background/75 border-b border-border/70 bg-background/90 px-3 py-2 backdrop-blur">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2">
-          <div className="flex min-w-0 justify-start">
-            <div className="flex min-w-0 shrink-0 items-center gap-1 pr-1">
-              <BeaconRoutesMenu />
-            </div>
-          </div>
-          <div className="flex shrink-0 justify-center px-2">
-            <HeaderLogo to="/home" />
-          </div>
-          <div className="min-w-0 overflow-hidden">
-            <div className="flex max-w-full justify-end">
-              <TowerAuthBar
-                user={user}
-                isPending={isPending}
-                onOpenTowerEmailPopup={openTowerEmailSignInPopup}
-                onSignOut={signOut}
-              />
-            </div>
-          </div>
-        </div>
-      </header>
-    </div>
+    <HeaderShell
+      towerConfigured
+      user={user}
+      sessionPending={isPending}
+      onOpenTowerEmailPopup={openTowerEmailSignInPopup}
+      onSignOut={signOut}
+    />
   );
 }
 
 export default function Header() {
-  const towerOk = isTowerConfigured();
-
-  if (towerOk) {
-    return <HeaderWithTower />;
+  if (!isTowerConfigured()) {
+    return (
+      <HeaderShell
+        towerConfigured={false}
+        user={undefined}
+        sessionPending={false}
+        onOpenTowerEmailPopup={() => {}}
+        onSignOut={() => {}}
+      />
+    );
   }
 
-  return (
-    <div className="shrink-0">
-      <header className="supports-backdrop-filter:bg-background/75 border-b border-border/70 bg-background/90 px-3 py-2 backdrop-blur">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2">
-          <div className="flex min-w-0 justify-start">
-            <BeaconRoutesMenu />
-          </div>
-          <div className="flex shrink-0 justify-center px-2">
-            <HeaderLogo to="/home" />
-          </div>
-          <div className="flex min-w-0 justify-end">
-            <span className="inline-flex h-8 items-center px-2 text-xs text-muted-foreground">Tower unavailable</span>
-          </div>
-        </div>
-      </header>
-    </div>
-  );
+  return <HeaderWithTower />;
 }

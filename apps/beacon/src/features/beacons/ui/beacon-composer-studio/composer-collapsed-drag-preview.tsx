@@ -7,9 +7,9 @@ export function ComposerCollapsedDragPreview(props: { row: BeaconCompositionDraf
   return (
     <div
       aria-hidden
-      className="flex min-h-9 max-w-xl cursor-grabbing touch-none flex-nowrap items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1.5 shadow-lg"
+      className="flex min-h-9 max-w-xl cursor-grabbing touch-none flex-nowrap items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-1.5 shadow-lg"
     >
-      <div className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground">
+      <div className="flex size-7 shrink-0 items-center justify-center rounded-sm text-muted-foreground">
         <GripVertical className="size-4" aria-hidden />
       </div>
       {hasExposedFields ? (

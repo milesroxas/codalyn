@@ -143,12 +143,18 @@ export async function saveBeaconListRuntimePayloadToCmsItem(options: {
   hiddenListIndices: readonly number[];
   /** One entry per `hiddenListIndices` item; per-row `propId` → string (Engine-exposed props from Studio). */
   propValueRows?: readonly Readonly<Record<string, string>>[] | null;
+  /** Parallel Composer slot display names (`n` in persisted JSON); length must match `hiddenListIndices`. */
+  slotLabels?: readonly string[] | null;
 }): Promise<void> {
   if (!options.cmsItemId.trim()) {
     throw new Error("Missing CMS item id.");
   }
   const fieldSlug = await resolveCmsFieldSlug(options.collectionId, options.fieldId);
-  const text = serializeBeaconListRuntimePayload([...options.hiddenListIndices], options.propValueRows);
+  const text = serializeBeaconListRuntimePayload(
+    [...options.hiddenListIndices],
+    options.propValueRows,
+    options.slotLabels
+  );
   const id = options.cmsItemId.trim();
   const cid = options.collectionId;
   await patchBeaconListCmsTextFieldData({ collectionId: cid, cmsItemId: id, fieldSlug, text, kind: "staged" });

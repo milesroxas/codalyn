@@ -109,7 +109,7 @@ export function QualityComparePreview(p: QualityComparePreviewProps) {
       <div
         ref={previewRef}
         className={cn(
-          "relative max-h-52 w-full overflow-hidden rounded-lg border border-border/50 bg-muted/25 shadow-inner",
+          "relative max-h-52 w-full overflow-hidden rounded-sm border border-border/50 bg-muted/25 shadow-inner",
           pending && "min-h-[128px]"
         )}
         style={{ aspectRatio }}

@@ -73,7 +73,7 @@ export function ImageEditorDissolveBranch(props: ImageEditorDissolveBranchProps)
   }
 
   return (
-    <div className="mx-4 mt-4 rounded-xl bg-background/80 p-3 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.55)] ring-1 ring-foreground/10 backdrop-blur-sm">
+    <div className="mx-4 mt-4 rounded-sm bg-background/80 p-3 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.55)] ring-1 ring-foreground/10 backdrop-blur-sm">
       <IncomingDissolvePreview
         entered={incomingEnter}
         fileBaseName={assetBaseNameFromFileName(dissolve.incomingFile.name)}

@@ -9,8 +9,6 @@ export type BeaconComposerStudioPanelProps = {
   activeDataList: string;
   draft: BeaconCompositionDraftRow[];
   dirty: boolean;
-  /** Shown in Target order when the list is empty and CMS state calls for a specific explanation. */
-  emptyTargetOrderHint: string | null;
   /** Component types present in the Engine-defined beacon list; Composer can only add from this set. */
   allowedPalette: BeaconPaletteEntry[];
   onAddFromPalette: (c: BeaconPaletteEntry) => void;
@@ -21,11 +19,11 @@ export type BeaconComposerStudioPanelProps = {
   savePending: boolean;
   pageRuntimeStatusLoading: boolean;
   pageRuntimeSynced: boolean;
-  pageRuntimeSyncReason?: string;
   embedSyncPending: boolean;
   onSyncInstallEmbed: () => void;
   rowMeta: BeaconComposerRowMeta[];
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
+  onRenameSlot: (rowKey: string, name: string) => void;
 };
 
 export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps) {
@@ -33,7 +31,6 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
     activeDataList,
     draft,
     dirty,
-    emptyTargetOrderHint,
     allowedPalette,
     onAddFromPalette,
     onReorder,
@@ -43,11 +40,11 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
     savePending,
     pageRuntimeStatusLoading,
     pageRuntimeSynced,
-    pageRuntimeSyncReason,
     embedSyncPending,
     onSyncInstallEmbed,
     rowMeta,
     onChangePropValue,
+    onRenameSlot,
   } = props;
 
   const busy = savePending || embedSyncPending;
@@ -55,11 +52,7 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
   return (
     <div className="space-y-3" data-slot="beacon_composer_studio">
       {!pageRuntimeStatusLoading && !pageRuntimeSynced ? (
-        <BeaconComposerRuntimeSyncAlert
-          pageRuntimeSyncReason={pageRuntimeSyncReason}
-          embedSyncPending={embedSyncPending}
-          onSyncInstallEmbed={onSyncInstallEmbed}
-        />
+        <BeaconComposerRuntimeSyncAlert embedSyncPending={embedSyncPending} onSyncInstallEmbed={onSyncInstallEmbed} />
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -77,17 +70,11 @@ export function BeaconComposerStudioPanel(props: BeaconComposerStudioPanelProps)
         </div>
       </div>
 
-      <p className="text-xs leading-snug text-muted-foreground">
-        Drag to set order, fill content for fields your designer exposed in Engine, and save. On a collection template,
-        the JSON (order + text) is written to the list CMS text field; the Engine reference list is unchanged.
-      </p>
-
       <ComposerOrderSection
         draft={draft}
         rowMeta={rowMeta}
         onChangePropValue={onChangePropValue}
-        emptyWhenNoSavedOrderHint={emptyTargetOrderHint}
-        allowedPaletteCount={allowedPalette.length}
+        onRenameSlot={onRenameSlot}
         busy={busy}
         onReorder={onReorder}
         onRemove={onRemove}

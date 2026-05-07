@@ -48,7 +48,7 @@ function InfoTip(props: { text: string; ariaLabel: string; placement?: InfoTipPl
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="text-muted-foreground hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="text-muted-foreground hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           aria-label={ariaLabel}
         >
           <Info className="size-3.5" aria-hidden />
@@ -91,7 +91,7 @@ function ExportPresetPickerList(props: {
           aria-label={`Edit ${optionAriaPrefix}: ${p.name}`}
           onClick={() => onEdit(p.id, scope)}
           className={cn(
-            "group flex min-w-0 w-full cursor-pointer items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2.5 text-left ring-1 ring-foreground/10 transition-colors outline-none",
+            "group flex min-w-0 w-full cursor-pointer items-center gap-2 rounded-sm border border-border/60 bg-background px-3 py-2.5 text-left ring-1 ring-foreground/10 transition-colors outline-none",
             "hover:border-primary/35 hover:bg-muted/35",
             "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           )}
@@ -363,7 +363,7 @@ export function SettingsPresetsPanel() {
   };
 
   const aspectTileClass =
-    "relative flex min-h-[2.75rem] min-w-0 flex-col items-center justify-center rounded-md border border-border/70 bg-muted/25 px-1.5 py-2 text-center";
+    "relative flex min-h-[2.75rem] min-w-0 flex-col items-center justify-center rounded-sm border border-border/70 bg-muted/25 px-1.5 py-2 text-center";
 
   return (
     <div className="flex min-w-0 flex-col">
@@ -490,7 +490,7 @@ function ExportPresetScopeColumn(props: {
         </Button>
       ) : null}
       {presets.length === 0 ? (
-        <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-5 text-center">
+        <div className="rounded-sm border border-border/60 bg-muted/10 px-3 py-5 text-center">
           <p className="text-muted-foreground text-[11px]">{emptyLabel}</p>
         </div>
       ) : (

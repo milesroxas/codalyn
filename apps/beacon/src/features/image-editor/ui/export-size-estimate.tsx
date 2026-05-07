@@ -69,11 +69,11 @@ export function ExportPresetLimitBar({ estimatedBytes, maxBytes, className }: Ex
         return (
           <div
             key={`preset-limit-seg-${segmentIndex}`}
-            className="bg-muted/80 flex h-2 min-h-2 min-w-0 flex-1 overflow-hidden rounded-[1px]"
+            className="bg-muted/80 flex h-2 min-h-2 min-w-0 flex-1 overflow-hidden rounded-sm"
             aria-hidden
           >
             <div
-              className={cn("h-full rounded-[1px] transition-[width] duration-300 ease-out", PRESET_METER_BAR[tone])}
+              className={cn("h-full rounded-sm transition-[width] duration-300 ease-out", PRESET_METER_BAR[tone])}
               style={{ width: `${fillPct}%` }}
             />
           </div>
@@ -159,7 +159,7 @@ export function ExportEncodeSizeFootnote({
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className="text-muted-foreground hover:text-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent hover:bg-muted/40"
+                    className="text-muted-foreground hover:text-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-sm border border-transparent hover:bg-muted/40"
                     aria-label="Size estimate details"
                     aria-describedby={detailsId}
                   >

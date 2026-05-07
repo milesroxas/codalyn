@@ -1,3 +1,4 @@
+import { ChevronLeft, List, PanelsTopLeft, SquareCode } from "lucide-react";
 import { type MutableRefObject, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { ComposableInstancePropMeta } from "@/features/beacons/model/beacon-composable-props";
@@ -8,7 +9,6 @@ import {
   mergeComposableMetaWithLiveResolved,
 } from "@/features/beacons/model/beacon-composable-props";
 import {
-  type BeaconComposerCmsSource,
   beaconCompositionSignature,
   draftToHiddenListIndices,
   normalizeComposerDraftPropValues,
@@ -68,7 +68,6 @@ import { createBeaconTargetOnPage } from "@/features/beacons/model/create-beacon
 import {
   installBeaconsWrapperOnPage,
   isBeaconsWrapperInstalledOnPage,
-  listBeaconsOrphanedOnBody,
   removeBeaconsWrapperIfNoBeaconTargetsOnPage,
   syncBeaconsInstallEmbedOnPage,
   uninstallBeaconsPageInstall,
@@ -88,6 +87,19 @@ import { BeaconComposerStudioPanel } from "@/features/beacons/ui/beacon-composer
 import { BeaconCompositionPanel } from "@/features/beacons/ui/beacon-composition-panel";
 import { BeaconHomePanel } from "@/features/beacons/ui/beacon-home-panel";
 import { BeaconPageRuntimeHeaderStatus } from "@/features/beacons/ui/beacon-page-runtime-header-status";
+import { beaconAppRouteSurfaceClass } from "@/shared/lib/beacon-app-route-surface";
+import {
+  CMS_SLOTS_AREA_NAV_LABEL,
+  CMS_SLOTS_BACK_BUTTON_ARIA_LABEL,
+  CMS_SLOTS_DELETE_DIALOG_TITLE,
+  CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON,
+  CMS_SLOTS_FEATURE_NAME,
+  CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP,
+  CMS_SLOTS_TOAST_LIST_CREATED,
+  CMS_SLOTS_TOAST_LIST_REMOVED,
+  CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED,
+  CMS_SLOTS_UNINSTALL_PAGE_LABEL,
+} from "@/shared/lib/cms-slots-feature-copy";
 import { getTowerOrigin } from "@/shared/lib/tower-client";
 import { cn } from "@/shared/lib/utils";
 import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
@@ -100,7 +112,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
-import { Button } from "@/shared/ui/button";
+import { Button, buttonVariants } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Label } from "@/shared/ui/label";
 import { ScrollArea } from "@/shared/ui/scroll-area";
@@ -395,7 +407,7 @@ function useBeaconSyncShellLabels(
     if (engineListCompositionStale) {
       return {
         syncShellOk: false as const,
-        syncShellReason: "Beacon list changed in Engine — sync page script." as const,
+        syncShellReason: CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON,
       };
     }
     return { syncShellOk: true as const, syncShellReason: undefined };
@@ -543,7 +555,6 @@ export function BeaconsScreen() {
   const [pageBeacons, setPageBeacons] = useState<BeaconOnPage[]>([]);
   const [pageScanLoading, setPageScanLoading] = useState(true);
   const [beaconsWrapperInstalled, setBeaconsWrapperInstalled] = useState(false);
-  const [legacyBeaconsOnBody, setLegacyBeaconsOnBody] = useState<BeaconOnPage[]>([]);
   const [installPending, setInstallPending] = useState(false);
 
   const [beaconName, setBeaconName] = useState("");
@@ -569,7 +580,7 @@ export function BeaconsScreen() {
   const [listTargetRemoveBusyKind, setListTargetRemoveBusyKind] = useState<"canvas" | "delete" | null>(null);
   const [listTargetPlaceOnCanvasPending, setListTargetPlaceOnCanvasPending] = useState(false);
   const [listTargetPhase, setListTargetPhase] = useState<BeaconListTargetPhase>("loading");
-  const [listTargetRegisteredName, setListTargetRegisteredName] = useState<string | null>(null);
+  const [, setListTargetRegisteredName] = useState<string | null>(null);
   const [listTargetOnCanvasCount, setListTargetOnCanvasCount] = useState(0);
   const [removeListTargetDialogOpen, setRemoveListTargetDialogOpen] = useState(false);
   const [activeBeaconKey, setActiveBeaconKey] = useState<string | null>(null);
@@ -603,7 +614,6 @@ export function BeaconsScreen() {
   const [composerOpeningKey, setComposerOpeningKey] = useState<string | null>(null);
   const [engineListSlotFile, setEngineListSlotFile] = useState<BeaconEngineSlotPropsFile | null>(null);
   const [composerSavePending, setComposerSavePending] = useState(false);
-  const [composerCmsSource, setComposerCmsSource] = useState<BeaconComposerCmsSource>("static_list");
   const [currentCmsItemId, setCurrentCmsItemId] = useState<string | null>(null);
   const composerStudioRef = useRef<{
     beacon: BeaconOnPage;
@@ -628,18 +638,12 @@ export function BeaconsScreen() {
       });
 
     try {
-      const [found, installed, legacy] = await Promise.all([
-        findBeaconTargetsOnPage(),
-        isBeaconsWrapperInstalledOnPage(),
-        listBeaconsOrphanedOnBody(),
-      ]);
+      const [found, installed] = await Promise.all([findBeaconTargetsOnPage(), isBeaconsWrapperInstalledOnPage()]);
       setPageBeacons(found);
       setBeaconsWrapperInstalled(installed);
-      setLegacyBeaconsOnBody(legacy);
     } catch {
       setPageBeacons([]);
       setBeaconsWrapperInstalled(false);
-      setLegacyBeaconsOnBody([]);
     } finally {
       setPageScanLoading(false);
     }
@@ -743,7 +747,7 @@ export function BeaconsScreen() {
           return;
         }
         setComposerSlotProps(sp);
-        const { draft, initialSignature, cmsSource } = await resolveComposerTargetOrder({
+        const { draft, initialSignature } = await resolveComposerTargetOrder({
           listContainer: beacon.container,
           engineScopedRows,
           currentCmsItemId,
@@ -752,7 +756,6 @@ export function BeaconsScreen() {
           return;
         }
         setComposerDraft(draft);
-        setComposerCmsSource(cmsSource);
         setComposerStudio((prev) =>
           prev == null || prev.beacon.key !== beacon.key ? prev : { ...prev, initialSignature }
         );
@@ -923,7 +926,7 @@ export function BeaconsScreen() {
         phase: "synced",
         registeredName: listTargetRegisteredName,
       };
-      void webflow.notify({ type: "Success", message: "Beacon created." });
+      void webflow.notify({ type: "Success", message: CMS_SLOTS_TOAST_LIST_CREATED });
       void refreshPageBeacons();
     } catch (err) {
       const message = formatDesignerError(err);
@@ -960,24 +963,6 @@ export function BeaconsScreen() {
     });
   }, [composerDraft, composerEngineRows, composerEngineComposable, composerSlotProps]);
 
-  const composerEmptyTargetOrderHint = useMemo(() => {
-    if (composerStudio == null) {
-      return null;
-    }
-    switch (composerCmsSource) {
-      case "cms_no_item":
-        return "Select a collection item in the Designer to load or edit a per-entry order for this list.";
-      case "cms_no_tower":
-        return "Connect Codalyn to Tower to load each entry’s order from the CMS text field for this list.";
-      case "cms_no_field":
-        return "The beacon list is missing a CMS text field. Create and sync a list target for this list, then return.";
-      case "cms_field_empty":
-        return "No saved order for this item yet. Add components from the palette to build a layout.";
-      default:
-        return null;
-    }
-  }, [composerStudio, composerCmsSource]);
-
   const handleOpenComposerStudio = async (beacon: BeaconOnPage) => {
     setComposerOpeningKey(beacon.key);
     try {
@@ -991,7 +976,7 @@ export function BeaconsScreen() {
       setComposerEngineComposable(liveComposable);
       const sp = await readBeaconEngineSlotPropsFile(beacon.container, engineScopedRows.length);
       setComposerSlotProps(sp);
-      const { draft: rawDraft, cmsSource } = await resolveComposerTargetOrder({
+      const { draft: rawDraft } = await resolveComposerTargetOrder({
         listContainer: beacon.container,
         engineScopedRows,
         currentCmsItemId,
@@ -1002,7 +987,6 @@ export function BeaconsScreen() {
         : rawDraft;
       const initialSignature = beaconCompositionSignature(draft);
       setComposerDraft(draft);
-      setComposerCmsSource(cmsSource);
       setComposerStudio({ beacon, initialSignature });
     } catch (err) {
       const message = formatDesignerError(err);
@@ -1019,7 +1003,6 @@ export function BeaconsScreen() {
     setComposerEngineComposable({});
     setComposerSlotProps(null);
     setComposerAllowedPalette([]);
-    setComposerCmsSource("static_list");
   }, []);
 
   const handleComposerAddFromPalette = useCallback((c: BeaconPaletteEntry) => {
@@ -1033,6 +1016,10 @@ export function BeaconsScreen() {
     setComposerDraft((prev) =>
       prev.map((r) => (r.key === rowKey ? { ...r, propValues: { ...(r.propValues ?? {}), [propId]: value } } : r))
     );
+  }, []);
+
+  const handleComposerRenameSlotRow = useCallback((rowKey: string, name: string) => {
+    setComposerDraft((prev) => prev.map((r) => (r.key === rowKey ? { ...r, name } : r)));
   }, []);
 
   const handleSetEngineSlotExposed = useCallback(
@@ -1217,7 +1204,8 @@ export function BeaconsScreen() {
       const onCmsTemplate = (await getCmsTemplateCollectionIdFromCurrentPage()) != null;
       /** After a static save the hidden list is rebuilt in draft order, so clone indices are 0..n-1. CMS leaves the Engine list as-is, so we keep greedy pool indices. */
       const hiddenListIndicesForRuntime = onCmsTemplate ? mapped.indices : draftToApply.map((_, u) => u);
-      const runtimeText = serializeBeaconListRuntimePayload(hiddenListIndicesForRuntime, propValueRows);
+      const slotLabels = draftToApply.map((d) => d.name);
+      const runtimeText = serializeBeaconListRuntimePayload(hiddenListIndicesForRuntime, propValueRows, slotLabels);
 
       if (onCmsTemplate) {
         if (!getTowerOrigin().trim() || currentCmsItemId == null) {
@@ -1262,6 +1250,7 @@ export function BeaconsScreen() {
             cmsItemId: currentCmsItemId,
             hiddenListIndices: hiddenListIndicesForRuntime,
             propValueRows,
+            slotLabels,
           });
         } catch (e) {
           cmsLayoutSaveFailed = true;
@@ -1283,12 +1272,11 @@ export function BeaconsScreen() {
             message:
               "Layout saved to the current CMS item’s text field. Page script updated — publish for the live site. The Engine reference list was not changed.",
           });
-          setComposerCmsSource("cms_from_field");
         }
       } else {
         const beforePoolIds = engineScopedRows.map((r) => r.componentId);
         const oldFile = await readBeaconEngineSlotPropsFile(beacon.container, engineScopedRows.length);
-        const hydrated = await applyBeaconCompositionDraft(beacon.container, draftToApply);
+        await applyBeaconCompositionDraft(beacon.container, draftToApply);
         const newFile = mergeSlotFileAfterListRebuild(beforePoolIds, oldFile, draftToApply);
         await writeBeaconEngineSlotPropsFile(beacon.container, newFile);
         await setBeaconListTargetInstancesStaticRuntimeText({
@@ -1298,32 +1286,25 @@ export function BeaconsScreen() {
           text: runtimeText,
         });
         await syncBeaconPageInlineScript();
-        const hydratedScoped = hydrated.filter((row) => allowedComponentIdSet.has(row.componentId));
         setComposerDraft(
-          draftToApply.map((d, j) => {
-            const h = hydratedScoped[j];
-            return {
-              key: d.key,
-              componentId: d.componentId,
-              name: h?.name ?? d.name,
-              propValues: d.propValues,
-            };
-          })
+          draftToApply.map((d) => ({
+            key: d.key,
+            componentId: d.componentId,
+            name: d.name,
+            propValues: d.propValues,
+          }))
         );
         setComposerStudio((prev) =>
           prev
             ? {
                 ...prev,
                 initialSignature: beaconCompositionSignature(
-                  draftToApply.map((d, j) => {
-                    const h = hydratedScoped[j];
-                    return {
-                      key: d.key,
-                      componentId: d.componentId,
-                      name: h?.name ?? d.name,
-                      propValues: d.propValues,
-                    };
-                  })
+                  draftToApply.map((d) => ({
+                    key: d.key,
+                    componentId: d.componentId,
+                    name: d.name,
+                    propValues: d.propValues,
+                  }))
                 ),
               }
             : null
@@ -1486,7 +1467,7 @@ export function BeaconsScreen() {
       setUninstallWithLastBeaconDelete(false);
       void webflow.notify({
         type: "Success",
-        message: shouldUninstallPage ? "Beacon removed. Beacons page install cleared." : "Beacon removed.",
+        message: shouldUninstallPage ? CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED : CMS_SLOTS_TOAST_LIST_REMOVED,
       });
       setEngineListCompositionStale(true);
       void refreshPageBeacons();
@@ -1702,27 +1683,24 @@ export function BeaconsScreen() {
   };
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      {/* /beacons page title only. Global app bar is `Header` in the shell, not this strip. */}
+    <div className={beaconAppRouteSurfaceClass}>
+      {/* /beacons route header. Global app bar is `Header` in the shell, not this strip. */}
       <div className="shrink-0 border-b border-border/50 bg-muted/20 dark:bg-muted/15" data-slot="beacons_route_header">
-        <div className="mx-auto flex h-8 min-w-0 max-w-lg items-center justify-between gap-2 px-3">
-          <h2 className="text-sm font-medium leading-none tracking-tight text-foreground">Beacons</h2>
-          <div className="flex min-w-0 shrink-0 items-center justify-end gap-1.5">
-            {beaconsWrapperInstalled && !pageRuntimeStatusLoading ? (
-              <div
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5"
-                data-slot="beacon_install_done"
-                role="status"
-              >
-                <span
-                  className="size-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(16,185,129,0.4)]"
-                  aria-hidden
-                />
-                <span className="text-[0.65rem] font-medium leading-none text-emerald-800 dark:text-emerald-300">
-                  Installed
-                </span>
-              </div>
-            ) : null}
+        <div className="mx-auto flex h-8 min-w-0 max-w-lg items-center gap-2 px-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="-ml-1 shrink-0 text-foreground"
+            aria-label={CMS_SLOTS_BACK_BUTTON_ARIA_LABEL}
+            onClick={() => void navigate("/home")}
+          >
+            <ChevronLeft aria-hidden className="size-4" strokeWidth={2.25} />
+          </Button>
+          <h2 className="min-w-0 truncate text-sm font-medium leading-none tracking-tight text-foreground">
+            {CMS_SLOTS_FEATURE_NAME}
+          </h2>
+          <div className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-1.5">
             {showPageRuntimeSyncHeader ? (
               <BeaconPageRuntimeHeaderStatus
                 loading={pageRuntimeStatusLoading}
@@ -1736,44 +1714,6 @@ export function BeaconsScreen() {
 
       <ScrollArea className="min-h-0 min-w-0 flex-1">
         <div className="mx-auto w-full max-w-lg space-y-4 px-3 py-3">
-          <nav
-            className="flex w-full min-w-0 flex-wrap items-end gap-1 border-b border-border/60"
-            aria-label="Beacons area"
-          >
-            <NavLink
-              to="/beacons/engine"
-              className={({ isActive }) =>
-                cn(
-                  "relative -mb-px border-b-2 border-transparent px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors",
-                  isActive && "border-primary text-foreground"
-                )
-              }
-              onClick={() => {
-                if (composerStudio != null) {
-                  handleComposerStudioBack();
-                }
-              }}
-            >
-              Engine
-            </NavLink>
-            <NavLink
-              to="/beacons/composer"
-              className={({ isActive }) =>
-                cn(
-                  "relative -mb-px border-b-2 border-transparent px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors",
-                  isActive && "border-primary text-foreground"
-                )
-              }
-              onClick={() => {
-                if (picking) {
-                  exitToList();
-                }
-              }}
-            >
-              Composer
-            </NavLink>
-          </nav>
-
           {isEngine ? (
             <div className="space-y-4" data-route="beacons-engine">
               {!picking && (
@@ -1782,7 +1722,6 @@ export function BeaconsScreen() {
                   beaconsWrapperInstalled={beaconsWrapperInstalled}
                   installPending={installPending}
                   onInstallWrapper={handleInstallWrapper}
-                  legacyBeaconsOnBody={legacyBeaconsOnBody}
                   pageBeacons={pageBeacons}
                   pageScanLoading={pageScanLoading}
                   beaconName={beaconName}
@@ -1795,11 +1734,6 @@ export function BeaconsScreen() {
                   openingBeaconKey={openingBeaconKey}
                   onRequestDelete={(b) => setBeaconToDelete(b)}
                   deletePendingKey={deletePendingKey}
-                  embedSyncPending={embedSyncPending}
-                  onSyncInstallEmbed={handleSyncInstallEmbed}
-                  pageRuntimeStatusLoading={pageRuntimeStatusLoading}
-                  pageRuntimeSynced={syncShellOk}
-                  pageRuntimeSyncReason={syncShellReason}
                 />
               )}
 
@@ -1827,11 +1761,6 @@ export function BeaconsScreen() {
                   listTargetCreatePending={listTargetCreatePending}
                   listTargetRemovePending={listTargetRemovePending}
                   listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
-                  embedSyncPending={embedSyncPending}
-                  onSyncInstallEmbed={handleSyncInstallEmbed}
-                  pageRuntimeStatusLoading={pageRuntimeStatusLoading}
-                  pageRuntimeSynced={syncShellOk}
-                  pageRuntimeSyncReason={syncShellReason}
                   engineSlotProps={engineListSlotFile ?? { v: 1, slots: [] }}
                   onSetSlotExposed={handleSetEngineSlotExposed}
                   onResyncEngineSlotAttrs={handleResyncEngineSlotAttrs}
@@ -1845,9 +1774,10 @@ export function BeaconsScreen() {
                 <BeaconComposerListPanel
                   pageScanLoading={pageScanLoading}
                   beaconsWrapperInstalled={beaconsWrapperInstalled}
+                  installPending={installPending}
+                  onInstallWrapper={handleInstallWrapper}
                   loading={composerEligibleLoading}
                   runtimeOk={composerRuntimeOk && syncShellOk}
-                  engineCompositionStale={composerRuntimeOk && engineListCompositionStale}
                   eligible={composerEligible}
                   openingKey={composerOpeningKey}
                   onOpenList={(b) => void handleOpenComposerStudio(b)}
@@ -1858,7 +1788,6 @@ export function BeaconsScreen() {
                   activeDataList={composerStudio.beacon.dataList}
                   draft={composerDraft}
                   dirty={composerDirty}
-                  emptyTargetOrderHint={composerEmptyTargetOrderHint}
                   allowedPalette={composerAllowedPalette}
                   onAddFromPalette={handleComposerAddFromPalette}
                   onReorder={handleComposerReorderDraft}
@@ -1868,147 +1797,166 @@ export function BeaconsScreen() {
                   savePending={composerSavePending}
                   pageRuntimeStatusLoading={pageRuntimeStatusLoading}
                   pageRuntimeSynced={syncShellOk}
-                  pageRuntimeSyncReason={syncShellReason}
                   embedSyncPending={embedSyncPending}
                   onSyncInstallEmbed={handleSyncInstallEmbed}
                   rowMeta={composerRowMeta}
                   onChangePropValue={handleComposerSetPropValue}
+                  onRenameSlot={handleComposerRenameSlotRow}
                 />
               )}
             </div>
           ) : null}
+        </div>
+      </ScrollArea>
 
-          <AlertDialog open={beaconToDelete != null} onOpenChange={(o) => !o && setBeaconToDelete(null)}>
-            <AlertDialogContent size="default">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete this beacon?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This unregisters the list-target site component in{" "}
-                  <span className="text-foreground">{BEACON_UTILITIES_COMPONENT_GROUP}</span> (if it exists), then
-                  removes the hidden list block
-                  {beaconToDelete != null && (
-                    <>
-                      {" "}
-                      <code className="font-mono text-[0.85em] text-foreground">{beaconToDelete.dataList}</code>
-                    </>
-                  )}{" "}
-                  and any component instances inside it, including their Text and CMS field bindings. This can&apos;t be
-                  undone.
-                  {isLastBeaconOnPageForDelete ? (
-                    <span>
-                      {" "}
-                      This is the only beacon list on the page; you can optionally remove the page install as well.
-                    </span>
-                  ) : null}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              {isLastBeaconOnPageForDelete ? (
-                <div
-                  className="flex max-w-sm gap-2.5 rounded-lg border border-border/70 bg-muted/25 p-2.5 sm:max-w-none"
-                  data-slot="beacon_delete_uninstall_page"
-                >
-                  <Checkbox
-                    id={lastBeaconUninstallChoiceId}
-                    checked={uninstallWithLastBeaconDelete}
-                    disabled={deletePendingKey != null}
-                    onCheckedChange={(v) => setUninstallWithLastBeaconDelete(v === true)}
-                  />
-                  <div className="min-w-0">
-                    <Label htmlFor={lastBeaconUninstallChoiceId}>Also uninstall Beacons on this page</Label>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Removes the hidden beacons install wrapper, if any, and the footer beacon script when Tower is
-                      configured. Publish the site for the live page to match.
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-              <AlertDialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={deletePendingKey != null}
-                  onClick={() => setBeaconToDelete(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  disabled={deletePendingKey != null}
-                  onClick={() => void handleConfirmDeleteBeacon()}
-                >
-                  {deletePendingKey != null ? "Deleting…" : "Delete"}
-                </Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+      <AlertDialog open={beaconToDelete != null} onOpenChange={(o) => !o && setBeaconToDelete(null)}>
+        <AlertDialogContent size="default">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{CMS_SLOTS_DELETE_DIALOG_TITLE}</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          {isLastBeaconOnPageForDelete ? (
+            <div
+              className="flex max-w-sm gap-2.5 rounded-sm border border-border/70 bg-muted/25 p-2.5 sm:max-w-none"
+              data-slot="beacon_delete_uninstall_page"
+            >
+              <Checkbox
+                id={lastBeaconUninstallChoiceId}
+                checked={uninstallWithLastBeaconDelete}
+                disabled={deletePendingKey != null}
+                onCheckedChange={(v) => setUninstallWithLastBeaconDelete(v === true)}
+              />
+              <div className="min-w-0">
+                <Label htmlFor={lastBeaconUninstallChoiceId}>{CMS_SLOTS_UNINSTALL_PAGE_LABEL}</Label>
+              </div>
+            </div>
+          ) : null}
+          <AlertDialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deletePendingKey != null}
+              onClick={() => setBeaconToDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deletePendingKey != null}
+              onClick={() => void handleConfirmDeleteBeacon()}
+            >
+              {deletePendingKey != null ? "Deleting…" : "Delete"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-          <AlertDialog
-            open={removeListTargetDialogOpen}
-            onOpenChange={(o) => {
-              if (!o && !listTargetRemovePending) {
-                setRemoveListTargetDialogOpen(false);
-                setListTargetRemoveBusyKind(null);
+      <AlertDialog
+        open={removeListTargetDialogOpen}
+        onOpenChange={(o) => {
+          if (!o && !listTargetRemovePending) {
+            setRemoveListTargetDialogOpen(false);
+            setListTargetRemoveBusyKind(null);
+          }
+        }}
+      >
+        <AlertDialogContent size="default">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove list target</AlertDialogTitle>
+            <AlertDialogDescription className="sr-only">
+              Confirm removing the list target from the canvas or deleting it entirely.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:flex-wrap">
+            <AlertDialogCancel type="button" disabled={listTargetRemovePending}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={listTargetRemovePending}
+              onClick={() => void handleRemoveListTargetFromCanvasOnly()}
+            >
+              {listTargetRemovePending && listTargetRemoveBusyKind === "canvas" ? "Removing…" : "Remove from canvas"}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={listTargetRemovePending}
+              onClick={() => void handleConfirmDeleteListTargetCompletely()}
+            >
+              {listTargetRemovePending && listTargetRemoveBusyKind === "delete" ? "Deleting…" : "Delete target"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <footer
+        data-slot="beacons_dock"
+        className="flex shrink-0 items-stretch gap-2 border-t border-border/65 bg-background px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.375rem)]"
+      >
+        <nav className="flex min-w-0 flex-1 items-stretch gap-1.5" aria-label={CMS_SLOTS_AREA_NAV_LABEL}>
+          <NavLink
+            to="/beacons/engine"
+            className={({ isActive }) =>
+              cn(
+                buttonVariants({
+                  variant: isActive ? "beaconsDockNavActive" : "beaconsDockNav",
+                  size: "dockNav",
+                }),
+                "min-w-0 flex-1 shrink"
+              )
+            }
+            onClick={() => {
+              if (composerStudio != null) {
+                handleComposerStudioBack();
               }
             }}
           >
-            <AlertDialogContent size="default">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Remove list target</AlertDialogTitle>
-                <AlertDialogDescription asChild>
-                  <div className="space-y-3 text-sm text-muted-foreground">
-                    <p>
-                      Choose how to remove
-                      {listTargetRegisteredName != null && (
-                        <>
-                          {" "}
-                          <code className="font-mono text-[0.85em] text-foreground">{listTargetRegisteredName}</code>
-                        </>
-                      )}
-                      . The beacon list&apos;s CMS plain text field (layout JSON) is only deleted when you delete the
-                      beacon list itself — not from this dialog.
-                    </p>
-                    <ul className="list-inside list-disc space-y-1.5 text-left">
-                      <li>
-                        <span className="text-foreground">Remove from canvas</span> — deletes instances on this page.
-                        The component stays in{" "}
-                        <span className="text-foreground">{BEACON_UTILITIES_COMPONENT_GROUP}</span>.
-                      </li>
-                      <li>
-                        <span className="text-foreground">Delete target</span> — also unregisters that site component.
-                        Canvas instances are removed first. This cannot be undone.
-                      </li>
-                    </ul>
-                  </div>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="sm:flex-wrap">
-                <AlertDialogCancel type="button" disabled={listTargetRemovePending}>
-                  Cancel
-                </AlertDialogCancel>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={listTargetRemovePending}
-                  onClick={() => void handleRemoveListTargetFromCanvasOnly()}
-                >
-                  {listTargetRemovePending && listTargetRemoveBusyKind === "canvas"
-                    ? "Removing…"
-                    : "Remove from canvas"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  disabled={listTargetRemovePending}
-                  onClick={() => void handleConfirmDeleteListTargetCompletely()}
-                >
-                  {listTargetRemovePending && listTargetRemoveBusyKind === "delete" ? "Deleting…" : "Delete target"}
-                </Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </ScrollArea>
+            <PanelsTopLeft aria-hidden />
+            Engine
+          </NavLink>
+          <NavLink
+            to="/beacons/composer"
+            className={({ isActive }) =>
+              cn(
+                buttonVariants({
+                  variant: isActive ? "beaconsDockNavActive" : "beaconsDockNav",
+                  size: "dockNav",
+                }),
+                "min-w-0 flex-1 shrink"
+              )
+            }
+            onClick={() => {
+              if (picking) {
+                exitToList();
+              }
+            }}
+          >
+            <List aria-hidden />
+            Composer
+          </NavLink>
+        </nav>
+        <Button
+          type="button"
+          variant="secondary"
+          size="dockNav"
+          disabled={embedSyncPending || pageRuntimeStatusLoading || !beaconsWrapperInstalled || pageScanLoading}
+          aria-busy={embedSyncPending}
+          title={
+            !beaconsWrapperInstalled
+              ? CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP
+              : pageRuntimeStatusLoading
+                ? "Checking page script…"
+                : undefined
+          }
+          onClick={() => void handleSyncInstallEmbed()}
+        >
+          <SquareCode aria-hidden />
+          Sync
+        </Button>
+      </footer>
     </div>
   );
 }

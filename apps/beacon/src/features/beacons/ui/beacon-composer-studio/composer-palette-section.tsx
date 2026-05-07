@@ -13,14 +13,11 @@ export function ComposerPaletteSection(props: ComposerPaletteSectionProps) {
   const { allowedPalette, busy, onAddFromPalette } = props;
 
   return (
-    <section className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-2.5" data-slot="beacon_composer_add">
-      <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Add to target</p>
+    <section className="space-y-2 rounded-sm border border-border/70 bg-muted/20 p-2.5" data-slot="beacon_composer_add">
       {allowedPalette.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border bg-background px-2.5 py-3 text-sm text-muted-foreground">
-          No component types available for this beacon list.
-        </p>
+        <div className="min-h-24 rounded-sm border border-dashed border-border bg-background" aria-hidden />
       ) : (
-        <ScrollArea className="h-[min(34vh,14rem)] rounded-md border border-border/70 bg-background">
+        <ScrollArea className="h-[min(34vh,14rem)] rounded-sm border border-border/70 bg-background">
           <ul className="m-0 list-none space-y-1 p-2" aria-label="Allowed component types for this list">
             {allowedPalette.map((c) => (
               <li key={c.id} className="min-w-0">

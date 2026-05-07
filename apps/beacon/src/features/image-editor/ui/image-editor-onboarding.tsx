@@ -24,7 +24,7 @@ export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
         <p className="max-w-sm text-sm text-muted-foreground">Sign in for the full workflow, or jump in as a guest.</p>
       </header>
 
-      <article className="rounded-xl border border-primary/30 bg-card p-4 ring-1 ring-primary/15">
+      <article className="rounded-sm border border-primary/30 bg-card p-4 ring-1 ring-primary/15">
         <div className="flex items-center gap-1.5">
           <Sparkles aria-hidden className="size-3.5 text-primary" />
           <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">Recommended</span>
@@ -51,7 +51,7 @@ export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
         </Button>
       </article>
 
-      <article className="rounded-xl border border-border bg-card/40 p-4">
+      <article className="rounded-sm border border-border bg-card/40 p-4">
         <h3 className="text-base font-semibold text-foreground">Continue as guest</h3>
         <p className="mt-1 text-xs leading-snug text-muted-foreground">
           Core crop and export tools. WebP only, no CMS access.

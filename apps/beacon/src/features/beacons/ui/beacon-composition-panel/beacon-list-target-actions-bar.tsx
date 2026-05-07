@@ -22,7 +22,6 @@ function BeaconListTargetSyncedActions(p: {
   listTargetPlaceOnCanvasPending: boolean;
   placeOrFocusLabel: string;
   placeOrFocusPendingLabel: string;
-  onBackToList: () => void;
   onRequestRemoveListTarget: () => void;
   onPlaceListTargetOnCanvas: () => void;
 }) {
@@ -37,9 +36,6 @@ function BeaconListTargetSyncedActions(p: {
         onClick={() => void p.onRequestRemoveListTarget()}
       >
         Remove target…
-      </Button>
-      <Button type="button" variant="outline" size="sm" onClick={() => void p.onBackToList()}>
-        Back to list
       </Button>
       <Button
         type="button"
@@ -81,7 +77,6 @@ export function BeaconListTargetActionsBar(props: BeaconListTargetActionsBarProp
           listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
           placeOrFocusLabel={placeOrFocusLabel}
           placeOrFocusPendingLabel={placeOrFocusPendingLabel}
-          onBackToList={onBackToList}
           onRequestRemoveListTarget={onRequestRemoveListTarget}
           onPlaceListTargetOnCanvas={onPlaceListTargetOnCanvas}
         />

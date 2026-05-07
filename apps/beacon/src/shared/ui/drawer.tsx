@@ -1,27 +1,27 @@
 import { XIcon } from "lucide-react";
-import type * as React from "react";
+import { Children, type ComponentProps, isValidElement, type ReactNode } from "react";
 import { Drawer as VaulDrawer } from "vaul";
 
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 
-function Drawer({ ...props }: React.ComponentProps<typeof VaulDrawer.Root>) {
+function Drawer({ ...props }: ComponentProps<typeof VaulDrawer.Root>) {
   return <VaulDrawer.Root data-slot="drawer" repositionInputs={false} {...props} />;
 }
 
-function DrawerTrigger({ ...props }: React.ComponentProps<typeof VaulDrawer.Trigger>) {
+function DrawerTrigger({ ...props }: ComponentProps<typeof VaulDrawer.Trigger>) {
   return <VaulDrawer.Trigger data-slot="drawer-trigger" {...props} />;
 }
 
-function DrawerPortal({ ...props }: React.ComponentProps<typeof VaulDrawer.Portal>) {
+function DrawerPortal({ ...props }: ComponentProps<typeof VaulDrawer.Portal>) {
   return <VaulDrawer.Portal data-slot="drawer-portal" {...props} />;
 }
 
-function DrawerClose({ ...props }: React.ComponentProps<typeof VaulDrawer.Close>) {
+function DrawerClose({ ...props }: ComponentProps<typeof VaulDrawer.Close>) {
   return <VaulDrawer.Close data-slot="drawer-close" {...props} />;
 }
 
-function DrawerOverlay({ className, ...props }: React.ComponentProps<typeof VaulDrawer.Overlay>) {
+function DrawerOverlay({ className, ...props }: ComponentProps<typeof VaulDrawer.Overlay>) {
   return (
     <VaulDrawer.Overlay
       data-slot="drawer-overlay"
@@ -39,10 +39,13 @@ function DrawerContent({
   children,
   showCloseButton = true,
   showDragHandle = true,
+  stickyFooter = false,
   ...props
-}: React.ComponentProps<typeof VaulDrawer.Content> & {
+}: ComponentProps<typeof VaulDrawer.Content> & {
   showCloseButton?: boolean;
   showDragHandle?: boolean;
+  /** When true, `DrawerHeader` and `DrawerFooter` stay fixed; other children scroll in between. */
+  stickyFooter?: boolean;
 }) {
   const closeControl = showCloseButton ? (
     <DrawerClose asChild>
@@ -89,13 +92,42 @@ function DrawerContent({
         ) : (
           <div className="mt-1 shrink-0" aria-hidden />
         )}
-        <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto px-4">{children}</div>
+        {stickyFooter ? (
+          (() => {
+            const nodes = Children.toArray(children);
+            const headerBlocks: ReactNode[] = [];
+            const footerBlocks: ReactNode[] = [];
+            const mainBlocks: ReactNode[] = [];
+            for (const node of nodes) {
+              if (isValidElement(node) && node.type === DrawerFooter) {
+                footerBlocks.push(node);
+              } else if (isValidElement(node) && node.type === DrawerHeader) {
+                headerBlocks.push(node);
+              } else {
+                mainBlocks.push(node);
+              }
+            }
+            return (
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4">
+                {headerBlocks}
+                <div className="scrollbar-themed min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+                  {mainBlocks}
+                </div>
+                {footerBlocks}
+              </div>
+            );
+          })()
+        ) : (
+          <div className="scrollbar-themed flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-y-auto px-4">
+            {children}
+          </div>
+        )}
       </VaulDrawer.Content>
     </DrawerPortal>
   );
 }
 
-function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
+function DrawerHeader({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="drawer-header"
@@ -105,11 +137,11 @@ function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function DrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
+function DrawerFooter({ className, ...props }: ComponentProps<"div">) {
   return <div data-slot="drawer-footer" className={cn("mt-6 flex shrink-0 flex-col gap-2", className)} {...props} />;
 }
 
-function DrawerTitle({ className, ...props }: React.ComponentProps<typeof VaulDrawer.Title>) {
+function DrawerTitle({ className, ...props }: ComponentProps<typeof VaulDrawer.Title>) {
   return (
     <VaulDrawer.Title
       data-slot="drawer-title"
@@ -119,7 +151,7 @@ function DrawerTitle({ className, ...props }: React.ComponentProps<typeof VaulDr
   );
 }
 
-function DrawerDescription({ className, ...props }: React.ComponentProps<typeof VaulDrawer.Description>) {
+function DrawerDescription({ className, ...props }: ComponentProps<typeof VaulDrawer.Description>) {
   return (
     <VaulDrawer.Description
       data-slot="drawer-description"

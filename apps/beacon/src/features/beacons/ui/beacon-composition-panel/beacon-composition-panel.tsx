@@ -115,28 +115,37 @@ export function BeaconCompositionPanel(props: BeaconCompositionPanelProps) {
       />
 
       <div className="space-y-2">
-        <p className="text-sm font-medium">Selected</p>
+        <div className="flex items-center gap-3">
+          <div className="h-px min-w-0 flex-1 bg-zinc-600/45" aria-hidden />
+          <span className="shrink-0 text-center text-xs text-zinc-500">Components</span>
+          <div className="h-px min-w-0 flex-1 bg-zinc-600/45" aria-hidden />
+        </div>
         {selected.length === 0 ? (
-          <div className="min-h-16 rounded-sm border border-dashed border-border bg-muted/10" aria-hidden />
+          <div className="min-h-16 rounded-[10px] border border-dashed border-zinc-700/55 bg-zinc-900/40" aria-hidden />
         ) : (
-          <ul className="space-y-1.5" aria-label="Selected components">
-            {selected.map((row, slotIndex) => (
-              <BeaconEngineSelectedRow
-                key={row.key}
-                row={row}
-                slotIndex={slotIndex}
-                available={composableByKey[row.key] ?? []}
-                slotExposed={engineSlotProps.slots[slotIndex]?.exposed ?? []}
-                composableLoading={composableLoading}
-                removingKey={removingKey}
-                listTargetActionBusy={listTargetActionBusy}
-                resyncingEngineSlotKey={resyncingEngineSlotKey}
-                onRemove={onRemove}
-                onSetSlotExposed={onSetSlotExposed}
-                onResyncEngineSlotAttrs={onResyncEngineSlotAttrs}
-              />
-            ))}
-          </ul>
+          <div className="overflow-hidden rounded-[10px] border border-zinc-700/55 bg-[#1c1c1c]">
+            <ul
+              className="scrollbar-themed max-h-60 divide-y divide-border/80 overflow-y-scroll"
+              aria-label="Selected components"
+            >
+              {selected.map((row, slotIndex) => (
+                <BeaconEngineSelectedRow
+                  key={row.key}
+                  row={row}
+                  slotIndex={slotIndex}
+                  available={composableByKey[row.key] ?? []}
+                  slotExposed={engineSlotProps.slots[slotIndex]?.exposed ?? []}
+                  composableLoading={composableLoading}
+                  removingKey={removingKey}
+                  listTargetActionBusy={listTargetActionBusy}
+                  resyncingEngineSlotKey={resyncingEngineSlotKey}
+                  onRemove={onRemove}
+                  onSetSlotExposed={onSetSlotExposed}
+                  onResyncEngineSlotAttrs={onResyncEngineSlotAttrs}
+                />
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     </>

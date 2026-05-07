@@ -1,8 +1,5 @@
-import { Loader2 } from "lucide-react";
-import { Button } from "@/shared/ui/button";
+import { Loader2, Plus, Search } from "lucide-react";
 import { Input } from "@/shared/ui/input";
-import { Label } from "@/shared/ui/label";
-import { ScrollArea } from "@/shared/ui/scroll-area";
 
 type BeaconCompositionComponentsCatalogProps = {
   searchFieldId: string;
@@ -30,66 +27,93 @@ export function BeaconCompositionComponentsCatalog(props: BeaconCompositionCompo
   } = props;
 
   return (
-    <div className="space-y-2" data-slot="beacon_list">
-      <Label htmlFor={searchFieldId}>Components</Label>
-      <Input
-        id={searchFieldId}
-        value={componentQuery}
-        onChange={(e) => setComponentQuery(e.target.value)}
-        autoComplete="off"
-        aria-busy={catalogLoading}
-      />
+    <div
+      className="space-y-4 overflow-hidden rounded-[10px] border border-zinc-700/55 bg-[#1c1c1c] p-4 text-zinc-100 shadow-sm"
+      data-slot="beacon_list"
+    >
+      <p className="text-xs leading-relaxed text-zinc-500">Add a list of components for this slot</p>
+
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-zinc-500"
+          aria-hidden
+        />
+        <Input
+          id={searchFieldId}
+          value={componentQuery}
+          onChange={(e) => setComponentQuery(e.target.value)}
+          autoComplete="off"
+          aria-busy={catalogLoading}
+          placeholder="Search components"
+          className="h-9 rounded-lg border-zinc-700 bg-zinc-800/85 px-2.5 py-1 pl-9 text-sm text-zinc-100 shadow-none placeholder:text-zinc-500 focus-visible:border-zinc-600 focus-visible:ring-zinc-600/40"
+        />
+      </div>
+
       {catalogError ? (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="text-sm text-red-400" role="alert">
           {catalogError}
         </p>
       ) : null}
-      <div className="relative h-40 rounded-sm border border-border">
+
+      <div className="relative -mx-1 h-40 shrink-0 overflow-hidden rounded-md">
         {catalogLoading ? (
           <div
-            className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-[1px]"
+            className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-[#1c1c1c]/75 backdrop-blur-[1px]"
             data-slot="beacon_list_loader"
             role="status"
             aria-live="polite"
             aria-label="Loading components"
           >
-            <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
+            <Loader2 className="size-5 animate-spin text-zinc-500" aria-hidden />
           </div>
         ) : null}
-        <ScrollArea className="h-full min-h-0 pr-0.5 pl-0" data-state={catalogLoading ? "loading" : "idle"}>
+        <div
+          className="scrollbar-themed h-40 overflow-y-scroll rounded-md"
+          data-state={catalogLoading ? "loading" : "idle"}
+        >
           {componentCatalog.length === 0 && !catalogLoading ? (
-            <div className="min-h-28" aria-hidden />
+            <div className="h-full min-h-28" aria-hidden />
           ) : (
-            <ul className="p-1.5" aria-label="Components">
+            <ul className="px-1" aria-label="Components">
               {componentCatalog.map((c) => {
                 const isAlreadyAdded = selectedComponentIdSet.has(c.id);
+                const disabled = addPending || catalogLoading || isAlreadyAdded;
                 return (
-                  <li key={c.id} className="p-0.5">
-                    <Button
+                  <li key={c.id} className="mx-2 border-b border-zinc-800/90 last:border-b-0">
+                    <button
                       type="button"
-                      variant="ghost"
-                      className="h-auto w-full min-w-0 flex-col items-stretch py-1.5 text-left"
+                      className="flex w-full min-w-0 items-center justify-between gap-3 py-2.5 text-left transition-colors hover:bg-zinc-800/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/60 disabled:pointer-events-none"
                       onClick={() => void onAddComponent(c)}
-                      disabled={addPending || catalogLoading || isAlreadyAdded}
+                      disabled={disabled}
                       aria-disabled={isAlreadyAdded}
+                      aria-label={isAlreadyAdded ? `${c.name} already added` : `Add ${c.name}`}
                     >
                       <span
                         className={
                           isAlreadyAdded
-                            ? "font-medium wrap-break-word text-muted-foreground"
-                            : "font-medium wrap-break-word"
+                            ? "min-w-0 truncate text-sm text-zinc-500"
+                            : "min-w-0 truncate text-sm font-normal text-white"
                         }
                       >
                         {c.name}
                       </span>
-                      {c.group ? <span className="text-xs text-muted-foreground">{c.group}</span> : null}
-                    </Button>
+                      <span
+                        className={
+                          isAlreadyAdded
+                            ? "flex size-5 shrink-0 items-center justify-center rounded-full border border-zinc-700 text-zinc-600"
+                            : "flex size-5 shrink-0 items-center justify-center rounded-full border border-zinc-400 text-zinc-100"
+                        }
+                        aria-hidden
+                      >
+                        <Plus className="size-2.5 stroke-[1.5]" />
+                      </span>
+                    </button>
                   </li>
                 );
               })}
             </ul>
           )}
-        </ScrollArea>
+        </div>
       </div>
     </div>
   );

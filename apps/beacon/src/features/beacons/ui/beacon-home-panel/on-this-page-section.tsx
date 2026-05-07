@@ -1,10 +1,10 @@
-import { Loader2, Plus, Trash2 } from "lucide-react";
-import { displayLabelForDataList } from "@/features/beacons/model/beacon-data-list-display";
+import { Loader2, Plus } from "lucide-react";
 import { BEACON_SLOT_NAME_MAX } from "@/features/beacons/model/beacon-list-runtime-payload";
 import type { BeaconOnPage } from "@/features/beacons/model/beacon-page-targets";
 import {
   CMS_SLOTS_ADD_SLOT_LABEL,
   CMS_SLOTS_PAGE_LIST_ARIA_LABEL,
+  CMS_SLOTS_PUBLISHED_SECTION_LABEL,
   CMS_SLOTS_SCAN_ARIA_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
@@ -19,6 +19,7 @@ import {
 } from "@/shared/ui/drawer";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
+import { BeaconPublishedSlotTile } from "./published-slot-tile";
 
 type OnThisPageSectionProps = {
   nameFieldId: string;
@@ -129,42 +130,28 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
       </Drawer>
 
       {hasBeacons ? (
-        <ul className="divide-y divide-border" aria-label={CMS_SLOTS_PAGE_LIST_ARIA_LABEL}>
-          {pageBeacons.map((b) => (
-            <li key={b.key} className="flex items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
-              <div className="min-w-0">
-                <p className="text-sm font-medium break-words">{displayLabelForDataList(b.dataList)}</p>
-                <p className="font-mono text-[0.65rem] text-muted-foreground break-all">{b.dataList}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-0.5">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={openingBeaconKey !== null || deletePendingKey !== null}
-                  onClick={() => void onOpenBeacon(b)}
-                >
-                  {openingBeaconKey === b.key ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : "Open"}
-                </Button>
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  disabled={openingBeaconKey !== null || deletePendingKey !== null}
-                  aria-label={`Delete ${displayLabelForDataList(b.dataList)}`}
-                  onClick={() => onRequestDelete(b)}
-                >
-                  {deletePendingKey === b.key ? (
-                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                  ) : (
-                    <Trash2 className="size-3.5" aria-hidden />
-                  )}
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="h-px min-w-0 flex-1 bg-border/60" aria-hidden />
+            <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+              {CMS_SLOTS_PUBLISHED_SECTION_LABEL}
+            </span>
+            <div className="h-px min-w-0 flex-1 bg-border/60" aria-hidden />
+          </div>
+          <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0" aria-label={CMS_SLOTS_PAGE_LIST_ARIA_LABEL}>
+            {pageBeacons.map((b) => (
+              <BeaconPublishedSlotTile
+                key={b.key}
+                beacon={b}
+                disabled={openingBeaconKey !== null || deletePendingKey !== null}
+                opening={openingBeaconKey === b.key}
+                deleting={deletePendingKey === b.key}
+                onOpen={() => void onOpenBeacon(b)}
+                onRequestDelete={() => onRequestDelete(b)}
+              />
+            ))}
+          </ul>
+        </div>
       ) : null}
     </div>
   );

@@ -8,6 +8,9 @@ export const CMS_SLOTS_AREA_NAV_LABEL = `${CMS_SLOTS_FEATURE_NAME} area`;
 
 export const CMS_SLOTS_ADD_SLOT_LABEL = "Add Slot";
 
+/** Section heading for CMS slot lists already on the page (home grid). */
+export const CMS_SLOTS_PUBLISHED_SECTION_LABEL = "Published Slots";
+
 export const CMS_SLOTS_INSTALL_LABEL = "Install";
 
 export const CMS_SLOTS_PAGE_LIST_ARIA_LABEL = "CMS slot lists on this page";

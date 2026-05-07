@@ -168,6 +168,29 @@ body {
   }
 }
 
+@layer utilities {
+  /** Visible, theme-aware scrollbars (native `overflow` regions + drawer bodies). */
+  .scrollbar-themed {
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 70%, var(--border))
+      color-mix(in oklab, var(--muted) 40%, transparent);
+  }
+  .scrollbar-themed::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scrollbar-themed::-webkit-scrollbar-track {
+    background: color-mix(in oklab, var(--muted) 45%, transparent);
+    border-radius: 9999px;
+  }
+  .scrollbar-themed::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--muted-foreground) 75%, var(--border));
+    border-radius: 9999px;
+    border: 2px solid color-mix(in oklab, var(--muted) 40%, transparent);
+  }
+}
+
 /* Compare wipe handle (pointer-driven; line + handle share left % + translate). */
 @layer components {
   .compare-wipe-handle {

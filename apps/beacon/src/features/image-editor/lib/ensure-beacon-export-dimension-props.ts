@@ -4,14 +4,14 @@ import {
 } from "@/features/image-editor/lib/beacon-designer-image-export-attrs";
 import { findImageElementForComponentInstanceProp } from "@/features/image-editor/lib/find-image-element-for-component-instance-prop";
 import {
-  BEACON_COMPONENT_STRING_PROPS_GROUP,
-  type BeaconStringComponentPropOptions,
-  beaconStringComponentPropOptions,
+  CMS_SLOT_COMPONENT_STRING_PROPS_GROUP,
+  type CmsSlotStringComponentPropOptions,
+  cmsSlotStringComponentPropOptions,
 } from "@/shared/lib/beacon-component-string-prop";
 
 export const BEACON_EXPORT_WIDTH_PROP_NAME = "Beacon export width";
 export const BEACON_EXPORT_HEIGHT_PROP_NAME = "Beacon export height";
-export const BEACON_EXPORT_PROPS_GROUP = BEACON_COMPONENT_STRING_PROPS_GROUP;
+export const BEACON_EXPORT_PROPS_GROUP = CMS_SLOT_COMPONENT_STRING_PROPS_GROUP;
 
 type AttributeSettingsEntry = {
   name: string;
@@ -76,12 +76,12 @@ export async function ensureBeaconExportDimensionPropsOnDefinition(
   let h = props0.find((p) => p.type === "string" && p.name === BEACON_EXPORT_HEIGHT_PROP_NAME);
 
   if (w == null || h == null) {
-    const toCreate: BeaconStringComponentPropOptions[] = [];
+    const toCreate: CmsSlotStringComponentPropOptions[] = [];
     if (w == null) {
-      toCreate.push(beaconStringComponentPropOptions(BEACON_EXPORT_WIDTH_PROP_NAME));
+      toCreate.push(cmsSlotStringComponentPropOptions(BEACON_EXPORT_WIDTH_PROP_NAME));
     }
     if (h == null) {
-      toCreate.push(beaconStringComponentPropOptions(BEACON_EXPORT_HEIGHT_PROP_NAME));
+      toCreate.push(cmsSlotStringComponentPropOptions(BEACON_EXPORT_HEIGHT_PROP_NAME));
     }
     await def.createProps(toCreate);
     const props1 = await def.getProps();

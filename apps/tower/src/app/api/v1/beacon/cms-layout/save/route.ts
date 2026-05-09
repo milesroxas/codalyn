@@ -9,12 +9,12 @@ import { getActiveOrganizationIdForApiRequest } from "@/server/billing/session-o
 import { consumeWebflowRequest } from "@/server/billing/usage-gate";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
-import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
+import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  if (!isBeaconsSurfaceEnabled()) {
+  if (!isCmsSlotsSurfaceEnabled()) {
     return Response.json({ code: "NOT_FOUND", message: "Not found." }, { status: 404 });
   }
   const auth = await verifyTowerApiRequest(req);

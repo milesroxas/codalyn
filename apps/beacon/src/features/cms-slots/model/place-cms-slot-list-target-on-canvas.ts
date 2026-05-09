@@ -1,0 +1,239 @@
+import {
+  bindCmsSlotListTargetInstancesToListCmsText,
+  ensureCmsSlotListCmsTextFieldOnList,
+} from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
+import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
+import { ensureCmsSlotListTargetTextProp } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
+import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
+import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
+
+const MAX_EXIT_COMPONENT_STEPS = 4;
+
+const LIST_TARGET_COMPONENT_MISSING = "No list target component. Create a list target first.";
+const PLACEMENT_FAILED =
+  "Could not place the list target. Select a valid container in the canvas or try another location.";
+
+/** If Webflow Designer never settles CMS `setProps` / polls, unblock placement + UI (see bind below). */
+const CMS_BIND_HARD_TIMEOUT_MS = 45_000;
+
+const PLACE_LIST_TARGET_LOG_PREFIX = "[beacon place list target]";
+
+/**
+ * `append` / `after` need page-level context — exit any open component edit before placing.
+ */
+async function exitToPageCanvas(): Promise<void> {
+  if (typeof webflow.getCurrentComponent !== "function" || typeof webflow.exitComponent !== "function") {
+    return;
+  }
+  for (let step = 0; step < MAX_EXIT_COMPONENT_STEPS; step += 1) {
+    const current = await webflow.getCurrentComponent().catch(() => null);
+    if (current == null) {
+      return;
+    }
+    await webflow.exitComponent().catch(() => undefined);
+  }
+}
+
+/** O(1) per Webflow docs: only elements with `children: true` support append/prepend. */
+function hasChildrenFlag(el: AnyElement): el is AnyElement & { append: (c: Component) => Promise<ComponentElement> } {
+  return (el as { children?: boolean }).children === true && typeof (el as { append?: unknown }).append === "function";
+}
+
+function elementTreeKey(el: AnyElement): string {
+  return `${el.id.component}:${el.id.element}`;
+}
+
+async function tryAppendComponent(el: AnyElement, comp: Component): Promise<ComponentElement | null> {
+  if (!hasChildrenFlag(el)) return null;
+  try {
+    return (await el.append(comp)) as ComponentElement;
+  } catch (e) {
+    if (webflowDesignerErrorCauseTag(e) === "InvalidElementPlacement") return null;
+    throw e;
+  }
+}
+
+async function tryAfterComponent(el: AnyElement, comp: Component): Promise<ComponentElement | null> {
+  try {
+    return (await el.after(comp)) as ComponentElement;
+  } catch (e) {
+    if (webflowDesignerErrorCauseTag(e) === "InvalidElementPlacement") return null;
+    throw e;
+  }
+}
+
+type ParentByChild = Map<string, AnyElement>;
+
+async function buildBodyAndParentMap(): Promise<{ body: AnyElement; parentByChild: ParentByChild } | null> {
+  const all = await webflow.getAllElements();
+  const body = all.find((e) => e.type === "Body");
+  if (body == null) {
+    return null;
+  }
+  if (typeof (body as { getChildren?: unknown }).getChildren !== "function") {
+    return { body, parentByChild: new Map() };
+  }
+  const parentByChild: ParentByChild = new Map();
+  const visit = async (node: AnyElement) => {
+    if (typeof (node as { getChildren?: unknown }).getChildren !== "function") return;
+    const children = await (node as { getChildren: () => Promise<AnyElement[]> }).getChildren();
+    for (const child of children) {
+      parentByChild.set(elementTreeKey(child), node);
+      await visit(child);
+    }
+  };
+  await visit(body);
+  return { body, parentByChild };
+}
+
+function* iterateAncestorsFromParent(
+  start: AnyElement,
+  parentByChild: ParentByChild
+): Generator<AnyElement, void, undefined> {
+  let cur: AnyElement | undefined = parentByChild.get(elementTreeKey(start));
+  const seen = new Set<string>();
+  while (cur) {
+    const k = elementTreeKey(cur);
+    if (seen.has(k)) break;
+    seen.add(k);
+    yield cur;
+    cur = parentByChild.get(k);
+  }
+}
+
+async function placeFromSelection(selected: AnyElement, comp: Component): Promise<ComponentElement | null> {
+  const inSelection = await tryAppendComponent(selected, comp);
+  if (inSelection) return inSelection;
+
+  const afterSelection = await tryAfterComponent(selected, comp);
+  if (afterSelection) return afterSelection;
+
+  const mapped = await buildBodyAndParentMap();
+  if (!mapped) {
+    return null;
+  }
+  for (const ancestor of iterateAncestorsFromParent(selected, mapped.parentByChild)) {
+    const inAncestor = await tryAppendComponent(ancestor, comp);
+    if (inAncestor) return inAncestor;
+  }
+  return tryAppendComponent(mapped.body, comp);
+}
+
+async function placeOnBodyWhenNoSelection(comp: Component): Promise<ComponentElement | null> {
+  const mapped = await buildBodyAndParentMap();
+  return mapped == null ? null : tryAppendComponent(mapped.body, comp);
+}
+
+export type PlaceCmsSlotListTargetOnCanvasResult = {
+  instance: ComponentElement;
+  /** `true` when a list target was already on the page; no new node was created. */
+  alreadyExisted: boolean;
+};
+
+/**
+ * `append` / `after` may need the registration id from `createCmsSlotListTargetComponent`; `getComponent` by that id
+ * can return a handle whose `getProps()` does not list the Text field the same way as the definition resolved by
+ * name. Keep two handles: placement vs Text prop resolution.
+ */
+async function resolveListTargetDefAndPlacementDef(
+  dataList: string,
+  listContainer: BlockElement,
+  preferredDefinitionId: string | null | undefined
+): Promise<{ resolvedDef: Component; placementDef: Component }> {
+  const resolvedDef = await getCmsSlotListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
+  if (resolvedDef == null) {
+    throw new Error(LIST_TARGET_COMPONENT_MISSING);
+  }
+  const definitionIdToFetch = preferredDefinitionId?.trim() || resolvedDef.id;
+  let placementDef: Component = resolvedDef;
+  try {
+    placementDef = await webflow.getComponent(definitionIdToFetch);
+  } catch (e) {
+    if (webflowDesignerErrorCauseTag(e) !== "ResourceMissing") {
+      throw e;
+    }
+  }
+  return { resolvedDef, placementDef };
+}
+
+async function ensureTextPropOnDefs(resolvedDef: Component, placementDef: Component): Promise<void> {
+  await ensureCmsSlotListTargetTextProp(resolvedDef);
+  if (placementDef.id !== resolvedDef.id) {
+    await ensureCmsSlotListTargetTextProp(placementDef);
+  }
+}
+
+async function tryPlaceNewListTargetInstance(placementDef: Component): Promise<ComponentElement | null> {
+  const selected = await webflow.getSelectedElement();
+  if (selected) {
+    return placeFromSelection(selected, placementDef);
+  }
+  return placeOnBodyWhenNoSelection(placementDef);
+}
+
+/**
+ * Places (or re-uses) a single list-target instance on the current page and binds its Text prop to the per-list
+ * CMS field when available. Linear: resolve component → place / re-use → ensure Text prop → ensure CMS field on the
+ * list block → bind once (CMS ensure sits next to bind so Data API + Designer agree). CMS bind is best-effort when
+ * the user is not on the matching template page — saving from the template later will bind successfully.
+ */
+export async function placeCmsSlotListTargetOnCanvas(
+  dataList: string,
+  listContainer: BlockElement,
+  preferredDefinitionId?: string | null
+): Promise<PlaceCmsSlotListTargetOnCanvasResult> {
+  await exitToPageCanvas();
+  const { resolvedDef, placementDef } = await resolveListTargetDefAndPlacementDef(
+    dataList,
+    listContainer,
+    preferredDefinitionId
+  );
+
+  const existing = await listCmsSlotListTargetInstancesOnPage(dataList, listContainer, { preferredDefinitionId });
+  const firstExisting = existing[0];
+  const instance = firstExisting ?? (await tryPlaceNewListTargetInstance(placementDef));
+  if (instance == null) {
+    throw new Error(PLACEMENT_FAILED);
+  }
+
+  await ensureTextPropOnDefs(resolvedDef, placementDef);
+  await exitToPageCanvas();
+
+  const cmsBinding = await ensureCmsSlotListCmsTextFieldOnList(listContainer, dataList);
+
+  if (cmsBinding != null) {
+    const onPage =
+      firstExisting != null
+        ? existing
+        : await listCmsSlotListTargetInstancesOnPage(dataList, listContainer, { preferredDefinitionId });
+    try {
+      await Promise.race([
+        bindCmsSlotListTargetInstancesToListCmsText({
+          dataList,
+          listContainer,
+          def: resolvedDef,
+          instances: onPage,
+          priorityInstances: [instance],
+          resolvedBinding: cmsBinding,
+        }),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(`CMS Text binding did not finish within ${CMS_BIND_HARD_TIMEOUT_MS / 1000}s.`));
+          }, CMS_BIND_HARD_TIMEOUT_MS);
+        }),
+      ]);
+    } catch (err) {
+      console.warn(PLACE_LIST_TARGET_LOG_PREFIX, "CMS Text bind failed (list target is still on the canvas):", err);
+      const msg =
+        err && typeof err === "object" && "message" in err && typeof (err as { message: unknown }).message === "string"
+          ? (err as { message: string }).message
+          : String(err);
+      void webflow.notify({
+        type: "Warning",
+        message: `${msg} Open this beacon again on the collection template to retry syncing the CMS text field.`,
+      });
+    }
+  }
+
+  return { instance, alreadyExisted: firstExisting != null };
+}

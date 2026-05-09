@@ -8,8 +8,8 @@ import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/to
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
 import { BEACON_HOME_TILE_CSS_VARS } from "@/shared/lib/beacon-app-backgrounds";
-import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
+import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 import { cn } from "@/shared/lib/utils";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
@@ -65,7 +65,7 @@ export function BeaconHomeScreen() {
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
   const towerConfigured = isTowerConfigured();
   const base = getTowerAuthBaseUrl();
-  const beaconsEnabled = isBeaconsSurfaceEnabled();
+  const cmsSlotsSurfaceEnabled = isCmsSlotsSurfaceEnabled();
 
   const [guestWelcomeDone, setGuestWelcomeDone] = useState(readBeaconGuestWelcomeComplete);
   const showWelcomeGate = !towerSessionPending && !towerUser && !guestWelcomeDone;
@@ -99,8 +99,8 @@ export function BeaconHomeScreen() {
           <BeaconHomeLaunchTile
             title={CMS_SLOTS_FEATURE_NAME}
             decorationVar={BEACON_HOME_TILE_CSS_VARS.cmsSlot}
-            disabled={!beaconsEnabled}
-            onClick={() => navigate("/beacons/engine")}
+            disabled={!cmsSlotsSurfaceEnabled}
+            onClick={() => navigate("/cms-slots/engine")}
           />
           <BeaconHomeLaunchTile
             title="Image Upload"

@@ -40,10 +40,10 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  /* Beacon bottom dock (`beaconsDockNav` / `beaconsDockNavActive` button variants). */
-  --beacon-dock-active-top: oklch(0.96 0.02 255);
-  --beacon-dock-active-bottom: oklch(0.86 0.07 258);
-  --beacon-dock-accent-line: oklch(0.58 0.16 218);
+  /* CMS Slots bottom dock (`cmsSlotsDockNav` / `cmsSlotsDockNavActive` button variants). */
+  --cms-slot-dock-active-top: oklch(0.96 0.02 255);
+  --cms-slot-dock-active-bottom: oklch(0.86 0.07 258);
+  --cms-slot-dock-accent-line: oklch(0.58 0.16 218);
   /* `--beacon-app-bg-*`, `--beacon-tile-*-url` set at startup (`injectBeaconAppBackgroundCssVars`; see `BEACON_*_BACKGROUND_PATHS`). */
   --app-bg-image: var(--beacon-app-bg-light);
   /* Beacon home tiles: JS uses `BEACON_HOME_TILE_CSS_VARS` (must stay aligned). */
@@ -142,9 +142,9 @@ body {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-  --beacon-dock-active-top: oklch(0.12 0.04 268);
-  --beacon-dock-active-bottom: oklch(0.32 0.14 266);
-  --beacon-dock-accent-line: oklch(0.76 0.14 218);
+  --cms-slot-dock-active-top: oklch(0.12 0.04 268);
+  --cms-slot-dock-active-bottom: oklch(0.32 0.14 266);
+  --cms-slot-dock-accent-line: oklch(0.76 0.14 218);
   --app-bg-image: var(--beacon-app-bg-dark);
   /* Beacon home tiles: see `BEACON_HOME_TILE_CSS_VARS` in codebase. */
   --beacon-home-tile-cms-bg: var(--beacon-tile-cms-dark-url);

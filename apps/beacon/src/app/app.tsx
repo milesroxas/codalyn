@@ -1,12 +1,12 @@
 import { useEffect } from "react";
-import { HashRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { BeaconAppShell } from "@/app/beacon-app-shell";
 import { BeaconHomeScreen } from "@/app/ui/beacon-home-screen";
-import { BeaconsScreen } from "@/features/beacons";
+import { CmsSlotsScreen } from "@/features/cms-slots";
 import { ImageEditor } from "@/features/image-editor";
 import { BeaconAppSettingsProvider, BeaconSettingsScreen } from "@/features/settings";
 import { applyBeaconExtensionSize } from "@/shared/lib/beacon-extension-size";
-import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
+import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 import { TooltipProvider } from "@/shared/ui/tooltip";
 
 function BeaconSettingsPage() {
@@ -18,11 +18,17 @@ function BeaconImagesPage() {
   return <ImageEditor />;
 }
 
-function BeaconBeaconsPage() {
-  if (!isBeaconsSurfaceEnabled()) {
+function LegacyBeaconsSegmentRedirect() {
+  const { segment } = useParams();
+  const next = segment === "engine" || segment === "composer" ? segment : "engine";
+  return <Navigate to={`/cms-slots/${next}`} replace />;
+}
+
+function CmsSlotsRoutePage() {
+  if (!isCmsSlotsSurfaceEnabled()) {
     return <Navigate to="/home" replace />;
   }
-  return <BeaconsScreen />;
+  return <CmsSlotsScreen />;
 }
 
 export function App() {
@@ -40,8 +46,10 @@ export function App() {
               <Route index element={<Navigate to="/home" replace />} />
               <Route path="home" element={<BeaconHomeScreen />} />
               <Route path="images" element={<BeaconImagesPage />} />
-              <Route path="beacons/:segment" element={<BeaconBeaconsPage />} />
-              <Route path="beacons" element={<Navigate to="/beacons/engine" replace />} />
+              <Route path="cms-slots/:segment" element={<CmsSlotsRoutePage />} />
+              <Route path="cms-slots" element={<Navigate to="/cms-slots/engine" replace />} />
+              <Route path="beacons/:segment" element={<LegacyBeaconsSegmentRedirect />} />
+              <Route path="beacons" element={<Navigate to="/cms-slots/engine" replace />} />
               <Route path="*" element={<Navigate to="/home" replace />} />
             </Route>
           </Routes>

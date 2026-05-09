@@ -1,7 +1,3 @@
-/**
- * Single source of truth for user-visible naming of the CMS Slots surface (`/beacons/*` routes).
- */
-
 export const CMS_SLOTS_FEATURE_NAME = "CMS Slots";
 
 export const CMS_SLOTS_AREA_NAV_LABEL = `${CMS_SLOTS_FEATURE_NAME} area`;

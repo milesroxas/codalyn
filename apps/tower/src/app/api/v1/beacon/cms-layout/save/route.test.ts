@@ -33,10 +33,10 @@ vi.mock("@/server/billing/session-org", () => ({
 }));
 
 describe("POST /api/v1/beacon/cms-layout/save", () => {
-  const prevBeaconsSurface = process.env.NEXT_PUBLIC_BEACONS_SURFACE_ENABLED;
+  const prevCmsSlotsSurface = process.env.NEXT_PUBLIC_CMS_SLOTS_SURFACE_ENABLED;
 
   beforeEach(() => {
-    delete process.env.NEXT_PUBLIC_BEACONS_SURFACE_ENABLED;
+    delete process.env.NEXT_PUBLIC_CMS_SLOTS_SURFACE_ENABLED;
     verifyTowerApiRequest.mockReset();
     resolveWebflowBearerToken.mockReset();
     parseCmsLayoutSaveRequest.mockReset();
@@ -49,15 +49,15 @@ describe("POST /api/v1/beacon/cms-layout/save", () => {
   });
 
   afterAll(() => {
-    if (prevBeaconsSurface === undefined) {
-      delete process.env.NEXT_PUBLIC_BEACONS_SURFACE_ENABLED;
+    if (prevCmsSlotsSurface === undefined) {
+      delete process.env.NEXT_PUBLIC_CMS_SLOTS_SURFACE_ENABLED;
     } else {
-      process.env.NEXT_PUBLIC_BEACONS_SURFACE_ENABLED = prevBeaconsSurface;
+      process.env.NEXT_PUBLIC_CMS_SLOTS_SURFACE_ENABLED = prevCmsSlotsSurface;
     }
   });
 
-  it("returns 404 when the Beacons surface flag is off", async () => {
-    process.env.NEXT_PUBLIC_BEACONS_SURFACE_ENABLED = "false";
+  it("returns 404 when the CMS Slots surface flag is off", async () => {
+    process.env.NEXT_PUBLIC_CMS_SLOTS_SURFACE_ENABLED = "false";
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
     const { POST } = await import("./route");
     const res = await POST(

@@ -14,8 +14,8 @@ import { useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
-import { isBeaconsSurfaceEnabled } from "@/shared/lib/beacons-surface-enabled";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
+import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import {
@@ -157,13 +157,13 @@ function BeaconMenuNavigateGroup(props: { pathname: string }) {
   return (
     <DropdownMenuGroup>
       <DropdownMenuLabel className="px-2 pb-1">Navigate</DropdownMenuLabel>
-      {isBeaconsSurfaceEnabled() ? (
+      {isCmsSlotsSurfaceEnabled() ? (
         <DropdownMenuItem
           className={cn(
-            pathname.startsWith("/beacons") &&
+            pathname.startsWith("/cms-slots") &&
               "bg-accent font-medium text-accent-foreground focus:bg-accent focus:text-accent-foreground"
           )}
-          onSelect={() => navigate("/beacons/engine")}
+          onSelect={() => navigate("/cms-slots/engine")}
         >
           <Radio aria-hidden />
           {CMS_SLOTS_FEATURE_NAME}

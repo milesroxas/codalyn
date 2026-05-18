@@ -47,6 +47,7 @@ import {
   resolveCmsSlotEngineConfiguredComponentIds,
   writeCmsSlotEngineConfiguredComponentIds,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
+import { resolveAllowedCmsSlotsSegment } from "@/features/cms-slots/model/cms-slots-access";
 import { loadComposerStudioSynchronizedState } from "@/features/cms-slots/model/composer-studio-sync";
 import {
   CMS_SLOT_UTILITIES_COMPONENT_GROUP,
@@ -73,6 +74,7 @@ import {
   listSiteComponentsForPicker,
   removeComponentInstanceFromCanvas,
 } from "@/features/cms-slots/model/site-components";
+import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotsRouteChrome } from "@/features/cms-slots/ui/cms-slots-route-chrome";
 import {
   CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON,
@@ -154,6 +156,7 @@ function useCmsSlotsInvalidSegmentRedirect(
   segmentFromPath: "engine" | "composer" | null,
   routePathname: string,
   routeHash: string,
+  defaultSegment: "engine" | "composer",
   navigate: (to: string, options?: { replace?: boolean }) => void
 ) {
   useEffect(() => {
@@ -162,11 +165,11 @@ function useCmsSlotsInvalidSegmentRedirect(
       const p = raw.startsWith("/") ? raw : `/${raw}`;
       const m = /^\/(?:cms-slots|beacons)\/([^/]+)\/?$/.exec(p);
       if (m != null && m[1] !== "engine" && m[1] !== "composer") {
-        void navigate("/cms-slots/engine", { replace: true });
+        void navigate(`/cms-slots/${defaultSegment}`, { replace: true });
         return;
       }
     }
-  }, [segmentFromPath, routePathname, routeHash, navigate]);
+  }, [segmentFromPath, routePathname, routeHash, defaultSegment, navigate]);
 }
 
 function useBeaconsListTargetPreviewOnModeChange() {
@@ -472,12 +475,15 @@ export function CmsSlotsScreen() {
   const nameFieldId = useId();
   const searchFieldId = useId();
   const lastBeaconUninstallChoiceId = useId();
+  const { editorExperience, canAccessEngine, defaultSegment } = useCmsSlotsAccess();
   const { segment: segmentParam } = useParams();
   const { pathname: routePathname, hash: routeHash } = useLocation();
   const segmentFromPath = parseCmsSlotsRouteSegment(routePathname, routeHash);
   /** Matched route param is authoritative; fall back to parsed path for older/wrapper edge cases. */
   const segment: "engine" | "composer" =
-    segmentParam === "engine" || segmentParam === "composer" ? segmentParam : (segmentFromPath ?? "engine");
+    segmentParam === "engine" || segmentParam === "composer"
+      ? resolveAllowedCmsSlotsSegment(segmentParam, editorExperience)
+      : (segmentFromPath ?? defaultSegment);
   const navigate = useNavigate();
   const [pageBeacons, setPageBeacons] = useState<CmsSlotListOnPage[]>([]);
   const [pageScanLoading, setPageScanLoading] = useState(true);
@@ -662,7 +668,13 @@ export function CmsSlotsScreen() {
     void refreshPageBeacons();
   }, [refreshPageBeacons]);
 
-  useCmsSlotsInvalidSegmentRedirect(segmentFromPath, routePathname, routeHash, navigate);
+  useCmsSlotsInvalidSegmentRedirect(segmentFromPath, routePathname, routeHash, defaultSegment, navigate);
+
+  useEffect(() => {
+    if (!canAccessEngine && isEngine) {
+      void navigate("/cms-slots/composer", { replace: true });
+    }
+  }, [canAccessEngine, isEngine, navigate]);
 
   useEffect(() => {
     if (!isComposer) return;

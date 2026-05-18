@@ -6,6 +6,7 @@ import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import type { CmsSlotListOnPage, HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import type { CmsSlotCompositionDraftRow, CmsSlotPaletteEntry } from "@/features/cms-slots/model/site-components";
+import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotComposerListPanel } from "@/features/cms-slots/ui/cms-slot-composer-list-panel";
 import { CmsSlotComposerStudioPanel } from "@/features/cms-slots/ui/cms-slot-composer-studio";
 import { ComposerPaletteSection } from "@/features/cms-slots/ui/cms-slot-composer-studio/composer-palette-section";
@@ -245,10 +246,7 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
           onBack={p.onComposerStudioBack}
           onSave={(draftOverride) => void p.onComposerSave(draftOverride)}
           savePending={p.composerSavePending}
-          pageRuntimeStatusLoading={p.pageRuntimeStatusLoading}
-          pageRuntimeSynced={p.syncShellOk}
           embedSyncPending={p.embedSyncPending}
-          onSyncInstallEmbed={p.onSyncInstallEmbed}
           rowMeta={p.composerRowMeta}
           onChangePropValue={p.onComposerSetPropValue}
           onRenameSlot={p.onComposerRenameSlotRow}
@@ -361,12 +359,49 @@ function CmsSlotsRemoveListTargetDialog(p: CmsSlotsRouteChromeProps) {
 }
 
 function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
+  const { composerOnly } = useCmsSlotsAccess();
   const syncNeedsFooterAttention =
     p.showPageRuntimeSyncHeader &&
     !p.syncShellOk &&
     !p.pageRuntimeStatusLoading &&
     !p.embedSyncPending &&
     !p.pageScanLoading;
+
+  const syncButton = (
+    <Button
+      type="button"
+      variant={syncNeedsFooterAttention ? "default" : "secondary"}
+      size="dockNav"
+      className={composerOnly ? "min-w-0 flex-1" : undefined}
+      disabled={p.embedSyncPending || p.pageRuntimeStatusLoading || !p.beaconsWrapperInstalled || p.pageScanLoading}
+      aria-busy={p.embedSyncPending}
+      title={
+        !p.beaconsWrapperInstalled
+          ? CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP
+          : p.pageRuntimeStatusLoading
+            ? "Checking page script…"
+            : syncNeedsFooterAttention
+              ? (p.syncShellReason ?? "Sync to update the embedded page script.")
+              : undefined
+      }
+      onClick={() => void p.onSyncInstallEmbed()}
+    >
+      <SquareCode aria-hidden />
+      Sync
+    </Button>
+  );
+
+  if (composerOnly) {
+    return (
+      <footer
+        data-slot="cms_slots_dock"
+        data-composer-only=""
+        className="flex shrink-0 items-stretch border-t border-border/65 bg-background px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.375rem)]"
+      >
+        {syncButton}
+      </footer>
+    );
+  }
 
   return (
     <footer
@@ -415,26 +450,7 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
           Composer
         </NavLink>
       </nav>
-      <Button
-        type="button"
-        variant={syncNeedsFooterAttention ? "default" : "secondary"}
-        size="dockNav"
-        disabled={p.embedSyncPending || p.pageRuntimeStatusLoading || !p.beaconsWrapperInstalled || p.pageScanLoading}
-        aria-busy={p.embedSyncPending}
-        title={
-          !p.beaconsWrapperInstalled
-            ? CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP
-            : p.pageRuntimeStatusLoading
-              ? "Checking page script…"
-              : syncNeedsFooterAttention
-                ? (p.syncShellReason ?? "Sync to update the embedded page script.")
-                : undefined
-        }
-        onClick={() => void p.onSyncInstallEmbed()}
-      >
-        <SquareCode aria-hidden />
-        Sync
-      </Button>
+      {syncButton}
     </footer>
   );
 }

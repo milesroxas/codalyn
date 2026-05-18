@@ -1,7 +1,6 @@
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
 import type { CmsSlotCompositionDraftRow, CmsSlotPaletteEntry } from "@/features/cms-slots/model/site-components";
 import { Button } from "@/shared/ui/button";
-import { CmsSlotComposerRuntimeSyncAlert } from "./cms-slot-composer-runtime-sync-alert";
 import { ComposerOrderSection } from "./composer-order-section";
 import { ComposerPaletteSection } from "./composer-palette-section";
 
@@ -17,10 +16,7 @@ export type CmsSlotComposerStudioPanelProps = {
   onBack: () => void;
   onSave: (draftOverride?: CmsSlotCompositionDraftRow[]) => void | Promise<void>;
   savePending: boolean;
-  pageRuntimeStatusLoading: boolean;
-  pageRuntimeSynced: boolean;
   embedSyncPending: boolean;
-  onSyncInstallEmbed: () => void;
   rowMeta: CmsSlotComposerRowMeta[];
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
   onRenameSlot: (rowKey: string, name: string) => void;
@@ -40,10 +36,7 @@ export function CmsSlotComposerStudioPanel(props: CmsSlotComposerStudioPanelProp
     onBack,
     onSave,
     savePending,
-    pageRuntimeStatusLoading,
-    pageRuntimeSynced,
     embedSyncPending,
-    onSyncInstallEmbed,
     rowMeta,
     onChangePropValue,
     onRenameSlot,
@@ -54,10 +47,6 @@ export function CmsSlotComposerStudioPanel(props: CmsSlotComposerStudioPanelProp
 
   return (
     <div className="space-y-3" data-slot="beacon_composer_studio">
-      {!pageRuntimeStatusLoading && !pageRuntimeSynced ? (
-        <CmsSlotComposerRuntimeSyncAlert embedSyncPending={embedSyncPending} onSyncInstallEmbed={onSyncInstallEmbed} />
-      ) : null}
-
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-medium">Studio</p>

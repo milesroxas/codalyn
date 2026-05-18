@@ -6,6 +6,7 @@ import {
 } from "@/features/auth/lib/beacon-guest-welcome-preference";
 import { isTowerConfigured, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
 import { BEACON_HOME_TILE_CSS_VARS } from "@/shared/lib/beacon-app-backgrounds";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
@@ -61,6 +62,7 @@ function BeaconHomeLaunchTile(props: {
 export function BeaconHomeScreen() {
   const navigate = useNavigate();
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
+  const { defaultSegment } = useCmsSlotsAccess();
   const towerConfigured = isTowerConfigured();
   const cmsSlotsSurfaceEnabled = isCmsSlotsSurfaceEnabled();
 
@@ -96,7 +98,7 @@ export function BeaconHomeScreen() {
             title={CMS_SLOTS_FEATURE_NAME}
             decorationVar={BEACON_HOME_TILE_CSS_VARS.cmsSlot}
             disabled={!cmsSlotsSurfaceEnabled}
-            onClick={() => navigate("/cms-slots/engine")}
+            onClick={() => navigate(`/cms-slots/${defaultSegment}`)}
           />
           <BeaconHomeLaunchTile
             title="Image Upload"

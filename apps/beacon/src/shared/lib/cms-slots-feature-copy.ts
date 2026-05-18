@@ -28,3 +28,8 @@ export const CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED = "CMS slot list removed.
 export const CMS_SLOTS_DELETE_DIALOG_TITLE = "Delete this CMS slot list?";
 
 export const CMS_SLOTS_UNINSTALL_PAGE_LABEL = `Also uninstall ${CMS_SLOTS_FEATURE_NAME} on this page`;
+
+/** Composer empty state when an editor has no slot lists to open on this page. */
+export const CMS_SLOTS_EDITOR_NO_SLOTS_TITLE = "No Slots Found";
+
+export const CMS_SLOTS_EDITOR_NO_SLOTS_DESCRIPTION = "Contact your team admin or site designer to enable this feature";

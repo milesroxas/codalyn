@@ -14,6 +14,7 @@ import { useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getTowerAuthBaseUrl, isTowerConfigured, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 import { cn } from "@/shared/lib/utils";
@@ -151,6 +152,7 @@ type BeaconAppMenuProps = {
 function BeaconMenuNavigateGroup(props: { pathname: string }) {
   const { pathname } = props;
   const navigate = useNavigate();
+  const { defaultSegment } = useCmsSlotsAccess();
 
   return (
     <DropdownMenuGroup>
@@ -161,7 +163,7 @@ function BeaconMenuNavigateGroup(props: { pathname: string }) {
             pathname.startsWith("/cms-slots") &&
               "bg-accent font-medium text-accent-foreground focus:bg-accent focus:text-accent-foreground"
           )}
-          onSelect={() => navigate("/cms-slots/engine")}
+          onSelect={() => navigate(`/cms-slots/${defaultSegment}`)}
         >
           <Radio aria-hidden />
           {CMS_SLOTS_FEATURE_NAME}

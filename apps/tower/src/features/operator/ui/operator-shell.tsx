@@ -17,10 +17,11 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
+import { useTowerWebSignOut } from "@/features/auth/model/use-tower-web-sign-out";
 import { persistBeaconThemePreference, toggledLightDarkTheme } from "@/features/beacon/lib/beacon-theme-preference";
 import { initialsFor } from "@/features/operator/model/format";
 import { OperatorCommandPalette } from "@/features/operator/ui/operator-command-palette";
@@ -61,13 +62,12 @@ export type OperatorShellProps = {
 
 export function OperatorShell({ userEmail, userName, children }: OperatorShellProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { data: session } = authClient.useSession();
   const { setTheme, resolvedTheme } = useTheme();
   const effectiveResolved: "light" | "dark" = resolvedTheme === "dark" ? "dark" : "light";
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
+  const { signOut: onSignOut, signingOut } = useTowerWebSignOut();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
@@ -85,14 +85,6 @@ export function OperatorShell({ userEmail, userName, children }: OperatorShellPr
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  const onSignOut = useCallback(async () => {
-    setSigningOut(true);
-    await authClient.signOut({ fetchOptions: { credentials: "include" } });
-    router.push("/");
-    router.refresh();
-    setSigningOut(false);
-  }, [router]);
 
   const cycleTheme = useCallback(() => {
     setTheme((current) => {

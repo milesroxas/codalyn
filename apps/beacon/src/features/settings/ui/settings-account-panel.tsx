@@ -1,8 +1,10 @@
-import { ExternalLink, LogOut, Sparkles } from "lucide-react";
+import { ExternalLink, LogOut } from "lucide-react";
 import type { ReactNode } from "react";
-import { getTowerAuthBaseUrl, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
+import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
 import type { BridgedTowerUser } from "@/features/auth/model/use-beacon-tower-session";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import { BeaconTowerNotConfiguredNotice } from "@/features/auth/ui/beacon-tower-not-configured-notice";
+import { BeaconTowerSignInPrompt } from "@/features/auth/ui/beacon-tower-sign-in-prompt";
 import type {
   BeaconSettingsSyncState,
   BeaconTowerWorkspace,
@@ -432,34 +434,14 @@ export function SettingsAccountPanel() {
 
   if (!user) {
     if (!base) {
-      return (
-        <p className="text-muted-foreground text-sm">
-          Tower is not configured. Add <span className="font-mono">VITE_TOWER_ORIGIN</span> to connect an account.
-        </p>
-      );
+      return <BeaconTowerNotConfiguredNotice />;
     }
 
     return (
-      <div className="flex flex-col gap-3">
-        <div className="space-y-1">
-          <h2 className="flex items-center gap-2 text-sm font-medium leading-tight">
-            <Sparkles aria-hidden className="size-4 text-primary" />
-            Tower account
-          </h2>
-          <p className="text-muted-foreground text-xs leading-snug">
-            Sign in or create an account to sync presets and preferences across devices. Until then, settings stay in
-            this browser only.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Button type="button" className="w-full" onClick={() => openTowerAuthPopup("/sign-in")}>
-            Sign in to Tower
-          </Button>
-          <Button type="button" variant="outline" className="w-full" onClick={() => openTowerAuthPopup("/sign-up")}>
-            Create Tower account
-          </Button>
-        </div>
-      </div>
+      <BeaconTowerSignInPrompt
+        title="Tower account"
+        description="Sign in or create an account to sync presets and preferences across devices. Until then, settings stay in this browser only."
+      />
     );
   }
 

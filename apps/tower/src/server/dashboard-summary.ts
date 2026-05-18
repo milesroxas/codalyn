@@ -2,8 +2,8 @@ import { webflowDataApiUrl } from "@codalyn/webflow-kit";
 import { and, desc, eq, gt } from "drizzle-orm";
 import { headers } from "next/headers";
 import { auth } from "@/server/auth";
-import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
+import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 import { db } from "@/shared/lib/db";
 import { organization, session as sessionTable } from "@/shared/lib/db/auth-schema";
 

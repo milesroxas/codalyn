@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
+import { getTowerAuthBaseUrl, isTowerConfigured, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
@@ -30,8 +30,6 @@ import {
 
 const lightLogoSrc = `${import.meta.env.BASE_URL}images/light-logo-beacon.svg`;
 const darkLogoSrc = `${import.meta.env.BASE_URL}images/dark-logo-beacon.svg`;
-
-const TOWER_EMAIL_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";
 
 /** Matches profile row (`size-8` avatar + default item padding). */
 const beaconMenuProfileRowMinClass = "min-h-10";
@@ -354,16 +352,10 @@ function HeaderShell(props: BeaconAppMenuProps) {
 
 function HeaderWithTower() {
   const { user, isPending, clearStoredSession } = useBeaconTowerSession();
-  const base = getTowerAuthBaseUrl();
 
   const openTowerEmailSignInPopup = useCallback(() => {
-    const origin = encodeURIComponent(window.location.origin);
-    window.open(`${base}/sign-in?beaconOrigin=${origin}`, "beacon-tower-auth", TOWER_EMAIL_AUTH_POPUP_FEATURES);
-  }, [base]);
-
-  const signOut = useCallback(() => {
-    clearStoredSession();
-  }, [clearStoredSession]);
+    openTowerAuthPopup("/sign-in");
+  }, []);
 
   return (
     <HeaderShell
@@ -371,7 +363,7 @@ function HeaderWithTower() {
       user={user}
       sessionPending={isPending}
       onOpenTowerEmailPopup={openTowerEmailSignInPopup}
-      onSignOut={signOut}
+      onSignOut={clearStoredSession}
     />
   );
 }

@@ -8,25 +8,18 @@ import { sendChangeEmailConfirmationEmail } from "@/server/email/change-email-co
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
 import { towerOrganization } from "@/server/membership/tower-organization";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
+import { TOWER_STATIC_BEACON_RELATED_ORIGINS } from "@/server/tower-static-beacon-origins";
 import { db } from "@/shared/lib/db";
 import * as schema from "@/shared/lib/db/auth-schema";
 
 const baseURL = resolveTowerPublicBaseUrl();
-
-/** Beacon extension + local dev; keep in sync with `middleware` CORS defaults + env extras. */
-const defaultTrustedOrigins = [
-  "http://localhost:1337",
-  "http://127.0.0.1:1337",
-  "http://localhost:3100",
-  "https://69e2b49536eded7411b48cf6.webflow-ext.com",
-] as const;
 
 function resolveTrustedOrigins(): string[] {
   const fromEnv = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? process.env.TOWER_CORS_ORIGINS ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  return [...new Set([baseURL, ...defaultTrustedOrigins, ...fromEnv])];
+  return [...new Set([baseURL, ...TOWER_STATIC_BEACON_RELATED_ORIGINS, ...fromEnv])];
 }
 
 export const auth = betterAuth({

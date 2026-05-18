@@ -4,7 +4,7 @@ import {
   readBeaconGuestWelcomeComplete,
   writeBeaconGuestWelcomeComplete,
 } from "@/features/auth/lib/beacon-guest-welcome-preference";
-import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
+import { isTowerConfigured, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
 import { BEACON_HOME_TILE_CSS_VARS } from "@/shared/lib/beacon-app-backgrounds";
@@ -12,8 +12,6 @@ import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 import { cn } from "@/shared/lib/utils";
 import { ScrollArea } from "@/shared/ui/scroll-area";
-
-const TOWER_EMAIL_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";
 
 type BeaconHomeTileCssVar = (typeof BEACON_HOME_TILE_CSS_VARS)[keyof typeof BEACON_HOME_TILE_CSS_VARS];
 
@@ -64,15 +62,13 @@ export function BeaconHomeScreen() {
   const navigate = useNavigate();
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
   const towerConfigured = isTowerConfigured();
-  const base = getTowerAuthBaseUrl();
   const cmsSlotsSurfaceEnabled = isCmsSlotsSurfaceEnabled();
 
   const [guestWelcomeDone, setGuestWelcomeDone] = useState(readBeaconGuestWelcomeComplete);
   const showWelcomeGate = !towerSessionPending && !towerUser && !guestWelcomeDone;
 
   const openTowerEmailSignInPopup = () => {
-    const origin = encodeURIComponent(window.location.origin);
-    window.open(`${base}/sign-in?beaconOrigin=${origin}`, "beacon-tower-auth", TOWER_EMAIL_AUTH_POPUP_FEATURES);
+    openTowerAuthPopup("/sign-in");
   };
 
   if (showWelcomeGate) {

@@ -15,10 +15,7 @@ export async function isTowerTeamAdminMemberOfOrg(userId: string, organizationId
 }
 
 /** Tower dashboard / first-party GET OAuth: active-org team admin or owner only. */
-export async function canTowerUserManageWebflowOAuthViaDashboard(
-  userId: string,
-  incoming: Headers
-): Promise<boolean> {
+export async function canTowerUserManageWebflowOAuthViaDashboard(userId: string, incoming: Headers): Promise<boolean> {
   const activeOrganizationId = await getActiveOrganizationIdForAuthHeaders(incoming);
   if (!activeOrganizationId) {
     return false;

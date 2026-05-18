@@ -1,6 +1,5 @@
 import { useCallback, useEffect } from "react";
 import {
-  clearBeaconTowerSessionToken,
   exchangeWebflowDesignerSession,
   readBeaconTowerSessionToken,
   readSuppressDesignerSessionExchange,
@@ -83,7 +82,7 @@ export function useBeaconTowerSession(): {
 
   const clearStoredSession = useCallback(() => {
     setSuppressDesignerSessionExchange(true);
-    clearBeaconTowerSessionToken();
+    // Do not clear localStorage before signOut: the bearer plugin needs `Authorization` to resolve the session.
     void towerAuthClient.signOut({ fetchOptions: { credentials: "include" } }).then(() => refetch());
   }, [refetch]);
 

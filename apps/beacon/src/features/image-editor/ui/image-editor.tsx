@@ -7,7 +7,7 @@ import {
   readBeaconGuestWelcomeComplete,
   writeBeaconGuestWelcomeComplete,
 } from "@/features/auth/lib/beacon-guest-welcome-preference";
-import { getTowerAuthBaseUrl, isTowerConfigured } from "@/features/auth/model/tower-auth-client";
+import { isTowerConfigured, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
 import {
@@ -43,8 +43,6 @@ import { ImageEditorPreimageColumn } from "@/features/image-editor/ui/image-edit
 import { ImageEditorWorkspace } from "@/features/image-editor/ui/image-editor-workspace";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { cn } from "@/shared/lib/utils";
-
-const TOWER_EMAIL_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";
 
 function shouldShowAutoPageSelectionChoice(
   pathMode: string,
@@ -651,12 +649,7 @@ export function ImageEditor() {
   );
 
   const openTowerEmailSignInPopup = useCallback(() => {
-    const base = getTowerAuthBaseUrl();
-    if (!base) {
-      return;
-    }
-    const origin = encodeURIComponent(window.location.origin);
-    window.open(`${base}/sign-in?beaconOrigin=${origin}`, "beacon-tower-auth", TOWER_EMAIL_AUTH_POPUP_FEATURES);
+    openTowerAuthPopup("/sign-in");
   }, []);
 
   const dropZoneLabelClass = cn(

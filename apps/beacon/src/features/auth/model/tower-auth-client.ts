@@ -1,8 +1,8 @@
 import { createAuthClient } from "better-auth/react";
 import {
-  BEACON_TOWER_SESSION_TOKEN_KEY,
+  clearBeaconTowerSessionToken,
   readBeaconTowerSessionToken,
-} from "@/features/auth/lib/webflow-designer-session";
+} from "@/features/auth/lib/beacon-tower-session-token";
 
 const baseURL = import.meta.env.VITE_TOWER_ORIGIN?.replace(/\/$/, "") ?? "";
 
@@ -19,12 +19,7 @@ export const towerAuthClient = createAuthClient({
     onResponse(context) {
       const path = String(context.request.url);
       if (path.includes("/sign-out")) {
-        try {
-          localStorage.removeItem(BEACON_TOWER_SESSION_TOKEN_KEY);
-          sessionStorage.removeItem(BEACON_TOWER_SESSION_TOKEN_KEY);
-        } catch {
-          /* ignore */
-        }
+        clearBeaconTowerSessionToken();
       }
     },
   },

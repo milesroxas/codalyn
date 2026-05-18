@@ -889,8 +889,9 @@ export function CmsSlotsScreen() {
 
   const selectedComponentIdSet = useMemo(() => new Set(selected.map((s) => s.componentId)), [selected]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `engineSlotLabelRefreshToken` reruns after Engine rename; `listTargetPhase` reruns when static list-target text becomes available.
   useEffect(() => {
+    void listTargetPhase;
+    void engineSlotLabelRefreshToken;
     if (!isEngine || !picking || selected.length === 0 || activeDataList == null) {
       setEnginePublishedDisplayNames(null);
       return;

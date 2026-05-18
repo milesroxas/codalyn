@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { HashRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { BeaconAppShell } from "@/app/beacon-app-shell";
 import { BeaconHomeScreen } from "@/app/ui/beacon-home-screen";
-import { CmsSlotsScreen } from "@/features/cms-slots";
+import { CmsSlotsAccessGate, CmsSlotsScreen } from "@/features/cms-slots";
 import { ImageEditor } from "@/features/image-editor";
 import { BeaconAppSettingsProvider, BeaconSettingsScreen } from "@/features/settings";
 import { applyBeaconExtensionSize } from "@/shared/lib/beacon-extension-size";
@@ -28,7 +28,11 @@ function CmsSlotsRoutePage() {
   if (!isCmsSlotsSurfaceEnabled()) {
     return <Navigate to="/home" replace />;
   }
-  return <CmsSlotsScreen />;
+  return (
+    <CmsSlotsAccessGate>
+      <CmsSlotsScreen />
+    </CmsSlotsAccessGate>
+  );
 }
 
 export function App() {

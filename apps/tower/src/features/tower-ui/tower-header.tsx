@@ -13,10 +13,11 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
+import { useTowerWebSignOut } from "@/features/auth/model/use-tower-web-sign-out";
 import { persistBeaconThemePreference, toggledLightDarkTheme } from "@/features/beacon/lib/beacon-theme-preference";
 import { avatarLetterFromUser } from "@/features/operator/model/format";
 import { TowerHeaderWorkspaceSwitcher } from "@/features/tower-ui/tower-header-workspace-switcher";
@@ -38,24 +39,15 @@ const publicLoggedOutSurfaces = new Set(["/", "/sign-in", "/sign-up"]);
 
 export function TowerHeader({ billingEnabled = false }: { billingEnabled?: boolean }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const { setTheme, resolvedTheme } = useTheme();
   const effectiveResolved: "light" | "dark" = resolvedTheme === "dark" ? "dark" : "light";
   const [mounted, setMounted] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
+  const { signOut: onSignOut, signingOut } = useTowerWebSignOut();
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  const onSignOut = useCallback(async () => {
-    setSigningOut(true);
-    await authClient.signOut({ fetchOptions: { credentials: "include" } });
-    router.push("/");
-    router.refresh();
-    setSigningOut(false);
-  }, [router]);
 
   const cycleTheme = useCallback(() => {
     setTheme((current) => {

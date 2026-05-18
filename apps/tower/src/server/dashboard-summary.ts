@@ -14,8 +14,11 @@ export type TowerDashboardSummary = {
   activeOrganizationName: string | null;
   webflowOAuthConnected: boolean;
   webflowSites: { id: string; displayName?: string }[] | null;
-  /** Workspace `admin` / `owner` on the active org — may connect or relink Webflow OAuth for the signed-in user. */
-  canManageWebflowOAuth: boolean;
+  /**
+   * Workspace `admin` / `owner` on the active org (`isTowerTeamAdminMemberOfOrg`).
+   * Gates Webflow OAuth controls on the dashboard, member/invitation management UX, and the Team shortcut label.
+   */
+  activeOrgTeamAdmin: boolean;
 };
 
 export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary> {
@@ -31,7 +34,7 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
       activeOrganizationName: null,
       webflowOAuthConnected: false,
       webflowSites: null,
-      canManageWebflowOAuth: false,
+      activeOrgTeamAdmin: false,
     };
   }
 
@@ -65,10 +68,9 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
     activeOrganizationName = orgRows[0]?.name ?? null;
   }
 
-  let canManageWebflowOAuth = false;
-  if (activeOrganizationId) {
-    canManageWebflowOAuth = await isTowerTeamAdminMemberOfOrg(userId, activeOrganizationId);
-  }
+  const activeOrgTeamAdmin = activeOrganizationId
+    ? await isTowerTeamAdminMemberOfOrg(userId, activeOrganizationId)
+    : false;
 
   const token = await resolveWebflowBearerToken({ userId });
   const webflowOAuthConnected = Boolean(token);
@@ -95,6 +97,6 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
     activeOrganizationName,
     webflowOAuthConnected,
     webflowSites,
-    canManageWebflowOAuth,
+    activeOrgTeamAdmin,
   };
 }

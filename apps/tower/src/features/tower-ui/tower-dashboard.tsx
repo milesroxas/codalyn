@@ -8,28 +8,27 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Separator } from "@/shared/ui/separator";
 
-const shortcutCards = [
-  {
-    title: "Team",
-    description: "Workspaces, invitations, and member roles for your organization.",
-    href: "/team",
-    external: false,
-    icon: IconUsers,
-    action: "Manage team",
-    badge: "Workspace",
-  },
-  {
-    title: "Beacon",
-    description: "Workspace image presets for the Beacon Webflow app, synced from Tower.",
-    href: "/beacon",
-    external: false,
-    icon: IconRadar2,
-    action: "Manage presets",
-    badge: "Beacon",
-  },
-] as const;
-
 export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) {
+  const shortcutCards = [
+    {
+      title: "Team",
+      description: "Workspaces, invitations, and member roles for your organization.",
+      href: "/team",
+      external: false,
+      icon: IconUsers,
+      action: summary.activeOrgTeamAdmin ? "Manage team" : "View team",
+      badge: "Workspace",
+    },
+    {
+      title: "Beacon",
+      description: "Workspace image presets for the Beacon Webflow app, synced from Tower.",
+      href: "/beacon",
+      external: false,
+      icon: IconRadar2,
+      action: "Manage presets",
+      badge: "Beacon",
+    },
+  ] as const;
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
       <div className="space-y-2">
@@ -78,7 +77,7 @@ export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) 
               ) : (
                 <Badge variant="outline">Not connected</Badge>
               )}
-              {summary.canManageWebflowOAuth ? (
+              {summary.activeOrgTeamAdmin ? (
                 <TowerWebflowOAuthPopupButton>
                   {summary.webflowOAuthConnected ? "Relink Webflow" : "Connect Webflow"}
                 </TowerWebflowOAuthPopupButton>

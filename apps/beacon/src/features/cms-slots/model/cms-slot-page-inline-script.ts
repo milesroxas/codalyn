@@ -36,8 +36,9 @@ function applyValue(el,v){v=String(v==null?"":v);var tag=String(el.tagName||"").
 function pickP(ps,k){if(!k||!ps||typeof ps!=="object")return;var a=String(k);if(Object.prototype.hasOwnProperty.call(ps,a))return ps[a];var al=a.toLowerCase();for(var x in ps)if(Object.prototype.hasOwnProperty.call(ps,x)&&x.toLowerCase()===al)return ps[x]}
 function bPropEmpty(v){if(v==null)return true;return String(v).trim()===""}
 function bPropSetHidden(n,h){if(h){n.setAttribute("hidden","");n.setAttribute("aria-hidden","true")}else{n.removeAttribute("hidden");n.removeAttribute("aria-hidden")}}
+function bListTargetReveal(target){target.classList.remove("${CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");target.style.removeProperty("visibility")}
 function applyProps(target,payload){var vn=payload?+payload.v:NaN;if(!payload||!isFinite(vn)||vn<2)return;var pc=payload.p;if(!Array.isArray(pc))return;var rows=target.children,i,j,row,props,nodes,node,rawP,segs,si,seg,pv,ra,rh,d=bDbg(),totA=0,totH=0,nLen=rows.length<pc.length?rows.length:pc.length;for(i=0;i<nLen;i++){row=rows[i];props=pc[i];if(!row||props===null||typeof props!=="object"){if(d)bLog("row missing",i);continue}nodes=row.querySelectorAll("[data-codalyn-beacon-prop]");ra=0;rh=0;for(j=0;j<nodes.length;j++){node=nodes[j];rawP=node.getAttribute("data-codalyn-beacon-prop")||"";if(!rawP)continue;segs=String(rawP).split("|");pv=null;for(si=0;si<segs.length;si++){seg=segs[si].trim();if(!seg)continue;pv=pickP(props,seg);if(pv!=null)break}if(bPropEmpty(pv)){bPropSetHidden(node,true);rh++;if(pv==null&&d)bLog("no payload for attr",i,rawP,"keys",Object.keys(props));continue}bPropSetHidden(node,false);applyValue(node,String(pv));ra++}totA+=ra;totH+=rh;if(d)bLog("row",i,"nodes",nodes.length,"set",ra,"hidden",rh)}if(d)bLog("applyProps",totA,"set",totH,"hidden nodes")}
-function reapply(target,payload){bLog("reapply 1/3 sync");applyProps(target,payload);setTimeout(function(){bLog("reapply 2/3 +0ms");applyProps(target,payload);setTimeout(function(){bLog("reapply 3/3 +100ms");applyProps(target,payload)},100)},0)}
+function reapply(target,payload,done){bLog("reapply 1/3 sync");applyProps(target,payload);setTimeout(function(){bLog("reapply 2/3 +0ms");applyProps(target,payload);setTimeout(function(){bLog("reapply 3/3 +100ms");applyProps(target,payload);if(typeof done==="function")done()},100)},0)}
 function run(){
 bLog("run",document.readyState);
 var sourcesByList={},sources=document.querySelectorAll("[data-target=beacons][data-list]");
@@ -51,7 +52,7 @@ if(!targetKey||String(target.getAttribute("data-beacon-target")||"").toLowerCase
 var sourceNode=sourcesByList[targetKey];
 if(!sourceNode){for(i=0;i<sources.length;i++){source=sources[i];if(isSource(source)&&listKey(source)===targetKey){sourceNode=source;break}}}
 if(!sourceNode){bLog("skip (no source)",targetKey);continue}
-target.classList.remove("${CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");
+target.style.visibility="hidden";
 var raw=String(target.textContent||"").trim();
 bLog("list",targetKey,"sourceChildren",sourceNode.children.length,"rawChars",raw.length,"rawStart",raw.slice(0,200));
 target.textContent="";
@@ -61,11 +62,11 @@ bLog("parse",ok,pe?{err:pe}:null,"v",v,"vPayload",payload?payload.v:null,"i",ind
 var children=sourceNode.children,cloned=0;
 if(ok){for(var u=0;u<indices.length;u++){var idx=+indices[u];if(idx===idx&&idx>=0&&idx%1===0&&idx<children.length){target.appendChild(children[idx].cloneNode(true));cloned++}}}else{for(var u=0;u<children.length;u++)target.appendChild(children[u].cloneNode(true))}
 bLog("cloned rows",ok?"byIndex":"allChildren",ok?cloned:target.children.length,"targetChildren",target.children.length);
-if(v>=2&&ok&&payload&&Array.isArray(payload.p))reapply(target,payload);
-else bLog("skip reapply (need v>=2, ok, p[])",v,ok,Array.isArray(payload&&payload.p))}
+if(v>=2&&ok&&payload&&Array.isArray(payload.p))reapply(target,payload,function(){bListTargetReveal(target)});
+else{bLog("skip reapply (need v>=2, ok, p[])",v,ok,Array.isArray(payload&&payload.p));bListTargetReveal(target)}}
 bLog("run done")
 }
-if(document.readyState==="complete")run();else addEventListener("load",run);
+if(document.readyState==="loading")addEventListener("DOMContentLoaded",run);else run();
 })();`;
 }
 

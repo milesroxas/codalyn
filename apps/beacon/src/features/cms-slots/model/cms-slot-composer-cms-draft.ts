@@ -7,6 +7,7 @@ import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-
 import { fetchCmsSlotListCmsTextForItem } from "@/features/cms-slots/model/cms-slot-list-cms-composition-save";
 import {
   parseCmsSlotListRuntimePayload,
+  resolveCmsSlotPublishedDisplayName,
   sanitizeSlotLabelForPayload,
 } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import {
@@ -139,8 +140,7 @@ function draftFromPayloadRows(
       continue;
     }
     const pr = propRows[u] ?? {};
-    const label = slotLabels != null ? sanitizeSlotLabelForPayload(slotLabels[u] ?? "") : "";
-    const name = label !== "" ? label : r.name;
+    const name = slotLabels != null ? resolveCmsSlotPublishedDisplayName(r.name, slotLabels[u]) : r.name;
     out.push({ key: crypto.randomUUID(), componentId: r.componentId, name, propValues: { ...pr } });
   }
   return out;

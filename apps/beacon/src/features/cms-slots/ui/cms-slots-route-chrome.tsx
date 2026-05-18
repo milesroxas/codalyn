@@ -8,6 +8,7 @@ import type { CmsSlotListOnPage, HydratedCmsSlotRow } from "@/features/cms-slots
 import type { CmsSlotCompositionDraftRow, CmsSlotPaletteEntry } from "@/features/cms-slots/model/site-components";
 import { CmsSlotComposerListPanel } from "@/features/cms-slots/ui/cms-slot-composer-list-panel";
 import { CmsSlotComposerStudioPanel } from "@/features/cms-slots/ui/cms-slot-composer-studio";
+import { ComposerPaletteSection } from "@/features/cms-slots/ui/cms-slot-composer-studio/composer-palette-section";
 import { CmsSlotCompositionPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel";
 import { CmsSlotHomePanel } from "@/features/cms-slots/ui/cms-slot-home-panel";
 import { CmsSlotPageRuntimeHeaderStatus } from "@/features/cms-slots/ui/cms-slot-page-runtime-header-status";
@@ -84,8 +85,11 @@ export type CmsSlotsRouteChromeProps = {
   listTargetPlaceOnCanvasPending: boolean;
   engineListSlotFile: CmsSlotEngineSlotPropsFile | null;
   onSetEngineSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void | Promise<void>;
-  onResyncEngineSlotAttrs: (slotIndex: number) => void | Promise<void>;
+  onResyncEngineSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
   resyncingEngineSlotKey: string | null;
+  enginePublishedDisplayNames: string[] | null;
+  onRenamePublishedDisplayName: (rowKey: string, nextName: string) => void | Promise<void>;
+  renamingPublishedSlotKey: string | null;
   exitToList: () => void;
   composerEligibleLoading: boolean;
   composerRuntimeOk: boolean;
@@ -139,7 +143,7 @@ function CmsSlotsRouteHeader(p: CmsSlotsRouteChromeProps) {
           {CMS_SLOTS_FEATURE_NAME}
         </h2>
         <div className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-1.5">
-          {p.showPageRuntimeSyncHeader ? (
+          {p.showPageRuntimeSyncHeader && !p.isEngine ? (
             <CmsSlotPageRuntimeHeaderStatus
               loading={p.pageRuntimeStatusLoading}
               synced={p.syncShellOk}
@@ -204,6 +208,9 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps) {
           onSetSlotExposed={p.onSetEngineSlotExposed}
           onResyncEngineSlotAttrs={p.onResyncEngineSlotAttrs}
           resyncingEngineSlotKey={p.resyncingEngineSlotKey}
+          enginePublishedDisplayNames={p.enginePublishedDisplayNames}
+          onRenamePublishedDisplayName={p.onRenamePublishedDisplayName}
+          renamingPublishedSlotKey={p.renamingPublishedSlotKey}
         />
       ) : null}
     </div>
@@ -245,6 +252,7 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
           rowMeta={p.composerRowMeta}
           onChangePropValue={p.onComposerSetPropValue}
           onRenameSlot={p.onComposerRenameSlotRow}
+          omitPalette
         />
       )}
     </div>
@@ -353,6 +361,13 @@ function CmsSlotsRemoveListTargetDialog(p: CmsSlotsRouteChromeProps) {
 }
 
 function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
+  const syncNeedsFooterAttention =
+    p.showPageRuntimeSyncHeader &&
+    !p.syncShellOk &&
+    !p.pageRuntimeStatusLoading &&
+    !p.embedSyncPending &&
+    !p.pageScanLoading;
+
   return (
     <footer
       data-slot="cms_slots_dock"
@@ -402,7 +417,7 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
       </nav>
       <Button
         type="button"
-        variant="secondary"
+        variant={syncNeedsFooterAttention ? "default" : "secondary"}
         size="dockNav"
         disabled={p.embedSyncPending || p.pageRuntimeStatusLoading || !p.beaconsWrapperInstalled || p.pageScanLoading}
         aria-busy={p.embedSyncPending}
@@ -411,7 +426,9 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
             ? CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP
             : p.pageRuntimeStatusLoading
               ? "Checking page script…"
-              : undefined
+              : syncNeedsFooterAttention
+                ? (p.syncShellReason ?? "Sync to update the embedded page script.")
+                : undefined
         }
         onClick={() => void p.onSyncInstallEmbed()}
       >
@@ -424,12 +441,22 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
 
 /** Route shell/header, scroll region, dialogs, footer — splits cognitive complexity off `CmsSlotsScreen`. */
 export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
+  const composerPaletteDocked = p.isComposer && p.composerStudio != null;
+
   return (
     <div className={beaconAppRouteSurfaceClass}>
       <CmsSlotsRouteHeader {...p} />
       <CmsSlotsRouteScrollBody {...p} />
       <CmsSlotsBeaconDeleteDialog {...p} />
       <CmsSlotsRemoveListTargetDialog {...p} />
+      {composerPaletteDocked ? (
+        <ComposerPaletteSection
+          variant="docked"
+          allowedPalette={p.composerAllowedPalette}
+          busy={p.composerSavePending || p.embedSyncPending}
+          onAddFromPalette={p.onComposerAddFromPalette}
+        />
+      ) : null}
       <CmsSlotsRouteDock {...p} />
     </div>
   );

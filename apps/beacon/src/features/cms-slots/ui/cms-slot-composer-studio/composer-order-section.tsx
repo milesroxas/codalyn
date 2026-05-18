@@ -1,6 +1,6 @@
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import { ScrollArea } from "@/shared/ui/scroll-area";
@@ -23,15 +23,8 @@ type ComposerOrderSectionProps = {
 export function ComposerOrderSection(props: ComposerOrderSectionProps) {
   const { draft, rowMeta, onChangePropValue, busy, onReorder, onRenameSlot, onRemove } = props;
 
-  const [fieldsOpenByKey, setFieldsOpenByKey] = useState<Record<string, boolean>>({});
-
-  const setFieldsOpen = useCallback((key: string, open: boolean) => {
-    setFieldsOpenByKey((prev) => ({ ...prev, [key]: open }));
-  }, []);
-
   const { collisionDetection, sensors, onDragStart, onDragEnd, onDragCancel, dragOverlay } = useComposerOrderSortable({
     draft,
-    rowMeta,
     busy,
     onReorder,
   });
@@ -55,16 +48,12 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
               <ul className="m-0 list-none space-y-2 p-0" aria-label="Composition order">
                 {draft.map((row, index) => {
                   const meta = rowMeta[index];
-                  const hasFields = (meta?.exposed ?? []).length > 0;
-                  const fieldsOpen = fieldsOpenByKey[row.key] ?? false;
                   return (
                     <ComposerOrderSortableRow
                       key={row.key}
                       row={row}
                       meta={meta}
                       busy={busy}
-                      fieldsOpen={hasFields ? fieldsOpen : false}
-                      onFieldsOpenChange={(open) => setFieldsOpen(row.key, open)}
                       onChangePropValue={onChangePropValue}
                       onRenameSlot={onRenameSlot}
                       onRemove={onRemove}
@@ -80,9 +69,7 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
               easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
             }}
           >
-            {dragOverlay != null ? (
-              <ComposerCollapsedDragPreview row={dragOverlay.row} hasExposedFields={dragOverlay.hasExposedFields} />
-            ) : null}
+            {dragOverlay != null ? <ComposerCollapsedDragPreview row={dragOverlay.row} /> : null}
           </DragOverlay>
         </DndContext>
       )}

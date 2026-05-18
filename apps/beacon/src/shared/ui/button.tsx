@@ -33,6 +33,9 @@ const buttonVariants = cva(
         /** Composer row title opens slot-name drawer; reads like muted text row line. */
         composerSlotTitle:
           "min-h-9 h-auto max-w-none w-full flex-1 justify-start truncate border-transparent bg-transparent px-1 py-1.5 text-left text-sm leading-snug font-medium shadow-none hover:bg-muted/70 focus-visible:bg-muted dark:hover:bg-muted/35 [&_svg]:size-4",
+        /** Composer palette: grid tile for adding a component type. */
+        composerPaletteTile:
+          "border-border/70 bg-muted/90 text-foreground shadow-none hover:bg-muted dark:border-white/12 dark:bg-muted/50 dark:hover:bg-muted/65",
       },
       size: {
         default: "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
@@ -48,6 +51,9 @@ const buttonVariants = cva(
         /** Paired with `variant="cmsSlotsCard"` */
         cmsSlotsCard:
           "!h-auto min-h-11 w-full shrink-0 justify-between gap-3 rounded-md px-4 py-3.5 font-semibold whitespace-normal [&_svg:not([class*='size-'])]:size-5",
+        /** Paired with `variant="composerPaletteTile"` */
+        composerPaletteTile:
+          "!h-auto min-h-[4.25rem] w-full max-w-none shrink-0 justify-center gap-0 rounded-md px-2 py-2.5 text-[0.8125rem] font-medium leading-tight whitespace-normal",
       },
     },
     defaultVariants: {

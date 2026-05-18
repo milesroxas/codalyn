@@ -88,6 +88,55 @@ export function sanitizeSlotLabelForPayload(s: string): string {
   return t.length <= CMS_SLOT_ROW_NAME_MAX ? t : t.slice(0, CMS_SLOT_ROW_NAME_MAX);
 }
 
+/**
+ * Single rule for “what label do we show / persist?”: optional `n[]` entry wins when non-empty after sanitize;
+ * otherwise the Webflow **component definition** display name (per hidden-list row).
+ */
+export function resolveCmsSlotPublishedDisplayName(
+  componentDefinitionName: string,
+  persistedLabel: string | null | undefined
+): string {
+  if (persistedLabel == null) {
+    return componentDefinitionName;
+  }
+  const label = sanitizeSlotLabelForPayload(persistedLabel);
+  return label !== "" ? label : componentDefinitionName;
+}
+
+/**
+ * For each Engine pool row (hidden list index), derive the label shown in Studio from the live v2 payload, or the
+ * component name when the payload is missing or that pool index has **mixed** composed-row labels (same index used
+ * more than once with different `n[]` entries).
+ */
+export function publishedDisplayNamesForEnginePool(
+  payload: CmsSlotListRuntimePayload | null,
+  engineScopedRows: ReadonlyArray<{ name: string }>
+): string[] {
+  if (payload == null || payload.i.length === 0) {
+    return engineScopedRows.map((r) => r.name);
+  }
+  const collected = new Map<number, string[]>();
+  for (let u = 0; u < payload.i.length; u++) {
+    const poolIdx = payload.i[u];
+    if (poolIdx < 0 || poolIdx >= engineScopedRows.length) {
+      continue;
+    }
+    const defName = engineScopedRows[poolIdx]?.name ?? "";
+    const resolved = resolveCmsSlotPublishedDisplayName(defName, payload.n?.[u]);
+    const arr = collected.get(poolIdx) ?? [];
+    arr.push(resolved);
+    collected.set(poolIdx, arr);
+  }
+  return engineScopedRows.map((row, j) => {
+    const labels = collected.get(j);
+    if (labels == null || labels.length === 0) {
+      return row.name;
+    }
+    const first = labels[0];
+    return labels.every((x) => x === first) ? first : row.name;
+  });
+}
+
 function resolvePayloadPropList(
   normalizedVersion: number,
   pRaw: unknown,

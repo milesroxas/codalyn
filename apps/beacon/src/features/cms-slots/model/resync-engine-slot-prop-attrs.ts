@@ -49,16 +49,16 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
   container: BlockElement | null;
   setResyncingEngineSlotKey: (key: string | null) => void;
   setSelected: Dispatch<SetStateAction<HydratedCmsSlotRow[]>>;
-}): Promise<void> {
+}): Promise<boolean> {
   const { slotIndex, selected, container, setResyncingEngineSlotKey, setSelected } = input;
   const labelRow = selected[slotIndex];
   if (labelRow == null) {
     console.log(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "aborted: no labelRow at slotIndex", slotIndex);
-    return;
+    return false;
   }
   if (container == null) {
     console.log(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "aborted: targetRef container is null");
-    return;
+    return false;
   }
   console.log(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "handleResyncEngineSlotAttrs", {
     slotIndex,
@@ -88,7 +88,7 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
         message:
           "That slot no longer matches the CMS slot list on the page. Close and reopen this list, then try tagging again.",
       });
-      return;
+      return false;
     }
 
     const f = await readCmsSlotEngineSlotPropsFile(container, scoped.length);
@@ -112,6 +112,7 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
 
     setSelected((prev) => mergeScopedIntoSelected(prev, scoped));
     notifyResyncOutcome(r, exposed);
+    return true;
   } catch (e) {
     console.error(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "handler catch (same message as Designer toast)", {
       formatted: formatWebflowDesignerError(e),
@@ -119,6 +120,7 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
       err: e,
     });
     void webflow.notify({ type: "Error", message: formatWebflowDesignerError(e) });
+    return false;
   } finally {
     setResyncingEngineSlotKey(null);
   }

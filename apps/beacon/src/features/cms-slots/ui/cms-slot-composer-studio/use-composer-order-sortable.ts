@@ -10,27 +10,24 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useCallback, useMemo, useState } from "react";
-import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 
 const POINTER_ACTIVATION_PX = 8;
 
 type UseComposerOrderSortableArgs = {
   draft: CmsSlotCompositionDraftRow[];
-  rowMeta: CmsSlotComposerRowMeta[];
   busy: boolean;
   onReorder: (fromIndex: number, toIndex: number) => void;
 };
 
 export type ComposerOrderDragOverlay = {
   row: CmsSlotCompositionDraftRow;
-  hasExposedFields: boolean;
 } | null;
 
 /**
  * dnd-kit wiring for target-order list: sensors, drag lifecycle, overlay payload.
  */
-export function useComposerOrderSortable({ draft, rowMeta, busy, onReorder }: UseComposerOrderSortableArgs) {
+export function useComposerOrderSortable({ draft, busy, onReorder }: UseComposerOrderSortableArgs) {
   const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(null);
 
   const sensors = useSensors(
@@ -70,9 +67,8 @@ export function useComposerOrderSortable({ draft, rowMeta, busy, onReorder }: Us
     if (index < 0) return null;
     return {
       row: draft[index],
-      hasExposedFields: (rowMeta[index]?.exposed ?? []).length > 0,
     };
-  }, [activeDragId, draft, rowMeta]);
+  }, [activeDragId, draft]);
 
   return {
     collisionDetection: closestCorners,

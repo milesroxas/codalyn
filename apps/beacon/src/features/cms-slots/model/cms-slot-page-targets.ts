@@ -124,15 +124,16 @@ export function filterHydratedCmsSlotRowsByComponentIds(
 }
 
 /**
- * Returns Engine-configured component ids for this beacon list. Falls back to the current target rows
- * when this beacon was created before that config attribute existed.
+ * Returns Engine-configured component ids for this beacon list. Falls back to component ids from the
+ * current hidden-list instances when the attribute is missing **or** persisted as empty (`__none__` —
+ * written on new lists before any slot row exists). Non-empty stored ids always win (Engine palette).
  */
 export async function resolveCmsSlotEngineConfiguredComponentIds(
   container: BlockElement,
   rows: HydratedCmsSlotRow[]
 ): Promise<string[]> {
   const configured = await readCmsSlotEngineConfiguredComponentIds(container);
-  if (configured != null) {
+  if (configured != null && configured.length > 0) {
     return configured;
   }
   return uniqueComponentIds(rows.map((row) => row.componentId));

@@ -24,6 +24,8 @@ export type CmsSlotComposerStudioPanelProps = {
   rowMeta: CmsSlotComposerRowMeta[];
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
   onRenameSlot: (rowKey: string, name: string) => void;
+  /** When true, {@link ComposerPaletteSection} is not rendered (parent places it, e.g. docked above the app footer). */
+  omitPalette?: boolean;
 };
 
 export function CmsSlotComposerStudioPanel(props: CmsSlotComposerStudioPanelProps) {
@@ -45,6 +47,7 @@ export function CmsSlotComposerStudioPanel(props: CmsSlotComposerStudioPanelProp
     rowMeta,
     onChangePropValue,
     onRenameSlot,
+    omitPalette = false,
   } = props;
 
   const busy = savePending || embedSyncPending;
@@ -80,7 +83,9 @@ export function CmsSlotComposerStudioPanel(props: CmsSlotComposerStudioPanelProp
         onRemove={onRemove}
       />
 
-      <ComposerPaletteSection allowedPalette={allowedPalette} busy={busy} onAddFromPalette={onAddFromPalette} />
+      {omitPalette ? null : (
+        <ComposerPaletteSection allowedPalette={allowedPalette} busy={busy} onAddFromPalette={onAddFromPalette} />
+      )}
     </div>
   );
 }

@@ -1,8 +1,13 @@
 import { serializeCmsSlotListRuntimePayload } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
+import {
+  getCmsSlotListTargetCmsCollectionIdFromListContainer,
+  getCmsSlotListTargetCmsFieldIdFromListContainer,
+  getCmsTemplateCollectionIdFromCurrentPage,
+} from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import { getCmsSlotListTargetTextPropId } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
-import { towerFetch } from "@/shared/lib/tower-client";
+import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -87,6 +92,82 @@ export async function fetchCmsSlotListCmsTextForItem(options: {
     return v;
   }
   return String(v);
+}
+
+/**
+ * Reads the JSON string the footer runtime consumes from the list target **Text** prop on non–collection-template
+ * pages (same surface {@link setCmsSlotListTargetInstancesStaticRuntimeText} writes).
+ */
+export async function readCmsSlotListStaticListTargetRuntimeText(options: {
+  dataList: string;
+  listContainer: BlockElement;
+  preferredDefinitionId: string | null;
+}): Promise<string | null> {
+  const def = await getCmsSlotListTargetComponentOrNull(
+    options.dataList,
+    options.listContainer,
+    options.preferredDefinitionId
+  );
+  if (def == null) {
+    return null;
+  }
+  const instances = await listCmsSlotListTargetInstancesOnPage(options.dataList, options.listContainer, {
+    preferredDefinitionId: options.preferredDefinitionId,
+  });
+  if (instances.length === 0) {
+    return null;
+  }
+  let instDef: Component | undefined;
+  try {
+    instDef = await instances[0].getComponent();
+  } catch {
+    /* use definition only */
+  }
+  const propId = await getCmsSlotListTargetTextPropId(instDef ?? def);
+  if (propId == null) {
+    return null;
+  }
+  const rows = await instances[0].searchProps();
+  const row = rows.find((r) => r.propId === propId);
+  const v = row?.value;
+  if (typeof v === "string") {
+    return v;
+  }
+  return null;
+}
+
+/**
+ * Runtime JSON string for the active publishing context: CMS item field on a collection template, otherwise list
+ * target Text on a static page. Matches where Composer reads layout (see {@link resolveComposerTargetOrder}).
+ */
+export async function readCmsSlotListRuntimePayloadText(options: {
+  listContainer: BlockElement;
+  dataList: string;
+  preferredDefinitionId: string | null;
+  currentCmsItemId: string | null;
+}): Promise<string | null> {
+  const pageCollection = await getCmsTemplateCollectionIdFromCurrentPage();
+  if (pageCollection != null) {
+    if (getTowerOrigin().trim() === "" || options.currentCmsItemId == null) {
+      return null;
+    }
+    const fromList = await getCmsSlotListTargetCmsCollectionIdFromListContainer(options.listContainer);
+    const fieldId = await getCmsSlotListTargetCmsFieldIdFromListContainer(options.listContainer);
+    if (fieldId == null) {
+      return null;
+    }
+    const collectionId = fromList ?? pageCollection;
+    return fetchCmsSlotListCmsTextForItem({
+      collectionId,
+      fieldId,
+      cmsItemId: options.currentCmsItemId,
+    });
+  }
+  return readCmsSlotListStaticListTargetRuntimeText({
+    dataList: options.dataList,
+    listContainer: options.listContainer,
+    preferredDefinitionId: options.preferredDefinitionId,
+  });
 }
 
 type PatchKind = "staged" | "live";

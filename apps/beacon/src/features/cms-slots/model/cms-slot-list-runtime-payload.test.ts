@@ -3,8 +3,48 @@ import {
   CMS_SLOT_LIST_RUNTIME_JSON_VERSION,
   cmsSlotListRuntimePayloadSequential,
   parseCmsSlotListRuntimePayload,
+  publishedDisplayNamesForEnginePool,
+  resolveCmsSlotPublishedDisplayName,
   serializeCmsSlotListRuntimePayload,
 } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
+
+describe("resolveCmsSlotPublishedDisplayName", () => {
+  it("uses persisted label when non-empty after sanitize", () => {
+    expect(resolveCmsSlotPublishedDisplayName("Card", "Hero")).toBe("Hero");
+  });
+
+  it("falls back to component name when persisted is empty or whitespace", () => {
+    expect(resolveCmsSlotPublishedDisplayName("Card", "")).toBe("Card");
+    expect(resolveCmsSlotPublishedDisplayName("Card", "  ")).toBe("Card");
+    expect(resolveCmsSlotPublishedDisplayName("Card", undefined)).toBe("Card");
+  });
+});
+
+describe("publishedDisplayNamesForEnginePool", () => {
+  it("maps pool rows from payload n[] and falls back to component name when pool unused", () => {
+    const payload = parseCmsSlotListRuntimePayload(
+      serializeCmsSlotListRuntimePayload([0, 1, 0], [{}, {}, {}], ["A", "B", "A"])
+    );
+    expect(payload).not.toBeNull();
+    if (payload == null) {
+      return;
+    }
+    const rows = [{ name: "One" }, { name: "Two" }, { name: "Three" }];
+    expect(publishedDisplayNamesForEnginePool(payload, rows)).toEqual(["A", "B", "Three"]);
+  });
+
+  it("uses component name when the same pool index has mixed composed labels", () => {
+    const payload = parseCmsSlotListRuntimePayload(
+      serializeCmsSlotListRuntimePayload([0, 0], [{}, {}], ["First", "Second"])
+    );
+    expect(payload).not.toBeNull();
+    if (payload == null) {
+      return;
+    }
+    const rows = [{ name: "Dup" }];
+    expect(publishedDisplayNamesForEnginePool(payload, rows)).toEqual(["Dup"]);
+  });
+});
 
 describe("cmsSlotListRuntimePayloadSequential", () => {
   it("serializes identity order for N children", () => {

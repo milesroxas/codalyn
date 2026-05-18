@@ -14,11 +14,17 @@ import {
 } from "@/features/cms-slots/model/cms-slot-composer-cms-draft";
 import { listComposerEligibleLists } from "@/features/cms-slots/model/cms-slot-composer-eligible";
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
+import { renamePublishedSlotDisplayNameAtPoolIndex } from "@/features/cms-slots/model/cms-slot-engine-rename-published-slot";
 import {
   type CmsSlotEngineSlotPropsFile,
   readCmsSlotEngineSlotPropsFile,
   writeCmsSlotEngineSlotPropsFile,
 } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+import { readCmsSlotListRuntimePayloadText } from "@/features/cms-slots/model/cms-slot-list-cms-composition-save";
+import {
+  parseCmsSlotListRuntimePayload,
+  publishedDisplayNamesForEnginePool,
+} from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import {
   getCmsSlotListTargetCmsFieldIdFromListContainer,
   resolveCmsSlotListTargetCmsCollectionIdForCleanup,
@@ -496,6 +502,9 @@ export function CmsSlotsScreen() {
   const [selected, setSelected] = useState<HydratedCmsSlotRow[]>([]);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [resyncingEngineSlotKey, setResyncingEngineSlotKey] = useState<string | null>(null);
+  const [enginePublishedDisplayNames, setEnginePublishedDisplayNames] = useState<string[] | null>(null);
+  const [engineSlotLabelRefreshToken, setEngineSlotLabelRefreshToken] = useState(0);
+  const [renamingPublishedSlotKey, setRenamingPublishedSlotKey] = useState<string | null>(null);
   const [listTargetCreatePending, setListTargetCreatePending] = useState(false);
   const [listTargetRemovePending, setListTargetRemovePending] = useState(false);
   const [listTargetRemoveBusyKind, setListTargetRemoveBusyKind] = useState<"canvas" | "delete" | null>(null);
@@ -761,6 +770,9 @@ export function CmsSlotsScreen() {
     setRemoveListTargetDialogOpen(false);
     setActiveBeaconKey(null);
     setEngineListSlotFile(null);
+    setEnginePublishedDisplayNames(null);
+    setEngineSlotLabelRefreshToken(0);
+    setRenamingPublishedSlotKey(null);
     listTargetResolveGen.current += 1;
     void refreshPageBeacons();
   }, [refreshPageBeacons]);
@@ -845,6 +857,43 @@ export function CmsSlotsScreen() {
   };
 
   const selectedComponentIdSet = useMemo(() => new Set(selected.map((s) => s.componentId)), [selected]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `engineSlotLabelRefreshToken` reruns after Engine rename; `listTargetPhase` reruns when static list-target text becomes available.
+  useEffect(() => {
+    if (!isEngine || !picking || selected.length === 0 || activeDataList == null) {
+      setEnginePublishedDisplayNames(null);
+      return;
+    }
+    const container = targetRef.current;
+    if (container == null) {
+      setEnginePublishedDisplayNames(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const text = await readCmsSlotListRuntimePayloadText({
+          listContainer: container,
+          dataList: activeDataList,
+          preferredDefinitionId: listTargetDefinitionIdRef.current,
+          currentCmsItemId,
+        });
+        if (cancelled) {
+          return;
+        }
+        const parsed =
+          text != null && text.trim() !== "" ? parseCmsSlotListRuntimePayload(text, selected.length) : null;
+        setEnginePublishedDisplayNames(publishedDisplayNamesForEnginePool(parsed, selected));
+      } catch {
+        if (!cancelled) {
+          setEnginePublishedDisplayNames(selected.map((r) => r.name));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEngine, picking, activeDataList, currentCmsItemId, selected, listTargetPhase, engineSlotLabelRefreshToken]);
 
   const composerDirty = useMemo(() => {
     if (composerStudio == null) return false;
@@ -951,7 +1000,7 @@ export function CmsSlotsScreen() {
 
   const handleResyncEngineSlotAttrs = useCallback(
     async (slotIndex: number) => {
-      await resyncEngineSlotPropAttributesForSlotIndex({
+      return await resyncEngineSlotPropAttributesForSlotIndex({
         slotIndex,
         selected,
         container: targetRef.current,
@@ -960,6 +1009,48 @@ export function CmsSlotsScreen() {
       });
     },
     [selected]
+  );
+
+  const handleRenamePublishedDisplayName = useCallback(
+    (rowKey: string, nextName: string) => {
+      void (async () => {
+        if (activeDataList == null || targetRef.current == null) {
+          return;
+        }
+        const slotIndex = selected.findIndex((r) => r.key === rowKey);
+        if (slotIndex < 0) {
+          return;
+        }
+        setRenamingPublishedSlotKey(rowKey);
+        try {
+          const result = await renamePublishedSlotDisplayNameAtPoolIndex({
+            listContainer: targetRef.current,
+            dataList: activeDataList,
+            preferredDefinitionId: listTargetDefinitionIdRef.current,
+            currentCmsItemId,
+            engineScopedRows: selected,
+            poolIndex: slotIndex,
+            nextName,
+          });
+          if (!result.ok) {
+            void webflow.notify({ type: "Error", message: result.reason });
+            return;
+          }
+          void webflow.notify({
+            type: "Success",
+            message: "Published slot name updated. Publish the site for changes on the live page.",
+          });
+          setEngineSlotLabelRefreshToken((g) => g + 1);
+          void refreshPageBeacons();
+        } catch (err) {
+          const message = formatWebflowDesignerError(err);
+          void webflow.notify({ type: "Error", message });
+        } finally {
+          setRenamingPublishedSlotKey(null);
+        }
+      })();
+    },
+    [activeDataList, currentCmsItemId, selected, refreshPageBeacons]
   );
 
   const handleComposerReorderDraft = useCallback((fromIndex: number, toIndex: number) => {
@@ -979,6 +1070,9 @@ export function CmsSlotsScreen() {
 
   const handleComposerSave = async () => {
     if (composerSavePending || composerStudio == null) return;
+    if (cmsSlotCompositionSignature(composerDraft) === composerStudio.initialSignature) {
+      return;
+    }
     if (composerDraft.length === 0) {
       void webflow.notify({ type: "Error", message: "Add at least one component before saving." });
       return;
@@ -1394,6 +1488,9 @@ export function CmsSlotsScreen() {
       onSetEngineSlotExposed={handleSetEngineSlotExposed}
       onResyncEngineSlotAttrs={handleResyncEngineSlotAttrs}
       resyncingEngineSlotKey={resyncingEngineSlotKey}
+      enginePublishedDisplayNames={enginePublishedDisplayNames}
+      onRenamePublishedDisplayName={handleRenamePublishedDisplayName}
+      renamingPublishedSlotKey={renamingPublishedSlotKey}
       exitToList={exitToList}
       composerEligibleLoading={composerEligibleLoading}
       composerRuntimeOk={composerRuntimeOk}

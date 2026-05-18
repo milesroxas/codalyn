@@ -1,6 +1,11 @@
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import { listComposableMetaByInstanceKey } from "@/features/cms-slots/model/cms-slot-composable-props";
-import { resolveComposerTargetOrder } from "@/features/cms-slots/model/cms-slot-composer-cms-draft";
+import {
+  cmsSlotCompositionSignature,
+  draftToHiddenListIndices,
+  normalizeComposerDraftPropValues,
+  resolveComposerTargetOrder,
+} from "@/features/cms-slots/model/cms-slot-composer-cms-draft";
 import {
   type CmsSlotEngineSlotPropsFile,
   readCmsSlotEngineSlotPropsFile,
@@ -41,12 +46,23 @@ export async function loadComposerStudioSynchronizedState(args: {
   if (shouldAbort()) return null;
   const composerSlotProps = await readCmsSlotEngineSlotPropsFile(slotList.container, engineScopedRows.length);
   if (shouldAbort()) return null;
-  const { draft, initialSignature } = await resolveComposerTargetOrder({
+  const { draft: rawDraft } = await resolveComposerTargetOrder({
     listContainer: slotList.container,
     engineScopedRows,
     currentCmsItemId,
   });
   if (shouldAbort()) return null;
+  const mapped = draftToHiddenListIndices(engineScopedRows, rawDraft);
+  const draft = mapped.ok
+    ? normalizeComposerDraftPropValues(
+        rawDraft,
+        mapped.indices,
+        engineScopedRows,
+        composerSlotProps,
+        composerEngineComposable
+      )
+    : rawDraft;
+  const initialSignature = cmsSlotCompositionSignature(draft);
   return {
     allowedPalette,
     engineScopedRows,

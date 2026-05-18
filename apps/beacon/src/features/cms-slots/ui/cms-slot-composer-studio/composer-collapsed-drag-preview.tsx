@@ -1,9 +1,9 @@
-import { ChevronDown, GripVertical, Trash2 } from "lucide-react";
+import { GripVertical, Trash2 } from "lucide-react";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 
-/** Visual duplicate of the collapsed header row — used inside @dnd-kit DragOverlay only. */
-export function ComposerCollapsedDragPreview(props: { row: CmsSlotCompositionDraftRow; hasExposedFields: boolean }) {
-  const { row, hasExposedFields } = props;
+/** Visual duplicate of the row header — used inside @dnd-kit DragOverlay only. */
+export function ComposerCollapsedDragPreview(props: { row: CmsSlotCompositionDraftRow }) {
+  const { row } = props;
   return (
     <div
       aria-hidden
@@ -12,11 +12,6 @@ export function ComposerCollapsedDragPreview(props: { row: CmsSlotCompositionDra
       <div className="flex size-7 shrink-0 items-center justify-center rounded-sm text-muted-foreground">
         <GripVertical className="size-4" aria-hidden />
       </div>
-      {hasExposedFields ? (
-        <span className="flex size-7 shrink-0 items-center justify-center text-muted-foreground">
-          <ChevronDown className="-rotate-90 size-4" aria-hidden />
-        </span>
-      ) : null}
       <p className="min-w-0 flex-1 truncate text-sm font-medium">{row.name}</p>
       <span className="flex size-7 shrink-0 items-center justify-center text-destructive/80">
         <Trash2 className="size-3.5" aria-hidden />

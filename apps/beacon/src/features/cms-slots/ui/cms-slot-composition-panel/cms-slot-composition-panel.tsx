@@ -34,8 +34,12 @@ export type CmsSlotCompositionPanelProps = {
   engineSlotProps: CmsSlotEngineSlotPropsFile;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
   /** Re-apply `data-codalyn-beacon-prop` on the component definition from current Engine “Expose” + bindings. */
-  onResyncEngineSlotAttrs: (slotIndex: number) => void;
+  onResyncEngineSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
   resyncingEngineSlotKey: string | null;
+  /** Index-aligned with `selected`; from runtime JSON `n[]` (null while loading). */
+  enginePublishedDisplayNames: string[] | null;
+  onRenamePublishedDisplayName: (rowKey: string, nextName: string) => void;
+  renamingPublishedSlotKey: string | null;
 };
 
 export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
@@ -66,6 +70,9 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     onSetSlotExposed,
     onResyncEngineSlotAttrs,
     resyncingEngineSlotKey,
+    enginePublishedDisplayNames,
+    onRenamePublishedDisplayName,
+    renamingPublishedSlotKey,
   } = props;
 
   const listTargetActionBusy =
@@ -133,6 +140,9 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
                   key={row.key}
                   row={row}
                   slotIndex={slotIndex}
+                  publishedDisplayName={enginePublishedDisplayNames?.[slotIndex] ?? row.name}
+                  onRenamePublishedDisplayName={onRenamePublishedDisplayName}
+                  renamingPublishedSlotKey={renamingPublishedSlotKey}
                   available={composableByKey[row.key] ?? []}
                   slotExposed={engineSlotProps.slots[slotIndex]?.exposed ?? []}
                   composableLoading={composableLoading}

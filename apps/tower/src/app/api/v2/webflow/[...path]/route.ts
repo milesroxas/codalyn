@@ -39,14 +39,14 @@ async function forward(req: Request, segments: string[]) {
   if (badPath) {
     return badPath;
   }
-  const webflowToken = await resolveWebflowBearerToken({ userId: auth.userId });
+  const webflowToken = await resolveWebflowBearerToken({ userId: auth.userId, request: req });
   if (!webflowToken) {
     return Response.json(
       {
         error: "No Webflow access token available",
         hint: hasWebflowOAuthCredentials()
-          ? "Sign in to Tower and connect Webflow (POST /api/integrations/webflow/authorize from Beacon, or the dashboard flow) so an access token is stored for your user."
-          : "Configure Webflow OAuth (WEBFLOW_CLIENT_ID, WEBFLOW_CLIENT_SECRET, optional WEBFLOW_REDIRECT_URI override) and connect your account from Beacon.",
+          ? "Choose your team workspace in Tower, then have a workspace admin connect Webflow (or use the admin dashboard / Beacon flow) so an access token is stored for that workspace."
+          : "Configure Webflow OAuth (WEBFLOW_CLIENT_ID, WEBFLOW_CLIENT_SECRET, optional WEBFLOW_REDIRECT_URI override) and connect from Tower.",
       },
       { status: 503 }
     );

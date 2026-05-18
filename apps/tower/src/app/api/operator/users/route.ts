@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorUserListResponse, OperatorUserRow } from "@/server/operator/types";
 import { db } from "@/shared/lib/db";
-import { member, user, webflowOAuthToken } from "@/shared/lib/db/auth-schema";
+import { member, organizationWebflowOAuthToken, user } from "@/shared/lib/db/auth-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +99,7 @@ export async function GET(req: Request): Promise<NextResponse<OperatorUserListRe
         canCreateOrganization: user.canCreateOrganization,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
-        webflowConnected: sql<boolean>`EXISTS(SELECT 1 FROM ${webflowOAuthToken} WHERE ${webflowOAuthToken.userId} = ${user.id})`,
+        webflowConnected: sql<boolean>`EXISTS(SELECT 1 FROM ${member} INNER JOIN ${organizationWebflowOAuthToken} ON ${organizationWebflowOAuthToken.organizationId} = ${member.organizationId} WHERE ${member.userId} = ${user.id})`,
         memberships: sql<number>`COALESCE((SELECT COUNT(*) FROM ${member} WHERE ${member.userId} = ${user.id}), 0)`,
       })
       .from(user)

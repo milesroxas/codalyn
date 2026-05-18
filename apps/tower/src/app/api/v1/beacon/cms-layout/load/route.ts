@@ -49,7 +49,7 @@ async function handleLoadRequest(req: Request, userId: string): Promise<Response
     );
   }
 
-  const webflowToken = await resolveWebflowBearerToken({ userId });
+  const webflowToken = await resolveWebflowBearerToken({ userId, request: req });
   if (!webflowToken) {
     return Response.json({ code: "NO_WEBFLOW_TOKEN", message: "Connect Webflow in Tower first." }, { status: 503 });
   }

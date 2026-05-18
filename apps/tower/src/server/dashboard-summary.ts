@@ -72,7 +72,7 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
     ? await isTowerTeamAdminMemberOfOrg(userId, activeOrganizationId)
     : false;
 
-  const token = await resolveWebflowBearerToken({ userId });
+  const token = await resolveWebflowBearerToken({ userId, requestHeaders: await headers() });
   const webflowOAuthConnected = Boolean(token);
 
   let webflowSites: { id: string; displayName?: string }[] | null = null;

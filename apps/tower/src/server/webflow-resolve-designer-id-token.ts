@@ -1,7 +1,5 @@
-import { eq } from "drizzle-orm";
 import { auth } from "@/server/auth";
-import { db } from "@/shared/lib/db";
-import { webflowOAuthToken } from "@/shared/lib/db/auth-schema";
+import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 
 const RESOLVE_URL = "https://api.webflow.com/beta/token/resolve";
 
@@ -58,12 +56,7 @@ export async function resolveWebflowDesignerIdToken(
 export async function pickBearerForWebflowIdTokenResolve(request: Request): Promise<string | undefined> {
   const session = await auth.api.getSession({ headers: request.headers });
   if (session?.user?.id) {
-    const rows = await db
-      .select({ accessToken: webflowOAuthToken.accessToken })
-      .from(webflowOAuthToken)
-      .where(eq(webflowOAuthToken.userId, session.user.id))
-      .limit(1);
-    const t = rows[0]?.accessToken?.trim();
+    const t = await resolveWebflowBearerToken({ userId: session.user.id, requestHeaders: request.headers });
     if (t) {
       return t;
     }

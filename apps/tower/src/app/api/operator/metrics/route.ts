@@ -9,7 +9,7 @@ import {
   organization,
   session as sessionTable,
   user,
-  webflowOAuthToken,
+  organizationWebflowOAuthToken,
 } from "@/shared/lib/db/auth-schema";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +53,7 @@ export async function GET(): Promise<NextResponse<OperatorMetrics | { error: str
     db.select({ total: count() }).from(user).where(eq(user.banned, true)),
     db.select({ total: count() }).from(organization),
     db.select({ total: count() }).from(invitation).where(eq(invitation.status, "pending")),
-    db.select({ total: count() }).from(webflowOAuthToken),
+    db.select({ total: count() }).from(organizationWebflowOAuthToken),
     db.select({ total: count() }).from(sessionTable).where(gt(sessionTable.expiresAt, now)),
     db.select({ total: count() }).from(user).where(gt(user.createdAt, days7)),
     db.select({ total: count() }).from(user).where(gt(user.createdAt, days30)),

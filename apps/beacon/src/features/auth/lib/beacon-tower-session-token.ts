@@ -1,6 +1,6 @@
 /**
  * Better Auth session token (bearer plugin) for Tower — not the Webflow Data API OAuth access token.
- * Webflow OAuth tokens live only on Tower (Postgres `webflow_oauth_token` after the code exchange).
+ * Webflow OAuth tokens live only on Tower (Postgres `organization_webflow_oauth_token` after the code exchange).
  */
 export const BEACON_TOWER_SESSION_TOKEN_KEY = "codalyn:beacon-tower-session-token";
 

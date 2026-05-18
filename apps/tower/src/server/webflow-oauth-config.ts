@@ -29,3 +29,15 @@ export function resolveWebflowOAuthRedirectUri(): string {
   }
   return `${resolveConfiguredAppUrl()}/api/integrations/webflow/callback`;
 }
+
+/** First-party dashboard OAuth: state + active workspace id (httpOnly). */
+export const WEBFLOW_OAUTH_STATE_COOKIE = "wf_oauth_state";
+export const WEBFLOW_OAUTH_ORG_COOKIE = "wf_oauth_org";
+
+export const webflowOAuthPkceCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  maxAge: 600,
+  path: "/",
+};

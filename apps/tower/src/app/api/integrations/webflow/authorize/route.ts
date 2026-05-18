@@ -1,10 +1,17 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
+import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { towerCorsHeadersFor } from "@/server/tower-cors";
 import { canTowerUserManageWebflowOAuthViaDashboard } from "@/server/tower-webflow-oauth-team-admin";
-import { resolveWebflowOAuthAppUrl, resolveWebflowOAuthRedirectUri } from "@/server/webflow-oauth-config";
-import { hasWebflowOAuthCredentials, resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
+import {
+  resolveWebflowOAuthAppUrl,
+  resolveWebflowOAuthRedirectUri,
+  WEBFLOW_OAUTH_ORG_COOKIE,
+  WEBFLOW_OAUTH_STATE_COOKIE,
+  webflowOAuthPkceCookieOptions,
+} from "@/server/webflow-oauth-config";
+import { hasWebflowOAuthCredentials } from "@/server/webflow-proxy-token";
 import { db } from "@/shared/lib/db";
 import { webflowOauthAuthorizeState } from "@/shared/lib/db/auth-schema";
 
@@ -41,10 +48,7 @@ export async function OPTIONS(request: Request) {
   return new Response(null, { status: 204, headers });
 }
 
-/** Dashboard / first-party: redirect to Webflow OAuth (state cookie + session cookie).
- * Team admins (`owner` / `admin` on active workspace) may always start OAuth.
- * Other roles may only use this GET when they have no stored token yet (e.g. Beacon popup onboarding); relink uses POST from the extension or Tower admin UI.
- */
+/** Dashboard / first-party: redirect to Webflow OAuth (state cookie + session cookie). Team admin/owner on active workspace only. */
 export async function GET(request: Request) {
   if (!hasWebflowOAuthCredentials()) {
     return Response.json(
@@ -65,23 +69,20 @@ export async function GET(request: Request) {
 
   const allowed = await canTowerUserManageWebflowOAuthViaDashboard(session.user.id, request.headers);
   if (!allowed) {
-    const existingToken = await resolveWebflowBearerToken({ userId: session.user.id });
-    if (existingToken) {
-      return NextResponse.redirect(`${appUrl}/?webflow=team_admin_required`);
-    }
+    return NextResponse.redirect(`${appUrl}/?webflow=team_admin_required`);
+  }
+
+  const activeOrganizationId = await getActiveOrganizationIdForAuthHeaders(request.headers);
+  if (!activeOrganizationId) {
+    return NextResponse.redirect(`${appUrl}/?webflow=no_active_workspace`);
   }
 
   let url: string;
   try {
     const state = crypto.randomUUID();
     const cookieStore = await cookies();
-    cookieStore.set("wf_oauth_state", state, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 600,
-      path: "/",
-    });
+    cookieStore.set(WEBFLOW_OAUTH_STATE_COOKIE, state, webflowOAuthPkceCookieOptions);
+    cookieStore.set(WEBFLOW_OAUTH_ORG_COOKIE, activeOrganizationId, webflowOAuthPkceCookieOptions);
     url = buildWebflowAuthorizeUrl(state);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "oauth_url_failed";
@@ -92,8 +93,8 @@ export async function GET(request: Request) {
 }
 
 /**
- * Designer extension: JSON `{ url }` + server-side `state` → user mapping (Bearer session).
- * Avoids relying on OAuth popup having a Tower session cookie.
+ * Designer extension: JSON `{ url }` + server-side `state` → user + workspace mapping (Bearer session).
+ * Team admin/owner on active workspace only.
  */
 export async function POST(request: Request) {
   const corsHeaders = towerCorsHeadersFor(request);
@@ -116,11 +117,22 @@ export async function POST(request: Request) {
     return Response.json({ error: "unauthorized" }, { status: 401, headers: jsonHeaders });
   }
 
+  const activeOrganizationId = await getActiveOrganizationIdForAuthHeaders(request.headers);
+  if (!activeOrganizationId) {
+    return Response.json({ error: "no_active_workspace" }, { status: 400, headers: jsonHeaders });
+  }
+
+  const allowed = await canTowerUserManageWebflowOAuthViaDashboard(session.user.id, request.headers);
+  if (!allowed) {
+    return Response.json({ error: "team_admin_required" }, { status: 403, headers: jsonHeaders });
+  }
+
   try {
     const state = crypto.randomUUID();
     await db.insert(webflowOauthAuthorizeState).values({
       state,
       userId: session.user.id,
+      organizationId: activeOrganizationId,
     });
     const url = buildWebflowAuthorizeUrl(state);
     return Response.json({ url }, { headers: jsonHeaders });

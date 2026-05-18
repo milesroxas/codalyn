@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const webflowToken = await resolveWebflowBearerToken({ userId: auth.userId });
+  const webflowToken = await resolveWebflowBearerToken({ userId: auth.userId, request: req });
   if (!webflowToken) {
     return Response.json({ code: "NO_WEBFLOW_TOKEN", message: "Connect Webflow in Tower first." }, { status: 503 });
   }

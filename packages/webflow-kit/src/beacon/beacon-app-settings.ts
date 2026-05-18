@@ -75,7 +75,7 @@ export type BeaconAppSettings = z.infer<typeof beaconAppSettingsSchema>;
 export function getDefaultBeaconAppSettings(): BeaconAppSettings {
   return {
     version: 1,
-    theme: "system",
+    theme: "dark",
     defaultExportFormat: DEFAULT_IMAGE_EXPORT_FORMAT,
     defaultExportQuality: 0.75,
     defaultAspectPreset: "free",

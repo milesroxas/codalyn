@@ -1,6 +1,7 @@
 import { IconPlug, IconRadar2, IconUsers } from "@tabler/icons-react";
 import Link from "next/link";
 import { BeaconDashboardActivity } from "@/features/beacon/ui/beacon-dashboard-activity";
+import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
 import type { TowerDashboardSummary } from "@/server/dashboard-summary";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -78,15 +79,9 @@ export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) 
                 <Badge variant="outline">Not connected</Badge>
               )}
               {summary.canManageWebflowOAuth ? (
-                !summary.webflowOAuthConnected ? (
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/api/integrations/webflow/authorize">Connect Webflow</Link>
-                  </Button>
-                ) : (
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/api/integrations/webflow/authorize">Relink Webflow</Link>
-                  </Button>
-                )
+                <TowerWebflowOAuthPopupButton>
+                  {summary.webflowOAuthConnected ? "Relink Webflow" : "Connect Webflow"}
+                </TowerWebflowOAuthPopupButton>
               ) : null}
             </div>
             {summary.webflowOAuthConnected && summary.webflowSites !== null ? (

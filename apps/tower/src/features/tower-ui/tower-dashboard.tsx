@@ -77,10 +77,16 @@ export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) 
               ) : (
                 <Badge variant="outline">Not connected</Badge>
               )}
-              {!summary.webflowOAuthConnected ? (
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/api/integrations/webflow/authorize">Connect Webflow</Link>
-                </Button>
+              {summary.canManageWebflowOAuth ? (
+                !summary.webflowOAuthConnected ? (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/api/integrations/webflow/authorize">Connect Webflow</Link>
+                  </Button>
+                ) : (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/api/integrations/webflow/authorize">Relink Webflow</Link>
+                  </Button>
+                )
               ) : null}
             </div>
             {summary.webflowOAuthConnected && summary.webflowSites !== null ? (

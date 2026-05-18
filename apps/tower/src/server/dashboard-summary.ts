@@ -3,6 +3,7 @@ import { and, desc, eq, gt } from "drizzle-orm";
 import { headers } from "next/headers";
 import { auth } from "@/server/auth";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
+import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
 import { db } from "@/shared/lib/db";
 import { organization, session as sessionTable } from "@/shared/lib/db/auth-schema";
 
@@ -13,6 +14,8 @@ export type TowerDashboardSummary = {
   activeOrganizationName: string | null;
   webflowOAuthConnected: boolean;
   webflowSites: { id: string; displayName?: string }[] | null;
+  /** Workspace `admin` / `owner` on the active org — may connect or relink Webflow OAuth for the signed-in user. */
+  canManageWebflowOAuth: boolean;
 };
 
 export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary> {
@@ -28,6 +31,7 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
       activeOrganizationName: null,
       webflowOAuthConnected: false,
       webflowSites: null,
+      canManageWebflowOAuth: false,
     };
   }
 
@@ -61,6 +65,11 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
     activeOrganizationName = orgRows[0]?.name ?? null;
   }
 
+  let canManageWebflowOAuth = false;
+  if (activeOrganizationId) {
+    canManageWebflowOAuth = await isTowerTeamAdminMemberOfOrg(userId, activeOrganizationId);
+  }
+
   const token = await resolveWebflowBearerToken({ userId });
   const webflowOAuthConnected = Boolean(token);
 
@@ -86,5 +95,6 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
     activeOrganizationName,
     webflowOAuthConnected,
     webflowSites,
+    canManageWebflowOAuth,
   };
 }

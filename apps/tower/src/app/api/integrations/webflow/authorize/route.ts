@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { towerCorsHeadersFor } from "@/server/tower-cors";
 import { resolveWebflowOAuthAppUrl, resolveWebflowOAuthRedirectUri } from "@/server/webflow-oauth-config";
-import { hasWebflowOAuthCredentials } from "@/server/webflow-proxy-token";
+import { hasWebflowOAuthCredentials, resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
+import { canTowerUserManageWebflowOAuthViaDashboard } from "@/server/tower-webflow-oauth-team-admin";
 import { db } from "@/shared/lib/db";
 import { webflowOauthAuthorizeState } from "@/shared/lib/db/auth-schema";
 
@@ -40,7 +41,10 @@ export async function OPTIONS(request: Request) {
   return new Response(null, { status: 204, headers });
 }
 
-/** Dashboard / first-party: redirect to Webflow OAuth (state cookie + session cookie). */
+/** Dashboard / first-party: redirect to Webflow OAuth (state cookie + session cookie).
+ * Team admins (`owner` / `admin` on active workspace) may always start OAuth.
+ * Other roles may only use this GET when they have no stored token yet (e.g. Beacon popup onboarding); relink uses POST from the extension or Tower admin UI.
+ */
 export async function GET(request: Request) {
   if (!hasWebflowOAuthCredentials()) {
     return Response.json(
@@ -57,6 +61,14 @@ export async function GET(request: Request) {
     return NextResponse.redirect(
       `${appUrl}/sign-in?callbackUrl=${encodeURIComponent("/api/integrations/webflow/authorize")}`
     );
+  }
+
+  const allowed = await canTowerUserManageWebflowOAuthViaDashboard(session.user.id, request.headers);
+  if (!allowed) {
+    const existingToken = await resolveWebflowBearerToken({ userId: session.user.id });
+    if (existingToken) {
+      return NextResponse.redirect(`${appUrl}/?webflow=team_admin_required`);
+    }
   }
 
   let url: string;

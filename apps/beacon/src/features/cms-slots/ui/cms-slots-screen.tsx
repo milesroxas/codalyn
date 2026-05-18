@@ -525,7 +525,10 @@ export function CmsSlotsScreen() {
   const [pageRuntimeStatusLoading, setPageRuntimeStatusLoading] = useState(true);
   const [pageRuntimeSynced, setPageRuntimeSynced] = useState(false);
   const [pageRuntimeSyncReason, setPageRuntimeSyncReason] = useState<string | undefined>(undefined);
-  /** Hash can match while Engine still changed beacon contents; user must Sync to acknowledge. */
+  /**
+   * True when Engine slot composition metadata changed before canvas attrs / footer script reflect it.
+   * Cleared after successful “Tag data attributes” or footer Sync.
+   */
   const [engineListCompositionStale, setEngineListCompositionStale] = useState(false);
 
   const isEngine = segment === "engine";
@@ -552,6 +555,34 @@ export function CmsSlotsScreen() {
     initialSignature: string;
   } | null>(null);
   composerStudioRef.current = composerStudio;
+
+  /** Latest engine rows — avoids stale closures inside queued slot-prop writes. */
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+
+  /**
+   * Serializes `data-beacon-engine-slot-props` writes so “Tag data attributes” reads the same exposed props the UI
+   * just persisted (no read-before-write race on rapid checkbox + Tag).
+   */
+  const slotPropsWriteTailRef = useRef(Promise.resolve<void>(undefined));
+  const withSlotPropsWriteExclusive = useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {
+    const prev = slotPropsWriteTailRef.current;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    slotPropsWriteTailRef.current = gate;
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }, []);
+
+  const awaitSlotPropsWritesIdle = useCallback(async () => {
+    await slotPropsWriteTailRef.current;
+  }, []);
 
   const refreshPageBeacons = useCallback(async () => {
     setPageScanLoading(true);
@@ -981,34 +1012,44 @@ export function CmsSlotsScreen() {
 
   const handleSetEngineSlotExposed = useCallback(
     async (slotIndex: number, exposed: ComposableInstancePropMeta[]) => {
-      const container = targetRef.current;
-      if (container == null) return;
-      const n = selected.length;
-      const f = await readCmsSlotEngineSlotPropsFile(container, n);
-      const nextSlots = f.slots.slice(0, n);
-      while (nextSlots.length < n) {
-        nextSlots.push({ exposed: [] });
-      }
-      nextSlots[slotIndex] = { exposed: [...exposed] };
-      const out: CmsSlotEngineSlotPropsFile = { v: 1, slots: nextSlots };
-      await writeCmsSlotEngineSlotPropsFile(container, out);
-      setEngineListSlotFile(out);
-      setEngineListCompositionStale(true);
+      await withSlotPropsWriteExclusive(async () => {
+        const container = targetRef.current;
+        if (container == null) {
+          return;
+        }
+        const n = selectedRef.current.length;
+        const f = await readCmsSlotEngineSlotPropsFile(container, n);
+        const nextSlots = f.slots.slice(0, n);
+        while (nextSlots.length < n) {
+          nextSlots.push({ exposed: [] });
+        }
+        nextSlots[slotIndex] = { exposed: [...exposed] };
+        const out: CmsSlotEngineSlotPropsFile = { v: 1, slots: nextSlots };
+        await writeCmsSlotEngineSlotPropsFile(container, out);
+        setEngineListSlotFile(out);
+        setEngineListCompositionStale(true);
+      });
     },
-    [selected]
+    [withSlotPropsWriteExclusive]
   );
 
   const handleResyncEngineSlotAttrs = useCallback(
     async (slotIndex: number) => {
-      return await resyncEngineSlotPropAttributesForSlotIndex({
+      await awaitSlotPropsWritesIdle();
+      const ok = await resyncEngineSlotPropAttributesForSlotIndex({
         slotIndex,
         selected,
         container: targetRef.current,
         setResyncingEngineSlotKey,
         setSelected,
       });
+      if (ok) {
+        setEngineListCompositionStale(false);
+        void refreshPageBeacons();
+      }
+      return ok;
     },
-    [selected]
+    [selected, awaitSlotPropsWritesIdle, refreshPageBeacons]
   );
 
   const handleRenamePublishedDisplayName = useCallback(
@@ -1068,44 +1109,57 @@ export function CmsSlotsScreen() {
     setComposerDraft((prev) => prev.filter((r) => r.key !== key));
   }, []);
 
-  const handleComposerSave = async () => {
-    if (composerSavePending || composerStudio == null) return;
-    if (cmsSlotCompositionSignature(composerDraft) === composerStudio.initialSignature) {
-      return;
-    }
-    if (composerDraft.length === 0) {
-      void webflow.notify({ type: "Error", message: "Add at least one component before saving." });
-      return;
-    }
-    setComposerSavePending(true);
-    try {
-      await executeCmsSlotComposerSave({
-        beacon: composerStudio.beacon,
-        composerDraft,
-        composerAllowedPalette,
-        composerEngineComposable,
-        currentCmsItemId,
-        listTargetDefinitionIdRef,
-        setters: {
-          setComposerDraft,
-          setComposerStudio,
-          setComposerEngineRows,
-          setComposerEngineComposable,
-          setComposerSlotProps,
-        },
-        onCompleteSideEffects: () => {
-          setEngineListCompositionStale(false);
-          void refreshPageBeacons();
-          void loadComposerEligible();
-        },
-      });
-    } catch (err) {
-      const message = formatWebflowDesignerError(err);
-      void webflow.notify({ type: "Error", message });
-    } finally {
-      setComposerSavePending(false);
-    }
-  };
+  const handleComposerSave = useCallback(
+    async (draftOverride?: CmsSlotCompositionDraftRow[]) => {
+      const draftToSave = draftOverride ?? composerDraft;
+      if (composerSavePending || composerStudio == null) return;
+      if (cmsSlotCompositionSignature(draftToSave) === composerStudio.initialSignature) {
+        return;
+      }
+      if (draftToSave.length === 0) {
+        void webflow.notify({ type: "Error", message: "Add at least one component before saving." });
+        return;
+      }
+      setComposerSavePending(true);
+      try {
+        await executeCmsSlotComposerSave({
+          beacon: composerStudio.beacon,
+          composerDraft: draftToSave,
+          composerAllowedPalette,
+          composerEngineComposable,
+          currentCmsItemId,
+          listTargetDefinitionIdRef,
+          setters: {
+            setComposerDraft,
+            setComposerStudio,
+            setComposerEngineRows,
+            setComposerEngineComposable,
+            setComposerSlotProps,
+          },
+          onCompleteSideEffects: () => {
+            setEngineListCompositionStale(false);
+            void refreshPageBeacons();
+            void loadComposerEligible();
+          },
+        });
+      } catch (err) {
+        const message = formatWebflowDesignerError(err);
+        void webflow.notify({ type: "Error", message });
+      } finally {
+        setComposerSavePending(false);
+      }
+    },
+    [
+      composerAllowedPalette,
+      composerDraft,
+      composerEngineComposable,
+      composerSavePending,
+      composerStudio,
+      currentCmsItemId,
+      loadComposerEligible,
+      refreshPageBeacons,
+    ]
+  );
 
   const handleAddComponent = async (c: ComponentSearchResult) => {
     if (selectedComponentIdSet.has(c.id)) return;

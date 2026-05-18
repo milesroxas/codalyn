@@ -1,4 +1,7 @@
-import { ensureCmsSlotListTargetSlotStyle } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
+import {
+  ensureCmsSlotListTargetLayoutStyle,
+  ensureCmsSlotListTargetSlotStyle,
+} from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
 import { tryAddCmsSlotListTargetTextPropDirectToDefinition } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
 import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
@@ -225,8 +228,11 @@ export async function applyCmsSlotListTargetSync(
         await dom.setAttribute(key, value);
       }
     }
-    const slotStyle = await ensureCmsSlotListTargetSlotStyle();
-    await dom.setStyles([slotStyle]);
+    const [slotStyle, layoutStyle] = await Promise.all([
+      ensureCmsSlotListTargetSlotStyle(),
+      ensureCmsSlotListTargetLayoutStyle(),
+    ]);
+    await dom.setStyles([slotStyle, layoutStyle]);
   });
 }
 
@@ -263,8 +269,11 @@ export async function createCmsSlotListTargetComponent(input: {
       root.setAttribute(k, v);
     }
 
-    const slotStyle = await ensureCmsSlotListTargetSlotStyle();
-    root.setStyles([slotStyle]);
+    const [slotStyle, layoutStyle] = await Promise.all([
+      ensureCmsSlotListTargetSlotStyle(),
+      ensureCmsSlotListTargetLayoutStyle(),
+    ]);
+    root.setStyles([slotStyle, layoutStyle]);
     root.setTextContent("");
 
     const registered = await webflow.registerComponent(

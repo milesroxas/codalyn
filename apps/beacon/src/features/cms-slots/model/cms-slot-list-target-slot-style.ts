@@ -1,28 +1,31 @@
 import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 
 /**
- * Class for the **list render target** component root (`div` with this class) — not the hidden beacon list
- * blocks in `beacons-wrapper`. Empty-slot look in the Designer: dotted border, subtle fill, flex grow.
+ * Class removed on live reveal: dotted border / fill for an empty-slot hint in the Designer.
+ * Do not set `display` here — the runtime strips this class when the list is shown so placeholder
+ * chrome does not ship; {@link CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME} stays on the element.
  */
 export const CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME = "beacon_list_render";
 
-async function applyBeaconListTargetSlotStyleProperties(style: Style): Promise<void> {
+/** Persists after live reveal: `display: contents` so cloned rows join ancestor flex/grid layout. */
+export const CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME = "beacon_list_layout";
+
+async function applyBeaconListTargetChromeStyleProperties(style: Style): Promise<void> {
   await style.setProperties({
-    display: "block",
-    width: "100%",
-    height: "100%",
     "box-sizing": "border-box",
     border: "1px dotted rgba(0, 0, 0, 0.22)",
     "background-color": "rgba(0, 0, 0, 0.04)",
-    flex: "1 1 0%",
-    "min-width": "0",
-    "align-self": "stretch",
+  });
+}
+
+async function applyBeaconListTargetLayoutStyleProperties(style: Style): Promise<void> {
+  await style.setProperties({
+    display: "contents !important",
   });
 }
 
 /**
- * Ensures the site has the **`beacon_list_render`** class (list render target only): dotted border, light fill, and
- * flex-friendly sizing so the target reads as an empty slot and grows when the parent is flex or grid.
+ * Ensures **`beacon_list_render`** exists (Designer-only list-target chrome).
  */
 export function ensureCmsSlotListTargetSlotStyle(): Promise<Style> {
   return runExclusiveDesignerStyleOp(async () => {
@@ -34,7 +37,24 @@ export function ensureCmsSlotListTargetSlotStyle(): Promise<Style> {
       }
     }
     const created = await webflow.createStyle(CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME);
-    await applyBeaconListTargetSlotStyleProperties(created);
+    await applyBeaconListTargetChromeStyleProperties(created);
+    return created;
+  });
+}
+
+/**
+ * Ensures **`beacon_list_layout`** exists (`display: contents !important`, not removed by the runtime).
+ */
+export function ensureCmsSlotListTargetLayoutStyle(): Promise<Style> {
+  return runExclusiveDesignerStyleOp(async () => {
+    const all = await webflow.getAllStyles();
+    for (const s of all) {
+      if ((await s.getName()) === CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME) {
+        return s;
+      }
+    }
+    const created = await webflow.createStyle(CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME);
+    await applyBeaconListTargetLayoutStyleProperties(created);
     return created;
   });
 }

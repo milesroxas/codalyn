@@ -3,6 +3,8 @@ import {
   clearBeaconTowerSessionToken,
   exchangeWebflowDesignerSession,
   readBeaconTowerSessionToken,
+  readSuppressDesignerSessionExchange,
+  setSuppressDesignerSessionExchange,
   writeBeaconTowerSessionToken,
 } from "@/features/auth/lib/webflow-designer-session";
 import { getTowerAuthBaseUrl, towerAuthClient } from "@/features/auth/model/tower-auth-client";
@@ -36,6 +38,7 @@ function handleTowerMessage(event: MessageEvent, towerOrigin: string, onSessionC
     return;
   }
   persistTowerSessionToken(data.token);
+  setSuppressDesignerSessionExchange(false);
   onSessionChanged();
 }
 
@@ -79,6 +82,7 @@ export function useBeaconTowerSession(): {
   const hasStoredSessionToken = Boolean(readBeaconTowerSessionToken());
 
   const clearStoredSession = useCallback(() => {
+    setSuppressDesignerSessionExchange(true);
     clearBeaconTowerSessionToken();
     void towerAuthClient.signOut({ fetchOptions: { credentials: "include" } }).then(() => refetch());
   }, [refetch]);
@@ -91,6 +95,9 @@ export function useBeaconTowerSession(): {
       return;
     }
     if (readBeaconTowerSessionToken()) {
+      return;
+    }
+    if (readSuppressDesignerSessionExchange()) {
       return;
     }
     let cancelled = false;

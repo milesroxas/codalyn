@@ -3,6 +3,7 @@ import {
   buildCmsSlotRuntimePropRow,
   type ComposableInstancePropMeta,
   mergeComposableMetaWithLiveResolved,
+  normalizeHeadingTagForPayload,
   pickRemappedPropValue,
 } from "@/features/cms-slots/model/cms-slot-composable-props";
 
@@ -38,6 +39,22 @@ describe("mergeComposableMetaWithLiveResolved", () => {
   });
 });
 
+describe("normalizeHeadingTagForPayload", () => {
+  it("maps option id via Webflow option label to h1..h6", () => {
+    const opts = [
+      { value: "wf-h1", label: "Heading 1" },
+      { value: "wf-h3", label: "H3" },
+    ];
+    expect(normalizeHeadingTagForPayload("wf-h1", opts)).toBe("h1");
+    expect(normalizeHeadingTagForPayload("wf-h3", opts)).toBe("h3");
+  });
+
+  it("accepts h1..h6 and single-digit levels", () => {
+    expect(normalizeHeadingTagForPayload("H1", undefined)).toBe("h1");
+    expect(normalizeHeadingTagForPayload("3", undefined)).toBe("h3");
+  });
+});
+
 describe("pickRemappedPropValue + buildCmsSlotRuntimePropRow", () => {
   it("resolves values from legacy keys and emits every exposed id", () => {
     const live = [E("new-id", "Headline", "string")];
@@ -57,5 +74,26 @@ describe("pickRemappedPropValue + buildCmsSlotRuntimePropRow", () => {
     expect(v).toBe("v");
     const row = buildCmsSlotRuntimePropRow({ propValues: { X: "v" } }, metas, aliasToCanonical);
     expect(row).toEqual({ x: "v" });
+  });
+
+  it("normalizes headingTag values in the runtime row using merged select options", () => {
+    const exposed: ComposableInstancePropMeta[] = [
+      {
+        propId: "tag",
+        label: "Level",
+        valueType: "headingTag",
+        selectOptions: [
+          { value: "opt-h1", label: "Heading 1" },
+          { value: "opt-h3", label: "Heading 3" },
+        ],
+      },
+    ];
+    const { metas, aliasToCanonical } = mergeComposableMetaWithLiveResolved(exposed, exposed);
+    expect(buildCmsSlotRuntimePropRow({ propValues: { tag: "opt-h1" } }, metas, aliasToCanonical)).toEqual({
+      tag: "h1",
+    });
+    expect(buildCmsSlotRuntimePropRow({ propValues: { tag: "h2" } }, metas, aliasToCanonical)).toEqual({
+      tag: "h2",
+    });
   });
 });

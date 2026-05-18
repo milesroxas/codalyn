@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/features/cms-slots/model/cms-slot-list-target-slot-style", () => ({
   ensureCmsSlotListTargetSlotStyle: vi.fn().mockResolvedValue({ id: "mock-slot" }),
+  ensureCmsSlotListTargetLayoutStyle: vi.fn().mockResolvedValue({ id: "mock-layout" }),
 }));
 
 import {

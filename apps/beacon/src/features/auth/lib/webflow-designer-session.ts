@@ -6,6 +6,29 @@ import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
  */
 export const BEACON_TOWER_SESSION_TOKEN_KEY = "codalyn:beacon-tower-session-token";
 
+/** When set, skip silent hybrid re-auth so explicit sign-out is not undone by `exchangeWebflowDesignerSession`. */
+export const BEACON_TOWER_SUPPRESS_DESIGNER_EXCHANGE_KEY = "codalyn:beacon-tower-suppress-designer-exchange";
+
+export function readSuppressDesignerSessionExchange(): boolean {
+  try {
+    return localStorage.getItem(BEACON_TOWER_SUPPRESS_DESIGNER_EXCHANGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setSuppressDesignerSessionExchange(suppress: boolean): void {
+  try {
+    if (suppress) {
+      localStorage.setItem(BEACON_TOWER_SUPPRESS_DESIGNER_EXCHANGE_KEY, "1");
+    } else {
+      localStorage.removeItem(BEACON_TOWER_SUPPRESS_DESIGNER_EXCHANGE_KEY);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export function readBeaconTowerSessionToken(): string | undefined {
   try {
     const fromLocal = localStorage.getItem(BEACON_TOWER_SESSION_TOKEN_KEY)?.trim();

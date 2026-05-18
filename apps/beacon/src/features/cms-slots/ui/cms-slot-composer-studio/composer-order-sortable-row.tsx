@@ -12,13 +12,15 @@ export type ComposerOrderSortableRowProps = {
   row: CmsSlotCompositionDraftRow;
   meta: CmsSlotComposerRowMeta | undefined;
   busy: boolean;
+  composerDraft: CmsSlotCompositionDraftRow[];
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
   onRenameSlot: (rowKey: string, name: string) => void;
+  onPersistComposerSlot?: (merged: CmsSlotCompositionDraftRow[]) => void | Promise<void>;
   onRemove: (key: string) => void;
 };
 
 export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
-  const { row, meta, busy, onChangePropValue, onRenameSlot, onRemove } = props;
+  const { row, meta, busy, composerDraft, onChangePropValue, onRenameSlot, onPersistComposerSlot, onRemove } = props;
   const exposed = meta?.exposed ?? [];
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.key,
@@ -56,6 +58,8 @@ export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
           row={row}
           exposed={exposed}
           disabled={busy}
+          compositionDraft={composerDraft}
+          onPersistComposerSlot={onPersistComposerSlot}
           onRename={onRenameSlot}
           onChangePropValue={onChangePropValue}
         />

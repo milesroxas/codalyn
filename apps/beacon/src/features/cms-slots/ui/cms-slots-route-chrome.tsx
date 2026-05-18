@@ -105,7 +105,7 @@ export type CmsSlotsRouteChromeProps = {
   onComposerReorderDraft: (fromIndex: number, toIndex: number) => void;
   onComposerRemoveDraft: (key: string) => void;
   onComposerStudioBack: () => void;
-  onComposerSave: () => void | Promise<void>;
+  onComposerSave: (draftOverride?: CmsSlotCompositionDraftRow[]) => void | Promise<void>;
   composerSavePending: boolean;
   onSyncInstallEmbed: () => void | Promise<void>;
   embedSyncPending: boolean;
@@ -243,7 +243,7 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
           onReorder={p.onComposerReorderDraft}
           onRemove={p.onComposerRemoveDraft}
           onBack={p.onComposerStudioBack}
-          onSave={() => void p.onComposerSave()}
+          onSave={(draftOverride) => void p.onComposerSave(draftOverride)}
           savePending={p.composerSavePending}
           pageRuntimeStatusLoading={p.pageRuntimeStatusLoading}
           pageRuntimeSynced={p.syncShellOk}

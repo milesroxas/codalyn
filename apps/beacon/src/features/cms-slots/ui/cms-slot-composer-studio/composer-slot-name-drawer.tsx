@@ -34,6 +34,9 @@ export type ComposerSlotNameDrawerProps = {
   row: CmsSlotCompositionDraftRow;
   exposed: ComposableInstancePropMeta[];
   disabled?: boolean;
+  /** Full Composer draft (Studio only). When set with {@link onPersistComposerSlot}, drawer Save persists like header Save. */
+  compositionDraft?: CmsSlotCompositionDraftRow[];
+  onPersistComposerSlot?: (merged: CmsSlotCompositionDraftRow[]) => void | Promise<void>;
   /** Optional className for the row title trigger (e.g. contrast on dark Engine chrome). */
   triggerClassName?: string;
   drawerTitle?: string;
@@ -77,6 +80,8 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
     row,
     exposed,
     disabled,
+    compositionDraft,
+    onPersistComposerSlot,
     triggerClassName,
     drawerTitle = "Edit Content",
     slotNameFieldLabel = "Slot name",
@@ -133,13 +138,18 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
     [draft, exposedPropIds, open, row.name, row.propValues]
   );
 
-  const applySaveClose = useCallback(() => {
+  const applySaveClose = useCallback(async () => {
     const clipped = draft.slice(0, CMS_SLOT_ROW_NAME_MAX);
     const t = clipped.trim();
-    onRename(row.key, t !== "" ? t : row.name.trim() || "Untitled");
+    const resolvedName = t !== "" ? t : row.name.trim() || "Untitled";
+    onRename(row.key, resolvedName);
     setCloseBeforeSaveDialogOpen(false);
     setOpen(false);
-  }, [draft, onRename, row.key, row.name]);
+    if (compositionDraft != null && onPersistComposerSlot != null) {
+      const merged = compositionDraft.map((r) => (r.key === row.key ? { ...r, name: resolvedName } : r));
+      await onPersistComposerSlot(merged);
+    }
+  }, [compositionDraft, draft, onPersistComposerSlot, onRename, row.key, row.name]);
 
   const handleDiscardComposerEditsClose = useCallback(() => {
     const b = baselineRef.current;
@@ -237,7 +247,7 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
               type="button"
               className="w-full"
               disabled={disabled || !hasUnsavedComposerEdits}
-              onClick={applySaveClose}
+              onClick={() => void applySaveClose()}
             >
               Save
             </Button>
@@ -271,7 +281,13 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
             >
               Discard edits
             </AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={applySaveClose}>
+            <AlertDialogAction
+              type="button"
+              onClick={(ev) => {
+                ev.preventDefault();
+                void applySaveClose();
+              }}
+            >
               Save
             </AlertDialogAction>
           </AlertDialogFooter>

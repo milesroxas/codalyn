@@ -66,7 +66,8 @@ const STUDIO_FIELD_BY_VALUE_TYPE: Readonly<Partial<Record<string, CmsSlotStudioP
   phone: "tel",
   file: "image",
   number: "number",
-  headingTag: "number",
+  /** `selectOptions` from Webflow supplies the control; fallback is a plain line input. */
+  headingTag: "line",
   boolean: "boolean",
   image: "image",
   imageAsset: "image",
@@ -86,6 +87,50 @@ const STUDIO_FIELD_BY_VALUE_TYPE: Readonly<Partial<Record<string, CmsSlotStudioP
  */
 export function cmsSlotStudioFieldKindForValueType(valueType: string): CmsSlotStudioPropFieldKind {
   return STUDIO_FIELD_BY_VALUE_TYPE[valueType] ?? "line";
+}
+
+const HEADING_LEVEL_IN_TAG_RE = /^h([1-6])$/i;
+
+/**
+ * Maps Webflow heading-tag prop values to `h1`..`h6` in the list runtime JSON so the footer script can apply levels
+ * without duplicating option-id tables in the minified runtime.
+ */
+export function normalizeHeadingTagForPayload(
+  raw: string,
+  selectOptions?: readonly ComposableInstancePropSelectOption[] | undefined
+): string {
+  const t = String(raw ?? "").trim();
+  if (t === "") {
+    return "";
+  }
+  const asTag = t.match(HEADING_LEVEL_IN_TAG_RE);
+  if (asTag != null) {
+    return `h${asTag[1]}`;
+  }
+  if (/^[1-6]$/.test(t)) {
+    return `h${t}`;
+  }
+  const opt = selectOptions?.find((o) => o.value === t);
+  if (opt != null) {
+    const fromLabel = headingLevelFromOptionLabel(opt.label);
+    if (fromLabel != null) {
+      return fromLabel;
+    }
+  }
+  return t;
+}
+
+function headingLevelFromOptionLabel(label: string): string | undefined {
+  const s = label.trim();
+  const direct = s.match(HEADING_LEVEL_IN_TAG_RE);
+  if (direct) {
+    return `h${direct[1]}`;
+  }
+  const fromHeadingWord = s.match(/heading\D*([1-6])\b/i);
+  if (fromHeadingWord) {
+    return `h${fromHeadingWord[1]}`;
+  }
+  return undefined;
 }
 
 /**
@@ -224,7 +269,11 @@ export function buildCmsSlotRuntimePropRow(
 ): Record<string, string> {
   const o: Record<string, string> = {};
   for (const ep of metas) {
-    o[ep.propId] = String(pickRemappedPropValue(ep.propId, d.propValues ?? undefined, aliasToCanonical) ?? "");
+    let v = String(pickRemappedPropValue(ep.propId, d.propValues ?? undefined, aliasToCanonical) ?? "");
+    if (ep.valueType === "headingTag") {
+      v = normalizeHeadingTagForPayload(v, ep.selectOptions);
+    }
+    o[ep.propId] = v;
   }
   return o;
 }

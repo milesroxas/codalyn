@@ -15,7 +15,7 @@ export type CmsSlotComposerStudioPanelProps = {
   onReorder: (fromIndex: number, toIndex: number) => void;
   onRemove: (key: string) => void;
   onBack: () => void;
-  onSave: () => void;
+  onSave: (draftOverride?: CmsSlotCompositionDraftRow[]) => void | Promise<void>;
   savePending: boolean;
   pageRuntimeStatusLoading: boolean;
   pageRuntimeSynced: boolean;
@@ -75,9 +75,11 @@ export function CmsSlotComposerStudioPanel(props: CmsSlotComposerStudioPanelProp
 
       <ComposerOrderSection
         draft={draft}
+        composerDraft={draft}
         rowMeta={rowMeta}
         onChangePropValue={onChangePropValue}
         onRenameSlot={onRenameSlot}
+        onPersistComposerSlot={(merged) => void onSave(merged)}
         busy={busy}
         onReorder={onReorder}
         onRemove={onRemove}

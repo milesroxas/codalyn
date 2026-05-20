@@ -1,12 +1,16 @@
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { BeaconFeatureRouteHeader } from "@/app/ui/beacon-feature-route-chrome";
 import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { BeaconTowerNotConfiguredNotice } from "@/features/auth/ui/beacon-tower-not-configured-notice";
 import { BeaconTowerSignInPrompt } from "@/features/auth/ui/beacon-tower-sign-in-prompt";
+import { CmsSlotsCollectionTemplateGatePrompt } from "@/features/cms-slots/ui/cms-slots-collection-template-prompt";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { beaconAppRouteSurfaceClass } from "@/shared/lib/beacon-app-route-surface";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
+import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 import { Button } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
@@ -23,11 +27,35 @@ function AccessGateLoadingStatus(props: { message: string }) {
   );
 }
 
+function CmsSlotsCollectionTemplateBlocked() {
+  const navigate = useNavigate();
+
+  return (
+    <div className={beaconAppRouteSurfaceClass}>
+      <BeaconFeatureRouteHeader title={CMS_SLOTS_FEATURE_NAME} onBack={() => navigate("/home")} />
+      <ScrollArea className="min-h-0 min-w-0 flex-1">
+        <div className="flex min-h-full min-w-0 flex-col items-center justify-center px-4 py-8">
+          <CmsSlotsCollectionTemplateGatePrompt />
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
 export function CmsSlotsAccessGate(props: { children: ReactNode }) {
   const { children } = props;
   const { user, isPending: sessionPending } = useBeaconTowerSession();
   const { syncState, refreshBeaconSettings } = useBeaconAppSettings();
+  const { ready: pageKindReady, isCmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
   const base = getTowerAuthBaseUrl();
+
+  if (!pageKindReady) {
+    return <AccessGateLoadingStatus message="Checking Designer page…" />;
+  }
+
+  if (!isCmsCollectionTemplatePage) {
+    return <CmsSlotsCollectionTemplateBlocked />;
+  }
 
   if (sessionPending) {
     return <AccessGateLoadingStatus message="Checking access…" />;

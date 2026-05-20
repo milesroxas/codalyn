@@ -104,11 +104,7 @@ function* iterateAncestorsFromParent(
   }
 }
 
-function isDescendantOfElement(
-  element: AnyElement,
-  ancestor: AnyElement,
-  parentByChild: ParentByChild
-): boolean {
+function isDescendantOfElement(element: AnyElement, ancestor: AnyElement, parentByChild: ParentByChild): boolean {
   const ancestorKey = elementTreeKey(ancestor);
   const seen = new Set<string>();
   let cur: AnyElement | undefined = element;

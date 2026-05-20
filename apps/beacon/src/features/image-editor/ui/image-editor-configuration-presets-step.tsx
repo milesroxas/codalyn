@@ -257,27 +257,30 @@ function PresetFormTargetPageList(props: {
   targets: ImagePageTarget[];
   scanPending: boolean;
   scanError: string | null;
+  pageScanned: boolean;
   onRescan: () => void;
   selectedTarget: ImagePageTarget | null;
   onSelectTarget: (t: ImagePageTarget) => void;
 }) {
-  const { targets, scanPending, scanError, onRescan, selectedTarget, onSelectTarget } = props;
+  const { targets, scanPending, scanError, pageScanned, onRescan, selectedTarget, onSelectTarget } = props;
   const hasListRows = targets.length > 0;
   return (
     <div className={cn("flex w-full min-w-0 flex-col gap-2", hasListRows && "max-h-48 min-h-0 overflow-hidden")}>
       <div className="flex min-w-0 shrink-0 items-center justify-between gap-2">
         <p className="text-muted-foreground text-[11px]">Images on this page</p>
-        <Button
-          type="button"
-          size="icon-sm"
-          variant="ghost"
-          className="shrink-0"
-          disabled={scanPending}
-          onClick={onRescan}
-          aria-label="Refresh list"
-        >
-          {scanPending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-        </Button>
+        {pageScanned ? (
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            className="shrink-0"
+            disabled={scanPending}
+            onClick={onRescan}
+            aria-label="Refresh list"
+          >
+            {scanPending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+          </Button>
+        ) : null}
       </div>
       {scanError ? <p className="shrink-0 text-destructive text-xs">{scanError}</p> : null}
       {scanPending && targets.length === 0 ? (
@@ -286,7 +289,15 @@ function PresetFormTargetPageList(props: {
           Scanning the page…
         </p>
       ) : null}
-      {targets.length === 0 && !scanPending ? (
+      {!pageScanned && !scanPending ? (
+        <div className="flex shrink-0 flex-col gap-2">
+          <p className="text-muted-foreground text-xs">Scan the page to list image surfaces you can target.</p>
+          <Button type="button" size="sm" className="self-start" onClick={onRescan}>
+            Scan page
+          </Button>
+        </div>
+      ) : null}
+      {pageScanned && targets.length === 0 && !scanPending ? (
         <p className="text-muted-foreground shrink-0 text-xs">
           No Image surfaces found. Add an Image to the page or select one on the canvas.
         </p>
@@ -339,6 +350,7 @@ function TargetPickSection(props: {
   targets: ImagePageTarget[];
   scanPending: boolean;
   scanError: string | null;
+  pageScanned: boolean;
   onRescan: () => void;
   selectionHint: SelectedImageTargetHint;
   selectedTarget: ImagePageTarget | null;
@@ -353,6 +365,7 @@ function TargetPickSection(props: {
     targets,
     scanPending,
     scanError,
+    pageScanned,
     onRescan,
     selectionHint,
     selectedTarget,
@@ -393,6 +406,7 @@ function TargetPickSection(props: {
         <PresetFormTargetPageList
           onRescan={onRescan}
           onSelectTarget={onSelectTarget}
+          pageScanned={pageScanned}
           scanError={scanError}
           scanPending={scanPending}
           selectedTarget={selectedTarget}
@@ -564,6 +578,7 @@ function ImageEditorConfigurationPresetsFormView(props: {
   formTarget: ImagePageTarget | null;
   formScanPending: boolean;
   formScanError: string | null;
+  formPageScanned: boolean;
   formRescan: () => void;
   formTargetSelect: (t: ImagePageTarget) => void;
   onFormUseCanvasSelection: () => void;
@@ -595,6 +610,7 @@ function ImageEditorConfigurationPresetsFormView(props: {
     formTarget,
     formScanPending,
     formScanError,
+    formPageScanned,
     formRescan,
     formTargetSelect,
     onFormUseCanvasSelection,
@@ -634,6 +650,7 @@ function ImageEditorConfigurationPresetsFormView(props: {
               onRescan={formRescan}
               onSelectTarget={formTargetSelect}
               onUseCanvasSelection={onFormUseCanvasSelection}
+              pageScanned={formPageScanned}
               scanError={formScanError}
               scanPending={formScanPending}
               selectedTarget={formTarget}
@@ -750,6 +767,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     targets: formTargets,
     scanPending: formScanPending,
     scanError: formScanError,
+    pageScanned: formPageScanned,
     rescan: formRescan,
     selectionHint: formSelectionHint,
     discoverySettled: formDiscoverySettled,
@@ -937,6 +955,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
           editingId={editingId}
           formDiscoverySettled={formDiscoverySettled}
           formError={formError}
+          formPageScanned={formPageScanned}
           formRescan={formRescan}
           formScanError={formScanError}
           formScanPending={formScanPending}

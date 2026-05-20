@@ -1,12 +1,9 @@
 import { getVisibleBuiltinAspectPresets, type ImageExportFormat } from "@codalyn/webflow-kit";
-import type { DragEvent, SetStateAction } from "react";
+import type { DragEvent, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Area } from "react-easy-crop";
 import { useNavigate } from "react-router-dom";
-import {
-  readBeaconGuestWelcomeComplete,
-  writeBeaconGuestWelcomeComplete,
-} from "@/features/auth/lib/beacon-guest-welcome-preference";
+import { useBeaconGuestWelcomeVisible } from "@/features/auth/lib/use-beacon-guest-welcome-visible";
 import { isTowerConfigured, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
@@ -18,11 +15,11 @@ import {
 import { aspectValue, type EditorAspectSelection } from "@/features/image-editor/lib/aspect-preset";
 import { isCmsPrimaryUploadContext } from "@/features/image-editor/lib/cms-primary-upload-context";
 import { dimensionsFromMaxWidthAndAspect } from "@/features/image-editor/lib/export-dimensions-from-aspect";
+import type { ImageEditorFlowStep, ImageEditorPathMode } from "@/features/image-editor/lib/image-editor-flow-step";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
 import { readBeaconDesignerExportForTarget } from "@/features/image-editor/lib/read-beacon-designer-export-for-target";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { useApplyCroppedToWebflow } from "@/features/image-editor/model/use-apply-cropped-to-webflow";
-import { useCmsCollectionTemplatePage } from "@/features/image-editor/model/use-cms-collection-template-page";
 import { useComponentInstanceImageProps } from "@/features/image-editor/model/use-component-instance-image-props";
 import { useExportByteEstimate } from "@/features/image-editor/model/use-export-byte-estimate";
 import { useExportQualityPreview } from "@/features/image-editor/model/use-export-quality-preview";
@@ -40,9 +37,14 @@ import {
 import { ImageEditorLoadedColumn } from "@/features/image-editor/ui/image-editor-loaded-column";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
 import { ImageEditorPreimageColumn } from "@/features/image-editor/ui/image-editor-preimage-column";
+import {
+  ImageEditorRouteChrome,
+  ImageEditorRouteContinueAction,
+} from "@/features/image-editor/ui/image-editor-route-chrome";
+import { ImageEditorStepNav } from "@/features/image-editor/ui/image-editor-step-nav";
 import { ImageEditorWorkspace } from "@/features/image-editor/ui/image-editor-workspace";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
-import { cn } from "@/shared/lib/utils";
+import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 
 function shouldShowAutoPageSelectionChoice(
   pathMode: string,
@@ -58,6 +60,53 @@ function shouldShowAutoPageSelectionChoice(
     !dismissedCanvasSelectionPrompt &&
     (autoSelectionHintKind === "image" || autoSelectionHintKind === "component")
   );
+}
+
+function imageEditorRouteChromeSlots(options: {
+  showFlowStepNav: boolean;
+  currentStepForNav: ImageEditorFlowStep;
+  imageSrc: string | null;
+  includeEntryStep: boolean;
+  pathMode: ImageEditorPathMode;
+  goToStep: (step: ImageEditorFlowStep) => void;
+  showGuestOnboarding: boolean;
+  flowStep: ImageEditorFlowStep;
+  showAutoPageTargetList: boolean;
+  autoPageTarget: ImagePageTarget | null;
+  beginAutoToUpload: () => void;
+}): { subheader?: ReactNode; footer?: ReactNode } {
+  const {
+    showFlowStepNav,
+    currentStepForNav,
+    imageSrc,
+    includeEntryStep,
+    pathMode,
+    goToStep,
+    showGuestOnboarding,
+    flowStep,
+    showAutoPageTargetList,
+    autoPageTarget,
+    beginAutoToUpload,
+  } = options;
+
+  const subheader = showFlowStepNav ? (
+    <ImageEditorStepNav
+      current={currentStepForNav}
+      hasImage={imageSrc != null}
+      includeEntryStep={includeEntryStep}
+      pathMode={pathMode}
+      onGoToStep={goToStep}
+    />
+  ) : undefined;
+
+  const showContinueToAddFooter =
+    !showGuestOnboarding && flowStep === "autoElement" && showAutoPageTargetList && imageSrc == null;
+
+  const footer = showContinueToAddFooter ? (
+    <ImageEditorRouteContinueAction disabled={autoPageTarget == null} onContinue={beginAutoToUpload} />
+  ) : undefined;
+
+  return { subheader, footer };
 }
 
 export function ImageEditor() {
@@ -88,7 +137,7 @@ export function ImageEditor() {
   const [replaceLibraryAsset, setReplaceLibraryAsset] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [originalBytes, setOriginalBytes] = useState<number | null>(null);
-  const [guestOnboardingComplete, setGuestOnboardingComplete] = useState(readBeaconGuestWelcomeComplete);
+  const { visible: guestWelcomeVisible, markGuestWelcomeComplete } = useBeaconGuestWelcomeVisible();
   const [imageSrc, setImageSrcInternal] = useState<string | null>(null);
   const setImageSrc = useCallback((action: SetStateAction<string | null>) => {
     setImageSrcInternal(action);
@@ -102,10 +151,10 @@ export function ImageEditor() {
   const towerConfigured = isTowerConfigured();
   const allowAvifEncoding = Boolean(towerUser);
   const isConfirmedGuest = !towerUser && !towerSessionPending;
-  const cmsCollectionTemplatePage = useCmsCollectionTemplatePage();
+  const { isCmsCollectionTemplatePage: cmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
   const guestCmsTemplateRestricted = isConfirmedGuest && cmsCollectionTemplatePage;
   /** Guest onboarding only after Tower session resolves; while pending, show the empty drop zone (no loading interstitial). */
-  const showGuestOnboarding = !imageSrc && !towerSessionPending && !towerUser && !guestOnboardingComplete;
+  const showGuestOnboarding = !imageSrc && guestWelcomeVisible;
   const prevShowGuestOnboarding = useRef(false);
 
   const {
@@ -235,9 +284,9 @@ export function ImageEditor() {
 
   useEffect(() => {
     if (towerUser) {
-      setGuestOnboardingComplete(true);
+      markGuestWelcomeComplete();
     }
-  }, [towerUser]);
+  }, [towerUser, markGuestWelcomeComplete]);
 
   useEffect(() => {
     if (towerUser && prevShowGuestOnboarding.current) {
@@ -420,13 +469,13 @@ export function ImageEditor() {
     targets: autoScanTargets,
     scanPending: autoScanPending,
     scanError: autoScanError,
+    pageScanned: autoPageScanned,
     rescan: onAutoRescan,
     selectionHint: autoSelectionHint,
     discoverySettled: autoDiscoverySettled,
   } = useImageEditorAutoTargets({
     flowStep,
     pathMode,
-    dismissedCanvasSelectionPrompt,
   });
 
   const applyAutoPageTarget = useCallback(
@@ -652,24 +701,9 @@ export function ImageEditor() {
     openTowerAuthPopup("/sign-in");
   }, []);
 
-  const dropZoneLabelClass = cn(
-    "flex aspect-video w-full cursor-pointer items-center justify-center rounded-sm border-2 border-dashed p-4 transition-colors",
-    dragActive ? "border-primary bg-accent/40" : "border-border bg-muted/30"
-  );
-
   const loadedEditor =
     imageSrc != null ? (
-      <ImageEditorLoadedColumn
-        busy={busy}
-        currentStepForNav={currentStepForNav}
-        fileBaseName={fileBaseName}
-        fileInputRef={fileInputRef}
-        flowStep={flowStep}
-        goToStep={goToStep}
-        includeEntryStep={includeEntryStep}
-        pathMode={pathMode}
-        showFlowStepNav={showFlowStepNav}
-      >
+      <ImageEditorLoadedColumn busy={busy} fileBaseName={fileBaseName} fileInputRef={fileInputRef} flowStep={flowStep}>
         <ImageEditorCropExportPanel
           exportPlaceBlockedLabel={exportPlaceBlockedLabelForApply}
           exportSizeBlockedMessage={exportSizeBlockedMessage}
@@ -752,8 +786,22 @@ export function ImageEditor() {
       </ImageEditorLoadedColumn>
     ) : null;
 
+  const { subheader: stepNavSubheader, footer: routeFooter } = imageEditorRouteChromeSlots({
+    showFlowStepNav,
+    currentStepForNav,
+    imageSrc,
+    includeEntryStep,
+    pathMode,
+    goToStep,
+    showGuestOnboarding,
+    flowStep,
+    showAutoPageTargetList,
+    autoPageTarget,
+    beginAutoToUpload,
+  });
+
   return (
-    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+    <ImageEditorRouteChrome subheader={stepNavSubheader} footer={routeFooter}>
       <ImageEditorWorkspace
         emptyStateContent={
           showGuestOnboarding ? (
@@ -761,13 +809,13 @@ export function ImageEditor() {
               towerConfigured={towerConfigured}
               onSignInToTower={openTowerEmailSignInPopup}
               onContinueAsGuest={() => {
-                writeBeaconGuestWelcomeComplete();
-                setGuestOnboardingComplete(true);
+                markGuestWelcomeComplete();
                 navigate("/home");
               }}
             />
           ) : (
             <ImageEditorPreimageColumn
+              autoPageScanned={autoPageScanned}
               autoScanError={autoScanError}
               autoScanPending={autoScanPending}
               autoSelectedTarget={autoPageTarget}
@@ -776,18 +824,14 @@ export function ImageEditor() {
               autoShowPageTargetList={showAutoPageTargetList}
               autoShowSelectionChoice={autoShowSelectionChoice}
               autoTargets={autoScanTargets}
-              beginAutoToUpload={beginAutoToUpload}
-              currentStepForNav={currentStepForNav}
-              dropZoneLabelClass={dropZoneLabelClass}
+              dragActive={dragActive}
               exitToUploadFade={exitToUploadFade}
               fileInputId={fileInputId}
               onDoneConfiguringPresets={finishConfigurePath}
               flowStep={flowStep}
-              goToStep={goToStep}
               handleDrag={handleDrag}
               handleDragState={handleDragState}
               handleDrop={handleDrop}
-              includeEntryStep={includeEntryStep}
               isConfirmedGuest={isConfirmedGuest}
               isTowerUser={isTowerUser}
               isWorkspaceDesigner={isWorkspaceDesigner}
@@ -798,7 +842,6 @@ export function ImageEditor() {
               onChooseAddImage={onChooseAddImageEntry}
               onChooseConfigure={onChooseConfigureEntry}
               onExitToUploadTransitionEnd={onExitToUploadTransitionEnd}
-              pathMode={pathMode}
               roleReady={roleReady}
             />
           )
@@ -806,7 +849,7 @@ export function ImageEditor() {
         beginOutgoingFade={beginOutgoingFade}
         dissolve={dissolve}
         dissolving={dissolving}
-        dropZoneLabelClass={dropZoneLabelClass}
+        dragActive={dragActive}
         fileInputId={fileInputId}
         fileInputRef={fileInputRef}
         finishDissolve={finishDissolve}
@@ -820,6 +863,6 @@ export function ImageEditor() {
         queueFile={queueFile}
         showIncomingPreview={showIncomingPreview}
       />
-    </div>
+    </ImageEditorRouteChrome>
   );
 }

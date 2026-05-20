@@ -17,6 +17,7 @@ import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/mo
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
+import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import {
@@ -153,11 +154,13 @@ function BeaconMenuNavigateGroup(props: { pathname: string }) {
   const { pathname } = props;
   const navigate = useNavigate();
   const { defaultSegment } = useCmsSlotsAccess();
+  const { ready: cmsPageKindReady, isCmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
+  const showCmsSlotsNav = isCmsSlotsSurfaceEnabled() && cmsPageKindReady && isCmsCollectionTemplatePage;
 
   return (
     <DropdownMenuGroup>
       <DropdownMenuLabel className="px-2 pb-1">Navigate</DropdownMenuLabel>
-      {isCmsSlotsSurfaceEnabled() ? (
+      {showCmsSlotsNav ? (
         <DropdownMenuItem
           className={cn(
             pathname.startsWith("/cms-slots") &&

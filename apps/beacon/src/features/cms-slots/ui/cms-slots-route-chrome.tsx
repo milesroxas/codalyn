@@ -1,5 +1,11 @@
-import { ChevronLeft, List, PanelsTopLeft } from "lucide-react";
+import { List, PanelsTopLeft } from "lucide-react";
 import { type NavigateFunction, NavLink } from "react-router-dom";
+import {
+  BeaconFeatureRouteChrome,
+  BeaconFeatureRouteFooter,
+  BeaconFeatureRouteHeader,
+  BeaconFeatureRouteScrollBody,
+} from "@/app/ui/beacon-feature-route-chrome";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
 import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
@@ -14,10 +20,8 @@ import { CmsSlotCompositionPanel } from "@/features/cms-slots/ui/cms-slot-compos
 import { CmsSlotHomePanel } from "@/features/cms-slots/ui/cms-slot-home-panel";
 import { CmsSlotsCmsFieldLinkDialog } from "@/features/cms-slots/ui/cms-slots-cms-field-link-dialog";
 import { CmsSlotsPageRuntimeSyncButton } from "@/features/cms-slots/ui/cms-slots-page-runtime-sync-button";
-import { beaconAppRouteSurfaceClass } from "@/shared/lib/beacon-app-route-surface";
 import {
   CMS_SLOTS_AREA_NAV_LABEL,
-  CMS_SLOTS_BACK_BUTTON_ARIA_LABEL,
   CMS_SLOTS_DELETE_DIALOG_TITLE,
   CMS_SLOTS_FEATURE_NAME,
   CMS_SLOTS_UNINSTALL_PAGE_LABEL,
@@ -35,7 +39,6 @@ import {
 import { Button, buttonVariants } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Label } from "@/shared/ui/label";
-import { ScrollArea } from "@/shared/ui/scroll-area";
 
 export type CmsSlotsRouteChromeProps = {
   navigate: NavigateFunction;
@@ -129,28 +132,6 @@ export type CmsSlotsRouteChromeProps = {
   setCmsFieldLinkPromptOpen: (v: boolean) => void;
   onRetryCmsFieldLink: () => void | Promise<void>;
 };
-
-function CmsSlotsRouteHeader({ navigate }: { navigate: NavigateFunction }) {
-  return (
-    <div className="shrink-0 border-b border-border/50 bg-muted/20 dark:bg-muted/15" data-slot="cms_slots_route_header">
-      <div className="mx-auto flex h-8 min-w-0 max-w-lg items-center gap-2 px-3">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="-ml-1 shrink-0 text-foreground"
-          aria-label={CMS_SLOTS_BACK_BUTTON_ARIA_LABEL}
-          onClick={() => void navigate("/home")}
-        >
-          <ChevronLeft aria-hidden className="size-4" strokeWidth={2.25} />
-        </Button>
-        <h2 className="min-w-0 truncate text-sm font-medium leading-none tracking-tight text-foreground">
-          {CMS_SLOTS_FEATURE_NAME}
-        </h2>
-      </div>
-    </div>
-  );
-}
 
 function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps) {
   return (
@@ -253,11 +234,9 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
 
 function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
   return (
-    <ScrollArea className="min-h-0 min-w-0 flex-1">
-      <div className="mx-auto w-full max-w-lg space-y-4 px-3 py-3">
-        {p.isEngine ? <CmsSlotsEngineRouteBody {...p} /> : p.isComposer ? <CmsSlotsComposerRouteBody {...p} /> : null}
-      </div>
-    </ScrollArea>
+    <BeaconFeatureRouteScrollBody>
+      {p.isEngine ? <CmsSlotsEngineRouteBody {...p} /> : p.isComposer ? <CmsSlotsComposerRouteBody {...p} /> : null}
+    </BeaconFeatureRouteScrollBody>
   );
 }
 
@@ -356,10 +335,10 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
   const { composerOnly } = useCmsSlotsAccess();
 
   return (
-    <footer
-      data-slot="cms_slots_dock"
+    <BeaconFeatureRouteFooter
+      dataSlot="cms_slots_dock"
       data-composer-only={composerOnly ? "" : undefined}
-      className="mt-auto flex shrink-0 items-stretch gap-2 border-t border-border/65 bg-background px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.375rem)]"
+      className="items-stretch gap-2"
     >
       {composerOnly ? (
         <div className="min-w-0 flex-1" aria-hidden />
@@ -417,7 +396,7 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
         pageScanLoading={p.pageScanLoading}
         onSync={p.onSyncInstallEmbed}
       />
-    </footer>
+    </BeaconFeatureRouteFooter>
   );
 }
 
@@ -426,27 +405,36 @@ export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
   const composerPaletteDocked = p.isComposer && p.composerStudio != null;
 
   return (
-    <div className={beaconAppRouteSurfaceClass}>
-      <CmsSlotsRouteHeader navigate={p.navigate} />
+    <BeaconFeatureRouteChrome
+      header={<BeaconFeatureRouteHeader title={CMS_SLOTS_FEATURE_NAME} dataSlot="cms_slots_route_header" />}
+      overlays={
+        <>
+          <CmsSlotsBeaconDeleteDialog {...p} />
+          <CmsSlotsRemoveListTargetDialog {...p} />
+          <CmsSlotsCmsFieldLinkDialog
+            open={p.cmsFieldLinkPromptOpen}
+            navReady={p.cmsFieldLinkNavReady}
+            retryPending={p.cmsFieldLinkRetryPending}
+            onOpenChange={p.setCmsFieldLinkPromptOpen}
+            onRetryLink={p.onRetryCmsFieldLink}
+          />
+        </>
+      }
+      footer={
+        <>
+          {composerPaletteDocked ? (
+            <ComposerPaletteSection
+              variant="docked"
+              allowedPalette={p.composerAllowedPalette}
+              busy={p.composerSavePending || p.embedSyncPending}
+              onAddFromPalette={p.onComposerAddFromPalette}
+            />
+          ) : null}
+          <CmsSlotsRouteDock {...p} />
+        </>
+      }
+    >
       <CmsSlotsRouteScrollBody {...p} />
-      <CmsSlotsBeaconDeleteDialog {...p} />
-      <CmsSlotsRemoveListTargetDialog {...p} />
-      <CmsSlotsCmsFieldLinkDialog
-        open={p.cmsFieldLinkPromptOpen}
-        navReady={p.cmsFieldLinkNavReady}
-        retryPending={p.cmsFieldLinkRetryPending}
-        onOpenChange={p.setCmsFieldLinkPromptOpen}
-        onRetryLink={p.onRetryCmsFieldLink}
-      />
-      {composerPaletteDocked ? (
-        <ComposerPaletteSection
-          variant="docked"
-          allowedPalette={p.composerAllowedPalette}
-          busy={p.composerSavePending || p.embedSyncPending}
-          onAddFromPalette={p.onComposerAddFromPalette}
-        />
-      ) : null}
-      <CmsSlotsRouteDock {...p} />
-    </div>
+    </BeaconFeatureRouteChrome>
   );
 }

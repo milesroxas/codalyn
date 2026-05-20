@@ -1,5 +1,7 @@
 export const CMS_SLOTS_FEATURE_NAME = "CMS Slots";
 
+export const CMS_SLOTS_HOME_TILE_DESCRIPTION = "Unique layouts in collection templates";
+
 export const CMS_SLOTS_AREA_NAV_LABEL = `${CMS_SLOTS_FEATURE_NAME} area`;
 
 export const CMS_SLOTS_ADD_SLOT_LABEL = "Add Slot";
@@ -13,7 +15,9 @@ export const CMS_SLOTS_PAGE_LIST_ARIA_LABEL = "CMS slot lists on this page";
 
 export const CMS_SLOTS_SCAN_ARIA_LABEL = "Scanning page for CMS slot lists";
 
-export const CMS_SLOTS_BACK_BUTTON_ARIA_LABEL = "Back to home";
+import { BEACON_BACK_TO_HOME_ARIA_LABEL } from "@/shared/lib/beacon-feature-route-copy";
+
+export const CMS_SLOTS_BACK_BUTTON_ARIA_LABEL = BEACON_BACK_TO_HOME_ARIA_LABEL;
 
 export const CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP = `Install ${CMS_SLOTS_FEATURE_NAME} on this page first.`;
 
@@ -47,3 +51,12 @@ export const CMS_SLOTS_UNINSTALL_PAGE_LABEL = `Also uninstall ${CMS_SLOTS_FEATUR
 export const CMS_SLOTS_EDITOR_NO_SLOTS_TITLE = "No Slots Found";
 
 export const CMS_SLOTS_EDITOR_NO_SLOTS_DESCRIPTION = "Contact your team admin or site designer to enable this feature";
+
+/** Action label on the home tile and route gate when CMS Slots is not on a collection template. */
+export const CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_LABEL = "Open a CMS collection template";
+
+export const CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_NOTIFY_MESSAGE =
+  "In the Designer, open Pages and select a CMS collection template.";
+
+/** Screen-reader label for the collection-template prompt control. */
+export const CMS_SLOTS_REQUIRES_COLLECTION_TEMPLATE_ARIA_LABEL = `${CMS_SLOTS_FEATURE_NAME}: ${CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_LABEL}`;

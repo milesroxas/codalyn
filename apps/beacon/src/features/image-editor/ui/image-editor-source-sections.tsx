@@ -1,7 +1,9 @@
 import { IconPhoto } from "@tabler/icons-react";
-import { FileImage, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import type { DragEvent, RefObject } from "react";
 
+import { BeaconRouteSubheader } from "@/app/ui/beacon-feature-route-chrome";
+import { ImageEditorDropzone } from "@/features/image-editor/ui/image-editor-dropzone";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 
@@ -53,48 +55,18 @@ export function IncomingDissolvePreview(props: {
   );
 }
 
-function DropzoneCard(props: {
-  className: string;
-  fileInputId: string;
-  onDragEnter: (e: DragEvent) => void;
-  onDragLeave: (e: DragEvent) => void;
-  onDragOver: (e: DragEvent) => void;
-  onDrop: (e: DragEvent) => void;
-}) {
-  const { className, fileInputId, onDragEnter, onDragLeave, onDragOver, onDrop } = props;
-  return (
-    <label
-      className={className}
-      htmlFor={fileInputId}
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-    >
-      <span className="flex flex-col items-center gap-2 text-center">
-        <Upload aria-hidden className="size-8 text-muted-foreground" />
-        <span className="text-muted-foreground text-xs">Drop an image, or browse.</span>
-        <span className="inline-flex items-center gap-1.5 rounded-sm border border-transparent bg-primary px-2.5 py-1 text-[0.8rem] font-medium text-primary-foreground">
-          <FileImage aria-hidden className="size-3.5" />
-          Browse files
-        </span>
-      </span>
-    </label>
-  );
-}
-
 export function EmptyImageSourceSection(props: {
   fileInputId: string;
-  dropZoneLabelClass: string;
+  dragActive: boolean;
   handleDrag: (e: DragEvent) => void;
   handleDragState: (e: DragEvent, active: boolean) => void;
   handleDrop: (e: DragEvent) => void;
 }) {
-  const { fileInputId, dropZoneLabelClass, handleDrag, handleDragState, handleDrop } = props;
+  const { fileInputId, dragActive, handleDrag, handleDragState, handleDrop } = props;
   return (
-    <DropzoneCard
-      className={dropZoneLabelClass}
+    <ImageEditorDropzone
       fileInputId={fileInputId}
+      dragActive={dragActive}
       onDragEnter={(e) => handleDragState(e, true)}
       onDragLeave={(e) => handleDragState(e, false)}
       onDragOver={handleDrag}
@@ -110,7 +82,7 @@ export function LoadedImageSourceSection(props: {
 }) {
   const { fileBaseName, busy, fileInputRef } = props;
   return (
-    <div className="flex min-h-0 min-w-0 items-center gap-2 border-b border-border bg-muted/40 py-1.5 pr-1.5 pl-3">
+    <BeaconRouteSubheader>
       <IconPhoto aria-hidden className="size-3.5 shrink-0 text-muted-foreground" stroke={1.5} />
       <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={fileBaseName}>
         {fileBaseName}
@@ -125,6 +97,6 @@ export function LoadedImageSourceSection(props: {
       >
         <Upload aria-hidden className="size-3.5" />
       </Button>
-    </div>
+    </BeaconRouteSubheader>
   );
 }

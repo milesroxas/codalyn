@@ -15,7 +15,7 @@ type ImageEditorDissolveBranchProps = {
   beginOutgoingFade: boolean;
   incomingEnter: boolean;
   loadedEditor: ReactNode;
-  dropZoneLabelClass: string;
+  dragActive: boolean;
   fileInputId: string;
   handleDrag: (e: DragEvent) => void;
   handleDragState: (e: DragEvent, active: boolean) => void;
@@ -33,7 +33,7 @@ export function ImageEditorDissolveBranch(props: ImageEditorDissolveBranchProps)
     beginOutgoingFade,
     incomingEnter,
     loadedEditor,
-    dropZoneLabelClass,
+    dragActive,
     fileInputId,
     handleDrag,
     handleDragState,
@@ -45,7 +45,7 @@ export function ImageEditorDissolveBranch(props: ImageEditorDissolveBranchProps)
 
   const emptyOrDefault = emptyStateWhenNoImage ?? (
     <EmptyImageSourceSection
-      dropZoneLabelClass={dropZoneLabelClass}
+      dragActive={dragActive}
       fileInputId={fileInputId}
       handleDrag={handleDrag}
       handleDragState={handleDragState}
@@ -63,7 +63,7 @@ export function ImageEditorDissolveBranch(props: ImageEditorDissolveBranchProps)
         )}
         onTransitionEnd={handleOutgoingFadeComplete}
       >
-        {loadedEditor ? loadedEditor : <div className="px-4 pt-4">{emptyOrDefault}</div>}
+        {loadedEditor ? loadedEditor : emptyOrDefault}
       </div>
     );
   }
@@ -73,7 +73,7 @@ export function ImageEditorDissolveBranch(props: ImageEditorDissolveBranchProps)
   }
 
   return (
-    <div className="mx-4 mt-4 rounded-sm bg-background/80 p-3 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.55)] ring-1 ring-foreground/10 backdrop-blur-sm">
+    <div className="rounded-sm bg-background/80 p-3 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.55)] ring-1 ring-foreground/10 backdrop-blur-sm">
       <IncomingDissolvePreview
         entered={incomingEnter}
         fileBaseName={assetBaseNameFromFileName(dissolve.incomingFile.name)}

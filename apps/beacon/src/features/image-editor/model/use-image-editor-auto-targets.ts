@@ -10,49 +10,29 @@ import {
 type UseImageEditorAutoTargetsOptions = {
   flowStep: ImageEditorFlowStep;
   pathMode: "unset" | "auto" | "configurations";
-  /**
-   * When the user has image-capable canvas selection, full-page scan is skipped
-   * until this is true (“Choose on page”).
-   */
-  dismissedCanvasSelectionPrompt: boolean;
 };
 
 export function useImageEditorAutoTargets(options: UseImageEditorAutoTargetsOptions) {
-  const { flowStep, pathMode, dismissedCanvasSelectionPrompt } = options;
+  const { flowStep, pathMode } = options;
 
   const [targets, setTargets] = useState<ImagePageTarget[]>([]);
   const [scanPending, setScanPending] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [pageScanned, setPageScanned] = useState(false);
   const [selectionHint, setSelectionHint] = useState<SelectedImageTargetHint>({ kind: "none" });
-  /** After selection probe (and any required full page scan) finishes. */
+  /** After the canvas selection probe finishes. */
   const [discoverySettled, setDiscoverySettled] = useState(false);
 
   const runAutoElementDiscovery = useCallback(async () => {
     setScanError(null);
     setDiscoverySettled(false);
     setTargets([]);
+    setPageScanned(false);
 
     const hint = await getSelectedImageTargetHint([]);
     setSelectionHint(hint);
-
-    const selectionAcceptsImage = hint.kind === "image" || hint.kind === "component";
-    const needFullPageScan = dismissedCanvasSelectionPrompt || !selectionAcceptsImage;
-
-    if (needFullPageScan) {
-      setScanPending(true);
-      try {
-        const t = await scanImageTargetsOnPage();
-        setTargets(t);
-        setSelectionHint(await getSelectedImageTargetHint(t));
-      } catch (e) {
-        setScanError(e instanceof Error ? e.message : "Could not scan the page");
-        setTargets([]);
-      } finally {
-        setScanPending(false);
-      }
-    }
     setDiscoverySettled(true);
-  }, [dismissedCanvasSelectionPrompt]);
+  }, []);
 
   useEffect(() => {
     const isTargetStep = pathMode === "auto" && flowStep === "autoElement";
@@ -62,12 +42,13 @@ export function useImageEditorAutoTargets(options: UseImageEditorAutoTargetsOpti
       setSelectionHint({ kind: "none" });
       setScanError(null);
       setScanPending(false);
+      setPageScanned(false);
       return;
     }
     void runAutoElementDiscovery();
   }, [pathMode, flowStep, runAutoElementDiscovery]);
 
-  /** User explicitly requested a full page rescan (refresh), or after changing canvas. */
+  /** User-triggered full page scan (initial scan or refresh). */
   const rescan = useCallback(async () => {
     setScanPending(true);
     setScanError(null);
@@ -75,9 +56,11 @@ export function useImageEditorAutoTargets(options: UseImageEditorAutoTargetsOpti
       const t = await scanImageTargetsOnPage();
       setTargets(t);
       setSelectionHint(await getSelectedImageTargetHint(t));
+      setPageScanned(true);
     } catch (e) {
       setScanError(e instanceof Error ? e.message : "Could not scan the page");
       setTargets([]);
+      setPageScanned(true);
     } finally {
       setScanPending(false);
     }
@@ -87,6 +70,7 @@ export function useImageEditorAutoTargets(options: UseImageEditorAutoTargetsOpti
     targets,
     scanPending,
     scanError,
+    pageScanned,
     rescan,
     selectionHint,
     discoverySettled,
@@ -101,6 +85,7 @@ export function usePresetFormTargets(active: boolean) {
   const [targets, setTargets] = useState<ImagePageTarget[]>([]);
   const [scanPending, setScanPending] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [pageScanned, setPageScanned] = useState(false);
   const [selectionHint, setSelectionHint] = useState<SelectedImageTargetHint>({ kind: "none" });
   const [discoverySettled, setDiscoverySettled] = useState(false);
 
@@ -108,28 +93,12 @@ export function usePresetFormTargets(active: boolean) {
     setScanError(null);
     setDiscoverySettled(false);
     setTargets([]);
+    setPageScanned(false);
 
     const hint = await getSelectedImageTargetHint([]);
     setSelectionHint(hint);
-
-    const selectionAcceptsImage = hint.kind === "image" || hint.kind === "component";
-    const needFullPageScan = dismissedCanvasSelectionPrompt || !selectionAcceptsImage;
-
-    if (needFullPageScan) {
-      setScanPending(true);
-      try {
-        const t = await scanImageTargetsOnPage();
-        setTargets(t);
-        setSelectionHint(await getSelectedImageTargetHint(t));
-      } catch (e) {
-        setScanError(e instanceof Error ? e.message : "Could not scan the page");
-        setTargets([]);
-      } finally {
-        setScanPending(false);
-      }
-    }
     setDiscoverySettled(true);
-  }, [dismissedCanvasSelectionPrompt]);
+  }, []);
 
   useEffect(() => {
     if (!active) {
@@ -139,6 +108,7 @@ export function usePresetFormTargets(active: boolean) {
       setSelectionHint({ kind: "none" });
       setScanError(null);
       setScanPending(false);
+      setPageScanned(false);
       return;
     }
     void run();
@@ -151,9 +121,11 @@ export function usePresetFormTargets(active: boolean) {
       const t = await scanImageTargetsOnPage();
       setTargets(t);
       setSelectionHint(await getSelectedImageTargetHint(t));
+      setPageScanned(true);
     } catch (e) {
       setScanError(e instanceof Error ? e.message : "Could not scan the page");
       setTargets([]);
+      setPageScanned(true);
     } finally {
       setScanPending(false);
     }
@@ -163,6 +135,7 @@ export function usePresetFormTargets(active: boolean) {
     targets,
     scanPending,
     scanError,
+    pageScanned,
     rescan,
     selectionHint,
     discoverySettled,

@@ -4,13 +4,13 @@ import type { DragEvent, RefObject } from "react";
 
 import { BeaconRouteSubheader } from "@/app/ui/beacon-feature-route-chrome";
 import { ImageEditorDropzone } from "@/features/image-editor/ui/image-editor-dropzone";
+import { beaconPanelContainClass } from "@/shared/lib/beacon-app-route-surface";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 
-const OUTGOING_FADE_CLASS = "transition-opacity duration-[380ms] ease-out will-change-[opacity] transform-gpu";
+const OUTGOING_FADE_CLASS = "transition-opacity duration-[380ms] ease-out";
 
-const INCOMING_STAGGER_BASE_CLASS =
-  "transition-[opacity,transform] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[opacity,transform] transform-gpu duration-300";
+const INCOMING_STAGGER_BASE_CLASS = "transition-opacity duration-300 ease-out";
 
 export { OUTGOING_FADE_CLASS };
 
@@ -22,25 +22,23 @@ export function IncomingDissolvePreview(props: {
 }) {
   const { imageUrl, fileBaseName, entered, onEntranceComplete } = props;
   return (
-    <div className="flex flex-col gap-3">
+    <div className={cn(beaconPanelContainClass, "flex flex-col gap-3")}>
       <p
         className={cn(
           INCOMING_STAGGER_BASE_CLASS,
-          "text-muted-foreground min-w-0 truncate text-xs leading-snug",
-          entered ? "translate-y-0 opacity-100 [transition-delay:0ms]" : "translate-y-2 opacity-0"
+          "min-w-0 truncate text-xs leading-snug text-muted-foreground",
+          entered ? "opacity-100 [transition-delay:0ms]" : "opacity-0"
         )}
         title={fileBaseName}
       >
-        <span className="text-foreground font-medium">Source: </span>
+        <span className="font-medium text-foreground">Source: </span>
         {fileBaseName}
       </p>
       <div
         className={cn(
           INCOMING_STAGGER_BASE_CLASS,
           "aspect-video overflow-hidden rounded-sm bg-muted/50 ring-1 ring-foreground/10",
-          entered
-            ? "translate-y-0 opacity-100 [transition-delay:90ms]"
-            : "translate-y-3 opacity-0 [transition-delay:0ms]"
+          entered ? "opacity-100 [transition-delay:90ms]" : "opacity-0 [transition-delay:0ms]"
         )}
         onTransitionEnd={(e) => {
           if (e.target !== e.currentTarget || e.propertyName !== "opacity") {

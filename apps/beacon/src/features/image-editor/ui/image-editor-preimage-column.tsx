@@ -1,19 +1,24 @@
 import { Loader2 } from "lucide-react";
 import type { DragEvent, TransitionEvent } from "react";
 import type { ImageEditorFlowStep } from "@/features/image-editor/lib/image-editor-flow-step";
+import {
+  imageEditorStepEnterTransitionClass,
+  imageEditorStepExitTransitionClass,
+  isImageEditorStepExitTransitionEnd,
+} from "@/features/image-editor/lib/image-editor-step-transition";
 import type { ImagePageTarget, SelectedImageTargetHint } from "@/features/image-editor/lib/scan-image-targets-on-page";
+import { useImageEditorStepEnter } from "@/features/image-editor/model/use-image-editor-step-enter";
 import { ImageEditorAutoTargetColumn } from "@/features/image-editor/ui/image-editor-auto-target-column";
 import { ImageEditorConfigurationPresetsStep } from "@/features/image-editor/ui/image-editor-configuration-presets-step";
 import { ImageEditorEntryColumn } from "@/features/image-editor/ui/image-editor-entry-column";
 import { EmptyImageSourceSection } from "@/features/image-editor/ui/image-editor-source-sections";
-import { cn } from "@/shared/lib/utils";
 
 type ImageEditorPreimageColumnProps = {
   flowStep: ImageEditorFlowStep;
   roleReady: boolean;
   isTowerUser: boolean;
-  exitToUploadFade: boolean;
-  onExitToUploadTransitionEnd: (e: TransitionEvent<HTMLDivElement>) => void;
+  stepExitFade: boolean;
+  onStepExitTransitionEnd: (e: TransitionEvent<HTMLDivElement>) => void;
   isConfirmedGuest: boolean;
   dragActive: boolean;
   fileInputId: string;
@@ -45,8 +50,8 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
     flowStep,
     roleReady,
     isTowerUser,
-    exitToUploadFade,
-    onExitToUploadTransitionEnd,
+    stepExitFade,
+    onStepExitTransitionEnd,
     isConfirmedGuest,
     dragActive,
     fileInputId,
@@ -73,6 +78,7 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
   } = props;
 
   const showDesignerStart = roleReady && isWorkspaceDesigner && flowStep === "entry";
+  const entered = useImageEditorStepEnter(flowStep);
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -92,11 +98,12 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
 
       {flowStep === "autoElement" ? (
         <div
-          className={cn(
-            "flex min-w-0 flex-col transition-opacity duration-300 ease-out",
-            exitToUploadFade && "pointer-events-none opacity-0"
-          )}
-          onTransitionEnd={onExitToUploadTransitionEnd}
+          className={imageEditorStepExitTransitionClass(stepExitFade)}
+          onTransitionEnd={(e) => {
+            if (isImageEditorStepExitTransitionEnd(e, stepExitFade)) {
+              onStepExitTransitionEnd(e);
+            }
+          }}
         >
           <ImageEditorAutoTargetColumn
             discoverySettled={autoDiscoverySettled}
@@ -117,13 +124,15 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
       ) : null}
 
       {flowStep === "upload" ? (
-        <EmptyImageSourceSection
-          dragActive={dragActive}
-          fileInputId={fileInputId}
-          handleDrag={handleDrag}
-          handleDragState={handleDragState}
-          handleDrop={handleDrop}
-        />
+        <div className={imageEditorStepEnterTransitionClass(entered)}>
+          <EmptyImageSourceSection
+            dragActive={dragActive}
+            fileInputId={fileInputId}
+            handleDrag={handleDrag}
+            handleDragState={handleDragState}
+            handleDrop={handleDrop}
+          />
+        </div>
       ) : null}
     </div>
   );

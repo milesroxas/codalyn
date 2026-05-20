@@ -16,6 +16,12 @@ import { aspectValue, type EditorAspectSelection } from "@/features/image-editor
 import { isCmsPrimaryUploadContext } from "@/features/image-editor/lib/cms-primary-upload-context";
 import { dimensionsFromMaxWidthAndAspect } from "@/features/image-editor/lib/export-dimensions-from-aspect";
 import type { ImageEditorFlowStep, ImageEditorPathMode } from "@/features/image-editor/lib/image-editor-flow-step";
+import { getImageEditorPlaceButtonState } from "@/features/image-editor/lib/image-editor-place-button-state";
+import {
+  shouldOfferReplacePlacement,
+  shouldOfferSelectionPlacement,
+} from "@/features/image-editor/lib/image-editor-placement-readiness";
+import { resolveImageEditorPlacement } from "@/features/image-editor/lib/image-editor-resolved-placement";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
 import { readBeaconDesignerExportForTarget } from "@/features/image-editor/lib/read-beacon-designer-export-for-target";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
@@ -40,10 +46,15 @@ import { ImageEditorPreimageColumn } from "@/features/image-editor/ui/image-edit
 import {
   ImageEditorRouteChrome,
   ImageEditorRouteContinueAction,
+  ImageEditorRoutePlaceAction,
 } from "@/features/image-editor/ui/image-editor-route-chrome";
 import { ImageEditorStepNav } from "@/features/image-editor/ui/image-editor-step-nav";
 import { ImageEditorWorkspace } from "@/features/image-editor/ui/image-editor-workspace";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
+import {
+  IMAGE_UPLOAD_CONTINUE_TO_ADD_LABEL,
+  IMAGE_UPLOAD_CONTINUE_TO_SAVE_LABEL,
+} from "@/shared/lib/beacon-feature-route-copy";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 
 function shouldShowAutoPageSelectionChoice(
@@ -74,6 +85,10 @@ function imageEditorRouteChromeSlots(options: {
   showAutoPageTargetList: boolean;
   autoPageTarget: ImagePageTarget | null;
   beginAutoToUpload: () => void;
+  beginPositionToSave: () => void;
+  continueToSaveDisabled: boolean;
+  stepExitFade: boolean;
+  savePlaceAction: { label: string; disabled: boolean; busy: boolean; onPlace: () => void } | null;
 }): { subheader?: ReactNode; footer?: ReactNode } {
   const {
     showFlowStepNav,
@@ -87,6 +102,10 @@ function imageEditorRouteChromeSlots(options: {
     showAutoPageTargetList,
     autoPageTarget,
     beginAutoToUpload,
+    beginPositionToSave,
+    continueToSaveDisabled,
+    stepExitFade,
+    savePlaceAction,
   } = options;
 
   const subheader = showFlowStepNav ? (
@@ -102,8 +121,29 @@ function imageEditorRouteChromeSlots(options: {
   const showContinueToAddFooter =
     !showGuestOnboarding && flowStep === "autoElement" && showAutoPageTargetList && imageSrc == null;
 
+  const showContinueToSaveFooter = !showGuestOnboarding && flowStep === "position" && imageSrc != null;
+
+  const showSavePlaceFooter = !showGuestOnboarding && flowStep === "save" && imageSrc != null;
+
   const footer = showContinueToAddFooter ? (
-    <ImageEditorRouteContinueAction disabled={autoPageTarget == null} onContinue={beginAutoToUpload} />
+    <ImageEditorRouteContinueAction
+      label={IMAGE_UPLOAD_CONTINUE_TO_ADD_LABEL}
+      disabled={autoPageTarget == null || stepExitFade}
+      onContinue={beginAutoToUpload}
+    />
+  ) : showContinueToSaveFooter ? (
+    <ImageEditorRouteContinueAction
+      label={IMAGE_UPLOAD_CONTINUE_TO_SAVE_LABEL}
+      disabled={continueToSaveDisabled || stepExitFade}
+      onContinue={beginPositionToSave}
+    />
+  ) : showSavePlaceFooter && savePlaceAction ? (
+    <ImageEditorRoutePlaceAction
+      label={savePlaceAction.label}
+      disabled={savePlaceAction.disabled}
+      busy={savePlaceAction.busy}
+      onPlace={savePlaceAction.onPlace}
+    />
   ) : undefined;
 
   return { subheader, footer };
@@ -362,6 +402,7 @@ export function ImageEditor() {
     effectiveOutputH,
     quality,
     exportFormat,
+    enabled: exportDimensionsReady,
   });
 
   const exportPlaceBlockedLabel = null;
@@ -373,6 +414,7 @@ export function ImageEditor() {
     effectiveOutputH,
     quality,
     exportFormat,
+    enabled: exportDimensionsReady,
   });
 
   const qualityPopoutWindowRef = useRef<Window | null>(null);
@@ -408,14 +450,14 @@ export function ImageEditor() {
   const {
     pathMode,
     flowStep,
-    setFlowStep,
     goToStep,
     chooseAutoPath,
     chooseConfigurePath,
     finishConfigurePath,
-    exitToUploadFade,
-    onExitToUploadTransitionEnd,
+    stepExitFade,
+    onStepExitTransitionEnd,
     beginAutoToUpload,
+    beginPositionToSave,
     frameSummary,
     currentStepForNav,
     showFlowStepNav,
@@ -701,12 +743,94 @@ export function ImageEditor() {
     openTowerAuthPopup("/sign-in");
   }, []);
 
+  const offerSelectionPlacement = useMemo(
+    () =>
+      shouldOfferSelectionPlacement({
+        selectedElementType,
+        componentImagePropsResolving,
+        componentImagePropCount: componentImageProps.length,
+        elementCmsBinding,
+        elementCmsBindingLoading,
+      }),
+    [
+      selectedElementType,
+      componentImagePropsResolving,
+      componentImageProps.length,
+      elementCmsBinding,
+      elementCmsBindingLoading,
+    ]
+  );
+
+  const offerReplacePlacement = useMemo(() => shouldOfferReplacePlacement(selectedElementType), [selectedElementType]);
+
+  const resolvedPlacementForPlace = useMemo(
+    () =>
+      resolveImageEditorPlacement({
+        placement,
+        offerSelectionPlacement,
+        offerReplacePlacement,
+        guestCmsTemplateRestricted,
+      }),
+    [placement, offerSelectionPlacement, offerReplacePlacement, guestCmsTemplateRestricted]
+  );
+
+  const savePlaceButton = useMemo(
+    () =>
+      getImageEditorPlaceButtonState({
+        exportPlaceBlockedLabel: exportPlaceBlockedLabelForApply,
+        exportSizeBlockedMessage,
+        busy,
+        foldersLoading,
+        assetFolderCount: assetFolders.length,
+        selectedAssetFolderId,
+        cmsPrimaryUpload,
+        elementCmsBindingLoading,
+        completedCrop,
+        placement: resolvedPlacementForPlace,
+        selectedElementType,
+        componentImagePropsResolving,
+        componentImagePropCount: componentImageProps.length,
+        selectedComponentImagePropId,
+      }),
+    [
+      exportPlaceBlockedLabelForApply,
+      exportSizeBlockedMessage,
+      busy,
+      foldersLoading,
+      assetFolders.length,
+      selectedAssetFolderId,
+      cmsPrimaryUpload,
+      elementCmsBindingLoading,
+      completedCrop,
+      resolvedPlacementForPlace,
+      selectedElementType,
+      componentImagePropsResolving,
+      componentImageProps.length,
+      selectedComponentImagePropId,
+    ]
+  );
+
+  const savePlaceAction = useMemo(
+    () =>
+      imageSrc != null && flowStep === "save"
+        ? {
+            label: savePlaceButton.label,
+            disabled: savePlaceButton.disabled,
+            busy: savePlaceButton.busy,
+            onPlace: applyToCanvas,
+          }
+        : null,
+    [imageSrc, flowStep, savePlaceButton, applyToCanvas]
+  );
+
   const loadedEditor =
     imageSrc != null ? (
-      <ImageEditorLoadedColumn busy={busy} fileBaseName={fileBaseName} fileInputRef={fileInputRef} flowStep={flowStep}>
+      <ImageEditorLoadedColumn
+        flowStep={flowStep}
+        stepExitFade={stepExitFade}
+        onStepExitTransitionEnd={onStepExitTransitionEnd}
+      >
         <ImageEditorCropExportPanel
-          exportPlaceBlockedLabel={exportPlaceBlockedLabelForApply}
-          exportSizeBlockedMessage={exportSizeBlockedMessage}
           exportDimensionsReady={exportDimensionsReady}
           strictOutputDimensionInputs={!autoTargetHasDesignerExportTag}
           aspectPreset={aspectPreset}
@@ -729,7 +853,6 @@ export function ImageEditor() {
           foldersLoading={foldersLoading}
           heightStr={heightStr}
           imageSrc={imageSrc}
-          onApplyToCanvas={applyToCanvas}
           onCreateAssetFolder={createAssetFolderNamed}
           onCropComplete={onCropComplete}
           onQualityCommit={onQualityCommit}
@@ -774,13 +897,11 @@ export function ImageEditor() {
           parsedExportHeight={parsedOutputH}
           effectiveExportWidth={effectiveOutputW}
           effectiveExportHeight={effectiveOutputH}
+          exportPreviewReady={exportDimensionsReady}
           onOpenQualityPopout={openQualityPopout}
           limitCropZoomToNativeResolution={settings.limitCropZoomToNativeResolution}
-          flowPhase={pathMode === "auto" ? "position" : flowStep === "position" ? "position" : "save"}
-          unifiedPositionAndSave={pathMode === "auto"}
-          onContinueToSave={() => {
-            setFlowStep("save");
-          }}
+          flowPhase={flowStep === "position" ? "position" : "save"}
+          hidePlacementCard={pathMode === "auto"}
           frameSummary={frameSummary}
         />
       </ImageEditorLoadedColumn>
@@ -798,10 +919,14 @@ export function ImageEditor() {
     showAutoPageTargetList,
     autoPageTarget,
     beginAutoToUpload,
+    beginPositionToSave,
+    continueToSaveDisabled: completedCrop == null || !exportDimensionsReady,
+    stepExitFade,
+    savePlaceAction,
   });
 
   return (
-    <ImageEditorRouteChrome subheader={stepNavSubheader} footer={routeFooter}>
+    <ImageEditorRouteChrome scrollResetKey={flowStep} subheader={stepNavSubheader} footer={routeFooter}>
       <ImageEditorWorkspace
         emptyStateContent={
           showGuestOnboarding ? (
@@ -825,7 +950,7 @@ export function ImageEditor() {
               autoShowSelectionChoice={autoShowSelectionChoice}
               autoTargets={autoScanTargets}
               dragActive={dragActive}
-              exitToUploadFade={exitToUploadFade}
+              stepExitFade={stepExitFade}
               fileInputId={fileInputId}
               onDoneConfiguringPresets={finishConfigurePath}
               flowStep={flowStep}
@@ -841,7 +966,7 @@ export function ImageEditor() {
               onAutoUseCanvasSelection={onAutoUseCanvasSelection}
               onChooseAddImage={onChooseAddImageEntry}
               onChooseConfigure={onChooseConfigureEntry}
-              onExitToUploadTransitionEnd={onExitToUploadTransitionEnd}
+              onStepExitTransitionEnd={onStepExitTransitionEnd}
               roleReady={roleReady}
             />
           )

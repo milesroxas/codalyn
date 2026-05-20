@@ -10,7 +10,8 @@ import {
   type SettingsSectionId,
   SettingsSectionNav,
 } from "@/features/settings/ui/settings-section-nav";
-import { beaconAppRouteSurfaceClass } from "@/shared/lib/beacon-app-route-surface";
+import { beaconAppRouteSurfaceClass, beaconPanelContainClass } from "@/shared/lib/beacon-app-route-surface";
+import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
@@ -84,7 +85,7 @@ export function BeaconSettingsScreen(props: BeaconSettingsScreenProps) {
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-3 pt-3">
         <ScrollArea className="h-full min-h-0 min-w-0 flex-1">
-          <div className="box-border min-w-0 max-w-full overflow-x-clip px-3">
+          <div className={cn(beaconPanelContainClass, "overflow-x-clip px-3")}>
             {!isTowerUser && section !== "account" ? <GuestSettingsUpsell /> : null}
             <SettingsSectionBody section={section} allowPresetsPanel={allowPresetsSection} />
           </div>

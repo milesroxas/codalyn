@@ -7,6 +7,7 @@ import {
   IncomingDissolvePreview,
   OUTGOING_FADE_CLASS,
 } from "@/features/image-editor/ui/image-editor-source-sections";
+import { beaconPanelContainClass } from "@/shared/lib/beacon-app-route-surface";
 import { cn } from "@/shared/lib/utils";
 
 type ImageEditorDissolveBranchProps = {
@@ -57,7 +58,8 @@ export function ImageEditorDissolveBranch(props: ImageEditorDissolveBranchProps)
     return (
       <div
         className={cn(
-          "flex min-w-0 flex-col gap-3",
+          beaconPanelContainClass,
+          "flex flex-col gap-3",
           OUTGOING_FADE_CLASS,
           beginOutgoingFade ? "pointer-events-none opacity-0 delay-[160ms]" : "opacity-100 delay-0"
         )}
@@ -73,7 +75,12 @@ export function ImageEditorDissolveBranch(props: ImageEditorDissolveBranchProps)
   }
 
   return (
-    <div className="rounded-sm bg-background/80 p-3 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.55)] ring-1 ring-foreground/10 backdrop-blur-sm">
+    <div
+      className={cn(
+        beaconPanelContainClass,
+        "rounded-sm bg-background/80 p-3 ring-1 ring-foreground/10 backdrop-blur-sm"
+      )}
+    >
       <IncomingDissolvePreview
         entered={incomingEnter}
         fileBaseName={assetBaseNameFromFileName(dissolve.incomingFile.name)}

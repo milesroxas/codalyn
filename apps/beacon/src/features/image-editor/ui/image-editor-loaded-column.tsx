@@ -1,24 +1,45 @@
-import type { ReactNode, RefObject } from "react";
+import type { ReactNode, TransitionEvent } from "react";
 import type { ImageEditorFlowStep } from "@/features/image-editor/lib/image-editor-flow-step";
-import { LoadedImageSourceSection } from "@/features/image-editor/ui/image-editor-source-sections";
+import {
+  imageEditorStepEnterTransitionClass,
+  imageEditorStepExitTransitionClass,
+  isImageEditorStepExitTransitionEnd,
+} from "@/features/image-editor/lib/image-editor-step-transition";
+import { useImageEditorStepEnter } from "@/features/image-editor/model/use-image-editor-step-enter";
+import { beaconPanelContainClass } from "@/shared/lib/beacon-app-route-surface";
+import { cn } from "@/shared/lib/utils";
 
 type ImageEditorLoadedColumnProps = {
   flowStep: ImageEditorFlowStep;
-  fileBaseName: string;
-  busy: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
+  stepExitFade: boolean;
+  onStepExitTransitionEnd: (e: TransitionEvent<HTMLDivElement>) => void;
   children: ReactNode;
 };
 
 export function ImageEditorLoadedColumn(props: ImageEditorLoadedColumnProps) {
-  const { flowStep, fileBaseName, busy, fileInputRef, children } = props;
+  const { flowStep, stepExitFade, onStepExitTransitionEnd, children } = props;
+  const entered = useImageEditorStepEnter(flowStep);
+
+  const handleExitTransitionEnd = (e: TransitionEvent<HTMLDivElement>) => {
+    if (!isImageEditorStepExitTransitionEnd(e, stepExitFade)) {
+      return;
+    }
+    onStepExitTransitionEnd(e);
+  };
+
+  if (flowStep === "position") {
+    return (
+      <div className={cn(beaconPanelContainClass, "flex flex-col gap-3")}>
+        <div className={imageEditorStepExitTransitionClass(stepExitFade)} onTransitionEnd={handleExitTransitionEnd}>
+          {children}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
-      {flowStep === "save" ? (
-        <LoadedImageSourceSection busy={busy} fileBaseName={fileBaseName} fileInputRef={fileInputRef} />
-      ) : null}
-      {children}
+    <div className={cn(beaconPanelContainClass, "flex flex-col gap-3")}>
+      <div className={imageEditorStepEnterTransitionClass(entered)}>{children}</div>
     </div>
   );
 }

@@ -15,8 +15,18 @@ export function useExportByteEstimate(options: {
   effectiveOutputH: number;
   quality: number;
   exportFormat: ImageExportFormat;
+  /** When false, skips estimate (e.g. export W×H not chosen yet). */
+  enabled?: boolean;
 }) {
-  const { imageSrc, completedCrop, effectiveOutputW, effectiveOutputH, quality, exportFormat } = options;
+  const {
+    imageSrc,
+    completedCrop,
+    effectiveOutputW,
+    effectiveOutputH,
+    quality,
+    exportFormat,
+    enabled = true,
+  } = options;
 
   const [estimatedBytes, setEstimatedBytes] = useState<number | null>(null);
   const [estimatePending, setEstimatePending] = useState(false);
@@ -33,11 +43,11 @@ export function useExportByteEstimate(options: {
     setEstimatedBytes(null);
     setEstimatePending(false);
     estimateGenRef.current += 1;
-    setEstimateNonce(imageSrc && completedCrop ? 1 : 0);
-  }, [geometryKey, imageSrc, completedCrop]);
+    setEstimateNonce(enabled && imageSrc && completedCrop ? 1 : 0);
+  }, [geometryKey, imageSrc, completedCrop, enabled]);
 
   useEffect(() => {
-    if (estimateNonce === 0 || !imageSrc || !completedCrop) {
+    if (!enabled || estimateNonce === 0 || !imageSrc || !completedCrop) {
       return;
     }
     const gen = ++estimateGenRef.current;
@@ -71,7 +81,7 @@ export function useExportByteEstimate(options: {
     return () => {
       window.clearTimeout(t);
     };
-  }, [estimateNonce, quality, exportFormat, imageSrc, completedCrop, effectiveOutputW, effectiveOutputH]);
+  }, [enabled, estimateNonce, quality, exportFormat, imageSrc, completedCrop, effectiveOutputW, effectiveOutputH]);
 
   const onQualityCommit = useCallback(() => {
     setEstimateNonce((n) => n + 1);

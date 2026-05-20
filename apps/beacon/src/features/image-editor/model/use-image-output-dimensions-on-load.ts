@@ -30,6 +30,10 @@ export function useImageOutputDimensionsOnLoad(
     if (!imageSrc) {
       return;
     }
+    // Reset crop before async load so export preview/encode never use the previous image's crop.
+    setCompletedCrop(null);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
     void loadImage(imageSrc)
       .then((img) => {
         if (applyNatural) {
@@ -40,9 +44,6 @@ export function useImageOutputDimensionsOnLoad(
           setWidthStr(String(w));
           setHeightStr(String(h));
         }
-        setCrop({ x: 0, y: 0 });
-        setZoom(1);
-        setCompletedCrop(null);
       })
       .catch(() => {
         if (imageSrc.startsWith("blob:")) {

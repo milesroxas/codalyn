@@ -4,6 +4,8 @@
 @import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant motion-safe (@media (prefers-reduced-motion: no-preference));
+@custom-variant motion-reduce (@media (prefers-reduced-motion: reduce));
 
 :root {
   font-family: system-ui, -apple-system, sans-serif;
@@ -166,6 +168,18 @@ body {
   html {
     @apply font-sans;
   }
+
+  /**
+   * Radix ScrollArea wraps children in a `display: table` div with `min-width: 100%`, which expands to
+   * the widest descendant and causes horizontal overflow in the Designer extension iframe.
+   */
+  [data-slot="scroll-area-viewport"] > div {
+    display: block !important;
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
 }
 
 @layer utilities {
@@ -193,6 +207,15 @@ body {
 
 /* Compare wipe handle (pointer-driven; line + handle share left % + translate). */
 @layer components {
+  [data-slot="image-editor-cropper"] {
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  [data-slot="image-editor-cropper"] .reactEasyCrop_Container {
+    overflow: hidden;
+  }
+
   .compare-wipe-handle {
     box-sizing: border-box;
     width: 0.875rem;

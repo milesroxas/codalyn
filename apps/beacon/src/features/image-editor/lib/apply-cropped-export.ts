@@ -21,6 +21,11 @@ export function clampEdge(n: number): number {
   return Math.min(MAX_EDGE, Math.max(MIN_EDGE, Math.round(n)));
 }
 
+/** Strips non-digit characters from dimension text inputs. */
+export function sanitizeDimensionDigitsInput(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
 /** Resolves width/height from the export inputs; empty or invalid uses fallback. */
 export function parseOutputDimension(input: string, fallback: number): number {
   const n = Number(input);

@@ -3,3 +3,15 @@
  * Use for the routed shell, settings, and any surface that should pin chrome (e.g. dock footer) to the viewport edges.
  */
 export const beaconAppRouteSurfaceClass = "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden";
+
+/**
+ * Width containment for any panel region inside the fixed-size Designer extension iframe.
+ * Pair with `overflow-x-clip` on scroll surfaces; children inherit a bounded width without per-section max-width hacks.
+ */
+export const beaconPanelContainClass = "min-w-0 w-full max-w-full";
+
+/** Padded, scrollable route body content (horizontal inset matches route chrome padding). */
+export const beaconRouteScrollContentClass = "box-border min-w-0 w-full max-w-full space-y-4 overflow-x-clip px-3 py-3";
+
+/** Full-bleed strip inside padded scroll content (e.g. loaded-image filename bar). */
+export const beaconRouteBleedXClass = "-mx-3 px-3";

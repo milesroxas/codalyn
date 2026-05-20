@@ -1,13 +1,17 @@
-import type { SetStateAction, TransitionEvent } from "react";
+import type { SetStateAction } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Area } from "react-easy-crop";
 import { type EditorAspectSelection, editorAspectLabel } from "@/features/image-editor/lib/aspect-preset";
 import {
-  getImageEditorStepOrder,
+  applyImageEditorBackNavigation,
   type ImageEditorFlowStep,
   type ImageEditorPathMode,
   imageEditorIncludeEntryInStepOrder,
 } from "@/features/image-editor/lib/image-editor-flow-step";
+import { prefersReducedMotion } from "@/features/image-editor/lib/prefers-reduced-motion";
+
+/** Steps that exit via opacity fade before advancing (see `imageEditorStepExitFadeClass`). */
+export type ImageEditorStepExitFrom = "autoElement" | "position";
 
 type UseImageEditorWorkflowOptions = {
   imageSrc: string | null;
@@ -53,8 +57,8 @@ export function useImageEditorWorkflow(options: UseImageEditorWorkflowOptions) {
 
   const [pathMode, setPathMode] = useState<ImageEditorPathMode>("unset");
   const [flowStep, setFlowStep] = useState<ImageEditorFlowStep>("entry");
-  const [exitToUploadFade, setExitToUploadFade] = useState(false);
-  const [exitToUploadFrom, setExitToUploadFrom] = useState<"autoElement" | null>(null);
+  const [stepExitFade, setStepExitFade] = useState(false);
+  const [stepExitFrom, setStepExitFrom] = useState<ImageEditorStepExitFrom | null>(null);
   const imageSrcReplaceDetectRef = useRef<string | null>(null);
 
   const includeEntryStep = useMemo(
@@ -77,35 +81,16 @@ export function useImageEditorWorkflow(options: UseImageEditorWorkflowOptions) {
 
   const goToStep = useCallback(
     (target: ImageEditorFlowStep) => {
-      if (pathMode === "unset") {
-        return;
-      }
-      const order = getImageEditorStepOrder(pathMode, {
-        includeEntryStep: imageEditorIncludeEntryInStepOrder(pathMode, isWorkspaceDesigner),
+      applyImageEditorBackNavigation({
+        target,
+        pathMode,
+        flowStep,
+        imageSrc,
+        isWorkspaceDesigner,
+        clearImageSourceOnly,
+        setPathMode,
+        setFlowStep,
       });
-      const ti = order.indexOf(target);
-      const fi = order.indexOf(flowStep);
-      if (ti === -1 || fi === -1 || ti >= fi) {
-        return;
-      }
-      if (target === "entry") {
-        clearImageSourceOnly();
-        setPathMode("unset");
-        setFlowStep("entry");
-        return;
-      }
-      const clearToStep =
-        target === "upload" ||
-        (target === "autoElement" && pathMode === "auto") ||
-        (target === "configurePresets" && pathMode === "configurations");
-      if (clearToStep) {
-        clearImageSourceOnly();
-        setFlowStep(target);
-        return;
-      }
-      if (target === "position" && imageSrc) {
-        setFlowStep("position");
-      }
     },
     [flowStep, pathMode, imageSrc, clearImageSourceOnly, isWorkspaceDesigner]
   );
@@ -154,30 +139,42 @@ export function useImageEditorWorkflow(options: UseImageEditorWorkflowOptions) {
     parsedOutputH,
   ]);
 
-  const onExitToUploadTransitionEnd = useCallback(
-    (e: TransitionEvent<HTMLDivElement>) => {
-      if (e.target !== e.currentTarget || e.propertyName !== "opacity" || !exitToUploadFade) {
+  const completeStepExit = useCallback((from: ImageEditorStepExitFrom) => {
+    if (from === "autoElement") {
+      setFlowStep("upload");
+    } else if (from === "position") {
+      setFlowStep("save");
+    }
+    setStepExitFade(false);
+    setStepExitFrom(null);
+  }, []);
+
+  const onStepExitTransitionEnd = useCallback(() => {
+    if (!stepExitFade || stepExitFrom == null) {
+      return;
+    }
+    completeStepExit(stepExitFrom);
+  }, [stepExitFade, stepExitFrom, completeStepExit]);
+
+  const beginStepExit = useCallback(
+    (from: ImageEditorStepExitFrom) => {
+      setStepExitFrom(from);
+      if (prefersReducedMotion()) {
+        completeStepExit(from);
         return;
       }
-      if (exitToUploadFrom === "autoElement") {
-        setFlowStep("upload");
-        setExitToUploadFade(false);
-        setExitToUploadFrom(null);
-      }
+      setStepExitFade(true);
     },
-    [exitToUploadFade, exitToUploadFrom]
+    [completeStepExit]
   );
 
   const beginAutoToUpload = useCallback(() => {
-    setExitToUploadFrom("autoElement");
-    setExitToUploadFade(true);
-  }, []);
+    beginStepExit("autoElement");
+  }, [beginStepExit]);
 
-  useEffect(() => {
-    if (pathMode === "auto" && flowStep === "save") {
-      setFlowStep("position");
-    }
-  }, [pathMode, flowStep]);
+  const beginPositionToSave = useCallback(() => {
+    beginStepExit("position");
+  }, [beginStepExit]);
 
   useEffect(() => {
     if (imageSrc && !dissolving && flowStep === "upload") {
@@ -217,9 +214,10 @@ export function useImageEditorWorkflow(options: UseImageEditorWorkflowOptions) {
     chooseAutoPath,
     chooseConfigurePath,
     finishConfigurePath,
-    exitToUploadFade,
+    stepExitFade,
     beginAutoToUpload,
-    onExitToUploadTransitionEnd,
+    beginPositionToSave,
+    onStepExitTransitionEnd,
     frameSummary,
     currentStepForNav,
     showFlowStepNav,

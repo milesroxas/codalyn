@@ -3,6 +3,8 @@ import type { DragEvent, ReactNode, RefObject, TransitionEvent } from "react";
 import type { ImageDissolveState } from "@/features/image-editor/model/use-image-dissolve-transition";
 import { ImageEditorDissolveBranch } from "@/features/image-editor/ui/image-editor-dissolve-branch";
 import { EmptyImageSourceSection } from "@/features/image-editor/ui/image-editor-source-sections";
+import { beaconPanelContainClass } from "@/shared/lib/beacon-app-route-surface";
+import { cn } from "@/shared/lib/utils";
 
 export type ImageEditorWorkspaceProps = {
   fileInputRef: RefObject<HTMLInputElement | null>;
@@ -46,7 +48,7 @@ export function ImageEditorWorkspace(props: ImageEditorWorkspaceProps) {
   } = props;
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className={cn(beaconPanelContainClass, "flex flex-col gap-3")}>
       <input
         ref={fileInputRef}
         disabled={dissolving}

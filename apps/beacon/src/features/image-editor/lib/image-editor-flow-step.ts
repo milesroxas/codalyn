@@ -21,7 +21,8 @@ function navAuto(includeEntry: boolean): NavItem[] {
   const core: NavItem[] = [
     { id: "autoElement", label: "Target" },
     { id: "upload", label: "Add" },
-    { id: "position", label: "Save" },
+    { id: "position", label: "Position" },
+    { id: "save", label: "Save" },
   ];
   if (includeEntry) {
     return [{ id: NAV_START, label: "Start" }, ...core];
@@ -59,9 +60,9 @@ export function getImageEditorStepOrder(
 ): ImageEditorFlowStep[] {
   if (pathMode === "auto") {
     if (orderOpts.includeEntryStep) {
-      return ["entry", "autoElement", "upload", "position"];
+      return ["entry", "autoElement", "upload", "position", "save"];
     }
-    return ["autoElement", "upload", "position"];
+    return ["autoElement", "upload", "position", "save"];
   }
   if (pathMode === "configurations") {
     return ["entry", "configurePresets"];
@@ -88,6 +89,52 @@ export function isImageEditorBackStep(
     imageEditorStepIndex(to, pathMode, orderOpts) < imageEditorStepIndex(from, pathMode, orderOpts) &&
     imageEditorStepIndex(to, pathMode, orderOpts) >= 0
   );
+}
+
+type ImageEditorBackNavigationInput = {
+  target: ImageEditorFlowStep;
+  pathMode: ImageEditorPathMode;
+  flowStep: ImageEditorFlowStep;
+  imageSrc: string | null;
+  isWorkspaceDesigner: boolean;
+  clearImageSourceOnly: () => void;
+  setPathMode: (mode: ImageEditorPathMode) => void;
+  setFlowStep: (step: ImageEditorFlowStep) => void;
+};
+
+/** Apply back navigation from the step strip when `target` is before `flowStep`. */
+export function applyImageEditorBackNavigation(input: ImageEditorBackNavigationInput): void {
+  const { target, pathMode, flowStep, imageSrc, isWorkspaceDesigner, clearImageSourceOnly, setPathMode, setFlowStep } =
+    input;
+  if (pathMode === "unset") {
+    return;
+  }
+  const order = getImageEditorStepOrder(pathMode, {
+    includeEntryStep: imageEditorIncludeEntryInStepOrder(pathMode, isWorkspaceDesigner),
+  });
+  const ti = order.indexOf(target);
+  const fi = order.indexOf(flowStep);
+  if (ti === -1 || fi === -1 || ti >= fi) {
+    return;
+  }
+  if (target === "entry") {
+    clearImageSourceOnly();
+    setPathMode("unset");
+    setFlowStep("entry");
+    return;
+  }
+  const clearToStep =
+    target === "upload" ||
+    (target === "autoElement" && pathMode === "auto") ||
+    (target === "configurePresets" && pathMode === "configurations");
+  if (clearToStep) {
+    clearImageSourceOnly();
+    setFlowStep(target);
+    return;
+  }
+  if ((target === "position" || target === "save") && imageSrc) {
+    setFlowStep(target);
+  }
 }
 
 /** `entry` appears in the step strip when designers can return to the start screen. */

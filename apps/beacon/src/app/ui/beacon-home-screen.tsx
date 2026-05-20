@@ -6,14 +6,8 @@ import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-acce
 import { CmsSlotsCollectionTemplatePrompt } from "@/features/cms-slots/ui/cms-slots-collection-template-prompt";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
 import { BEACON_HOME_TILE_CSS_VARS } from "@/shared/lib/beacon-app-backgrounds";
-import {
-  IMAGE_UPLOAD_FEATURE_NAME,
-  IMAGE_UPLOAD_HOME_TILE_DESCRIPTION,
-} from "@/shared/lib/beacon-feature-route-copy";
-import {
-  CMS_SLOTS_FEATURE_NAME,
-  CMS_SLOTS_HOME_TILE_DESCRIPTION,
-} from "@/shared/lib/cms-slots-feature-copy";
+import { IMAGE_UPLOAD_FEATURE_NAME, IMAGE_UPLOAD_HOME_TILE_DESCRIPTION } from "@/shared/lib/beacon-feature-route-copy";
+import { CMS_SLOTS_FEATURE_NAME, CMS_SLOTS_HOME_TILE_DESCRIPTION } from "@/shared/lib/cms-slots-feature-copy";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 import { cn } from "@/shared/lib/utils";

@@ -52,8 +52,18 @@ export function useExportQualityPreview(options: {
   effectiveOutputH: number;
   quality: number;
   exportFormat: ImageExportFormat;
+  /** When false, skips encode (e.g. export W×H not chosen yet). */
+  enabled?: boolean;
 }) {
-  const { imageSrc, completedCrop, effectiveOutputW, effectiveOutputH, quality, exportFormat } = options;
+  const {
+    imageSrc,
+    completedCrop,
+    effectiveOutputW,
+    effectiveOutputH,
+    quality,
+    exportFormat,
+    enabled = true,
+  } = options;
 
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [compressedUrl, setCompressedUrl] = useState<string | null>(null);
@@ -127,8 +137,18 @@ export function useExportQualityPreview(options: {
   }, [geometryKey]);
 
   useEffect(() => {
-    if (!imageSrc || !completedCrop) {
+    if (!enabled || !imageSrc || !completedCrop) {
       previewGenRef.current += 1;
+      const prev = urlsRef.current;
+      if (prev.original) {
+        URL.revokeObjectURL(prev.original);
+      }
+      if (prev.compressed) {
+        URL.revokeObjectURL(prev.compressed);
+      }
+      urlsRef.current = { original: null, compressed: null };
+      previewBlobsRef.current = { png: null, compressed: null };
+      assignUrls(null, null);
       setPreviewPending(false);
       return;
     }
@@ -149,7 +169,7 @@ export function useExportQualityPreview(options: {
     return () => {
       window.clearTimeout(t);
     };
-  }, [imageSrc, completedCrop, effectiveOutputW, effectiveOutputH, quality, exportFormat, assignUrls]);
+  }, [enabled, imageSrc, completedCrop, effectiveOutputW, effectiveOutputH, quality, exportFormat, assignUrls]);
 
   return {
     originalPreviewUrl: originalUrl,

@@ -1,8 +1,14 @@
 import { ChevronLeft } from "lucide-react";
 import type * as React from "react";
 import type { ReactNode } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { beaconAppRouteSurfaceClass } from "@/shared/lib/beacon-app-route-surface";
+import {
+  beaconAppRouteSurfaceClass,
+  beaconPanelContainClass,
+  beaconRouteBleedXClass,
+  beaconRouteScrollContentClass,
+} from "@/shared/lib/beacon-app-route-surface";
 import { BEACON_BACK_TO_HOME_ARIA_LABEL } from "@/shared/lib/beacon-feature-route-copy";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
@@ -26,7 +32,7 @@ export function BeaconFeatureRouteHeader(props: BeaconFeatureRouteHeaderProps) {
 
   return (
     <div className="shrink-0 border-b border-border/50 bg-muted/20 dark:bg-muted/15" data-slot={dataSlot}>
-      <div className="mx-auto flex h-8 min-w-0 max-w-lg items-center gap-2 px-3">
+      <div className={cn(beaconPanelContainClass, "flex h-8 items-center gap-2 px-3")}>
         <Button
           type="button"
           variant="ghost"
@@ -47,14 +53,31 @@ export type BeaconFeatureRouteScrollBodyProps = {
   children: ReactNode;
   className?: string;
   contentClassName?: string;
+  /** When this value changes, the scroll viewport resets to the top (e.g. image editor flow step). */
+  scrollResetKey?: string | number | boolean | null;
 };
 
 export function BeaconFeatureRouteScrollBody(props: BeaconFeatureRouteScrollBodyProps) {
-  const { children, className, contentClassName } = props;
+  const { children, className, contentClassName, scrollResetKey } = props;
+  const viewportRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (scrollResetKey === undefined) {
+      return;
+    }
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return;
+    }
+    viewport.scrollTop = 0;
+  }, [scrollResetKey]);
+
   return (
-    <ScrollArea className={cn("min-h-0 min-w-0 flex-1", className)}>
-      <div className={cn("mx-auto w-full max-w-lg space-y-4 px-3 py-3", contentClassName)}>{children}</div>
-    </ScrollArea>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", className)}>
+      <ScrollArea className="h-full min-h-0 min-w-0 flex-1" viewportRef={viewportRef}>
+        <div className={cn(beaconRouteScrollContentClass, contentClassName)}>{children}</div>
+      </ScrollArea>
+    </div>
   );
 }
 
@@ -89,7 +112,11 @@ export function BeaconRouteSubheader(props: BeaconRouteSubheaderProps) {
   return (
     <div
       data-slot="beacon_route_subheader"
-      className="-mx-3 flex min-h-0 min-w-0 items-center gap-2 border-b border-border bg-muted/40 py-1.5 pr-1.5 pl-3"
+      className={cn(
+        beaconPanelContainClass,
+        beaconRouteBleedXClass,
+        "flex min-h-0 items-center gap-2 border-b border-border bg-muted/40 py-1.5 pr-1.5"
+      )}
     >
       {children}
     </div>
@@ -106,7 +133,7 @@ export function BeaconFeatureRouteSubheader(props: BeaconFeatureRouteSubheaderPr
   const { children, dataSlot = "beacon_feature_route_subheader" } = props;
   return (
     <div className="shrink-0 border-b border-border/50 bg-background" data-slot={dataSlot}>
-      <div className="mx-auto w-full max-w-lg px-3 py-2">{children}</div>
+      <div className={cn(beaconPanelContainClass, "px-3 py-2")}>{children}</div>
     </div>
   );
 }

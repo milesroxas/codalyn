@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction, TransitionEvent } from "react";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { assetBaseNameFromFileName } from "@/features/image-editor/lib/sanitize-asset-base-name";
 
@@ -82,6 +82,15 @@ export function useImageDissolveTransition(options: {
       cancelAnimationFrame(id);
     };
   }, [dissolve]);
+
+  useEffect(() => {
+    return () => {
+      const d = dissolveRef.current;
+      if (d.phase === "dissolving") {
+        URL.revokeObjectURL(d.incomingUrl);
+      }
+    };
+  }, []);
 
   useLayoutEffect(() => {
     if (!showIncomingPreview) {

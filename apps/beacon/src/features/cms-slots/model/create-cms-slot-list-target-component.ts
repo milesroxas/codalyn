@@ -146,6 +146,25 @@ async function getBeaconListTargetComponentByNameOrSearch(name: string): Promise
  *   `webflow.getComponent(id)` first so placement is not blocked by a brief post-register index delay for
  *   `getComponentByName` / search.
  */
+/**
+ * Every registered list-target definition whose root `data-list` matches (Beacon Utilities group only).
+ * Used when container-based name lookup misses after rename, stale ids, or uninstall cleanup.
+ */
+export async function listCmsSlotListTargetComponentsByDataList(dataList: string): Promise<Component[]> {
+  const components = await webflow.getAllComponents();
+  const out: Component[] = [];
+  for (const comp of components) {
+    const settings = await comp.getSettings();
+    if (settings.group !== CMS_SLOT_UTILITIES_COMPONENT_GROUP) {
+      continue;
+    }
+    if (await beaconListTargetRootMatchesDataList(comp, dataList)) {
+      out.push(comp);
+    }
+  }
+  return out;
+}
+
 export async function getCmsSlotListTargetComponentOrNull(
   dataList: string,
   listContainer: BlockElement,
@@ -239,6 +258,9 @@ export async function applyCmsSlotListTargetSync(
 /**
  * Registers a site component under {@link CMS_SLOT_UTILITIES_COMPONENT_GROUP} whose root is a single DOM node that
  * identifies **this beacon list** (the `data-list` target), not the component instances inside the list.
+ *
+ * On a CMS collection template, call {@link ensureCmsSlotListCmsTextFieldOnList} **before** this so the Plain Text
+ * field exists and the Designer bind catalog is refreshed prior to registration and placement.
  *
  * Also adds a **`textContent`** “Text” prop (`tryAddCmsSlotListTargetTextPropDirectToDefinition`), sets empty root
  * text in the builder, and binds that prop to the root DOM. `ensureCmsSlotListTargetTextProp` runs on place/reconcile

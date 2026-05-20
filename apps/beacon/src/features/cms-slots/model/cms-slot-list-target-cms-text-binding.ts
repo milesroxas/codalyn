@@ -1,4 +1,5 @@
 import { getCmsSlotListTargetTextProp } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
+import { findCmsSlotListsOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { towerFetch } from "@/shared/lib/tower-client";
 import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
 
@@ -23,6 +24,11 @@ export const CMS_SLOT_LIST_TARGET_CMS_FIELD_ID_ATTR = "data-beacon-cms-field-id"
 export type CmsSlotListCmsBinding = {
   collectionId: string;
   fieldId: string;
+};
+
+export type CmsSlotListCmsTextFieldEnsureResult = {
+  binding: CmsSlotListCmsBinding;
+  fieldWasCreated: boolean;
 };
 
 export function cmsSlotListCmsPlainTextFieldDisplayName(dataList: string): string {
@@ -184,16 +190,19 @@ async function postNewCmsPlainTextField(collectionId: string, dataList: string):
  * Data API: find or create the per-list Plain Text CMS field. List render targets bind their `Text` prop to this
  * field (one field per beacon list, shared across all render-target instances).
  */
-async function ensureCmsPlainTextField(collectionId: string, dataList: string): Promise<CmsSlotListCmsBinding | null> {
+async function ensureCmsPlainTextField(
+  collectionId: string,
+  dataList: string
+): Promise<(CmsSlotListCmsBinding & { fieldWasCreated: boolean }) | null> {
   const existing = await findExistingBeaconListField(collectionId, dataList);
   if (existing != null) {
-    return { collectionId, fieldId: existing };
+    return { collectionId, fieldId: existing, fieldWasCreated: false };
   }
   const created = await postNewCmsPlainTextField(collectionId, dataList);
   if (created == null) {
     return null;
   }
-  return { collectionId, fieldId: created };
+  return { collectionId, fieldId: created, fieldWasCreated: true };
 }
 
 export async function getCmsSlotListTargetCmsCollectionIdFromListContainer(
@@ -215,42 +224,73 @@ async function persistCmsAttrsOnListBlock(listContainer: BlockElement, binding: 
   await listContainer.setCustomAttribute(CMS_SLOT_LIST_TARGET_CMS_FIELD_ID_ATTR, binding.fieldId);
 }
 
+function sameBlockElement(a: BlockElement, b: BlockElement): boolean {
+  return a.id.component === b.id.component && a.id.element === b.id.element;
+}
+
+/** When off a CMS template page, reuse the collection id from another beacon list on the same page. */
+async function inferCmsCollectionIdFromSiblingBeaconLists(excludeContainer: BlockElement): Promise<string | null> {
+  const lists = await findCmsSlotListsOnPage();
+  for (const { container } of lists) {
+    if (sameBlockElement(container, excludeContainer)) {
+      continue;
+    }
+    const collectionId = await getCmsSlotListTargetCmsCollectionIdFromListContainer(container);
+    if (collectionId != null) {
+      return collectionId;
+    }
+  }
+  return null;
+}
+
 /**
- * Resolves the CMS binding for this list:
+ * Resolves the CMS binding for this list (call **before** registering or placing a list-target component on a
+ * collection template):
  * - On a CMS template page: ensures the field exists in **that** collection and persists ids on the list block.
- * - Off-template with stored attrs: re-validates the stored field still exists in the stored collection.
+ * - Off-template: reuses another beacon list’s collection id on the same page, then ensures the field there.
+ * - Off-template with stored attrs only: re-validates the stored field still exists in the stored collection.
  * - Otherwise: `null` (no CMS bind possible right now).
  *
- * The Designer only exposes CMS bindable sources on the matching template page, so callers should treat `null`
- * here as "skip bind" rather than retry forever.
+ * After creating a field, Webflow’s Designer may not expose it for binding until the user switches to CMS and back
+ * to Designer — use the CMS field link prompt rather than automatic page pivots.
  */
 export async function ensureCmsSlotListCmsTextFieldOnList(
   listContainer: BlockElement,
   dataList: string
-): Promise<CmsSlotListCmsBinding | null> {
+): Promise<CmsSlotListCmsTextFieldEnsureResult | null> {
   const pageCollection = await getCmsTemplateCollectionIdFromCurrentPage();
   const storedCollection = await getCmsSlotListTargetCmsCollectionIdFromListContainer(listContainer);
   const storedField = await getCmsSlotListTargetCmsFieldIdFromListContainer(listContainer);
+  const collectionIdForEnsure = pageCollection ?? (await inferCmsCollectionIdFromSiblingBeaconLists(listContainer));
 
-  if (pageCollection != null) {
-    if (storedCollection === pageCollection && storedField != null) {
-      const fields = await readCollectionFields(pageCollection);
+  if (collectionIdForEnsure != null) {
+    if (storedCollection === collectionIdForEnsure && storedField != null) {
+      const fields = await readCollectionFields(collectionIdForEnsure);
       if (fieldPlainTextById(fields, storedField) != null) {
-        return { collectionId: pageCollection, fieldId: storedField };
+        return {
+          binding: { collectionId: collectionIdForEnsure, fieldId: storedField },
+          fieldWasCreated: false,
+        };
       }
     }
-    const ensured = await ensureCmsPlainTextField(pageCollection, dataList);
+    const ensured = await ensureCmsPlainTextField(collectionIdForEnsure, dataList);
     if (ensured == null) {
       return null;
     }
     await persistCmsAttrsOnListBlock(listContainer, ensured);
-    return ensured;
+    return {
+      binding: { collectionId: ensured.collectionId, fieldId: ensured.fieldId },
+      fieldWasCreated: ensured.fieldWasCreated,
+    };
   }
 
   if (storedCollection != null && storedField != null) {
     const fields = await readCollectionFields(storedCollection);
     if (fieldPlainTextById(fields, storedField) != null) {
-      return { collectionId: storedCollection, fieldId: storedField };
+      return {
+        binding: { collectionId: storedCollection, fieldId: storedField },
+        fieldWasCreated: false,
+      };
     }
   }
 
@@ -549,7 +589,7 @@ export async function bindCmsSlotListTargetInstancesToListCmsText(options: {
   if (options.resolvedBinding !== undefined) {
     binding = options.resolvedBinding;
   } else {
-    binding = await ensureCmsSlotListCmsTextFieldOnList(options.listContainer, options.dataList);
+    binding = (await ensureCmsSlotListCmsTextFieldOnList(options.listContainer, options.dataList))?.binding ?? null;
   }
   if (binding == null) {
     return;

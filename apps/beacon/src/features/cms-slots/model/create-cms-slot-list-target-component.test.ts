@@ -9,6 +9,7 @@ import {
   CMS_SLOT_LIST_RENDER_TAG,
   CMS_SLOT_UTILITIES_COMPONENT_GROUP,
   getCmsSlotListTargetComponentOrNull,
+  listCmsSlotListTargetComponentsByDataList,
   uniqueCmsSlotListTargetComponentName,
 } from "./create-cms-slot-list-target-component";
 
@@ -178,5 +179,50 @@ describe("getCmsSlotListTargetComponentOrNull", () => {
     const out = await getCmsSlotListTargetComponentOrNull(DATA_LIST, listContainer, "gone-id");
     expect(out).toBe(byName);
     expect(getComponentByName).toHaveBeenCalled();
+  });
+});
+
+describe("listCmsSlotListTargetComponentsByDataList", () => {
+  beforeEach(() => {
+    webflowPrev = (globalThis as { webflow?: unknown }).webflow;
+  });
+
+  afterEach(() => {
+    (globalThis as { webflow?: unknown }).webflow = webflowPrev;
+  });
+
+  it("returns Beacon Utilities definitions whose root data-list matches", async () => {
+    const matchDom = makeListTargetDomRoot({
+      "data-target": "beacons",
+      "data-list": DATA_LIST,
+      "data-beacon-target": "list",
+    });
+    const match = {
+      id: "def-match",
+      getSettings: vi.fn().mockResolvedValue({ group: CMS_SLOT_UTILITIES_COMPONENT_GROUP }),
+      getRootElement: vi.fn().mockResolvedValue({ type: "DOM" as const, ...matchDom }),
+    } as unknown as Component;
+    const otherDom = makeListTargetDomRoot({
+      "data-target": "beacons",
+      "data-list": "beacon-other",
+      "data-beacon-target": "list",
+    });
+    const other = {
+      id: "def-other",
+      getSettings: vi.fn().mockResolvedValue({ group: CMS_SLOT_UTILITIES_COMPONENT_GROUP }),
+      getRootElement: vi.fn().mockResolvedValue({ type: "DOM" as const, ...otherDom }),
+    } as unknown as Component;
+    const utility = {
+      id: "def-utility",
+      getSettings: vi.fn().mockResolvedValue({ group: CMS_SLOT_UTILITIES_COMPONENT_GROUP }),
+      getRootElement: vi.fn().mockResolvedValue(null),
+    } as unknown as Component;
+
+    (globalThis as unknown as { webflow: WebflowApi }).webflow = {
+      getAllComponents: vi.fn().mockResolvedValue([match, other, utility]),
+    } as unknown as WebflowApi;
+
+    const out = await listCmsSlotListTargetComponentsByDataList(DATA_LIST);
+    expect(out).toEqual([match]);
   });
 });

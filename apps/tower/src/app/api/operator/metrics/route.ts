@@ -7,9 +7,9 @@ import {
   invitation,
   member,
   organization,
+  organizationWebflowOAuthToken,
   session as sessionTable,
   user,
-  organizationWebflowOAuthToken,
 } from "@/shared/lib/db/auth-schema";
 
 export const dynamic = "force-dynamic";

@@ -5,7 +5,13 @@ import { auth } from "@/server/auth";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorUserDetail, OperatorUserPatch } from "@/server/operator/types";
 import { db } from "@/shared/lib/db";
-import { member, organization, session as sessionTable, user, organizationWebflowOAuthToken } from "@/shared/lib/db/auth-schema";
+import {
+  member,
+  organization,
+  organizationWebflowOAuthToken,
+  session as sessionTable,
+  user,
+} from "@/shared/lib/db/auth-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -70,10 +76,7 @@ async function fetchUserDetail(userId: string): Promise<OperatorUserDetail | nul
     db
       .select({ exists: sql<boolean>`1` })
       .from(member)
-      .innerJoin(
-        organizationWebflowOAuthToken,
-        eq(organizationWebflowOAuthToken.organizationId, member.organizationId)
-      )
+      .innerJoin(organizationWebflowOAuthToken, eq(organizationWebflowOAuthToken.organizationId, member.organizationId))
       .where(eq(member.userId, userId))
       .limit(1),
   ]);

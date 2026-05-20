@@ -75,5 +75,5 @@ export function CmsSlotsAccessGate(props: { children: ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return <div className={beaconAppRouteSurfaceClass}>{children}</div>;
 }

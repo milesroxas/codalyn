@@ -1,8 +1,12 @@
-import { removeAllCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
+import {
+  removeAllCmsSlotListTargetInstancesOnPage,
+  removeAllInstancesOfComponentOnPage,
+} from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import {
   CMS_SLOT_UTILITIES_COMPONENT_GROUP,
   getCmsSlotListTargetComponentOrNull,
+  listCmsSlotListTargetComponentsByDataList,
 } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 
@@ -67,6 +71,38 @@ export async function removeCmsSlotListFromPage(container: BlockElement): Promis
 }
 
 /**
+ * Removes every list-target site component for `dataList` (canvas instances first, then `unregisterComponent`).
+ * Resolves by container/name when available, then scans Beacon Utilities definitions by root `data-list`.
+ */
+export async function purgeCmsSlotListTargetDefinitionsForDataList(
+  dataList: string,
+  listContainer?: BlockElement | null,
+  preferredDefinitionId?: string | null
+): Promise<void> {
+  const definitions = new Map<string, Component>();
+  if (listContainer != null) {
+    const primary = await getCmsSlotListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
+    if (primary != null) {
+      definitions.set(primary.id, primary);
+    }
+  }
+  for (const comp of await listCmsSlotListTargetComponentsByDataList(dataList)) {
+    definitions.set(comp.id, comp);
+  }
+  if (listContainer != null && definitions.size > 0) {
+    await removeAllCmsSlotListTargetInstancesOnPage(dataList, listContainer, { preferredDefinitionId });
+  }
+  for (const comp of definitions.values()) {
+    await removeAllInstancesOfComponentOnPage(comp);
+    try {
+      await webflow.unregisterComponent(comp);
+    } catch (e) {
+      console.warn("[beacon] unregister list target component failed (non-fatal):", e);
+    }
+  }
+}
+
+/**
  * If a Beacon list-target **site component** exists for this list (in {@link CMS_SLOT_UTILITIES_COMPONENT_GROUP}),
  * removes its **page instances** (Placed on canvas), unregisters the definition, then removes the hidden beacon list
  * block. Order: resolve definition from `container` → remove instances → `unregisterComponent` → remove the block so
@@ -74,13 +110,10 @@ export async function removeCmsSlotListFromPage(container: BlockElement): Promis
  */
 export async function deleteCmsSlotListAndListTargetDefinition(
   dataList: string,
-  container: BlockElement
+  container: BlockElement,
+  preferredDefinitionId?: string | null
 ): Promise<void> {
-  const comp = await getCmsSlotListTargetComponentOrNull(dataList, container);
-  if (comp != null) {
-    await removeAllCmsSlotListTargetInstancesOnPage(dataList, container);
-    await webflow.unregisterComponent(comp);
-  }
+  await purgeCmsSlotListTargetDefinitionsForDataList(dataList, container, preferredDefinitionId);
   await removeCmsSlotListFromPage(container);
 }
 

@@ -81,6 +81,32 @@ export async function removeAllCmsSlotListTargetInstancesOnPage(
   }
 }
 
+/** Removes every instance of `definition` on the current page (by definition id, then name + group). */
+export async function removeAllInstancesOfComponentOnPage(definition: Component): Promise<void> {
+  const expectedId = definition.id;
+  const expectedName = await definition.getName();
+  const expectedGroup = (await definition.getSettings()).group;
+  const all = await webflow.getAllElements();
+  for (const el of all) {
+    if (el.type !== "ComponentInstance") {
+      continue;
+    }
+    const inst = el as ComponentElement;
+    const c = await inst.getComponent();
+    if (c.id !== expectedId && (await c.getName()) !== expectedName) {
+      continue;
+    }
+    if ((await c.getSettings()).group !== expectedGroup) {
+      continue;
+    }
+    try {
+      await inst.remove();
+    } catch (e) {
+      console.warn("[beacon] remove component instance failed (non-fatal):", e);
+    }
+  }
+}
+
 /**
  * True when a component instance on the current page matches the list-target by name/group.
  * Skips the mirror-surface check (no `enterComponent` / `exitComponent`) — for Composer list eligibility

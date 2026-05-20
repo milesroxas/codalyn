@@ -1,4 +1,4 @@
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { ComposerEligibleList } from "@/features/cms-slots/model/cms-slot-composer-eligible";
 import { displayLabelForDataList } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import { shouldShowCmsSlotsEditorNoSlotsEmpty } from "@/features/cms-slots/model/cms-slots-access";
@@ -17,7 +17,6 @@ type CmsSlotComposerListPanelProps = {
   eligible: ComposerEligibleList[];
   openingKey: string | null;
   onOpenList: (b: ComposerEligibleList) => void;
-  onRefresh: () => void;
 };
 
 export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
@@ -31,7 +30,6 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
     eligible,
     openingKey,
     onOpenList,
-    onRefresh,
   } = props;
   const { composerOnly } = useCmsSlotsAccess();
   const scanSettled = !loading && !pageScanLoading;
@@ -70,23 +68,6 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
 
   return (
     <div className="space-y-4" data-slot="beacon_composer_list">
-      <div className="flex items-center justify-end gap-2">
-        {loading || pageScanLoading ? (
-          <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-label="Loading lists" />
-        ) : null}
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          className="shrink-0"
-          disabled={loading || pageScanLoading}
-          aria-label="Refresh lists"
-          onClick={() => void onRefresh()}
-        >
-          <RefreshCw aria-hidden className="size-4" />
-        </Button>
-      </div>
-
       {runtimeOk && eligible.length > 0 ? (
         <ul className="divide-y divide-border" aria-label="Lists available in Composer">
           {eligible.map((b) => (

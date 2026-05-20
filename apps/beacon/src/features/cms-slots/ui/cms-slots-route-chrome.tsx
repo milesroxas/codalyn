@@ -1,4 +1,4 @@
-import { ChevronLeft, List, PanelsTopLeft, SquareCode } from "lucide-react";
+import { ChevronLeft, List, PanelsTopLeft } from "lucide-react";
 import { type NavigateFunction, NavLink } from "react-router-dom";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
@@ -12,14 +12,14 @@ import { CmsSlotComposerStudioPanel } from "@/features/cms-slots/ui/cms-slot-com
 import { ComposerPaletteSection } from "@/features/cms-slots/ui/cms-slot-composer-studio/composer-palette-section";
 import { CmsSlotCompositionPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel";
 import { CmsSlotHomePanel } from "@/features/cms-slots/ui/cms-slot-home-panel";
-import { CmsSlotPageRuntimeHeaderStatus } from "@/features/cms-slots/ui/cms-slot-page-runtime-header-status";
+import { CmsSlotsCmsFieldLinkDialog } from "@/features/cms-slots/ui/cms-slots-cms-field-link-dialog";
+import { CmsSlotsPageRuntimeSyncButton } from "@/features/cms-slots/ui/cms-slots-page-runtime-sync-button";
 import { beaconAppRouteSurfaceClass } from "@/shared/lib/beacon-app-route-surface";
 import {
   CMS_SLOTS_AREA_NAV_LABEL,
   CMS_SLOTS_BACK_BUTTON_ARIA_LABEL,
   CMS_SLOTS_DELETE_DIALOG_TITLE,
   CMS_SLOTS_FEATURE_NAME,
-  CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP,
   CMS_SLOTS_UNINSTALL_PAGE_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { cn } from "@/shared/lib/utils";
@@ -42,7 +42,7 @@ export type CmsSlotsRouteChromeProps = {
   nameFieldId: string;
   searchFieldId: string;
   lastBeaconUninstallChoiceId: string;
-  showPageRuntimeSyncHeader: boolean;
+  pageRuntimeSyncRelevant: boolean;
   pageRuntimeStatusLoading: boolean;
   syncShellOk: boolean;
   syncShellReason: string | undefined;
@@ -97,7 +97,6 @@ export type CmsSlotsRouteChromeProps = {
   composerEligible: CmsSlotListOnPage[];
   composerOpeningKey: string | null;
   onOpenComposerStudio: (b: CmsSlotListOnPage) => void | Promise<void>;
-  onRefreshComposerEligible: () => void | Promise<void>;
   composerStudio: { beacon: CmsSlotListOnPage; initialSignature: string } | null;
   composerDraft: CmsSlotCompositionDraftRow[];
   composerDirty: boolean;
@@ -124,9 +123,14 @@ export type CmsSlotsRouteChromeProps = {
   setListTargetRemoveBusyKind: (v: "canvas" | "delete" | null) => void;
   onRemoveListTargetFromCanvasOnly: () => void | Promise<void>;
   onConfirmDeleteListTargetCompletely: () => void | Promise<void>;
+  cmsFieldLinkPromptOpen: boolean;
+  cmsFieldLinkNavReady: boolean;
+  cmsFieldLinkRetryPending: boolean;
+  setCmsFieldLinkPromptOpen: (v: boolean) => void;
+  onRetryCmsFieldLink: () => void | Promise<void>;
 };
 
-function CmsSlotsRouteHeader(p: CmsSlotsRouteChromeProps) {
+function CmsSlotsRouteHeader({ navigate }: { navigate: NavigateFunction }) {
   return (
     <div className="shrink-0 border-b border-border/50 bg-muted/20 dark:bg-muted/15" data-slot="cms_slots_route_header">
       <div className="mx-auto flex h-8 min-w-0 max-w-lg items-center gap-2 px-3">
@@ -136,22 +140,13 @@ function CmsSlotsRouteHeader(p: CmsSlotsRouteChromeProps) {
           size="icon-sm"
           className="-ml-1 shrink-0 text-foreground"
           aria-label={CMS_SLOTS_BACK_BUTTON_ARIA_LABEL}
-          onClick={() => void p.navigate("/home")}
+          onClick={() => void navigate("/home")}
         >
           <ChevronLeft aria-hidden className="size-4" strokeWidth={2.25} />
         </Button>
         <h2 className="min-w-0 truncate text-sm font-medium leading-none tracking-tight text-foreground">
           {CMS_SLOTS_FEATURE_NAME}
         </h2>
-        <div className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-1.5">
-          {p.showPageRuntimeSyncHeader && !p.isEngine ? (
-            <CmsSlotPageRuntimeHeaderStatus
-              loading={p.pageRuntimeStatusLoading}
-              synced={p.syncShellOk}
-              reason={p.syncShellReason}
-            />
-          ) : null}
-        </div>
       </div>
     </div>
   );
@@ -232,7 +227,6 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
           eligible={p.composerEligible}
           openingKey={p.composerOpeningKey}
           onOpenList={(b) => void p.onOpenComposerStudio(b)}
-          onRefresh={() => void p.onRefreshComposerEligible()}
         />
       ) : (
         <CmsSlotComposerStudioPanel
@@ -360,97 +354,69 @@ function CmsSlotsRemoveListTargetDialog(p: CmsSlotsRouteChromeProps) {
 
 function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
   const { composerOnly } = useCmsSlotsAccess();
-  const syncNeedsFooterAttention =
-    p.showPageRuntimeSyncHeader &&
-    !p.syncShellOk &&
-    !p.pageRuntimeStatusLoading &&
-    !p.embedSyncPending &&
-    !p.pageScanLoading;
-
-  const syncButton = (
-    <Button
-      type="button"
-      variant={syncNeedsFooterAttention ? "default" : "secondary"}
-      size="dockNav"
-      className={composerOnly ? "min-w-0 flex-1" : undefined}
-      disabled={p.embedSyncPending || p.pageRuntimeStatusLoading || !p.beaconsWrapperInstalled || p.pageScanLoading}
-      aria-busy={p.embedSyncPending}
-      title={
-        !p.beaconsWrapperInstalled
-          ? CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP
-          : p.pageRuntimeStatusLoading
-            ? "Checking page script…"
-            : syncNeedsFooterAttention
-              ? (p.syncShellReason ?? "Sync to update the embedded page script.")
-              : undefined
-      }
-      onClick={() => void p.onSyncInstallEmbed()}
-    >
-      <SquareCode aria-hidden />
-      Sync
-    </Button>
-  );
-
-  if (composerOnly) {
-    return (
-      <footer
-        data-slot="cms_slots_dock"
-        data-composer-only=""
-        className="flex shrink-0 items-stretch border-t border-border/65 bg-background px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.375rem)]"
-      >
-        {syncButton}
-      </footer>
-    );
-  }
 
   return (
     <footer
       data-slot="cms_slots_dock"
-      className="flex shrink-0 items-stretch gap-2 border-t border-border/65 bg-background px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.375rem)]"
+      data-composer-only={composerOnly ? "" : undefined}
+      className="mt-auto flex shrink-0 items-stretch gap-2 border-t border-border/65 bg-background px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.375rem)]"
     >
-      <nav className="flex min-w-0 flex-1 items-stretch gap-1.5" aria-label={CMS_SLOTS_AREA_NAV_LABEL}>
-        <NavLink
-          to="/cms-slots/engine"
-          className={({ isActive }) =>
-            cn(
-              buttonVariants({
-                variant: isActive ? "cmsSlotsDockNavActive" : "cmsSlotsDockNav",
-                size: "dockNav",
-              }),
-              "min-w-0 flex-1 shrink"
-            )
-          }
-          onClick={() => {
-            if (p.composerStudio != null) {
-              p.onComposerStudioBack();
+      {composerOnly ? (
+        <div className="min-w-0 flex-1" aria-hidden />
+      ) : (
+        <nav className="flex min-w-0 flex-1 items-stretch gap-1.5" aria-label={CMS_SLOTS_AREA_NAV_LABEL}>
+          <NavLink
+            to="/cms-slots/engine"
+            className={({ isActive }) =>
+              cn(
+                buttonVariants({
+                  variant: isActive ? "cmsSlotsDockNavActive" : "cmsSlotsDockNav",
+                  size: "dockNav",
+                }),
+                "min-w-0 flex-1 shrink"
+              )
             }
-          }}
-        >
-          <PanelsTopLeft aria-hidden />
-          Engine
-        </NavLink>
-        <NavLink
-          to="/cms-slots/composer"
-          className={({ isActive }) =>
-            cn(
-              buttonVariants({
-                variant: isActive ? "cmsSlotsDockNavActive" : "cmsSlotsDockNav",
-                size: "dockNav",
-              }),
-              "min-w-0 flex-1 shrink"
-            )
-          }
-          onClick={() => {
-            if (p.picking) {
-              p.exitToList();
+            onClick={() => {
+              if (p.composerStudio != null) {
+                p.onComposerStudioBack();
+              }
+            }}
+          >
+            <PanelsTopLeft aria-hidden />
+            Engine
+          </NavLink>
+          <NavLink
+            to="/cms-slots/composer"
+            className={({ isActive }) =>
+              cn(
+                buttonVariants({
+                  variant: isActive ? "cmsSlotsDockNavActive" : "cmsSlotsDockNav",
+                  size: "dockNav",
+                }),
+                "min-w-0 flex-1 shrink"
+              )
             }
-          }}
-        >
-          <List aria-hidden />
-          Composer
-        </NavLink>
-      </nav>
-      {syncButton}
+            onClick={() => {
+              if (p.picking) {
+                p.exitToList();
+              }
+            }}
+          >
+            <List aria-hidden />
+            Composer
+          </NavLink>
+        </nav>
+      )}
+      <CmsSlotsPageRuntimeSyncButton
+        relevant={p.pageRuntimeSyncRelevant}
+        synced={p.syncShellOk}
+        reason={p.syncShellReason}
+        statusLoading={p.pageRuntimeStatusLoading}
+        embedSyncPending={p.embedSyncPending}
+        beaconsWrapperInstalled={p.beaconsWrapperInstalled}
+        pageScanLoading={p.pageScanLoading}
+        onSync={p.onSyncInstallEmbed}
+      />
     </footer>
   );
 }
@@ -461,10 +427,17 @@ export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
 
   return (
     <div className={beaconAppRouteSurfaceClass}>
-      <CmsSlotsRouteHeader {...p} />
+      <CmsSlotsRouteHeader navigate={p.navigate} />
       <CmsSlotsRouteScrollBody {...p} />
       <CmsSlotsBeaconDeleteDialog {...p} />
       <CmsSlotsRemoveListTargetDialog {...p} />
+      <CmsSlotsCmsFieldLinkDialog
+        open={p.cmsFieldLinkPromptOpen}
+        navReady={p.cmsFieldLinkNavReady}
+        retryPending={p.cmsFieldLinkRetryPending}
+        onOpenChange={p.setCmsFieldLinkPromptOpen}
+        onRetryLink={p.onRetryCmsFieldLink}
+      />
       {composerPaletteDocked ? (
         <ComposerPaletteSection
           variant="docked"

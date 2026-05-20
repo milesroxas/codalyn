@@ -25,7 +25,9 @@ import {
   parseCmsSlotListRuntimePayload,
   publishedDisplayNamesForEnginePool,
 } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
+import type { CmsSlotListCmsTextFieldEnsureResult } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import {
+  ensureCmsSlotListCmsTextFieldOnList,
   getCmsSlotListTargetCmsFieldIdFromListContainer,
   resolveCmsSlotListTargetCmsCollectionIdForCleanup,
   tryDeleteCmsSlotListTargetCmsPlainTextField,
@@ -36,7 +38,10 @@ import {
   removeAllCmsSlotListTargetInstancesOnPage,
 } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
-import { getCmsSlotPageRuntimeSyncStatus } from "@/features/cms-slots/model/cms-slot-page-inline-script";
+import {
+  type CmsSlotPageRuntimeSyncStatus,
+  getCmsSlotPageRuntimeSyncStatus,
+} from "@/features/cms-slots/model/cms-slot-page-inline-script";
 import {
   type CmsSlotListOnPage,
   cmsSlotListKey,
@@ -66,6 +71,7 @@ import {
 import { paletteForConfiguredComponentIds } from "@/features/cms-slots/model/palette-for-configured-component-ids";
 import { placeCmsSlotListTargetOnCanvas } from "@/features/cms-slots/model/place-cms-slot-list-target-on-canvas";
 import { resyncEngineSlotPropAttributesForSlotIndex } from "@/features/cms-slots/model/resync-engine-slot-prop-attrs";
+import { retryCmsSlotListTargetCmsFieldLink } from "@/features/cms-slots/model/retry-cms-slot-list-target-cms-field-link";
 import {
   appendComponentToSlotListContainer,
   type CmsSlotCompositionDraftRow,
@@ -77,6 +83,7 @@ import {
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotsRouteChrome } from "@/features/cms-slots/ui/cms-slots-route-chrome";
 import {
+  CMS_SLOTS_CMS_FIELD_LINK_TOAST_SUCCESS,
   CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON,
   CMS_SLOTS_TOAST_LIST_CREATED,
   CMS_SLOTS_TOAST_LIST_REMOVED,
@@ -330,19 +337,25 @@ function useBeaconSyncShellLabels(
   pageRuntimeSyncReason: string | undefined,
   engineListCompositionStale: boolean
 ) {
-  return useMemo(() => {
+  return useMemo((): { syncShellOk: boolean; syncShellReason: string | undefined } => {
     if (!pageRuntimeSynced) {
-      return { syncShellOk: false as const, syncShellReason: pageRuntimeSyncReason };
+      return { syncShellOk: false, syncShellReason: pageRuntimeSyncReason };
     }
     if (engineListCompositionStale) {
       return {
-        syncShellOk: false as const,
+        syncShellOk: false,
         syncShellReason: CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON,
       };
     }
-    return { syncShellOk: true as const, syncShellReason: undefined };
+    return { syncShellOk: true, syncShellReason: undefined };
   }, [pageRuntimeSynced, pageRuntimeSyncReason, engineListCompositionStale]);
 }
+
+type LoadComposerEligibleOptions = {
+  rescanLists?: boolean;
+  refreshRuntime?: boolean;
+  runtime?: CmsSlotPageRuntimeSyncStatus;
+};
 
 function useDebounceComponentCatalog(picking: boolean, componentQuery: string, runCatalogLoad: (q: string) => void) {
   useEffect(() => {
@@ -471,6 +484,72 @@ function useListTargetOnCanvasCountWhenSynced(
   ]);
 }
 
+function isListTargetPlaceOnCanvasBlocked(
+  listTargetPlaceOnCanvasPending: boolean,
+  listTargetCreatePending: boolean,
+  listTargetRemovePending: boolean,
+  listTargetPhase: CmsSlotListTargetPhase,
+  activeDataList: string | null
+): boolean {
+  return (
+    listTargetPlaceOnCanvasPending ||
+    listTargetCreatePending ||
+    listTargetRemovePending ||
+    listTargetPhase !== "synced" ||
+    activeDataList == null
+  );
+}
+
+async function refreshListTargetOnCanvasCount(
+  dataList: string,
+  listContainer: BlockElement,
+  preferredDefinitionId: string | null,
+  setListTargetOnCanvasCount: (n: number) => void
+): Promise<void> {
+  try {
+    const list = await listCmsSlotListTargetInstancesOnPage(dataList, listContainer, {
+      preferredDefinitionId,
+    });
+    setListTargetOnCanvasCount(list.length);
+  } catch {
+    setListTargetOnCanvasCount(0);
+  }
+}
+
+async function finishListTargetCanvasPlacement(params: {
+  instance: ComponentElement;
+  alreadyExisted: boolean;
+  cmsFieldWasCreated: boolean;
+  activeDataList: string;
+  listContainer: BlockElement;
+  preferredDefinitionId: string | null;
+  openCmsFieldLinkPrompt: (binding: { collectionId: string; fieldId: string }) => void;
+  setListTargetOnCanvasCount: (n: number) => void;
+}): Promise<void> {
+  if (params.cmsFieldWasCreated) {
+    const collectionId = await resolveCmsSlotListTargetCmsCollectionIdForCleanup(params.listContainer);
+    const fieldId = await getCmsSlotListTargetCmsFieldIdFromListContainer(params.listContainer);
+    if (collectionId != null && fieldId != null) {
+      void params.openCmsFieldLinkPrompt({ collectionId, fieldId });
+    }
+  }
+  try {
+    await webflow.setSelectedElement(params.instance);
+  } catch {
+    /* selection is optional */
+  }
+  await refreshListTargetOnCanvasCount(
+    params.activeDataList,
+    params.listContainer,
+    params.preferredDefinitionId,
+    params.setListTargetOnCanvasCount
+  );
+  void webflow.notify({
+    type: "Success",
+    message: params.alreadyExisted ? "Selected the list target on the canvas." : "List target placed on the canvas.",
+  });
+}
+
 export function CmsSlotsScreen() {
   const nameFieldId = useId();
   const searchFieldId = useId();
@@ -519,6 +598,11 @@ export function CmsSlotsScreen() {
   const [, setListTargetRegisteredName] = useState<string | null>(null);
   const [listTargetOnCanvasCount, setListTargetOnCanvasCount] = useState(0);
   const [removeListTargetDialogOpen, setRemoveListTargetDialogOpen] = useState(false);
+  const [cmsFieldLinkPromptOpen, setCmsFieldLinkPromptOpen] = useState(false);
+  const [cmsFieldLinkNavReady, setCmsFieldLinkNavReady] = useState(false);
+  const [cmsFieldLinkRetryPending, setCmsFieldLinkRetryPending] = useState(false);
+  const cmsFieldLinkBindingRef = useRef<{ collectionId: string; fieldId: string } | null>(null);
+  const cmsFieldLinkNavBaselineRef = useRef<{ pageId: string; appMode: string | null } | null>(null);
   const [activeBeaconKey, setActiveBeaconKey] = useState<string | null>(null);
   const listTargetResolveGen = useRef(0);
   /** Last known list target registration for a beacon; avoids re-querying Webflow on repeat opens. */
@@ -531,6 +615,10 @@ export function CmsSlotsScreen() {
   const [pageRuntimeStatusLoading, setPageRuntimeStatusLoading] = useState(true);
   const [pageRuntimeSynced, setPageRuntimeSynced] = useState(false);
   const [pageRuntimeSyncReason, setPageRuntimeSyncReason] = useState<string | undefined>(undefined);
+  const pageRuntimeSyncedRef = useRef(pageRuntimeSynced);
+  pageRuntimeSyncedRef.current = pageRuntimeSynced;
+  const pageRuntimeSyncReasonRef = useRef(pageRuntimeSyncReason);
+  pageRuntimeSyncReasonRef.current = pageRuntimeSyncReason;
   /**
    * True when Engine slot composition metadata changed before canvas attrs / footer script reflect it.
    * Cleared after successful “Tag data attributes” or footer Sync.
@@ -590,21 +678,18 @@ export function CmsSlotsScreen() {
     await slotPropsWriteTailRef.current;
   }, []);
 
-  const refreshPageBeacons = useCallback(async () => {
+  const applyPageRuntimeSyncStatus = useCallback((runtime: CmsSlotPageRuntimeSyncStatus) => {
+    setPageRuntimeSynced(runtime.synced);
+    setPageRuntimeSyncReason(runtime.reason);
+  }, []);
+
+  const fetchPageBeaconsAndRuntime = useCallback(async (): Promise<CmsSlotPageRuntimeSyncStatus> => {
     setPageScanLoading(true);
     setPageRuntimeStatusLoading(true);
-    const runtimePromise = getCmsSlotPageRuntimeSyncStatus()
-      .then((runtime) => {
-        setPageRuntimeSynced(runtime.synced);
-        setPageRuntimeSyncReason(runtime.reason);
-      })
-      .catch(() => {
-        setPageRuntimeSynced(false);
-        setPageRuntimeSyncReason("Could not check page script status.");
-      })
-      .finally(() => {
-        setPageRuntimeStatusLoading(false);
-      });
+    const runtimePromise = getCmsSlotPageRuntimeSyncStatus().then((runtime) => {
+      applyPageRuntimeSyncStatus(runtime);
+      return runtime;
+    });
 
     try {
       const [found, installed] = await Promise.all([findCmsSlotListsOnPage(), isCmsSlotsWrapperInstalledOnPage()]);
@@ -617,33 +702,54 @@ export function CmsSlotsScreen() {
       setPageScanLoading(false);
     }
 
-    await runtimePromise;
-  }, []);
-
-  const loadComposerEligible = useCallback(async () => {
-    setComposerEligibleLoading(true);
     try {
-      const found = await findCmsSlotListsOnPage();
-      const r = await listComposerEligibleLists(found);
-      setComposerEligible(r.eligible);
-      setComposerRuntimeOk(r.runtimeOk);
-      setPageRuntimeSynced(r.pageRuntimeSynced);
-      setPageRuntimeSyncReason(r.runtimeOk ? undefined : r.runtimeReason);
-    } catch {
-      setComposerEligible([]);
-      setComposerRuntimeOk(false);
-      try {
-        const runtime = await getCmsSlotPageRuntimeSyncStatus();
-        setPageRuntimeSynced(runtime.synced);
-        setPageRuntimeSyncReason(runtime.reason);
-      } catch {
-        setPageRuntimeSynced(false);
-        setPageRuntimeSyncReason("Could not check page script status.");
-      }
+      return await runtimePromise;
     } finally {
-      setComposerEligibleLoading(false);
+      setPageRuntimeStatusLoading(false);
     }
-  }, []);
+  }, [applyPageRuntimeSyncStatus]);
+
+  const refreshPageBeacons = useCallback(async () => {
+    await fetchPageBeaconsAndRuntime();
+  }, [fetchPageBeaconsAndRuntime]);
+
+  const loadComposerEligible = useCallback(
+    async (opts?: LoadComposerEligibleOptions) => {
+      setComposerEligibleLoading(true);
+      try {
+        let beacons = pageBeacons;
+        if (opts?.rescanLists) {
+          beacons = await findCmsSlotListsOnPage();
+          setPageBeacons(beacons);
+        }
+
+        let runtime = opts?.runtime;
+        if (runtime == null) {
+          runtime = opts?.refreshRuntime
+            ? await getCmsSlotPageRuntimeSyncStatus()
+            : {
+                synced: pageRuntimeSyncedRef.current,
+                reason: pageRuntimeSyncReasonRef.current,
+              };
+        }
+        if (opts?.refreshRuntime || opts?.runtime != null) {
+          applyPageRuntimeSyncStatus(runtime);
+        }
+
+        const r = await listComposerEligibleLists(beacons, runtime);
+        setComposerEligible(r.eligible);
+        setComposerRuntimeOk(r.runtimeOk);
+      } catch {
+        setComposerEligible([]);
+        setComposerRuntimeOk(false);
+        const runtime = await getCmsSlotPageRuntimeSyncStatus();
+        applyPageRuntimeSyncStatus(runtime);
+      } finally {
+        setComposerEligibleLoading(false);
+      }
+    },
+    [applyPageRuntimeSyncStatus, pageBeacons]
+  );
 
   const { syncShellOk, syncShellReason } = useBeaconSyncShellLabels(
     pageRuntimeSynced,
@@ -652,7 +758,7 @@ export function CmsSlotsScreen() {
   );
 
   /** Page script sync only matters once the wrapper is installed and at least one beacon list exists. */
-  const showPageRuntimeSyncHeader = beaconsWrapperInstalled && pageBeacons.length > 0;
+  const pageRuntimeSyncRelevant = beaconsWrapperInstalled && pageBeacons.length > 0;
 
   useEffect(() => {
     void beaconToDelete;
@@ -677,9 +783,9 @@ export function CmsSlotsScreen() {
   }, [canAccessEngine, isEngine, navigate]);
 
   useEffect(() => {
-    if (!isComposer) return;
+    if (!isComposer || pageScanLoading || pageRuntimeStatusLoading) return;
     void loadComposerEligible();
-  }, [isComposer, loadComposerEligible]);
+  }, [isComposer, pageScanLoading, pageRuntimeStatusLoading, loadComposerEligible]);
 
   useEffect(() => {
     if (typeof webflow.subscribe !== "function") {
@@ -851,6 +957,88 @@ export function CmsSlotsScreen() {
     }
   };
 
+  const openCmsFieldLinkPrompt = useCallback(async (binding: { collectionId: string; fieldId: string }) => {
+    cmsFieldLinkBindingRef.current = binding;
+    setCmsFieldLinkNavReady(false);
+    setCmsFieldLinkPromptOpen(true);
+    try {
+      const page = await webflow.getCurrentPage();
+      const appMode = typeof webflow.getCurrentMode === "function" ? await webflow.getCurrentMode() : null;
+      cmsFieldLinkNavBaselineRef.current = { pageId: String(page.id), appMode };
+    } catch {
+      cmsFieldLinkNavBaselineRef.current = null;
+    }
+  }, []);
+
+  const promptCmsFieldLinkIfCreated = useCallback(
+    (ensure: CmsSlotListCmsTextFieldEnsureResult | null | undefined) => {
+      if (ensure?.fieldWasCreated) {
+        void openCmsFieldLinkPrompt(ensure.binding);
+      }
+    },
+    [openCmsFieldLinkPrompt]
+  );
+
+  useEffect(() => {
+    if (!cmsFieldLinkPromptOpen || typeof webflow.subscribe !== "function") {
+      return undefined;
+    }
+    const checkReturn = async () => {
+      const baseline = cmsFieldLinkNavBaselineRef.current;
+      if (baseline == null) {
+        return;
+      }
+      try {
+        const page = await webflow.getCurrentPage();
+        const appMode = typeof webflow.getCurrentMode === "function" ? await webflow.getCurrentMode() : null;
+        if (String(page.id) !== baseline.pageId || appMode !== baseline.appMode) {
+          setCmsFieldLinkNavReady(true);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    const unsubPage = webflow.subscribe("currentpage", () => {
+      void checkReturn();
+    });
+    const unsubMode = webflow.subscribe("currentappmode", () => {
+      void checkReturn();
+    });
+    return () => {
+      unsubPage();
+      unsubMode();
+    };
+  }, [cmsFieldLinkPromptOpen]);
+
+  const handleRetryCmsFieldLink = async () => {
+    if (cmsFieldLinkRetryPending || activeDataList == null) {
+      return;
+    }
+    const listContainer = targetRef.current;
+    const binding = cmsFieldLinkBindingRef.current;
+    if (listContainer == null || binding == null) {
+      return;
+    }
+    setCmsFieldLinkRetryPending(true);
+    try {
+      const result = await retryCmsSlotListTargetCmsFieldLink({
+        dataList: activeDataList,
+        listContainer,
+        preferredDefinitionId: listTargetDefinitionIdRef.current,
+        collectionId: binding.collectionId,
+        fieldId: binding.fieldId,
+      });
+      if (result.ok) {
+        setCmsFieldLinkPromptOpen(false);
+        void webflow.notify({ type: "Success", message: CMS_SLOTS_CMS_FIELD_LINK_TOAST_SUCCESS });
+      } else {
+        void webflow.notify({ type: "Error", message: result.message });
+      }
+    } finally {
+      setCmsFieldLinkRetryPending(false);
+    }
+  };
+
   const handleCreate = async () => {
     if (createPending) return;
     const trimmed = beaconName.trim();
@@ -862,6 +1050,7 @@ export function CmsSlotsScreen() {
     try {
       listTargetDefinitionIdRef.current = null;
       const { container, dataList } = await createCmsSlotListOnPage(trimmed);
+      const cmsEnsure = await ensureCmsSlotListCmsTextFieldOnList(container, dataList);
       const { component: listTargetComponent, definitionId } = await createCmsSlotListTargetComponent({
         dataList,
         listContainer: container,
@@ -871,7 +1060,15 @@ export function CmsSlotsScreen() {
       setListTargetPhase("synced");
       setListTargetRegisteredName(listTargetRegisteredName);
       await writeCmsSlotEngineConfiguredComponentIds(container, []);
-      await placeCmsSlotListTargetOnCanvas(dataList, container, definitionId);
+      await placeCmsSlotListTargetOnCanvas(dataList, container, definitionId, { resolvedCmsEnsure: cmsEnsure });
+      promptCmsFieldLinkIfCreated(cmsEnsure);
+      if (cmsEnsure == null) {
+        void webflow.notify({
+          type: "Warning",
+          message:
+            "CMS Plain Text field was not created. Open a CMS collection template page, or ensure another beacon on this page already has a CMS field.",
+        });
+      }
       const listTargetOnPage = await listCmsSlotListTargetInstancesOnPage(dataList, container, {
         preferredDefinitionId: definitionId,
       });
@@ -1151,8 +1348,9 @@ export function CmsSlotsScreen() {
           },
           onCompleteSideEffects: () => {
             setEngineListCompositionStale(false);
-            void refreshPageBeacons();
-            void loadComposerEligible();
+            void fetchPageBeaconsAndRuntime().then((runtime) => {
+              void loadComposerEligible({ runtime });
+            });
           },
         });
       } catch (err) {
@@ -1170,7 +1368,7 @@ export function CmsSlotsScreen() {
       composerStudio,
       currentCmsItemId,
       loadComposerEligible,
-      refreshPageBeacons,
+      fetchPageBeaconsAndRuntime,
     ]
   );
 
@@ -1195,7 +1393,7 @@ export function CmsSlotsScreen() {
 
       const dataList = activeDataList;
       if (dataList != null) {
-        await ensureListTargetAfterAppendingSlotRow({
+        const cmsEnsure = await ensureListTargetAfterAppendingSlotRow({
           dataList,
           container,
           listTargetDefinitionIdRef,
@@ -1205,6 +1403,7 @@ export function CmsSlotsScreen() {
           setListTargetRegisteredName,
           setListTargetOnCanvasCount,
         });
+        promptCmsFieldLinkIfCreated(cmsEnsure);
       }
     } catch (err) {
       const message = formatWebflowDesignerError(err);
@@ -1224,9 +1423,9 @@ export function CmsSlotsScreen() {
         type: "Success",
         message: "Page custom code updated. Publish the site to apply on the live site.",
       });
-      await refreshPageBeacons();
+      const runtime = await fetchPageBeaconsAndRuntime();
       if (isComposer) {
-        await loadComposerEligible();
+        await loadComposerEligible({ runtime });
       }
     } catch (err) {
       const message = formatWebflowDesignerError(err);
@@ -1281,7 +1480,7 @@ export function CmsSlotsScreen() {
         );
       }
       if (shouldUninstallPage) {
-        await uninstallCmsSlotsPageInstall();
+        await uninstallCmsSlotsPageInstall({ dataLists: [target.dataList] });
         await removeCmsSlotsWrapperIfNoSlotListsOnPage();
       }
       setBeaconToDelete(null);
@@ -1339,6 +1538,7 @@ export function CmsSlotsScreen() {
     listTargetResolveGen.current += 1;
     setListTargetCreatePending(true);
     try {
+      const cmsEnsure = await ensureCmsSlotListCmsTextFieldOnList(listContainer, activeDataList);
       const { component: created, definitionId } = await createCmsSlotListTargetComponent({
         dataList: activeDataList,
         listContainer,
@@ -1347,6 +1547,7 @@ export function CmsSlotsScreen() {
       const registeredName = await created.getName();
       setListTargetRegisteredName(registeredName);
       setListTargetPhase("synced");
+      promptCmsFieldLinkIfCreated(cmsEnsure);
       if (activeBeaconKey != null) {
         listTargetReconcileCacheRef.current = {
           beaconKey: activeBeaconKey,
@@ -1369,39 +1570,36 @@ export function CmsSlotsScreen() {
 
   const handlePlaceListTargetOnCanvas = async () => {
     if (
-      listTargetPlaceOnCanvasPending ||
-      listTargetCreatePending ||
-      listTargetRemovePending ||
-      listTargetPhase !== "synced" ||
+      isListTargetPlaceOnCanvasBlocked(
+        listTargetPlaceOnCanvasPending,
+        listTargetCreatePending,
+        listTargetRemovePending,
+        listTargetPhase,
+        activeDataList
+      ) ||
       activeDataList == null
     ) {
       return;
     }
+    const dataList = activeDataList;
     const listContainer = targetRef.current;
     if (!listContainer) return;
     setListTargetPlaceOnCanvasPending(true);
     try {
-      const { instance, alreadyExisted } = await placeCmsSlotListTargetOnCanvas(
-        activeDataList,
+      const { instance, alreadyExisted, cmsFieldWasCreated } = await placeCmsSlotListTargetOnCanvas(
+        dataList,
         listContainer,
         listTargetDefinitionIdRef.current
       );
-      try {
-        await webflow.setSelectedElement(instance);
-      } catch {
-        /* selection is optional */
-      }
-      try {
-        const list = await listCmsSlotListTargetInstancesOnPage(activeDataList, listContainer, {
-          preferredDefinitionId: listTargetDefinitionIdRef.current,
-        });
-        setListTargetOnCanvasCount(list.length);
-      } catch {
-        setListTargetOnCanvasCount(0);
-      }
-      void webflow.notify({
-        type: "Success",
-        message: alreadyExisted ? "Selected the list target on the canvas." : "List target placed on the canvas.",
+      await finishListTargetCanvasPlacement({
+        instance,
+        alreadyExisted,
+        cmsFieldWasCreated,
+        activeDataList: dataList,
+        listContainer,
+        preferredDefinitionId: listTargetDefinitionIdRef.current,
+        openCmsFieldLinkPrompt,
+        setListTargetOnCanvasCount,
       });
     } catch (err) {
       const message = formatWebflowDesignerError(err);
@@ -1509,7 +1707,7 @@ export function CmsSlotsScreen() {
       nameFieldId={nameFieldId}
       searchFieldId={searchFieldId}
       lastBeaconUninstallChoiceId={lastBeaconUninstallChoiceId}
-      showPageRuntimeSyncHeader={showPageRuntimeSyncHeader}
+      pageRuntimeSyncRelevant={pageRuntimeSyncRelevant}
       pageRuntimeStatusLoading={pageRuntimeStatusLoading}
       syncShellOk={syncShellOk}
       syncShellReason={syncShellReason}
@@ -1564,7 +1762,6 @@ export function CmsSlotsScreen() {
       composerEligible={composerEligible}
       composerOpeningKey={composerOpeningKey}
       onOpenComposerStudio={handleOpenComposerStudio}
-      onRefreshComposerEligible={loadComposerEligible}
       composerStudio={composerStudio}
       composerDraft={composerDraft}
       composerDirty={composerDirty}
@@ -1591,6 +1788,11 @@ export function CmsSlotsScreen() {
       setListTargetRemoveBusyKind={setListTargetRemoveBusyKind}
       onRemoveListTargetFromCanvasOnly={handleRemoveListTargetFromCanvasOnly}
       onConfirmDeleteListTargetCompletely={handleConfirmDeleteListTargetCompletely}
+      cmsFieldLinkPromptOpen={cmsFieldLinkPromptOpen}
+      cmsFieldLinkNavReady={cmsFieldLinkNavReady}
+      cmsFieldLinkRetryPending={cmsFieldLinkRetryPending}
+      setCmsFieldLinkPromptOpen={setCmsFieldLinkPromptOpen}
+      onRetryCmsFieldLink={handleRetryCmsFieldLink}
     />
   );
 }

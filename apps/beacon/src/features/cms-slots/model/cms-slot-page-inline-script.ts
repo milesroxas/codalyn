@@ -368,11 +368,13 @@ function formatRuntimeStatusError(err: unknown): string {
   return "Could not verify page script.";
 }
 
+export type CmsSlotPageRuntimeSyncStatus = { synced: boolean; reason?: string };
+
 /**
  * `true` when the current page’s footer includes the Codalyn beacon runtime and its hash matches the extension build.
  * Composer only lists beacons when this is satisfied so live/preview match the expected cloning script.
  */
-export async function getCmsSlotPageRuntimeSyncStatus(): Promise<{ synced: boolean; reason?: string }> {
+export async function getCmsSlotPageRuntimeSyncStatus(): Promise<CmsSlotPageRuntimeSyncStatus> {
   if (!getTowerOrigin()) {
     return { synced: false, reason: "Tower is not configured." };
   }

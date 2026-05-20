@@ -27,6 +27,20 @@ export const CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED = "CMS slot list removed.
 
 export const CMS_SLOTS_DELETE_DIALOG_TITLE = "Delete this CMS slot list?";
 
+export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_TITLE = "Refresh CMS in Webflow";
+
+export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_DESCRIPTION =
+  "A new CMS Plain Text field was created for this beacon list. Switch to CMS in Webflow, then return to the Designer so the field appears for binding.";
+
+export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_WAITING = "After you return to the Designer, use Link to CMS field below.";
+
+export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_READY =
+  "You switched views — link the list target Text prop to the new CMS field.";
+
+export const CMS_SLOTS_CMS_FIELD_LINK_RETRY_LABEL = "Link to CMS field";
+
+export const CMS_SLOTS_CMS_FIELD_LINK_TOAST_SUCCESS = "List target linked to the CMS field.";
+
 export const CMS_SLOTS_UNINSTALL_PAGE_LABEL = `Also uninstall ${CMS_SLOTS_FEATURE_NAME} on this page`;
 
 /** Composer empty state when an editor has no slot lists to open on this page. */

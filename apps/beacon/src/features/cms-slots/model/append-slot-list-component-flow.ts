@@ -1,4 +1,8 @@
 import type { MutableRefObject } from "react";
+import {
+  type CmsSlotListCmsTextFieldEnsureResult,
+  ensureCmsSlotListCmsTextFieldOnList,
+} from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import {
@@ -23,7 +27,7 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
   setListTargetPhase: (p: CmsSlotListTargetPhase) => void;
   setListTargetRegisteredName: (n: string | null) => void;
   setListTargetOnCanvasCount: (n: number) => void;
-}): Promise<void> {
+}): Promise<CmsSlotListCmsTextFieldEnsureResult | null> {
   const {
     dataList,
     container,
@@ -35,6 +39,7 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
     setListTargetOnCanvasCount,
   } = options;
   try {
+    const cmsEnsure = await ensureCmsSlotListCmsTextFieldOnList(container, dataList);
     const comp = await getCmsSlotListTargetComponentOrNull(dataList, container, listTargetDefinitionIdRef.current);
     if (comp == null) {
       const { component: created, definitionId } = await createCmsSlotListTargetComponent({
@@ -54,7 +59,9 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
         };
       }
     }
-    await placeCmsSlotListTargetOnCanvas(dataList, container, listTargetDefinitionIdRef.current);
+    await placeCmsSlotListTargetOnCanvas(dataList, container, listTargetDefinitionIdRef.current, {
+      resolvedCmsEnsure: cmsEnsure,
+    });
     try {
       const list = await listCmsSlotListTargetInstancesOnPage(dataList, container, {
         preferredDefinitionId: listTargetDefinitionIdRef.current,
@@ -63,7 +70,9 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
     } catch {
       setListTargetOnCanvasCount(0);
     }
+    return cmsEnsure;
   } catch (e) {
     console.warn("[cms-slots] list target after add component:", e);
+    return null;
   }
 }

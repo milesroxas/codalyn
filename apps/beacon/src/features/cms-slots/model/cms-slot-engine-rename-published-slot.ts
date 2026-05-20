@@ -92,13 +92,14 @@ export async function renamePublishedSlotDisplayNameAtPoolIndex(input: {
           "On a collection template, select a collection item and connect Codalyn to Tower to edit published slot names.",
       };
     }
-    const binding = await ensureCmsSlotListCmsTextFieldOnList(listContainer, dataList);
-    if (binding == null) {
+    const cmsEnsure = await ensureCmsSlotListCmsTextFieldOnList(listContainer, dataList);
+    if (cmsEnsure == null) {
       return {
         ok: false,
         reason: "Could not use the list CMS text field. Create and sync a list target for this list, then try again.",
       };
     }
+    const binding = cmsEnsure.binding;
     const listTargetDef = await getCmsSlotListTargetComponentOrNull(dataList, listContainer, preferredDefinitionId);
     if (listTargetDef != null) {
       const listTargetOnPage = await listCmsSlotListTargetInstancesOnPage(dataList, listContainer, {

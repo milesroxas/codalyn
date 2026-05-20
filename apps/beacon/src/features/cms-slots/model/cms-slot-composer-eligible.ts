@@ -1,23 +1,26 @@
 import { hasCmsSlotListTargetInstanceOnPageByName } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
-import { getCmsSlotPageRuntimeSyncStatus } from "@/features/cms-slots/model/cms-slot-page-inline-script";
+import {
+  type CmsSlotPageRuntimeSyncStatus,
+  getCmsSlotPageRuntimeSyncStatus,
+} from "@/features/cms-slots/model/cms-slot-page-inline-script";
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
 
 export type ComposerEligibleList = CmsSlotListOnPage;
 
-export async function listComposerEligibleLists(pageBeacons: CmsSlotListOnPage[]): Promise<{
+export async function listComposerEligibleLists(
+  pageBeacons: CmsSlotListOnPage[],
+  runtimeStatus?: CmsSlotPageRuntimeSyncStatus
+): Promise<{
   eligible: ComposerEligibleList[];
   runtimeOk: boolean;
   runtimeReason?: string;
-  /** Same check as Engine: footer custom code matches this extension build. */
-  pageRuntimeSynced: boolean;
 }> {
-  const runtime = await getCmsSlotPageRuntimeSyncStatus();
+  const runtime = runtimeStatus ?? (await getCmsSlotPageRuntimeSyncStatus());
   if (!runtime.synced) {
     return {
       eligible: [],
       runtimeOk: false,
       runtimeReason: runtime.reason,
-      pageRuntimeSynced: false,
     };
   }
 
@@ -30,5 +33,5 @@ export async function listComposerEligibleLists(pageBeacons: CmsSlotListOnPage[]
     eligible.push(b);
   }
 
-  return { eligible, runtimeOk: true, pageRuntimeSynced: true };
+  return { eligible, runtimeOk: true };
 }

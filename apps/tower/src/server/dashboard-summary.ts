@@ -1,11 +1,11 @@
 import { webflowDataApiUrl } from "@codalyn/webflow-kit";
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt } from "drizzle-orm";
 import { headers } from "next/headers";
 import { auth } from "@/server/auth";
 import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 import { db } from "@/shared/lib/db";
-import { organization, session as sessionTable } from "@/shared/lib/db/auth-schema";
+import { member, organization, session as sessionTable, user } from "@/shared/lib/db/auth-schema";
 
 export type TowerDashboardSummary = {
   signedIn: boolean;
@@ -20,6 +20,50 @@ export type TowerDashboardSummary = {
    */
   activeOrgTeamAdmin: boolean;
 };
+
+async function resolveActiveOrganizationId(userId: string, rawSessionId?: string): Promise<string | null> {
+  if (rawSessionId) {
+    const rows = await db
+      .select({ activeOrganizationId: sessionTable.activeOrganizationId })
+      .from(sessionTable)
+      .where(eq(sessionTable.id, rawSessionId))
+      .limit(1);
+    const sessionActiveOrgId = rows[0]?.activeOrganizationId ?? null;
+    if (sessionActiveOrgId) {
+      return sessionActiveOrgId;
+    }
+  }
+
+  const recentSessionRows = await db
+    .select({ activeOrganizationId: sessionTable.activeOrganizationId })
+    .from(sessionTable)
+    .where(and(eq(sessionTable.userId, userId), gt(sessionTable.expiresAt, new Date())))
+    .orderBy(desc(sessionTable.updatedAt))
+    .limit(1);
+  const recentSessionActiveOrgId = recentSessionRows[0]?.activeOrganizationId ?? null;
+  if (recentSessionActiveOrgId) {
+    return recentSessionActiveOrgId;
+  }
+
+  const [preferredRow, orgRows] = await Promise.all([
+    db.select({ preferredOrganizationId: user.preferredOrganizationId }).from(user).where(eq(user.id, userId)).limit(1),
+    db
+      .select({ id: organization.id, name: organization.name })
+      .from(member)
+      .innerJoin(organization, eq(member.organizationId, organization.id))
+      .where(eq(member.userId, userId))
+      .orderBy(asc(organization.name)),
+  ]);
+  const preferredOrganizationId = preferredRow[0]?.preferredOrganizationId ?? null;
+  const fallbackOrgId =
+    (preferredOrganizationId && orgRows.find((row) => row.id === preferredOrganizationId)?.id) ??
+    orgRows[0]?.id ??
+    null;
+  if (fallbackOrgId && rawSessionId) {
+    await db.update(sessionTable).set({ activeOrganizationId: fallbackOrgId }).where(eq(sessionTable.id, rawSessionId));
+  }
+  return fallbackOrgId;
+}
 
 export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary> {
   const sessionData = await auth.api.getSession({ headers: await headers() });
@@ -39,24 +83,7 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
   }
 
   const rawSession = sessionData.session as { id?: string } | undefined;
-  let activeOrganizationId: string | null = null;
-  if (rawSession?.id) {
-    const rows = await db
-      .select({ activeOrganizationId: sessionTable.activeOrganizationId })
-      .from(sessionTable)
-      .where(eq(sessionTable.id, rawSession.id))
-      .limit(1);
-    activeOrganizationId = rows[0]?.activeOrganizationId ?? null;
-  }
-  if (!activeOrganizationId) {
-    const rows = await db
-      .select({ activeOrganizationId: sessionTable.activeOrganizationId })
-      .from(sessionTable)
-      .where(and(eq(sessionTable.userId, userId), gt(sessionTable.expiresAt, new Date())))
-      .orderBy(desc(sessionTable.updatedAt))
-      .limit(1);
-    activeOrganizationId = rows[0]?.activeOrganizationId ?? null;
-  }
+  const activeOrganizationId = await resolveActiveOrganizationId(userId, rawSession?.id);
 
   let activeOrganizationName: string | null = null;
   if (activeOrganizationId) {

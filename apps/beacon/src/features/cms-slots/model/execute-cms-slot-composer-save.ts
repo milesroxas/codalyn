@@ -118,14 +118,15 @@ async function applyComposerSaveCmsTemplatePath(args: {
     });
     return false;
   }
-  const binding = await ensureCmsSlotListCmsTextFieldOnList(beacon.container, beacon.dataList);
-  if (binding == null) {
+  const cmsEnsure = await ensureCmsSlotListCmsTextFieldOnList(beacon.container, beacon.dataList);
+  if (cmsEnsure == null) {
     void webflow.notify({
       type: "Error",
       message: "Could not use the list CMS text field. Create and sync a list target for this list, then try again.",
     });
     return false;
   }
+  const binding = cmsEnsure.binding;
   const listTargetDef = await getCmsSlotListTargetComponentOrNull(
     beacon.dataList,
     beacon.container,

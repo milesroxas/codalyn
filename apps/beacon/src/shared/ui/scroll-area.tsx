@@ -1,7 +1,7 @@
 "use client";
 
 import { ScrollArea as ScrollAreaPrimitive } from "radix-ui";
-import type * as React from "react";
+import * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -9,11 +9,42 @@ type ScrollAreaProps = React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
   viewportRef?: React.Ref<HTMLDivElement>;
 };
 
+/** Radix sets inline `display: table` / `min-width: 100%` on the viewport content wrapper. */
+function patchScrollAreaViewportContent(viewport: HTMLDivElement | null) {
+  const inner = viewport?.firstElementChild;
+  if (!(inner instanceof HTMLElement)) {
+    return;
+  }
+  inner.style.display = "block";
+  inner.style.boxSizing = "border-box";
+  inner.style.width = "100%";
+  inner.style.maxWidth = "100%";
+  inner.style.minWidth = "0";
+}
+
+function assignRef<T>(ref: React.Ref<T> | undefined, value: T | null) {
+  if (typeof ref === "function") {
+    ref(value);
+    return;
+  }
+  if (ref && typeof ref === "object") {
+    ref.current = value;
+  }
+}
+
 function ScrollArea({ className, children, viewportRef, ...props }: ScrollAreaProps) {
+  const handleViewportRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      patchScrollAreaViewportContent(node);
+      assignRef(viewportRef, node);
+    },
+    [viewportRef]
+  );
+
   return (
     <ScrollAreaPrimitive.Root data-slot="scroll-area" className={cn("relative min-w-0", className)} {...props}>
       <ScrollAreaPrimitive.Viewport
-        ref={viewportRef}
+        ref={handleViewportRef}
         data-slot="scroll-area-viewport"
         className="size-full min-h-0 min-w-0 overflow-x-hidden rounded-[inherit] outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
       >

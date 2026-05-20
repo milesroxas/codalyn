@@ -1,6 +1,6 @@
-import posthog from "posthog-js";
 import type { ErrorInfo, ReactNode } from "react";
 import { Component } from "react";
+import { captureObservabilityException } from "@/shared/lib/init-observability";
 
 interface Props {
   children: ReactNode;
@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    posthog.captureException(error, {
+    captureObservabilityException(error, {
       componentStack: errorInfo.componentStack,
     });
   }

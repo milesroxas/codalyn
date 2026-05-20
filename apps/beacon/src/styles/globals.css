@@ -168,18 +168,6 @@ body {
   html {
     @apply font-sans;
   }
-
-  /**
-   * Radix ScrollArea wraps children in a `display: table` div with `min-width: 100%`, which expands to
-   * the widest descendant and causes horizontal overflow in the Designer extension iframe.
-   */
-  [data-slot="scroll-area-viewport"] > div {
-    display: block !important;
-    box-sizing: border-box;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-  }
 }
 
 @layer utilities {

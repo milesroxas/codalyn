@@ -1,39 +1,8 @@
 import "./styles/globals.css";
-import posthog from "posthog-js";
 import { createRoot } from "react-dom/client";
-import { getCurrentPreset } from "@/features/linter/model/linter.factory";
-import { identifySiteGroup, identifyWorkspaceGroup, registerFrameworkPreset } from "@/shared/lib/analytics";
-import { buildInfo } from "@/shared/lib/build-info";
+import { initObservability } from "@/shared/lib/init-observability";
 
-posthog.init("phc_kJd34pP5g9zgEp8Q9dAIGnTx6vT8Vlafo2C3bzMfcR4", {
-  api_host: "https://us.i.posthog.com",
-  person_profiles: "identified_only",
-  capture_exceptions: {
-    capture_unhandled_errors: true,
-    capture_unhandled_rejections: true,
-    capture_console_errors: false,
-  },
-});
-
-posthog.register({
-  app_version: buildInfo.version,
-  build_channel: buildInfo.channel,
-  build_time: buildInfo.buildTime,
-  bundle_recipient: buildInfo.recipient,
-});
-registerFrameworkPreset(getCurrentPreset());
-
-webflow.getSiteInfo().then((siteInfo) => {
-  identifySiteGroup({
-    siteId: siteInfo.siteId,
-    siteName: siteInfo.siteName,
-    shortName: siteInfo.shortName,
-  });
-  identifyWorkspaceGroup({
-    workspaceId: siteInfo.workspaceId,
-    workspaceSlug: siteInfo.workspaceSlug,
-  });
-});
+initObservability();
 
 import Header from "@/app/ui/Header";
 import { useExpandedView } from "@/features/linter/store/expandedView.store";

@@ -1,0 +1,28 @@
+{
+  "name": "@codalyn/observability",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared PostHog and Sentry configuration for Codalyn apps.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist .turbo",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run src"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.12",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
+  }
+}

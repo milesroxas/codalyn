@@ -13,10 +13,11 @@ export function computeEditorExperienceFromMembership(
   workspaceMemberRole: string | null,
   restrictToEditorExperience: boolean
 ): boolean {
-  if (!workspaceMemberRole) {
+  const normalized = workspaceMemberRole?.trim();
+  if (!normalized) {
     return false;
   }
-  const role = workspaceMemberRole.toLowerCase();
+  const role = normalized.toLowerCase();
   if (role === "editor" || role === "member") {
     return true;
   }

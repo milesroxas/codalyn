@@ -334,68 +334,73 @@ function CmsSlotsRemoveListTargetDialog(p: CmsSlotsRouteChromeProps) {
 function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
   const { composerOnly } = useCmsSlotsAccess();
 
+  const syncButton = (
+    <CmsSlotsPageRuntimeSyncButton
+      composerOnly={composerOnly}
+      relevant={p.pageRuntimeSyncRelevant}
+      synced={p.syncShellOk}
+      reason={p.syncShellReason}
+      statusLoading={p.pageRuntimeStatusLoading}
+      embedSyncPending={p.embedSyncPending}
+      beaconsWrapperInstalled={p.beaconsWrapperInstalled}
+      pageScanLoading={p.pageScanLoading}
+      onSync={p.onSyncInstallEmbed}
+    />
+  );
+
+  if (composerOnly) {
+    return (
+      <BeaconFeatureRouteFooter dataSlot="cms_slots_dock" data-composer-only="" className="items-stretch gap-2">
+        {syncButton}
+      </BeaconFeatureRouteFooter>
+    );
+  }
+
   return (
-    <BeaconFeatureRouteFooter
-      dataSlot="cms_slots_dock"
-      data-composer-only={composerOnly ? "" : undefined}
-      className="items-stretch gap-2"
-    >
-      {composerOnly ? (
-        <div className="min-w-0 flex-1" aria-hidden />
-      ) : (
-        <nav className="flex min-w-0 flex-1 items-stretch gap-1.5" aria-label={CMS_SLOTS_AREA_NAV_LABEL}>
-          <NavLink
-            to="/cms-slots/engine"
-            className={({ isActive }) =>
-              cn(
-                buttonVariants({
-                  variant: isActive ? "cmsSlotsDockNavActive" : "cmsSlotsDockNav",
-                  size: "dockNav",
-                }),
-                "min-w-0 flex-1 shrink"
-              )
+    <BeaconFeatureRouteFooter dataSlot="cms_slots_dock" className="items-stretch gap-2">
+      <nav className="flex min-w-0 flex-1 items-stretch gap-1.5" aria-label={CMS_SLOTS_AREA_NAV_LABEL}>
+        <NavLink
+          to="/cms-slots/engine"
+          className={({ isActive }) =>
+            cn(
+              buttonVariants({
+                variant: isActive ? "cmsSlotsDockNavActive" : "cmsSlotsDockNav",
+                size: "dockNav",
+              }),
+              "min-w-0 flex-1 shrink"
+            )
+          }
+          onClick={() => {
+            if (p.composerStudio != null) {
+              p.onComposerStudioBack();
             }
-            onClick={() => {
-              if (p.composerStudio != null) {
-                p.onComposerStudioBack();
-              }
-            }}
-          >
-            <PanelsTopLeft aria-hidden />
-            Engine
-          </NavLink>
-          <NavLink
-            to="/cms-slots/composer"
-            className={({ isActive }) =>
-              cn(
-                buttonVariants({
-                  variant: isActive ? "cmsSlotsDockNavActive" : "cmsSlotsDockNav",
-                  size: "dockNav",
-                }),
-                "min-w-0 flex-1 shrink"
-              )
+          }}
+        >
+          <PanelsTopLeft aria-hidden />
+          Engine
+        </NavLink>
+        <NavLink
+          to="/cms-slots/composer"
+          className={({ isActive }) =>
+            cn(
+              buttonVariants({
+                variant: isActive ? "cmsSlotsDockNavActive" : "cmsSlotsDockNav",
+                size: "dockNav",
+              }),
+              "min-w-0 flex-1 shrink"
+            )
+          }
+          onClick={() => {
+            if (p.picking) {
+              p.exitToList();
             }
-            onClick={() => {
-              if (p.picking) {
-                p.exitToList();
-              }
-            }}
-          >
-            <List aria-hidden />
-            Composer
-          </NavLink>
-        </nav>
-      )}
-      <CmsSlotsPageRuntimeSyncButton
-        relevant={p.pageRuntimeSyncRelevant}
-        synced={p.syncShellOk}
-        reason={p.syncShellReason}
-        statusLoading={p.pageRuntimeStatusLoading}
-        embedSyncPending={p.embedSyncPending}
-        beaconsWrapperInstalled={p.beaconsWrapperInstalled}
-        pageScanLoading={p.pageScanLoading}
-        onSync={p.onSyncInstallEmbed}
-      />
+          }}
+        >
+          <List aria-hidden />
+          Composer
+        </NavLink>
+      </nav>
+      {syncButton}
     </BeaconFeatureRouteFooter>
   );
 }

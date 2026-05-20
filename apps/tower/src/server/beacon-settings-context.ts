@@ -1,8 +1,9 @@
 import type { BeaconOrgTeamSettings } from "@codalyn/webflow-kit";
-import { and, asc, desc, eq, gt } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { auth } from "@/server/auth";
+import { resolveActiveOrganizationId } from "@/server/resolve-active-organization-id";
 import { db } from "@/shared/lib/db";
-import { member, organization, session as sessionTable, user } from "@/shared/lib/db/auth-schema";
+import { member, organization, user } from "@/shared/lib/db/auth-schema";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { isTowerTeamAdminRole } from "@/shared/lib/membership/tower-organization-access";
 
@@ -70,26 +71,7 @@ export async function resolveBeaconMembershipContext(request: Request): Promise<
   const appUserRole = userRows[0]?.role ?? null;
 
   const rawSession = sessionData.session as { id?: string } | undefined;
-  let activeOrganizationId: string | null = null;
-
-  if (rawSession?.id) {
-    const rows = await db
-      .select({ activeOrganizationId: sessionTable.activeOrganizationId })
-      .from(sessionTable)
-      .where(eq(sessionTable.id, rawSession.id))
-      .limit(1);
-    activeOrganizationId = rows[0]?.activeOrganizationId ?? null;
-  }
-
-  if (!activeOrganizationId) {
-    const rows = await db
-      .select({ activeOrganizationId: sessionTable.activeOrganizationId })
-      .from(sessionTable)
-      .where(and(eq(sessionTable.userId, userId), gt(sessionTable.expiresAt, new Date())))
-      .orderBy(desc(sessionTable.updatedAt))
-      .limit(1);
-    activeOrganizationId = rows[0]?.activeOrganizationId ?? null;
-  }
+  const activeOrganizationId = await resolveActiveOrganizationId(userId, rawSession?.id);
 
   if (!activeOrganizationId) {
     return {

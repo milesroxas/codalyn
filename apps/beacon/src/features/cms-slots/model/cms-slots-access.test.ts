@@ -21,7 +21,7 @@ describe("cms-slots-access", () => {
     expect(resolveAllowedCmsSlotsSegment("engine", true)).toBe("composer");
     expect(resolveAllowedCmsSlotsSegment("composer", true)).toBe("composer");
     expect(computeEditorExperienceFromMembership("editor", false)).toBe(true);
-    expect(computeEditorExperienceFromMembership("member", false)).toBe(true);
+    expect(computeEditorExperienceFromMembership(" member ", false)).toBe(true);
     expect(computeEditorExperienceFromMembership("admin", true)).toBe(true);
   });
 

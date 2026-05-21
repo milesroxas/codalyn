@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createContext, createElement, type ReactNode, useContext, useEffect, useState } from "react";
 
 export type CmsCollectionTemplatePageState = {
   /** False until the current Designer page kind has been read at least once. */
@@ -7,15 +7,15 @@ export type CmsCollectionTemplatePageState = {
   isCmsCollectionTemplatePage: boolean;
 };
 
-/**
- * Tracks whether the active Designer page is a CMS collection template.
- * @see Page.getKind() in `@webflow/designer-extension-typings` (`'cms'`).
- */
-export function useCmsCollectionTemplatePage(): CmsCollectionTemplatePageState {
-  const [state, setState] = useState<CmsCollectionTemplatePageState>({
-    ready: false,
-    isCmsCollectionTemplatePage: false,
-  });
+const defaultState: CmsCollectionTemplatePageState = {
+  ready: false,
+  isCmsCollectionTemplatePage: false,
+};
+
+const CmsCollectionTemplatePageContext = createContext<CmsCollectionTemplatePageState>(defaultState);
+
+function useCmsCollectionTemplatePageState(): CmsCollectionTemplatePageState {
+  const [state, setState] = useState<CmsCollectionTemplatePageState>(defaultState);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,4 +43,17 @@ export function useCmsCollectionTemplatePage(): CmsCollectionTemplatePageState {
   }, []);
 
   return state;
+}
+
+export function CmsCollectionTemplatePageProvider(props: { children: ReactNode }) {
+  const state = useCmsCollectionTemplatePageState();
+  return createElement(CmsCollectionTemplatePageContext.Provider, { value: state }, props.children);
+}
+
+/**
+ * Tracks whether the active Designer page is a CMS collection template.
+ * @see Page.getKind() in `@webflow/designer-extension-typings` (`'cms'`).
+ */
+export function useCmsCollectionTemplatePage(): CmsCollectionTemplatePageState {
+  return useContext(CmsCollectionTemplatePageContext);
 }

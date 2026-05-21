@@ -1,5 +1,7 @@
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
+import { shouldShowCmsSlotsPreInstall } from "@/features/cms-slots/model/cms-slots-access";
 import { CmsSlotPreInstallBlock } from "@/features/cms-slots/ui/cms-slot-pre-install-block";
+import { CmsSlotsPageScanLoadingPanel } from "@/features/cms-slots/ui/cms-slots-page-scan-loading-panel";
 import { OnThisPageSection } from "./on-this-page-section";
 
 type CmsSlotHomePanelProps = {
@@ -9,6 +11,7 @@ type CmsSlotHomePanelProps = {
   onInstallWrapper: () => void;
   pageBeacons: CmsSlotListOnPage[];
   pageScanLoading: boolean;
+  routeStateKnown: boolean;
   beaconName: string;
   setBeaconName: (v: string) => void;
   createPending: boolean;
@@ -29,6 +32,7 @@ export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
     onInstallWrapper,
     pageBeacons,
     pageScanLoading,
+    routeStateKnown,
     beaconName,
     setBeaconName,
     createPending,
@@ -41,7 +45,11 @@ export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
     deletePendingKey,
   } = props;
 
-  if (!beaconsWrapperInstalled) {
+  if (!routeStateKnown) {
+    return <CmsSlotsPageScanLoadingPanel />;
+  }
+
+  if (shouldShowCmsSlotsPreInstall({ routeStateKnown, beaconsWrapperInstalled })) {
     return (
       <div className="flex min-h-[40vh] flex-col items-stretch justify-center py-4" data-slot="beacon_install_prompt">
         <CmsSlotPreInstallBlock

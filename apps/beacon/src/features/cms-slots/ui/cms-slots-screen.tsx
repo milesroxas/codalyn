@@ -1,4 +1,13 @@
-import { type MutableRefObject, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  type MutableRefObject,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ensureListTargetAfterAppendingSlotRow } from "@/features/cms-slots/model/append-slot-list-component-flow";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
@@ -54,6 +63,10 @@ import {
   writeCmsSlotEngineConfiguredComponentIds,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { resolveAllowedCmsSlotsSegment } from "@/features/cms-slots/model/cms-slots-access";
+import {
+  readCmsSlotsPageInstallInitialState,
+  writeCmsSlotsPageInstallCache,
+} from "@/features/cms-slots/model/cms-slots-page-install-cache";
 import { loadComposerSynchronizedState } from "@/features/cms-slots/model/composer-sync";
 import {
   CMS_SLOT_UTILITIES_COMPONENT_GROUP,
@@ -583,9 +596,11 @@ export function CmsSlotsScreen() {
       ? resolveAllowedCmsSlotsSegment(segmentParam, editorExperience)
       : (segmentFromPath ?? defaultSegment);
   const navigate = useNavigate();
-  const [pageBeacons, setPageBeacons] = useState<CmsSlotListOnPage[]>([]);
+  const initialPageInstall = readCmsSlotsPageInstallInitialState();
+  const [pageBeacons, setPageBeacons] = useState<CmsSlotListOnPage[]>(initialPageInstall.pageBeacons);
   const [pageScanLoading, setPageScanLoading] = useState(true);
-  const [beaconsWrapperInstalled, setBeaconsWrapperInstalled] = useState(false);
+  const [routeStateKnown, setRouteStateKnown] = useState(initialPageInstall.routeStateKnown);
+  const [beaconsWrapperInstalled, setBeaconsWrapperInstalled] = useState(initialPageInstall.beaconsWrapperInstalled);
   const [installPending, setInstallPending] = useState(false);
 
   const [beaconName, setBeaconName] = useState("");
@@ -648,7 +663,8 @@ export function CmsSlotsScreen() {
 
   const isEngine = segment === "engine";
   const isComposer = segment === "composer";
-  const [composerEligibleLoading, setComposerEligibleLoading] = useState(false);
+  const [composerEligibleLoading, setComposerEligibleLoading] = useState(isComposer);
+  const [composerEligibleResolved, setComposerEligibleResolved] = useState(false);
   const [composerEligible, setComposerEligible] = useState<CmsSlotListOnPage[]>([]);
   const [composerRuntimeOk, setComposerRuntimeOk] = useState(false);
   const [activeComposer, setActiveComposer] = useState<{ beacon: CmsSlotListOnPage; initialSignature: string } | null>(
@@ -716,11 +732,22 @@ export function CmsSlotsScreen() {
       const [found, installed] = await Promise.all([findCmsSlotListsOnPage(), isCmsSlotsWrapperInstalledOnPage()]);
       setPageBeacons(found);
       setBeaconsWrapperInstalled(installed);
+      try {
+        const page = await webflow.getCurrentPage();
+        writeCmsSlotsPageInstallCache({
+          pageId: String(page.id),
+          pageBeacons: found,
+          beaconsWrapperInstalled: installed,
+        });
+      } catch {
+        /* cache write is best-effort */
+      }
     } catch {
       setPageBeacons([]);
       setBeaconsWrapperInstalled(false);
     } finally {
       setPageScanLoading(false);
+      setRouteStateKnown(true);
     }
 
     try {
@@ -737,6 +764,7 @@ export function CmsSlotsScreen() {
   const loadComposerEligible = useCallback(
     async (opts?: LoadComposerEligibleOptions) => {
       setComposerEligibleLoading(true);
+      setComposerEligibleResolved(false);
       try {
         let beacons = pageBeacons;
         if (opts?.rescanLists) {
@@ -767,6 +795,7 @@ export function CmsSlotsScreen() {
         applyPageRuntimeSyncStatus(runtime);
       } finally {
         setComposerEligibleLoading(false);
+        setComposerEligibleResolved(true);
       }
     },
     [applyPageRuntimeSyncStatus, pageBeacons]
@@ -807,6 +836,12 @@ export function CmsSlotsScreen() {
     if (!isComposer || pageScanLoading || pageRuntimeStatusLoading) return;
     void loadComposerEligible();
   }, [isComposer, pageScanLoading, pageRuntimeStatusLoading, loadComposerEligible]);
+
+  useLayoutEffect(() => {
+    if (isComposer && !composerEligibleResolved && !composerEligibleLoading) {
+      setComposerEligibleLoading(true);
+    }
+  }, [isComposer, composerEligibleResolved, composerEligibleLoading]);
 
   useEffect(() => {
     if (typeof webflow.subscribe !== "function") {
@@ -1741,6 +1776,7 @@ export function CmsSlotsScreen() {
       installPending={installPending}
       pageBeacons={pageBeacons}
       pageScanLoading={pageScanLoading}
+      routeStateKnown={routeStateKnown}
       beaconName={beaconName}
       setBeaconName={setBeaconName}
       createPending={createPending}
@@ -1782,6 +1818,7 @@ export function CmsSlotsScreen() {
       onAutoOpenExposeDrawerConsumed={() => setAutoOpenExposeDrawerRowKey(null)}
       exitToList={exitToList}
       composerEligibleLoading={composerEligibleLoading}
+      composerEligibleResolved={composerEligibleResolved}
       composerRuntimeOk={composerRuntimeOk}
       composerEligible={composerEligible}
       composerOpeningKey={composerOpeningKey}

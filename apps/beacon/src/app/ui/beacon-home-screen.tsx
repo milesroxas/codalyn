@@ -4,6 +4,7 @@ import { useBeaconGuestWelcomeVisible } from "@/features/auth/lib/use-beacon-gue
 import { isTowerConfigured, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotsCollectionTemplatePrompt } from "@/features/cms-slots/ui/cms-slots-collection-template-prompt";
+import { CmsSlotsPageInstallPrefetch } from "@/features/cms-slots/ui/cms-slots-page-install-prefetch";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
 import { BEACON_HOME_TILE_CSS_VARS } from "@/shared/lib/beacon-app-backgrounds";
 import { IMAGE_UPLOAD_FEATURE_NAME, IMAGE_UPLOAD_HOME_TILE_DESCRIPTION } from "@/shared/lib/beacon-feature-route-copy";
@@ -124,33 +125,36 @@ export function BeaconHomeScreen() {
   }
 
   return (
-    <ScrollArea className="min-h-0 min-w-0 flex-1">
-      <div className="flex min-h-full min-w-0 flex-col justify-center px-4 py-8">
-        <div className="mx-auto grid w-full max-w-160 grid-cols-1 gap-4 sm:auto-rows-fr sm:grid-cols-2 sm:gap-5 sm:min-h-[17rem]">
-          {cmsSlotsNeedsCollectionTemplate ? (
+    <>
+      <CmsSlotsPageInstallPrefetch />
+      <ScrollArea className="min-h-0 min-w-0 flex-1">
+        <div className="flex min-h-full min-w-0 flex-col justify-center px-4 py-8">
+          <div className="mx-auto grid w-full max-w-160 grid-cols-1 gap-4 sm:auto-rows-fr sm:grid-cols-2 sm:gap-5 sm:min-h-[17rem]">
+            {cmsSlotsNeedsCollectionTemplate ? (
+              <BeaconHomeLaunchTile
+                title={CMS_SLOTS_FEATURE_NAME}
+                description={CMS_SLOTS_HOME_TILE_DESCRIPTION}
+                decorationVar={BEACON_HOME_TILE_CSS_VARS.cmsSlot}
+                prompt={<CmsSlotsCollectionTemplatePrompt variant="tile" />}
+              />
+            ) : (
+              <BeaconHomeLaunchTile
+                title={CMS_SLOTS_FEATURE_NAME}
+                description={CMS_SLOTS_HOME_TILE_DESCRIPTION}
+                decorationVar={BEACON_HOME_TILE_CSS_VARS.cmsSlot}
+                disabled={!cmsSlotsSurfaceEnabled || !cmsPageKindReady}
+                onClick={() => navigate(`/cms-slots/${defaultSegment}`)}
+              />
+            )}
             <BeaconHomeLaunchTile
-              title={CMS_SLOTS_FEATURE_NAME}
-              description={CMS_SLOTS_HOME_TILE_DESCRIPTION}
-              decorationVar={BEACON_HOME_TILE_CSS_VARS.cmsSlot}
-              prompt={<CmsSlotsCollectionTemplatePrompt variant="tile" />}
+              title={IMAGE_UPLOAD_FEATURE_NAME}
+              description={IMAGE_UPLOAD_HOME_TILE_DESCRIPTION}
+              decorationVar={BEACON_HOME_TILE_CSS_VARS.imageUpload}
+              onClick={() => navigate("/images")}
             />
-          ) : (
-            <BeaconHomeLaunchTile
-              title={CMS_SLOTS_FEATURE_NAME}
-              description={CMS_SLOTS_HOME_TILE_DESCRIPTION}
-              decorationVar={BEACON_HOME_TILE_CSS_VARS.cmsSlot}
-              disabled={!cmsSlotsSurfaceEnabled || !cmsPageKindReady}
-              onClick={() => navigate(`/cms-slots/${defaultSegment}`)}
-            />
-          )}
-          <BeaconHomeLaunchTile
-            title={IMAGE_UPLOAD_FEATURE_NAME}
-            description={IMAGE_UPLOAD_HOME_TILE_DESCRIPTION}
-            decorationVar={BEACON_HOME_TILE_CSS_VARS.imageUpload}
-            onClick={() => navigate("/images")}
-          />
+          </div>
         </div>
-      </div>
-    </ScrollArea>
+      </ScrollArea>
+    </>
   );
 }

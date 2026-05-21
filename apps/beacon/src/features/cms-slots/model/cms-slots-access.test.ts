@@ -5,6 +5,7 @@ import {
   defaultCmsSlotsRouteSegment,
   resolveAllowedCmsSlotsSegment,
   shouldShowCmsSlotsEditorNoSlotsEmpty,
+  shouldShowCmsSlotsPreInstall,
 } from "@/features/cms-slots/model/cms-slots-access";
 
 describe("cms-slots-access", () => {
@@ -25,11 +26,17 @@ describe("cms-slots-access", () => {
     expect(computeEditorExperienceFromMembership("admin", true)).toBe(true);
   });
 
-  it("shows editor no-slots empty only after scan settles with nothing to open", () => {
+  it("shows pre-install only after route install state is known", () => {
+    expect(shouldShowCmsSlotsPreInstall({ routeStateKnown: false, beaconsWrapperInstalled: false })).toBe(false);
+    expect(shouldShowCmsSlotsPreInstall({ routeStateKnown: true, beaconsWrapperInstalled: false })).toBe(true);
+    expect(shouldShowCmsSlotsPreInstall({ routeStateKnown: true, beaconsWrapperInstalled: true })).toBe(false);
+  });
+
+  it("shows editor no-slots empty only after composer list has fully settled", () => {
     expect(
       shouldShowCmsSlotsEditorNoSlotsEmpty({
         composerOnly: false,
-        scanSettled: true,
+        composerListSettled: true,
         beaconsWrapperInstalled: false,
         eligibleCount: 0,
       })
@@ -37,7 +44,7 @@ describe("cms-slots-access", () => {
     expect(
       shouldShowCmsSlotsEditorNoSlotsEmpty({
         composerOnly: true,
-        scanSettled: false,
+        composerListSettled: false,
         beaconsWrapperInstalled: false,
         eligibleCount: 0,
       })
@@ -45,7 +52,7 @@ describe("cms-slots-access", () => {
     expect(
       shouldShowCmsSlotsEditorNoSlotsEmpty({
         composerOnly: true,
-        scanSettled: true,
+        composerListSettled: true,
         beaconsWrapperInstalled: false,
         eligibleCount: 0,
       })
@@ -53,7 +60,7 @@ describe("cms-slots-access", () => {
     expect(
       shouldShowCmsSlotsEditorNoSlotsEmpty({
         composerOnly: true,
-        scanSettled: true,
+        composerListSettled: true,
         beaconsWrapperInstalled: true,
         eligibleCount: 0,
       })
@@ -61,7 +68,7 @@ describe("cms-slots-access", () => {
     expect(
       shouldShowCmsSlotsEditorNoSlotsEmpty({
         composerOnly: true,
-        scanSettled: true,
+        composerListSettled: true,
         beaconsWrapperInstalled: true,
         eligibleCount: 2,
       })

@@ -57,6 +57,7 @@ export type CmsSlotsRouteChromeProps = {
   installPending: boolean;
   pageBeacons: CmsSlotListOnPage[];
   pageScanLoading: boolean;
+  routeStateKnown: boolean;
   beaconName: string;
   setBeaconName: (v: string) => void;
   createPending: boolean;
@@ -98,6 +99,7 @@ export type CmsSlotsRouteChromeProps = {
   onAutoOpenExposeDrawerConsumed: () => void;
   exitToList: () => void;
   composerEligibleLoading: boolean;
+  composerEligibleResolved: boolean;
   composerRuntimeOk: boolean;
   composerEligible: CmsSlotListOnPage[];
   composerOpeningKey: string | null;
@@ -146,6 +148,7 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps) {
           onInstallWrapper={p.onInstallWrapper}
           pageBeacons={p.pageBeacons}
           pageScanLoading={p.pageScanLoading}
+          routeStateKnown={p.routeStateKnown}
           beaconName={p.beaconName}
           setBeaconName={p.setBeaconName}
           createPending={p.createPending}
@@ -206,6 +209,9 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
       {p.activeComposer == null ? (
         <CmsSlotComposerListPanel
           pageScanLoading={p.pageScanLoading}
+          pageRuntimeStatusLoading={p.pageRuntimeStatusLoading}
+          routeStateKnown={p.routeStateKnown}
+          composerEligibleResolved={p.composerEligibleResolved}
           beaconsWrapperInstalled={p.beaconsWrapperInstalled}
           installPending={p.installPending}
           onInstallWrapper={p.onInstallWrapper}

@@ -10,6 +10,7 @@ import { BeaconAppSettingsProvider, BeaconSettingsScreen } from "@/features/sett
 import { ErrorBoundary } from "@/shared/components/error-boundary";
 import { applyBeaconExtensionSize } from "@/shared/lib/beacon-extension-size";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
+import { CmsCollectionTemplatePageProvider } from "@/shared/lib/use-cms-collection-template-page";
 import { TooltipProvider } from "@/shared/ui/tooltip";
 
 function BeaconSettingsPage() {
@@ -53,23 +54,25 @@ export function App() {
   return (
     <ErrorBoundary>
       <BeaconAppSettingsProvider>
-        <HashRouter>
-          <TooltipProvider delayDuration={200}>
-            <Routes>
-              <Route path="/settings" element={<BeaconSettingsPage />} />
-              <Route element={<BeaconAppShell />}>
-                <Route index element={<Navigate to="/home" replace />} />
-                <Route path="home" element={<BeaconHomeScreen />} />
-                <Route path="images" element={<BeaconImagesPage />} />
-                <Route path="cms-slots/:segment" element={<CmsSlotsRoutePage />} />
-                <Route path="cms-slots" element={<CmsSlotsIndexRedirect />} />
-                <Route path="beacons/:segment" element={<LegacyBeaconsSegmentRedirect />} />
-                <Route path="beacons" element={<CmsSlotsIndexRedirect />} />
-                <Route path="*" element={<Navigate to="/home" replace />} />
-              </Route>
-            </Routes>
-          </TooltipProvider>
-        </HashRouter>
+        <CmsCollectionTemplatePageProvider>
+          <HashRouter>
+            <TooltipProvider delayDuration={200}>
+              <Routes>
+                <Route path="/settings" element={<BeaconSettingsPage />} />
+                <Route element={<BeaconAppShell />}>
+                  <Route index element={<Navigate to="/home" replace />} />
+                  <Route path="home" element={<BeaconHomeScreen />} />
+                  <Route path="images" element={<BeaconImagesPage />} />
+                  <Route path="cms-slots/:segment" element={<CmsSlotsRoutePage />} />
+                  <Route path="cms-slots" element={<CmsSlotsIndexRedirect />} />
+                  <Route path="beacons/:segment" element={<LegacyBeaconsSegmentRedirect />} />
+                  <Route path="beacons" element={<CmsSlotsIndexRedirect />} />
+                  <Route path="*" element={<Navigate to="/home" replace />} />
+                </Route>
+              </Routes>
+            </TooltipProvider>
+          </HashRouter>
+        </CmsCollectionTemplatePageProvider>
       </BeaconAppSettingsProvider>
     </ErrorBoundary>
   );

@@ -46,14 +46,23 @@ export function resolveAllowedCmsSlotsSegment(
   return segment;
 }
 
+/** Pre-install prompt only after the route knows wrapper install state (avoids flashing install before scan). */
+export function shouldShowCmsSlotsPreInstall(input: {
+  routeStateKnown: boolean;
+  beaconsWrapperInstalled: boolean;
+}): boolean {
+  return input.routeStateKnown && !input.beaconsWrapperInstalled;
+}
+
 /** Composer list panel: editor-only empty state when install/scan finished and no lists are available. */
 export function shouldShowCmsSlotsEditorNoSlotsEmpty(input: {
   composerOnly: boolean;
-  scanSettled: boolean;
+  /** True once page scan, runtime status, and composer eligibility have all settled. */
+  composerListSettled: boolean;
   beaconsWrapperInstalled: boolean;
   eligibleCount: number;
 }): boolean {
-  if (!input.composerOnly || !input.scanSettled) {
+  if (!input.composerOnly || !input.composerListSettled) {
     return false;
   }
   if (!input.beaconsWrapperInstalled) {

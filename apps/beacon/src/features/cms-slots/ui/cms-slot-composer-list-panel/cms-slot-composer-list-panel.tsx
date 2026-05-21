@@ -1,13 +1,20 @@
 import type { ComposerEligibleList } from "@/features/cms-slots/model/cms-slot-composer-eligible";
 import { displayLabelForDataList } from "@/features/cms-slots/model/cms-slot-data-list-display";
-import { shouldShowCmsSlotsEditorNoSlotsEmpty } from "@/features/cms-slots/model/cms-slots-access";
+import {
+  shouldShowCmsSlotsEditorNoSlotsEmpty,
+  shouldShowCmsSlotsPreInstall,
+} from "@/features/cms-slots/model/cms-slots-access";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotListTile } from "@/features/cms-slots/ui/cms-slot-list-tile";
 import { CmsSlotPreInstallBlock } from "@/features/cms-slots/ui/cms-slot-pre-install-block";
 import { CmsSlotsEditorNoSlotsEmptyState } from "@/features/cms-slots/ui/cms-slots-editor-no-slots-empty-state";
+import { CmsSlotsPageScanLoadingPanel } from "@/features/cms-slots/ui/cms-slots-page-scan-loading-panel";
 
 type CmsSlotComposerListPanelProps = {
   pageScanLoading: boolean;
+  pageRuntimeStatusLoading: boolean;
+  routeStateKnown: boolean;
+  composerEligibleResolved: boolean;
   beaconsWrapperInstalled: boolean;
   installPending: boolean;
   onInstallWrapper: () => void;
@@ -21,6 +28,9 @@ type CmsSlotComposerListPanelProps = {
 export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
   const {
     pageScanLoading,
+    pageRuntimeStatusLoading,
+    routeStateKnown,
+    composerEligibleResolved,
     beaconsWrapperInstalled,
     installPending,
     onInstallWrapper,
@@ -31,13 +41,18 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
     onOpenList,
   } = props;
   const { composerOnly } = useCmsSlotsAccess();
-  const scanSettled = !loading && !pageScanLoading;
+  const composerListSettled =
+    routeStateKnown && !pageScanLoading && !pageRuntimeStatusLoading && !loading && composerEligibleResolved;
   const showEditorNoSlotsEmpty = shouldShowCmsSlotsEditorNoSlotsEmpty({
     composerOnly,
-    scanSettled,
+    composerListSettled,
     beaconsWrapperInstalled,
     eligibleCount: eligible.length,
   });
+
+  if (!composerListSettled) {
+    return <CmsSlotsPageScanLoadingPanel />;
+  }
 
   if (showEditorNoSlotsEmpty) {
     return (
@@ -50,7 +65,7 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
     );
   }
 
-  if (!beaconsWrapperInstalled) {
+  if (shouldShowCmsSlotsPreInstall({ routeStateKnown, beaconsWrapperInstalled })) {
     return (
       <div
         className="flex min-h-[min(40vh,16rem)] flex-col items-center justify-center py-4"

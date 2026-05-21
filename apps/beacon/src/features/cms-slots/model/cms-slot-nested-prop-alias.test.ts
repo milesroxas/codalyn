@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mapNestedPropsToExposedIds } from "@/features/cms-slots/model/cms-slot-engine-codalyn-attr-sync";
+import {
+  collectNestedPublishSeedPairsFromBinding,
+  mapNestedPropsToExposedIds,
+  nestedPublishSeedPairKey,
+} from "@/features/cms-slots/model/cms-slot-nested-prop-alias";
 
 describe("mapNestedPropsToExposedIds", () => {
   const exposed = new Set(["parent-title", "parent-img"]);
@@ -35,5 +39,25 @@ describe("mapNestedPropsToExposedIds", () => {
       cardAlias
     );
     expect(buttonAlias.get("btn-label")).toBe("parent-title");
+  });
+});
+
+describe("collectNestedPublishSeedPairsFromBinding", () => {
+  it("records nested prop ids tagged below the root component", () => {
+    expect(collectNestedPublishSeedPairsFromBinding("card-link", "cta-link", 1)).toEqual({
+      nestedPropId: "card-link",
+      canonicalPropId: "cta-link",
+    });
+  });
+
+  it("ignores root-level bindings and same-id bindings", () => {
+    expect(collectNestedPublishSeedPairsFromBinding("cta-link", "cta-link", 1)).toBeNull();
+    expect(collectNestedPublishSeedPairsFromBinding("card-link", "cta-link", 0)).toBeNull();
+  });
+
+  it("builds stable pair keys", () => {
+    expect(nestedPublishSeedPairKey({ nestedPropId: "Card-Link", canonicalPropId: "CTA-LINK" })).toBe(
+      "card-link|cta-link"
+    );
   });
 });

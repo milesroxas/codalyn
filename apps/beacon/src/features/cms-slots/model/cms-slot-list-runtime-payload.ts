@@ -11,7 +11,9 @@
  * v2: `i` = clone order (indices into the hidden list’s children), `p` = parallel array of per-row `propId` → string.
  * `p` keys are **only** propIds the Engine had marked `exposed` in the slot file (not every Webflow prop on the
  * component). The footer runtime applies those keys to `data-codalyn-beacon-prop` nodes in each cloned row; a missing
- * key or empty/whitespace-only value sets `hidden` on that node (placeholders are not shown).
+ * key or empty/whitespace-only value sets `hidden` on that node (placeholders are not shown). When a value is set,
+ * the runtime also clears Webflow conditional visibility (`w-condition-invisible`) on ancestor wrappers so Composer
+ * can show elements that were kept in HTML with publish-time placeholders on the hidden Engine list instance.
  *
  * Optional `n` (parallel to `i`/`p`) stores Composer-only **slot display names**. The footer runtime ignores `n`; it is
  * for Studio UX persistence in the same JSON blob.
@@ -33,7 +35,7 @@ export type CmsSlotListRuntimePayload = {
   i: number[];
   /**
    * Parallel to `i`: string values for each property exposed in Engine, keyed by Webflow `propId`.
-   * (Text, image URL / asset id, `true`/`false`, decimal numbers, hex colors, etc.)
+   * (Text, image URL, `true`/`false`, decimal numbers, hex colors, etc.)
    */
   p: Array<Record<string, string>>;
   /** Optional parallel slot labels (Composer); ignored by footer runtime. */

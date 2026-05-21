@@ -1,4 +1,9 @@
 import SparkMD5 from "spark-md5";
+import {
+  beaconPropApplyValueRuntimeSource,
+  beaconPropEmptyRuntimeSource,
+  beaconPropVisibilityRuntimeSource,
+} from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import { cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
 import {
   CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME,
@@ -26,52 +31,46 @@ export function hashCmsSlotRuntimeSource(source: string): string {
 
 const REGISTER_DISPLAY_NAME = "CodalynBeaconRuntime";
 
+/** Uploaded JS files for the hosted beacon runtime (`registerHostedRuntimeScript`). */
+export const CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX = "codalyn-beacon-runtime-";
+
+const LOG_PREFIX = "[codalyn-beacon-runtime-cleanup]";
+
 /**
  * Minified IIFE for the Beacon runtime source uploaded as a Webflow Asset.
- * Live-site debug: set `window.CODALYN_BEACON_DEBUG = true` (before load) or
- * `localStorage.setItem("codalyn-beacon-debug", "1")` then reload — watch console for `[codalyn-beacon]`.
  */
 export function getCmsSlotPageInlineScriptSource(): string {
   return `(function(){
-function bDbg(){try{return(typeof globalThis!=="undefined"&&!!globalThis.CODALYN_BEACON_DEBUG)||(typeof localStorage!=="undefined"&&localStorage.getItem("codalyn-beacon-debug")==="1")}catch(e){return false}}
-function bLog(){if(!bDbg())return;console.log.apply(console,["[codalyn-beacon]"].concat([].slice.call(arguments)))}
 function listKey(el){var t=String(el.getAttribute("data-list")||"").toLowerCase();return t&&t.indexOf("beacon-")===0?t:null}
 function isSource(el){return String(el.getAttribute("data-target")||"").toLowerCase()==="beacons"&&String(el.getAttribute("data-beacon-target")||"").toLowerCase()!=="list"&&listKey(el)!=null}
-function applyValue(el,v){v=String(v==null?"":v);var tag=String(el.tagName||"").toUpperCase();if(tag==="IMG"||tag==="SOURCE"){el.setAttribute("src",v);el.removeAttribute&&el.removeAttribute("srcset");return}if(tag==="A"){el.setAttribute("href",v);return}if(tag==="IFRAME"||tag==="EMBED"){el.setAttribute("src",v);return}if(tag==="INPUT"){var type=String(el.type||"").toLowerCase();if(type==="checkbox"||type==="radio"){el.checked=!!(v&&v!=="0"&&v!=="false"&&v.toLowerCase()!=="off")}else{el.value=v}return}if(tag==="TEXTAREA"||tag==="SELECT"){el.value=v;return}el.textContent=v}
+${beaconPropApplyValueRuntimeSource()}
 function bBeaconNormHeadingTag(v){v=String(v==null?"":v).trim().toLowerCase();var m=v.match(/^h([1-6])$/);if(m)return"H"+m[1];if(/^[1-6]$/.test(v))return"H"+v;return""}
 function bBeaconResolveHeadingTagEl(el,v){var want=bBeaconNormHeadingTag(v);if(!want)return el;var cur=String(el.tagName||"").toUpperCase();var head=/^H[1-6]$/.test(cur),wrap=cur==="DIV"||cur==="SPAN";if(!head&&!wrap)return el;if(head&&cur===want)return el;var doc=el.ownerDocument,nw=doc.createElement(want),a,i;while(el.firstChild)nw.appendChild(el.firstChild);for(i=el.attributes.length-1;i>=0;i--){a=el.attributes[i];nw.setAttribute(a.name,a.value)}if(el.parentNode){el.parentNode.replaceChild(nw,el);return nw}return el}
 function pickP(ps,k){if(!k||!ps||typeof ps!=="object")return;var a=String(k);if(Object.prototype.hasOwnProperty.call(ps,a))return ps[a];var al=a.toLowerCase();for(var x in ps)if(Object.prototype.hasOwnProperty.call(ps,x)&&x.toLowerCase()===al)return ps[x]}
-function bPropEmpty(v){if(v==null)return true;return String(v).trim()===""}
-function bPropSetHidden(n,h){if(h){n.setAttribute("hidden","");n.setAttribute("aria-hidden","true")}else{n.removeAttribute("hidden");n.removeAttribute("aria-hidden")}}
+${beaconPropEmptyRuntimeSource()}
+${beaconPropVisibilityRuntimeSource()}
 function bListTargetReveal(target){target.classList.remove("${CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");${cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource()}${cmsSlotListTargetRuntimeLayoutRevealSource()}target.style.removeProperty("visibility");target.removeAttribute("aria-label")}
-function applyProps(target,payload){var vn=payload?+payload.v:NaN;if(!payload||!isFinite(vn)||vn<2)return;var pc=payload.p;if(!Array.isArray(pc))return;var rows=target.children,i,j,row,props,nodes,node,rawP,segs,si,seg,pv,ra,rh,anyV,d=bDbg(),totA=0,totH=0,nLen=rows.length<pc.length?rows.length:pc.length;for(i=0;i<nLen;i++){row=rows[i];props=pc[i];if(!row||props===null||typeof props!=="object"){if(d)bLog("row missing",i);continue}nodes=row.querySelectorAll("[data-codalyn-beacon-prop]");ra=0;rh=0;for(j=0;j<nodes.length;j++){node=nodes[j];rawP=node.getAttribute("data-codalyn-beacon-prop")||"";if(!rawP)continue;segs=String(rawP).split("|");anyV=false;for(si=0;si<segs.length;si++){seg=segs[si].trim();if(!seg)continue;pv=pickP(props,seg);if(bPropEmpty(pv))continue;anyV=true;if(bBeaconNormHeadingTag(String(pv))){node=bBeaconResolveHeadingTagEl(node,String(pv));continue}applyValue(node,String(pv))}if(!anyV){bPropSetHidden(node,true);rh++;if(d)bLog("no payload for attr",i,rawP,"keys",Object.keys(props));continue}bPropSetHidden(node,false);ra++}totA+=ra;totH+=rh;if(d)bLog("row",i,"nodes",nodes.length,"set",ra,"hidden",rh)}if(d)bLog("applyProps",totA,"set",totH,"hidden nodes")}
-function reapply(target,payload,done){bLog("reapply 1/3 sync");applyProps(target,payload);setTimeout(function(){bLog("reapply 2/3 +0ms");applyProps(target,payload);setTimeout(function(){bLog("reapply 3/3 +100ms");applyProps(target,payload);if(typeof done==="function")done()},100)},0)}
+function applyProps(target,payload){var vn=payload?+payload.v:NaN;if(!payload||!isFinite(vn)||vn<2)return;var pc=payload.p;if(!Array.isArray(pc))return;var rows=target.children,i,j,row,props,nodes,node,rawP,segs,si,seg,pv,ra,rh,anyV,totA=0,totH=0,nLen=rows.length<pc.length?rows.length:pc.length;for(i=0;i<nLen;i++){row=rows[i];props=pc[i];if(!row||props===null||typeof props!=="object"){continue}nodes=row.querySelectorAll("[data-codalyn-beacon-prop]");ra=0;rh=0;for(j=0;j<nodes.length;j++){node=nodes[j];rawP=node.getAttribute("data-codalyn-beacon-prop")||"";if(!rawP)continue;segs=String(rawP).split("|");anyV=false;for(si=0;si<segs.length;si++){seg=segs[si].trim();if(!seg)continue;pv=pickP(props,seg);if(bPropEmpty(pv))continue;anyV=true;if(bBeaconNormHeadingTag(String(pv))){node=bBeaconResolveHeadingTagEl(node,String(pv));continue}applyValue(node,String(pv))}if(!anyV){bPropClearPublishPlaceholder(node);bPropConceal(node,row);rh++;continue}bPropReveal(node,row);ra++}totA+=ra;totH+=rh}}
+function reapply(target,payload,done){applyProps(target,payload);setTimeout(function(){applyProps(target,payload);setTimeout(function(){applyProps(target,payload);if(typeof done==="function")done()},100)},0)}
 function run(){
-bLog("run",document.readyState);
 var sourcesByList={},sources=document.querySelectorAll("[data-target=beacons][data-list]");
 for(var i=0;i<sources.length;i++){var source=sources[i];if(isSource(source)){var key=listKey(source);if(key)sourcesByList[key]=source}}
-bLog("hidden list keys",Object.keys(sourcesByList));
 var targets=document.querySelectorAll("[data-beacon-target][data-list]");
-bLog("list target elements",targets.length);
 for(var t=0;t<targets.length;t++){
 var target=targets[t],targetKey=listKey(target);
 if(!targetKey||String(target.getAttribute("data-beacon-target")||"").toLowerCase()!=="list")continue;
 var sourceNode=sourcesByList[targetKey];
 if(!sourceNode){for(i=0;i<sources.length;i++){source=sources[i];if(isSource(source)&&listKey(source)===targetKey){sourceNode=source;break}}}
-if(!sourceNode){bLog("skip (no source)",targetKey);continue}
+if(!sourceNode){continue}
 target.style.visibility="hidden";
 var raw=String(target.textContent||"").trim();
-bLog("list",targetKey,"sourceChildren",sourceNode.children.length,"rawChars",raw.length,"rawStart",raw.slice(0,200));
 target.textContent="";
-var payload=null,ok=false,indices=null,v=0,pe=null;
-try{payload=JSON.parse(raw);var vv=+payload.v;ok=!!(payload&&(vv===1||vv===2)&&Array.isArray(payload.i));if(ok){indices=payload.i;v=vv}}catch(e){ok=false;pe=String((e&&e.message)||e)}
-bLog("parse",ok,pe?{err:pe}:null,"v",v,"vPayload",payload?payload.v:null,"i",indices?indices.length:0,"p",payload&&payload.p?payload.p.length:0);
+var payload=null,ok=false,indices=null,v=0;
+try{payload=JSON.parse(raw);var vv=+payload.v;ok=!!(payload&&(vv===1||vv===2)&&Array.isArray(payload.i));if(ok){indices=payload.i;v=vv}}catch(e){ok=false}
 var children=sourceNode.children,cloned=0;
 if(ok){for(var u=0;u<indices.length;u++){var idx=+indices[u];if(idx===idx&&idx>=0&&idx%1===0&&idx<children.length){target.appendChild(children[idx].cloneNode(true));cloned++}}}else{for(var u=0;u<children.length;u++)target.appendChild(children[u].cloneNode(true))}
-bLog("cloned rows",ok?"byIndex":"allChildren",ok?cloned:target.children.length,"targetChildren",target.children.length);
 if(v>=2&&ok&&payload&&Array.isArray(payload.p))reapply(target,payload,function(){bListTargetReveal(target)});
-else{bLog("skip reapply (need v>=2, ok, p[])",v,ok,Array.isArray(payload&&payload.p));bListTargetReveal(target)}}
-bLog("run done")
+else{bListTargetReveal(target)}}
 }
 if(document.readyState==="loading")addEventListener("DOMContentLoaded",run);else run();
 })();`;
@@ -314,6 +313,205 @@ function withoutCmsSlotMarkedScripts(scripts: PageCustomScript[]): PageCustomScr
   );
 }
 
+type PaginatedList = { limit: number; offset: number; total: number };
+
+type SiteAssetRow = {
+  id: string;
+  hostedUrl: string;
+  originalFileName: string;
+};
+
+type RegisteredScriptRow = {
+  id: string;
+  displayName?: string;
+  hostedLocation?: string;
+};
+
+export function isBeaconRuntimeAssetFileName(fileName: string): boolean {
+  return fileName.startsWith(CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX) && fileName.endsWith(".js");
+}
+
+export function normalizeHostedAssetUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.href.replace(/\/$/, "");
+  } catch {
+    return url.trim().replace(/\/$/, "");
+  }
+}
+
+export function selectBeaconRuntimeAssetIdsToPurge(options: {
+  assets: SiteAssetRow[];
+  appliedHostedUrls: Iterable<string>;
+}): string[] {
+  const applied = new Set([...options.appliedHostedUrls].map(normalizeHostedAssetUrl));
+  return options.assets
+    .filter((asset) => isBeaconRuntimeAssetFileName(asset.originalFileName))
+    .filter((asset) => !applied.has(normalizeHostedAssetUrl(asset.hostedUrl)))
+    .map((asset) => asset.id);
+}
+
+async function fetchAllPaginated<T>(
+  pathBase: string,
+  pick: (body: Record<string, unknown>) => { items: T[]; pagination?: PaginatedList }
+): Promise<T[]> {
+  const limit = 100;
+  let offset = 0;
+  const all: T[] = [];
+
+  for (;;) {
+    const sep = pathBase.includes("?") ? "&" : "?";
+    const res = await towerFetch(`${pathBase}${sep}limit=${limit}&offset=${offset}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) {
+      throw new Error(`Paginated fetch failed (${res.status})`);
+    }
+    const body = (await readJson<Record<string, unknown>>(res)) ?? {};
+    const { items, pagination } = pick(body);
+    all.push(...items);
+    const total = pagination?.total ?? items.length;
+    offset += items.length;
+    if (items.length === 0 || offset >= total) {
+      break;
+    }
+  }
+
+  return all;
+}
+
+async function getSiteCustomScripts(siteId: string): Promise<PageCustomScript[]> {
+  const res = await towerFetch(`/api/v2/webflow/sites/${encodeURIComponent(siteId)}/custom_code`, {
+    headers: { Accept: "application/json" },
+  });
+  if (res.status === 404) {
+    return [];
+  }
+  await assertTowerOk(res, "Get site custom code");
+  const data = await readJson<{ scripts?: PageCustomScript[] }>(res);
+  return Array.isArray(data?.scripts) ? data.scripts : [];
+}
+
+async function listAllSitePageIds(siteId: string): Promise<string[]> {
+  const pages = await fetchAllPaginated<{ id?: string }>(
+    `/api/v2/webflow/sites/${encodeURIComponent(siteId)}/pages`,
+    (body) => ({
+      items: Array.isArray(body.pages) ? (body.pages as { id?: string }[]) : [],
+      pagination: body.pagination as PaginatedList | undefined,
+    })
+  );
+  return pages.map((page) => page.id).filter((id): id is string => typeof id === "string" && id.length > 0);
+}
+
+async function listBeaconRuntimeAssets(siteId: string): Promise<SiteAssetRow[]> {
+  const assets = await fetchAllPaginated<SiteAssetRow>(
+    `/api/v2/webflow/sites/${encodeURIComponent(siteId)}/assets`,
+    (body) => ({
+      items: Array.isArray(body.assets) ? (body.assets as SiteAssetRow[]) : [],
+      pagination: body.pagination as PaginatedList | undefined,
+    })
+  );
+  return assets.filter(
+    (asset) =>
+      typeof asset.id === "string" &&
+      typeof asset.hostedUrl === "string" &&
+      typeof asset.originalFileName === "string" &&
+      isBeaconRuntimeAssetFileName(asset.originalFileName)
+  );
+}
+
+async function listRegisteredBeaconRuntimeScripts(siteId: string): Promise<RegisteredScriptRow[]> {
+  const scripts = await fetchAllPaginated<RegisteredScriptRow>(
+    `/api/v2/webflow/sites/${encodeURIComponent(siteId)}/registered_scripts`,
+    (body) => ({
+      items: Array.isArray(body.registeredScripts) ? (body.registeredScripts as RegisteredScriptRow[]) : [],
+      pagination: body.pagination as PaginatedList | undefined,
+    })
+  );
+  return scripts.filter((script) => script.displayName === REGISTER_DISPLAY_NAME);
+}
+
+function collectScriptIds(scripts: PageCustomScript[] | undefined, out: Set<string>): void {
+  for (const script of scripts ?? []) {
+    if (typeof script.id === "string" && script.id.length > 0) {
+      out.add(script.id);
+    }
+  }
+}
+
+async function collectAppliedCustomCodeScriptIds(siteId: string): Promise<Set<string>> {
+  const ids = new Set<string>();
+  collectScriptIds(await getSiteCustomScripts(siteId), ids);
+
+  const pageIds = await listAllSitePageIds(siteId);
+  const batchSize = 5;
+  for (let i = 0; i < pageIds.length; i += batchSize) {
+    const batch = pageIds.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (pageId) => {
+        try {
+          collectScriptIds(await getPageCustomScripts(pageId), ids);
+        } catch (err) {
+          console.warn(LOG_PREFIX, "Could not read page custom code", pageId, err);
+        }
+      })
+    );
+  }
+
+  return ids;
+}
+
+function collectAppliedHostedUrls(
+  appliedScriptIds: Set<string>,
+  registeredScripts: RegisteredScriptRow[]
+): Set<string> {
+  const out = new Set<string>();
+  for (const script of registeredScripts) {
+    if (!appliedScriptIds.has(script.id)) {
+      continue;
+    }
+    if (typeof script.hostedLocation !== "string" || script.hostedLocation.length === 0) {
+      continue;
+    }
+    out.add(normalizeHostedAssetUrl(script.hostedLocation));
+  }
+  return out;
+}
+
+async function deleteSiteAsset(assetId: string): Promise<boolean> {
+  const res = await towerFetch(`/api/v2/webflow/assets/${encodeURIComponent(assetId)}`, {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  });
+  return res.ok || res.status === 404;
+}
+
+/**
+ * Best-effort delete of beacon runtime JS assets that are no longer referenced by site or page custom code.
+ * Also clears stale assets left behind by prior syncs on the same page.
+ */
+async function purgeUnreferencedBeaconRuntimeAssets(siteId: string): Promise<void> {
+  try {
+    const [appliedScriptIds, registeredScripts, assets] = await Promise.all([
+      collectAppliedCustomCodeScriptIds(siteId),
+      listRegisteredBeaconRuntimeScripts(siteId),
+      listBeaconRuntimeAssets(siteId),
+    ]);
+    const appliedHostedUrls = collectAppliedHostedUrls(appliedScriptIds, registeredScripts);
+    const assetIds = selectBeaconRuntimeAssetIdsToPurge({ assets, appliedHostedUrls });
+    for (const assetId of assetIds) {
+      const ok = await deleteSiteAsset(assetId);
+      if (!ok) {
+        console.warn(LOG_PREFIX, "DELETE asset failed", assetId);
+      }
+    }
+  } catch (err) {
+    console.warn(LOG_PREFIX, "Runtime asset cleanup failed", err);
+  }
+}
+
 /**
  * Uploads the Beacon runtime to Webflow Assets, registers it as a hosted script, and applies it to the current page
  * footer custom code. Requires Tower + Webflow OAuth with `assets:write`, `custom_code:read`, and
@@ -350,14 +548,16 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
 }
 
 /**
- * Removes the Codalyn beacon **footer** custom code from the current page (Tower + Data API). No-op if Tower is
- * not configured or the page has no matching script.
+ * Removes the Codalyn beacon **footer** custom code from the current page (Tower + Data API) and deletes unreferenced
+ * `codalyn-beacon-runtime-*.js` assets from the site. No-op if Tower is not configured or the page has no matching
+ * script.
  */
 export async function removeCmsSlotPageRuntimeFromPage(): Promise<void> {
   if (!getTowerOrigin()) {
     return;
   }
 
+  const siteId = (await webflow.getSiteInfo()).siteId;
   const pageId = (await webflow.getCurrentPage()).id as string;
   const existing = await getPageCustomScripts(pageId);
   const next = withoutCmsSlotMarkedScripts(existing);
@@ -365,6 +565,7 @@ export async function removeCmsSlotPageRuntimeFromPage(): Promise<void> {
     return;
   }
   await putPageCustomScripts(pageId, next);
+  await purgeUnreferencedBeaconRuntimeAssets(siteId);
 }
 
 function formatRuntimeStatusError(err: unknown): string {

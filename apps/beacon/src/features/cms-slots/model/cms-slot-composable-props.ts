@@ -89,6 +89,13 @@ export function cmsSlotStudioFieldKindForValueType(valueType: string): CmsSlotSt
   return STUDIO_FIELD_BY_VALUE_TYPE[valueType] ?? "line";
 }
 
+const CMS_SLOT_IMAGE_VALUE_TYPES = new Set(["image", "imageAsset", "cmsImage", "imageSet", "file"]);
+
+/** Webflow image-capable instance prop `valueType`s (Composer stores a hosted image URL string). */
+export function isCmsSlotImageValueType(valueType: string): boolean {
+  return CMS_SLOT_IMAGE_VALUE_TYPES.has(valueType);
+}
+
 const HEADING_LEVEL_IN_TAG_RE = /^h([1-6])$/i;
 
 /**

@@ -1,23 +1,18 @@
+import { CMS_SLOT_BEACON_PROP_ATTR } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
+import {
+  seedHiddenListPublishPlaceholders,
+  seedNestedPublishPlaceholdersOnPlacedInstance,
+} from "@/features/cms-slots/model/cms-slot-hidden-list-publish-placeholders";
+import {
+  bindingPropIdFromSettingValue,
+  canonicalExposedPropId,
+  collectNestedPublishSeedPairsFromBinding,
+  nestedAliasForComponentInstance,
+  nestedPublishSeedPairKey,
+} from "@/features/cms-slots/model/cms-slot-nested-prop-alias";
 import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 import { exitCurrentComponentIfAny } from "@/features/image-editor/lib/with-image-element-for-page-target";
-import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
-
-/** Filter Designer console DevTools with this string to trace Engine “Tag data attributes on component”. */
-export const CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX = "[Beacon tag attrs]" as const;
-
-function debugTagAttrsLog(stage: string, detail?: Record<string, unknown>): void {
-  console.log(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, stage, detail ?? {});
-}
-
-function debugTagAttrsErr(stage: string, err: unknown, extra?: Record<string, unknown>): void {
-  console.error(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, stage, {
-    ...extra,
-    message: err instanceof Error ? err.message : String(err),
-    causeTag: webflowDesignerErrorCauseTag(err),
-    err,
-  });
-}
 
 const MAX_NESTED_COMPONENT_EXITS = 8;
 
@@ -31,41 +26,21 @@ async function exitUntilPageForInstanceEnter(): Promise<void> {
   }
 }
 
-const ATTR = "data-codalyn-beacon-prop";
-
 export type EngineCodalynAttrSyncResult = {
   tagged: number;
   removed: number;
   variantsWalked: number;
+  /** Instance props seeded so Webflow conditional visibility includes tagged nodes at publish. */
+  publishPlaceholdersSeeded: number;
   errors: string[];
 };
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
-}
+export type EngineTagWalkResult = {
+  taggedPropIds: Set<string>;
+  nestedPublishSeedPairKeys: Set<string>;
+};
 
-/** `getSettings()` rows and nested instance `getProps()` values: `{ sourceType: "prop", propId }` (flat or nested under `value`). */
-function bindingPropIdFromSettingValue(v: unknown): string | null {
-  if (!isRecord(v)) {
-    return null;
-  }
-  const fromBindingShape = (row: Record<string, unknown>): string | null => {
-    if (row.sourceType !== "prop") {
-      return null;
-    }
-    const id = row.propId;
-    return typeof id === "string" && id.length > 0 ? id : null;
-  };
-  const direct = fromBindingShape(v);
-  if (direct != null) {
-    return direct;
-  }
-  const inner = v.value;
-  if (!isRecord(inner)) {
-    return null;
-  }
-  return fromBindingShape(inner);
-}
+export { mapNestedPropsToExposedIds } from "@/features/cms-slots/model/cms-slot-nested-prop-alias";
 
 function attrValueStillWanted(value: string, exposedIds: ReadonlySet<string>): boolean {
   for (const part of value.split("|")) {
@@ -120,34 +95,7 @@ function canonicalExposedId(
   exposedIds: ReadonlySet<string>,
   nestedAlias: ReadonlyMap<string, string>
 ): string | null {
-  if (exposedIds.has(boundPropId)) {
-    return boundPropId;
-  }
-  const mapped = nestedAlias.get(boundPropId);
-  return mapped != null && exposedIds.has(mapped) ? mapped : null;
-}
-
-/**
- * Which nested instance props receive an exposed parent prop (directly or via an upstream nested alias).
- * Used to decide whether to `enterComponent` this instance and how to translate inner element bindings.
- */
-export function mapNestedPropsToExposedIds(
-  props: ReadonlyArray<{ propId: string; value: unknown }>,
-  exposedIds: ReadonlySet<string>,
-  upstreamAlias: ReadonlyMap<string, string> = new Map()
-): Map<string, string> {
-  const alias = new Map<string, string>();
-  for (const p of props) {
-    const linked = bindingPropIdFromSettingValue(p.value);
-    if (linked == null) {
-      continue;
-    }
-    const canonical = exposedIds.has(linked) ? linked : upstreamAlias.get(linked);
-    if (canonical != null && exposedIds.has(canonical)) {
-      alias.set(p.propId, canonical);
-    }
-  }
-  return alias;
+  return canonicalExposedPropId(boundPropId, exposedIds, nestedAlias);
 }
 
 async function nestedAliasForInstance(
@@ -155,8 +103,7 @@ async function nestedAliasForInstance(
   exposedIds: ReadonlySet<string>,
   upstreamAlias: ReadonlyMap<string, string>
 ): Promise<Map<string, string>> {
-  const props = await inst.getProps().catch(() => [] as InstancePropSummary[]);
-  return mapNestedPropsToExposedIds(props, exposedIds, upstreamAlias);
+  return nestedAliasForComponentInstance(inst, exposedIds, upstreamAlias);
 }
 
 function collectExposedPropIdsFromSettings(
@@ -189,20 +136,15 @@ function collectAllPropBindingPropIds(settings: Record<string, unknown>): string
   return ids;
 }
 
-type PropTagWalkDiag = {
-  eligibleNodesChecked: number;
-  designerBoundPropIds: Set<string>;
-};
-
 async function stripStaleCodalynAttr(
   attr: PropAttrOps,
   exposedIds: ReadonlySet<string>,
   out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">
 ): Promise<void> {
   try {
-    const existing = await attr.get(ATTR);
+    const existing = await attr.get(CMS_SLOT_BEACON_PROP_ATTR);
     if (existing != null && existing.length > 0 && !attrValueStillWanted(existing, exposedIds)) {
-      await attr.remove(ATTR);
+      await attr.remove(CMS_SLOT_BEACON_PROP_ATTR);
       out.removed += 1;
     }
   } catch (e) {
@@ -216,24 +158,33 @@ async function applyCodalynAttrForBindings(
   exposedIds: ReadonlySet<string>,
   nestedAlias: ReadonlyMap<string, string>,
   out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">,
-  diag?: PropTagWalkDiag
+  taggedPropIds: Set<string>,
+  nestedPublishSeedPairKeys: Set<string>,
+  nestedDepth: number
 ): Promise<void> {
   try {
-    if (diag != null) {
-      diag.eligibleNodesChecked += 1;
-      for (const pid of collectAllPropBindingPropIds(settings)) {
-        diag.designerBoundPropIds.add(pid);
-      }
-    }
     const fromExpose = collectExposedPropIdsFromSettings(settings, exposedIds, nestedAlias);
     const uniq = [...new Set(fromExpose)].sort();
     if (uniq.length === 0) {
       return;
     }
+    for (const pid of collectAllPropBindingPropIds(settings)) {
+      const canonical = canonicalExposedId(pid, exposedIds, nestedAlias);
+      if (canonical == null) {
+        continue;
+      }
+      const pair = collectNestedPublishSeedPairsFromBinding(pid, canonical, nestedDepth);
+      if (pair != null) {
+        nestedPublishSeedPairKeys.add(nestedPublishSeedPairKey(pair));
+      }
+    }
+    for (const pid of uniq) {
+      taggedPropIds.add(pid);
+    }
     const nextVal = uniq.join("|");
-    const cur = await attr.get(ATTR);
+    const cur = await attr.get(CMS_SLOT_BEACON_PROP_ATTR);
     if (cur !== nextVal) {
-      await attr.set(ATTR, nextVal);
+      await attr.set(CMS_SLOT_BEACON_PROP_ATTR, nextVal);
       out.tagged += 1;
     }
   } catch (e) {
@@ -246,10 +197,11 @@ async function enterNestedDefinitionIfLinked(
   exposedIds: ReadonlySet<string>,
   upstreamAlias: ReadonlyMap<string, string>,
   out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">,
-  diag: PropTagWalkDiag | undefined,
-  depth: number
+  taggedPropIds: Set<string>,
+  nestedPublishSeedPairKeys: Set<string>,
+  nestedDepth: number
 ): Promise<void> {
-  if (depth > MAX_NESTED_COMPONENT_EXITS) {
+  if (nestedDepth > MAX_NESTED_COMPONENT_EXITS) {
     return;
   }
   const link = await nestedAliasForInstance(inst, exposedIds, upstreamAlias);
@@ -260,28 +212,16 @@ async function enterNestedDefinitionIfLinked(
   for (const [k, v] of link) {
     merged.set(k, v);
   }
-  let nestedName: string | undefined;
-  try {
-    nestedName = await (await inst.getComponent()).getName();
-  } catch {
-    /* optional */
-  }
-  debugTagAttrsLog("enter nested (props wired to exposed)", {
-    depth,
-    nestedName,
-    nestedPropToExposed: Object.fromEntries(link),
-  });
   try {
     await webflow.enterComponent(inst);
   } catch (e) {
-    debugTagAttrsErr("enter nested failed", e, { depth, nestedName });
     out.errors.push(String(e instanceof Error ? e.message : e));
     return;
   }
   try {
     const root = await (await inst.getComponent()).getRootElement();
     if (root) {
-      await walkTree(root, exposedIds, merged, out, diag, depth + 1);
+      await walkTree(root, exposedIds, merged, out, taggedPropIds, nestedPublishSeedPairKeys, nestedDepth + 1);
     }
   } finally {
     await webflow.exitComponent().catch(() => undefined);
@@ -293,7 +233,8 @@ async function walkTree(
   exposedIds: ReadonlySet<string>,
   nestedAlias: ReadonlyMap<string, string>,
   out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">,
-  diag: PropTagWalkDiag | undefined,
+  taggedPropIds: Set<string>,
+  nestedPublishSeedPairKeys: Set<string>,
   nestedDepth: number
 ): Promise<void> {
   const attr = propAttrOpsFor(el);
@@ -302,7 +243,16 @@ async function walkTree(
   }
   if (hasElementSettings(el) && attr) {
     const settings = await (el as AnyElement & { getSettings: () => Promise<Record<string, unknown>> }).getSettings();
-    await applyCodalynAttrForBindings(attr, settings, exposedIds, nestedAlias, out, diag);
+    await applyCodalynAttrForBindings(
+      attr,
+      settings,
+      exposedIds,
+      nestedAlias,
+      out,
+      taggedPropIds,
+      nestedPublishSeedPairKeys,
+      nestedDepth
+    );
   }
   if (el.type === "ComponentInstance") {
     const inst = el as ComponentElement;
@@ -312,40 +262,25 @@ async function walkTree(
         continue;
       }
       for (const ch of await slot.getChildren()) {
-        await walkTree(ch, exposedIds, nestedAlias, out, diag, nestedDepth);
+        await walkTree(ch, exposedIds, nestedAlias, out, taggedPropIds, nestedPublishSeedPairKeys, nestedDepth);
       }
     }
-    await enterNestedDefinitionIfLinked(inst, exposedIds, nestedAlias, out, diag, nestedDepth);
+    await enterNestedDefinitionIfLinked(
+      inst,
+      exposedIds,
+      nestedAlias,
+      out,
+      taggedPropIds,
+      nestedPublishSeedPairKeys,
+      nestedDepth
+    );
     return;
   }
   if (hasChildren(el)) {
     for (const ch of await el.getChildren()) {
-      await walkTree(ch, exposedIds, nestedAlias, out, diag, nestedDepth);
+      await walkTree(ch, exposedIds, nestedAlias, out, taggedPropIds, nestedPublishSeedPairKeys, nestedDepth);
     }
   }
-}
-
-function logDiagWhenNothingTagged(
-  diag: PropTagWalkDiag,
-  out: EngineCodalynAttrSyncResult,
-  exposedIds: ReadonlySet<string>
-): void {
-  if (out.tagged !== 0 || out.removed !== 0 || exposedIds.size === 0) {
-    return;
-  }
-  const overlap = [...exposedIds].filter((id) => diag.designerBoundPropIds.has(id));
-  const stage =
-    diag.eligibleNodesChecked === 0
-      ? "no tags: no taggable elements with prop bindings on this variant"
-      : overlap.length === 0
-        ? "no tags: bindings use nested prop ids — wire nested instance props to exposed parent props, then retry"
-        : "no writes: overlaps exist but ATTR unchanged (already synced?)";
-  debugTagAttrsLog(stage, {
-    eligibleNodesChecked: diag.eligibleNodesChecked,
-    designerBoundPropIds: [...diag.designerBoundPropIds].sort(),
-    exposedPropIds: [...exposedIds].sort(),
-    idsInExposeAndOnBindings: overlap,
-  });
 }
 
 type TagSyncEnteredGate = { entered: boolean };
@@ -353,29 +288,23 @@ type TagSyncEnteredGate = { entered: boolean };
 async function enterComponentDefinitionsAndWalk(
   instance: ComponentElement,
   comp: Component,
-  exposedIds: Set<string>,
+  exposed: readonly ComposableInstancePropMeta[],
   out: EngineCodalynAttrSyncResult,
   gate: TagSyncEnteredGate
-): Promise<void> {
+): Promise<EngineTagWalkResult> {
+  const exposedIds = new Set(exposed.map((e) => e.propId));
+  const taggedPropIds = new Set<string>();
+  const nestedPublishSeedPairKeys = new Set<string>();
   await exitUntilPageForInstanceEnter();
-  try {
-    await webflow.enterComponent(instance);
-  } catch (e) {
-    debugTagAttrsErr("enterComponent failed", e);
-    throw e;
-  }
+  await webflow.enterComponent(instance);
   gate.entered = true;
 
   const root = await comp.getRootElement();
   if (root) {
-    const diag: PropTagWalkDiag | undefined =
-      exposedIds.size > 0 ? { eligibleNodesChecked: 0, designerBoundPropIds: new Set<string>() } : undefined;
-    await walkTree(root, exposedIds, new Map(), out, diag, 0);
-    if (diag != null) {
-      logDiagWhenNothingTagged(diag, out, exposedIds);
-    }
+    await walkTree(root, exposedIds, new Map(), out, taggedPropIds, nestedPublishSeedPairKeys, 0);
   }
   out.variantsWalked = 1;
+  return { taggedPropIds, nestedPublishSeedPairKeys };
 }
 
 /**
@@ -388,19 +317,41 @@ export function syncEngineCodalynSlotPropAttributes(
   exposed: readonly ComposableInstancePropMeta[]
 ): Promise<EngineCodalynAttrSyncResult> {
   return runExclusiveDesignerStyleOp(async () => {
-    const exposedIds = new Set(exposed.map((e) => e.propId));
-    const out: EngineCodalynAttrSyncResult = { tagged: 0, removed: 0, variantsWalked: 0, errors: [] };
+    const out: EngineCodalynAttrSyncResult = {
+      tagged: 0,
+      removed: 0,
+      variantsWalked: 0,
+      publishPlaceholdersSeeded: 0,
+      errors: [],
+    };
     const comp = await instance.getComponent();
     const gate: TagSyncEnteredGate = { entered: false };
+    let taggedPropIds = new Set<string>();
+    let nestedPublishSeedPairKeys = new Set<string>();
     try {
-      await enterComponentDefinitionsAndWalk(instance, comp, exposedIds, out, gate);
-    } catch (e) {
-      debugTagAttrsErr("sync aborted", e);
-      throw e;
+      ({ taggedPropIds, nestedPublishSeedPairKeys } = await enterComponentDefinitionsAndWalk(
+        instance,
+        comp,
+        exposed,
+        out,
+        gate
+      ));
     } finally {
       if (gate.entered) {
         await webflow.exitComponent().catch(() => undefined);
       }
+    }
+    try {
+      const parentSeeded = await seedHiddenListPublishPlaceholders(instance, exposed, taggedPropIds);
+      const nestedSeeded = await seedNestedPublishPlaceholdersOnPlacedInstance(
+        instance,
+        exposed,
+        taggedPropIds,
+        nestedPublishSeedPairKeys
+      );
+      out.publishPlaceholdersSeeded = parentSeeded + nestedSeeded;
+    } catch (e) {
+      out.errors.push(String(e instanceof Error ? e.message : e));
     }
     return out;
   });

@@ -1,7 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
-  CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX,
   type EngineCodalynAttrSyncResult,
   syncEngineCodalynSlotPropAttributes,
 } from "@/features/cms-slots/model/cms-slot-engine-codalyn-attr-sync";
@@ -12,7 +11,7 @@ import {
   listInstancesInSlotListContainer,
   resolveCmsSlotEngineConfiguredComponentIds,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
-import { formatWebflowDesignerError, webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
+import { formatWebflowDesignerError } from "@/shared/lib/webflow-designer-error";
 
 function notifyResyncOutcome(r: EngineCodalynAttrSyncResult, exposed: ComposableInstancePropMeta[]): void {
   if (r.errors.length > 0) {
@@ -29,7 +28,9 @@ function notifyResyncOutcome(r: EngineCodalynAttrSyncResult, exposed: Composable
   }
   void webflow.notify({
     type: "Success",
-    message: `Updated ${r.tagged} data attribute(s), removed ${r.removed} stale. Publish the site for the live page.`,
+    message: `Updated ${r.tagged} data attribute(s), removed ${r.removed} stale${
+      r.publishPlaceholdersSeeded > 0 ? `, seeded ${r.publishPlaceholdersSeeded} publish placeholder(s)` : ""
+    }. Publish the site for the live page.`,
   });
 }
 
@@ -53,36 +54,19 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
   const { slotIndex, selected, container, setResyncingEngineSlotKey, setSelected } = input;
   const labelRow = selected[slotIndex];
   if (labelRow == null) {
-    console.log(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "aborted: no labelRow at slotIndex", slotIndex);
     return false;
   }
   if (container == null) {
-    console.log(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "aborted: targetRef container is null");
     return false;
   }
-  console.log(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "handleResyncEngineSlotAttrs", {
-    slotIndex,
-    labelRow: { componentId: labelRow.componentId, name: labelRow.name, key: labelRow.key },
-  });
   setResyncingEngineSlotKey(labelRow.key);
   try {
     const freshRows = await listInstancesInSlotListContainer(container);
     const configuredIds = await resolveCmsSlotEngineConfiguredComponentIds(container, freshRows);
     const scoped = filterHydratedCmsSlotRowsByComponentIds(freshRows, configuredIds);
-    console.log(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "canvas + engine filter", {
-      freshInstancesCount: freshRows.length,
-      freshInstances: freshRows.map((x) => ({ componentId: x.componentId, name: x.name })),
-      configuredIds,
-      scopedCount: scoped.length,
-      scoped: scoped.map((x) => ({ componentId: x.componentId, name: x.name })),
-    });
 
     const row = scoped[slotIndex];
     if (row == null) {
-      console.error(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "scoped[slotIndex] missing — slot/UI out of sync", {
-        slotIndex,
-        scopedLength: scoped.length,
-      });
       void webflow.notify({
         type: "Error",
         message:
@@ -93,32 +77,13 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
 
     const f = await readCmsSlotEngineSlotPropsFile(container, scoped.length);
     const exposed = f.slots[slotIndex]?.exposed ?? [];
-    console.log(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "resolved row + exposed props", {
-      rowComponentId: row.componentId,
-      rowName: row.name,
-      exposedPropIds: exposed.map((e) => e.propId),
-    });
 
     const r = await syncEngineCodalynSlotPropAttributes(row.instance, exposed);
-    console.log(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "sync result", {
-      ...r,
-      notifyPath:
-        r.errors.length > 0
-          ? "Warning (walk errors)"
-          : r.tagged === 0 && r.removed === 0 && exposed.length > 0
-            ? "Info (nothing tagged)"
-            : "Success",
-    });
 
     setSelected((prev) => mergeScopedIntoSelected(prev, scoped));
     notifyResyncOutcome(r, exposed);
     return true;
   } catch (e) {
-    console.error(CMS_SLOT_TAG_ATTRS_DEBUG_PREFIX, "handler catch (same message as Designer toast)", {
-      formatted: formatWebflowDesignerError(e),
-      causeTag: webflowDesignerErrorCauseTag(e),
-      err: e,
-    });
     void webflow.notify({ type: "Error", message: formatWebflowDesignerError(e) });
     return false;
   } finally {

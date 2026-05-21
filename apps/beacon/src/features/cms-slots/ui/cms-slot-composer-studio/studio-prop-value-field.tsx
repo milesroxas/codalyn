@@ -3,6 +3,7 @@ import {
   type CmsSlotStudioPropFieldKind,
   type ComposableInstancePropMeta,
   cmsSlotStudioFieldKindForValueType,
+  isCmsSlotImageValueType,
 } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
   colorInputValue,
@@ -120,17 +121,25 @@ const STUDIO_PROP_VALUE_BY_KIND: Record<CmsSlotStudioPropFieldKind, (p: StudioPr
   ),
   image: ({ inputId, ep, value, busy, onChange }) => {
     const fileLike = ep.valueType === "file";
+    const imageHint = isCmsSlotImageValueType(ep.valueType);
     return (
-      <Input
-        id={inputId}
-        className="text-sm"
-        type="text"
-        inputMode="url"
-        placeholder={fileLike ? "File URL or site asset id" : "Image URL or site asset id"}
-        value={value}
-        disabled={busy}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <div className="space-y-1">
+        <Input
+          id={inputId}
+          className="text-sm"
+          type="text"
+          inputMode="url"
+          placeholder={fileLike ? "File URL" : imageHint ? "https://… (image link from Webflow Assets)" : "Image URL"}
+          value={value}
+          disabled={busy}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {imageHint ? (
+          <p className="text-[0.65rem] leading-snug text-muted-foreground">
+            Paste the image link URL from Webflow Assets — not the asset id.
+          </p>
+        ) : null}
+      </div>
     );
   },
   date: ({ inputId, value, busy, onChange }) => (

@@ -22,17 +22,7 @@ export const CMS_SLOT_LIST_RENDER_TAG = "div";
  */
 export const CMS_SLOT_LIST_TARGET_HINT_ATTR = "data-beacon-list-target-hint";
 
-const LOG_PREFIX = "[Beacon list target]";
-
 const ID_TAIL_LENGTH = 8;
-
-function logListTargetDebug(message: string, detail?: unknown): void {
-  if (detail !== undefined) {
-    console.log(LOG_PREFIX, message, detail);
-  } else {
-    console.log(LOG_PREFIX, message);
-  }
-}
 
 export function uniqueCmsSlotListTargetComponentName(dataList: string, listContainer: BlockElement): string {
   const el = String(listContainer.id.element);
@@ -101,8 +91,8 @@ async function tryGetBeaconListTargetByPreferredDefinitionId(
     if (await beaconListTargetRootMatchesDataList(byId, dataList)) {
       try {
         await applyCmsSlotListTargetSync(byId, dataList, listContainer);
-      } catch (e) {
-        logListTargetDebug("applyCmsSlotListTargetSync (preferredDefinitionId) failed, falling back to name search", e);
+      } catch {
+        /* fall back to name search */
       }
       if (await beaconListTargetDefinitionMatchesList(byId, dataList, listContainer)) {
         return byId;
@@ -315,14 +305,6 @@ export async function createCmsSlotListTargetComponent(input: {
     const component = await webflow.getComponent(definitionId);
     await tryAddCmsSlotListTargetTextPropDirectToDefinition(component);
     return { component, definitionId };
-  });
-
-  logListTargetDebug("registerComponent: done", {
-    definitionId,
-    componentId: comp.id,
-    name: await comp.getName(),
-    group: (await comp.getSettings()).group,
-    dataList,
   });
 
   return { component: comp, definitionId };

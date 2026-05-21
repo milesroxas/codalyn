@@ -1381,10 +1381,6 @@ export function CmsSlotsScreen() {
       if (cmsSlotCompositionSignature(draftToSave) === activeComposer.initialSignature) {
         return;
       }
-      if (draftToSave.length === 0) {
-        void webflow.notify({ type: "Error", message: "Add at least one component before saving." });
-        return;
-      }
       setComposerSavePending(true);
       try {
         await executeCmsSlotComposerSave({

@@ -1,7 +1,5 @@
-import { Copy } from "lucide-react";
 import { useCallback, useId, useRef, useState } from "react";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
-import { copyCmsSlotInstancePropId } from "@/features/cms-slots/model/cms-slot-composer-clipboard";
 import { CMS_SLOT_ROW_NAME_MAX } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import {
@@ -207,22 +205,9 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
                   const propFieldId = `cms-slot-composer-${row.key}-${ep.propId}`;
                   return (
                     <div key={ep.propId} className="space-y-0.5">
-                      <div className="flex items-start justify-between gap-1.5">
-                        <Label className="text-xs text-muted-foreground" htmlFor={propFieldId}>
-                          {ep.label}
-                        </Label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          className="shrink-0 text-muted-foreground"
-                          disabled={disabled}
-                          aria-label={`Copy prop id for ${ep.label}`}
-                          onClick={() => void copyCmsSlotInstancePropId(ep.propId)}
-                        >
-                          <Copy className="size-3.5" aria-hidden />
-                        </Button>
-                      </div>
+                      <Label className="text-xs text-muted-foreground" htmlFor={propFieldId}>
+                        {ep.label}
+                      </Label>
                       <ComposerPropValueField
                         inputId={propFieldId}
                         ep={ep}

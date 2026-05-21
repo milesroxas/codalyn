@@ -21,12 +21,12 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         headerMenu:
           "border border-border/55 bg-muted/90 px-3 text-[0.8125rem] font-medium shadow-none hover:bg-muted dark:border-white/14 dark:bg-muted dark:hover:bg-muted/85 [&_svg]:opacity-95",
-        /** CMS Slots bottom dock: inactive route */
-        cmsSlotsDockNav:
+        /** Route footer dock: muted (inactive nav tab, idle action). */
+        routeDockMuted:
           "border-input/65 bg-muted/35 text-muted-foreground shadow-none hover:bg-muted/50 hover:text-foreground dark:border-white/14 dark:bg-black/55 dark:text-muted-foreground dark:hover:bg-white/12 dark:hover:text-foreground",
-        /** CMS Slots bottom dock: active route (gradient + cyan bottom edge glow; themed via `--cms-slot-dock-*` in globals.css). */
-        cmsSlotsDockNavActive:
-          "border-[color-mix(in_oklab,var(--cms-slot-dock-accent-line)_48%,var(--border))] text-foreground shadow-[inset_0_-2px_10px_-3px_color-mix(in_oklab,var(--cms-slot-dock-accent-line)_35%,transparent),inset_0_-1px_0_0_var(--cms-slot-dock-accent-line)] [background-image:linear-gradient(to_bottom,var(--cms-slot-dock-active-top)_0%,var(--cms-slot-dock-active-bottom)_100%)] hover:brightness-[1.04]",
+        /** Route footer dock: active (selected tab, emphasized action; `--beacon-route-dock-*` in globals.css). */
+        routeDockActive:
+          "border-[color-mix(in_oklab,var(--beacon-route-dock-accent-line)_48%,var(--border))] text-foreground shadow-[inset_0_-2px_10px_-3px_color-mix(in_oklab,var(--beacon-route-dock-accent-line)_35%,transparent),inset_0_-1px_0_0_var(--beacon-route-dock-accent-line)] [background-image:linear-gradient(to_bottom,var(--beacon-route-dock-active-top)_0%,var(--beacon-route-dock-active-bottom)_100%)] hover:brightness-[1.04]",
         /** CMS Slots full-width action row (e.g. Add Slot / Install). */
         cmsSlotsCard:
           "border-border/65 bg-muted/50 text-foreground shadow-none hover:bg-muted/65 dark:border-white/12 dark:bg-muted/35 dark:hover:bg-muted/50",

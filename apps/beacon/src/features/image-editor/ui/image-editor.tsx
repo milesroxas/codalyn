@@ -1,4 +1,5 @@
 import { getVisibleBuiltinAspectPresets, type ImageExportFormat } from "@codalyn/webflow-kit";
+import { ArrowRight, Crop } from "lucide-react";
 import type { DragEvent, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Area } from "react-easy-crop";
@@ -45,8 +46,7 @@ import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-o
 import { ImageEditorPreimageColumn } from "@/features/image-editor/ui/image-editor-preimage-column";
 import {
   ImageEditorRouteChrome,
-  ImageEditorRouteContinueAction,
-  ImageEditorRoutePlaceAction,
+  ImageEditorRouteFooterAction,
 } from "@/features/image-editor/ui/image-editor-route-chrome";
 import { ImageEditorStepNav } from "@/features/image-editor/ui/image-editor-step-nav";
 import { ImageEditorWorkspace } from "@/features/image-editor/ui/image-editor-workspace";
@@ -126,23 +126,26 @@ function imageEditorRouteChromeSlots(options: {
   const showSavePlaceFooter = !showGuestOnboarding && flowStep === "save" && imageSrc != null;
 
   const footer = showContinueToAddFooter ? (
-    <ImageEditorRouteContinueAction
+    <ImageEditorRouteFooterAction
       label={IMAGE_UPLOAD_CONTINUE_TO_ADD_LABEL}
       disabled={autoPageTarget == null || stepExitFade}
-      onContinue={beginAutoToUpload}
+      onAction={beginAutoToUpload}
+      trailingIcon={<ArrowRight aria-hidden strokeWidth={2.25} />}
     />
   ) : showContinueToSaveFooter ? (
-    <ImageEditorRouteContinueAction
+    <ImageEditorRouteFooterAction
       label={IMAGE_UPLOAD_CONTINUE_TO_SAVE_LABEL}
       disabled={continueToSaveDisabled || stepExitFade}
-      onContinue={beginPositionToSave}
+      onAction={beginPositionToSave}
+      trailingIcon={<ArrowRight aria-hidden strokeWidth={2.25} />}
     />
   ) : showSavePlaceFooter && savePlaceAction ? (
-    <ImageEditorRoutePlaceAction
+    <ImageEditorRouteFooterAction
       label={savePlaceAction.label}
       disabled={savePlaceAction.disabled}
       busy={savePlaceAction.busy}
-      onPlace={savePlaceAction.onPlace}
+      onAction={savePlaceAction.onPlace}
+      trailingIcon={<Crop aria-hidden strokeWidth={2.25} />}
     />
   ) : undefined;
 

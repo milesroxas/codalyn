@@ -1,14 +1,14 @@
-import { ArrowRight, Crop, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   BeaconFeatureRouteChrome,
+  BeaconFeatureRouteDockButton,
   BeaconFeatureRouteFooter,
   BeaconFeatureRouteHeader,
   BeaconFeatureRouteScrollBody,
   BeaconFeatureRouteSubheader,
 } from "@/app/ui/beacon-feature-route-chrome";
 import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
-import { Button } from "@/shared/ui/button";
 
 export type ImageEditorRouteChromeProps = {
   children: ReactNode;
@@ -29,7 +29,7 @@ export function ImageEditorRouteChrome(props: ImageEditorRouteChromeProps) {
       }
       footer={
         footer ? (
-          <BeaconFeatureRouteFooter dataSlot="image_upload_route_footer" className="flex-col gap-0">
+          <BeaconFeatureRouteFooter dataSlot="image_upload_route_footer" className="items-stretch gap-2">
             {footer}
           </BeaconFeatureRouteFooter>
         ) : null
@@ -40,43 +40,27 @@ export function ImageEditorRouteChrome(props: ImageEditorRouteChromeProps) {
   );
 }
 
-export function ImageEditorRouteContinueAction(props: { label: string; disabled: boolean; onContinue: () => void }) {
-  const { label, disabled, onContinue } = props;
-  return (
-    <Button
-      type="button"
-      variant="cmsSlotsCard"
-      size="cmsSlotsCard"
-      disabled={disabled}
-      aria-label={label}
-      onClick={onContinue}
-    >
-      <span>{label}</span>
-      <ArrowRight aria-hidden className="size-5 shrink-0" strokeWidth={2.25} />
-    </Button>
-  );
-}
-
-export function ImageEditorRoutePlaceAction(props: {
+export function ImageEditorRouteFooterAction(props: {
   label: string;
   disabled: boolean;
-  busy: boolean;
-  onPlace: () => void;
+  busy?: boolean;
+  onAction: () => void;
+  trailingIcon: ReactNode;
 }) {
-  const { label, disabled, busy, onPlace } = props;
+  const { label, disabled, busy = false, onAction, trailingIcon } = props;
   return (
-    <Button
+    <BeaconFeatureRouteDockButton
       type="button"
-      variant="cmsSlotsCard"
-      size="cmsSlotsCard"
+      stretch
+      emphasized={!disabled}
       disabled={disabled}
       aria-label={label}
       aria-busy={busy}
-      onClick={() => void onPlace()}
+      onClick={() => void onAction()}
     >
-      {busy ? <Loader2 aria-hidden className="size-5 shrink-0 animate-spin" strokeWidth={2.25} /> : null}
-      <span>{label}</span>
-      {!busy ? <Crop aria-hidden className="size-5 shrink-0" strokeWidth={2.25} /> : null}
-    </Button>
+      {busy ? <Loader2 aria-hidden className="animate-spin" strokeWidth={2.25} /> : null}
+      {label}
+      {!busy ? trailingIcon : null}
+    </BeaconFeatureRouteDockButton>
   );
 }

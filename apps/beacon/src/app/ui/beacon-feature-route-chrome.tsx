@@ -1,3 +1,4 @@
+import type { VariantProps } from "class-variance-authority";
 import { ChevronLeft } from "lucide-react";
 import type * as React from "react";
 import type { ReactNode } from "react";
@@ -11,7 +12,7 @@ import {
 } from "@/shared/lib/beacon-app-route-surface";
 import { BEACON_BACK_TO_HOME_ARIA_LABEL } from "@/shared/lib/beacon-feature-route-copy";
 import { cn } from "@/shared/lib/utils";
-import { Button } from "@/shared/ui/button";
+import { Button, type buttonVariants } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
 export type BeaconFeatureRouteHeaderProps = {
@@ -99,6 +100,23 @@ export function BeaconFeatureRouteFooter(props: BeaconFeatureRouteFooterProps) {
     >
       {children}
     </footer>
+  );
+}
+
+export type BeaconFeatureRouteDockButtonProps = React.ComponentProps<typeof Button> &
+  VariantProps<typeof buttonVariants> & {
+    /** Grow to fill the footer row (e.g. Save, Continue). */
+    stretch?: boolean;
+    /** Primary dock action (`default`). When false, uses `secondary` (Save idle, Sync synced). */
+    emphasized?: boolean;
+  };
+
+/** Footer dock action sizing shared by CMS Slots and Image Upload route footers. */
+export function BeaconFeatureRouteDockButton(props: BeaconFeatureRouteDockButtonProps) {
+  const { stretch, emphasized = true, className, size = "dockNav", variant, ...rest } = props;
+  const resolvedVariant = variant ?? (emphasized ? "default" : "secondary");
+  return (
+    <Button variant={resolvedVariant} size={size} className={cn(stretch && "min-w-0 flex-1", className)} {...rest} />
   );
 }
 

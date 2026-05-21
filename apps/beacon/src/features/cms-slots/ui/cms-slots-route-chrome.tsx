@@ -2,6 +2,7 @@ import { List, PanelsTopLeft } from "lucide-react";
 import { type NavigateFunction, NavLink } from "react-router-dom";
 import {
   BeaconFeatureRouteChrome,
+  BeaconFeatureRouteDockButton,
   BeaconFeatureRouteFooter,
   BeaconFeatureRouteHeader,
   BeaconFeatureRouteScrollBody,
@@ -364,17 +365,16 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
 
   const composerSaveButton =
     p.activeComposer != null ? (
-      <Button
+      <BeaconFeatureRouteDockButton
         type="button"
-        variant={p.composerDirty ? "default" : "secondary"}
-        size="dockNav"
-        className="min-w-0 flex-1"
+        stretch
+        emphasized={p.composerDirty}
         disabled={!p.composerDirty || composerSavePending}
         aria-busy={p.composerSavePending}
         onClick={() => void p.onComposerSave()}
       >
-        {p.composerSavePending ? "Saving…" : "Save"}
-      </Button>
+        {composerSavePending ? "Saving…" : "Save"}
+      </BeaconFeatureRouteDockButton>
     ) : null;
 
   if (composerOnly) {
@@ -396,7 +396,7 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
           className={({ isActive }) =>
             cn(
               buttonVariants({
-                variant: isActive ? "cmsSlotsDockNavActive" : "cmsSlotsDockNav",
+                variant: isActive ? "routeDockActive" : "routeDockMuted",
                 size: "dockNav",
               }),
               "min-w-0 flex-1 shrink"
@@ -416,7 +416,7 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
           className={({ isActive }) =>
             cn(
               buttonVariants({
-                variant: isActive ? "cmsSlotsDockNavActive" : "cmsSlotsDockNav",
+                variant: isActive ? "routeDockActive" : "routeDockMuted",
                 size: "dockNav",
               }),
               "min-w-0 flex-1 shrink"

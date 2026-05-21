@@ -76,8 +76,8 @@ function BeaconHomeLaunchTile(props: {
         onClick={disabled ? undefined : onClick}
         className={cn(
           beaconHomeLaunchTileSurfaceClass,
-          "outline-none transition-[transform,border-color,opacity] hover:border-primary/35 focus-visible:ring-4 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none",
-          disabled ? "opacity-60" : "active:translate-y-px"
+          "outline-none transition-[opacity,border-color] hover:border-primary/35 focus-visible:ring-4 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none",
+          disabled ? "opacity-60" : "active:opacity-[0.98]"
         )}
       >
         {artwork}

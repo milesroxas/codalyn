@@ -1,6 +1,6 @@
 import { SquareCode } from "lucide-react";
+import { BeaconFeatureRouteDockButton } from "@/app/ui/beacon-feature-route-chrome";
 import { CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP } from "@/shared/lib/cms-slots-feature-copy";
-import { Button } from "@/shared/ui/button";
 
 export type CmsSlotsPageRuntimeSyncButtonProps = {
   /** Footer Sync is shown only when the page wrapper is installed and at least one list exists. */
@@ -20,10 +20,9 @@ export function CmsSlotsPageRuntimeSyncButton(props: CmsSlotsPageRuntimeSyncButt
     props.relevant && !props.synced && !props.statusLoading && !props.embedSyncPending && !props.pageScanLoading;
 
   return (
-    <Button
+    <BeaconFeatureRouteDockButton
       type="button"
-      variant={needsAttention ? "default" : "secondary"}
-      size="dockNav"
+      emphasized={needsAttention}
       disabled={
         props.embedSyncPending || props.statusLoading || !props.beaconsWrapperInstalled || props.pageScanLoading
       }
@@ -41,6 +40,6 @@ export function CmsSlotsPageRuntimeSyncButton(props: CmsSlotsPageRuntimeSyncButt
     >
       <SquareCode aria-hidden />
       {props.embedSyncPending ? "Syncing…" : "Sync"}
-    </Button>
+    </BeaconFeatureRouteDockButton>
   );
 }

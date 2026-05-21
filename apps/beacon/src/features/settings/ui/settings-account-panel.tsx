@@ -1,8 +1,8 @@
-import { ExternalLink, LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
 import type { BridgedTowerUser } from "@/features/auth/model/use-beacon-tower-session";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import { BeaconTowerActionList } from "@/features/auth/ui/beacon-tower-action-list";
 import { BeaconTowerNotConfiguredNotice } from "@/features/auth/ui/beacon-tower-not-configured-notice";
 import { BeaconTowerSignInPrompt } from "@/features/auth/ui/beacon-tower-sign-in-prompt";
 import type {
@@ -32,15 +32,6 @@ function userInitials(user: BridgedTowerUser): string {
   }
   const e = user.email.trim();
   return e ? e.slice(0, 1).toUpperCase() : "?";
-}
-
-function openTowerAppPath(path: string): void {
-  const base = getTowerAuthBaseUrl();
-  if (!base) {
-    return;
-  }
-  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
-  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 function isProductAdminAppRole(role: string | null): boolean {
@@ -280,7 +271,6 @@ function SignedInAccountSections({
   setActiveBeaconWorkspace: (organizationId: string) => void;
   onSignOut: () => void;
 }) {
-  const base = getTowerAuthBaseUrl();
   const productAdmin = isProductAdminAppRole(appUserRole);
   const roleAux = roleAuxLabel(syncState, workspaceMemberRole, hasActiveWorkspace);
 
@@ -372,40 +362,7 @@ function SignedInAccountSections({
             Manage presets, workspace, and security in the browser.
           </p>
         </div>
-        <div className="flex flex-col gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full justify-between gap-2"
-            disabled={!base}
-            onClick={() => openTowerAppPath("/beacon")}
-          >
-            Beacon &amp; presets
-            <ExternalLink aria-hidden className="size-3.5 opacity-60" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full justify-between gap-2"
-            disabled={!base}
-            onClick={() => openTowerAppPath("/account")}
-          >
-            Account &amp; security
-            <ExternalLink aria-hidden className="size-3.5 opacity-60" />
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            className="w-full justify-start gap-2"
-            onClick={() => void onSignOut()}
-          >
-            <LogOut aria-hidden className="size-3.5" />
-            Sign out
-          </Button>
-        </div>
+        <BeaconTowerActionList onSignOut={onSignOut} />
       </section>
     </div>
   );

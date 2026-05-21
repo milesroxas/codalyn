@@ -22,6 +22,8 @@ function CmsSlotListTargetSyncedActions(p: {
   listTargetPlaceOnCanvasPending: boolean;
   placeOrFocusLabel: string;
   placeOrFocusPendingLabel: string;
+  /** Primary CTA when placing; softer secondary when focusing an existing canvas target. */
+  placeOrFocusVariant: "default" | "secondary";
   onRequestRemoveListTarget: () => void;
   onPlaceListTargetOnCanvas: () => void;
 }) {
@@ -39,6 +41,7 @@ function CmsSlotListTargetSyncedActions(p: {
       </Button>
       <Button
         type="button"
+        variant={p.placeOrFocusVariant}
         size="sm"
         disabled={p.ctaDisabled}
         aria-busy={p.listTargetPlaceOnCanvasPending}
@@ -68,6 +71,7 @@ export function CmsSlotListTargetActionsBar(props: CmsSlotListTargetActionsBarPr
   const ctaDisabled = listTargetActionBusy || removingKey !== null || activeDataList == null;
   const placeOrFocusLabel = listTargetOnCanvasCount > 0 ? "Focus on canvas" : "Place on canvas";
   const placeOrFocusPendingLabel = listTargetOnCanvasCount > 0 ? "Focusing…" : "Placing…";
+  const placeOrFocusVariant = listTargetOnCanvasCount > 0 ? "secondary" : "default";
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
       {listTargetPhase === "synced" ? (
@@ -77,6 +81,7 @@ export function CmsSlotListTargetActionsBar(props: CmsSlotListTargetActionsBarPr
           listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
           placeOrFocusLabel={placeOrFocusLabel}
           placeOrFocusPendingLabel={placeOrFocusPendingLabel}
+          placeOrFocusVariant={placeOrFocusVariant}
           onRequestRemoveListTarget={onRequestRemoveListTarget}
           onPlaceListTargetOnCanvas={onPlaceListTargetOnCanvas}
         />

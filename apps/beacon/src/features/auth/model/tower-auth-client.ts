@@ -43,3 +43,12 @@ export function openTowerAuthPopup(path: "/sign-in" | "/sign-up"): void {
   const origin = encodeURIComponent(window.location.origin);
   window.open(`${baseURL}${path}?beaconOrigin=${origin}`, "beacon-tower-auth", TOWER_AUTH_POPUP_FEATURES);
 }
+
+/** Opens a Tower app route in a new browser tab. */
+export function openTowerAppPath(path: string): void {
+  if (!baseURL) {
+    return;
+  }
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  window.open(`${baseURL}${normalizedPath}`, "_blank", "noopener,noreferrer");
+}

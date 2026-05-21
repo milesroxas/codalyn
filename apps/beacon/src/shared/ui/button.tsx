@@ -23,19 +23,19 @@ const buttonVariants = cva(
           "border border-border/55 bg-muted/90 px-3 text-[0.8125rem] font-medium shadow-none hover:bg-muted dark:border-white/14 dark:bg-muted dark:hover:bg-muted/85 [&_svg]:opacity-95",
         /** Route footer dock: muted (inactive nav tab, idle action). */
         routeDockMuted:
-          "border-input/65 bg-muted/35 text-muted-foreground shadow-none hover:bg-muted/50 hover:text-foreground dark:border-white/14 dark:bg-black/55 dark:text-muted-foreground dark:hover:bg-white/12 dark:hover:text-foreground",
+          "border-input/65 bg-muted/35 text-muted-foreground shadow-none hover:bg-muted/50 hover:text-foreground dark:border-border dark:bg-muted/55 dark:hover:bg-muted/70 dark:hover:text-foreground",
         /** Route footer dock: active (selected tab, emphasized action; `--beacon-route-dock-*` in globals.css). */
         routeDockActive:
           "border-[color-mix(in_oklab,var(--beacon-route-dock-accent-line)_48%,var(--border))] text-foreground shadow-[inset_0_-2px_10px_-3px_color-mix(in_oklab,var(--beacon-route-dock-accent-line)_35%,transparent),inset_0_-1px_0_0_var(--beacon-route-dock-accent-line)] [background-image:linear-gradient(to_bottom,var(--beacon-route-dock-active-top)_0%,var(--beacon-route-dock-active-bottom)_100%)] hover:brightness-[1.04]",
         /** CMS Slots full-width action row (e.g. Add Slot / Install). */
         cmsSlotsCard:
-          "border-border/65 bg-muted/50 text-foreground shadow-none hover:bg-muted/65 dark:border-white/12 dark:bg-muted/35 dark:hover:bg-muted/50",
+          "border-border/65 bg-muted/50 text-foreground shadow-none hover:bg-muted/65 dark:bg-muted/35 dark:hover:bg-muted/50",
         /** Composer row title opens slot-name drawer; reads like muted text row line. */
         composerSlotTitle:
           "min-h-9 h-auto max-w-none w-full flex-1 justify-start truncate border-transparent bg-transparent px-1 py-1.5 text-left text-sm leading-snug font-medium shadow-none hover:bg-muted/70 focus-visible:bg-muted dark:hover:bg-muted/35 [&_svg]:size-4",
         /** Composer palette: grid tile for adding a component type. */
         composerPaletteTile:
-          "border-border/70 bg-muted/90 text-foreground shadow-none hover:bg-muted dark:border-white/12 dark:bg-muted/50 dark:hover:bg-muted/65",
+          "border-border/70 bg-muted/90 text-foreground shadow-none hover:bg-muted dark:bg-muted/50 dark:hover:bg-muted/65",
       },
       size: {
         default: "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",

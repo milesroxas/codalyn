@@ -149,7 +149,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
           type="button"
           size="icon-sm"
           variant="ghost"
-          className="shrink-0 text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
+          className="shrink-0"
           aria-label={`Remove ${publishedDisplayName}`}
           disabled={removingKey !== null || listTargetActionBusy}
           onClick={() => void onRemove(row)}
@@ -162,18 +162,17 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
           disabled={
             removingKey !== null || listTargetActionBusy || resyncingEngineSlotKey !== null || publishedRenameBusy
           }
-          triggerClassName="text-white hover:bg-zinc-800"
           drawerTitle="Rename published slot"
           slotNameFieldLabel="Published name"
           onRename={(key, next) => onRenamePublishedDisplayName(key, next)}
           onChangePropValue={() => {}}
         />
-        <span className="shrink-0 tabular-nums text-xs text-zinc-500">{exposedCount}</span>
+        <span className="shrink-0 tabular-nums text-xs text-muted-foreground">{exposedCount}</span>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="h-7 shrink-0 rounded-md border-zinc-500 bg-transparent px-2.5 text-xs font-normal text-white hover:bg-zinc-800"
+          className="h-7 shrink-0 px-2.5 text-xs font-normal"
           disabled={removingKey !== null || listTargetActionBusy}
           onClick={openExposeDrawer}
         >

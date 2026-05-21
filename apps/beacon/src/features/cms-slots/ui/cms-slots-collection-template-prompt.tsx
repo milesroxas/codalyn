@@ -10,7 +10,7 @@ import { Button } from "@/shared/ui/button";
 import { Empty } from "@/shared/ui/empty";
 
 const collectionTemplatePromptVariants = cva(
-  "border-amber-500/40 bg-background/95 text-amber-950 shadow-sm hover:bg-background dark:bg-background/90 dark:text-amber-50 dark:hover:bg-background/80",
+  "border-border bg-background/95 text-foreground shadow-sm hover:bg-muted",
   {
     variants: {
       variant: {
@@ -52,7 +52,7 @@ export function CmsSlotsCollectionTemplateGatePrompt() {
   return (
     <Empty
       data-slot="cms_slots_collection_template_gate"
-      className="relative isolate min-h-[min(44vh,16rem)] gap-0 overflow-hidden rounded-lg border border-dashed border-amber-500/25 bg-muted/20 px-6 py-12"
+      className="relative isolate min-h-[min(44vh,16rem)] gap-0 overflow-hidden rounded-lg border border-dashed border-border bg-muted/20 px-6 py-12"
     >
       <span
         aria-hidden

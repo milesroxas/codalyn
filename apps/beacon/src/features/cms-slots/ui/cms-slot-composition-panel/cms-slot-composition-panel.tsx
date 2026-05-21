@@ -127,14 +127,14 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
 
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <div className="h-px min-w-0 flex-1 bg-zinc-600/45" aria-hidden />
-          <span className="shrink-0 text-center text-xs text-zinc-500">Components</span>
-          <div className="h-px min-w-0 flex-1 bg-zinc-600/45" aria-hidden />
+          <div className="h-px min-w-0 flex-1 bg-border" aria-hidden />
+          <span className="shrink-0 text-center text-xs text-muted-foreground">Components</span>
+          <div className="h-px min-w-0 flex-1 bg-border" aria-hidden />
         </div>
         {selected.length === 0 ? (
-          <div className="min-h-16 rounded-[10px] border border-dashed border-zinc-700/55 bg-zinc-900/40" aria-hidden />
+          <div className="min-h-16 rounded-[10px] border border-dashed border-border bg-muted/10" aria-hidden />
         ) : (
-          <div className="overflow-hidden rounded-[10px] border border-zinc-700/55 bg-[#1c1c1c]">
+          <div className="overflow-hidden rounded-[10px] border border-border/70 bg-card text-card-foreground shadow-sm">
             <ul
               className="scrollbar-themed max-h-60 divide-y divide-border/80 overflow-y-scroll"
               aria-label="Selected components"

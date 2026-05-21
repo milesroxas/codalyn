@@ -26,10 +26,7 @@ export function CmsSlotsEditorNoSlotsEmptyState(props: { className?: string }) {
         className="pointer-events-none absolute inset-0 bg-linear-to-t from-background/92 via-background/40 to-background/55"
       />
       <EmptyHeader className="relative z-1 gap-2.5">
-        <EmptyMedia
-          variant="icon"
-          className="mb-0 size-10 rounded-md border border-border/40 bg-background/85 dark:bg-black/55 [&_svg:not([class*='size-'])]:size-5"
-        >
+        <EmptyMedia variant="icon" className="mb-0 size-10 [&_svg:not([class*='size-'])]:size-5">
           <Inbox aria-hidden strokeWidth={1.75} />
         </EmptyMedia>
         <EmptyTitle className="text-base text-foreground">{CMS_SLOTS_EDITOR_NO_SLOTS_TITLE}</EmptyTitle>

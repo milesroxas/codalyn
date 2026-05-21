@@ -5,8 +5,8 @@ import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-erro
 
 const LOG_PREFIX = "[beacon list CMS]";
 const MAX_EXIT_COMPONENT_STEPS = 4;
-const FIELD_VISIBILITY_ATTEMPTS = 6;
-const FIELD_VISIBILITY_DELAY_MS = 250;
+const FIELD_VISIBILITY_ATTEMPTS = 10;
+const FIELD_VISIBILITY_DELAY_MS = 400;
 
 /** Designer ↔︎ Data API lag after creating or selecting a CMS field; separate from Tower visibility polling. */
 const CMS_BIND_ATTEMPTS = 12;
@@ -45,7 +45,16 @@ export async function getCmsTemplateCollectionIdFromCurrentPage(): Promise<strin
     return null;
   }
   const page = await webflow.getCurrentPage();
-  if (page == null || typeof page.getCollectionId !== "function") {
+  if (page == null) {
+    return null;
+  }
+  if (typeof page.getKind === "function") {
+    const kind = await page.getKind();
+    if (kind !== "cms") {
+      return null;
+    }
+  }
+  if (typeof page.getCollectionId !== "function") {
     return null;
   }
   const id = await page.getCollectionId();
@@ -65,7 +74,7 @@ function isPlainTextFieldType(type: unknown): boolean {
     .trim()
     .toLowerCase()
     .replace(/[\s_-]+/g, "");
-  return normalized === "plaintext";
+  return normalized === "plaintext" || normalized === "text";
 }
 
 /** Stored attrs must reference an actual Plain Text field — otherwise Designer rejects CMS binding (“CMS field not found”). */
@@ -147,7 +156,12 @@ async function findExistingBeaconListField(collectionId: string, dataList: strin
   return findBeaconListTargetField(fields, dataList)?.id ?? null;
 }
 
-async function postNewCmsPlainTextField(collectionId: string, dataList: string): Promise<string | null> {
+type PostCmsPlainTextFieldResult = { fieldId: string; newlyCreated: boolean };
+
+async function postNewCmsPlainTextField(
+  collectionId: string,
+  dataList: string
+): Promise<PostCmsPlainTextFieldResult | null> {
   const res = await towerFetch(`/api/v2/webflow/collections/${encodeURIComponent(collectionId)}/fields`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -158,7 +172,12 @@ async function postNewCmsPlainTextField(collectionId: string, dataList: string):
     }),
   });
   if (res.status === 409) {
-    return findExistingBeaconListField(collectionId, dataList);
+    const existing = await findExistingBeaconListField(collectionId, dataList);
+    if (existing != null) {
+      return { fieldId: existing, newlyCreated: false };
+    }
+    console.warn(LOG_PREFIX, "POST field 409 but could not resolve an existing Plain Text field");
+    return null;
   }
   if (!res.ok) {
     console.warn(LOG_PREFIX, "POST field failed", res.status);
@@ -177,13 +196,20 @@ async function postNewCmsPlainTextField(collectionId: string, dataList: string):
     console.warn(LOG_PREFIX, "POST field: missing id in response");
     return null;
   }
-  if (!(await waitForFieldVisibility(collectionId, newId))) {
-    console.warn(
-      LOG_PREFIX,
-      "POST field: collection GET still lists the Plain Text field as missing or wrong type — using POST response id anyway (Designer may already resolve it)"
-    );
+  if (await waitForFieldVisibility(collectionId, newId)) {
+    return { fieldId: newId, newlyCreated: true };
   }
-  return newId;
+  const byName = await findExistingBeaconListField(collectionId, dataList);
+  if (byName != null) {
+    return { fieldId: byName, newlyCreated: false };
+  }
+  console.warn(LOG_PREFIX, "POST field: could not verify Plain Text field on collection after create");
+  return null;
+}
+
+/** Confirms the binding still exists on the collection (Data API GET), for UI prompts and retries. */
+export async function verifyCmsSlotListTargetPlainTextField(binding: CmsSlotListCmsBinding): Promise<boolean> {
+  return waitForFieldVisibility(binding.collectionId, binding.fieldId);
 }
 
 /**
@@ -202,7 +228,7 @@ async function ensureCmsPlainTextField(
   if (created == null) {
     return null;
   }
-  return { collectionId, fieldId: created, fieldWasCreated: true };
+  return { collectionId, fieldId: created.fieldId, fieldWasCreated: created.newlyCreated };
 }
 
 export async function getCmsSlotListTargetCmsCollectionIdFromListContainer(

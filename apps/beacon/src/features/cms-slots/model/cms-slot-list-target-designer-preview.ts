@@ -1,3 +1,4 @@
+import { applyCmsSlotListTargetDesignerPlaceholderForList } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
 import {
   clearListTargetMirrorSurfaceComponentInstances,
   withListTargetMirrorSurface,
@@ -92,6 +93,7 @@ export async function syncCmsSlotListTargetDesignerPreview(
       }
     }
   });
+  await applyCmsSlotListTargetDesignerPlaceholderForList(dataList, listContainer);
   return mirrored;
 }
 
@@ -136,6 +138,7 @@ export async function resyncAllCmsSlotListTargetDesignerPreviewsOnPage(): Promis
       for (const inst of instances) {
         await applyListTargetInstancePreview(inst, sourceRows, b.dataList, b.container);
       }
+      await applyCmsSlotListTargetDesignerPlaceholderForList(b.dataList, b.container);
     }
   });
 }

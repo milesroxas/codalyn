@@ -34,11 +34,8 @@ async function exitUntilPageForInstanceEnter(): Promise<void> {
 const ATTR = "data-codalyn-beacon-prop";
 
 export type EngineCodalynAttrSyncResult = {
-  /** Elements that had the attribute set or updated */
   tagged: number;
-  /** Elements that had our attribute removed (left expose list) */
   removed: number;
-  /** Passes over component variant trees (always 1: current canvas variant only) */
   variantsWalked: number;
   errors: string[];
 };
@@ -47,10 +44,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
-/**
- * Webflow `getSettings()` values are usually setting rows: `{ valueType?, value: { sourceType, propId } }`.
- * Some responses use a flat `{ sourceType: "prop", propId }` — accept both (mirrors image-editor binding reads).
- */
+/** `getSettings()` rows and nested instance `getProps()` values: `{ sourceType: "prop", propId }` (flat or nested under `value`). */
 function bindingPropIdFromSettingValue(v: unknown): string | null {
   if (!isRecord(v)) {
     return null;
@@ -91,42 +85,97 @@ function hasChildren(el: AnyElement): el is AnyElement & { getChildren: () => Pr
   return "children" in el && (el as { children?: boolean }).children === true;
 }
 
-function hasCustomAttributes(el: AnyElement): boolean {
-  return "customAttributes" in el && (el as { customAttributes?: boolean }).customAttributes === true;
-}
-
-type CustomAttrOps = {
-  getCustomAttribute: (n: string) => Promise<null | string>;
-  setCustomAttribute: (n: string, v: string) => Promise<null>;
-  removeCustomAttribute: (n: string) => Promise<null>;
+type PropAttrOps = {
+  get: (name: string) => Promise<null | string>;
+  set: (name: string, value: string) => Promise<null>;
+  remove: (name: string) => Promise<null>;
 };
 
-type SettingsOps = {
-  getSettings: () => Promise<Record<string, unknown>>;
-};
-
-function asCustomAttrEl(el: AnyElement): CustomAttrOps {
-  return el as AnyElement as CustomAttrOps;
-}
-
-function asSettingsEl(el: AnyElement): SettingsOps {
-  return el as AnyElement as SettingsOps;
-}
-
-async function stripStaleCodalynAttr(
-  ael: CustomAttrOps,
-  exposedIds: ReadonlySet<string>,
-  out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">
-): Promise<void> {
-  try {
-    const existing = await ael.getCustomAttribute(ATTR);
-    if (existing != null && existing.length > 0 && !attrValueStillWanted(existing, exposedIds)) {
-      await ael.removeCustomAttribute(ATTR);
-      out.removed += 1;
-    }
-  } catch (e) {
-    out.errors.push(String(e instanceof Error ? e.message : e));
+function propAttrOpsFor(el: AnyElement): PropAttrOps | null {
+  if (el.type === "DOM") {
+    const dom = el as DOMElement;
+    return {
+      get: (n) => dom.getAttribute(n),
+      set: (n, v) => dom.setAttribute(n, v),
+      remove: (n) => dom.removeAttribute(n),
+    };
   }
+  if ("customAttributes" in el && (el as { customAttributes?: boolean }).customAttributes === true) {
+    const ca = el as AnyElement & {
+      getCustomAttribute: (n: string) => Promise<null | string>;
+      setCustomAttribute: (n: string, v: string) => Promise<null>;
+      removeCustomAttribute: (n: string) => Promise<null>;
+    };
+    return {
+      get: (n) => ca.getCustomAttribute(n),
+      set: (n, v) => ca.setCustomAttribute(n, v),
+      remove: (n) => ca.removeCustomAttribute(n),
+    };
+  }
+  return null;
+}
+
+function canonicalExposedId(
+  boundPropId: string,
+  exposedIds: ReadonlySet<string>,
+  nestedAlias: ReadonlyMap<string, string>
+): string | null {
+  if (exposedIds.has(boundPropId)) {
+    return boundPropId;
+  }
+  const mapped = nestedAlias.get(boundPropId);
+  return mapped != null && exposedIds.has(mapped) ? mapped : null;
+}
+
+/**
+ * Which nested instance props receive an exposed parent prop (directly or via an upstream nested alias).
+ * Used to decide whether to `enterComponent` this instance and how to translate inner element bindings.
+ */
+export function mapNestedPropsToExposedIds(
+  props: ReadonlyArray<{ propId: string; value: unknown }>,
+  exposedIds: ReadonlySet<string>,
+  upstreamAlias: ReadonlyMap<string, string> = new Map()
+): Map<string, string> {
+  const alias = new Map<string, string>();
+  for (const p of props) {
+    const linked = bindingPropIdFromSettingValue(p.value);
+    if (linked == null) {
+      continue;
+    }
+    const canonical = exposedIds.has(linked) ? linked : upstreamAlias.get(linked);
+    if (canonical != null && exposedIds.has(canonical)) {
+      alias.set(p.propId, canonical);
+    }
+  }
+  return alias;
+}
+
+async function nestedAliasForInstance(
+  inst: ComponentElement,
+  exposedIds: ReadonlySet<string>,
+  upstreamAlias: ReadonlyMap<string, string>
+): Promise<Map<string, string>> {
+  const props = await inst.getProps().catch(() => [] as InstancePropSummary[]);
+  return mapNestedPropsToExposedIds(props, exposedIds, upstreamAlias);
+}
+
+function collectExposedPropIdsFromSettings(
+  settings: Record<string, unknown>,
+  exposedIds: ReadonlySet<string>,
+  nestedAlias: ReadonlyMap<string, string>
+): string[] {
+  const fromExpose: string[] = [];
+  for (const v of Object.values(settings)) {
+    const pid = bindingPropIdFromSettingValue(v);
+    if (pid == null) {
+      continue;
+    }
+    const canonical = canonicalExposedId(pid, exposedIds, nestedAlias);
+    if (canonical != null) {
+      fromExpose.push(canonical);
+    }
+  }
+  return fromExpose;
 }
 
 function collectAllPropBindingPropIds(settings: Record<string, unknown>): string[] {
@@ -140,50 +189,51 @@ function collectAllPropBindingPropIds(settings: Record<string, unknown>): string
   return ids;
 }
 
-function collectExposedPropIdsFromSettings(
-  settings: Record<string, unknown>,
-  exposedIds: ReadonlySet<string>
-): string[] {
-  const fromExpose: string[] = [];
-  for (const v of Object.values(settings)) {
-    const pid = bindingPropIdFromSettingValue(v);
-    if (pid != null && exposedIds.has(pid)) {
-      fromExpose.push(pid);
-    }
-  }
-  return fromExpose;
-}
-
-/** When set, records how many eligible elements we saw and every `propId` from `sourceType: prop` bindings on them. */
-export type PropTagWalkDiag = {
+type PropTagWalkDiag = {
   eligibleNodesChecked: number;
   designerBoundPropIds: Set<string>;
 };
 
-async function applyCodalynAttrForBindings(
-  ael: CustomAttrOps,
-  sel: SettingsOps,
+async function stripStaleCodalynAttr(
+  attr: PropAttrOps,
   exposedIds: ReadonlySet<string>,
+  out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">
+): Promise<void> {
+  try {
+    const existing = await attr.get(ATTR);
+    if (existing != null && existing.length > 0 && !attrValueStillWanted(existing, exposedIds)) {
+      await attr.remove(ATTR);
+      out.removed += 1;
+    }
+  } catch (e) {
+    out.errors.push(String(e instanceof Error ? e.message : e));
+  }
+}
+
+async function applyCodalynAttrForBindings(
+  attr: PropAttrOps,
+  settings: Record<string, unknown>,
+  exposedIds: ReadonlySet<string>,
+  nestedAlias: ReadonlyMap<string, string>,
   out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">,
   diag?: PropTagWalkDiag
 ): Promise<void> {
   try {
-    const settings = await sel.getSettings();
     if (diag != null) {
       diag.eligibleNodesChecked += 1;
       for (const pid of collectAllPropBindingPropIds(settings)) {
         diag.designerBoundPropIds.add(pid);
       }
     }
-    const fromExpose = collectExposedPropIdsFromSettings(settings, exposedIds);
+    const fromExpose = collectExposedPropIdsFromSettings(settings, exposedIds, nestedAlias);
     const uniq = [...new Set(fromExpose)].sort();
     if (uniq.length === 0) {
       return;
     }
     const nextVal = uniq.join("|");
-    const cur = await ael.getCustomAttribute(ATTR);
+    const cur = await attr.get(ATTR);
     if (cur !== nextVal) {
-      await ael.setCustomAttribute(ATTR, nextVal);
+      await attr.set(ATTR, nextVal);
       out.tagged += 1;
     }
   } catch (e) {
@@ -191,24 +241,86 @@ async function applyCodalynAttrForBindings(
   }
 }
 
-async function walk(
+async function enterNestedDefinitionIfLinked(
+  inst: ComponentElement,
+  exposedIds: ReadonlySet<string>,
+  upstreamAlias: ReadonlyMap<string, string>,
+  out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">,
+  diag: PropTagWalkDiag | undefined,
+  depth: number
+): Promise<void> {
+  if (depth > MAX_NESTED_COMPONENT_EXITS) {
+    return;
+  }
+  const link = await nestedAliasForInstance(inst, exposedIds, upstreamAlias);
+  if (link.size === 0) {
+    return;
+  }
+  const merged = new Map(upstreamAlias);
+  for (const [k, v] of link) {
+    merged.set(k, v);
+  }
+  let nestedName: string | undefined;
+  try {
+    nestedName = await (await inst.getComponent()).getName();
+  } catch {
+    /* optional */
+  }
+  debugTagAttrsLog("enter nested (props wired to exposed)", {
+    depth,
+    nestedName,
+    nestedPropToExposed: Object.fromEntries(link),
+  });
+  try {
+    await webflow.enterComponent(inst);
+  } catch (e) {
+    debugTagAttrsErr("enter nested failed", e, { depth, nestedName });
+    out.errors.push(String(e instanceof Error ? e.message : e));
+    return;
+  }
+  try {
+    const root = await (await inst.getComponent()).getRootElement();
+    if (root) {
+      await walkTree(root, exposedIds, merged, out, diag, depth + 1);
+    }
+  } finally {
+    await webflow.exitComponent().catch(() => undefined);
+  }
+}
+
+async function walkTree(
   el: AnyElement,
   exposedIds: ReadonlySet<string>,
+  nestedAlias: ReadonlyMap<string, string>,
   out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">,
-  diag?: PropTagWalkDiag
+  diag: PropTagWalkDiag | undefined,
+  nestedDepth: number
 ): Promise<void> {
-  const canAttr = hasCustomAttributes(el);
-  const canSettings = hasElementSettings(el);
-  if (canAttr) {
-    await stripStaleCodalynAttr(asCustomAttrEl(el), exposedIds, out);
+  const attr = propAttrOpsFor(el);
+  if (attr) {
+    await stripStaleCodalynAttr(attr, exposedIds, out);
   }
-  if (canSettings && canAttr) {
-    await applyCodalynAttrForBindings(asCustomAttrEl(el), asSettingsEl(el), exposedIds, out, diag);
+  if (hasElementSettings(el) && attr) {
+    const settings = await (el as AnyElement & { getSettings: () => Promise<Record<string, unknown>> }).getSettings();
+    await applyCodalynAttrForBindings(attr, settings, exposedIds, nestedAlias, out, diag);
+  }
+  if (el.type === "ComponentInstance") {
+    const inst = el as ComponentElement;
+    const slots = await inst.getSlots().catch(() => [] as SlotInstanceElement[]);
+    for (const slot of slots) {
+      if (!hasChildren(slot as unknown as AnyElement)) {
+        continue;
+      }
+      for (const ch of await slot.getChildren()) {
+        await walkTree(ch, exposedIds, nestedAlias, out, diag, nestedDepth);
+      }
+    }
+    await enterNestedDefinitionIfLinked(inst, exposedIds, nestedAlias, out, diag, nestedDepth);
+    return;
   }
   if (hasChildren(el)) {
-    const kids = await el.getChildren();
-    for (const ch of kids) {
-      await walk(ch, exposedIds, out, diag);
+    for (const ch of await el.getChildren()) {
+      await walkTree(ch, exposedIds, nestedAlias, out, diag, nestedDepth);
     }
   }
 }
@@ -224,12 +336,12 @@ function logDiagWhenNothingTagged(
   const overlap = [...exposedIds].filter((id) => diag.designerBoundPropIds.has(id));
   const stage =
     diag.eligibleNodesChecked === 0
-      ? "no tags: no elements combined component prop bindings + Custom attributes API on this variant"
+      ? "no tags: no taggable elements with prop bindings on this variant"
       : overlap.length === 0
-        ? "no tags: Expose IDs do not match any prop binding on eligible elements — link elements to props in Component"
-        : "no writes: overlaps exist but ATTR unchanged (already synced?) — check idsInExposeAndOnBindings";
+        ? "no tags: bindings use nested prop ids — wire nested instance props to exposed parent props, then retry"
+        : "no writes: overlaps exist but ATTR unchanged (already synced?)";
   debugTagAttrsLog(stage, {
-    eligibleNodesHadSettingsAndCustomAttrs: diag.eligibleNodesChecked,
+    eligibleNodesChecked: diag.eligibleNodesChecked,
     designerBoundPropIds: [...diag.designerBoundPropIds].sort(),
     exposedPropIds: [...exposedIds].sort(),
     idsInExposeAndOnBindings: overlap,
@@ -238,9 +350,6 @@ function logDiagWhenNothingTagged(
 
 type TagSyncEnteredGate = { entered: boolean };
 
-/**
- * Leaves nested components, enters `instance`, walks prop tags, sets `gate.entered` only after successful `enterComponent`.
- */
 async function enterComponentDefinitionsAndWalk(
   instance: ComponentElement,
   comp: Component,
@@ -248,10 +357,7 @@ async function enterComponentDefinitionsAndWalk(
   out: EngineCodalynAttrSyncResult,
   gate: TagSyncEnteredGate
 ): Promise<void> {
-  debugTagAttrsLog("exit nested scopes (prep for enterComponent)");
   await exitUntilPageForInstanceEnter();
-
-  debugTagAttrsLog("enterComponent(instance)");
   try {
     await webflow.enterComponent(instance);
   } catch (e) {
@@ -261,37 +367,21 @@ async function enterComponentDefinitionsAndWalk(
   gate.entered = true;
 
   const root = await comp.getRootElement();
-  debugTagAttrsLog("getRootElement", {
-    rootElementType: root?.type ?? null,
-    missingRoot: root == null,
-  });
-
   if (root) {
     const diag: PropTagWalkDiag | undefined =
       exposedIds.size > 0 ? { eligibleNodesChecked: 0, designerBoundPropIds: new Set<string>() } : undefined;
-    await walk(root, exposedIds, out, diag);
+    await walkTree(root, exposedIds, new Map(), out, diag, 0);
     if (diag != null) {
       logDiagWhenNothingTagged(diag, out, exposedIds);
     }
-  } else {
-    debugTagAttrsLog("skipped walk: no root element for current variant");
   }
   out.variantsWalked = 1;
-  debugTagAttrsLog("walk done", {
-    tagged: out.tagged,
-    removed: out.removed,
-    walkErrors: out.errors.slice(),
-  });
 }
 
 /**
- * For the **component definition** of `instance`, walks the in-component DOM and:
- * - sets `data-codalyn-beacon-prop` on any element that has a **property binding** to an id in `exposed` (pipe-joins
- *   multiple); required for the published footer runtime to find targets.
- * - removes that attribute if it was set but the prop is no longer exposed.
- *
- * Only the **currently selected component variant** is walked (no variant switching). If bindings live only in
- * another variant, open that variant in the component editor and run sync again.
+ * Tags `data-codalyn-beacon-prop` on elements bound to exposed instance props. Enters nested component definitions
+ * only when `getProps()` shows their props are wired to an exposed parent prop; inner bindings use nested prop ids
+ * and are written with the canonical exposed id the runtime expects.
  */
 export function syncEngineCodalynSlotPropAttributes(
   instance: ComponentElement,
@@ -301,30 +391,15 @@ export function syncEngineCodalynSlotPropAttributes(
     const exposedIds = new Set(exposed.map((e) => e.propId));
     const out: EngineCodalynAttrSyncResult = { tagged: 0, removed: 0, variantsWalked: 0, errors: [] };
     const comp = await instance.getComponent();
-    let compName: string | undefined;
-    try {
-      compName = await comp.getName();
-    } catch (e) {
-      debugTagAttrsErr("getComponent().getName failed (non-fatal)", e);
-    }
-    debugTagAttrsLog("sync start", {
-      definitionComponentId: comp.id,
-      definitionName: compName,
-      exposedPropIds: [...exposedIds],
-    });
-
     const gate: TagSyncEnteredGate = { entered: false };
     try {
       await enterComponentDefinitionsAndWalk(instance, comp, exposedIds, out, gate);
     } catch (e) {
-      debugTagAttrsErr("sync aborted (rethrow)", e);
+      debugTagAttrsErr("sync aborted", e);
       throw e;
     } finally {
       if (gate.entered) {
-        debugTagAttrsLog("exitComponent");
-        await webflow.exitComponent().catch((e) => {
-          debugTagAttrsErr("exitComponent failed (ignored)", e);
-        });
+        await webflow.exitComponent().catch(() => undefined);
       }
     }
     return out;

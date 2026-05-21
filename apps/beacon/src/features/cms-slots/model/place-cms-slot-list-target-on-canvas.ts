@@ -4,6 +4,7 @@ import {
   type CmsSlotListCmsTextFieldEnsureResult,
   ensureCmsSlotListCmsTextFieldOnList,
 } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
+import { applyCmsSlotListTargetDesignerPlaceholderForList } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
 import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import { ensureCmsSlotListTargetTextProp } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
@@ -366,6 +367,12 @@ export async function placeCmsSlotListTargetOnCanvas(
           cmsBinding,
           cmsFieldWasCreated,
         });
+
+  try {
+    await applyCmsSlotListTargetDesignerPlaceholderForList(dataList, listContainer, preferredDefinitionId);
+  } catch (err) {
+    console.warn(PLACE_LIST_TARGET_LOG_PREFIX, "Designer placeholder apply failed:", err);
+  }
 
   return { instance, alreadyExisted: firstExisting != null, cmsFieldWasCreated, cmsBindSucceeded };
 }

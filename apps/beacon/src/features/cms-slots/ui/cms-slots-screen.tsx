@@ -31,6 +31,7 @@ import {
   getCmsSlotListTargetCmsFieldIdFromListContainer,
   resolveCmsSlotListTargetCmsCollectionIdForCleanup,
   tryDeleteCmsSlotListTargetCmsPlainTextField,
+  verifyCmsSlotListTargetPlainTextField,
 } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import { clearAllCmsSlotListTargetDesignerPreviewsOnPage } from "@/features/cms-slots/model/cms-slot-list-target-designer-preview";
 import {
@@ -84,6 +85,7 @@ import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-acce
 import { CmsSlotsRouteChrome } from "@/features/cms-slots/ui/cms-slots-route-chrome";
 import {
   CMS_SLOTS_CMS_FIELD_LINK_TOAST_SUCCESS,
+  CMS_SLOTS_CMS_FIELD_NOT_VISIBLE_NOTIFY,
   CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON,
   CMS_SLOTS_TOAST_LIST_CREATED,
   CMS_SLOTS_TOAST_LIST_REMOVED,
@@ -516,6 +518,20 @@ async function refreshListTargetOnCanvasCount(
   }
 }
 
+async function promptCmsFieldLinkWhenVerified(
+  ensure: CmsSlotListCmsTextFieldEnsureResult | null | undefined,
+  openCmsFieldLinkPrompt: (binding: { collectionId: string; fieldId: string }) => void
+): Promise<void> {
+  if (!ensure?.fieldWasCreated) {
+    return;
+  }
+  if (!(await verifyCmsSlotListTargetPlainTextField(ensure.binding))) {
+    void webflow.notify({ type: "Warning", message: CMS_SLOTS_CMS_FIELD_NOT_VISIBLE_NOTIFY });
+    return;
+  }
+  void openCmsFieldLinkPrompt(ensure.binding);
+}
+
 async function finishListTargetCanvasPlacement(params: {
   instance: ComponentElement;
   alreadyExisted: boolean;
@@ -530,7 +546,10 @@ async function finishListTargetCanvasPlacement(params: {
     const collectionId = await resolveCmsSlotListTargetCmsCollectionIdForCleanup(params.listContainer);
     const fieldId = await getCmsSlotListTargetCmsFieldIdFromListContainer(params.listContainer);
     if (collectionId != null && fieldId != null) {
-      void params.openCmsFieldLinkPrompt({ collectionId, fieldId });
+      await promptCmsFieldLinkWhenVerified(
+        { binding: { collectionId, fieldId }, fieldWasCreated: true },
+        params.openCmsFieldLinkPrompt
+      );
     }
   }
   try {
@@ -584,6 +603,8 @@ export function CmsSlotsScreen() {
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [addPending, setAddPending] = useState(false);
+  /** Opens the expose/tag drawer on the row with this `key` once after add-from-catalog. */
+  const [autoOpenExposeDrawerRowKey, setAutoOpenExposeDrawerRowKey] = useState<string | null>(null);
   const [selected, setSelected] = useState<HydratedCmsSlotRow[]>([]);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [resyncingEngineSlotKey, setResyncingEngineSlotKey] = useState<string | null>(null);
@@ -906,6 +927,7 @@ export function CmsSlotsScreen() {
     setComponentQuery("");
     setComponentCatalog([]);
     setSelected([]);
+    setAutoOpenExposeDrawerRowKey(null);
     setCatalogError(null);
     setBeaconName("");
     setCreateFormOpen(false);
@@ -972,9 +994,7 @@ export function CmsSlotsScreen() {
 
   const promptCmsFieldLinkIfCreated = useCallback(
     (ensure: CmsSlotListCmsTextFieldEnsureResult | null | undefined) => {
-      if (ensure?.fieldWasCreated) {
-        void openCmsFieldLinkPrompt(ensure.binding);
-      }
+      void promptCmsFieldLinkWhenVerified(ensure, openCmsFieldLinkPrompt);
     },
     [openCmsFieldLinkPrompt]
   );
@@ -1379,8 +1399,10 @@ export function CmsSlotsScreen() {
     setAddPending(true);
     try {
       const instance = await appendComponentToSlotListContainer(container, c.id);
-      const nextSelected = [...selected, { key: crypto.randomUUID(), componentId: c.id, name: c.name, instance }];
+      const rowKey = crypto.randomUUID();
+      const nextSelected = [...selected, { key: rowKey, componentId: c.id, name: c.name, instance }];
       setSelected(nextSelected);
+      setAutoOpenExposeDrawerRowKey(rowKey);
       await writeCmsSlotEngineConfiguredComponentIds(
         container,
         nextSelected.map((row) => row.componentId)
@@ -1756,6 +1778,8 @@ export function CmsSlotsScreen() {
       enginePublishedDisplayNames={enginePublishedDisplayNames}
       onRenamePublishedDisplayName={handleRenamePublishedDisplayName}
       renamingPublishedSlotKey={renamingPublishedSlotKey}
+      autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
+      onAutoOpenExposeDrawerConsumed={() => setAutoOpenExposeDrawerRowKey(null)}
       exitToList={exitToList}
       composerEligibleLoading={composerEligibleLoading}
       composerRuntimeOk={composerRuntimeOk}

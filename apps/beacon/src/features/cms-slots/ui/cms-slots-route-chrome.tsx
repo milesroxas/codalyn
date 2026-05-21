@@ -94,6 +94,8 @@ export type CmsSlotsRouteChromeProps = {
   enginePublishedDisplayNames: string[] | null;
   onRenamePublishedDisplayName: (rowKey: string, nextName: string) => void | Promise<void>;
   renamingPublishedSlotKey: string | null;
+  autoOpenExposeDrawerRowKey: string | null;
+  onAutoOpenExposeDrawerConsumed: () => void;
   exitToList: () => void;
   composerEligibleLoading: boolean;
   composerRuntimeOk: boolean;
@@ -188,6 +190,8 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps) {
           enginePublishedDisplayNames={p.enginePublishedDisplayNames}
           onRenamePublishedDisplayName={p.onRenamePublishedDisplayName}
           renamingPublishedSlotKey={p.renamingPublishedSlotKey}
+          autoOpenExposeDrawerRowKey={p.autoOpenExposeDrawerRowKey}
+          onAutoOpenExposeDrawerConsumed={p.onAutoOpenExposeDrawerConsumed}
         />
       ) : null}
     </div>

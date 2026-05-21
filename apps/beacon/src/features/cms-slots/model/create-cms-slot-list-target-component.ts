@@ -1,4 +1,9 @@
 import {
+  applyCmsSlotListTargetDesignerPlaceholderToDom,
+  CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL,
+  cmsSlotListTargetDesignerPlaceholderInlineStyle,
+} from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
+import {
   ensureCmsSlotListTargetLayoutStyle,
   ensureCmsSlotListTargetSlotStyle,
 } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
@@ -247,11 +252,10 @@ export async function applyCmsSlotListTargetSync(
         await dom.setAttribute(key, value);
       }
     }
-    const [slotStyle, layoutStyle] = await Promise.all([
-      ensureCmsSlotListTargetSlotStyle(),
-      ensureCmsSlotListTargetLayoutStyle(),
-    ]);
-    await dom.setStyles([slotStyle, layoutStyle]);
+    await ensureCmsSlotListTargetLayoutStyle();
+    const slotStyle = await ensureCmsSlotListTargetSlotStyle();
+    await dom.setStyles([slotStyle]);
+    await applyCmsSlotListTargetDesignerPlaceholderToDom(dom);
   });
 }
 
@@ -291,11 +295,11 @@ export async function createCmsSlotListTargetComponent(input: {
       root.setAttribute(k, v);
     }
 
-    const [slotStyle, layoutStyle] = await Promise.all([
-      ensureCmsSlotListTargetSlotStyle(),
-      ensureCmsSlotListTargetLayoutStyle(),
-    ]);
-    root.setStyles([slotStyle, layoutStyle]);
+    await ensureCmsSlotListTargetLayoutStyle();
+    const slotStyle = await ensureCmsSlotListTargetSlotStyle();
+    root.setStyles([slotStyle]);
+    root.setAttribute("style", cmsSlotListTargetDesignerPlaceholderInlineStyle());
+    root.setAttribute("aria-label", CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL);
     root.setTextContent("");
 
     const registered = await webflow.registerComponent(

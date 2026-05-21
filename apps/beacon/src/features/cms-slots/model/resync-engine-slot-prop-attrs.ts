@@ -23,7 +23,7 @@ function notifyResyncOutcome(r: EngineCodalynAttrSyncResult, exposed: Composable
     void webflow.notify({
       type: "Info",
       message:
-        "No elements were tagged. Open the main component and bind headings, images, or links to the exposed props, then try again.",
+        "No elements were tagged. Bind elements to component props, wire nested instances to exposed parent props, then try again.",
     });
     return;
   }

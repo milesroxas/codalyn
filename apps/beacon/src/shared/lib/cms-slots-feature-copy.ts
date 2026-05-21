@@ -1,5 +1,8 @@
 export const CMS_SLOTS_FEATURE_NAME = "CMS Slots";
 
+/** Designer canvas label on the list render target (stripped at runtime). */
+export const CMS_SLOTS_LIST_TARGET_DESIGNER_LABEL = "Beacon - CMS Slot Target";
+
 export const CMS_SLOTS_HOME_TILE_DESCRIPTION = "Unique layouts in collection templates";
 
 export const CMS_SLOTS_AREA_NAV_LABEL = `${CMS_SLOTS_FEATURE_NAME} area`;
@@ -44,6 +47,9 @@ export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_READY =
 export const CMS_SLOTS_CMS_FIELD_LINK_RETRY_LABEL = "Link to CMS field";
 
 export const CMS_SLOTS_CMS_FIELD_LINK_TOAST_SUCCESS = "List target linked to the CMS field.";
+
+export const CMS_SLOTS_CMS_FIELD_NOT_VISIBLE_NOTIFY =
+  "Could not confirm the CMS Plain Text field on this collection. Check your Webflow connection in Tower, then try creating the list target again.";
 
 export const CMS_SLOTS_UNINSTALL_PAGE_LABEL = `Also uninstall ${CMS_SLOTS_FEATURE_NAME} on this page`;
 

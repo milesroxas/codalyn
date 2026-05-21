@@ -40,6 +40,8 @@ export type CmsSlotCompositionPanelProps = {
   enginePublishedDisplayNames: string[] | null;
   onRenamePublishedDisplayName: (rowKey: string, nextName: string) => void;
   renamingPublishedSlotKey: string | null;
+  autoOpenExposeDrawerRowKey?: string | null;
+  onAutoOpenExposeDrawerConsumed?: () => void;
 };
 
 export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
@@ -73,6 +75,8 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     enginePublishedDisplayNames,
     onRenamePublishedDisplayName,
     renamingPublishedSlotKey,
+    autoOpenExposeDrawerRowKey = null,
+    onAutoOpenExposeDrawerConsumed,
   } = props;
 
   const listTargetActionBusy =
@@ -152,6 +156,8 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
                   onRemove={onRemove}
                   onSetSlotExposed={onSetSlotExposed}
                   onResyncEngineSlotAttrs={onResyncEngineSlotAttrs}
+                  autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
+                  onAutoOpenExposeDrawerConsumed={onAutoOpenExposeDrawerConsumed}
                 />
               ))}
             </ul>

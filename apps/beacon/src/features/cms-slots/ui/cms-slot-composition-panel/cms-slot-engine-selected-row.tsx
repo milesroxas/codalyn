@@ -1,5 +1,5 @@
 import { Loader2, Trash2 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
@@ -52,6 +52,9 @@ type CmsSlotEngineSelectedRowProps = {
   onRemove: (row: HydratedCmsSlotRow) => void;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
   onResyncEngineSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
+  /** When set to this row’s `key`, opens the expose/tag drawer once (e.g. right after adding the component). */
+  autoOpenExposeDrawerRowKey?: string | null;
+  onAutoOpenExposeDrawerConsumed?: () => void;
 };
 
 export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
@@ -70,6 +73,8 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     onRemove,
     onSetSlotExposed,
     onResyncEngineSlotAttrs,
+    autoOpenExposeDrawerRowKey = null,
+    onAutoOpenExposeDrawerConsumed,
   } = props;
 
   const [propsDrawerOpen, setPropsDrawerOpen] = useState(false);
@@ -83,6 +88,14 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     exposeBaselineRef.current = snapshotExposed(slotExposed);
     setPropsDrawerOpen(true);
   }, [slotExposed]);
+
+  useEffect(() => {
+    if (autoOpenExposeDrawerRowKey !== row.key) {
+      return;
+    }
+    openExposeDrawer();
+    onAutoOpenExposeDrawerConsumed?.();
+  }, [autoOpenExposeDrawerRowKey, onAutoOpenExposeDrawerConsumed, openExposeDrawer, row.key]);
 
   const handlePropsDrawerOpenChange = useCallback(
     (nextOpen: boolean) => {

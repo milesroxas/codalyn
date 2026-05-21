@@ -1,4 +1,5 @@
 import { bindCmsSlotListTargetInstancesToListCmsText } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
+import { applyCmsSlotListTargetDesignerPlaceholderForList } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
 import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import { ensureCmsSlotListTargetTextProp } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
 import {
@@ -69,6 +70,11 @@ export async function reconcileCmsSlotListTarget(
       }
     } catch (e) {
       console.warn("[beacon] CMS text bind (reconcile):", e);
+    }
+    try {
+      await applyCmsSlotListTargetDesignerPlaceholderForList(dataList, listContainer);
+    } catch (e) {
+      console.warn("[beacon] list target designer placeholder:", e);
     }
   }
 

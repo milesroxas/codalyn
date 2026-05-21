@@ -1,5 +1,10 @@
 import SparkMD5 from "spark-md5";
-import { CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
+import { cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
+import {
+  CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME,
+  cmsSlotListTargetRuntimeLayoutRevealSource,
+  ensureCmsSlotListTargetLayoutStyle,
+} from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
 import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
 
 /** Matches `attributes` on the applied page script so we can replace it on sync. */
@@ -38,7 +43,7 @@ function bBeaconResolveHeadingTagEl(el,v){var want=bBeaconNormHeadingTag(v);if(!
 function pickP(ps,k){if(!k||!ps||typeof ps!=="object")return;var a=String(k);if(Object.prototype.hasOwnProperty.call(ps,a))return ps[a];var al=a.toLowerCase();for(var x in ps)if(Object.prototype.hasOwnProperty.call(ps,x)&&x.toLowerCase()===al)return ps[x]}
 function bPropEmpty(v){if(v==null)return true;return String(v).trim()===""}
 function bPropSetHidden(n,h){if(h){n.setAttribute("hidden","");n.setAttribute("aria-hidden","true")}else{n.removeAttribute("hidden");n.removeAttribute("aria-hidden")}}
-function bListTargetReveal(target){target.classList.remove("${CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");target.style.removeProperty("visibility")}
+function bListTargetReveal(target){target.classList.remove("${CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");${cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource()}${cmsSlotListTargetRuntimeLayoutRevealSource()}target.style.removeProperty("visibility");target.removeAttribute("aria-label")}
 function applyProps(target,payload){var vn=payload?+payload.v:NaN;if(!payload||!isFinite(vn)||vn<2)return;var pc=payload.p;if(!Array.isArray(pc))return;var rows=target.children,i,j,row,props,nodes,node,rawP,segs,si,seg,pv,ra,rh,anyV,d=bDbg(),totA=0,totH=0,nLen=rows.length<pc.length?rows.length:pc.length;for(i=0;i<nLen;i++){row=rows[i];props=pc[i];if(!row||props===null||typeof props!=="object"){if(d)bLog("row missing",i);continue}nodes=row.querySelectorAll("[data-codalyn-beacon-prop]");ra=0;rh=0;for(j=0;j<nodes.length;j++){node=nodes[j];rawP=node.getAttribute("data-codalyn-beacon-prop")||"";if(!rawP)continue;segs=String(rawP).split("|");anyV=false;for(si=0;si<segs.length;si++){seg=segs[si].trim();if(!seg)continue;pv=pickP(props,seg);if(bPropEmpty(pv))continue;anyV=true;if(bBeaconNormHeadingTag(String(pv))){node=bBeaconResolveHeadingTagEl(node,String(pv));continue}applyValue(node,String(pv))}if(!anyV){bPropSetHidden(node,true);rh++;if(d)bLog("no payload for attr",i,rawP,"keys",Object.keys(props));continue}bPropSetHidden(node,false);ra++}totA+=ra;totH+=rh;if(d)bLog("row",i,"nodes",nodes.length,"set",ra,"hidden",rh)}if(d)bLog("applyProps",totA,"set",totH,"hidden nodes")}
 function reapply(target,payload,done){bLog("reapply 1/3 sync");applyProps(target,payload);setTimeout(function(){bLog("reapply 2/3 +0ms");applyProps(target,payload);setTimeout(function(){bLog("reapply 3/3 +100ms");applyProps(target,payload);if(typeof done==="function")done()},100)},0)}
 function run(){
@@ -318,6 +323,8 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
   if (!getTowerOrigin()) {
     throw new Error("Tower is not configured (VITE_TOWER_ORIGIN). Cannot sync page custom code.");
   }
+
+  await ensureCmsSlotListTargetLayoutStyle();
 
   const sourceCode = getCmsSlotPageInlineScriptSource();
 

@@ -12,8 +12,6 @@ export type CmsSlotsPageRuntimeSyncButtonProps = {
   beaconsWrapperInstalled: boolean;
   pageScanLoading: boolean;
   onSync: () => void | Promise<void>;
-  /** Editor-style dock: stretch Sync across the footer row. */
-  composerOnly?: boolean;
 };
 
 /** Single UI surface for page-script sync (footer dock). */
@@ -26,7 +24,6 @@ export function CmsSlotsPageRuntimeSyncButton(props: CmsSlotsPageRuntimeSyncButt
       type="button"
       variant={needsAttention ? "default" : "secondary"}
       size="dockNav"
-      className={props.composerOnly ? "min-w-0 flex-1" : undefined}
       disabled={
         props.embedSyncPending || props.statusLoading || !props.beaconsWrapperInstalled || props.pageScanLoading
       }

@@ -42,7 +42,7 @@ function nextSlotLabelsAfterPoolRename(
 
 /**
  * Updates only `n[]` for every composed row that uses `poolIndex`, re-serializing with the same `i` and `p` so
- * labels stay aligned with Composer / Studio (single runtime JSON blob).
+ * labels stay aligned with Composer (single runtime JSON blob).
  */
 export async function renamePublishedSlotDisplayNameAtPoolIndex(input: {
   listContainer: BlockElement;

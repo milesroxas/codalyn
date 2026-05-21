@@ -1,6 +1,7 @@
 import { Loader2, Plus } from "lucide-react";
 import { CMS_SLOT_ROW_NAME_MAX } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
+import { CmsSlotPublishedSlotTile } from "@/features/cms-slots/ui/cms-slot-list-tile";
 import {
   CMS_SLOTS_ADD_SLOT_LABEL,
   CMS_SLOTS_PAGE_LIST_ARIA_LABEL,
@@ -19,7 +20,6 @@ import {
 } from "@/shared/ui/drawer";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { CmsSlotPublishedSlotTile } from "./published-slot-tile";
 
 type OnThisPageSectionProps = {
   nameFieldId: string;
@@ -142,7 +142,7 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
             {pageBeacons.map((b) => (
               <CmsSlotPublishedSlotTile
                 key={b.key}
-                slotList={b}
+                dataList={b.dataList}
                 disabled={openingBeaconKey !== null || deletePendingKey !== null}
                 opening={openingBeaconKey === b.key}
                 deleting={deletePendingKey === b.key}

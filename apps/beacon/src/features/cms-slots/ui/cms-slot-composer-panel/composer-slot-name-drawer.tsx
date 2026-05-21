@@ -26,7 +26,7 @@ import {
 } from "@/shared/ui/drawer";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { StudioPropValueField } from "./studio-prop-value-field";
+import { ComposerPropValueField } from "./composer-prop-value-field";
 
 type ComposerEditBaseline = { name: string; propValues: Record<string, string> };
 
@@ -34,7 +34,7 @@ export type ComposerSlotNameDrawerProps = {
   row: CmsSlotCompositionDraftRow;
   exposed: ComposableInstancePropMeta[];
   disabled?: boolean;
-  /** Full Composer draft (Studio only). When set with {@link onPersistComposerSlot}, drawer Save persists like header Save. */
+  /** Full Composer draft. When set with {@link onPersistComposerSlot}, drawer Save persists like header Save. */
   compositionDraft?: CmsSlotCompositionDraftRow[];
   onPersistComposerSlot?: (merged: CmsSlotCompositionDraftRow[]) => void | Promise<void>;
   /** Optional className for the row title trigger (e.g. contrast on dark Engine chrome). */
@@ -201,18 +201,15 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
               />
             </div>
             {exposed.length > 0 ? (
-              <div className="space-y-3 border-t border-border/50 pt-3" data-slot="cms_slot_studio_prop_fields">
+              <div className="space-y-3 border-t border-border/50 pt-3" data-slot="cms_slot_composer_prop_fields">
                 {exposed.map((ep) => {
                   const v = row.propValues?.[ep.propId] ?? "";
-                  const propFieldId = `cms-slot-studio-${row.key}-${ep.propId}`;
+                  const propFieldId = `cms-slot-composer-${row.key}-${ep.propId}`;
                   return (
                     <div key={ep.propId} className="space-y-0.5">
                       <div className="flex items-start justify-between gap-1.5">
                         <Label className="text-xs text-muted-foreground" htmlFor={propFieldId}>
                           {ep.label}
-                          <span className="ml-1.5 font-mono text-[0.6rem] font-normal text-muted-foreground/90">
-                            {ep.valueType}
-                          </span>
                         </Label>
                         <Button
                           type="button"
@@ -226,10 +223,7 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
                           <Copy className="size-3.5" aria-hidden />
                         </Button>
                       </div>
-                      <p className="truncate font-mono text-[0.6rem] text-muted-foreground/90" title={ep.propId}>
-                        {ep.propId}
-                      </p>
-                      <StudioPropValueField
+                      <ComposerPropValueField
                         inputId={propFieldId}
                         ep={ep}
                         value={v}

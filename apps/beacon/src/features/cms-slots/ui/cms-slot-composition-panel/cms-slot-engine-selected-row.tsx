@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
-import { ComposerSlotNameDrawer } from "@/features/cms-slots/ui/cms-slot-composer-studio/composer-slot-name-drawer";
+import { ComposerSlotNameDrawer } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-slot-name-drawer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -196,7 +196,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
             ) : available.length === 0 ? (
               <p className="text-sm text-muted-foreground">No composable props found for this component.</p>
             ) : (
-              <ul className="m-0 list-none space-y-2.5 p-0 pb-2" aria-label="Studio props">
+              <ul className="m-0 list-none space-y-2.5 p-0 pb-2" aria-label="Composer props">
                 {available.map((p) => {
                   const on = slotExposed.some((e) => e.propId === p.propId);
                   return (

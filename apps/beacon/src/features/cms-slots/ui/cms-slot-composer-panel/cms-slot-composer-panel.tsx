@@ -4,7 +4,7 @@ import { Button } from "@/shared/ui/button";
 import { ComposerOrderSection } from "./composer-order-section";
 import { ComposerPaletteSection } from "./composer-palette-section";
 
-export type CmsSlotComposerStudioPanelProps = {
+export type CmsSlotComposerPanelProps = {
   activeDataList: string;
   draft: CmsSlotCompositionDraftRow[];
   dirty: boolean;
@@ -22,9 +22,11 @@ export type CmsSlotComposerStudioPanelProps = {
   onRenameSlot: (rowKey: string, name: string) => void;
   /** When true, {@link ComposerPaletteSection} is not rendered (parent places it, e.g. docked above the app footer). */
   omitPalette?: boolean;
+  /** Editor-style Composer: Save lives in the app footer; header shows Back to List only. */
+  composerOnly?: boolean;
 };
 
-export function CmsSlotComposerStudioPanel(props: CmsSlotComposerStudioPanelProps) {
+export function CmsSlotComposerPanel(props: CmsSlotComposerPanelProps) {
   const {
     activeDataList,
     draft,
@@ -41,24 +43,27 @@ export function CmsSlotComposerStudioPanel(props: CmsSlotComposerStudioPanelProp
     onChangePropValue,
     onRenameSlot,
     omitPalette = false,
+    composerOnly = false,
   } = props;
 
   const busy = savePending || embedSyncPending;
 
   return (
-    <div className="space-y-3" data-slot="beacon_composer_studio">
+    <div className="space-y-3" data-slot="beacon_composer">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-medium">Studio</p>
+          <p className="text-sm font-medium">Composer</p>
           <code className="mt-0.5 block truncate font-mono text-[0.7rem] text-muted-foreground">{activeDataList}</code>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onBack()}>
-            Back
+            {composerOnly ? "Back to List" : "Back"}
           </Button>
-          <Button type="button" size="sm" disabled={!dirty || busy || draft.length === 0} onClick={() => void onSave()}>
-            {savePending ? "Saving…" : "Save"}
-          </Button>
+          {composerOnly ? null : (
+            <Button type="button" size="sm" disabled={!dirty || busy} onClick={() => void onSave()}>
+              {savePending ? "Saving…" : "Save"}
+            </Button>
+          )}
         </div>
       </div>
 

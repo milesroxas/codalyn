@@ -1,5 +1,5 @@
 /**
- * Engine lists every bindable **instance** prop (via `searchProps`) so designers can choose what Studio exposes.
+ * Engine lists every bindable **instance** prop (via `searchProps`) so designers can choose what Composer exposes.
  * Per-row values still serialize to JSON `p` as strings (booleans `true`/`false`, numbers as text, link JSON, etc.).
  */
 
@@ -9,7 +9,7 @@ export type ComposableInstancePropMeta = {
   propId: string;
   label: string;
   valueType: string;
-  /** When Webflow provides discrete choices (e.g. component variants), Studio renders a select; values are `id` strings. */
+  /** When Webflow provides discrete choices (e.g. component variants), Composer renders a select; values are `id` strings. */
   selectOptions?: ComposableInstancePropSelectOption[];
 };
 
@@ -28,8 +28,8 @@ function selectOptionsFromInstanceProp(
   return opts.map((o) => ({ value: o.id, label: o.name ?? o.id }));
 }
 
-/** Which control Studio renders for props the designer enabled in Engine. */
-export type CmsSlotStudioPropFieldKind =
+/** Which control Composer renders for props the designer enabled in Engine. */
+export type CmsSlotComposerPropFieldKind =
   | "multiline"
   | "line"
   | "url"
@@ -42,10 +42,10 @@ export type CmsSlotStudioPropFieldKind =
   | "date";
 
 /**
- * Webflow `BindableValueType` → Studio control. Unknown types use `line`.
+ * Webflow `BindableValueType` → Composer control. Unknown types use `line`.
  * `selectOptions` on {@link ComposableInstancePropMeta} wins in the UI (variant / enum with `display.options`).
  */
-const STUDIO_FIELD_BY_VALUE_TYPE: Readonly<Partial<Record<string, CmsSlotStudioPropFieldKind>>> = {
+const COMPOSER_FIELD_BY_VALUE_TYPE: Readonly<Partial<Record<string, CmsSlotComposerPropFieldKind>>> = {
   string: "line",
   richText: "multiline",
   text: "multiline",
@@ -83,10 +83,10 @@ const STUDIO_FIELD_BY_VALUE_TYPE: Readonly<Partial<Record<string, CmsSlotStudioP
 };
 
 /**
- * Maps Webflow `InstanceProp` `valueType` to a Studio field.
+ * Maps Webflow `InstanceProp` `valueType` to a Composer field.
  */
-export function cmsSlotStudioFieldKindForValueType(valueType: string): CmsSlotStudioPropFieldKind {
-  return STUDIO_FIELD_BY_VALUE_TYPE[valueType] ?? "line";
+export function cmsSlotComposerFieldKindForValueType(valueType: string): CmsSlotComposerPropFieldKind {
+  return COMPOSER_FIELD_BY_VALUE_TYPE[valueType] ?? "line";
 }
 
 const CMS_SLOT_IMAGE_VALUE_TYPES = new Set(["image", "imageAsset", "cmsImage", "imageSet", "file"]);
@@ -303,7 +303,7 @@ export async function listComposableMetaByInstanceKey(
 }
 
 /**
- * All bindable instance props (full `InstanceProp` from `searchProps`), for Engine “Expose to Studio”.
+ * All bindable instance props (full `InstanceProp` from `searchProps`), for Engine “Expose to Composer”.
  */
 export async function listComposablePropsForInstance(
   instance: ComponentElement

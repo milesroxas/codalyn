@@ -1,11 +1,10 @@
-import { Loader2 } from "lucide-react";
 import type { ComposerEligibleList } from "@/features/cms-slots/model/cms-slot-composer-eligible";
 import { displayLabelForDataList } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import { shouldShowCmsSlotsEditorNoSlotsEmpty } from "@/features/cms-slots/model/cms-slots-access";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
+import { CmsSlotListTile } from "@/features/cms-slots/ui/cms-slot-list-tile";
 import { CmsSlotPreInstallBlock } from "@/features/cms-slots/ui/cms-slot-pre-install-block";
 import { CmsSlotsEditorNoSlotsEmptyState } from "@/features/cms-slots/ui/cms-slots-editor-no-slots-empty-state";
-import { Button } from "@/shared/ui/button";
 
 type CmsSlotComposerListPanelProps = {
   pageScanLoading: boolean;
@@ -69,24 +68,15 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
   return (
     <div className="space-y-4" data-slot="beacon_composer_list">
       {runtimeOk && eligible.length > 0 ? (
-        <ul className="divide-y divide-border" aria-label="Lists available in Composer">
+        <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0" aria-label="Lists available in Composer">
           {eligible.map((b) => (
-            <li key={b.key} className="flex items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
-              <div className="min-w-0">
-                <p className="text-sm font-medium break-words">{displayLabelForDataList(b.dataList)}</p>
-                <p className="font-mono text-[0.65rem] text-muted-foreground break-all">{b.dataList}</p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="shrink-0"
-                disabled={openingKey !== null}
-                onClick={() => void onOpenList(b)}
-              >
-                {openingKey === b.key ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : "Open studio"}
-              </Button>
-            </li>
+            <CmsSlotListTile
+              key={b.key}
+              label={displayLabelForDataList(b.dataList)}
+              disabled={openingKey !== null}
+              busy={openingKey === b.key}
+              onOpen={() => void onOpenList(b)}
+            />
           ))}
         </ul>
       ) : null}

@@ -213,7 +213,7 @@ async function patchBeaconListCmsTextFieldData(options: {
  * Persists the runtime JSON to the **Beacon list target text** field created for this list
  * (see `cmsSlotListCmsPlainTextFieldDisplayName` + list target Text prop CMS bind). Staged + **live** patches so
  * the **published** page sees the same payload the list target Text renders. One CMS item id ⇒ one v2
- * `{v,i,p}`; `p` holds every Studio prop value (including `""`) for that entry — see
+ * `{v,i,p}`; `p` holds every Composer prop value (including `""`) for that entry — see
  * {@link serializeCmsSlotListRuntimePayload}.
  */
 export async function saveCmsSlotListRuntimePayloadToCmsItem(options: {
@@ -222,7 +222,7 @@ export async function saveCmsSlotListRuntimePayloadToCmsItem(options: {
   cmsItemId: string;
   /** Ordered indices into the hidden beacon list block’s `children` (what the site runtime will clone by index). */
   hiddenListIndices: readonly number[];
-  /** One entry per `hiddenListIndices` item; per-row `propId` → string (Engine-exposed props from Studio). */
+  /** One entry per `hiddenListIndices` item; per-row `propId` → string (Engine-exposed props from Composer). */
   propValueRows?: readonly Readonly<Record<string, string>>[] | null;
   /** Parallel Composer slot display names (`n` in persisted JSON); length must match `hiddenListIndices`. */
   slotLabels?: readonly string[] | null;
@@ -245,7 +245,7 @@ export async function saveCmsSlotListRuntimePayloadToCmsItem(options: {
 /**
  * On **static** (non–collection-template) pages the list target Text is not fed by a CMS item. The published footer
  * runtime reads JSON from that Text — this writes the same v2 string as
- * {@link saveCmsSlotListRuntimePayloadToCmsItem} so live matches Composer Studio.
+ * {@link saveCmsSlotListRuntimePayloadToCmsItem} so live matches Composer.
  */
 export async function setCmsSlotListTargetInstancesStaticRuntimeText(options: {
   dataList: string;

@@ -14,8 +14,8 @@ import type { CmsSlotListOnPage, HydratedCmsSlotRow } from "@/features/cms-slots
 import type { CmsSlotCompositionDraftRow, CmsSlotPaletteEntry } from "@/features/cms-slots/model/site-components";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotComposerListPanel } from "@/features/cms-slots/ui/cms-slot-composer-list-panel";
-import { CmsSlotComposerStudioPanel } from "@/features/cms-slots/ui/cms-slot-composer-studio";
-import { ComposerPaletteSection } from "@/features/cms-slots/ui/cms-slot-composer-studio/composer-palette-section";
+import { CmsSlotComposerPanel } from "@/features/cms-slots/ui/cms-slot-composer-panel";
+import { ComposerPaletteSection } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-palette-section";
 import { CmsSlotCompositionPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel";
 import { CmsSlotHomePanel } from "@/features/cms-slots/ui/cms-slot-home-panel";
 import { CmsSlotsCmsFieldLinkDialog } from "@/features/cms-slots/ui/cms-slots-cms-field-link-dialog";
@@ -101,15 +101,15 @@ export type CmsSlotsRouteChromeProps = {
   composerRuntimeOk: boolean;
   composerEligible: CmsSlotListOnPage[];
   composerOpeningKey: string | null;
-  onOpenComposerStudio: (b: CmsSlotListOnPage) => void | Promise<void>;
-  composerStudio: { beacon: CmsSlotListOnPage; initialSignature: string } | null;
+  onOpenComposer: (b: CmsSlotListOnPage) => void | Promise<void>;
+  activeComposer: { beacon: CmsSlotListOnPage; initialSignature: string } | null;
   composerDraft: CmsSlotCompositionDraftRow[];
   composerDirty: boolean;
   composerAllowedPalette: CmsSlotPaletteEntry[];
   onComposerAddFromPalette: (c: CmsSlotPaletteEntry) => void;
   onComposerReorderDraft: (fromIndex: number, toIndex: number) => void;
   onComposerRemoveDraft: (key: string) => void;
-  onComposerStudioBack: () => void;
+  onComposerBack: () => void;
   onComposerSave: (draftOverride?: CmsSlotCompositionDraftRow[]) => void | Promise<void>;
   composerSavePending: boolean;
   onSyncInstallEmbed: () => void | Promise<void>;
@@ -199,9 +199,11 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps) {
 }
 
 function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
+  const { composerOnly } = useCmsSlotsAccess();
+
   return (
     <div className="space-y-4" data-route="cms-slots-composer">
-      {p.composerStudio == null ? (
+      {p.activeComposer == null ? (
         <CmsSlotComposerListPanel
           pageScanLoading={p.pageScanLoading}
           beaconsWrapperInstalled={p.beaconsWrapperInstalled}
@@ -211,18 +213,18 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
           runtimeOk={p.composerRuntimeOk && p.syncShellOk}
           eligible={p.composerEligible}
           openingKey={p.composerOpeningKey}
-          onOpenList={(b) => void p.onOpenComposerStudio(b)}
+          onOpenList={(b) => void p.onOpenComposer(b)}
         />
       ) : (
-        <CmsSlotComposerStudioPanel
-          activeDataList={p.composerStudio.beacon.dataList}
+        <CmsSlotComposerPanel
+          activeDataList={p.activeComposer.beacon.dataList}
           draft={p.composerDraft}
           dirty={p.composerDirty}
           allowedPalette={p.composerAllowedPalette}
           onAddFromPalette={p.onComposerAddFromPalette}
           onReorder={p.onComposerReorderDraft}
           onRemove={p.onComposerRemoveDraft}
-          onBack={p.onComposerStudioBack}
+          onBack={p.onComposerBack}
           onSave={(draftOverride) => void p.onComposerSave(draftOverride)}
           savePending={p.composerSavePending}
           embedSyncPending={p.embedSyncPending}
@@ -230,6 +232,7 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
           onChangePropValue={p.onComposerSetPropValue}
           onRenameSlot={p.onComposerRenameSlotRow}
           omitPalette
+          composerOnly={composerOnly}
         />
       )}
     </div>
@@ -338,9 +341,10 @@ function CmsSlotsRemoveListTargetDialog(p: CmsSlotsRouteChromeProps) {
 function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
   const { composerOnly } = useCmsSlotsAccess();
 
+  const composerSavePending = p.composerSavePending || p.embedSyncPending;
+
   const syncButton = (
     <CmsSlotsPageRuntimeSyncButton
-      composerOnly={composerOnly}
       relevant={p.pageRuntimeSyncRelevant}
       synced={p.syncShellOk}
       reason={p.syncShellReason}
@@ -352,10 +356,28 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
     />
   );
 
+  const composerSaveButton =
+    p.activeComposer != null ? (
+      <Button
+        type="button"
+        variant={p.composerDirty ? "default" : "secondary"}
+        size="dockNav"
+        className="min-w-0 flex-1"
+        disabled={!p.composerDirty || composerSavePending}
+        aria-busy={p.composerSavePending}
+        onClick={() => void p.onComposerSave()}
+      >
+        {p.composerSavePending ? "Saving…" : "Save"}
+      </Button>
+    ) : null;
+
   if (composerOnly) {
+    if (composerSaveButton == null) {
+      return null;
+    }
     return (
       <BeaconFeatureRouteFooter dataSlot="cms_slots_dock" data-composer-only="" className="items-stretch gap-2">
-        {syncButton}
+        {composerSaveButton}
       </BeaconFeatureRouteFooter>
     );
   }
@@ -375,8 +397,8 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
             )
           }
           onClick={() => {
-            if (p.composerStudio != null) {
-              p.onComposerStudioBack();
+            if (p.activeComposer != null) {
+              p.onComposerBack();
             }
           }}
         >
@@ -411,7 +433,7 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
 
 /** Route shell/header, scroll region, dialogs, footer — splits cognitive complexity off `CmsSlotsScreen`. */
 export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
-  const composerPaletteDocked = p.isComposer && p.composerStudio != null;
+  const composerPaletteDocked = p.isComposer && p.activeComposer != null;
 
   return (
     <BeaconFeatureRouteChrome

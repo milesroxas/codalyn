@@ -20,7 +20,7 @@ import {
 import { paletteForConfiguredComponentIds } from "@/features/cms-slots/model/palette-for-configured-component-ids";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 
-export type ComposerStudioSyncResult = {
+export type ComposerSyncResult = {
   allowedPalette: Awaited<ReturnType<typeof paletteForConfiguredComponentIds>>;
   engineScopedRows: HydratedCmsSlotRow[];
   composerEngineComposable: Record<string, ComposableInstancePropMeta[]>;
@@ -29,11 +29,11 @@ export type ComposerStudioSyncResult = {
   initialSignature: string;
 };
 
-export async function loadComposerStudioSynchronizedState(args: {
+export async function loadComposerSynchronizedState(args: {
   slotList: CmsSlotListOnPage;
   currentCmsItemId: string | null;
   shouldAbort: () => boolean;
-}): Promise<ComposerStudioSyncResult | null> {
+}): Promise<ComposerSyncResult | null> {
   const { slotList, currentCmsItemId, shouldAbort } = args;
   const rows = await listInstancesInSlotListContainer(slotList.container);
   if (shouldAbort()) return null;

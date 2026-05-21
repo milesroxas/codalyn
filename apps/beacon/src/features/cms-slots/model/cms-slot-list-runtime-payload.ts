@@ -5,7 +5,8 @@
  * 1. **Composer (CMS item)** — `saveCmsSlotListRuntimePayloadToCmsItem` writes this string to that field (staged + live) for
  *    the *current* collection entry, so every CMS row has its own `i` + `p`.
  * 2. **Published page** — the footer `beacon` runtime reads `listTarget.textContent` (JSON), clones hidden Engine children
- *    by `i` into the list target, then for each row applies `p[propId]` onto elements with matching `data-codalyn-beacon-prop`
+ *    by `i` into the list target (empty or missing `i` ⇒ no rows; invalid JSON does not fall back to the full Engine list),
+ *    then for each row applies `p[propId]` onto elements with matching `data-codalyn-beacon-prop`
  *    (keys are matched case-insensitively; the attribute may list `oldId|newId` separated by `|` for Webflow id churn).
  *
  * v2: `i` = clone order (indices into the hidden list’s children), `p` = parallel array of per-row `propId` → string.
@@ -16,7 +17,7 @@
  * can show elements that were kept in HTML with publish-time placeholders on the hidden Engine list instance.
  *
  * Optional `n` (parallel to `i`/`p`) stores Composer-only **slot display names**. The footer runtime ignores `n`; it is
- * for Studio UX persistence in the same JSON blob.
+ * for Composer UX persistence in the same JSON blob.
  */
 export const CMS_SLOT_LIST_RUNTIME_JSON_VERSION = 2 as const;
 /** Max length for a Composer slot display name persisted in payload `n[]`. */
@@ -106,7 +107,7 @@ export function resolveCmsSlotPublishedDisplayName(
 }
 
 /**
- * For each Engine pool row (hidden list index), derive the label shown in Studio from the live v2 payload, or the
+ * For each Engine pool row (hidden list index), derive the label shown in Composer from the live v2 payload, or the
  * component name when the payload is missing or that pool index has **mixed** composed-row labels (same index used
  * more than once with different `n[]` entries).
  */

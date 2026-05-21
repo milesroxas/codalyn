@@ -41,7 +41,7 @@ import {
 } from "@/features/cms-slots/model/site-components";
 import { getTowerOrigin } from "@/shared/lib/tower-client";
 
-type ComposerStudioState = {
+type ActiveComposerState = {
   beacon: CmsSlotListOnPage;
   initialSignature: string;
 };
@@ -82,8 +82,8 @@ type ComposerSaveSetters = {
   setComposerDraft: (
     v: CmsSlotCompositionDraftRow[] | ((p: CmsSlotCompositionDraftRow[]) => CmsSlotCompositionDraftRow[])
   ) => void;
-  setComposerStudio: (
-    v: ComposerStudioState | null | ((p: ComposerStudioState | null) => ComposerStudioState | null)
+  setActiveComposer: (
+    v: ActiveComposerState | null | ((p: ActiveComposerState | null) => ActiveComposerState | null)
   ) => void;
   setComposerEngineRows: (v: HydratedCmsSlotRow[]) => void;
   setComposerEngineComposable: (v: Record<string, ComposableInstancePropMeta[]>) => void;
@@ -160,7 +160,7 @@ async function applyComposerSaveCmsTemplatePath(args: {
   }
   await syncCmsSlotPageInlineScript();
   setters.setComposerDraft(draftToApply);
-  setters.setComposerStudio((prev) =>
+  setters.setActiveComposer((prev) =>
     prev ? { ...prev, initialSignature: cmsSlotCompositionSignature(draftToApply) } : null
   );
   if (cmsLayoutSaveFailed) {
@@ -206,7 +206,7 @@ async function applyComposerSaveStaticPagePath(args: {
     propValues: d.propValues,
   }));
   setters.setComposerDraft(normalizedDraft);
-  setters.setComposerStudio((prev) =>
+  setters.setActiveComposer((prev) =>
     prev
       ? {
           ...prev,
@@ -244,7 +244,7 @@ export async function executeCmsSlotComposerSave(input: {
 
   const allowedComponentIdSet = new Set(composerAllowedPalette.map((entry) => entry.id));
   const draftToApply = composerDraft.filter((row) => allowedComponentIdSet.has(row.componentId));
-  if (draftToApply.length === 0) {
+  if (draftToApply.length === 0 && composerDraft.length > 0) {
     void webflow.notify({
       type: "Error",
       message: "This list only allows component types configured in Engine.",

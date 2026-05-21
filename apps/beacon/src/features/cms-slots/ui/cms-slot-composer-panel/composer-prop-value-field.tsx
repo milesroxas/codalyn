@@ -1,8 +1,8 @@
 import type { ReactElement } from "react";
 import {
-  type CmsSlotStudioPropFieldKind,
+  type CmsSlotComposerPropFieldKind,
   type ComposableInstancePropMeta,
-  cmsSlotStudioFieldKindForValueType,
+  cmsSlotComposerFieldKindForValueType,
   isCmsSlotImageValueType,
 } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
@@ -15,7 +15,7 @@ import { Checkbox } from "@/shared/ui/checkbox";
 import { Input } from "@/shared/ui/input";
 import { Textarea } from "@/shared/ui/textarea";
 
-type StudioPropValueFieldProps = {
+type ComposerPropValueFieldProps = {
   inputId: string;
   ep: ComposableInstancePropMeta;
   value: string;
@@ -23,8 +23,8 @@ type StudioPropValueFieldProps = {
   onChange: (v: string) => void;
 };
 
-function StudioPropSelectField(
-  p: StudioPropValueFieldProps & { options: NonNullable<ComposableInstancePropMeta["selectOptions"]> }
+function ComposerPropSelectField(
+  p: ComposerPropValueFieldProps & { options: NonNullable<ComposableInstancePropMeta["selectOptions"]> }
 ) {
   const { inputId, ep, value, busy, onChange, options } = p;
   const hasValue = value.trim() !== "";
@@ -57,7 +57,10 @@ function StudioPropSelectField(
   );
 }
 
-const STUDIO_PROP_VALUE_BY_KIND: Record<CmsSlotStudioPropFieldKind, (p: StudioPropValueFieldProps) => ReactElement> = {
+const COMPOSER_PROP_VALUE_BY_KIND: Record<
+  CmsSlotComposerPropFieldKind,
+  (p: ComposerPropValueFieldProps) => ReactElement
+> = {
   boolean: ({ inputId, value, busy, onChange }) => (
     <div className="flex items-center gap-2 py-0.5">
       <Checkbox
@@ -194,14 +197,14 @@ const STUDIO_PROP_VALUE_BY_KIND: Record<CmsSlotStudioPropFieldKind, (p: StudioPr
   ),
 };
 
-export function StudioPropValueField(props: StudioPropValueFieldProps) {
+export function ComposerPropValueField(props: ComposerPropValueFieldProps) {
   const { inputId, ep, value, busy, onChange } = props;
-  const kind = cmsSlotStudioFieldKindForValueType(ep.valueType);
+  const kind = cmsSlotComposerFieldKindForValueType(ep.valueType);
   const options = ep.selectOptions;
 
   if (options != null && options.length > 0) {
     return (
-      <StudioPropSelectField
+      <ComposerPropSelectField
         inputId={inputId}
         ep={ep}
         value={value}
@@ -212,5 +215,5 @@ export function StudioPropValueField(props: StudioPropValueFieldProps) {
     );
   }
 
-  return STUDIO_PROP_VALUE_BY_KIND[kind](props);
+  return COMPOSER_PROP_VALUE_BY_KIND[kind](props);
 }

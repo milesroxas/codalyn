@@ -124,6 +124,34 @@ describe("cms slot beacon runtime (published DOM)", () => {
     return { target };
   }
 
+  it("renders nothing when payload has empty i (Composer order cleared)", () => {
+    const { target } = mountListFixture(JSON.stringify({ v: 2, i: [], p: [] }));
+    runCmsSlotBeaconRuntime(document);
+    expect(target.children.length).toBe(0);
+  });
+
+  it("renders nothing when list target text is empty or invalid (no Engine fallback)", () => {
+    for (const payloadJson of ["", "not-json", '{"v":3,"i":[0]}']) {
+      const doc = document;
+      const source = doc.createElement("div");
+      source.setAttribute("data-target", "beacons");
+      source.setAttribute("data-list", LIST);
+      const row = doc.createElement("div");
+      row.textContent = "Engine row";
+      source.appendChild(row);
+
+      const target = doc.createElement("div");
+      target.setAttribute("data-beacon-target", "list");
+      target.setAttribute("data-list", LIST);
+      target.textContent = payloadJson;
+      doc.body.append(source, target);
+
+      runCmsSlotBeaconRuntime(doc);
+      expect(target.children.length).toBe(0);
+      doc.body.innerHTML = "";
+    }
+  });
+
   it("deep-clones nested component markup and applies per-row props inside nested nodes", () => {
     const payload = JSON.stringify({
       v: 2,

@@ -50,7 +50,7 @@ export type CmsSlotComposerCmsSource =
   | "cms_from_field";
 
 /**
- * Order + per-row prop string values (Studio). Used for dirty detection vs. initial CMS/static load.
+ * Order + per-row prop string values (Composer). Used for dirty detection vs. initial CMS/static load.
  */
 export function cmsSlotCompositionSignature(draft: ReadonlyArray<CmsSlotCompositionDraftRow>): string {
   return draft

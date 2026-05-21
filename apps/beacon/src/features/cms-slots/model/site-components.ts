@@ -122,7 +122,7 @@ export type CmsSlotCompositionDraftRow = {
   componentId: string;
   name: string;
   /**
-   * Studio-only values for engine-exposed component props, keyed by `propId`.
+   * Composer-only values for engine-exposed component props, keyed by `propId`.
    * Saved in the list target CMS JSON as {@link import("@/features/cms-slots/model/cms-slot-list-runtime-payload").CmsSlotListRuntimePayload.p}.
    */
   propValues?: Record<string, string>;

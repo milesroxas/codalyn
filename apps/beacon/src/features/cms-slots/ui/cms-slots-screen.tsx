@@ -54,7 +54,7 @@ import {
   writeCmsSlotEngineConfiguredComponentIds,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { resolveAllowedCmsSlotsSegment } from "@/features/cms-slots/model/cms-slots-access";
-import { loadComposerStudioSynchronizedState } from "@/features/cms-slots/model/composer-studio-sync";
+import { loadComposerSynchronizedState } from "@/features/cms-slots/model/composer-sync";
 import {
   CMS_SLOT_UTILITIES_COMPONENT_GROUP,
   createCmsSlotListTargetComponent,
@@ -221,7 +221,7 @@ type BeaconsPageChangeReset = {
   setCreateFormOpen: (v: boolean) => void;
   setActiveDataList: (v: string | null) => void;
   setSelected: (v: HydratedCmsSlotRow[]) => void;
-  setComposerStudio: (v: { beacon: CmsSlotListOnPage; initialSignature: string } | null) => void;
+  setActiveComposer: (v: { beacon: CmsSlotListOnPage; initialSignature: string } | null) => void;
   setComposerDraft: (v: CmsSlotCompositionDraftRow[]) => void;
   setComposerAllowedPalette: (v: CmsSlotPaletteEntry[]) => void;
   setComposerEngineRows: (v: HydratedCmsSlotRow[]) => void;
@@ -290,7 +290,7 @@ function useBeaconsPageChangeReset(
         reset.setSelected([]);
         reset.targetRef.current = null;
         void navigate("/cms-slots/engine", { replace: true });
-        reset.setComposerStudio(null);
+        reset.setActiveComposer(null);
         reset.setComposerDraft([]);
         reset.setComposerAllowedPalette([]);
         reset.setComposerEngineRows([]);
@@ -651,7 +651,7 @@ export function CmsSlotsScreen() {
   const [composerEligibleLoading, setComposerEligibleLoading] = useState(false);
   const [composerEligible, setComposerEligible] = useState<CmsSlotListOnPage[]>([]);
   const [composerRuntimeOk, setComposerRuntimeOk] = useState(false);
-  const [composerStudio, setComposerStudio] = useState<{ beacon: CmsSlotListOnPage; initialSignature: string } | null>(
+  const [activeComposer, setActiveComposer] = useState<{ beacon: CmsSlotListOnPage; initialSignature: string } | null>(
     null
   );
   const [composerDraft, setComposerDraft] = useState<CmsSlotCompositionDraftRow[]>([]);
@@ -665,11 +665,11 @@ export function CmsSlotsScreen() {
   const [engineListSlotFile, setEngineListSlotFile] = useState<CmsSlotEngineSlotPropsFile | null>(null);
   const [composerSavePending, setComposerSavePending] = useState(false);
   const [currentCmsItemId, setCurrentCmsItemId] = useState<string | null>(null);
-  const composerStudioRef = useRef<{
+  const activeComposerRef = useRef<{
     beacon: CmsSlotListOnPage;
     initialSignature: string;
   } | null>(null);
-  composerStudioRef.current = composerStudio;
+  activeComposerRef.current = activeComposer;
 
   /** Latest engine rows — avoids stale closures inside queued slot-prop writes. */
   const selectedRef = useRef(selected);
@@ -822,15 +822,15 @@ export function CmsSlotsScreen() {
     if (!isComposer) {
       return undefined;
     }
-    const studio = composerStudioRef.current;
-    if (studio == null) {
+    const openComposer = activeComposerRef.current;
+    if (openComposer == null) {
       return undefined;
     }
-    const beacon = studio.beacon;
+    const beacon = openComposer.beacon;
     let cancelled = false;
     void (async () => {
       try {
-        const result = await loadComposerStudioSynchronizedState({
+        const result = await loadComposerSynchronizedState({
           slotList: beacon,
           currentCmsItemId,
           shouldAbort: () => cancelled,
@@ -843,7 +843,7 @@ export function CmsSlotsScreen() {
         setComposerEngineComposable(result.composerEngineComposable);
         setComposerSlotProps(result.composerSlotProps);
         setComposerDraft(result.draft);
-        setComposerStudio((prev) =>
+        setActiveComposer((prev) =>
           prev == null || prev.beacon.key !== beacon.key ? prev : { ...prev, initialSignature: result.initialSignature }
         );
       } catch (e) {
@@ -865,7 +865,7 @@ export function CmsSlotsScreen() {
     setCreateFormOpen,
     setActiveDataList,
     setSelected,
-    setComposerStudio,
+    setActiveComposer,
     setComposerDraft,
     setComposerAllowedPalette,
     setComposerEngineRows,
@@ -1157,9 +1157,9 @@ export function CmsSlotsScreen() {
   }, [isEngine, picking, activeDataList, currentCmsItemId, selected, listTargetPhase, engineSlotLabelRefreshToken]);
 
   const composerDirty = useMemo(() => {
-    if (composerStudio == null) return false;
-    return cmsSlotCompositionSignature(composerDraft) !== composerStudio.initialSignature;
-  }, [composerDraft, composerStudio]);
+    if (activeComposer == null) return false;
+    return cmsSlotCompositionSignature(composerDraft) !== activeComposer.initialSignature;
+  }, [composerDraft, activeComposer]);
 
   const composerRowMeta = useMemo((): CmsSlotComposerRowMeta[] => {
     if (composerSlotProps == null || composerEngineRows.length === 0) {
@@ -1181,7 +1181,7 @@ export function CmsSlotsScreen() {
     });
   }, [composerDraft, composerEngineRows, composerEngineComposable, composerSlotProps]);
 
-  const handleOpenComposerStudio = async (beacon: CmsSlotListOnPage) => {
+  const handleOpenComposer = async (beacon: CmsSlotListOnPage) => {
     setComposerOpeningKey(beacon.key);
     try {
       const rows = await listInstancesInSlotListContainer(beacon.container);
@@ -1205,7 +1205,7 @@ export function CmsSlotsScreen() {
         : rawDraft;
       const initialSignature = cmsSlotCompositionSignature(draft);
       setComposerDraft(draft);
-      setComposerStudio({ beacon, initialSignature });
+      setActiveComposer({ beacon, initialSignature });
     } catch (err) {
       const message = formatWebflowDesignerError(err);
       void webflow.notify({ type: "Error", message });
@@ -1214,8 +1214,8 @@ export function CmsSlotsScreen() {
     }
   };
 
-  const handleComposerStudioBack = useCallback(() => {
-    setComposerStudio(null);
+  const handleComposerBack = useCallback(() => {
+    setActiveComposer(null);
     setComposerDraft([]);
     setComposerEngineRows([]);
     setComposerEngineComposable({});
@@ -1342,8 +1342,8 @@ export function CmsSlotsScreen() {
   const handleComposerSave = useCallback(
     async (draftOverride?: CmsSlotCompositionDraftRow[]) => {
       const draftToSave = draftOverride ?? composerDraft;
-      if (composerSavePending || composerStudio == null) return;
-      if (cmsSlotCompositionSignature(draftToSave) === composerStudio.initialSignature) {
+      if (composerSavePending || activeComposer == null) return;
+      if (cmsSlotCompositionSignature(draftToSave) === activeComposer.initialSignature) {
         return;
       }
       if (draftToSave.length === 0) {
@@ -1353,7 +1353,7 @@ export function CmsSlotsScreen() {
       setComposerSavePending(true);
       try {
         await executeCmsSlotComposerSave({
-          beacon: composerStudio.beacon,
+          beacon: activeComposer.beacon,
           composerDraft: draftToSave,
           composerAllowedPalette,
           composerEngineComposable,
@@ -1361,7 +1361,7 @@ export function CmsSlotsScreen() {
           listTargetDefinitionIdRef,
           setters: {
             setComposerDraft,
-            setComposerStudio,
+            setActiveComposer,
             setComposerEngineRows,
             setComposerEngineComposable,
             setComposerSlotProps,
@@ -1385,7 +1385,7 @@ export function CmsSlotsScreen() {
       composerDraft,
       composerEngineComposable,
       composerSavePending,
-      composerStudio,
+      activeComposer,
       currentCmsItemId,
       loadComposerEligible,
       fetchPageBeaconsAndRuntime,
@@ -1785,15 +1785,15 @@ export function CmsSlotsScreen() {
       composerRuntimeOk={composerRuntimeOk}
       composerEligible={composerEligible}
       composerOpeningKey={composerOpeningKey}
-      onOpenComposerStudio={handleOpenComposerStudio}
-      composerStudio={composerStudio}
+      onOpenComposer={handleOpenComposer}
+      activeComposer={activeComposer}
       composerDraft={composerDraft}
       composerDirty={composerDirty}
       composerAllowedPalette={composerAllowedPalette}
       onComposerAddFromPalette={handleComposerAddFromPalette}
       onComposerReorderDraft={handleComposerReorderDraft}
       onComposerRemoveDraft={handleComposerRemoveDraft}
-      onComposerStudioBack={handleComposerStudioBack}
+      onComposerBack={handleComposerBack}
       onComposerSave={handleComposerSave}
       composerSavePending={composerSavePending}
       onSyncInstallEmbed={handleSyncInstallEmbed}

@@ -1,4 +1,4 @@
-/** Normalize string values for boolean studio fields. */
+/** Normalize string values for boolean Composer fields. */
 export function parseBoolString(s: string): boolean {
   const t = s.trim().toLowerCase();
   return t === "1" || t === "true" || t === "yes" || t === "on";

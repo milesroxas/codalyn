@@ -68,7 +68,7 @@ target.textContent="";
 var payload=null,ok=false,indices=null,v=0;
 try{payload=JSON.parse(raw);var vv=+payload.v;ok=!!(payload&&(vv===1||vv===2)&&Array.isArray(payload.i));if(ok){indices=payload.i;v=vv}}catch(e){ok=false}
 var children=sourceNode.children,cloned=0;
-if(ok){for(var u=0;u<indices.length;u++){var idx=+indices[u];if(idx===idx&&idx>=0&&idx%1===0&&idx<children.length){target.appendChild(children[idx].cloneNode(true));cloned++}}}else{for(var u=0;u<children.length;u++)target.appendChild(children[u].cloneNode(true))}
+if(ok){for(var u=0;u<indices.length;u++){var idx=+indices[u];if(idx===idx&&idx>=0&&idx%1===0&&idx<children.length){target.appendChild(children[idx].cloneNode(true));cloned++}}}
 if(v>=2&&ok&&payload&&Array.isArray(payload.p))reapply(target,payload,function(){bListTargetReveal(target)});
 else{bListTargetReveal(target)}}
 }

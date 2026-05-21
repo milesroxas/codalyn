@@ -1,4 +1,4 @@
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { CMS_SLOT_ROW_NAME_MAX } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { CmsSlotPublishedSlotTile } from "@/features/cms-slots/ui/cms-slot-list-tile";
@@ -6,7 +6,6 @@ import {
   CMS_SLOTS_ADD_SLOT_LABEL,
   CMS_SLOTS_PAGE_LIST_ARIA_LABEL,
   CMS_SLOTS_PUBLISHED_SECTION_LABEL,
-  CMS_SLOTS_SCAN_ARIA_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
 import {
@@ -59,15 +58,6 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
 
   return (
     <div className="space-y-3" data-slot="cms_slots_on_page">
-      {pageScanLoading ? (
-        <div className="flex justify-center py-1">
-          <Loader2
-            className="size-4 shrink-0 animate-spin text-muted-foreground"
-            aria-label={CMS_SLOTS_SCAN_ARIA_LABEL}
-          />
-        </div>
-      ) : null}
-
       <Drawer open={createFormOpen} onOpenChange={setCreateFormOpen} dismissible>
         <DrawerTrigger asChild>
           <Button

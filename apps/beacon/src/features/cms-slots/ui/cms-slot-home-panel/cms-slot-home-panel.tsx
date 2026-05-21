@@ -1,7 +1,6 @@
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { shouldShowCmsSlotsPreInstall } from "@/features/cms-slots/model/cms-slots-access";
 import { CmsSlotPreInstallBlock } from "@/features/cms-slots/ui/cms-slot-pre-install-block";
-import { CmsSlotsPageScanLoadingPanel } from "@/features/cms-slots/ui/cms-slots-page-scan-loading-panel";
 import { OnThisPageSection } from "./on-this-page-section";
 
 type CmsSlotHomePanelProps = {
@@ -46,7 +45,7 @@ export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
   } = props;
 
   if (!routeStateKnown) {
-    return <CmsSlotsPageScanLoadingPanel />;
+    return null;
   }
 
   if (shouldShowCmsSlotsPreInstall({ routeStateKnown, beaconsWrapperInstalled })) {

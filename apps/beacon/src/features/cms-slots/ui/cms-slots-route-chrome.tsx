@@ -1,4 +1,5 @@
 import { List, PanelsTopLeft } from "lucide-react";
+import type { ReactNode } from "react";
 import { type NavigateFunction, NavLink } from "react-router-dom";
 import {
   BeaconFeatureRouteChrome,
@@ -7,11 +8,18 @@ import {
   BeaconFeatureRouteHeader,
   BeaconFeatureRouteScrollBody,
 } from "@/app/ui/beacon-feature-route-chrome";
+import { BeaconRouteContentTransition } from "@/app/ui/beacon-route-content-transition";
+import { BeaconRouteLoadingOverlay } from "@/app/ui/beacon-route-loading-overlay";
+import { BeaconRouteLoadingShell } from "@/app/ui/beacon-route-loading-shell";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
 import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import type { CmsSlotListOnPage, HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
+import {
+  cmsSlotsComposerRouteContentKey,
+  cmsSlotsEngineRouteContentKey,
+} from "@/features/cms-slots/model/cms-slots-panel-content-key";
 import type { CmsSlotCompositionDraftRow, CmsSlotPaletteEntry } from "@/features/cms-slots/model/site-components";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotComposerListPanel } from "@/features/cms-slots/ui/cms-slot-composer-list-panel";
@@ -25,6 +33,8 @@ import {
   CMS_SLOTS_AREA_NAV_LABEL,
   CMS_SLOTS_DELETE_DIALOG_TITLE,
   CMS_SLOTS_FEATURE_NAME,
+  CMS_SLOTS_OPENING_ARIA_LABEL,
+  CMS_SLOTS_SCAN_ARIA_LABEL,
   CMS_SLOTS_UNINSTALL_PAGE_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { cn } from "@/shared/lib/utils";
@@ -58,6 +68,7 @@ export type CmsSlotsRouteChromeProps = {
   installPending: boolean;
   pageBeacons: CmsSlotListOnPage[];
   pageScanLoading: boolean;
+  pageBootBlocking: boolean;
   routeStateKnown: boolean;
   beaconName: string;
   setBeaconName: (v: string) => void;
@@ -139,31 +150,17 @@ export type CmsSlotsRouteChromeProps = {
 };
 
 function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps) {
-  return (
-    <div className="space-y-4" data-route="cms-slots-engine">
-      {!p.picking ? (
-        <CmsSlotHomePanel
-          nameFieldId={p.nameFieldId}
-          beaconsWrapperInstalled={p.beaconsWrapperInstalled}
-          installPending={p.installPending}
-          onInstallWrapper={p.onInstallWrapper}
-          pageBeacons={p.pageBeacons}
-          pageScanLoading={p.pageScanLoading}
-          routeStateKnown={p.routeStateKnown}
-          beaconName={p.beaconName}
-          setBeaconName={p.setBeaconName}
-          createPending={p.createPending}
-          createFormOpen={p.createFormOpen}
-          setCreateFormOpen={p.setCreateFormOpen}
-          onCreate={p.onCreate}
-          onOpenBeacon={p.onOpenBeacon}
-          openingBeaconKey={p.openingBeaconKey}
-          onRequestDelete={(b) => p.setBeaconToDelete(b)}
-          deletePendingKey={p.deletePendingKey}
-        />
-      ) : null}
+  const contentKey = cmsSlotsEngineRouteContentKey({
+    picking: p.picking,
+    openingBeaconKey: p.openingBeaconKey,
+  });
 
-      {p.picking ? (
+  let panel: ReactNode;
+  if (contentKey === "opening") {
+    panel = <BeaconRouteLoadingShell ariaLabel={CMS_SLOTS_OPENING_ARIA_LABEL} dataSlot="cms_slots_engine_opening" />;
+  } else if (contentKey === "composition") {
+    panel = (
+      <div className="space-y-4" data-route="cms-slots-engine-composition">
         <CmsSlotCompositionPanel
           searchFieldId={p.searchFieldId}
           activeDataList={p.activeDataList}
@@ -197,34 +194,57 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps) {
           autoOpenExposeDrawerRowKey={p.autoOpenExposeDrawerRowKey}
           onAutoOpenExposeDrawerConsumed={p.onAutoOpenExposeDrawerConsumed}
         />
-      ) : null}
+      </div>
+    );
+  } else {
+    panel = (
+      <div className="space-y-4" data-route="cms-slots-engine-home">
+        <CmsSlotHomePanel
+          nameFieldId={p.nameFieldId}
+          beaconsWrapperInstalled={p.beaconsWrapperInstalled}
+          installPending={p.installPending}
+          onInstallWrapper={p.onInstallWrapper}
+          pageBeacons={p.pageBeacons}
+          pageScanLoading={p.pageScanLoading}
+          routeStateKnown={p.routeStateKnown}
+          beaconName={p.beaconName}
+          setBeaconName={p.setBeaconName}
+          createPending={p.createPending}
+          createFormOpen={p.createFormOpen}
+          setCreateFormOpen={p.setCreateFormOpen}
+          onCreate={p.onCreate}
+          onOpenBeacon={p.onOpenBeacon}
+          openingBeaconKey={p.openingBeaconKey}
+          onRequestDelete={(b) => p.setBeaconToDelete(b)}
+          deletePendingKey={p.deletePendingKey}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div data-route="cms-slots-engine">
+      <BeaconRouteContentTransition contentKey={contentKey}>{panel}</BeaconRouteContentTransition>
     </div>
   );
 }
 
 function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
   const { composerOnly } = useCmsSlotsAccess();
+  const contentKey = cmsSlotsComposerRouteContentKey({
+    activeComposer: p.activeComposer,
+    composerOpeningKey: p.composerOpeningKey,
+  });
 
-  return (
-    <div className="space-y-4" data-route="cms-slots-composer">
-      {p.activeComposer == null ? (
-        <CmsSlotComposerListPanel
-          pageScanLoading={p.pageScanLoading}
-          pageRuntimeStatusLoading={p.pageRuntimeStatusLoading}
-          routeStateKnown={p.routeStateKnown}
-          composerEligibleResolved={p.composerEligibleResolved}
-          beaconsWrapperInstalled={p.beaconsWrapperInstalled}
-          installPending={p.installPending}
-          onInstallWrapper={p.onInstallWrapper}
-          loading={p.composerEligibleLoading}
-          runtimeOk={p.composerRuntimeOk && p.syncShellOk}
-          eligible={p.composerEligible}
-          openingKey={p.composerOpeningKey}
-          onOpenList={(b) => void p.onOpenComposer(b)}
-        />
-      ) : (
+  let panel: ReactNode;
+  if (contentKey === "opening") {
+    panel = <BeaconRouteLoadingShell ariaLabel={CMS_SLOTS_OPENING_ARIA_LABEL} dataSlot="cms_slots_composer_opening" />;
+  } else if (contentKey === "composer" && p.activeComposer != null) {
+    const activeComposer = p.activeComposer;
+    panel = (
+      <div className="space-y-4" data-route="cms-slots-composer-editor">
         <CmsSlotComposerPanel
-          activeDataList={p.activeComposer.beacon.dataList}
+          activeDataList={activeComposer.beacon.dataList}
           draft={p.composerDraft}
           dirty={p.composerDirty}
           allowedPalette={p.composerAllowedPalette}
@@ -241,15 +261,48 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
           omitPalette
           composerOnly={composerOnly}
         />
-      )}
+      </div>
+    );
+  } else {
+    panel = (
+      <div className="space-y-4" data-route="cms-slots-composer-list">
+        <CmsSlotComposerListPanel
+          pageScanLoading={p.pageScanLoading}
+          pageRuntimeStatusLoading={p.pageRuntimeStatusLoading}
+          routeStateKnown={p.routeStateKnown}
+          composerEligibleResolved={p.composerEligibleResolved}
+          beaconsWrapperInstalled={p.beaconsWrapperInstalled}
+          installPending={p.installPending}
+          onInstallWrapper={p.onInstallWrapper}
+          loading={p.composerEligibleLoading}
+          runtimeOk={p.composerRuntimeOk && p.syncShellOk}
+          eligible={p.composerEligible}
+          openingKey={p.composerOpeningKey}
+          onOpenList={(b) => void p.onOpenComposer(b)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div data-route="cms-slots-composer">
+      <BeaconRouteContentTransition contentKey={contentKey}>{panel}</BeaconRouteContentTransition>
     </div>
   );
 }
 
 function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
+  const pageBootBlocking = p.pageBootBlocking;
+
   return (
     <BeaconFeatureRouteScrollBody>
-      {p.isEngine ? <CmsSlotsEngineRouteBody {...p} /> : p.isComposer ? <CmsSlotsComposerRouteBody {...p} /> : null}
+      <BeaconRouteLoadingOverlay visible={pageBootBlocking} ariaLabel={CMS_SLOTS_SCAN_ARIA_LABEL} />
+      <div
+        className={cn("flex min-h-0 min-w-0 flex-1 flex-col", pageBootBlocking && "pointer-events-none invisible")}
+        aria-hidden={pageBootBlocking}
+      >
+        {p.isEngine ? <CmsSlotsEngineRouteBody {...p} /> : p.isComposer ? <CmsSlotsComposerRouteBody {...p} /> : null}
+      </div>
     </BeaconFeatureRouteScrollBody>
   );
 }

@@ -74,7 +74,7 @@ export function BeaconFeatureRouteScrollBody(props: BeaconFeatureRouteScrollBody
   }, [scrollResetKey]);
 
   return (
-    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", className)}>
+    <div className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", className)}>
       <ScrollArea className="h-full min-h-0 min-w-0 flex-1" viewportRef={viewportRef}>
         <div className={cn(beaconRouteScrollContentClass, contentClassName)}>{children}</div>
       </ScrollArea>

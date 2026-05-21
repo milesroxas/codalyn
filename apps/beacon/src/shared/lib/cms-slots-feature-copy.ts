@@ -18,6 +18,8 @@ export const CMS_SLOTS_PAGE_LIST_ARIA_LABEL = "CMS slot lists on this page";
 
 export const CMS_SLOTS_SCAN_ARIA_LABEL = "Scanning page for CMS slot lists";
 
+export const CMS_SLOTS_OPENING_ARIA_LABEL = "Opening CMS slot";
+
 import { BEACON_BACK_TO_HOME_ARIA_LABEL } from "@/shared/lib/beacon-feature-route-copy";
 
 export const CMS_SLOTS_BACK_BUTTON_ARIA_LABEL = BEACON_BACK_TO_HOME_ARIA_LABEL;

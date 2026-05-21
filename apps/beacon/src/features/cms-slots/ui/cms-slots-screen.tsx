@@ -599,6 +599,8 @@ export function CmsSlotsScreen() {
   const initialPageInstall = readCmsSlotsPageInstallInitialState();
   const [pageBeacons, setPageBeacons] = useState<CmsSlotListOnPage[]>(initialPageInstall.pageBeacons);
   const [pageScanLoading, setPageScanLoading] = useState(true);
+  /** Full-route boot overlay only until the first page scan settles (not background refreshes). */
+  const [pageBootBlocking, setPageBootBlocking] = useState(!initialPageInstall.routeStateKnown);
   const [routeStateKnown, setRouteStateKnown] = useState(initialPageInstall.routeStateKnown);
   const [beaconsWrapperInstalled, setBeaconsWrapperInstalled] = useState(initialPageInstall.beaconsWrapperInstalled);
   const [installPending, setInstallPending] = useState(false);
@@ -748,6 +750,7 @@ export function CmsSlotsScreen() {
     } finally {
       setPageScanLoading(false);
       setRouteStateKnown(true);
+      setPageBootBlocking(false);
     }
 
     try {
@@ -1772,6 +1775,7 @@ export function CmsSlotsScreen() {
       installPending={installPending}
       pageBeacons={pageBeacons}
       pageScanLoading={pageScanLoading}
+      pageBootBlocking={pageBootBlocking}
       routeStateKnown={routeStateKnown}
       beaconName={beaconName}
       setBeaconName={setBeaconName}

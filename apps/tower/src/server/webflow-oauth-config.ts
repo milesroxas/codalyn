@@ -1,21 +1,11 @@
-function trimTrailingSlash(input: string): string {
-  return input.replace(/\/$/, "");
-}
-
-function resolveConfiguredAppUrl(): string {
-  const configured = (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.BETTER_AUTH_URL?.trim() || "").trim();
-  if (configured) {
-    return trimTrailingSlash(configured);
-  }
-  return "http://localhost:3100";
-}
+import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 
 /**
  * Canonical app origin used for OAuth redirects/pages.
- * Local/dev defaults to localhost:3100 when app URL env vars are unset.
+ * Matches Better Auth `baseURL` (custom domain in production, localhost in dev).
  */
 export function resolveWebflowOAuthAppUrl(): string {
-  return resolveConfiguredAppUrl();
+  return resolveTowerPublicBaseUrl();
 }
 
 /**
@@ -27,7 +17,7 @@ export function resolveWebflowOAuthRedirectUri(): string {
   if (explicit) {
     return explicit;
   }
-  return `${resolveConfiguredAppUrl()}/api/integrations/webflow/callback`;
+  return `${resolveTowerPublicBaseUrl()}/api/integrations/webflow/callback`;
 }
 
 /** First-party dashboard OAuth: state + active workspace id (httpOnly). */

@@ -11,7 +11,7 @@ const beaconRoot = __dirname;
 const towerRoot = path.join(beaconRoot, "../tower");
 
 /** Default Tower for `vite build --mode production` when `VITE_TOWER_ORIGIN` is unset. Override via env or `.env.production`. */
-const DEFAULT_PRODUCTION_TOWER_ORIGIN = "https://codalyn-tower.vercel.app";
+const DEFAULT_PRODUCTION_TOWER_ORIGIN = "https://codalyn.app";
 
 function isLocalTowerUrl(origin: string): boolean {
   try {
@@ -25,7 +25,7 @@ function isLocalTowerUrl(origin: string): boolean {
 /**
  * Tower base URL baked into the bundle.
  * - Dev / `vite build --mode development`: default `http://TOWER_DEV_HOST:TOWER_PORT` when unset.
- * - Production (`vite build --mode production`): defaults to codalyn-tower.vercel.app when unset.
+ * - Production (`vite build --mode production`): defaults to codalyn.app when unset.
  *   Override with `VITE_TOWER_ORIGIN`. `http://localhost` from env is rejected (mixed content); use
  *   `BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION=1` for rare local Tower tests.
  */

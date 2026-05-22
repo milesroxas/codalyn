@@ -1,0 +1,380 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  type BeaconPresetRow,
+  type BeaconPresetSettingsSnapshot,
+  createBeaconPresetResolver,
+  type PresetTargetKey,
+  serializePresetTargetKey,
+} from "./beacon-image-preset-domain.js";
+
+function makeRow(partial: Partial<BeaconPresetRow> & Pick<BeaconPresetRow, "id" | "targetKey">): BeaconPresetRow {
+  return {
+    id: partial.id,
+    targetKey: partial.targetKey,
+    name: partial.name ?? partial.id,
+    width: partial.width ?? 1200,
+    height: partial.height ?? 800,
+    exportFormat: partial.exportFormat,
+    maxFileSizeBytes: partial.maxFileSizeBytes ?? 200_000,
+  };
+}
+
+function makeSettings(
+  rows: BeaconPresetRow[],
+  siteDefault: BeaconPresetRow | null = null
+): BeaconPresetSettingsSnapshot {
+  const byTargetKey = new Map(rows.map((row) => [serializePresetTargetKey(row.targetKey), row]));
+  return {
+    siteDefault,
+    byTargetKey,
+    defaults: {
+      exportFormat: "webp",
+      exportQuality: 0.72,
+    },
+  };
+}
+
+describe("createBeaconPresetResolver", () => {
+  const resolver = createBeaconPresetResolver();
+
+  it("tagged width and height wins", () => {
+    const instance = makeRow({
+      id: "inst",
+      targetKey: {
+        kind: "bare-image-instance",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+      },
+      width: 800,
+      height: 600,
+    });
+    const output = resolver.resolve({
+      settings: makeSettings([instance]),
+      target: {
+        kind: "bare-image",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+        tagged: { width: 2000, height: 1200 },
+      },
+    });
+    expect(output.source).toBe("tagged");
+    expect(output.constraints?.width).toBe(2000);
+    expect(output.constraints?.height).toBe(1200);
+  });
+
+  it("tagged dimensions use preset format and max-size from lower priority path", () => {
+    const instance = makeRow({
+      id: "inst",
+      targetKey: {
+        kind: "bare-image-instance",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+      },
+      exportFormat: "avif",
+      maxFileSizeBytes: 321_000,
+    });
+    const output = resolver.resolve({
+      settings: makeSettings([instance]),
+      target: {
+        kind: "bare-image",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+        tagged: { width: 6000, height: 3000 },
+      },
+    });
+    expect(output.source).toBe("tagged");
+    expect(output.presetId).toBe("inst");
+    expect(output.constraints).toEqual({
+      width: 2560,
+      height: 1280,
+      exportFormat: "avif",
+      maxFileSizeBytes: 321_000,
+      quality: 0.72,
+    });
+  });
+
+  it("uses bare-image instance preset", () => {
+    const output = resolver.resolve({
+      settings: makeSettings([
+        makeRow({
+          id: "inst",
+          targetKey: {
+            kind: "bare-image-instance",
+            siteId: "site_1",
+            pageId: "page_1",
+            elementId: "img_1",
+          },
+          width: 111,
+          height: 222,
+        }),
+      ]),
+      target: {
+        kind: "bare-image",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+        tagged: null,
+      },
+    });
+    expect(output.source).toBe("instance");
+    expect(output.constraints?.width).toBe(111);
+    expect(output.constraints?.height).toBe(222);
+  });
+
+  it("uses component-image instance preset", () => {
+    const output = resolver.resolve({
+      settings: makeSettings([
+        makeRow({
+          id: "inst",
+          targetKey: {
+            kind: "component-image-instance",
+            siteId: "site_1",
+            pageId: "page_1",
+            instanceElementId: "comp_inst_1",
+            imagePropId: "prop_1",
+          },
+          width: 333,
+          height: 444,
+        }),
+      ]),
+      target: {
+        kind: "component-image",
+        siteId: "site_1",
+        pageId: "page_1",
+        instanceElementId: "comp_inst_1",
+        componentDefinitionId: "comp_def_1",
+        imagePropId: "prop_1",
+        tagged: null,
+      },
+    });
+    expect(output.source).toBe("instance");
+    expect(output.constraints?.width).toBe(333);
+    expect(output.constraints?.height).toBe(444);
+  });
+
+  it("falls back to component preset", () => {
+    const output = resolver.resolve({
+      settings: makeSettings([
+        makeRow({
+          id: "component",
+          targetKey: {
+            kind: "component-image",
+            siteId: "site_1",
+            componentDefinitionId: "comp_def_1",
+            imagePropId: "prop_1",
+          },
+          width: 777,
+          height: 555,
+        }),
+      ]),
+      target: {
+        kind: "component-image",
+        siteId: "site_1",
+        pageId: "page_1",
+        instanceElementId: "comp_inst_1",
+        componentDefinitionId: "comp_def_1",
+        imagePropId: "prop_1",
+        tagged: null,
+      },
+    });
+    expect(output.source).toBe("component");
+    expect(output.presetId).toBe("component");
+    expect(output.constraints?.width).toBe(777);
+    expect(output.constraints?.height).toBe(555);
+  });
+
+  it("falls back to element preset for bare images", () => {
+    const output = resolver.resolve({
+      settings: makeSettings([
+        makeRow({
+          id: "element",
+          targetKey: {
+            kind: "bare-image-element",
+            siteId: "site_1",
+          },
+          width: 901,
+          height: 902,
+        }),
+      ]),
+      target: {
+        kind: "bare-image",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+        tagged: null,
+      },
+    });
+    expect(output.source).toBe("element");
+    expect(output.presetId).toBe("element");
+    expect(output.constraints?.width).toBe(901);
+    expect(output.constraints?.height).toBe(902);
+  });
+
+  it("falls back to site default preset", () => {
+    const siteDefault = makeRow({
+      id: "site",
+      targetKey: {
+        kind: "bare-image-element",
+        siteId: "site_1",
+      },
+      width: 1400,
+      height: 900,
+      exportFormat: "avif",
+    });
+    const output = resolver.resolve({
+      settings: makeSettings([], siteDefault),
+      target: {
+        kind: "bare-image",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+        tagged: null,
+      },
+    });
+    expect(output.source).toBe("site-default");
+    expect(output.presetId).toBe("site");
+    expect(output.constraints?.exportFormat).toBe("avif");
+  });
+
+  it("falls back to manual when no constraints resolve", () => {
+    const output = resolver.resolve({
+      settings: makeSettings([]),
+      target: {
+        kind: "bare-image",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+        tagged: null,
+      },
+    });
+    expect(output).toEqual({
+      constraints: null,
+      source: "manual",
+      presetId: null,
+      blockers: [],
+    });
+  });
+
+  it("returns ambiguous CMS blocker", () => {
+    const output = resolver.resolve({
+      settings: makeSettings([]),
+      target: {
+        kind: "cms-ambiguous",
+        siteId: "site_1",
+      },
+    });
+    expect(output).toEqual({
+      constraints: null,
+      source: "manual",
+      presetId: null,
+      blockers: ["ambiguous-cms-binding"],
+    });
+  });
+
+  it("duplicate target key assertion detects duplicates", () => {
+    const existing = makeRow({
+      id: "row_1",
+      targetKey: {
+        kind: "bare-image-instance",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+      },
+    });
+    const settings = makeSettings([existing]);
+    const result = resolver.assertUniqueTarget(settings, existing.targetKey);
+    expect(result).toBe("DUPLICATE_PRESET_TARGET");
+  });
+
+  it("excludeId allows update without duplicate error", () => {
+    const existing = makeRow({
+      id: "row_1",
+      targetKey: {
+        kind: "component-image",
+        siteId: "site_1",
+        componentDefinitionId: "comp_1",
+        imagePropId: "prop_1",
+      },
+    });
+    const settings = makeSettings([existing]);
+    const result = resolver.assertUniqueTarget(settings, existing.targetKey, "row_1");
+    expect(result).toBe("ok");
+  });
+
+  it("returns deterministic output for the same input", () => {
+    const input = {
+      settings: makeSettings([
+        makeRow({
+          id: "component",
+          targetKey: {
+            kind: "component-image",
+            siteId: "site_1",
+            componentDefinitionId: "comp_def_1",
+            imagePropId: "prop_1",
+          },
+          width: 777,
+          height: 555,
+        }),
+      ]),
+      target: {
+        kind: "component-image" as const,
+        siteId: "site_1",
+        pageId: "page_1",
+        instanceElementId: "comp_inst_1",
+        componentDefinitionId: "comp_def_1",
+        imagePropId: "prop_1",
+        tagged: null,
+      },
+    };
+    expect(resolver.resolve(input)).toEqual(resolver.resolve(input));
+  });
+});
+
+describe("preset target key serialization", () => {
+  it("is deterministic for equivalent target keys", () => {
+    const keyA: PresetTargetKey = {
+      kind: "component-image-instance",
+      siteId: "site_1",
+      pageId: "page_1",
+      instanceElementId: "inst_1",
+      imagePropId: "prop_1",
+    };
+    const keyB = {
+      imagePropId: "prop_1",
+      instanceElementId: "inst_1",
+      pageId: "page_1",
+      siteId: "site_1",
+      kind: "component-image-instance",
+    } as PresetTargetKey;
+    expect(serializePresetTargetKey(keyA)).toBe(serializePresetTargetKey(keyB));
+  });
+
+  it("keeps instance semantics distinct for bare and component images", () => {
+    const bareA = serializePresetTargetKey({
+      kind: "bare-image-instance",
+      siteId: "site_1",
+      pageId: "page_1",
+      elementId: "img_1",
+    });
+    const bareB = serializePresetTargetKey({
+      kind: "bare-image-instance",
+      siteId: "site_1",
+      pageId: "page_2",
+      elementId: "img_1",
+    });
+    const component = serializePresetTargetKey({
+      kind: "component-image-instance",
+      siteId: "site_1",
+      pageId: "page_1",
+      instanceElementId: "img_1",
+      imagePropId: "prop_1",
+    });
+    expect(bareA).not.toBe(bareB);
+    expect(bareA).not.toBe(component);
+  });
+});

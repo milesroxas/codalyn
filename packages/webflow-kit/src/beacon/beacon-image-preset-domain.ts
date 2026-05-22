@@ -1,0 +1,428 @@
+import { BEACON_IMAGE_ERROR_CODES } from "./beacon-image-errors.js";
+
+const TAGGED_EXPORT_MAX_EDGE = 2560;
+const TAGGED_EXPORT_DEFAULT_WIDTH = 1920;
+const TAGGED_EXPORT_DEFAULT_HEIGHT = 1080;
+
+export type BareImageInstancePresetTargetKey = {
+  kind: "bare-image-instance";
+  siteId: string;
+  pageId: string;
+  elementId: string;
+};
+
+export type BareImageElementPresetTargetKey = {
+  kind: "bare-image-element";
+  siteId: string;
+};
+
+export type ComponentImageInstancePresetTargetKey = {
+  kind: "component-image-instance";
+  siteId: string;
+  pageId: string;
+  instanceElementId: string;
+  imagePropId: string;
+};
+
+export type ComponentImagePresetTargetKey = {
+  kind: "component-image";
+  siteId: string;
+  componentDefinitionId: string;
+  imagePropId: string;
+};
+
+/**
+ * Reserved for future support of preseting an inner image element in a component definition.
+ */
+export type ComponentImageElementPresetTargetKey = {
+  kind: "component-image-element";
+  siteId: string;
+  componentDefinitionId: string;
+  elementId: string;
+};
+
+export type PresetTargetKey =
+  | BareImageInstancePresetTargetKey
+  | BareImageElementPresetTargetKey
+  | ComponentImageInstancePresetTargetKey
+  | ComponentImagePresetTargetKey
+  | ComponentImageElementPresetTargetKey;
+
+export type PresetTargetKeyString = string & { readonly __brand: "PresetTargetKeyString" };
+
+export type BeaconPresetRow = {
+  id: string;
+  targetKey: PresetTargetKey;
+  name: string;
+  width: number;
+  height: number;
+  exportFormat?: "webp" | "avif";
+  maxFileSizeBytes: number;
+};
+
+export type BeaconPresetSettingsSnapshot = {
+  siteDefault: BeaconPresetRow | null;
+  byTargetKey: ReadonlyMap<PresetTargetKeyString, BeaconPresetRow>;
+  defaults: {
+    exportFormat: "webp" | "avif";
+    exportQuality: number;
+  };
+};
+
+export type ResolvedUploadTarget =
+  | {
+      kind: "bare-image";
+      siteId: string;
+      pageId: string;
+      elementId: string;
+      tagged: { width: number; height: number } | null;
+    }
+  | {
+      kind: "component-image";
+      siteId: string;
+      pageId: string;
+      instanceElementId: string;
+      componentDefinitionId: string;
+      imagePropId: string;
+      tagged: { width: number; height: number } | null;
+    }
+  | {
+      kind: "cms-ambiguous";
+      siteId: string;
+    };
+
+export type ResolverInput = {
+  settings: BeaconPresetSettingsSnapshot;
+  target: ResolvedUploadTarget;
+};
+
+export type PresetConstraintSource = "tagged" | "instance" | "component" | "element" | "site-default" | "manual";
+
+export type ExportConstraints = {
+  width: number;
+  height: number;
+  exportFormat: "webp" | "avif";
+  maxFileSizeBytes: number | null;
+  quality: number;
+};
+
+export type ResolverOutput = {
+  constraints: ExportConstraints | null;
+  source: PresetConstraintSource;
+  presetId: string | null;
+  blockers: ReadonlyArray<"ambiguous-cms-binding">;
+};
+
+export type DuplicateCheckResult = "ok" | "DUPLICATE_PRESET_TARGET";
+
+export type BeaconPresetResolver = {
+  resolve(input: ResolverInput): ResolverOutput;
+  assertUniqueTarget(
+    settings: BeaconPresetSettingsSnapshot,
+    key: PresetTargetKey,
+    excludeId?: string
+  ): DuplicateCheckResult;
+};
+
+type PresetSelection = {
+  preset: BeaconPresetRow;
+  source: Exclude<PresetConstraintSource, "tagged" | "manual">;
+};
+
+function toPresetTargetKeyString(value: string): PresetTargetKeyString {
+  return value as PresetTargetKeyString;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function normalizeTargetKey(key: PresetTargetKey): Record<string, string> {
+  switch (key.kind) {
+    case "bare-image-instance":
+      return {
+        kind: key.kind,
+        siteId: key.siteId,
+        pageId: key.pageId,
+        elementId: key.elementId,
+      };
+    case "bare-image-element":
+      return {
+        kind: key.kind,
+        siteId: key.siteId,
+      };
+    case "component-image-instance":
+      return {
+        kind: key.kind,
+        siteId: key.siteId,
+        pageId: key.pageId,
+        instanceElementId: key.instanceElementId,
+        imagePropId: key.imagePropId,
+      };
+    case "component-image":
+      return {
+        kind: key.kind,
+        siteId: key.siteId,
+        componentDefinitionId: key.componentDefinitionId,
+        imagePropId: key.imagePropId,
+      };
+    case "component-image-element":
+      return {
+        kind: key.kind,
+        siteId: key.siteId,
+        componentDefinitionId: key.componentDefinitionId,
+        elementId: key.elementId,
+      };
+  }
+}
+
+function hasOnlyNonEmptyStrings(obj: Record<string, string>): boolean {
+  return Object.values(obj).every((value) => isNonEmptyString(value));
+}
+
+export function isPresetTargetKey(value: unknown): value is PresetTargetKey {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const v = value as Record<string, unknown>;
+  if (!isNonEmptyString(v.kind)) {
+    return false;
+  }
+  switch (v.kind) {
+    case "bare-image-instance":
+      return isNonEmptyString(v.siteId) && isNonEmptyString(v.pageId) && isNonEmptyString(v.elementId);
+    case "bare-image-element":
+      return isNonEmptyString(v.siteId);
+    case "component-image-instance":
+      return (
+        isNonEmptyString(v.siteId) &&
+        isNonEmptyString(v.pageId) &&
+        isNonEmptyString(v.instanceElementId) &&
+        isNonEmptyString(v.imagePropId)
+      );
+    case "component-image":
+      return isNonEmptyString(v.siteId) && isNonEmptyString(v.componentDefinitionId) && isNonEmptyString(v.imagePropId);
+    case "component-image-element":
+      return isNonEmptyString(v.siteId) && isNonEmptyString(v.componentDefinitionId) && isNonEmptyString(v.elementId);
+    default:
+      return false;
+  }
+}
+
+export function serializePresetTargetKey(key: PresetTargetKey): PresetTargetKeyString {
+  const normalized = normalizeTargetKey(key);
+  if (!hasOnlyNonEmptyStrings(normalized)) {
+    throw new Error(BEACON_IMAGE_ERROR_CODES.PRESET_TARGET_KEY_INVALID);
+  }
+  return toPresetTargetKeyString(JSON.stringify(normalized));
+}
+
+export function deserializePresetTargetKey(serialized: string): PresetTargetKey | null {
+  try {
+    const parsed = JSON.parse(serialized) as unknown;
+    if (!isPresetTargetKey(parsed)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clampTaggedDimensions(width: number, height: number): { width: number; height: number } {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
+    return {
+      width: TAGGED_EXPORT_DEFAULT_WIDTH,
+      height: TAGGED_EXPORT_DEFAULT_HEIGHT,
+    };
+  }
+  const maxEdge = Math.max(width, height);
+  if (maxEdge <= TAGGED_EXPORT_MAX_EDGE) {
+    return {
+      width: Math.round(width),
+      height: Math.round(height),
+    };
+  }
+  const scale = TAGGED_EXPORT_MAX_EDGE / maxEdge;
+  return {
+    width: Math.round(width * scale),
+    height: Math.round(height * scale),
+  };
+}
+
+function toPresetConstraints(
+  row: BeaconPresetRow,
+  defaults: BeaconPresetSettingsSnapshot["defaults"]
+): ExportConstraints {
+  return {
+    width: row.width,
+    height: row.height,
+    exportFormat: row.exportFormat ?? defaults.exportFormat,
+    maxFileSizeBytes: row.maxFileSizeBytes,
+    quality: defaults.exportQuality,
+  };
+}
+
+function getPresetByKey(
+  settings: BeaconPresetSettingsSnapshot,
+  targetKey: PresetTargetKey,
+  source: PresetSelection["source"]
+): PresetSelection | null {
+  const serialized = serializePresetTargetKey(targetKey);
+  const direct = settings.byTargetKey.get(serialized);
+  if (direct !== undefined) {
+    return { preset: direct, source };
+  }
+  for (const row of settings.byTargetKey.values()) {
+    if (serializePresetTargetKey(row.targetKey) === serialized) {
+      return { preset: row, source };
+    }
+  }
+  return null;
+}
+
+function selectPresetForUntypedTarget(input: ResolverInput): PresetSelection | null {
+  const { settings, target } = input;
+  if (target.kind === "bare-image") {
+    return (
+      getPresetByKey(
+        settings,
+        {
+          kind: "bare-image-instance",
+          siteId: target.siteId,
+          pageId: target.pageId,
+          elementId: target.elementId,
+        },
+        "instance"
+      ) ??
+      getPresetByKey(
+        settings,
+        {
+          kind: "bare-image-element",
+          siteId: target.siteId,
+        },
+        "element"
+      ) ??
+      (settings.siteDefault === null ? null : { preset: settings.siteDefault, source: "site-default" })
+    );
+  }
+  if (target.kind === "component-image") {
+    return (
+      getPresetByKey(
+        settings,
+        {
+          kind: "component-image-instance",
+          siteId: target.siteId,
+          pageId: target.pageId,
+          instanceElementId: target.instanceElementId,
+          imagePropId: target.imagePropId,
+        },
+        "instance"
+      ) ??
+      getPresetByKey(
+        settings,
+        {
+          kind: "component-image",
+          siteId: target.siteId,
+          componentDefinitionId: target.componentDefinitionId,
+          imagePropId: target.imagePropId,
+        },
+        "component"
+      ) ??
+      (settings.siteDefault === null ? null : { preset: settings.siteDefault, source: "site-default" })
+    );
+  }
+  return null;
+}
+
+function isTaggedDimensions(
+  value: { width: number; height: number } | null
+): value is { width: number; height: number } {
+  return (
+    value !== null &&
+    Number.isFinite(value.width) &&
+    Number.isFinite(value.height) &&
+    Number.isInteger(value.width) &&
+    Number.isInteger(value.height) &&
+    value.width > 0 &&
+    value.height > 0
+  );
+}
+
+function resolveInternal(input: ResolverInput): ResolverOutput {
+  if (input.target.kind === "cms-ambiguous") {
+    return {
+      constraints: null,
+      source: "manual",
+      presetId: null,
+      blockers: ["ambiguous-cms-binding"],
+    };
+  }
+
+  const presetSelection = selectPresetForUntypedTarget(input);
+  if (isTaggedDimensions(input.target.tagged)) {
+    const clamped = clampTaggedDimensions(input.target.tagged.width, input.target.tagged.height);
+    return {
+      constraints: {
+        width: clamped.width,
+        height: clamped.height,
+        exportFormat: presetSelection?.preset.exportFormat ?? input.settings.defaults.exportFormat,
+        maxFileSizeBytes: presetSelection?.preset.maxFileSizeBytes ?? null,
+        quality: input.settings.defaults.exportQuality,
+      },
+      source: "tagged",
+      presetId: presetSelection?.preset.id ?? null,
+      blockers: [],
+    };
+  }
+
+  if (presetSelection !== null) {
+    return {
+      constraints: toPresetConstraints(presetSelection.preset, input.settings.defaults),
+      source: presetSelection.source,
+      presetId: presetSelection.preset.id,
+      blockers: [],
+    };
+  }
+
+  return {
+    constraints: null,
+    source: "manual",
+    presetId: null,
+    blockers: [],
+  };
+}
+
+function assertUniqueTargetInternal(
+  settings: BeaconPresetSettingsSnapshot,
+  key: PresetTargetKey,
+  excludeId?: string
+): DuplicateCheckResult {
+  const keyString = serializePresetTargetKey(key);
+  for (const row of settings.byTargetKey.values()) {
+    const rowKey = serializePresetTargetKey(row.targetKey);
+    if (rowKey !== keyString) {
+      continue;
+    }
+    if (excludeId !== undefined && row.id === excludeId) {
+      continue;
+    }
+    return BEACON_IMAGE_ERROR_CODES.DUPLICATE_PRESET_TARGET;
+  }
+  return "ok";
+}
+
+export function createBeaconPresetResolver(): BeaconPresetResolver {
+  return {
+    resolve(input: ResolverInput): ResolverOutput {
+      return resolveInternal(input);
+    },
+    assertUniqueTarget(
+      settings: BeaconPresetSettingsSnapshot,
+      key: PresetTargetKey,
+      excludeId?: string
+    ): DuplicateCheckResult {
+      return assertUniqueTargetInternal(settings, key, excludeId);
+    },
+  };
+}

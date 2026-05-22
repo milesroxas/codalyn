@@ -18,7 +18,10 @@ import {
   parseOutputDimensionStrict,
 } from "@/features/image-editor/lib/apply-cropped-export";
 import { aspectValue, type EditorAspectSelection } from "@/features/image-editor/lib/aspect-preset";
-import { readBeaconPresetV2ReadEnabled } from "@/features/image-editor/lib/beacon-preset-v2-flags";
+import {
+  readBeaconPresetV2ApplyEnabled,
+  readBeaconPresetV2ReadEnabled,
+} from "@/features/image-editor/lib/beacon-preset-v2-flags";
 import {
   type ElementCmsBindingResolution,
   isCmsPrimaryUploadContext,
@@ -32,6 +35,7 @@ import {
 } from "@/features/image-editor/lib/image-editor-placement-readiness";
 import { resolveImageEditorPlacement } from "@/features/image-editor/lib/image-editor-resolved-placement";
 import { mapSelectedTargetToResolvedUploadTarget } from "@/features/image-editor/lib/image-editor-resolved-target";
+import { resolveSessionResolvedConstraintsApplication } from "@/features/image-editor/lib/image-editor-session-resolved-constraints";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
 import { readBeaconDesignerExportForTarget } from "@/features/image-editor/lib/read-beacon-designer-export-for-target";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
@@ -218,6 +222,7 @@ export function ImageEditor() {
   const [fileBaseName, setFileBaseName] = useState("edited");
   const [quality, setQuality] = useState(settings.defaultExportQuality);
   const [exportFormat, setExportFormat] = useState<ImageExportFormat>(settings.defaultExportFormat);
+  const [sessionMaxFileSizeBytes, setSessionMaxFileSizeBytes] = useState<number | null>(null);
   const [placement, setPlacement] = useState<PlacementMode>("library");
   const [replaceLibraryAsset, setReplaceLibraryAsset] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -236,6 +241,7 @@ export function ImageEditor() {
   const towerConfigured = isTowerConfigured();
   const allowAvifEncoding = Boolean(towerUser);
   const presetV2ReadEnabled = useMemo(() => readBeaconPresetV2ReadEnabled(), []);
+  const presetV2ApplyEnabled = useMemo(() => readBeaconPresetV2ApplyEnabled(), []);
   const isConfirmedGuest = !towerUser && !towerSessionPending;
   const { isCmsCollectionTemplatePage: cmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
   const guestCmsTemplateRestricted = isConfirmedGuest && cmsCollectionTemplatePage;
@@ -246,6 +252,8 @@ export function ImageEditor() {
   const [resolverPageId, setResolverPageId] = useState<string | null>(null);
   const [resolvedUploadTarget, setResolvedUploadTarget] = useState<ResolvedUploadTarget | null>(null);
   const lastResolvedTargetInputKeyRef = useRef<string | null>(null);
+  const lastAppliedResolvedConstraintsKeyRef = useRef<string | null>(null);
+  const skipNextPersistExportDefaultsRef = useRef(false);
 
   const {
     assetFolders,
@@ -449,6 +457,10 @@ export function ImageEditor() {
   }, [towerUser?.id, syncState, settings]);
 
   useEffect(() => {
+    if (skipNextPersistExportDefaultsRef.current) {
+      skipNextPersistExportDefaultsRef.current = false;
+      return;
+    }
     if (!exportDefaultsHydratedRef.current || !canPersistExportDefaults) {
       return;
     }
@@ -457,6 +469,40 @@ export function ImageEditor() {
       defaultExportQuality: quality,
     });
   }, [exportFormat, quality, canPersistExportDefaults, updateSettings]);
+
+  useEffect(() => {
+    const sessionConstraintApplication = resolveSessionResolvedConstraintsApplication({
+      enabled: presetV2ApplyEnabled && presetV2ReadEnabled,
+      imageSrc,
+      readout: resolvedConstraintsReadout,
+    });
+    setAutoTargetHasDesignerExportTag(sessionConstraintApplication.taggedDimensionsActive);
+    setSessionMaxFileSizeBytes(sessionConstraintApplication.maxFileSizeBytes);
+    if (!sessionConstraintApplication.shouldApply || sessionConstraintApplication.constraints == null) {
+      lastAppliedResolvedConstraintsKeyRef.current = null;
+      return;
+    }
+    const constraints = sessionConstraintApplication.constraints;
+    const applyKey = JSON.stringify({
+      target: resolvedUploadTarget,
+      source: sessionConstraintApplication.source,
+      constraints,
+      imageSrc,
+    });
+    if (lastAppliedResolvedConstraintsKeyRef.current === applyKey) {
+      return;
+    }
+    lastAppliedResolvedConstraintsKeyRef.current = applyKey;
+    skipNextPersistExportDefaultsRef.current = true;
+    setOutputWidth(constraints.width);
+    setOutputHeight(constraints.height);
+    setWidthStr(String(constraints.width));
+    setHeightStr(String(constraints.height));
+    setExportFormat(constraints.exportFormat);
+    setQuality(constraints.quality);
+    setCropFrameMode("custom");
+    setAspectPreset("free");
+  }, [presetV2ApplyEnabled, presetV2ReadEnabled, imageSrc, resolvedUploadTarget, resolvedConstraintsReadout]);
 
   useEffect(() => {
     if (!allowAvifEncoding && exportFormat === "avif") {
@@ -674,6 +720,15 @@ export function ImageEditor() {
         setSelectedComponentImagePropId(t.imagePropId);
       }
       setPlacement(t.kind === "image" ? "replace" : "selection");
+      if (presetV2ApplyEnabled) {
+        setCropFrameMode("aspect");
+        setAspectPreset("unset");
+        setOutputWidth(0);
+        setOutputHeight(0);
+        setWidthStr("");
+        setHeightStr("");
+        return;
+      }
       const tagged = await readBeaconDesignerExportForTarget(t);
       if (tagged) {
         setAutoTargetHasDesignerExportTag(true);
@@ -692,7 +747,7 @@ export function ImageEditor() {
       setWidthStr("");
       setHeightStr("");
     },
-    [setSelectedComponentImagePropId]
+    [presetV2ApplyEnabled, setSelectedComponentImagePropId]
   );
 
   const onExportMaxWidthBlur = useCallback(() => {
@@ -1048,6 +1103,7 @@ export function ImageEditor() {
           showResolvedReadout={presetV2ReadEnabled}
           resolvedUploadTarget={resolvedUploadTarget}
           resolvedConstraintsReadout={resolvedConstraintsReadout}
+          sessionMaxFileSizeBytes={sessionMaxFileSizeBytes}
         />
       </ImageEditorLoadedColumn>
     ) : null;

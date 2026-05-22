@@ -184,6 +184,7 @@ export type ImageEditorCropExportPanelProps = {
   showResolvedReadout?: boolean;
   resolvedUploadTarget?: ResolvedUploadTarget | null;
   resolvedConstraintsReadout?: ResolverOutput | null;
+  sessionMaxFileSizeBytes?: number | null;
 };
 
 /** Fade controls below the crop preview; opacity-only so layout width stays stable in the extension iframe. */
@@ -839,8 +840,9 @@ function ExportEncodeCard(p: ExportCardProps) {
 function ResolvedConstraintsReadOnlyCard(props: {
   target: ResolvedUploadTarget | null;
   readout: ResolverOutput | null;
+  sessionMaxFileSizeBytes: number | null;
 }) {
-  const { target, readout } = props;
+  const { target, readout, sessionMaxFileSizeBytes } = props;
   const constraints = readout?.constraints ?? null;
   const blockers = readout?.blockers ?? [];
   return (
@@ -867,6 +869,10 @@ function ResolvedConstraintsReadOnlyCard(props: {
           <p className="text-muted-foreground">Max file size</p>
           <p className="tabular-nums">
             {constraints?.maxFileSizeBytes == null ? "—" : `${constraints.maxFileSizeBytes.toLocaleString()} B`}
+          </p>
+          <p className="text-muted-foreground">Session max file size</p>
+          <p className="tabular-nums">
+            {sessionMaxFileSizeBytes == null ? "—" : `${sessionMaxFileSizeBytes.toLocaleString()} B`}
           </p>
           <p className="text-muted-foreground">Preset id</p>
           <p className="tabular-nums">{readout?.presetId ?? "—"}</p>
@@ -1415,6 +1421,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     showResolvedReadout = false,
     resolvedUploadTarget = null,
     resolvedConstraintsReadout = null,
+    sessionMaxFileSizeBytes = null,
   } = props;
 
   const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
@@ -1544,7 +1551,11 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
       />
 
       {showResolvedReadout ? (
-        <ResolvedConstraintsReadOnlyCard target={resolvedUploadTarget} readout={resolvedConstraintsReadout} />
+        <ResolvedConstraintsReadOnlyCard
+          target={resolvedUploadTarget}
+          readout={resolvedConstraintsReadout}
+          sessionMaxFileSizeBytes={sessionMaxFileSizeBytes}
+        />
       ) : null}
 
       {hidePlacementCard ? null : (

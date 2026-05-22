@@ -1,0 +1,27 @@
+---
+description: DRY, single source of truth, and no senior-engineer red flags (before and after each task)
+alwaysApply: true
+---
+
+# Code quality (before and after each task)
+
+## Before implementing
+
+1. Search the repo for existing helpers, types, components, and package APIs — extend them instead of copying.
+2. Confirm boundaries: **no cross-app imports**; share via `packages/*` (e.g. `@codalyn/webflow-kit`, `@codalyn/loadout`).
+3. Respect **Feature-Sliced Design** in apps: `app` → `pages` → `widgets` → `features` → `entities` → `shared` (imports only downward).
+
+## While implementing
+
+- **DRY**: one canonical implementation per behavior; extract shared logic instead of duplicating markup, validation, or API calls.
+- **Single source of truth**: constants, config, and types live in one place; consumers import — do not re-declare the same values or shapes in multiple files.
+- **No hacks**: avoid `setTimeout` retries, silent `catch {}`, feature flags to paper over bugs, copy-paste wrappers, or “temporary” code without a tracked follow-up. Prefer fixing the real constraint.
+- **Minimal scope**: change only what the task requires; match existing naming and patterns.
+
+## After implementing
+
+Re-scan your diff for duplication, parallel definitions of the same concept, and workarounds a staff engineer would reject in review. Refactor before finishing.
+
+## UI (shadcn apps)
+
+Call sites do not own visual styling. Extend primitives under `shared/ui` (variants/CVA) — see `apps/beacon/AGENTS.md` for the full shadcn rule.

@@ -1,0 +1,38 @@
+---
+description: Mandatory Biome lint and TypeScript typecheck before finishing any task
+alwaysApply: true
+---
+
+# Quality gates (every task)
+
+## Before you finish
+
+Run lint and typecheck for every package you changed. Do not mark the task complete until both pass with **zero errors and zero warnings**.
+
+From the **repo root** (preferred — matches CI):
+
+```bash
+pnpm lint
+pnpm typecheck
+```
+
+When only one app or package changed, you may scope (faster):
+
+```bash
+pnpm app <flint|beacon|tower> lint
+pnpm app <flint|beacon|tower> typecheck
+# or: pnpm exec turbo run lint typecheck --filter=@codalyn/<name>
+```
+
+Beacon also supports `pnpm lint:all` (typecheck + lint in one command).
+
+## Fixing issues
+
+- Resolve **all** Biome diagnostics (errors and warnings), not only errors.
+- Use `pnpm lint:fix` or `pnpm app <app> lint:fix` only when formatting or safe auto-fixes are intended.
+- Do not add `biome-ignore` / `eslint-disable` unless unavoidable; Beacon enforces this via `scripts/assert-no-biome-ignore.mjs`.
+- Do not use `@ts-expect-error`, `@ts-ignore`, or `as any` to silence type errors without a documented, narrow reason.
+
+## If checks fail
+
+Fix the root cause in the changed code. Do not leave the repo in a failing lint or typecheck state.

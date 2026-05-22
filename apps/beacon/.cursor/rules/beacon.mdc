@@ -11,10 +11,9 @@ Use **pnpm** only (`packageManager` in `package.json`). Install with `pnpm insta
 
 ## Commands (verify changes)
 
-After substantive edits, prefer:
+Follow repo **`.cursor/rules/quality-gates.mdc`** (mandatory). From this app:
 
-- `pnpm typecheck` — TypeScript (`tsc --noEmit`)
-- `pnpm lint` — Biome (`biome check .`)
+- `pnpm lint:all` — typecheck + lint
 - `pnpm test:run` — when tests cover the change
 
 Use `pnpm lint:fix` only when formatting/lint fixes are intended.
@@ -23,12 +22,12 @@ Use `pnpm lint:fix` only when formatting/lint fixes are intended.
 
 This app runs in the Designer **iframe** and uses the global **`webflow`** object. Do not assume Node APIs in browser extension code.
 
-For API behavior, limitations, typings (`@webflow/designer-extension-typings`), errors (`err.cause.tag`), and app modes, read **`AGENTS.md`** at the repo root instead of duplicating it here.
+For API behavior, limitations, typings (`@webflow/designer-extension-typings`), errors (`err.cause.tag`), and app modes, read **`apps/beacon/AGENTS.md`** instead of duplicating it here. Repo-wide agent rules: root **`AGENTS.md`** and **`.cursor/rules/`**.
 
 Manifest: **`webflow.json`** (`publicDir` is **`dist`**, **`apiVersion`**: `"2"`). Production bundle flow uses Vite build + `webflow extension bundle` (see `package.json` scripts).
 
 ## Agent behavior
 
+- Follow repo **`.cursor/rules/code-quality.mdc`** and **`security.mdc`** for every task.
 - Prefer **minimal, task-scoped** changes; match existing patterns in `src/`.
 - **Reference files** (`@path`) when the task touches known files; otherwise search the repo before editing.
-- Do not add `setTimeout`-based workarounds unless unavoidable (user preference).

@@ -1,0 +1,19 @@
+---
+description: Security review when a task touches auth, secrets, APIs, or user data
+alwaysApply: true
+---
+
+# Security (when the task may affect trust boundaries)
+
+Treat these as **security-relevant**: auth (Better Auth, sessions, OAuth), env/secrets, API routes and proxies, database queries, file upload, CORS, tokens, webhooks, user input rendered or stored, and anything that crosses the Webflow Designer iframe ↔ Tower server boundary.
+
+## Before finishing security-relevant work
+
+- **Secrets**: never commit `.env`, API keys, or tokens; use env vars and existing config patterns only.
+- **Input**: validate and normalize untrusted input at boundaries; do not trust client/extension payloads on the server.
+- **AuthZ**: enforce authorization on the server for every sensitive action; do not rely on UI hiding alone.
+- **Output**: avoid leaking stack traces, internal IDs, or secrets in errors shown to users.
+- **Dependencies**: prefer existing crypto/auth libraries; do not roll custom crypto or token formats.
+- **OWASP basics**: guard injection (SQL/NoSQL/command), XSS (escape or framework defaults), SSRF on outbound fetches, and open redirects on OAuth/callback URLs.
+
+If unsure, state assumptions and choose the stricter default. Do not ship “we can harden later” shortcuts on auth or data handling.

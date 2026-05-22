@@ -19,6 +19,8 @@ Package boundaries act as **DDD bounded contexts** — no cross-app imports; cro
 
 Use this file for workspace setup and repo-wide commands; each app’s README covers that app’s architecture, local scripts, and internal documentation.
 
+AI agents (Cursor, etc.): see **`AGENTS.md`** and **`.cursor/rules/`** for mandatory lint/typecheck, code-quality, and security expectations on every task.
+
 ## Requirements
 
 - Node >= 20

@@ -1,7 +1,9 @@
+import { BEACON_IMAGE_ERROR_CODES, type BeaconImageErrorCode } from "@codalyn/webflow-kit";
 import type { Dispatch, SetStateAction, TransitionEvent } from "react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { assetBaseNameFromFileName } from "@/features/image-editor/lib/sanitize-asset-base-name";
+import { createSourceImageFileValidator } from "@/features/image-editor/lib/validate-source-image-file";
 
 export type ImageDissolveState = { phase: "idle" } | { phase: "dissolving"; incomingUrl: string; incomingFile: File };
 
@@ -19,18 +21,53 @@ export function useImageDissolveTransition(options: {
   const dissolveRef = useRef(dissolve);
   dissolveRef.current = dissolve;
   const dissolveSettledRef = useRef(false);
+  const sourceImageFileValidatorRef = useRef(createSourceImageFileValidator());
 
-  const queueFile = useCallback((file: File | undefined) => {
-    if (!file?.type.startsWith("image/")) {
-      return;
+  const sourceImageErrorMessage = useCallback((errorCode: BeaconImageErrorCode): string => {
+    switch (errorCode) {
+      case BEACON_IMAGE_ERROR_CODES.SOURCE_IMAGE_SVG_BLOCKED:
+        return "SVG uploads are not supported. Use JPEG, PNG, WebP, GIF, or AVIF.";
+      case BEACON_IMAGE_ERROR_CODES.SOURCE_IMAGE_TOO_LARGE:
+        return "Source image is too large. Maximum source size is 20 MiB.";
+      case BEACON_IMAGE_ERROR_CODES.SOURCE_IMAGE_TOO_MANY_PIXELS:
+        return "Source image has too many pixels. Maximum decoded area is 40 megapixels.";
+      case BEACON_IMAGE_ERROR_CODES.SOURCE_IMAGE_DECODE_FAILED:
+        return "Could not decode this image. Choose a different file.";
+      default:
+        return "File type is not allowed. Use JPEG, PNG, WebP, GIF, or AVIF.";
     }
-    if (dissolveRef.current.phase === "dissolving") {
-      return;
-    }
-    const incomingUrl = URL.createObjectURL(file);
-    setDissolve({ phase: "dissolving", incomingUrl, incomingFile: file });
-    dissolveSettledRef.current = false;
   }, []);
+
+  const notifySourceImageValidationFailure = useCallback(
+    async (errorCode: BeaconImageErrorCode) => {
+      await webflow.notify({ type: "Error", message: sourceImageErrorMessage(errorCode) });
+    },
+    [sourceImageErrorMessage]
+  );
+
+  const queueFile = useCallback(
+    (file: File | undefined) => {
+      if (!file) {
+        return;
+      }
+      if (dissolveRef.current.phase === "dissolving") {
+        return;
+      }
+
+      void (async () => {
+        const result = await sourceImageFileValidatorRef.current.validate({ file });
+        if (!result.ok) {
+          await notifySourceImageValidationFailure(result.errorCode);
+          return;
+        }
+
+        const incomingUrl = URL.createObjectURL(file);
+        setDissolve({ phase: "dissolving", incomingUrl, incomingFile: file });
+        dissolveSettledRef.current = false;
+      })();
+    },
+    [notifySourceImageValidationFailure]
+  );
 
   const finishDissolve = useCallback(() => {
     const d = dissolveRef.current;

@@ -1,4 +1,4 @@
-import type { ImageExportFormat } from "@codalyn/webflow-kit";
+import type { ImageExportFormat, ResolvedUploadTarget, ResolverOutput } from "@codalyn/webflow-kit";
 import { FolderPlus, Info, Loader2 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useState } from "react";
 import type { Area, MediaSize } from "react-easy-crop";
@@ -181,6 +181,9 @@ export type ImageEditorCropExportPanelProps = {
    */
   exportSizeUsesAspectAndMaxWidth?: boolean;
   onExportMaxWidthBlur?: () => void;
+  showResolvedReadout?: boolean;
+  resolvedUploadTarget?: ResolvedUploadTarget | null;
+  resolvedConstraintsReadout?: ResolverOutput | null;
 };
 
 /** Fade controls below the crop preview; opacity-only so layout width stays stable in the extension iframe. */
@@ -833,6 +836,48 @@ function ExportEncodeCard(p: ExportCardProps) {
   );
 }
 
+function ResolvedConstraintsReadOnlyCard(props: {
+  target: ResolvedUploadTarget | null;
+  readout: ResolverOutput | null;
+}) {
+  const { target, readout } = props;
+  const constraints = readout?.constraints ?? null;
+  const blockers = readout?.blockers ?? [];
+  return (
+    <section className="mt-4 flex flex-col gap-3" aria-labelledby="resolved-export-constraints-readonly">
+      <h2 className="sr-only" id="resolved-export-constraints-readonly">
+        Resolved constraints
+      </h2>
+      <Card size="sm">
+        <CardHeader className="space-y-1 pb-2">
+          <CardTitle className="text-sm font-medium">Resolved constraints (read-only)</CardTitle>
+          <CardDescription className="text-xs leading-snug">
+            Debug view only. Current export fields remain unchanged in this phase.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-x-3 gap-y-1.5 pt-0 text-xs">
+          <p className="text-muted-foreground">Target</p>
+          <p className="tabular-nums">{target?.kind ?? "none"}</p>
+          <p className="text-muted-foreground">Source</p>
+          <p className="tabular-nums">{readout?.source ?? "manual"}</p>
+          <p className="text-muted-foreground">Size</p>
+          <p className="tabular-nums">{constraints ? `${constraints.width}×${constraints.height}` : "—"}</p>
+          <p className="text-muted-foreground">Format</p>
+          <p className="tabular-nums">{constraints?.exportFormat ?? "—"}</p>
+          <p className="text-muted-foreground">Max file size</p>
+          <p className="tabular-nums">
+            {constraints?.maxFileSizeBytes == null ? "—" : `${constraints.maxFileSizeBytes.toLocaleString()} B`}
+          </p>
+          <p className="text-muted-foreground">Preset id</p>
+          <p className="tabular-nums">{readout?.presetId ?? "—"}</p>
+          <p className="text-muted-foreground">Blockers</p>
+          <p className="tabular-nums">{blockers.length === 0 ? "none" : blockers.join(", ")}</p>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
 type AssetFolderCardProps = {
   baseId: string;
   assetFolders: AssetFolderRow[];
@@ -1367,6 +1412,9 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     frameSummary,
     exportSizeUsesAspectAndMaxWidth = false,
     onExportMaxWidthBlur,
+    showResolvedReadout = false,
+    resolvedUploadTarget = null,
+    resolvedConstraintsReadout = null,
   } = props;
 
   const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
@@ -1494,6 +1542,10 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         exportPreviewReady={exportPreviewReady}
         onOpenQualityPopout={onOpenQualityPopout}
       />
+
+      {showResolvedReadout ? (
+        <ResolvedConstraintsReadOnlyCard target={resolvedUploadTarget} readout={resolvedConstraintsReadout} />
+      ) : null}
 
       {hidePlacementCard ? null : (
         <PlacementCard

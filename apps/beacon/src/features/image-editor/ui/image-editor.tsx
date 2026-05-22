@@ -1,4 +1,8 @@
-import { getVisibleBuiltinAspectPresets, type ImageExportFormat } from "@codalyn/webflow-kit";
+import {
+  getVisibleBuiltinAspectPresets,
+  type ImageExportFormat,
+  type ResolvedUploadTarget,
+} from "@codalyn/webflow-kit";
 import { ArrowRight, Crop } from "lucide-react";
 import type { DragEvent, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -14,7 +18,11 @@ import {
   parseOutputDimensionStrict,
 } from "@/features/image-editor/lib/apply-cropped-export";
 import { aspectValue, type EditorAspectSelection } from "@/features/image-editor/lib/aspect-preset";
-import { isCmsPrimaryUploadContext } from "@/features/image-editor/lib/cms-primary-upload-context";
+import { readBeaconPresetV2ReadEnabled } from "@/features/image-editor/lib/beacon-preset-v2-flags";
+import {
+  type ElementCmsBindingResolution,
+  isCmsPrimaryUploadContext,
+} from "@/features/image-editor/lib/cms-primary-upload-context";
 import { dimensionsFromMaxWidthAndAspect } from "@/features/image-editor/lib/export-dimensions-from-aspect";
 import type { ImageEditorFlowStep, ImageEditorPathMode } from "@/features/image-editor/lib/image-editor-flow-step";
 import { getImageEditorPlaceButtonState } from "@/features/image-editor/lib/image-editor-place-button-state";
@@ -23,9 +31,11 @@ import {
   shouldOfferSelectionPlacement,
 } from "@/features/image-editor/lib/image-editor-placement-readiness";
 import { resolveImageEditorPlacement } from "@/features/image-editor/lib/image-editor-resolved-placement";
+import { mapSelectedTargetToResolvedUploadTarget } from "@/features/image-editor/lib/image-editor-resolved-target";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
 import { readBeaconDesignerExportForTarget } from "@/features/image-editor/lib/read-beacon-designer-export-for-target";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
+import { webflowElementIdKey } from "@/features/image-editor/lib/webflow-element-id-key";
 import { useApplyCroppedToWebflow } from "@/features/image-editor/model/use-apply-cropped-to-webflow";
 import { useComponentInstanceImageProps } from "@/features/image-editor/model/use-component-instance-image-props";
 import { useExportByteEstimate } from "@/features/image-editor/model/use-export-byte-estimate";
@@ -36,6 +46,7 @@ import { useImageEditorAutoTargets } from "@/features/image-editor/model/use-ima
 import { useImageEditorWorkflow } from "@/features/image-editor/model/use-image-editor-workflow";
 import { useImageOutputDimensionsOnLoad } from "@/features/image-editor/model/use-image-output-dimensions-on-load";
 import { useQualityPopoutBridge } from "@/features/image-editor/model/use-quality-popout-bridge";
+import { useResolvedExportConstraints } from "@/features/image-editor/model/use-resolved-export-constraints";
 import { useRevokeBlobUrlOnChange } from "@/features/image-editor/model/use-revoke-blob-url";
 import {
   type CropFrameMode,
@@ -71,6 +82,36 @@ function shouldShowAutoPageSelectionChoice(
     !dismissedCanvasSelectionPrompt &&
     (autoSelectionHintKind === "image" || autoSelectionHintKind === "component")
   );
+}
+
+function buildResolvedTargetInput(options: {
+  siteId: string;
+  pageId: string;
+  autoPageTarget: ImagePageTarget | null;
+  selectedElement: AnyElement | null;
+  selectedComponentImagePropId: string | null;
+  elementCmsBinding: ElementCmsBindingResolution;
+}): Parameters<typeof mapSelectedTargetToResolvedUploadTarget>[0] {
+  const { siteId, pageId, autoPageTarget, selectedElement, selectedComponentImagePropId, elementCmsBinding } = options;
+  return {
+    siteId,
+    pageId,
+    autoPageTarget,
+    selectedElement: autoPageTarget == null ? selectedElement : null,
+    selectedComponentImagePropId:
+      autoPageTarget?.kind === "component"
+        ? (autoPageTarget.imagePropId ?? selectedComponentImagePropId)
+        : selectedComponentImagePropId,
+    elementCmsBinding: autoPageTarget == null ? elementCmsBinding : "none",
+  };
+}
+
+function resolvedTargetInputKey(input: Parameters<typeof mapSelectedTargetToResolvedUploadTarget>[0]): string {
+  const base = `${input.siteId}:${input.pageId}`;
+  if (input.autoPageTarget != null) {
+    return `${base}:${input.autoPageTarget.kind}:${webflowElementIdKey(input.autoPageTarget.element)}:${input.autoPageTarget.imagePropId ?? "none"}`;
+  }
+  return `${base}:${input.selectedElement ? webflowElementIdKey(input.selectedElement) : "none"}:${input.selectedComponentImagePropId ?? "none"}:${input.elementCmsBinding}`;
 }
 
 function imageEditorRouteChromeSlots(options: {
@@ -194,12 +235,17 @@ export function ImageEditor() {
   const serverExportDefaultsAppliedRef = useRef(false);
   const towerConfigured = isTowerConfigured();
   const allowAvifEncoding = Boolean(towerUser);
+  const presetV2ReadEnabled = useMemo(() => readBeaconPresetV2ReadEnabled(), []);
   const isConfirmedGuest = !towerUser && !towerSessionPending;
   const { isCmsCollectionTemplatePage: cmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
   const guestCmsTemplateRestricted = isConfirmedGuest && cmsCollectionTemplatePage;
   /** Guest onboarding only after Tower session resolves; while pending, show the empty drop zone (no loading interstitial). */
   const showGuestOnboarding = !imageSrc && guestWelcomeVisible;
   const prevShowGuestOnboarding = useRef(false);
+  const [resolverSiteId, setResolverSiteId] = useState<string | null>(null);
+  const [resolverPageId, setResolverPageId] = useState<string | null>(null);
+  const [resolvedUploadTarget, setResolvedUploadTarget] = useState<ResolvedUploadTarget | null>(null);
+  const lastResolvedTargetInputKeyRef = useRef<string | null>(null);
 
   const {
     assetFolders,
@@ -211,6 +257,7 @@ export function ImageEditor() {
   } = useImageEditorAssetFolders(imageSrc);
 
   const {
+    selectedElement,
     componentImageProps,
     selectedComponentImagePropId,
     setSelectedComponentImagePropId,
@@ -220,6 +267,97 @@ export function ImageEditor() {
     elementCmsBinding,
     elementCmsBindingLoading,
   } = useComponentInstanceImageProps();
+
+  useEffect(() => {
+    if (!presetV2ReadEnabled) {
+      setResolverSiteId(null);
+      setResolverPageId(null);
+      return;
+    }
+    let cancelled = false;
+    void webflow
+      .getSiteInfo()
+      .then((site) => {
+        if (!cancelled) {
+          setResolverSiteId(site.siteId);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResolverSiteId(null);
+        }
+      });
+    void webflow
+      .getCurrentPage()
+      .then((page) => {
+        if (!cancelled) {
+          setResolverPageId(page.id);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResolverPageId(null);
+        }
+      });
+    const unsub = webflow.subscribe("currentpage", (page) => {
+      setResolverPageId(page.id);
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [presetV2ReadEnabled]);
+
+  const resolverTargetInput = useMemo(() => {
+    if (!presetV2ReadEnabled || resolverSiteId == null || resolverPageId == null || imageSrc == null) {
+      return null;
+    }
+    return buildResolvedTargetInput({
+      siteId: resolverSiteId,
+      pageId: resolverPageId,
+      autoPageTarget,
+      selectedElement,
+      selectedComponentImagePropId,
+      elementCmsBinding,
+    });
+  }, [
+    presetV2ReadEnabled,
+    resolverSiteId,
+    resolverPageId,
+    autoPageTarget,
+    selectedElement,
+    selectedComponentImagePropId,
+    elementCmsBinding,
+    imageSrc,
+  ]);
+
+  useEffect(() => {
+    if (resolverTargetInput == null) {
+      lastResolvedTargetInputKeyRef.current = null;
+      setResolvedUploadTarget(null);
+      return;
+    }
+    const inputKey = resolvedTargetInputKey(resolverTargetInput);
+    if (lastResolvedTargetInputKeyRef.current === inputKey) {
+      return;
+    }
+    lastResolvedTargetInputKeyRef.current = inputKey;
+    let cancelled = false;
+    void mapSelectedTargetToResolvedUploadTarget(resolverTargetInput).then((target) => {
+      if (!cancelled) {
+        setResolvedUploadTarget(target);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [resolverTargetInput]);
+
+  const resolvedConstraintsReadout = useResolvedExportConstraints({
+    enabled: presetV2ReadEnabled,
+    settings,
+    target: resolvedUploadTarget,
+  });
 
   const visibleBuiltinAspectPresets = useMemo(() => getVisibleBuiltinAspectPresets(settings), [settings]);
 
@@ -907,6 +1045,9 @@ export function ImageEditor() {
           flowPhase={flowStep === "position" ? "position" : "save"}
           hidePlacementCard={pathMode === "auto"}
           frameSummary={frameSummary}
+          showResolvedReadout={presetV2ReadEnabled}
+          resolvedUploadTarget={resolvedUploadTarget}
+          resolvedConstraintsReadout={resolvedConstraintsReadout}
         />
       </ImageEditorLoadedColumn>
     ) : null;

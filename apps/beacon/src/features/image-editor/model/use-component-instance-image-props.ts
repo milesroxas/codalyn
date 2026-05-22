@@ -8,6 +8,7 @@ import {
 } from "@/features/image-editor/model/refresh-component-instance-image-props";
 
 export function useComponentInstanceImageProps() {
+  const [selectedElement, setSelectedElement] = useState<AnyElement | null>(null);
   const [componentImageProps, setComponentImageProps] = useState<ComponentImagePropOption[]>([]);
   const [selectedComponentImagePropId, setSelectedComponentImagePropId] = useState<string | null>(null);
   const [selectedElementType, setSelectedElementType] = useState<string | null>(null);
@@ -19,6 +20,7 @@ export function useComponentInstanceImageProps() {
 
   const refreshComponentImageProps = useCallback(async (el: AnyElement | null) => {
     const gen = ++componentPropsResolveGenRef.current;
+    setSelectedElement(el);
     setSelectedElementType(el?.type ?? null);
 
     if (el?.type !== "ComponentInstance") {
@@ -58,6 +60,7 @@ export function useComponentInstanceImageProps() {
   }, []);
 
   return {
+    selectedElement,
     componentImageProps,
     selectedComponentImagePropId,
     setSelectedComponentImagePropId,

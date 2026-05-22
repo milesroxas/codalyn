@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
+import { CompactRedirectSkeleton } from "@/shared/ui/page-loading-skeletons";
 
 function SuccessInner() {
   const router = useRouter();
@@ -26,7 +27,7 @@ function SuccessInner() {
 
 export default function WebflowOAuthSuccessPage() {
   return (
-    <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Loading…</p>}>
+    <Suspense fallback={<CompactRedirectSkeleton />}>
       <SuccessInner />
     </Suspense>
   );

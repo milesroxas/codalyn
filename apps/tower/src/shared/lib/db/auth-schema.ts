@@ -32,6 +32,8 @@ export const user = pgTable("user", {
   subscriptionPlan: text("subscription_plan").default("free").notNull(),
   /** Stripe subscription `status` (e.g. `active`, `canceled`); null when no Stripe sub. */
   subscriptionStatus: text("subscription_status"),
+  /** Set when operator early-access invite, team invite signup, or org join grants Tower/Beacon sign-in during MVP. */
+  earlyAccessGrantedAt: timestamp("early_access_granted_at"),
   /**
    * Default team workspace for Tower UI when the user belongs to several orgs.
    * Cleared server-side if the org is deleted (`ON DELETE SET NULL`).
@@ -218,6 +220,24 @@ export const invitation = pgTable(
     index("invitation_organizationId_idx").on(table.organizationId),
     index("invitation_email_idx").on(table.email),
   ]
+);
+
+/** Inbound early-access interest queue. Approval uses `inviteCustomerForEarlyAccess`; access truth stays on `user`. */
+export const earlyAccessRequest = pgTable(
+  "early_access_request",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull().unique(),
+    name: text("name"),
+    note: text("note"),
+    teamMemberEmails: jsonb("team_member_emails").$type<string[] | null>(),
+    /** `pending` · `approved` · `dismissed` */
+    status: text("status").notNull().default("pending"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at"),
+    resolvedByUserId: text("resolved_by_user_id").references(() => user.id, { onDelete: "set null" }),
+  },
+  (table) => [index("early_access_request_status_idx").on(table.status)]
 );
 
 /** Monthly Vercel-side usage for metering (Beacon API + proxy); resets by calendar month. */

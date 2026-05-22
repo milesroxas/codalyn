@@ -1,6 +1,7 @@
 import { isAPIError } from "better-auth/api";
 import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
+import { assertEmailMaySignUp, assertUserMaySignInByEmail } from "@/server/access/early-access";
 import { auth } from "@/server/auth";
 import { deriveWebflowDesignerCredentialPassword } from "@/server/derive-webflow-designer-password";
 import type { WebflowResolvedDesignerUser } from "@/server/webflow-resolve-designer-id-token";
@@ -46,6 +47,11 @@ async function signUpNewDesignerUser(
   resolved: WebflowResolvedDesignerUser,
   password: string
 ): Promise<DesignerSessionResult> {
+  try {
+    await assertEmailMaySignUp(resolved.email, null);
+  } catch {
+    return { ok: false, status: 403, message: "early_access_required" };
+  }
   const displayName = [resolved.firstName, resolved.lastName].filter(Boolean).join(" ").trim() || resolved.email;
   try {
     const signedUp = await auth.api.signUpEmail({
@@ -84,6 +90,11 @@ async function signInExistingDesignerUser(
   resolved: WebflowResolvedDesignerUser,
   password: string
 ): Promise<DesignerSessionResult> {
+  try {
+    await assertUserMaySignInByEmail(resolved.email);
+  } catch {
+    return { ok: false, status: 403, message: "early_access_required" };
+  }
   try {
     const signedIn = await auth.api.signInEmail({
       body: {

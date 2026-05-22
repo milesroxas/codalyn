@@ -10,14 +10,13 @@ import {
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { authClient } from "@/features/auth/model/auth-client";
+import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-
-const inputClass = "h-10 rounded-lg bg-background/80 dark:bg-input/40";
 
 type SignInPostResult = { kind: "beacon_popup" } | { kind: "error"; message: string } | { kind: "done" };
 
@@ -58,6 +57,26 @@ function SignInForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [earlyAccessRequired, setEarlyAccessRequired] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/account/access-policy", { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { earlyAccessRequired?: boolean } | null) => {
+        if (!cancelled) {
+          setEarlyAccessRequired(Boolean(data?.earlyAccessRequired));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEarlyAccessRequired(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!operatorInviteParam || beaconOrigin) {
@@ -130,7 +149,9 @@ function SignInForm() {
         <CardHeader className="space-y-1 pb-2">
           <CardTitle className="text-xl font-semibold tracking-tight">Welcome back</CardTitle>
           <CardDescription className="text-base leading-relaxed">
-            Sign in with your Tower email and password.
+            {earlyAccessRequired
+              ? "Sign in with your Tower email and password. Early access is required while Tower is in MVP."
+              : "Sign in with your Tower email and password."}
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
@@ -143,7 +164,8 @@ function SignInForm() {
                 autoComplete="email"
                 value={email}
                 onChange={(ev) => setEmail(ev.target.value)}
-                className={inputClass}
+                fieldSize="lg"
+                surface="elevated"
                 required
               />
             </div>
@@ -155,7 +177,8 @@ function SignInForm() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(ev) => setPassword(ev.target.value)}
-                className={inputClass}
+                fieldSize="lg"
+                surface="elevated"
                 required
               />
             </div>
@@ -170,15 +193,27 @@ function SignInForm() {
           </form>
         </CardContent>
         <CardFooter className="flex-col border-t border-border/60 bg-muted/20 px-6 py-4">
-          <p className="text-left text-sm text-muted-foreground">
-            No account?{" "}
-            <Link
-              href={`/sign-up?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}${operatorInviteParam ? `&invite=${encodeURIComponent(operatorInviteParam)}` : ""}`}
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              Create one
-            </Link>
-          </p>
+          {earlyAccessRequired ? (
+            <p className="text-left text-sm text-muted-foreground">
+              Need access?{" "}
+              <Link
+                href={`/request-access?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`}
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                Request early access
+              </Link>
+            </p>
+          ) : (
+            <p className="text-left text-sm text-muted-foreground">
+              No account?{" "}
+              <Link
+                href={`/sign-up?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}${operatorInviteParam ? `&invite=${encodeURIComponent(operatorInviteParam)}` : ""}`}
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                Create one
+              </Link>
+            </p>
+          )}
         </CardFooter>
       </Card>
     </AuthShell>
@@ -187,13 +222,7 @@ function SignInForm() {
 
 export default function SignInPage() {
   return (
-    <Suspense
-      fallback={
-        <AuthShell>
-          <p className="text-left text-sm text-muted-foreground">Loading…</p>
-        </AuthShell>
-      }
-    >
+    <Suspense fallback={<AuthCardSkeleton variant="sign-in" />}>
       <SignInForm />
     </Suspense>
   );

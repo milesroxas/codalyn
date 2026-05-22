@@ -1,8 +1,16 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { admin, bearer } from "better-auth/plugins";
 import { adminAc, userAc } from "better-auth/plugins/admin/access";
+import {
+  assertEmailMaySignUp,
+  assertUserMaySignInByEmail,
+  grantEarlyAccess,
+  readOperatorInviteTokenFromAuthContext,
+} from "@/server/access/early-access";
+import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
 import { resolveAuthSecret } from "@/server/auth-secret";
 import { sendChangeEmailConfirmationEmail } from "@/server/email/change-email-confirmation-email";
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
@@ -84,6 +92,32 @@ export const auth = betterAuth({
   secret: resolveAuthSecret(),
   baseURL,
   trustedOrigins: resolveTrustedOrigins(),
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === "/sign-up/email") {
+        const email = typeof ctx.body?.email === "string" ? ctx.body.email : "";
+        const inviteToken = readOperatorInviteTokenFromAuthContext(ctx);
+        await assertEmailMaySignUp(email, inviteToken);
+        return;
+      }
+      if (ctx.path === "/sign-in/email") {
+        const email = typeof ctx.body?.email === "string" ? ctx.body.email : "";
+        await assertUserMaySignInByEmail(email);
+      }
+    }),
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (createdUser) => {
+          if (!isTowerEarlyAccessGateEnabled()) {
+            return;
+          }
+          await grantEarlyAccess(createdUser.id);
+        },
+      },
+    },
+  },
   plugins: [
     nextCookies(),
     bearer(),

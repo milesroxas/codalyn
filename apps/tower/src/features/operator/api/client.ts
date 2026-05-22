@@ -90,6 +90,29 @@ export const operatorApi = {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
+  listEarlyAccessRequests: async (
+    status: "pending" | "approved" | "dismissed" | "all" = "pending"
+  ): Promise<{
+    rows: Array<{
+      id: string;
+      email: string;
+      name: string | null;
+      note: string | null;
+      teamMemberEmails: string[] | null;
+      status: string;
+      createdAt: string;
+      resolvedAt: string | null;
+      resolvedByUserId: string | null;
+    }>;
+  }> => requestJson(`/api/operator/early-access-requests?status=${encodeURIComponent(status)}`),
+  resolveEarlyAccessRequest: async (
+    id: string,
+    action: "approve" | "dismiss"
+  ): Promise<{ ok: true; inviteUrl?: string }> =>
+    requestJson(`/api/operator/early-access-requests/${encodeURIComponent(id)}`, {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    }),
   listWorkspaces: async (query: OperatorWorkspaceListQuery = {}): Promise<OperatorWorkspaceListResponse> =>
     requestJson<OperatorWorkspaceListResponse>(`/api/operator/workspaces${toSearchParams(query)}`),
   getWorkspace: async (orgId: string): Promise<OperatorWorkspaceDetail> =>

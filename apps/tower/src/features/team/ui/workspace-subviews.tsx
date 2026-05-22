@@ -13,10 +13,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
+import { NativeSelect } from "@/shared/ui/native-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
-
-const selectRowClass =
-  "h-8 w-full min-w-28 rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
 function MemberInitial(props: { name: string; email: string }) {
   const letter = (props.name?.trim()[0] ?? props.email?.trim()[0] ?? "?").toUpperCase();
@@ -123,8 +121,9 @@ function WorkspaceMemberDirectoryCard(props: {
                     </td>
                     <td className="px-4 py-3 align-middle">
                       {canManageTeam ? (
-                        <select
-                          className={selectRowClass}
+                        <NativeSelect
+                          fieldSize="sm"
+                          className="min-w-28"
                           value={m.role}
                           disabled={busy || m.userId === currentUserId}
                           aria-label={`Role for ${m.user.email}`}
@@ -137,7 +136,7 @@ function WorkspaceMemberDirectoryCard(props: {
                               {r}
                             </option>
                           ))}
-                        </select>
+                        </NativeSelect>
                       ) : (
                         <Badge variant="secondary" className="font-mono text-xs">
                           {m.role}
@@ -237,9 +236,8 @@ function WorkspaceInvitesTab(props: {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ws-invite-role">Role</Label>
-                <select
+                <NativeSelect
                   id="ws-invite-role"
-                  className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
                   value={inviteRole}
                   onChange={(ev) => onInviteRoleChange(ev.target.value)}
                 >
@@ -248,7 +246,7 @@ function WorkspaceInvitesTab(props: {
                       {r}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </div>
             </div>
             <div className="flex min-w-0 flex-col space-y-2 lg:shrink-0">

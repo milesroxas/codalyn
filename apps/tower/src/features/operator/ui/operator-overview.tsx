@@ -226,10 +226,11 @@ function SecondaryStats({
             tone={totals.banned > 0 ? "warn" : "default"}
           />
           <StatTile
-            label="Pending invitations"
-            value={nf.format(totals.pendingInvitations)}
-            hint="Workspace invites awaiting accept"
+            label="Early access requests"
+            value={nf.format(totals.pendingEarlyAccessRequests)}
+            hint="Review under Access requests"
             icon={IconKey}
+            tone={totals.pendingEarlyAccessRequests > 0 ? "warn" : "default"}
           />
         </>
       )}

@@ -77,6 +77,44 @@ const COLS = 27;
 const ROWS = 21;
 const MAX_CANVAS_DPR = 1.5;
 
+function resetNetworkGraphicState(refs: {
+  armsInitializedRef: MutableRefObject<boolean>;
+  firstPaintAfterInitRef: MutableRefObject<boolean>;
+  lastHubRef: MutableRefObject<{ hubI: number; hubJ: number }>;
+  echoLayersRef: MutableRefObject<EchoLayer[]>;
+  lastPaintMsRef: MutableRefObject<number | null>;
+  glowSettleRef: MutableRefObject<number>;
+  smoothPointerSpeedRef: MutableRefObject<number>;
+  hubScaleRenderedRef: MutableRefObject<number>;
+  hubOuterRingMulRef: MutableRefObject<number>;
+  velSmoothRef: MutableRefObject<{ x: number; y: number }>;
+  chromaStrengthRef: MutableRefObject<number>;
+  lastPointerSampleRef: MutableRefObject<{ x: number; y: number; ms: number } | null>;
+  armSnapAtRef: MutableRefObject<number[]>;
+}): void {
+  refs.armsInitializedRef.current = false;
+  refs.firstPaintAfterInitRef.current = true;
+  refs.lastHubRef.current = { hubI: -99, hubJ: -99 };
+  refs.echoLayersRef.current = [];
+  refs.lastPaintMsRef.current = null;
+  refs.glowSettleRef.current = 0;
+  refs.smoothPointerSpeedRef.current = 0;
+  refs.hubScaleRenderedRef.current = 1;
+  refs.hubOuterRingMulRef.current = 1;
+  refs.velSmoothRef.current = { x: 0, y: 0 };
+  refs.chromaStrengthRef.current = 0;
+  refs.lastPointerSampleRef.current = null;
+  refs.armSnapAtRef.current.fill(0);
+}
+
+function isLayoutReady(rect: DOMRect): boolean {
+  return rect.width >= 2 && rect.height >= 2;
+}
+
+function layoutSizeChanged(w: number, h: number, last: { w: number; h: number }): boolean {
+  return Math.abs(w - last.w) > 0.5 || Math.abs(h - last.h) > 0.5;
+}
+
 type NetColors = {
   field: string;
   ring: string;
@@ -1324,15 +1362,20 @@ export function NetworkGraphic() {
   const rafRef = useRef(0);
   const remeasureRetryRafRef = useRef(0);
   const remeasureRetryCountRef = useRef(0);
+  const lastLayoutSizeRef = useRef({ w: 0, h: 0 });
   const { resolvedTheme } = useTheme();
 
   const paint = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     const w = rect.width;
     const h = rect.height;
-    if (w < 2 || h < 2) return;
+    if (w < 2 || h < 2) {
+      return;
+    }
 
     if (!armsInitializedRef.current) {
       initializeWaveAtCenter(
@@ -1403,7 +1446,7 @@ export function NetworkGraphic() {
   }, [paint]);
 
   const remeasureAndRepaint = useCallback(
-    (fromRetry = false) => {
+    (fromRetry = false, reason = "unknown") => {
       if (remeasureRetryRafRef.current !== 0) {
         cancelAnimationFrame(remeasureRetryRafRef.current);
         remeasureRetryRafRef.current = 0;
@@ -1412,32 +1455,48 @@ export function NetworkGraphic() {
         remeasureRetryCountRef.current = 0;
       }
       const el = containerRef.current;
-      if (!el) return;
+      if (!el) {
+        return;
+      }
       const rect = el.getBoundingClientRect();
-      if (rect.width < 2 || rect.height < 2) {
+      if (!isLayoutReady(rect)) {
         if (remeasureRetryCountRef.current < 90) {
           remeasureRetryCountRef.current += 1;
           remeasureRetryRafRef.current = requestAnimationFrame(() => {
             remeasureRetryRafRef.current = 0;
-            remeasureAndRepaint(true);
+            remeasureAndRepaint(true, reason);
           });
         }
         return;
       }
       remeasureRetryCountRef.current = 0;
-      armsInitializedRef.current = false;
-      firstPaintAfterInitRef.current = true;
-      lastHubRef.current = { hubI: -99, hubJ: -99 };
-      echoLayersRef.current = [];
-      lastPaintMsRef.current = null;
-      glowSettleRef.current = 0;
-      smoothPointerSpeedRef.current = 0;
-      hubScaleRenderedRef.current = 1;
-      hubOuterRingMulRef.current = 1;
-      velSmoothRef.current = { x: 0, y: 0 };
-      chromaStrengthRef.current = 0;
-      lastPointerSampleRef.current = null;
-      armSnapAtRef.current.fill(0);
+
+      const w = rect.width;
+      const h = rect.height;
+      const last = lastLayoutSizeRef.current;
+      const sizeChanged = layoutSizeChanged(w, h, last);
+      if (!sizeChanged && armsInitializedRef.current) {
+        paint();
+        scheduleLoop();
+        return;
+      }
+      lastLayoutSizeRef.current = { w, h };
+
+      resetNetworkGraphicState({
+        armsInitializedRef,
+        firstPaintAfterInitRef,
+        lastHubRef,
+        echoLayersRef,
+        lastPaintMsRef,
+        glowSettleRef,
+        smoothPointerSpeedRef,
+        hubScaleRenderedRef,
+        hubOuterRingMulRef,
+        velSmoothRef,
+        chromaStrengthRef,
+        lastPointerSampleRef,
+        armSnapAtRef,
+      });
       paint();
       scheduleLoop();
     },
@@ -1448,7 +1507,7 @@ export function NetworkGraphic() {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
-      remeasureAndRepaint();
+      remeasureAndRepaint(false, "ResizeObserver");
     });
     ro.observe(el);
     return () => {
@@ -1458,11 +1517,11 @@ export function NetworkGraphic() {
 
   useEffect(() => {
     const onPageShow = () => {
-      remeasureAndRepaint();
+      remeasureAndRepaint(false, "pageshow");
     };
     const onVisibility = () => {
       if (!document.hidden) {
-        remeasureAndRepaint();
+        remeasureAndRepaint(false, "visibilitychange");
       }
     };
     window.addEventListener("pageshow", onPageShow);
@@ -1475,14 +1534,14 @@ export function NetworkGraphic() {
 
   useEffect(() => {
     const onResize = () => {
-      remeasureAndRepaint();
+      remeasureAndRepaint(false, "window.resize");
     };
     window.addEventListener("resize", onResize);
     let rafOuter = 0;
     let rafInner = 0;
     rafOuter = requestAnimationFrame(() => {
       rafInner = requestAnimationFrame(() => {
-        remeasureAndRepaint();
+        remeasureAndRepaint(false, "mount.double-rAF");
       });
     });
     return () => {
@@ -1513,12 +1572,20 @@ export function NetworkGraphic() {
 
   useEffect(() => {
     scheduleLoop();
+    return () => {
+      if (rafRef.current !== 0) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
+    };
   }, [scheduleLoop]);
 
   useEffect(() => {
     return () => {
-      if (rafRef.current !== 0) cancelAnimationFrame(rafRef.current);
-      if (remeasureRetryRafRef.current !== 0) cancelAnimationFrame(remeasureRetryRafRef.current);
+      if (remeasureRetryRafRef.current !== 0) {
+        cancelAnimationFrame(remeasureRetryRafRef.current);
+        remeasureRetryRafRef.current = 0;
+      }
     };
   }, []);
 

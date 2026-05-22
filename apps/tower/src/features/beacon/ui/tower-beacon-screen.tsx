@@ -6,8 +6,10 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { draftToMaxBytes, type MaxSizeUnit, parsePresetOutputDimension } from "@/features/beacon/lib/preset-dimensions";
+import { BeaconPageSkeleton } from "@/features/beacon/ui/beacon-page-skeleton";
 import { TowerBeaconPresetsPanel } from "@/features/beacon/ui/tower-beacon-presets-panel";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 
 type BeaconApiPayload = {
   settings: BeaconAppSettings;
@@ -107,11 +109,7 @@ export function TowerBeaconScreen() {
   );
 
   if (sessionPending) {
-    return (
-      <main className="mx-auto min-h-dvh max-w-4xl px-4 py-10 sm:px-6">
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      </main>
-    );
+    return <BeaconPageSkeleton />;
   }
 
   if (!session?.user) {
@@ -224,7 +222,7 @@ export function TowerBeaconScreen() {
 
       {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
 
-      {loading && !payload ? <p className="mt-6 text-sm text-muted-foreground">Loading presets…</p> : null}
+      {loading && !payload ? <Skeleton className="mt-6 h-48 w-full rounded-xl" aria-hidden /> : null}
 
       {payload ? (
         <TowerBeaconPresetsPanel

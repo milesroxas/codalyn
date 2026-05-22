@@ -34,8 +34,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { Skeleton } from "@/shared/ui/skeleton";
 
-const publicLoggedOutSurfaces = new Set(["/", "/sign-in", "/sign-up"]);
+const publicLoggedOutSurfaces = new Set(["/", "/sign-in", "/sign-up", "/request-access"]);
 
 export function TowerHeader({ billingEnabled = false }: { billingEnabled?: boolean }) {
   const pathname = usePathname();
@@ -161,7 +162,12 @@ function AuthSection({
   onSignOut: () => void | Promise<void>;
 }) {
   if (isPending) {
-    return <span className="text-xs text-muted-foreground">…</span>;
+    return (
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-8 w-16 rounded-md" aria-hidden />
+        <Skeleton className="h-8 w-20 rounded-md" aria-hidden />
+      </div>
+    );
   }
   if (!user) {
     return (

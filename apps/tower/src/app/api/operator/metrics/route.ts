@@ -1,5 +1,6 @@
 import { and, count, desc, eq, gt, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { countPendingEarlyAccessRequests } from "@/server/access/early-access-request";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorMetrics } from "@/server/operator/types";
 import { db } from "@/shared/lib/db";
@@ -44,6 +45,7 @@ export async function GET(): Promise<NextResponse<OperatorMetrics | { error: str
     [{ total: signups7 = 0 } = { total: 0 }],
     [{ total: signups30 = 0 } = { total: 0 }],
     [{ total: workspaces30 = 0 } = { total: 0 }],
+    pendingEarlyAccessRequests,
     recentUsers,
     recentWorkspacesRaw,
   ] = await Promise.all([
@@ -58,6 +60,7 @@ export async function GET(): Promise<NextResponse<OperatorMetrics | { error: str
     db.select({ total: count() }).from(user).where(gt(user.createdAt, days7)),
     db.select({ total: count() }).from(user).where(gt(user.createdAt, days30)),
     db.select({ total: count() }).from(organization).where(gt(organization.createdAt, days30)),
+    countPendingEarlyAccessRequests(),
     db
       .select({
         id: user.id,
@@ -93,6 +96,7 @@ export async function GET(): Promise<NextResponse<OperatorMetrics | { error: str
       banned: Number(totalBanned),
       workspaces: Number(totalWorkspaces),
       pendingInvitations: Number(totalInvitations),
+      pendingEarlyAccessRequests: Number(pendingEarlyAccessRequests),
       webflowConnected: Number(totalWebflowConnected),
     },
     activity: {

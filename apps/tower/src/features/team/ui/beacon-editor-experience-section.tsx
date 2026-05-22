@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { BeaconEditorExperienceSkeleton } from "@/features/team/ui/team-workspace-panel-skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Label } from "@/shared/ui/label";
 import { Switch } from "@/shared/ui/switch";
@@ -66,6 +67,14 @@ export function BeaconEditorExperienceSection({ enabled }: BeaconEditorExperienc
 
   if (!enabled) {
     return null;
+  }
+
+  if (loading) {
+    return (
+      <div className="mb-8">
+        <BeaconEditorExperienceSkeleton />
+      </div>
+    );
   }
 
   return (

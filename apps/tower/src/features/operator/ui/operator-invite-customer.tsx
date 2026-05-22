@@ -106,7 +106,7 @@ export function OperatorInviteCustomer({ onInvited, trigger }: OperatorInviteCus
         <DialogHeader>
           <DialogTitle>Invite customer</DialogTitle>
           <DialogDescription>
-            New addresses get a sign-up link. Existing users gain permission to create a team workspace.
+            New addresses get an early-access sign-up link. Existing users are granted Tower sign-in immediately.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-3">

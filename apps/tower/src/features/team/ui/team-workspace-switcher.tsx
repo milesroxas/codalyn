@@ -21,6 +21,7 @@ import {
 } from "@/shared/ui/dropdown-menu";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
+import { Skeleton } from "@/shared/ui/skeleton";
 
 export type WorkspaceOrgRow = { id: string; name: string; slug: string };
 
@@ -65,7 +66,11 @@ export function TeamWorkspaceSwitcher(props: {
           >
             <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
               <IconBuildingCommunity className="size-4 shrink-0 opacity-60" aria-hidden />
-              <span className="truncate">{props.triggerLabel}</span>
+              {props.orgsPending ? (
+                <Skeleton className="h-3 w-24" aria-hidden />
+              ) : (
+                <span className="truncate">{props.triggerLabel}</span>
+              )}
             </span>
             <IconChevronDown className="size-4 shrink-0 opacity-50" aria-hidden />
           </Button>

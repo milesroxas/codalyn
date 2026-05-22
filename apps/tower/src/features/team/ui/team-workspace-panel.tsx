@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { FormEvent } from "react";
+import { TeamWorkspacePanelSkeleton } from "@/features/team/ui/team-workspace-panel-skeleton";
 import { WorkspaceTabsShell } from "@/features/team/ui/workspace-subviews";
 import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
 
@@ -33,11 +34,7 @@ export function TeamWorkspacePanel(props: {
 
   return (
     <div className="space-y-8">
-      {activeOrgPending ? (
-        <div className="rounded-xl border border-dashed bg-muted/20 p-8 text-center text-sm text-muted-foreground">
-          Loading workspace…
-        </div>
-      ) : null}
+      {activeOrgPending ? <TeamWorkspacePanelSkeleton /> : null}
 
       {!activeOrgPending && !activeOrg ? (
         <div className="rounded-xl border border-dashed bg-muted/20 p-10 text-center">

@@ -1,4 +1,5 @@
 import { organization } from "better-auth/plugins";
+import { grantEarlyAccess } from "@/server/access/early-access";
 import { sendOrganizationInvitationEmail } from "@/server/email/organization-invitation-email";
 import { isTowerProductAdmin } from "@/server/membership/product-admin";
 import {
@@ -37,5 +38,13 @@ export const towerOrganization = organization({
   membershipLimit: async (_user, org) => resolveMembershipSeatCap(org as Record<string, unknown>),
   sendInvitationEmail: async (data) => {
     await sendOrganizationInvitationEmail(data);
+  },
+  organizationHooks: {
+    afterAcceptInvitation: async ({ user }) => {
+      await grantEarlyAccess(user.id);
+    },
+    afterAddMember: async ({ user }) => {
+      await grantEarlyAccess(user.id);
+    },
   },
 });

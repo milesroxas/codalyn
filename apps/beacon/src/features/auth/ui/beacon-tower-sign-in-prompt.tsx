@@ -1,5 +1,5 @@
 import { Sparkles } from "lucide-react";
-import { openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
+import { openTowerAppPath, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
 import { Button } from "@/shared/ui/button";
 
 export type BeaconTowerSignInPromptProps = {
@@ -23,8 +23,8 @@ export function BeaconTowerSignInPrompt(props: BeaconTowerSignInPromptProps) {
         <Button type="button" className="w-full" onClick={() => openTowerAuthPopup("/sign-in")}>
           Sign in to Tower
         </Button>
-        <Button type="button" variant="outline" className="w-full" onClick={() => openTowerAuthPopup("/sign-up")}>
-          Create Tower account
+        <Button type="button" variant="outline" className="w-full" onClick={() => openTowerAppPath("/request-access")}>
+          Request early access
         </Button>
       </div>
     </div>

@@ -10,14 +10,15 @@ import {
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { authClient } from "@/features/auth/model/auth-client";
+import { EarlyAccessSignUpGate } from "@/features/auth/ui/early-access-sign-up-gate";
+import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
+import { TOWER_OPERATOR_INVITE_HEADER } from "@/shared/lib/access/operator-invite-header";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Switch } from "@/shared/ui/switch";
-
-const inputClass = "h-10 rounded-lg bg-background/80 dark:bg-input/40";
 
 async function postEnableTeamCreation(): Promise<{ ok: true } | { ok: false; errorKey?: string }> {
   const res = await fetch("/api/account/enable-team-creation", {
@@ -81,9 +82,33 @@ function SignUpForm() {
   const [pending, setPending] = useState(false);
   const [operatorInviteToken, setOperatorInviteToken] = useState<string | null>(null);
   const [inviteEmailLocked, setInviteEmailLocked] = useState(false);
+  const [earlyAccessRequired, setEarlyAccessRequired] = useState<boolean | null>(null);
+  const [inviteValidated, setInviteValidated] = useState(!operatorInviteParam && !beaconOrigin);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/account/access-policy", { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { earlyAccessRequired?: boolean } | null) => {
+        if (!cancelled) {
+          setEarlyAccessRequired(Boolean(data?.earlyAccessRequired));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEarlyAccessRequired(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!operatorInviteParam || beaconOrigin) {
+      if (!operatorInviteParam) {
+        setInviteValidated(true);
+      }
       return;
     }
     let cancelled = false;
@@ -96,6 +121,7 @@ function SignUpForm() {
       }
       if (!res.ok) {
         setError("This invite link is invalid or expired. Ask your administrator for a new one.");
+        setInviteValidated(true);
         return;
       }
       const data = (await res.json().catch(() => null)) as { email?: string } | null;
@@ -105,6 +131,7 @@ function SignUpForm() {
         setOperatorInviteToken(operatorInviteParam);
         setInviteEmailLocked(true);
       }
+      setInviteValidated(true);
     })();
     return () => {
       cancelled = true;
@@ -133,6 +160,7 @@ function SignUpForm() {
     setPending(true);
     const displayName =
       [firstName.trim(), lastName.trim()].filter(Boolean).join(" ").trim() || email.split("@")[0] || "User";
+    const inviteToken = operatorInviteToken ?? operatorInviteParam?.trim() ?? null;
     const { data, error: err } = await authClient.signUp.email({
       email,
       password,
@@ -140,6 +168,13 @@ function SignUpForm() {
       firstName: firstName.trim() || undefined,
       lastName: lastName.trim() || undefined,
       ...(beaconOrigin ? {} : { callbackURL: callbackUrl }),
+      fetchOptions: inviteToken
+        ? {
+            headers: {
+              [TOWER_OPERATOR_INVITE_HEADER]: inviteToken,
+            },
+          }
+        : undefined,
     });
     setPending(false);
     if (err) {
@@ -147,7 +182,7 @@ function SignUpForm() {
       return;
     }
     const postErr = await runAfterTowerSignUp({
-      operatorInviteToken,
+      operatorInviteToken: inviteToken,
       beaconOrigin,
       startWithTeamWorkspace,
     });
@@ -156,6 +191,18 @@ function SignUpForm() {
       return;
     }
     await finishSignUp(data);
+  }
+
+  const signInHref = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`;
+  const requestAccessHref = `/request-access?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`;
+  const joiningViaTeamInvite = callbackUrl.includes("/invitations/accept");
+
+  if (earlyAccessRequired === null || !inviteValidated) {
+    return <AuthCardSkeleton variant="sign-up" />;
+  }
+
+  if (earlyAccessRequired && inviteValidated && !operatorInviteToken && !operatorInviteParam && !joiningViaTeamInvite) {
+    return <EarlyAccessSignUpGate signInHref={signInHref} requestAccessHref={requestAccessHref} />;
   }
 
   return (
@@ -178,7 +225,8 @@ function SignUpForm() {
                   autoComplete="given-name"
                   value={firstName}
                   onChange={(ev) => setFirstName(ev.target.value)}
-                  className={inputClass}
+                  fieldSize="lg"
+                  surface="elevated"
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -189,7 +237,8 @@ function SignUpForm() {
                   autoComplete="family-name"
                   value={lastName}
                   onChange={(ev) => setLastName(ev.target.value)}
-                  className={inputClass}
+                  fieldSize="lg"
+                  surface="elevated"
                 />
               </div>
             </div>
@@ -201,7 +250,8 @@ function SignUpForm() {
                 autoComplete="email"
                 value={email}
                 onChange={(ev) => setEmail(ev.target.value)}
-                className={inputClass}
+                fieldSize="lg"
+                surface="elevated"
                 required
                 readOnly={inviteEmailLocked}
                 aria-readonly={inviteEmailLocked}
@@ -215,7 +265,8 @@ function SignUpForm() {
                 autoComplete="new-password"
                 value={password}
                 onChange={(ev) => setPassword(ev.target.value)}
-                className={inputClass}
+                fieldSize="lg"
+                surface="elevated"
                 required
                 minLength={8}
               />
@@ -271,13 +322,7 @@ function SignUpForm() {
 
 export default function SignUpPage() {
   return (
-    <Suspense
-      fallback={
-        <AuthShell>
-          <p className="text-left text-sm text-muted-foreground">Loading…</p>
-        </AuthShell>
-      }
-    >
+    <Suspense fallback={<AuthCardSkeleton variant="sign-up" />}>
       <SignUpForm />
     </Suspense>
   );

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { grantEarlyAccess } from "@/server/access/early-access";
 import { auth } from "@/server/auth";
 import { verifyOperatorCustomerInviteToken } from "@/server/operator-customer-invite-token";
 import { db } from "@/shared/lib/db";
@@ -31,6 +32,7 @@ export async function POST(req: Request) {
   }
 
   await db.update(user).set({ canCreateOrganization: true }).where(eq(user.id, session.user.id));
+  await grantEarlyAccess(session.user.id);
 
   return NextResponse.json({ ok: true });
 }

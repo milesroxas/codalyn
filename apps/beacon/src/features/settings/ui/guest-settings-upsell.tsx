@@ -18,8 +18,8 @@ export function GuestSettingsUpsell() {
             Sync with Tower
           </h2>
           <p className="text-muted-foreground text-xs leading-snug">
-            Sign in to restore your account on this device, or create one to sync presets and preferences everywhere.
-            Guest mode keeps settings in this browser only.
+            Sign in with an early-access Tower account to restore sync on this device. Guest mode keeps settings in this
+            browser only.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">

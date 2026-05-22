@@ -21,7 +21,9 @@ export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
         <h2 id="beacon-onboarding-title" className="text-2xl font-semibold text-foreground">
           Welcome to Beacon
         </h2>
-        <p className="max-w-sm text-sm text-muted-foreground">Sign in for the full workflow, or jump in as a guest.</p>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          Sign in with an early-access Tower account for the full workflow, or jump in as a guest.
+        </p>
       </header>
 
       <article className="rounded-sm border border-primary/30 bg-card p-4 ring-1 ring-primary/15">

@@ -174,9 +174,6 @@ export function TowerHeaderWorkspaceSwitcher() {
   };
 
   const workspaceTriggerLabel = useMemo(() => {
-    if (orgsPending) {
-      return "Loading workspaces…";
-    }
     const orgList = orgs ?? [];
     if (orgList.length === 0) {
       return "No workspace";
@@ -185,7 +182,7 @@ export function TowerHeaderWorkspaceSwitcher() {
       return activeOrg.name;
     }
     return "Select workspace";
-  }, [orgsPending, orgs, activeOrg?.name]);
+  }, [orgs, activeOrg?.name]);
 
   if (sessionPending || !session?.user) {
     return null;

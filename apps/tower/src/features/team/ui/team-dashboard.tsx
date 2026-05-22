@@ -5,6 +5,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { BeaconEditorExperienceSection } from "@/features/team/ui/beacon-editor-experience-section";
+import { TeamDashboardSkeleton } from "@/features/team/ui/team-dashboard-skeleton";
 import { TeamWorkspacePanel } from "@/features/team/ui/team-workspace-panel";
 import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
 import {
@@ -176,11 +177,7 @@ export function TeamDashboard() {
   }, [activeOrg?.invitations]);
 
   if (sessionPending) {
-    return (
-      <main className="mx-auto min-h-dvh max-w-4xl px-4 py-10 sm:px-6">
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      </main>
-    );
+    return <TeamDashboardSkeleton />;
   }
 
   if (!session?.user) {

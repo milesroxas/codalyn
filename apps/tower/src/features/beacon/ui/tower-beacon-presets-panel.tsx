@@ -10,17 +10,12 @@ import {
   maxBytesToDraft,
   parsePresetOutputDimension,
 } from "@/features/beacon/lib/preset-dimensions";
-import { cn } from "@/shared/lib/utils";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-
-const nativeSelectClass = cn(
-  "rounded-lg border border-input bg-transparent text-sm text-foreground outline-none",
-  "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
-);
+import { NativeSelect } from "@/shared/ui/native-select";
 
 function PresetMaxEditor(props: { maxFileSizeBytes: number; onCommit: (next: number) => void; disabled?: boolean }) {
   const { maxFileSizeBytes, onCommit, disabled } = props;
@@ -47,8 +42,8 @@ function PresetMaxEditor(props: { maxFileSizeBytes: number; onCommit: (next: num
         onChange={(e: ChangeEvent<HTMLInputElement>) => setStr(e.target.value)}
         onBlur={() => commit(str, unit)}
       />
-      <select
-        className={cn("h-9 w-18 shrink-0 px-2", nativeSelectClass)}
+      <NativeSelect
+        className="w-18 shrink-0"
         value={unit}
         disabled={disabled}
         onChange={(e) => {
@@ -59,7 +54,7 @@ function PresetMaxEditor(props: { maxFileSizeBytes: number; onCommit: (next: num
       >
         <option value="kb">KB</option>
         <option value="mb">MB</option>
-      </select>
+      </NativeSelect>
     </div>
   );
 }
@@ -231,8 +226,8 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                     </div>
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Format</Label>
-                      <select
-                        className={cn("h-9 w-full px-2.5", nativeSelectClass)}
+                      <NativeSelect
+                        className="w-full"
                         value={p.exportFormat ?? settings?.defaultExportFormat ?? "webp"}
                         disabled={saving}
                         onChange={(e) =>
@@ -241,7 +236,7 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                       >
                         <option value="webp">WebP</option>
                         <option value="avif">AVIF</option>
-                      </select>
+                      </NativeSelect>
                     </div>
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Max encoded size</Label>
@@ -277,15 +272,15 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
               <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">New preset</p>
               <div className="mb-3 space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Adds to</Label>
-                <select
-                  className={cn("h-9 w-full max-w-sm px-2.5", nativeSelectClass)}
+                <NativeSelect
+                  className="max-w-sm"
                   value={presetTarget}
                   disabled={saving}
                   onChange={(e) => setPresetTarget(e.target.value as "workspace" | "designer")}
                 >
                   <option value="workspace">Workspace (everyone)</option>
                   <option value="designer">Designers only</option>
-                </select>
+                </NativeSelect>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5 sm:col-span-2">
@@ -331,26 +326,26 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                       value={draftMaxStr}
                       onChange={(e) => setDraftMaxStr(e.target.value)}
                     />
-                    <select
-                      className={cn("h-9 w-18 shrink-0 px-2", nativeSelectClass)}
+                    <NativeSelect
+                      className="w-18 shrink-0"
                       value={draftMaxUnit}
                       onChange={(e) => setDraftMaxUnit(e.target.value as MaxSizeUnit)}
                     >
                       <option value="kb">KB</option>
                       <option value="mb">MB</option>
-                    </select>
+                    </NativeSelect>
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Format</Label>
-                  <select
-                    className={cn("h-9 w-full px-2.5", nativeSelectClass)}
+                  <NativeSelect
+                    className="w-full"
                     value={draftFormat}
                     onChange={(e) => setDraftFormat(e.target.value as ImageExportFormat)}
                   >
                     <option value="webp">WebP</option>
                     <option value="avif">AVIF</option>
-                  </select>
+                  </NativeSelect>
                 </div>
               </div>
               <div className="mt-3 flex justify-end">
@@ -451,8 +446,8 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                       </div>
                       <div className="space-y-1.5 sm:col-span-2">
                         <Label className="text-xs text-muted-foreground">Format</Label>
-                        <select
-                          className={cn("h-9 w-full px-2.5", nativeSelectClass)}
+                        <NativeSelect
+                          className="w-full"
                           value={p.exportFormat ?? settings?.defaultExportFormat ?? "webp"}
                           disabled={saving}
                           onChange={(e) =>
@@ -461,7 +456,7 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                         >
                           <option value="webp">WebP</option>
                           <option value="avif">AVIF</option>
-                        </select>
+                        </NativeSelect>
                       </div>
                       <div className="space-y-1.5 sm:col-span-2">
                         <Label className="text-xs text-muted-foreground">Max encoded size</Label>

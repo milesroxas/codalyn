@@ -8,7 +8,7 @@ import { authClient } from "@/features/auth/model/auth-client";
 import { OperatorShell } from "@/features/operator/ui/operator-shell";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { Button } from "@/shared/ui/button";
-import { Skeleton } from "@/shared/ui/skeleton";
+import { OperatorGateSkeleton } from "@/shared/ui/page-loading-skeletons";
 
 export function OperatorGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -17,14 +17,7 @@ export function OperatorGate({ children }: { children: ReactNode }) {
   const operatorSignInHref = `/sign-in?callbackUrl=${encodeURIComponent(pathname || "/console")}`;
 
   if (isPending) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-4 w-48" />
-        </div>
-      </div>
-    );
+    return <OperatorGateSkeleton />;
   }
 
   if (!session?.user) {

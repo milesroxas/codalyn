@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
+import { AcceptInvitationSkeleton, CompactRedirectSkeleton } from "@/shared/ui/page-loading-skeletons";
 
 function AcceptInvitationContent() {
   const router = useRouter();
@@ -60,11 +61,7 @@ function AcceptInvitationContent() {
   }
 
   if (sessionPending) {
-    return (
-      <main className="mx-auto max-w-sm px-6 py-8">
-        <p className="text-sm text-neutral-600">Loading…</p>
-      </main>
-    );
+    return <AcceptInvitationSkeleton />;
   }
 
   if (!session?.user) {
@@ -114,7 +111,7 @@ function AcceptInvitationContent() {
 
 export default function AcceptInvitationPage() {
   return (
-    <Suspense fallback={<p className="p-6 text-sm text-neutral-600">Loading…</p>}>
+    <Suspense fallback={<CompactRedirectSkeleton />}>
       <AcceptInvitationContent />
     </Suspense>
   );

@@ -6,6 +6,7 @@ export type OperatorMetrics = {
     banned: number;
     workspaces: number;
     pendingInvitations: number;
+    pendingEarlyAccessRequests: number;
     webflowConnected: number;
   };
   activity: {

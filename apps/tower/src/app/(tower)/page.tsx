@@ -1,5 +1,6 @@
 import { TowerDashboard } from "@/features/tower-ui/tower-dashboard";
 import { TowerLanding } from "@/features/tower-ui/tower-landing";
+import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
 import { getTowerDashboardSummary } from "@/server/dashboard-summary";
 
 export default async function HomePage() {
@@ -9,5 +10,5 @@ export default async function HomePage() {
     return <TowerDashboard summary={summary} />;
   }
 
-  return <TowerLanding />;
+  return <TowerLanding earlyAccessRequired={isTowerEarlyAccessGateEnabled()} />;
 }

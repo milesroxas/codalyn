@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
+import { CompactRedirectSkeleton } from "@/shared/ui/page-loading-skeletons";
 
 function ErrorInner() {
   const searchParams = useSearchParams();
@@ -29,7 +30,7 @@ function ErrorInner() {
 
 export default function WebflowOAuthErrorPage() {
   return (
-    <Suspense fallback={<p className="p-6">Loading…</p>}>
+    <Suspense fallback={<CompactRedirectSkeleton />}>
       <ErrorInner />
     </Suspense>
   );

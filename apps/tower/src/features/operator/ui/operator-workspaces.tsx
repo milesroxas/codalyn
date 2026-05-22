@@ -21,6 +21,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
+import { TablePaginationSummarySkeleton } from "@/shared/ui/table-pagination-skeleton";
 
 const DEFAULT_LIMIT = 25;
 
@@ -186,11 +187,13 @@ export function OperatorWorkspaces() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <p>
-          {loading
-            ? "Loading…"
-            : `Showing ${rows.length === 0 ? 0 : offset + 1}–${offset + rows.length} of ${nf.format(total)}`}
-        </p>
+        <div>
+          {loading ? (
+            <TablePaginationSummarySkeleton />
+          ) : (
+            `Showing ${rows.length === 0 ? 0 : offset + 1}–${offset + rows.length} of ${nf.format(total)}`
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <Button
             type="button"

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
+import { AccountSettingsSkeleton } from "@/features/account/ui/account-settings-skeleton";
 import { authClient } from "@/features/auth/model/auth-client";
 import {
   AlertDialog,
@@ -19,8 +20,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Separator } from "@/shared/ui/separator";
-
-const inputClass = "h-10 rounded-lg bg-background/80 dark:bg-input/40";
 
 export function AccountSettingsScreen() {
   const router = useRouter();
@@ -213,11 +212,7 @@ export function AccountSettingsScreen() {
   }
 
   if (sessionPending || !session?.user) {
-    return (
-      <main className="mx-auto max-w-2xl px-4 py-10">
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      </main>
-    );
+    return <AccountSettingsSkeleton />;
   }
 
   const u = session.user;
@@ -249,7 +244,8 @@ export function AccountSettingsScreen() {
                     autoComplete="given-name"
                     value={firstName}
                     onChange={(ev) => setFirstName(ev.target.value)}
-                    className={inputClass}
+                    fieldSize="lg"
+                    surface="elevated"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -260,7 +256,8 @@ export function AccountSettingsScreen() {
                     autoComplete="family-name"
                     value={lastName}
                     onChange={(ev) => setLastName(ev.target.value)}
-                    className={inputClass}
+                    fieldSize="lg"
+                    surface="elevated"
                   />
                 </div>
               </div>
@@ -299,7 +296,8 @@ export function AccountSettingsScreen() {
                   autoComplete="email"
                   value={newEmail}
                   onChange={(ev) => setNewEmail(ev.target.value)}
-                  className={inputClass}
+                  fieldSize="lg"
+                  surface="elevated"
                   required
                 />
               </div>
@@ -335,7 +333,8 @@ export function AccountSettingsScreen() {
                   autoComplete="current-password"
                   value={currentPassword}
                   onChange={(ev) => setCurrentPassword(ev.target.value)}
-                  className={inputClass}
+                  fieldSize="lg"
+                  surface="elevated"
                   required
                 />
               </div>
@@ -347,7 +346,8 @@ export function AccountSettingsScreen() {
                   autoComplete="new-password"
                   value={newPassword}
                   onChange={(ev) => setNewPassword(ev.target.value)}
-                  className={inputClass}
+                  fieldSize="lg"
+                  surface="elevated"
                   required
                   minLength={8}
                 />
@@ -360,7 +360,8 @@ export function AccountSettingsScreen() {
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(ev) => setConfirmPassword(ev.target.value)}
-                  className={inputClass}
+                  fieldSize="lg"
+                  surface="elevated"
                   required
                   minLength={8}
                 />
@@ -414,7 +415,8 @@ export function AccountSettingsScreen() {
                       autoComplete="current-password"
                       value={deletePassword}
                       onChange={(ev) => setDeletePassword(ev.target.value)}
-                      className={inputClass}
+                      fieldSize="lg"
+                      surface="elevated"
                       required
                       autoFocus
                     />
@@ -427,7 +429,8 @@ export function AccountSettingsScreen() {
                       autoComplete="off"
                       value={deleteConfirm}
                       onChange={(ev) => setDeleteConfirm(ev.target.value)}
-                      className={inputClass}
+                      fieldSize="lg"
+                      surface="elevated"
                       required
                     />
                   </div>

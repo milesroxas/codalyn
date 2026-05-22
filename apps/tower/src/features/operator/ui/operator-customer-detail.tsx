@@ -213,6 +213,7 @@ export function OperatorCustomerDetail(props: OperatorCustomerDetailProps) {
         {state.loading || !state.detail ? (
           <>
             <SheetHeader>
+              <SheetTitle className="sr-only">Customer details</SheetTitle>
               <Skeleton className="h-4 w-40" />
               <Skeleton className="h-3 w-24" />
             </SheetHeader>

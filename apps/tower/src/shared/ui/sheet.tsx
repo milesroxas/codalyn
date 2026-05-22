@@ -1,8 +1,11 @@
+"use client";
+
 import { IconX } from "@tabler/icons-react";
 import { Dialog as SheetPrimitive } from "radix-ui";
 import type * as React from "react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
+import { ScrollArea } from "@/shared/ui/scroll-area";
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -50,7 +53,7 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-background shadow-lg transition ease-in-out data-open:animate-in data-open:duration-200 data-closed:animate-out data-closed:duration-150",
+          "fixed z-50 flex flex-col gap-4 overflow-hidden bg-background shadow-lg transition ease-in-out data-open:animate-in data-open:duration-200 data-closed:animate-out data-closed:duration-150",
           side === "right" &&
             "inset-y-0 right-0 h-full w-full border-l border-border sm:max-w-lg data-open:slide-in-from-right data-closed:slide-out-to-right",
           side === "left" &&
@@ -87,8 +90,14 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function SheetBody({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="sheet-body" className={cn("flex-1 overflow-y-auto px-5 py-4", className)} {...props} />;
+function SheetBody({ className, children, ...props }: React.ComponentProps<"div">) {
+  return (
+    <ScrollArea className="min-h-0 flex-1">
+      <div data-slot="sheet-body" className={cn("px-5 py-4", className)} {...props}>
+        {children}
+      </div>
+    </ScrollArea>
+  );
 }
 
 function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {

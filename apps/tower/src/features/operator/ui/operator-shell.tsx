@@ -153,9 +153,9 @@ export function OperatorShell({ userEmail, userName, children }: OperatorShellPr
   );
 
   return (
-    <div className="relative flex min-h-dvh flex-col bg-background text-foreground">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       {/* Top bar */}
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/90 px-3 backdrop-blur supports-backdrop-filter:bg-background/75 sm:px-4">
+      <header className="z-40 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/90 px-3 backdrop-blur supports-backdrop-filter:bg-background/75 sm:px-4">
         <Button
           type="button"
           variant="ghost"
@@ -266,9 +266,9 @@ export function OperatorShell({ userEmail, userName, children }: OperatorShellPr
         </div>
       </header>
 
-      <div className="flex min-w-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1">
         {/* Desktop sidebar */}
-        <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col border-r border-border bg-background md:flex">
+        <aside className="hidden h-full w-56 shrink-0 flex-col border-r border-border bg-background md:flex">
           <div className="px-3 py-4">
             <p className="px-2 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Navigate</p>
           </div>
@@ -306,7 +306,7 @@ export function OperatorShell({ userEmail, userName, children }: OperatorShellPr
           </div>
         ) : null}
 
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
           <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</div>
         </main>
       </div>

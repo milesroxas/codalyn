@@ -99,8 +99,8 @@ export async function GET(req: Request): Promise<NextResponse<OperatorUserListRe
         canCreateOrganization: user.canCreateOrganization,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
-        webflowConnected: sql<boolean>`EXISTS(SELECT 1 FROM ${member} INNER JOIN ${organizationWebflowOAuthToken} ON ${organizationWebflowOAuthToken.organizationId} = ${member.organizationId} WHERE ${member.userId} = ${user.id})`,
-        memberships: sql<number>`COALESCE((SELECT COUNT(*) FROM ${member} WHERE ${member.userId} = ${user.id}), 0)`,
+        webflowConnected: sql<boolean>`EXISTS(SELECT 1 FROM ${member} m INNER JOIN ${organizationWebflowOAuthToken} w ON w."organization_id" = m."organization_id" WHERE m."user_id" = "user"."id")`,
+        memberships: sql<number>`COALESCE((SELECT COUNT(*) FROM ${member} m WHERE m."user_id" = "user"."id"), 0)`,
       })
       .from(user)
       .where(whereClause)

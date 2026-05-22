@@ -220,6 +220,7 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
         {loading || !detail ? (
           <>
             <SheetHeader>
+              <SheetTitle className="sr-only">Workspace details</SheetTitle>
               <Skeleton className="h-4 w-40" />
               <Skeleton className="h-3 w-24" />
             </SheetHeader>

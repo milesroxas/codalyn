@@ -154,12 +154,13 @@ function imageEditorRouteChromeSlots(options: {
 
 export function ImageEditor() {
   const navigate = useNavigate();
-  const { settings, updateSettings, canPersistExportDefaults, syncState, workspaceMemberRole, isTowerUser } =
+  const { settings, updateSettings, canPersistExportDefaults, syncState, isTowerUser, editorExperience } =
     useBeaconAppSettings();
   const roleReady = useMemo(() => !isTowerUser || syncState === "synced", [isTowerUser, syncState]);
+  /** Designers and admins in designer view (not editor-style mode) see the entry step. */
   const isWorkspaceDesigner = useMemo(
-    () => Boolean(roleReady && workspaceMemberRole?.toLowerCase() === "designer"),
-    [roleReady, workspaceMemberRole]
+    () => Boolean(roleReady && isTowerUser && !editorExperience),
+    [roleReady, isTowerUser, editorExperience]
   );
   const baseId = useId();
   const fileInputId = `${baseId}-file`;

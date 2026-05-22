@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 import { DEFAULT_IMAGE_EXPORT_FORMAT } from "../image/output-formats.js";
+import { BEACON_IMAGE_ERROR_CODES, type BeaconImageErrorCode } from "./beacon-image-errors.js";
+import {
+  type BeaconPresetRow,
+  isPresetTargetKey,
+  type PresetTargetKeyString,
+  serializePresetTargetKey,
+} from "./beacon-image-preset-domain.js";
 
 const WEBP_AVIF = z.enum(["webp", "avif"]);
 
@@ -37,6 +44,33 @@ export const beaconImagePresetRowSchema = z.object({
 
 export type BeaconImagePresetRow = z.infer<typeof beaconImagePresetRowSchema>;
 
+const beaconPresetTargetKeySchema = z.custom<BeaconPresetRow["targetKey"]>(isPresetTargetKey);
+
+export const beaconPresetRowV2Schema = beaconImagePresetRowSchema.extend({
+  targetKey: beaconPresetTargetKeySchema,
+});
+
+export type BeaconPresetRowV2 = z.infer<typeof beaconPresetRowV2Schema>;
+
+export const beaconPresetStorageV2Schema = z.object({
+  siteDefault: beaconPresetRowV2Schema.nullable(),
+  byTargetKey: z.record(z.string(), beaconPresetRowV2Schema),
+});
+
+export type BeaconPresetStorageV2 = {
+  siteDefault: BeaconPresetRowV2 | null;
+  byTargetKey: Record<PresetTargetKeyString, BeaconPresetRowV2>;
+};
+
+export type BeaconPresetStorageValidationResult =
+  | { ok: true; value: BeaconPresetStorageV2 }
+  | {
+      ok: false;
+      errorCode:
+        | typeof BEACON_IMAGE_ERROR_CODES.PRESET_TARGET_KEY_INVALID
+        | typeof BEACON_IMAGE_ERROR_CODES.DUPLICATE_PRESET_TARGET;
+    };
+
 /** Built-in crop aspect options (same set as the image editor preset strip). Order is display order. */
 export const BEACON_BUILTIN_ASPECT_PRESETS: readonly BeaconAspectPreset[] = ["free", "1", "16-9", "4-3", "3-2", "9-16"];
 
@@ -48,6 +82,10 @@ export const beaconAppSettingsSchema = z.object({
   defaultExportQuality: z.number().min(0).max(1),
   defaultAspectPreset: beaconAspectPresetSchema,
   imagePresets: z.array(beaconImagePresetRowSchema),
+  imagePresetStorageV2: beaconPresetStorageV2Schema.default({
+    siteDefault: null,
+    byTargetKey: {},
+  }),
   /**
    * Workspace-level export presets visible only to designers (and admins), not to editors.
    * Stored with team settings; cleared in API responses for editor experience.
@@ -72,6 +110,93 @@ export const beaconAppSettingsSchema = z.object({
 
 export type BeaconAppSettings = z.infer<typeof beaconAppSettingsSchema>;
 
+function normalizeBeaconPresetStorageV2Internal(input: BeaconPresetStorageV2): BeaconPresetStorageValidationResult {
+  const byTargetKey: Record<PresetTargetKeyString, BeaconPresetRowV2> = {};
+  const seen = new Set<string>();
+
+  const addRow = (row: BeaconPresetRowV2, includeInByTargetKey: boolean): BeaconPresetStorageValidationResult => {
+    let serialized: PresetTargetKeyString;
+    try {
+      serialized = serializePresetTargetKey(row.targetKey);
+    } catch {
+      return { ok: false, errorCode: BEACON_IMAGE_ERROR_CODES.PRESET_TARGET_KEY_INVALID };
+    }
+    if (seen.has(serialized)) {
+      return { ok: false, errorCode: BEACON_IMAGE_ERROR_CODES.DUPLICATE_PRESET_TARGET };
+    }
+    seen.add(serialized);
+    if (includeInByTargetKey) {
+      byTargetKey[serialized] = row;
+    }
+    return { ok: true, value: { siteDefault: null, byTargetKey } };
+  };
+
+  if (input.siteDefault !== null) {
+    const siteDefaultResult = addRow(input.siteDefault, false);
+    if (!siteDefaultResult.ok) {
+      return siteDefaultResult;
+    }
+  }
+
+  for (const row of Object.values(input.byTargetKey)) {
+    const result = addRow(row, true);
+    if (!result.ok) {
+      return result;
+    }
+  }
+
+  return {
+    ok: true,
+    value: {
+      siteDefault: input.siteDefault,
+      byTargetKey,
+    },
+  };
+}
+
+export function normalizeBeaconPresetStorageV2(raw: unknown): BeaconPresetStorageValidationResult {
+  const parsed = beaconPresetStorageV2Schema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      errorCode: BEACON_IMAGE_ERROR_CODES.PRESET_TARGET_KEY_INVALID,
+    };
+  }
+  return normalizeBeaconPresetStorageV2Internal(parsed.data as BeaconPresetStorageV2);
+}
+
+export function validateBeaconPresetStorageV2Patch(raw: unknown):
+  | {
+      ok: true;
+      normalizedPatch: unknown;
+    }
+  | {
+      ok: false;
+      errorCode: Extract<BeaconImageErrorCode, "PRESET_TARGET_KEY_INVALID" | "DUPLICATE_PRESET_TARGET">;
+    } {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ok: true, normalizedPatch: raw };
+  }
+  const record = raw as Record<string, unknown>;
+  if (!Object.keys(record).includes("imagePresetStorageV2")) {
+    return { ok: true, normalizedPatch: raw };
+  }
+  if (record.imagePresetStorageV2 === undefined) {
+    return { ok: true, normalizedPatch: raw };
+  }
+  const normalized = normalizeBeaconPresetStorageV2(record.imagePresetStorageV2);
+  if (!normalized.ok) {
+    return { ok: false, errorCode: normalized.errorCode };
+  }
+  return {
+    ok: true,
+    normalizedPatch: {
+      ...record,
+      imagePresetStorageV2: normalized.value,
+    },
+  };
+}
+
 export function getDefaultBeaconAppSettings(): BeaconAppSettings {
   return {
     version: 1,
@@ -80,6 +205,10 @@ export function getDefaultBeaconAppSettings(): BeaconAppSettings {
     defaultExportQuality: 0.75,
     defaultAspectPreset: "free",
     imagePresets: [],
+    imagePresetStorageV2: {
+      siteDefault: null,
+      byTargetKey: {},
+    },
     designerOnlyImagePresets: [],
     hiddenBuiltinAspectPresets: [],
     limitCropZoomToNativeResolution: false,
@@ -125,11 +254,25 @@ function migrateImagePresetsField(raw: unknown): unknown {
 }
 
 export function parseBeaconAppSettings(raw: unknown): BeaconAppSettings {
+  let normalizedV2: BeaconPresetStorageV2 = {
+    siteDefault: null,
+    byTargetKey: {},
+  };
+  if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
+    const maybeV2 = (raw as Record<string, unknown>).imagePresetStorageV2;
+    if (maybeV2 !== undefined) {
+      const normalized = normalizeBeaconPresetStorageV2(maybeV2);
+      if (normalized.ok) {
+        normalizedV2 = normalized.value;
+      }
+    }
+  }
   const prepped =
     raw !== null && typeof raw === "object" && !Array.isArray(raw)
       ? {
           ...(raw as Record<string, unknown>),
           imagePresets: migrateImagePresetsField((raw as Record<string, unknown>).imagePresets),
+          imagePresetStorageV2: normalizedV2,
           designerOnlyImagePresets: migrateImagePresetsField((raw as Record<string, unknown>).designerOnlyImagePresets),
         }
       : raw;
@@ -161,13 +304,18 @@ export function mergeBeaconAppSettings(base: BeaconAppSettings, patch: Partial<B
     ...base,
     ...clean,
     imagePresets: clean.imagePresets ?? base.imagePresets,
+    imagePresetStorageV2: clean.imagePresetStorageV2 ?? base.imagePresetStorageV2,
     designerOnlyImagePresets: clean.designerOnlyImagePresets ?? base.designerOnlyImagePresets,
     cmsLayout: clean.cmsLayout ?? base.cmsLayout,
   });
 }
 
 export function parseBeaconAppSettingsPartial(raw: unknown): Partial<BeaconAppSettings> {
-  const parsed = beaconAppSettingsSchema.partial().safeParse(raw);
+  const normalizedPatch = validateBeaconPresetStorageV2Patch(raw);
+  if (!normalizedPatch.ok) {
+    return {};
+  }
+  const parsed = beaconAppSettingsSchema.partial().safeParse(normalizedPatch.normalizedPatch);
   if (parsed.success) {
     return parsed.data;
   }

@@ -4,6 +4,7 @@ import { type BeaconAppSettings, beaconAppSettingsSchema, mergeBeaconAppSettings
 
 const beaconOrgTeamFieldsSchema = beaconAppSettingsSchema.pick({
   imagePresets: true,
+  imagePresetStorageV2: true,
   designerOnlyImagePresets: true,
   hiddenBuiltinAspectPresets: true,
   defaultAspectPreset: true,
@@ -33,6 +34,9 @@ export function mergeOrgTeamSettingsIntoUser(
   if (org.imagePresets !== undefined) {
     patch.imagePresets = org.imagePresets;
   }
+  if (org.imagePresetStorageV2 !== undefined) {
+    patch.imagePresetStorageV2 = org.imagePresetStorageV2;
+  }
   if (org.designerOnlyImagePresets !== undefined) {
     patch.designerOnlyImagePresets = org.designerOnlyImagePresets;
   }
@@ -59,6 +63,7 @@ export function mergeOrgTeamSettingsIntoUser(
 
 const PRESET_KEYS = new Set<keyof BeaconAppSettings>([
   "imagePresets",
+  "imagePresetStorageV2",
   "designerOnlyImagePresets",
   "hiddenBuiltinAspectPresets",
   "defaultAspectPreset",

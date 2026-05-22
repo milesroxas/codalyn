@@ -1,4 +1,5 @@
 import {
+  BEACON_IMAGE_ERROR_CODES,
   type BeaconAppSettings,
   getDefaultBeaconAppSettings,
   mergeBeaconAppSettings,
@@ -7,6 +8,7 @@ import {
   parseBeaconAppSettingsPartial,
   parseBeaconOrgTeamSettingsPartial,
   splitBeaconSettingsPatch,
+  validateBeaconPresetStorageV2Patch,
 } from "@codalyn/webflow-kit";
 import { eq } from "drizzle-orm";
 import {
@@ -25,6 +27,10 @@ import { isTowerTeamAdminRole } from "@/shared/lib/membership/tower-organization
 
 export const runtime = "nodejs";
 
+function jsonError(status: number, error: string, errorCode?: string): Response {
+  return Response.json(errorCode ? { error, errorCode } : { error }, { status });
+}
+
 function stripPersonalForEditor(patch: Partial<BeaconAppSettings>): Partial<BeaconAppSettings> {
   const out: Partial<BeaconAppSettings> = {};
   if (patch.theme !== undefined) {
@@ -41,8 +47,41 @@ function extractBody(raw: unknown): { organizationId?: string; patch: Partial<Be
   const organizationId = typeof o.organizationId === "string" ? o.organizationId : undefined;
   const { organizationId: _drop, ...rest } = o;
   void _drop;
-  const patch = parseBeaconAppSettingsPartial(rest);
+  const normalized = validateBeaconPresetStorageV2Patch(rest);
+  if (!normalized.ok) {
+    return { organizationId, patch: {} };
+  }
+  const patch = parseBeaconAppSettingsPartial(normalized.normalizedPatch);
   return { organizationId, patch };
+}
+
+function hasOrganizationIdOverride(raw: unknown): boolean {
+  return (
+    raw !== null &&
+    typeof raw === "object" &&
+    !Array.isArray(raw) &&
+    "organizationId" in raw &&
+    typeof (raw as Record<string, unknown>).organizationId === "string"
+  );
+}
+
+function validateTeamMutationPermissions(opts: {
+  editorExperience: boolean;
+  canManageTeam: boolean;
+  hasTeamMutation: boolean;
+}): Response | null {
+  const { editorExperience, canManageTeam, hasTeamMutation } = opts;
+  if (editorExperience && hasTeamMutation) {
+    return jsonError(
+      403,
+      "Team presets are locked in editor mode",
+      BEACON_IMAGE_ERROR_CODES.TEAM_PRESETS_LOCKED_EDITOR_MODE
+    );
+  }
+  if (!canManageTeam && hasTeamMutation) {
+    return jsonError(403, "Preset mutation denied", BEACON_IMAGE_ERROR_CODES.PRESET_PERMISSION_DENIED);
+  }
+  return null;
 }
 
 async function loadEffectiveSettings(userId: string, ctx: Awaited<ReturnType<typeof resolveBeaconMembershipContext>>) {
@@ -95,12 +134,12 @@ export async function GET(req: Request) {
     return auth.response;
   }
   if (!auth.userId) {
-    return Response.json({ error: "Session required" }, { status: 401 });
+    return jsonError(401, "Session required");
   }
 
   const ctx = await resolveBeaconMembershipContext(req);
   if (!ctx) {
-    return Response.json({ error: "Session required" }, { status: 401 });
+    return jsonError(401, "Session required");
   }
 
   const payload = await loadEffectiveSettings(auth.userId, ctx);
@@ -114,31 +153,29 @@ export async function PUT(req: Request) {
     return auth.response;
   }
   if (!auth.userId) {
-    return Response.json({ error: "Session required" }, { status: 401 });
+    return jsonError(401, "Session required");
   }
 
   let rawBody: unknown;
   try {
     rawBody = await req.json();
   } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+    return jsonError(400, "Invalid JSON");
+  }
+
+  const normalizedPatchInput = validateBeaconPresetStorageV2Patch(rawBody);
+  if (!normalizedPatchInput.ok) {
+    return jsonError(400, "Invalid preset target key", normalizedPatchInput.errorCode);
   }
 
   const ctx = await resolveBeaconMembershipContext(req);
   if (!ctx) {
-    return Response.json({ error: "Session required" }, { status: 401 });
+    return jsonError(401, "Session required");
   }
 
-  const { organizationId: organizationIdFromBody, patch } = extractBody(rawBody);
-  if (
-    rawBody &&
-    typeof rawBody === "object" &&
-    !Array.isArray(rawBody) &&
-    "organizationId" in rawBody &&
-    typeof (rawBody as Record<string, unknown>).organizationId === "string" &&
-    !isProductAdminAppRole(ctx.appUserRole)
-  ) {
-    return Response.json({ error: "organizationId is only valid for product admins" }, { status: 400 });
+  const { organizationId: organizationIdFromBody, patch } = extractBody(normalizedPatchInput.normalizedPatch);
+  if (hasOrganizationIdOverride(rawBody) && !isProductAdminAppRole(ctx.appUserRole)) {
+    return jsonError(400, "organizationId is only valid for product admins");
   }
 
   const editorExperience = computeBeaconEditorExperience(ctx);
@@ -146,16 +183,25 @@ export async function PUT(req: Request) {
   const { team, personal } = splitBeaconSettingsPatch(patch);
 
   const teamPatch = parseBeaconOrgTeamSettingsPartial(team);
+  const hasTeamMutation = Object.keys(teamPatch).length > 0;
 
-  if (editorExperience && Object.keys(teamPatch).length > 0) {
-    return Response.json({ error: "Team presets are locked in editor mode" }, { status: 403 });
+  const permissionError = validateTeamMutationPermissions({
+    editorExperience,
+    canManageTeam,
+    hasTeamMutation,
+  });
+  if (permissionError) {
+    return permissionError;
   }
 
   const personalToApply = editorExperience ? stripPersonalForEditor(personal) : personal;
 
   const targetOrgId = await resolveTargetOrganizationIdForTeamSettings(ctx, organizationIdFromBody);
+  if (hasTeamMutation && !targetOrgId) {
+    return jsonError(400, "Organization context required", BEACON_IMAGE_ERROR_CODES.ORGANIZATION_CONTEXT_REQUIRED);
+  }
   if (organizationIdFromBody?.trim() && isProductAdminAppRole(ctx.appUserRole) && !targetOrgId) {
-    return Response.json({ error: "Unknown organization" }, { status: 400 });
+    return jsonError(400, "Unknown organization");
   }
 
   await persistTeamBeaconPatch(auth.userId, {
@@ -170,7 +216,7 @@ export async function PUT(req: Request) {
 
   const nextCtx = await resolveBeaconMembershipContext(req);
   if (!nextCtx) {
-    return Response.json({ error: "Session required" }, { status: 401 });
+    return jsonError(401, "Session required");
   }
 
   const payload = await loadEffectiveSettings(auth.userId, nextCtx);

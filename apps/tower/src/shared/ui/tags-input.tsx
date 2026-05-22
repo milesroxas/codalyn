@@ -5,10 +5,10 @@ import { type ClipboardEvent, type FocusEvent, type KeyboardEvent, useRef } from
 import { cn } from "@/shared/lib/utils";
 import { Badge } from "@/shared/ui/badge";
 import {
+  type FormFieldVariantProps,
   formFieldFocusWithinClass,
   formFieldInvalidClass,
   formFieldSurfaceClass,
-  type FormFieldVariantProps,
 } from "@/shared/ui/form-field-styles";
 
 const TAG_SEPARATORS = /[\s,;]+/;

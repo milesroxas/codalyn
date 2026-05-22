@@ -28,11 +28,7 @@ function Textarea({
   ...props
 }: React.ComponentProps<"textarea"> & VariantProps<typeof textareaVariants>) {
   return (
-    <textarea
-      data-slot="textarea"
-      className={cn(textareaVariants({ fieldSize, surface }), className)}
-      {...props}
-    />
+    <textarea data-slot="textarea" className={cn(textareaVariants({ fieldSize, surface }), className)} {...props} />
   );
 }
 

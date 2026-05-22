@@ -11,11 +11,7 @@ function NativeSelect({
   ...props
 }: Omit<React.ComponentProps<"select">, "size"> & VariantProps<typeof formFieldVariants>) {
   return (
-    <select
-      data-slot="native-select"
-      className={cn(formFieldVariants({ fieldSize, surface }), className)}
-      {...props}
-    />
+    <select data-slot="native-select" className={cn(formFieldVariants({ fieldSize, surface }), className)} {...props} />
   );
 }
 

@@ -24,4 +24,4 @@ function Input({
   );
 }
 
-export { Input, formFieldVariants as inputVariants };
+export { formFieldVariants as inputVariants, Input };

@@ -1,12 +1,12 @@
 import { Loader2 } from "lucide-react";
-import type { DragEvent, TransitionEvent } from "react";
+import type { DragEvent, ReactNode, TransitionEvent } from "react";
 import type { ImageEditorFlowStep } from "@/features/image-editor/lib/image-editor-flow-step";
 import {
   imageEditorStepEnterTransitionClass,
   imageEditorStepExitTransitionClass,
   isImageEditorStepExitTransitionEnd,
 } from "@/features/image-editor/lib/image-editor-step-transition";
-import type { ImagePageTarget, SelectedImageTargetHint } from "@/features/image-editor/lib/scan-image-targets-on-page";
+import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { useImageEditorStepEnter } from "@/features/image-editor/model/use-image-editor-step-enter";
 import { ImageEditorAutoTargetColumn } from "@/features/image-editor/ui/image-editor-auto-target-column";
 import { ImageEditorConfigurationPresetsStep } from "@/features/image-editor/ui/image-editor-configuration-presets-step";
@@ -29,20 +29,20 @@ type ImageEditorPreimageColumnProps = {
   onChooseAddImage: () => void;
   onChooseConfigure: () => void;
   onDoneConfiguringPresets: () => void;
+  onConfigurePresetsFooterChange?: (footer: ReactNode | null) => void;
+  onConfigurePresetsSubheaderChange?: (subheader: ReactNode | null) => void;
   /** Auto path: element scan */
   autoTargets: ImagePageTarget[];
   autoScanPending: boolean;
   autoScanError: string | null;
   autoPageScanned: boolean;
   onAutoRescan: () => void;
-  autoSelectionHint: SelectedImageTargetHint;
   autoSelectedTarget: ImagePageTarget | null;
+  autoDisplaySurfaceTarget: ImagePageTarget | null;
   onAutoSelectTarget: (t: ImagePageTarget) => void;
-  onAutoUseCanvasSelection: () => void;
-  onAutoChooseAnotherOnPage: () => void;
-  autoShowSelectionChoice: boolean;
+  hasCanvasImageTarget: boolean;
   autoDiscoverySettled: boolean;
-  autoShowPageTargetList: boolean;
+  onAutoUseCanvasSelection: () => void;
 };
 
 export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps) {
@@ -62,19 +62,19 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
     onChooseAddImage,
     onChooseConfigure,
     onDoneConfiguringPresets,
+    onConfigurePresetsFooterChange,
+    onConfigurePresetsSubheaderChange,
     autoTargets,
     autoScanPending,
     autoScanError,
     autoPageScanned,
     onAutoRescan,
-    autoSelectionHint,
     autoSelectedTarget,
+    autoDisplaySurfaceTarget,
     onAutoSelectTarget,
-    onAutoUseCanvasSelection,
-    onAutoChooseAnotherOnPage,
-    autoShowSelectionChoice,
+    hasCanvasImageTarget,
     autoDiscoverySettled,
-    autoShowPageTargetList,
+    onAutoUseCanvasSelection,
   } = props;
 
   const showDesignerStart = roleReady && isWorkspaceDesigner && flowStep === "entry";
@@ -93,7 +93,12 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
       ) : null}
 
       {flowStep === "configurePresets" ? (
-        <ImageEditorConfigurationPresetsStep isGuest={isConfirmedGuest} onDone={onDoneConfiguringPresets} />
+        <ImageEditorConfigurationPresetsStep
+          isGuest={isConfirmedGuest}
+          onDone={onDoneConfiguringPresets}
+          onFooterChange={onConfigurePresetsFooterChange}
+          onSubheaderChange={onConfigurePresetsSubheaderChange}
+        />
       ) : null}
 
       {flowStep === "autoElement" ? (
@@ -107,7 +112,7 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
         >
           <ImageEditorAutoTargetColumn
             discoverySettled={autoDiscoverySettled}
-            onChooseAnotherOnPage={onAutoChooseAnotherOnPage}
+            hasCanvasImageTarget={hasCanvasImageTarget}
             onRescan={onAutoRescan}
             onSelectTarget={onAutoSelectTarget}
             onUseCanvasSelection={onAutoUseCanvasSelection}
@@ -115,9 +120,7 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
             scanError={autoScanError}
             scanPending={autoScanPending}
             selectedTarget={autoSelectedTarget}
-            selectionHint={autoSelectionHint}
-            showPageTargetList={autoShowPageTargetList}
-            showSelectionChoice={autoShowSelectionChoice}
+            displaySurfaceTarget={autoDisplaySurfaceTarget}
             targets={autoTargets}
           />
         </div>

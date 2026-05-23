@@ -131,8 +131,9 @@ Within a slice, use **segments** such as `ui/`, `model/`, `api/`, `lib/` as need
 
 This repo uses **shadcn/ui** (see `components.json`; components live under **`src/shared/ui`** via the `@/shared/ui` alias).
 
-- **Call sites do not own styling.** Do not add Tailwind classes, inline styles, or ad hoc `className` overrides at usage sites to change how a primitive looks (colors, spacing, borders, typography, states). That duplicates the design system and breaks a single source of truth.
+- **Call sites do not own styling (enforced).** Do not add Tailwind classes, inline styles, or ad hoc `className` overrides at usage sites to change how a primitive looks (colors, spacing, borders, typography, states). Treat this as a DRY/single-source-of-truth violation that must be refactored.
 - **Prefer `variant` and component API** defined on the primitive: extend the shadcn component with `class-variance-authority` (or the project’s existing pattern) so sizes, intents, and states are named and centralized.
-- **Extend in `shared/ui` only when necessary.** If a new visual or behavior is required, add or adjust the component file (or a thin wrapper next to it) under `shared/ui`, then consume the stable API elsewhere. Reserve one-off `className` at call sites for **non-visual layout** only when unavoidable (e.g. flex/grid slotting that cannot live in the primitive without harming reuse)—and keep it minimal.
+- **Extend in `shared/ui` by default.** If a new visual or behavior is required, add or adjust the component file (or a thin wrapper next to it) under `shared/ui`, then consume the stable API elsewhere. Allow one-off call-site `className` only when absolutely necessary for **non-visual layout** constraints that cannot live in the primitive without harming reuse, and keep overrides minimal.
+- **Completion gate**: before finishing, re-check changed call sites for visual styling and migrate to variants unless the strict exception above applies.
 
 When a task explicitly says to use shadcn, **add or compose from `shared/ui`**, not bespoke styled elements in features or pages.

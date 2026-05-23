@@ -6,6 +6,9 @@ import {
   buildPresetTargetKeyForScope,
   createBeaconPresetResolver,
   createSiteDefaultPresetTargetKey,
+  findBeaconPresetRowByTargetKey,
+  formatBeaconPresetDisplayName,
+  listBeaconPresetStorageEntries,
   type PresetTargetKey,
   serializePresetTargetKey,
 } from "./beacon-image-preset-domain.js";
@@ -390,6 +393,39 @@ describe("preset target key serialization", () => {
   });
 });
 
+describe("findBeaconPresetRowByTargetKey", () => {
+  it("returns site default row for site-default key", () => {
+    const siteDefault = makeRow({
+      id: "site_row",
+      targetKey: createSiteDefaultPresetTargetKey("site_1"),
+    });
+    const settings = makeSettings([], siteDefault);
+    const found = findBeaconPresetRowByTargetKey(settings, createSiteDefaultPresetTargetKey("site_1"));
+    expect(found?.id).toBe("site_row");
+  });
+
+  it("returns scoped row by canonical target key", () => {
+    const row = makeRow({
+      id: "instance_row",
+      targetKey: {
+        kind: "bare-image-instance",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+      },
+    });
+    const settings = makeSettings([row]);
+    const found = findBeaconPresetRowByTargetKey(settings, row.targetKey);
+    expect(found?.id).toBe("instance_row");
+  });
+
+  it("returns null when no row matches", () => {
+    const settings = makeSettings([]);
+    const found = findBeaconPresetRowByTargetKey(settings, createSiteDefaultPresetTargetKey("site_1"));
+    expect(found).toBeNull();
+  });
+});
+
 describe("buildPresetTargetKeyForScope", () => {
   it("builds site-default target key from any resolved target", () => {
     const key = buildPresetTargetKeyForScope({
@@ -462,5 +498,33 @@ describe("buildPresetTargetKeyForScope", () => {
         },
       })
     ).toBeNull();
+  });
+});
+
+describe("preset storage listing helpers", () => {
+  it("lists site default and scoped rows with scope labels", () => {
+    const siteDefault = makeRow({
+      id: "site",
+      name: "Default",
+      targetKey: createSiteDefaultPresetTargetKey("site_1"),
+    });
+    const instance = makeRow({
+      id: "inst",
+      targetKey: {
+        kind: "bare-image-instance",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+      },
+    });
+    const entries = listBeaconPresetStorageEntries({
+      siteDefault,
+      byTargetKey: {
+        [serializePresetTargetKey(instance.targetKey)]: instance,
+      },
+    });
+    expect(entries).toHaveLength(2);
+    expect(entries[0]?.scope).toBe("site-default");
+    expect(formatBeaconPresetDisplayName(instance, "instance")).toBe(`${instance.name} (Instance)`);
   });
 });

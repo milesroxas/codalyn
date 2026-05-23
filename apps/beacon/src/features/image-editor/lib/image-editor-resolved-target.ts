@@ -143,8 +143,18 @@ export async function mapSelectedTargetToResolvedUploadTarget(input: {
   selectedElement: AnyElement | null;
   selectedComponentImagePropId: string | null;
   elementCmsBinding: ElementCmsBindingResolution;
+  /** When false, skips Designer reads that enter component instances (preset lookup only). */
+  shouldResolveTaggedDimensions?: boolean;
 }): Promise<ResolvedUploadTarget | null> {
-  const { siteId, pageId, autoPageTarget, selectedElement, selectedComponentImagePropId, elementCmsBinding } = input;
+  const {
+    siteId,
+    pageId,
+    autoPageTarget,
+    selectedElement,
+    selectedComponentImagePropId,
+    elementCmsBinding,
+    shouldResolveTaggedDimensions = true,
+  } = input;
   const target = asImagePageTarget(autoPageTarget, selectedElement, selectedComponentImagePropId);
   if (target == null) {
     if (elementCmsBinding !== "none") {
@@ -163,7 +173,7 @@ export async function mapSelectedTargetToResolvedUploadTarget(input: {
       siteId,
       pageId,
       elementId,
-      tagged: await resolveTaggedDimensions(target),
+      tagged: shouldResolveTaggedDimensions ? await resolveTaggedDimensions(target) : null,
     };
   }
 
@@ -186,18 +196,18 @@ export async function mapSelectedTargetToResolvedUploadTarget(input: {
     instanceElementId,
     componentDefinitionId,
     imagePropId,
-    tagged: await resolveTaggedDimensions(target),
+    tagged: shouldResolveTaggedDimensions ? await resolveTaggedDimensions(target) : null,
   };
 }
 
 export function toBeaconPresetSettingsSnapshot(settings: BeaconAppSettings): BeaconPresetSettingsSnapshot {
-  const byTargetKey = new Map<PresetTargetKeyString, (typeof settings.imagePresetStorageV2.byTargetKey)[string]>();
-  for (const [key, row] of Object.entries(settings.imagePresetStorageV2.byTargetKey)) {
+  const byTargetKey = new Map<PresetTargetKeyString, (typeof settings.imagePresetStorage.byTargetKey)[string]>();
+  for (const [key, row] of Object.entries(settings.imagePresetStorage.byTargetKey)) {
     byTargetKey.set(key as PresetTargetKeyString, row);
   }
 
   return {
-    siteDefault: settings.imagePresetStorageV2.siteDefault,
+    siteDefault: settings.imagePresetStorage.siteDefault,
     byTargetKey,
     defaults: {
       exportFormat: settings.defaultExportFormat,

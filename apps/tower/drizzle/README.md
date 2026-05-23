@@ -13,6 +13,8 @@ Schema source: `src/shared/lib/db/auth-schema.ts`. Generated artifacts in this f
 | `pnpm db:migrate:dev:vercel` / `:prod:vercel` | **`vercel env pull`** to a gitignored temp file, then migrate (requires linked `apps/tower/.vercel`). |
 | `pnpm db:push` | **Dev-only** shortcut: sync schema to DB **without** new migration files. Fast iteration; do not rely on this alone for releases. |
 | `pnpm db:check` | Validates migration files against snapshots (good for CI). |
+| `pnpm db:beacon-preset-storage-migrate:local` | One-time JSON cleanup for legacy Beacon preset keys in `beacon_app_settings.payload` and `organization.beacon_team_settings`. Add `--dry-run` to preview. |
+| `pnpm db:beacon-preset-storage-migrate:dev` / `:prod` | Same data migration against remote DB (Neon / Vercel env variants mirror `db:migrate`). |
 | `pnpm db:studio` | Opens Drizzle Studio against `DATABASE_URL`. |
 
 ## Recommended flow

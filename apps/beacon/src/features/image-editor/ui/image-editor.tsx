@@ -20,18 +20,18 @@ import {
 } from "@/features/image-editor/lib/apply-cropped-export";
 import { aspectValue, type EditorAspectSelection } from "@/features/image-editor/lib/aspect-preset";
 import {
-  readBeaconPresetV2ApplyEnabled,
-  readBeaconPresetV2EnforceEnabled,
-  readBeaconPresetV2NaturalAdvisoryEnabled,
-  readBeaconPresetV2PickerEnabled,
-  readBeaconPresetV2ReadEnabled,
-} from "@/features/image-editor/lib/beacon-preset-v2-flags";
-import {
   type ElementCmsBindingResolution,
   isCmsPrimaryUploadContext,
 } from "@/features/image-editor/lib/cms-primary-upload-context";
 import { dimensionsFromMaxWidthAndAspect } from "@/features/image-editor/lib/export-dimensions-from-aspect";
-import type { ImageEditorFlowStep, ImageEditorPathMode } from "@/features/image-editor/lib/image-editor-flow-step";
+import { resolveDisplayedSurfaceTarget } from "@/features/image-editor/lib/image-editor-display-surface-target";
+import {
+  getImageEditorNavSteps,
+  type ImageEditorFlowStep,
+  type ImageEditorPathMode,
+  imageEditorStepRestartHint,
+  shouldShowImageEditorStepNav,
+} from "@/features/image-editor/lib/image-editor-flow-step";
 import {
   applyNaturalSizeSuggestionToSession,
   resolveImageEditorNaturalSizeAdvisory,
@@ -52,7 +52,6 @@ import {
 } from "@/features/image-editor/lib/image-editor-upload-preset-picker";
 import { loadImage } from "@/features/image-editor/lib/load-image";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
-import { readBeaconDesignerExportForTarget } from "@/features/image-editor/lib/read-beacon-designer-export-for-target";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { webflowElementIdKey } from "@/features/image-editor/lib/webflow-element-id-key";
 import { useApplyCroppedToWebflow } from "@/features/image-editor/model/use-apply-cropped-to-webflow";
@@ -79,7 +78,6 @@ import {
   ImageEditorRouteChrome,
   ImageEditorRouteFooterAction,
 } from "@/features/image-editor/ui/image-editor-route-chrome";
-import { ImageEditorStepNav } from "@/features/image-editor/ui/image-editor-step-nav";
 import { ImageEditorWorkspace } from "@/features/image-editor/ui/image-editor-workspace";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import {
@@ -87,19 +85,18 @@ import {
   IMAGE_UPLOAD_CONTINUE_TO_SAVE_LABEL,
 } from "@/shared/lib/beacon-feature-route-copy";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
+import { StepNav } from "@/shared/ui/step-nav";
 
-function shouldShowAutoPageSelectionChoice(
+function hasAutoCanvasImageTarget(
   pathMode: string,
   flowStep: string,
   autoDiscoverySettled: boolean,
-  dismissedCanvasSelectionPrompt: boolean,
   autoSelectionHintKind: string
 ): boolean {
   return (
     pathMode === "auto" &&
     flowStep === "autoElement" &&
     autoDiscoverySettled &&
-    !dismissedCanvasSelectionPrompt &&
     (autoSelectionHintKind === "image" || autoSelectionHintKind === "component")
   );
 }
@@ -138,79 +135,139 @@ function imageEditorRouteChromeSlots(options: {
   showFlowStepNav: boolean;
   currentStepForNav: ImageEditorFlowStep;
   imageSrc: string | null;
-  includeEntryStep: boolean;
   pathMode: ImageEditorPathMode;
   goToStep: (step: ImageEditorFlowStep) => void;
   showGuestOnboarding: boolean;
   flowStep: ImageEditorFlowStep;
-  showAutoPageTargetList: boolean;
+  autoDiscoverySettled: boolean;
   autoPageTarget: ImagePageTarget | null;
   beginAutoToUpload: () => void;
   beginPositionToSave: () => void;
   continueToSaveDisabled: boolean;
   stepExitFade: boolean;
   savePlaceAction: { label: string; disabled: boolean; busy: boolean; onPlace: () => void } | null;
+  configurePresetsFooter: ReactNode | null;
+  configurePresetsSubheader: ReactNode | null;
 }): { subheader?: ReactNode; footer?: ReactNode } {
   const {
     showFlowStepNav,
     currentStepForNav,
     imageSrc,
-    includeEntryStep,
     pathMode,
     goToStep,
     showGuestOnboarding,
     flowStep,
-    showAutoPageTargetList,
+    autoDiscoverySettled,
     autoPageTarget,
     beginAutoToUpload,
     beginPositionToSave,
     continueToSaveDisabled,
     stepExitFade,
     savePlaceAction,
+    configurePresetsFooter,
+    configurePresetsSubheader,
   } = options;
 
-  const subheader = showFlowStepNav ? (
-    <ImageEditorStepNav
-      current={currentStepForNav}
-      hasImage={imageSrc != null}
-      includeEntryStep={includeEntryStep}
-      pathMode={pathMode}
-      onGoToStep={goToStep}
-    />
-  ) : undefined;
+  const defaultSubheader =
+    showFlowStepNav && shouldShowImageEditorStepNav(pathMode) ? (
+      <StepNav
+        aria-label="Image editor steps"
+        current={currentStepForNav}
+        onStepSelect={goToStep}
+        steps={getImageEditorNavSteps(pathMode).map((step) => ({
+          id: step.id,
+          label: step.label,
+          restartHint: imageEditorStepRestartHint(step.id, imageSrc != null),
+        }))}
+      />
+    ) : null;
+  const subheader =
+    !showGuestOnboarding && flowStep === "configurePresets"
+      ? (configurePresetsSubheader ?? defaultSubheader)
+      : defaultSubheader;
 
-  const showContinueToAddFooter =
-    !showGuestOnboarding && flowStep === "autoElement" && showAutoPageTargetList && imageSrc == null;
-
-  const showContinueToSaveFooter = !showGuestOnboarding && flowStep === "position" && imageSrc != null;
-
-  const showSavePlaceFooter = !showGuestOnboarding && flowStep === "save" && imageSrc != null;
-
-  const footer = showContinueToAddFooter ? (
-    <ImageEditorRouteFooterAction
-      label={IMAGE_UPLOAD_CONTINUE_TO_ADD_LABEL}
-      disabled={autoPageTarget == null || stepExitFade}
-      onAction={beginAutoToUpload}
-      trailingIcon={<ArrowRight aria-hidden strokeWidth={2.25} />}
-    />
-  ) : showContinueToSaveFooter ? (
-    <ImageEditorRouteFooterAction
-      label={IMAGE_UPLOAD_CONTINUE_TO_SAVE_LABEL}
-      disabled={continueToSaveDisabled || stepExitFade}
-      onAction={beginPositionToSave}
-      trailingIcon={<ArrowRight aria-hidden strokeWidth={2.25} />}
-    />
-  ) : showSavePlaceFooter && savePlaceAction ? (
-    <ImageEditorRouteFooterAction
-      label={savePlaceAction.label}
-      disabled={savePlaceAction.disabled}
-      busy={savePlaceAction.busy}
-      onAction={savePlaceAction.onPlace}
-      trailingIcon={<Crop aria-hidden strokeWidth={2.25} />}
-    />
-  ) : undefined;
+  const footer = resolveImageEditorRouteFooter({
+    showGuestOnboarding,
+    flowStep,
+    autoDiscoverySettled,
+    imageSrc,
+    autoPageTarget,
+    stepExitFade,
+    beginAutoToUpload,
+    continueToSaveDisabled,
+    beginPositionToSave,
+    savePlaceAction,
+    configurePresetsFooter,
+  });
 
   return { subheader, footer };
+}
+
+function resolveImageEditorRouteFooter(options: {
+  showGuestOnboarding: boolean;
+  flowStep: ImageEditorFlowStep;
+  autoDiscoverySettled: boolean;
+  imageSrc: string | null;
+  autoPageTarget: ImagePageTarget | null;
+  stepExitFade: boolean;
+  beginAutoToUpload: () => void;
+  continueToSaveDisabled: boolean;
+  beginPositionToSave: () => void;
+  savePlaceAction: { label: string; disabled: boolean; busy: boolean; onPlace: () => void } | null;
+  configurePresetsFooter: ReactNode | null;
+}): ReactNode | undefined {
+  const {
+    showGuestOnboarding,
+    flowStep,
+    autoDiscoverySettled,
+    imageSrc,
+    autoPageTarget,
+    stepExitFade,
+    beginAutoToUpload,
+    continueToSaveDisabled,
+    beginPositionToSave,
+    savePlaceAction,
+    configurePresetsFooter,
+  } = options;
+
+  if (showGuestOnboarding) {
+    return undefined;
+  }
+  if (flowStep === "configurePresets") {
+    return configurePresetsFooter ?? undefined;
+  }
+  if (flowStep === "autoElement" && autoDiscoverySettled && imageSrc == null && autoPageTarget != null) {
+    return (
+      <ImageEditorRouteFooterAction
+        label={IMAGE_UPLOAD_CONTINUE_TO_ADD_LABEL}
+        disabled={stepExitFade}
+        onAction={beginAutoToUpload}
+        trailingIcon={<ArrowRight aria-hidden strokeWidth={2.25} />}
+      />
+    );
+  }
+  if (flowStep === "position" && imageSrc != null) {
+    return (
+      <ImageEditorRouteFooterAction
+        label={IMAGE_UPLOAD_CONTINUE_TO_SAVE_LABEL}
+        disabled={continueToSaveDisabled || stepExitFade}
+        onAction={beginPositionToSave}
+        trailingIcon={<ArrowRight aria-hidden strokeWidth={2.25} />}
+      />
+    );
+  }
+  if (flowStep === "save" && imageSrc != null && savePlaceAction) {
+    return (
+      <ImageEditorRouteFooterAction
+        label={savePlaceAction.label}
+        disabled={savePlaceAction.disabled}
+        busy={savePlaceAction.busy}
+        onAction={savePlaceAction.onPlace}
+        trailingIcon={<Crop aria-hidden strokeWidth={2.25} />}
+      />
+    );
+  }
+  return undefined;
 }
 
 type SessionConstraintSetters = {
@@ -284,17 +341,11 @@ export function ImageEditor() {
   }, []);
   const [autoPageTarget, setAutoPageTarget] = useState<ImagePageTarget | null>(null);
   const [autoTargetHasDesignerExportTag, setAutoTargetHasDesignerExportTag] = useState(false);
-  const [dismissedCanvasSelectionPrompt, setDismissedCanvasSelectionPrompt] = useState(false);
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
   const exportDefaultsHydratedRef = useRef(!towerUser?.id);
   const serverExportDefaultsAppliedRef = useRef(false);
   const towerConfigured = isTowerConfigured();
   const allowAvifEncoding = Boolean(towerUser);
-  const presetV2ReadEnabled = useMemo(() => readBeaconPresetV2ReadEnabled(), []);
-  const presetV2ApplyEnabled = useMemo(() => readBeaconPresetV2ApplyEnabled(), []);
-  const presetV2PickerEnabled = useMemo(() => readBeaconPresetV2PickerEnabled(), []);
-  const presetV2EnforceEnabled = useMemo(() => readBeaconPresetV2EnforceEnabled(), []);
-  const presetV2NaturalAdvisoryEnabled = useMemo(() => readBeaconPresetV2NaturalAdvisoryEnabled(), []);
   const isConfirmedGuest = !towerUser && !towerSessionPending;
   const { isCmsCollectionTemplatePage: cmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
   const guestCmsTemplateRestricted = isConfirmedGuest && cmsCollectionTemplatePage;
@@ -304,8 +355,9 @@ export function ImageEditor() {
   const [resolverSiteId, setResolverSiteId] = useState<string | null>(null);
   const [resolverPageId, setResolverPageId] = useState<string | null>(null);
   const [resolvedUploadTarget, setResolvedUploadTarget] = useState<ResolvedUploadTarget | null>(null);
+  const [configurePresetsFooter, setConfigurePresetsFooter] = useState<ReactNode | null>(null);
+  const [configurePresetsSubheader, setConfigurePresetsSubheader] = useState<ReactNode | null>(null);
   const lastResolvedTargetInputKeyRef = useRef<string | null>(null);
-  const lastAppliedResolvedConstraintsKeyRef = useRef<string | null>(null);
   const lastAppliedUploadPresetOptionIdRef = useRef<string | null>(null);
   const skipNextPersistExportDefaultsRef = useRef(false);
   const [uploadPresetOptionId, setUploadPresetOptionId] = useState<string>("");
@@ -332,11 +384,6 @@ export function ImageEditor() {
   } = useComponentInstanceImageProps();
 
   useEffect(() => {
-    if (!presetV2ReadEnabled) {
-      setResolverSiteId(null);
-      setResolverPageId(null);
-      return;
-    }
     let cancelled = false;
     void webflow
       .getSiteInfo()
@@ -369,10 +416,10 @@ export function ImageEditor() {
       cancelled = true;
       unsub();
     };
-  }, [presetV2ReadEnabled]);
+  }, []);
 
   const resolverTargetInput = useMemo(() => {
-    if (!presetV2ReadEnabled || resolverSiteId == null || resolverPageId == null || imageSrc == null) {
+    if (resolverSiteId == null || resolverPageId == null || imageSrc == null) {
       return null;
     }
     return buildResolvedTargetInput({
@@ -384,7 +431,6 @@ export function ImageEditor() {
       elementCmsBinding,
     });
   }, [
-    presetV2ReadEnabled,
     resolverSiteId,
     resolverPageId,
     autoPageTarget,
@@ -417,7 +463,7 @@ export function ImageEditor() {
   }, [resolverTargetInput]);
 
   const resolvedConstraintsReadout = useResolvedExportConstraints({
-    enabled: presetV2ReadEnabled,
+    enabled: true,
     settings,
     target: resolvedUploadTarget,
   });
@@ -425,20 +471,13 @@ export function ImageEditor() {
   const uploadPresetPickerStateOptions = useMemo(
     () =>
       buildUploadPresetPickerOptions({
-        enabled: presetV2PickerEnabled && presetV2ReadEnabled,
+        enabled: true,
         settings,
         target: resolvedUploadTarget,
         readout: resolvedConstraintsReadout,
         allowTeamPresets: !isConfirmedGuest,
       }),
-    [
-      presetV2PickerEnabled,
-      presetV2ReadEnabled,
-      settings,
-      resolvedUploadTarget,
-      resolvedConstraintsReadout,
-      isConfirmedGuest,
-    ]
+    [settings, resolvedUploadTarget, resolvedConstraintsReadout, isConfirmedGuest]
   );
 
   const uploadPresetPickerOptions = useMemo<UploadPresetPickerOption[]>(
@@ -461,7 +500,7 @@ export function ImageEditor() {
   );
 
   useEffect(() => {
-    if (!presetV2PickerEnabled || !presetV2ReadEnabled || imageSrc == null) {
+    if (imageSrc == null) {
       setUploadPresetOptionId("");
       lastAppliedUploadPresetOptionIdRef.current = null;
       return;
@@ -473,14 +512,7 @@ export function ImageEditor() {
     if (nextOptionId !== uploadPresetOptionId) {
       setUploadPresetOptionId(nextOptionId);
     }
-  }, [
-    presetV2PickerEnabled,
-    presetV2ReadEnabled,
-    imageSrc,
-    resolvedConstraintsReadout,
-    uploadPresetPickerOptionMap,
-    uploadPresetOptionId,
-  ]);
+  }, [imageSrc, resolvedConstraintsReadout, uploadPresetPickerOptionMap, uploadPresetOptionId]);
 
   const visibleBuiltinAspectPresets = useMemo(() => getVisibleBuiltinAspectPresets(settings), [settings]);
 
@@ -588,11 +620,11 @@ export function ImageEditor() {
   const sessionConstraintApplication = useMemo(
     () =>
       resolveSessionResolvedConstraintsApplication({
-        enabled: presetV2ApplyEnabled && presetV2ReadEnabled,
+        enabled: true,
         imageSrc,
         readout: resolvedConstraintsReadout,
       }),
-    [presetV2ApplyEnabled, presetV2ReadEnabled, imageSrc, resolvedConstraintsReadout]
+    [imageSrc, resolvedConstraintsReadout]
   );
 
   useEffect(() => {
@@ -600,41 +632,6 @@ export function ImageEditor() {
   }, [sessionConstraintApplication.taggedDimensionsActive]);
 
   useEffect(() => {
-    if (presetV2PickerEnabled && presetV2ReadEnabled) {
-      return;
-    }
-    setSessionMaxFileSizeBytes(sessionConstraintApplication.maxFileSizeBytes);
-    if (!sessionConstraintApplication.shouldApply || sessionConstraintApplication.constraints == null) {
-      lastAppliedResolvedConstraintsKeyRef.current = null;
-      return;
-    }
-    const applyKey = JSON.stringify({
-      target: resolvedUploadTarget,
-      source: sessionConstraintApplication.source,
-      constraints: sessionConstraintApplication.constraints,
-      imageSrc,
-    });
-    if (lastAppliedResolvedConstraintsKeyRef.current === applyKey) {
-      return;
-    }
-    lastAppliedResolvedConstraintsKeyRef.current = applyKey;
-    skipNextPersistExportDefaultsRef.current = true;
-    applySessionConstraintsFromPickerSelection(sessionConstraintApplication.constraints, {
-      setOutputWidth,
-      setOutputHeight,
-      setWidthStr,
-      setHeightStr,
-      setExportFormat,
-      setQuality,
-      setCropFrameMode,
-      setAspectPreset,
-    });
-  }, [presetV2PickerEnabled, presetV2ReadEnabled, sessionConstraintApplication, resolvedUploadTarget, imageSrc]);
-
-  useEffect(() => {
-    if (!presetV2PickerEnabled || !presetV2ReadEnabled) {
-      return;
-    }
     const selectedOption = uploadPresetPickerOptionMap.get(uploadPresetOptionId) ?? null;
     const selectedConstraints = selectedOption?.constraints ?? null;
     if (selectedOption == null || isManualUploadPresetOptionId(selectedOption.id)) {
@@ -667,14 +664,7 @@ export function ImageEditor() {
       setCropFrameMode,
       setAspectPreset,
     });
-  }, [
-    presetV2PickerEnabled,
-    presetV2ReadEnabled,
-    resolvedUploadTarget,
-    uploadPresetOptionId,
-    uploadPresetPickerOptionMap,
-    imageSrc,
-  ]);
+  }, [resolvedUploadTarget, uploadPresetOptionId, uploadPresetPickerOptionMap, imageSrc]);
 
   useEffect(() => {
     if (!allowAvifEncoding && exportFormat === "avif") {
@@ -698,7 +688,7 @@ export function ImageEditor() {
   useRevokeBlobUrlOnChange(imageSrc);
 
   useEffect(() => {
-    if (!presetV2NaturalAdvisoryEnabled || imageSrc == null) {
+    if (imageSrc == null) {
       setSourceNaturalSize(null);
       return;
     }
@@ -722,7 +712,7 @@ export function ImageEditor() {
     return () => {
       cancelled = true;
     };
-  }, [imageSrc, presetV2NaturalAdvisoryEnabled]);
+  }, [imageSrc]);
 
   const parsedOutputW = useMemo(() => {
     if (autoTargetHasDesignerExportTag) {
@@ -773,7 +763,7 @@ export function ImageEditor() {
   const naturalSizeAdvisory = useMemo(
     () =>
       resolveImageEditorNaturalSizeAdvisory({
-        enabled: presetV2NaturalAdvisoryEnabled && imageSrc != null,
+        enabled: imageSrc != null,
         dismissed: naturalSizeAdvisoryKey != null && dismissedNaturalSizeAdvisoryKey === naturalSizeAdvisoryKey,
         naturalSize: sourceNaturalSize,
         comparisonSize: advisoryComparisonSize,
@@ -782,7 +772,6 @@ export function ImageEditor() {
         canEditSessionDimensions: !autoTargetHasDesignerExportTag,
       }),
     [
-      presetV2NaturalAdvisoryEnabled,
       imageSrc,
       naturalSizeAdvisoryKey,
       dismissedNaturalSizeAdvisoryKey,
@@ -864,11 +853,11 @@ export function ImageEditor() {
   const presetFileLimitBlocker = useMemo(
     () =>
       resolveImageEditorPresetFileLimitBlocker({
-        enforceEnabled: presetV2EnforceEnabled && presetV2ReadEnabled,
+        enforceEnabled: true,
         maxFileSizeBytes: sessionMaxFileSizeBytes,
         estimatedBytes,
       }),
-    [presetV2EnforceEnabled, presetV2ReadEnabled, sessionMaxFileSizeBytes, estimatedBytes]
+    [sessionMaxFileSizeBytes, estimatedBytes]
   );
 
   const exportSizeBlockedMessage = useMemo(() => {
@@ -935,7 +924,6 @@ export function ImageEditor() {
     frameSummary,
     currentStepForNav,
     showFlowStepNav,
-    includeEntryStep,
   } = useImageEditorWorkflow({
     imageSrc,
     dissolving,
@@ -1006,26 +994,6 @@ export function ImageEditor() {
         setSelectedComponentImagePropId(t.imagePropId);
       }
       setPlacement(t.kind === "image" ? "replace" : "selection");
-      if (presetV2ApplyEnabled) {
-        setCropFrameMode("aspect");
-        setAspectPreset("unset");
-        setOutputWidth(0);
-        setOutputHeight(0);
-        setWidthStr("");
-        setHeightStr("");
-        return;
-      }
-      const tagged = await readBeaconDesignerExportForTarget(t);
-      if (tagged) {
-        setAutoTargetHasDesignerExportTag(true);
-        setCropFrameMode("custom");
-        setOutputWidth(tagged.width);
-        setOutputHeight(tagged.height);
-        setWidthStr(String(tagged.width));
-        setHeightStr(String(tagged.height));
-        setAspectPreset("free");
-        return;
-      }
       setCropFrameMode("aspect");
       setAspectPreset("unset");
       setOutputWidth(0);
@@ -1033,7 +1001,7 @@ export function ImageEditor() {
       setWidthStr("");
       setHeightStr("");
     },
-    [presetV2ApplyEnabled, setSelectedComponentImagePropId]
+    [setSelectedComponentImagePropId]
   );
 
   const onExportMaxWidthBlur = useCallback(() => {
@@ -1083,7 +1051,6 @@ export function ImageEditor() {
   const onChooseAddImageEntry = useCallback(() => {
     setAutoPageTarget(null);
     setAutoTargetHasDesignerExportTag(false);
-    setDismissedCanvasSelectionPrompt(false);
     setAspectPreset("unset");
     setCropFrameMode("aspect");
     setWidthStr("");
@@ -1096,7 +1063,6 @@ export function ImageEditor() {
   const onChooseConfigureEntry = useCallback(() => {
     setAutoPageTarget(null);
     setAutoTargetHasDesignerExportTag(false);
-    setDismissedCanvasSelectionPrompt(false);
     setAspectPreset("unset");
     setCropFrameMode("aspect");
     setWidthStr("");
@@ -1119,11 +1085,7 @@ export function ImageEditor() {
       return;
     }
     const t =
-      autoSelectionHint.kind === "image"
-        ? autoSelectionHint.target
-        : autoSelectionHint.kind === "component"
-          ? autoSelectionHint.target
-          : null;
+      autoSelectionHint.kind === "image" || autoSelectionHint.kind === "component" ? autoSelectionHint.target : null;
     if (t) {
       setAutoPageTarget(t);
       void applyAutoPageTarget(t);
@@ -1131,27 +1093,17 @@ export function ImageEditor() {
     }
   }, [autoSelectionHint, applyAutoPageTarget, beginAutoToUpload]);
 
-  const onAutoChooseAnotherOnPage = useCallback(() => {
-    setDismissedCanvasSelectionPrompt(true);
-    setAutoPageTarget(null);
-    setAutoTargetHasDesignerExportTag(false);
-    setAspectPreset("unset");
-    setCropFrameMode("aspect");
-    setWidthStr("");
-    setHeightStr("");
-    setOutputWidth(0);
-    setOutputHeight(0);
-  }, []);
-
-  const autoShowSelectionChoice = shouldShowAutoPageSelectionChoice(
+  const hasCanvasImageTarget = hasAutoCanvasImageTarget(
     pathMode,
     flowStep,
     autoDiscoverySettled,
-    dismissedCanvasSelectionPrompt,
     autoSelectionHint.kind
   );
 
-  const showAutoPageTargetList = autoDiscoverySettled && !autoShowSelectionChoice;
+  const autoDisplaySurfaceTarget = useMemo(
+    () => resolveDisplayedSurfaceTarget(autoSelectionHint, autoPageTarget),
+    [autoPageTarget, autoSelectionHint]
+  );
 
   const exportPlaceBlockedForApply = useMemo(() => {
     if (pathMode === "auto" && isConfirmedGuest && currentCmsItemId) {
@@ -1170,7 +1122,6 @@ export function ImageEditor() {
     if (pathMode === "unset" && flowStep === "entry") {
       setAutoPageTarget(null);
       setAutoTargetHasDesignerExportTag(false);
-      setDismissedCanvasSelectionPrompt(false);
       setAspectPreset("unset");
       setCropFrameMode("aspect");
       setWidthStr("");
@@ -1314,8 +1265,8 @@ export function ImageEditor() {
   );
 
   const uploadPresetPickerVisible = useMemo(
-    () => presetV2PickerEnabled && presetV2ReadEnabled && uploadPresetPickerOptions.length > 0,
-    [presetV2PickerEnabled, presetV2ReadEnabled, uploadPresetPickerOptions.length]
+    () => uploadPresetPickerOptions.length > 0,
+    [uploadPresetPickerOptions.length]
   );
 
   const loadedEditor =
@@ -1398,7 +1349,7 @@ export function ImageEditor() {
           flowPhase={flowStep === "position" ? "position" : "save"}
           hidePlacementCard={pathMode === "auto"}
           frameSummary={frameSummary}
-          showResolvedReadout={presetV2ReadEnabled}
+          showResolvedReadout
           resolvedUploadTarget={resolvedUploadTarget}
           resolvedConstraintsReadout={resolvedConstraintsReadout}
           sessionMaxFileSizeBytes={sessionMaxFileSizeBytes}
@@ -1419,18 +1370,19 @@ export function ImageEditor() {
     showFlowStepNav,
     currentStepForNav,
     imageSrc,
-    includeEntryStep,
     pathMode,
     goToStep,
     showGuestOnboarding,
     flowStep,
-    showAutoPageTargetList,
+    autoDiscoverySettled,
     autoPageTarget,
     beginAutoToUpload,
     beginPositionToSave,
     continueToSaveDisabled: completedCrop == null || !exportDimensionsReady,
     stepExitFade,
     savePlaceAction,
+    configurePresetsFooter,
+    configurePresetsSubheader,
   });
 
   return (
@@ -1452,15 +1404,17 @@ export function ImageEditor() {
               autoScanError={autoScanError}
               autoScanPending={autoScanPending}
               autoSelectedTarget={autoPageTarget}
-              autoSelectionHint={autoSelectionHint}
+              autoDisplaySurfaceTarget={autoDisplaySurfaceTarget}
               autoDiscoverySettled={autoDiscoverySettled}
-              autoShowPageTargetList={showAutoPageTargetList}
-              autoShowSelectionChoice={autoShowSelectionChoice}
               autoTargets={autoScanTargets}
+              hasCanvasImageTarget={hasCanvasImageTarget}
+              onAutoUseCanvasSelection={onAutoUseCanvasSelection}
               dragActive={dragActive}
               stepExitFade={stepExitFade}
               fileInputId={fileInputId}
               onDoneConfiguringPresets={finishConfigurePath}
+              onConfigurePresetsFooterChange={setConfigurePresetsFooter}
+              onConfigurePresetsSubheaderChange={setConfigurePresetsSubheader}
               flowStep={flowStep}
               handleDrag={handleDrag}
               handleDragState={handleDragState}
@@ -1468,10 +1422,8 @@ export function ImageEditor() {
               isConfirmedGuest={isConfirmedGuest}
               isTowerUser={isTowerUser}
               isWorkspaceDesigner={isWorkspaceDesigner}
-              onAutoChooseAnotherOnPage={onAutoChooseAnotherOnPage}
               onAutoRescan={onAutoRescan}
               onAutoSelectTarget={onAutoSelectTarget}
-              onAutoUseCanvasSelection={onAutoUseCanvasSelection}
               onChooseAddImage={onChooseAddImageEntry}
               onChooseConfigure={onChooseConfigureEntry}
               onStepExitTransitionEnd={onStepExitTransitionEnd}

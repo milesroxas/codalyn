@@ -14,6 +14,7 @@ import { BEACON_BACK_TO_HOME_ARIA_LABEL } from "@/shared/lib/beacon-feature-rout
 import { cn } from "@/shared/lib/utils";
 import { Button, type buttonVariants } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
+import { hasBeaconRouteSubheaderContent } from "@/shared/ui/step-nav";
 
 export type BeaconFeatureRouteHeaderProps = {
   title: string;
@@ -146,9 +147,12 @@ export type BeaconFeatureRouteSubheaderProps = {
   dataSlot?: string;
 };
 
-/** Pinned strip directly under the route header (e.g. step breadcrumbs). */
+/** Pinned strip directly under the route header (e.g. step breadcrumbs). Hidden when empty. */
 export function BeaconFeatureRouteSubheader(props: BeaconFeatureRouteSubheaderProps) {
   const { children, dataSlot = "beacon_feature_route_subheader" } = props;
+  if (!hasBeaconRouteSubheaderContent(children)) {
+    return null;
+  }
   return (
     <div className="shrink-0 border-b border-border/50 bg-background" data-slot={dataSlot}>
       <div className={cn(beaconPanelContainClass, "px-3 py-2")}>{children}</div>

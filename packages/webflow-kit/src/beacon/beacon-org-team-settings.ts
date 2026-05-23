@@ -3,9 +3,7 @@ import type { z } from "zod";
 import { type BeaconAppSettings, beaconAppSettingsSchema, mergeBeaconAppSettings } from "./beacon-app-settings.js";
 
 const beaconOrgTeamFieldsSchema = beaconAppSettingsSchema.pick({
-  imagePresets: true,
-  imagePresetStorageV2: true,
-  designerOnlyImagePresets: true,
+  imagePresetStorage: true,
   hiddenBuiltinAspectPresets: true,
   defaultAspectPreset: true,
   defaultExportFormat: true,
@@ -31,14 +29,8 @@ export function mergeOrgTeamSettingsIntoUser(
     return user;
   }
   const patch: Partial<BeaconAppSettings> = {};
-  if (org.imagePresets !== undefined) {
-    patch.imagePresets = org.imagePresets;
-  }
-  if (org.imagePresetStorageV2 !== undefined) {
-    patch.imagePresetStorageV2 = org.imagePresetStorageV2;
-  }
-  if (org.designerOnlyImagePresets !== undefined) {
-    patch.designerOnlyImagePresets = org.designerOnlyImagePresets;
+  if (org.imagePresetStorage !== undefined) {
+    patch.imagePresetStorage = org.imagePresetStorage;
   }
   if (org.hiddenBuiltinAspectPresets !== undefined) {
     patch.hiddenBuiltinAspectPresets = org.hiddenBuiltinAspectPresets;
@@ -62,9 +54,7 @@ export function mergeOrgTeamSettingsIntoUser(
 }
 
 const PRESET_KEYS = new Set<keyof BeaconAppSettings>([
-  "imagePresets",
-  "imagePresetStorageV2",
-  "designerOnlyImagePresets",
+  "imagePresetStorage",
   "hiddenBuiltinAspectPresets",
   "defaultAspectPreset",
   "defaultExportFormat",

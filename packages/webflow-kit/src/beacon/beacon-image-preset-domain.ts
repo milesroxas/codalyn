@@ -500,3 +500,102 @@ export function createBeaconPresetResolver(): BeaconPresetResolver {
     },
   };
 }
+
+type PresetStorageLookup = {
+  siteDefault: BeaconPresetRow | null;
+  byTargetKey: Readonly<Record<string, BeaconPresetRow>> | ReadonlyMap<PresetTargetKeyString, BeaconPresetRow>;
+};
+
+function findRowInByTargetKey(
+  byTargetKey: PresetStorageLookup["byTargetKey"],
+  keyString: PresetTargetKeyString
+): BeaconPresetRow | null {
+  if (byTargetKey instanceof Map) {
+    const direct = byTargetKey.get(keyString);
+    if (direct !== undefined) {
+      return direct;
+    }
+    for (const row of byTargetKey.values()) {
+      if (serializePresetTargetKey(row.targetKey) === keyString) {
+        return row;
+      }
+    }
+    return null;
+  }
+  const record = byTargetKey as Readonly<Record<string, BeaconPresetRow>>;
+  const direct = record[keyString];
+  if (direct !== undefined) {
+    return direct;
+  }
+  for (const row of Object.values(record)) {
+    if (serializePresetTargetKey(row.targetKey) === keyString) {
+      return row;
+    }
+  }
+  return null;
+}
+
+/** Returns the stored preset row for a canonical target key, if any. */
+export function findBeaconPresetRowByTargetKey(
+  storage: PresetStorageLookup,
+  key: PresetTargetKey
+): BeaconPresetRow | null {
+  if (key.kind === "site-default") {
+    if (storage.siteDefault === null) {
+      return null;
+    }
+    return serializePresetTargetKey(storage.siteDefault.targetKey) === serializePresetTargetKey(key)
+      ? storage.siteDefault
+      : null;
+  }
+  return findRowInByTargetKey(storage.byTargetKey, serializePresetTargetKey(key));
+}
+
+export function inferPresetCrudScopeFromTargetKey(row: BeaconPresetRow): PresetCrudScope {
+  if (row.targetKey.kind === "site-default") {
+    return "site-default";
+  }
+  if (row.targetKey.kind === "component-image") {
+    return "component";
+  }
+  if (row.targetKey.kind === "bare-image-element" || row.targetKey.kind === "component-image-element") {
+    return "element";
+  }
+  return "instance";
+}
+
+export function labelForPresetCrudScope(scope: PresetCrudScope): string {
+  if (scope === "site-default") {
+    return "Site default";
+  }
+  if (scope === "element") {
+    return "Element";
+  }
+  if (scope === "component") {
+    return "Component";
+  }
+  return "Instance";
+}
+
+export type BeaconPresetStorageEntry = {
+  row: BeaconPresetRow;
+  scope: PresetCrudScope;
+};
+
+export function listBeaconPresetStorageEntries(storage: {
+  siteDefault: BeaconPresetRow | null;
+  byTargetKey: Readonly<Record<string, BeaconPresetRow>>;
+}): BeaconPresetStorageEntry[] {
+  const entries: BeaconPresetStorageEntry[] = [];
+  if (storage.siteDefault !== null) {
+    entries.push({ row: storage.siteDefault, scope: "site-default" });
+  }
+  for (const row of Object.values(storage.byTargetKey)) {
+    entries.push({ row, scope: inferPresetCrudScopeFromTargetKey(row) });
+  }
+  return entries;
+}
+
+export function formatBeaconPresetDisplayName(row: BeaconPresetRow, scope: PresetCrudScope): string {
+  return `${row.name} (${labelForPresetCrudScope(scope)})`;
+}

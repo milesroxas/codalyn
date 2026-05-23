@@ -34,6 +34,13 @@ Use **pnpm** only (`packageManager` in root `package.json`).
 - Shared code: `packages/loadout`, `packages/webflow-kit`, `packages/observability`.
 - Workspace layout and commands: root `README.md`.
 
+## UI styling ownership (always enforce)
+
+- Do not style shared components at call sites.
+- When a new look is needed, update or extend the component variant/API at the owning primitive (typically under `shared/ui`), then consume the variant.
+- Allow call-site overrides only when absolutely necessary for non-visual layout placement that cannot be expressed in the primitive without harming reuse.
+- Treat call-site visual styling as a DRY/single-source-of-truth violation and refactor before considering work complete.
+
 ## App-specific guides
 
 | App | Extra agent context |

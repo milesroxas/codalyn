@@ -19,6 +19,7 @@ import {
 } from "@/shared/ui/drawer";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
+import { SectionLabelDivider } from "@/shared/ui/section-label-divider";
 
 type OnThisPageSectionProps = {
   nameFieldId: string;
@@ -62,15 +63,15 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
         <DrawerTrigger asChild>
           <Button
             type="button"
-            variant="cmsSlotsCard"
-            size="cmsSlotsCard"
+            variant="actionCard"
+            size="actionCard"
             disabled={pageScanLoading}
             aria-busy={pageScanLoading}
             aria-expanded={createFormOpen}
             aria-haspopup="dialog"
           >
+            <Plus data-icon="inline-start" aria-hidden strokeWidth={2.25} />
             <span>{CMS_SLOTS_ADD_SLOT_LABEL}</span>
-            <Plus aria-hidden strokeWidth={2.25} />
           </Button>
         </DrawerTrigger>
         <DrawerContent>
@@ -121,13 +122,7 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
 
       {hasBeacons ? (
         <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="h-px min-w-0 flex-1 bg-border/60" aria-hidden />
-            <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-              {CMS_SLOTS_PUBLISHED_SECTION_LABEL}
-            </span>
-            <div className="h-px min-w-0 flex-1 bg-border/60" aria-hidden />
-          </div>
+          <SectionLabelDivider label={CMS_SLOTS_PUBLISHED_SECTION_LABEL} />
           <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0" aria-label={CMS_SLOTS_PAGE_LIST_ARIA_LABEL}>
             {pageBeacons.map((b) => (
               <CmsSlotPublishedSlotTile

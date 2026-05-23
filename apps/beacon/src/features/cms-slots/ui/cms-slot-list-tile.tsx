@@ -1,8 +1,7 @@
-import { Loader2, MoreVertical } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { displayLabelForDataList } from "@/features/cms-slots/model/cms-slot-data-list-display";
-import { cn } from "@/shared/lib/utils";
-import { Button } from "@/shared/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
+import { TileBottomPinnedLabel, TileButton, TileGridListItem, TileOverlayButton, TileSurface } from "@/shared/ui/tile";
 
 type CmsSlotListTileProps = {
   label: string;
@@ -18,50 +17,30 @@ export function CmsSlotListTile(props: CmsSlotListTileProps) {
   const showActionsMenu = onRequestDelete != null;
 
   return (
-    <li className="list-none">
-      <div className="relative w-full">
-        <button
-          type="button"
-          className={cn(
-            "relative flex min-h-[6.75rem] w-full flex-col rounded-xl border border-border/80 bg-card text-left shadow-sm outline-none transition-[border-color,background-color,opacity]",
-            "hover:border-border hover:bg-muted/25 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
-            busy && "pointer-events-none opacity-60"
-          )}
+    <TileGridListItem>
+      <TileSurface>
+        <TileButton
+          tileVariant="cmsUpload"
+          busy={busy}
           disabled={disabled}
-          aria-busy={busy}
           aria-label={`Open ${label}`}
           onClick={() => void onOpen()}
         >
-          <span
-            className={cn(
-              "pointer-events-none absolute bottom-3 left-3.5 text-sm font-medium text-foreground",
-              showActionsMenu ? "right-11" : "right-3.5"
-            )}
-          >
-            {label}
-          </span>
-          {busy ? (
-            <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-card/80">
-              <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
-            </span>
-          ) : null}
-        </button>
+          <TileBottomPinnedLabel reserveActionSpace={showActionsMenu}>{label}</TileBottomPinnedLabel>
+        </TileButton>
 
         {showActionsMenu ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                size="icon-sm"
-                variant="ghost"
-                className="absolute top-1.5 right-1.5 z-10 text-foreground/90 hover:bg-muted/60 hover:text-foreground"
+              <TileOverlayButton
+                intent="menu"
                 disabled={disabled}
                 aria-label={`More actions for ${label}`}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => event.stopPropagation()}
               >
                 <MoreVertical aria-hidden className="size-4" strokeWidth={2} />
-              </Button>
+              </TileOverlayButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-36">
               <DropdownMenuItem disabled={disabled || busy} onSelect={() => void onOpen()}>
@@ -73,8 +52,8 @@ export function CmsSlotListTile(props: CmsSlotListTileProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
-      </div>
-    </li>
+      </TileSurface>
+    </TileGridListItem>
   );
 }
 

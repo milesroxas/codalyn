@@ -15,42 +15,46 @@ export type ImageEditorStepOrderOptions = {
 
 type NavItem = { id: ImageEditorFlowStep; label: string };
 
-const NAV_START: ImageEditorFlowStep = "entry";
-
-function navAuto(includeEntry: boolean): NavItem[] {
-  const core: NavItem[] = [
+function navAuto(): NavItem[] {
+  return [
     { id: "autoElement", label: "Target" },
     { id: "upload", label: "Add" },
     { id: "position", label: "Position" },
     { id: "save", label: "Save" },
   ];
-  if (includeEntry) {
-    return [{ id: NAV_START, label: "Start" }, ...core];
-  }
-  return core;
 }
 
 function navConfigurations(): NavItem[] {
-  return [
-    { id: NAV_START, label: "Start" },
-    { id: "configurePresets", label: "Presets" },
-  ];
+  return [{ id: "configurePresets", label: "Presets" }];
 }
 
-export function getImageEditorNavSteps(
-  pathMode: ImageEditorPathMode,
-  orderOpts: ImageEditorStepOrderOptions
-): NavItem[] {
+export function getImageEditorNavSteps(pathMode: ImageEditorPathMode): NavItem[] {
   if (pathMode === "unset") {
     return [];
   }
   if (pathMode === "auto") {
-    return navAuto(orderOpts.includeEntryStep);
+    return navAuto();
   }
   if (pathMode === "configurations") {
     return navConfigurations();
   }
   return [];
+}
+
+export function shouldShowImageEditorStepNav(pathMode: ImageEditorPathMode): boolean {
+  return getImageEditorNavSteps(pathMode).length > 0;
+}
+
+export const IMAGE_EDITOR_STEP_RESTART_HINT = "Restarts this step — you will add your image file again.";
+
+export function imageEditorStepRestartHint(stepId: ImageEditorFlowStep, hasImage: boolean): string | undefined {
+  if (!hasImage) {
+    return undefined;
+  }
+  if (stepId === "autoElement" || stepId === "configurePresets") {
+    return IMAGE_EDITOR_STEP_RESTART_HINT;
+  }
+  return undefined;
 }
 
 /** Linear step order for a path (used for back navigation and step index). */

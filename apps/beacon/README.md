@@ -4,6 +4,10 @@ Asset tooling Designer Extension for Webflow. See the [Designer Extension docs](
 
 Workspace setup, monorepo commands, and the shared Webflow extension bundle workflow are documented in the [repository root README](../../README.md).
 
+## Internal docs
+
+- [Image upload presets](./docs/image-upload-presets.md)
+
 ## Development
 
 From the repository root: `pnpm app beacon dev`. From this directory: `pnpm dev`.

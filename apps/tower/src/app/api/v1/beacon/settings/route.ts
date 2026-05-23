@@ -2,13 +2,12 @@ import {
   BEACON_IMAGE_ERROR_CODES,
   type BeaconAppSettings,
   getDefaultBeaconAppSettings,
-  mergeBeaconAppSettings,
   mergeOrgTeamSettingsIntoUser,
   parseBeaconAppSettings,
   parseBeaconAppSettingsPartial,
   parseBeaconOrgTeamSettingsPartial,
   splitBeaconSettingsPatch,
-  validateBeaconPresetStorageV2Patch,
+  validateBeaconPresetStoragePatch,
 } from "@codalyn/webflow-kit";
 import { eq } from "drizzle-orm";
 import {
@@ -47,7 +46,7 @@ function extractBody(raw: unknown): { organizationId?: string; patch: Partial<Be
   const organizationId = typeof o.organizationId === "string" ? o.organizationId : undefined;
   const { organizationId: _drop, ...rest } = o;
   void _drop;
-  const normalized = validateBeaconPresetStorageV2Patch(rest);
+  const normalized = validateBeaconPresetStoragePatch(rest);
   if (!normalized.ok) {
     return { organizationId, patch: {} };
   }
@@ -98,7 +97,7 @@ async function loadEffectiveSettings(userId: string, ctx: Awaited<ReturnType<typ
   const team = ctx?.beaconTeamSettings ?? null;
   const merged = mergeOrgTeamSettingsIntoUser(userSettings, team);
   const editorExperience = ctx ? computeBeaconEditorExperience(ctx) : false;
-  const settings = editorExperience ? mergeBeaconAppSettings(merged, { designerOnlyImagePresets: [] }) : merged;
+  const settings = merged;
   const canManageTeamBeaconSettings = ctx ? canManageBeaconTeamSettings(ctx) : false;
   const restrictToEditorExperience =
     ctx && isTowerTeamAdminRole(ctx.memberRole) ? ctx.beaconRestrictToEditorExperience : false;
@@ -163,7 +162,7 @@ export async function PUT(req: Request) {
     return jsonError(400, "Invalid JSON");
   }
 
-  const normalizedPatchInput = validateBeaconPresetStorageV2Patch(rawBody);
+  const normalizedPatchInput = validateBeaconPresetStoragePatch(rawBody);
   if (!normalizedPatchInput.ok) {
     return jsonError(400, "Invalid preset target key", normalizedPatchInput.errorCode);
   }

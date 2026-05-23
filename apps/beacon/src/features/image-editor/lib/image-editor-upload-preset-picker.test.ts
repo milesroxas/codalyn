@@ -67,7 +67,7 @@ describe("buildUploadPresetPickerOptions", () => {
       siteId: "site-1",
     });
     const settings = makeSettings({
-      imagePresetStorageV2: {
+      imagePresetStorage: {
         siteDefault: {
           id: "preset-site",
           name: "Site",
@@ -117,7 +117,7 @@ describe("buildUploadPresetPickerOptions", () => {
       elementId: "img-1",
     });
     const settings = makeSettings({
-      imagePresetStorageV2: {
+      imagePresetStorage: {
         siteDefault: null,
         byTargetKey: {
           [instanceKey]: {
@@ -147,6 +147,18 @@ describe("buildUploadPresetPickerOptions", () => {
       maxFileSizeBytes: 88_000,
       quality: settings.defaultExportQuality,
     });
+  });
+
+  it("returns manual-only option for cms-ambiguous target", () => {
+    const options = buildUploadPresetPickerOptions({
+      enabled: true,
+      settings: getDefaultBeaconAppSettings(),
+      target: { kind: "cms-ambiguous", siteId: "site-1" },
+      readout: makeReadout({ source: "manual", constraints: null, presetId: null }),
+      allowTeamPresets: true,
+    });
+    expect(options).toHaveLength(1);
+    expect(options[0]?.scope).toBe("manual");
   });
 });
 

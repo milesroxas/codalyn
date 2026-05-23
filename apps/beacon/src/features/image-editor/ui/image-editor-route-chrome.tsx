@@ -9,6 +9,7 @@ import {
   BeaconFeatureRouteSubheader,
 } from "@/app/ui/beacon-feature-route-chrome";
 import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
+import { hasBeaconRouteSubheaderContent } from "@/shared/ui/step-nav";
 
 export type ImageEditorRouteChromeProps = {
   children: ReactNode;
@@ -19,14 +20,13 @@ export type ImageEditorRouteChromeProps = {
 
 export function ImageEditorRouteChrome(props: ImageEditorRouteChromeProps) {
   const { children, subheader, footer, scrollResetKey } = props;
+  const routeSubheader = hasBeaconRouteSubheaderContent(subheader) ? (
+    <BeaconFeatureRouteSubheader dataSlot="image_upload_route_subheader">{subheader}</BeaconFeatureRouteSubheader>
+  ) : null;
   return (
     <BeaconFeatureRouteChrome
       header={<BeaconFeatureRouteHeader title={IMAGE_UPLOAD_FEATURE_NAME} dataSlot="image_upload_route_header" />}
-      subheader={
-        subheader ? (
-          <BeaconFeatureRouteSubheader dataSlot="image_upload_route_subheader">{subheader}</BeaconFeatureRouteSubheader>
-        ) : null
-      }
+      subheader={routeSubheader}
       footer={
         footer ? (
           <BeaconFeatureRouteFooter dataSlot="image_upload_route_footer" className="items-stretch gap-2">

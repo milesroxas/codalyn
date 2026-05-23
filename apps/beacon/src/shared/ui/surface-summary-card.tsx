@@ -1,0 +1,532 @@
+import { cva, type VariantProps } from "class-variance-authority";
+import type * as React from "react";
+
+import { cn } from "@/shared/lib/utils";
+import { ScrollArea } from "@/shared/ui/scroll-area";
+
+const surfaceSummaryCardVariants = cva("flex min-w-0 flex-col gap-2 rounded-sm border px-3 py-2.5 text-left", {
+  variants: {
+    state: {
+      empty: "border-border/60 bg-muted/20",
+      selected: "border-border/80 bg-muted/35",
+    },
+  },
+  defaultVariants: {
+    state: "empty",
+  },
+});
+
+const surfaceSummaryCardLabelClass = "text-[11px] font-medium text-muted-foreground";
+const surfaceSummaryCardTitleClass = "text-sm font-medium leading-snug";
+const surfaceSummaryCardMetaClass = "text-muted-foreground text-[10px] leading-snug";
+const surfaceSummaryCardEmptyClass = "text-muted-foreground text-xs leading-relaxed";
+const surfaceSummaryCardPendingClass = "text-muted-foreground flex items-center gap-2 text-xs leading-relaxed";
+const surfaceSummaryCardSectionLabelClass = "text-[10px] font-medium text-muted-foreground";
+
+const surfaceSummaryCardPanelSectionLabelClass =
+  "text-[10px] font-medium uppercase tracking-wide text-muted-foreground";
+
+const surfaceSummaryCardPanelVariants = cva("flex min-w-0 flex-col overflow-hidden rounded-md border text-left", {
+  variants: {
+    tone: {
+      default: "border-border/80 bg-card",
+    },
+  },
+  defaultVariants: {
+    tone: "default",
+  },
+});
+
+const surfaceSummaryCardIconBoxVariants = cva(
+  "flex size-9 shrink-0 items-center justify-center rounded-sm border bg-muted/40 text-muted-foreground [&_svg:not([class*='size-'])]:size-4",
+  {
+    variants: {
+      tone: {
+        default: "border-border/70",
+      },
+    },
+    defaultVariants: {
+      tone: "default",
+    },
+  }
+);
+
+const surfaceSummaryCardNestedCardVariants = cva("flex min-w-0 items-center gap-3 rounded-sm border px-3 py-2.5", {
+  variants: {
+    tone: {
+      default: "border-border/70 bg-muted/20",
+    },
+  },
+  defaultVariants: {
+    tone: "default",
+  },
+});
+
+const surfaceSummaryCardOptionRowVariants = cva(
+  "flex min-w-0 w-full cursor-pointer items-center gap-3 rounded-sm border px-3 py-2.5 text-left outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      tone: {
+        default: "border-border/70 bg-muted/15 hover:bg-muted/30",
+      },
+    },
+    defaultVariants: {
+      tone: "default",
+    },
+  }
+);
+
+const surfaceSummaryCardOptionRowChevronClass = "size-4 shrink-0 text-muted-foreground";
+
+const surfaceSummaryCardSelectRowVariants = cva(
+  "flex min-w-0 w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors has-focus-visible:outline-none has-focus-visible:ring-2 has-focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      selected: {
+        true: "border-primary/55 bg-accent/35 ring-1 ring-primary/15",
+        false: "border-border/70 bg-muted/15 hover:bg-muted/30",
+      },
+      interactive: {
+        true: "cursor-pointer",
+        false: "cursor-default",
+      },
+    },
+    defaultVariants: {
+      selected: false,
+      interactive: true,
+    },
+  }
+);
+
+const surfaceSummaryCardSelectRowListClass = "flex min-w-0 flex-col gap-2";
+
+const surfaceSummaryCardSurfaceSummaryClass = "flex min-w-0 flex-col gap-2";
+
+const surfaceSummaryCardFormFieldsClass = "flex min-w-0 flex-col gap-4";
+
+const surfaceSummaryCardScanListSectionClass = "flex w-full min-w-0 flex-col gap-2";
+
+const surfaceSummaryCardScanListSectionVariants = cva(surfaceSummaryCardScanListSectionClass, {
+  variants: {
+    scrollable: {
+      true: "max-h-48 min-h-0 overflow-hidden",
+      false: "",
+    },
+  },
+  defaultVariants: {
+    scrollable: false,
+  },
+});
+const surfaceSummaryCardScanListSectionHeaderClass = "flex min-w-0 shrink-0 items-center justify-between gap-2";
+const surfaceSummaryCardScanListSectionLabelClass = "text-muted-foreground text-xs";
+const surfaceSummaryCardScanListStatusClass = "text-muted-foreground flex shrink-0 items-center gap-2 text-xs";
+const surfaceSummaryCardScanListErrorClass = "shrink-0 text-destructive text-xs";
+const surfaceSummaryCardScanListScrollClass = "h-44 w-full min-w-0 pr-2";
+
+const surfaceSummaryCardNestedCardListClass = "flex min-w-0 flex-col gap-2";
+
+const surfaceSummaryCardIntroClass = "text-muted-foreground text-xs leading-relaxed";
+
+function SurfaceSummaryCard({
+  className,
+  state,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardVariants>) {
+  return (
+    <div data-slot="surface-summary-card" className={cn(surfaceSummaryCardVariants({ state }), className)} {...props} />
+  );
+}
+
+function SurfaceSummaryCardLabel({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p data-slot="surface-summary-card-label" className={cn(surfaceSummaryCardLabelClass, className)} {...props} />
+  );
+}
+
+function SurfaceSummaryCardBody({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div data-slot="surface-summary-card-body" className={cn("flex min-w-0 flex-col gap-0.5", className)} {...props} />
+  );
+}
+
+function SurfaceSummaryCardTitle({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p data-slot="surface-summary-card-title" className={cn(surfaceSummaryCardTitleClass, className)} {...props} />
+  );
+}
+
+function SurfaceSummaryCardMeta({ className, ...props }: React.ComponentProps<"p">) {
+  return <p data-slot="surface-summary-card-meta" className={cn(surfaceSummaryCardMetaClass, className)} {...props} />;
+}
+
+function SurfaceSummaryCardPending({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p data-slot="surface-summary-card-pending" className={cn(surfaceSummaryCardPendingClass, className)} {...props} />
+  );
+}
+
+function SurfaceSummaryCardEmpty({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p data-slot="surface-summary-card-empty" className={cn(surfaceSummaryCardEmptyClass, className)} {...props} />
+  );
+}
+
+function SurfaceSummaryCardSection({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-section"
+      className={cn("flex min-w-0 flex-col gap-1.5", className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardSectionLabel({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="surface-summary-card-section-label"
+      className={cn(surfaceSummaryCardSectionLabelClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardActionRow({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-action-row"
+      className={cn("flex min-w-0 items-center justify-between gap-2", className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardActionCopy({ className, ...props }: React.ComponentProps<"div">) {
+  return <div data-slot="surface-summary-card-action-copy" className={cn("min-w-0 flex-1", className)} {...props} />;
+}
+
+function SurfaceSummaryCardPanel({
+  className,
+  tone,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardPanelVariants>) {
+  return (
+    <div
+      data-slot="surface-summary-card-panel"
+      className={cn(surfaceSummaryCardPanelVariants({ tone }), className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardPanelSection({
+  className,
+  showDivider = true,
+  ...props
+}: React.ComponentProps<"section"> & { showDivider?: boolean }) {
+  return (
+    <section
+      data-slot="surface-summary-card-panel-section"
+      className={cn("flex min-w-0 flex-col gap-2 px-3 py-3", showDivider && "border-b border-border/60", className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardPanelSectionLabel({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="surface-summary-card-panel-section-label"
+      className={cn(surfaceSummaryCardPanelSectionLabelClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardIntro({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p data-slot="surface-summary-card-intro" className={cn(surfaceSummaryCardIntroClass, className)} {...props} />
+  );
+}
+
+function SurfaceSummaryCardIconBox({
+  className,
+  tone,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardIconBoxVariants>) {
+  return (
+    <div
+      data-slot="surface-summary-card-icon-box"
+      className={cn(surfaceSummaryCardIconBoxVariants({ tone }), className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardIconRow({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-icon-row"
+      className={cn("flex min-w-0 items-center gap-3", className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardIconRowCopy({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-icon-row-copy"
+      className={cn("flex min-w-0 flex-1 flex-col gap-0.5", className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardNestedCard({
+  className,
+  tone,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardNestedCardVariants>) {
+  return (
+    <div
+      data-slot="surface-summary-card-nested-card"
+      className={cn(surfaceSummaryCardNestedCardVariants({ tone }), className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardNestedCardCopy({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-nested-card-copy"
+      className={cn("flex min-w-0 flex-1 flex-col gap-0.5", className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardOptionRow({
+  className,
+  tone,
+  ...props
+}: React.ComponentProps<"button"> & VariantProps<typeof surfaceSummaryCardOptionRowVariants>) {
+  return (
+    <button
+      type="button"
+      data-slot="surface-summary-card-option-row"
+      className={cn(surfaceSummaryCardOptionRowVariants({ tone }), className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardOptionRowCopy({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-option-row-copy"
+      className={cn("flex min-w-0 flex-1 flex-col gap-0.5 text-left", className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardOptionRows({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-option-rows"
+      className={cn("flex min-w-0 flex-col gap-2", className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardNestedCardList({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-nested-card-list"
+      className={cn(surfaceSummaryCardNestedCardListClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardOptionRowChevron({ className, children, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="surface-summary-card-option-row-chevron"
+      className={cn(surfaceSummaryCardOptionRowChevronClass, "[&_svg:not([class*='size-'])]:size-4", className)}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SurfaceSummaryCardSelectRow({
+  className,
+  selected = false,
+  interactive = true,
+  htmlFor,
+  children,
+  ...props
+}: React.ComponentProps<"label"> & VariantProps<typeof surfaceSummaryCardSelectRowVariants>) {
+  return (
+    <label
+      htmlFor={htmlFor}
+      data-slot="surface-summary-card-select-row"
+      data-selected={selected ? "true" : "false"}
+      className={cn(surfaceSummaryCardSelectRowVariants({ selected, interactive }), className)}
+      {...props}
+    >
+      {children}
+    </label>
+  );
+}
+
+function SurfaceSummaryCardSurfaceDisplay({
+  className,
+  selected = true,
+  ...props
+}: React.ComponentProps<"div"> & Pick<VariantProps<typeof surfaceSummaryCardSelectRowVariants>, "selected">) {
+  return (
+    <div
+      data-slot="surface-summary-card-surface-display"
+      data-selected={selected ? "true" : "false"}
+      className={cn(surfaceSummaryCardSelectRowVariants({ selected, interactive: false }), className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardSelectRowList({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-select-row-list"
+      className={cn(surfaceSummaryCardSelectRowListClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardSurfaceSummary({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-surface-summary"
+      className={cn(surfaceSummaryCardSurfaceSummaryClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardFormFields({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-form-fields"
+      className={cn(surfaceSummaryCardFormFieldsClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardScanListSection({
+  className,
+  scrollable = false,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardScanListSectionVariants>) {
+  return (
+    <div
+      data-slot="surface-summary-card-scan-list-section"
+      className={cn(surfaceSummaryCardScanListSectionVariants({ scrollable }), className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardScanListSectionHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-scan-list-section-header"
+      className={cn(surfaceSummaryCardScanListSectionHeaderClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardScanListSectionLabel({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="surface-summary-card-scan-list-section-label"
+      className={cn(surfaceSummaryCardScanListSectionLabelClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardScanListStatus({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="surface-summary-card-scan-list-status"
+      className={cn(surfaceSummaryCardScanListStatusClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardScanListError({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="surface-summary-card-scan-list-error"
+      className={cn(surfaceSummaryCardScanListErrorClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardScanListScroll({ children }: { children: React.ReactNode }) {
+  return (
+    <ScrollArea className={surfaceSummaryCardScanListScrollClass} data-slot="surface-summary-card-scan-list-scroll">
+      {children}
+    </ScrollArea>
+  );
+}
+
+export {
+  SurfaceSummaryCard,
+  SurfaceSummaryCardActionCopy,
+  SurfaceSummaryCardActionRow,
+  SurfaceSummaryCardBody,
+  SurfaceSummaryCardEmpty,
+  SurfaceSummaryCardFormFields,
+  SurfaceSummaryCardIconBox,
+  SurfaceSummaryCardIconRow,
+  SurfaceSummaryCardIconRowCopy,
+  SurfaceSummaryCardIntro,
+  SurfaceSummaryCardLabel,
+  SurfaceSummaryCardMeta,
+  SurfaceSummaryCardNestedCard,
+  SurfaceSummaryCardNestedCardCopy,
+  SurfaceSummaryCardNestedCardList,
+  SurfaceSummaryCardOptionRow,
+  SurfaceSummaryCardOptionRowChevron,
+  SurfaceSummaryCardOptionRowCopy,
+  SurfaceSummaryCardOptionRows,
+  SurfaceSummaryCardPanel,
+  SurfaceSummaryCardPanelSection,
+  SurfaceSummaryCardPanelSectionLabel,
+  SurfaceSummaryCardPending,
+  SurfaceSummaryCardScanListError,
+  SurfaceSummaryCardScanListScroll,
+  SurfaceSummaryCardScanListSection,
+  SurfaceSummaryCardScanListSectionHeader,
+  SurfaceSummaryCardScanListSectionLabel,
+  SurfaceSummaryCardScanListStatus,
+  SurfaceSummaryCardSection,
+  SurfaceSummaryCardSectionLabel,
+  SurfaceSummaryCardSelectRow,
+  SurfaceSummaryCardSelectRowList,
+  SurfaceSummaryCardSurfaceDisplay,
+  SurfaceSummaryCardSurfaceSummary,
+  SurfaceSummaryCardTitle,
+};

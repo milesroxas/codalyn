@@ -2,40 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   getDefaultBeaconAppSettings,
   parseBeaconAppSettings,
-  validateBeaconPresetStorageV2Patch,
+  validateBeaconPresetStoragePatch,
 } from "./beacon-app-settings.js";
 import { BEACON_IMAGE_ERROR_CODES } from "./beacon-image-errors.js";
 import { serializePresetTargetKey } from "./beacon-image-preset-domain.js";
 
-describe("beacon app settings v2 preset storage", () => {
-  it("loads legacy settings without crashing", () => {
-    const parsed = parseBeaconAppSettings({
-      version: 1,
-      theme: "dark",
-      defaultExportFormat: "webp",
-      defaultExportQuality: 0.75,
-      defaultAspectPreset: "free",
-      imagePresets: [],
-      designerOnlyImagePresets: [],
-    });
-    expect(parsed.version).toBe(1);
-    expect(parsed.imagePresets).toEqual([]);
-    expect(parsed.imagePresetStorageV2).toEqual({
-      siteDefault: null,
-      byTargetKey: {},
-    });
+describe("beacon app settings preset storage", () => {
+  it("returns defaults for fresh install payload", () => {
+    const parsed = parseBeaconAppSettings({});
+    expect(parsed).toEqual(getDefaultBeaconAppSettings());
   });
 
-  it("keeps legacy preset rows readable", () => {
-    const parsed = parseBeaconAppSettings({
-      ...getDefaultBeaconAppSettings(),
-      imagePresets: [{ id: "legacy_1", name: "Legacy", width: 1200, height: 800, maxFileSizeBytes: 100_000 }],
-    });
-    expect(parsed.imagePresets).toHaveLength(1);
-    expect(parsed.imagePresets[0]?.id).toBe("legacy_1");
-  });
-
-  it("parses and canonicalizes v2 byTargetKey entries", () => {
+  it("parses and canonicalizes byTargetKey entries", () => {
     const row = {
       id: "row_1",
       name: "Row 1",
@@ -52,7 +30,7 @@ describe("beacon app settings v2 preset storage", () => {
     };
     const parsed = parseBeaconAppSettings({
       ...getDefaultBeaconAppSettings(),
-      imagePresetStorageV2: {
+      imagePresetStorage: {
         siteDefault: null,
         byTargetKey: {
           not_canonical: row,
@@ -60,14 +38,14 @@ describe("beacon app settings v2 preset storage", () => {
       },
     });
     const canonical = serializePresetTargetKey(row.targetKey);
-    expect(parsed.imagePresetStorageV2?.byTargetKey[canonical]?.id).toBe("row_1");
-    expect(Object.keys(parsed.imagePresetStorageV2?.byTargetKey ?? {})).toEqual([canonical]);
+    expect(parsed.imagePresetStorage?.byTargetKey[canonical]?.id).toBe("row_1");
+    expect(Object.keys(parsed.imagePresetStorage?.byTargetKey ?? {})).toEqual([canonical]);
   });
 
-  it("round-trips v2 settings without data loss", () => {
+  it("round-trips preset storage without data loss", () => {
     const settings = {
       ...getDefaultBeaconAppSettings(),
-      imagePresetStorageV2: {
+      imagePresetStorage: {
         siteDefault: {
           id: "site_default",
           name: "Site default",
@@ -104,12 +82,12 @@ describe("beacon app settings v2 preset storage", () => {
       },
     };
     const parsed = parseBeaconAppSettings(settings);
-    expect(parsed.imagePresetStorageV2).toEqual(settings.imagePresetStorageV2);
+    expect(parsed.imagePresetStorage).toEqual(settings.imagePresetStorage);
   });
 
-  it("rejects invalid target keys in v2 patch validation", () => {
-    const result = validateBeaconPresetStorageV2Patch({
-      imagePresetStorageV2: {
+  it("rejects invalid target keys in patch validation", () => {
+    const result = validateBeaconPresetStoragePatch({
+      imagePresetStorage: {
         siteDefault: null,
         byTargetKey: {
           anything: {
@@ -133,9 +111,9 @@ describe("beacon app settings v2 preset storage", () => {
     }
   });
 
-  it("rejects duplicate canonical target keys in v2 patch validation", () => {
-    const result = validateBeaconPresetStorageV2Patch({
-      imagePresetStorageV2: {
+  it("rejects duplicate canonical target keys in patch validation", () => {
+    const result = validateBeaconPresetStoragePatch({
+      imagePresetStorage: {
         siteDefault: null,
         byTargetKey: {
           one: {

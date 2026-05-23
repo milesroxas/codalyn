@@ -6,7 +6,6 @@ import {
   applyImageEditorBackNavigation,
   type ImageEditorFlowStep,
   type ImageEditorPathMode,
-  imageEditorIncludeEntryInStepOrder,
 } from "@/features/image-editor/lib/image-editor-flow-step";
 import { prefersReducedMotion } from "@/features/image-editor/lib/prefers-reduced-motion";
 
@@ -60,11 +59,6 @@ export function useImageEditorWorkflow(options: UseImageEditorWorkflowOptions) {
   const [stepExitFade, setStepExitFade] = useState(false);
   const [stepExitFrom, setStepExitFrom] = useState<ImageEditorStepExitFrom | null>(null);
   const imageSrcReplaceDetectRef = useRef<string | null>(null);
-
-  const includeEntryStep = useMemo(
-    () => imageEditorIncludeEntryInStepOrder(pathMode, isWorkspaceDesigner),
-    [pathMode, isWorkspaceDesigner]
-  );
 
   const clearImageSourceOnly = useCallback(() => {
     setImageSrcInternal((prev) => {
@@ -210,7 +204,6 @@ export function useImageEditorWorkflow(options: UseImageEditorWorkflowOptions) {
     setFlowStep,
     clearImageSourceOnly,
     goToStep,
-    includeEntryStep,
     chooseAutoPath,
     chooseConfigurePath,
     finishConfigurePath,

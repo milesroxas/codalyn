@@ -25,3 +25,11 @@ Re-scan your diff for duplication, parallel definitions of the same concept, and
 ## UI (shadcn apps)
 
 Call sites do not own visual styling. Extend primitives under `shared/ui` (variants/CVA) — see `apps/beacon/AGENTS.md` for the full shadcn rule.
+
+### Styling ownership (enforced)
+
+- **Default rule**: do not style components at call sites. Do not introduce `className`, inline `style`, or ad hoc wrappers to change a primitive's colors, spacing, borders, typography, radius, shadows, or interactive states.
+- **Required path**: if a component needs a new look, update or extend that component's variant/component API in `shared/ui` (or the owning shared primitive), then consume the named variant at call sites.
+- **Exception policy**: call-site overrides are allowed only when absolutely necessary for non-visual layout constraints (placement-only flex/grid/width behavior that cannot live in the primitive). Keep overrides minimal and local.
+- **Review gate**: when a diff adds visual classes at usage sites, refactor to a component variant before completing the task unless the exception policy explicitly applies.
+- **DRY + single source of truth**: visual decisions must live in one component definition, not duplicated across feature/page call sites.

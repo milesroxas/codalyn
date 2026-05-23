@@ -15,18 +15,18 @@ export function CmsSlotPreInstallBlock(props: CmsSlotPreInstallBlockProps) {
     <div className="mx-auto w-full max-w-md py-4" data-slot="cms_slots_install">
       <Button
         type="button"
-        variant="cmsSlotsCard"
-        size="cmsSlotsCard"
+        variant="actionCard"
+        size="actionCard"
         disabled={installPending || pageScanLoading}
         aria-busy={installPending}
         onClick={() => void onInstallWrapper()}
       >
-        <span>{installPending ? "Installing…" : CMS_SLOTS_INSTALL_LABEL}</span>
         {installPending ? (
-          <Loader2 className="size-5 shrink-0 animate-spin" aria-hidden />
+          <Loader2 data-icon="inline-start" className="shrink-0 animate-spin" aria-hidden />
         ) : (
-          <Radio aria-hidden strokeWidth={2.25} />
+          <Radio data-icon="inline-start" aria-hidden strokeWidth={2.25} />
         )}
+        <span>{installPending ? "Installing…" : CMS_SLOTS_INSTALL_LABEL}</span>
       </Button>
     </div>
   );

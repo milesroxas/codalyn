@@ -31,3 +31,5 @@ Manifest: **`webflow.json`** (`publicDir` is **`dist`**, **`apiVersion`**: `"2"`
 - Follow repo **`.cursor/rules/code-quality.mdc`** and **`security.mdc`** for every task.
 - Prefer **minimal, task-scoped** changes; match existing patterns in `src/`.
 - **Reference files** (`@path`) when the task touches known files; otherwise search the repo before editing.
+- Do not style components at call sites; update or extend variants/component APIs at the owning primitive in `shared/ui`.
+- Only use call-site style overrides when absolutely necessary for non-visual layout placement and keep them minimal.

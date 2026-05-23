@@ -58,7 +58,7 @@ function sourceScope(source: PresetConstraintSource): UploadPresetPickerScope {
 }
 
 function resolveSingleRowConstraints(args: {
-  row: NonNullable<BeaconAppSettings["imagePresetStorageV2"]["siteDefault"]>;
+  row: NonNullable<BeaconAppSettings["imagePresetStorage"]["siteDefault"]>;
   rowScope: UploadPresetPickerScope;
   target: ResolvedUploadTarget;
   settings: BeaconAppSettings;
@@ -82,7 +82,7 @@ function resolveSingleRowConstraints(args: {
 }
 
 function optionForRow(args: {
-  row: NonNullable<BeaconAppSettings["imagePresetStorageV2"]["siteDefault"]>;
+  row: NonNullable<BeaconAppSettings["imagePresetStorage"]["siteDefault"]>;
   scope: UploadPresetPickerScope;
   target: ResolvedUploadTarget;
   settings: BeaconAppSettings;
@@ -115,7 +115,7 @@ function pushBareImagePresetOptions(args: {
 }) {
   const { options, settings, target } = args;
   const bareInstanceRow =
-    settings.imagePresetStorageV2.byTargetKey[
+    settings.imagePresetStorage.byTargetKey[
       serializePresetTargetKey({
         kind: "bare-image-instance",
         siteId: target.siteId,
@@ -127,7 +127,7 @@ function pushBareImagePresetOptions(args: {
     options.push(optionForRow({ row: bareInstanceRow, scope: "instance", target, settings }));
   }
   const bareElementRow =
-    settings.imagePresetStorageV2.byTargetKey[
+    settings.imagePresetStorage.byTargetKey[
       serializePresetTargetKey({
         kind: "bare-image-element",
         siteId: target.siteId,
@@ -145,7 +145,7 @@ function pushComponentImagePresetOptions(args: {
 }) {
   const { options, settings, target } = args;
   const componentInstanceRow =
-    settings.imagePresetStorageV2.byTargetKey[
+    settings.imagePresetStorage.byTargetKey[
       serializePresetTargetKey({
         kind: "component-image-instance",
         siteId: target.siteId,
@@ -158,7 +158,7 @@ function pushComponentImagePresetOptions(args: {
     options.push(optionForRow({ row: componentInstanceRow, scope: "instance", target, settings }));
   }
   const componentRow =
-    settings.imagePresetStorageV2.byTargetKey[
+    settings.imagePresetStorage.byTargetKey[
       serializePresetTargetKey({
         kind: "component-image",
         siteId: target.siteId,
@@ -177,7 +177,7 @@ function pushSiteDefaultPresetOption(args: {
   target: Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }>;
 }) {
   const { options, settings, target } = args;
-  const siteDefaultRow = settings.imagePresetStorageV2.siteDefault;
+  const siteDefaultRow = settings.imagePresetStorage.siteDefault;
   if (siteDefaultRow?.targetKey.siteId === target.siteId) {
     options.push(optionForRow({ row: siteDefaultRow, scope: "site-default", target, settings }));
   }

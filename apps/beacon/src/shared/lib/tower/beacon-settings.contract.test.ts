@@ -3,6 +3,7 @@ import {
   getDefaultBeaconAppSettings,
   parseBeaconAppSettings,
   parseBeaconAppSettingsPartial,
+  serializePresetTargetKey,
 } from "@codalyn/webflow-kit";
 import { describe, expect, it } from "vitest";
 
@@ -48,10 +49,61 @@ describe("Tower ↔ Beacon settings JSON contract", () => {
     expect(merged.cmsLayout?.fieldSlug).toBe("layout-json");
   });
 
+  it("parses and preserves preset storage from Tower payloads", () => {
+    const key = serializePresetTargetKey({
+      kind: "bare-image-instance",
+      siteId: "site_1",
+      pageId: "page_1",
+      elementId: "img_1",
+    });
+    const payload = {
+      ...getDefaultBeaconAppSettings(),
+      imagePresetStorage: {
+        siteDefault: {
+          id: "site_default",
+          name: "Site default",
+          width: 1400,
+          height: 900,
+          maxFileSizeBytes: 100_000,
+          targetKey: {
+            kind: "site-default" as const,
+            siteId: "site_1",
+          },
+        },
+        byTargetKey: {
+          [key]: {
+            id: "inst_1",
+            name: "Instance",
+            width: 1000,
+            height: 1000,
+            maxFileSizeBytes: 90_000,
+            targetKey: {
+              kind: "bare-image-instance" as const,
+              siteId: "site_1",
+              pageId: "page_1",
+              elementId: "img_1",
+            },
+          },
+        },
+      },
+    };
+    expect(parseBeaconAppSettings(payload).imagePresetStorage).toEqual(payload.imagePresetStorage);
+  });
+
   it("does not accept invalid preset rows in the schema (parse falls back to defaults)", () => {
     const bad = {
       ...getDefaultBeaconAppSettings(),
-      imagePresets: [{ id: "", name: "x", width: 0, height: 100, maxFileSizeBytes: 5000 }],
+      imagePresetStorage: {
+        siteDefault: {
+          id: "",
+          name: "x",
+          width: 0,
+          height: 100,
+          maxFileSizeBytes: 5000,
+          targetKey: { kind: "site-default" as const, siteId: "site_1" },
+        },
+        byTargetKey: {},
+      },
     };
     expect(beaconAppSettingsSchema.safeParse(bad).success).toBe(false);
     expect(parseBeaconAppSettings(bad)).toEqual(getDefaultBeaconAppSettings());

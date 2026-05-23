@@ -9,7 +9,7 @@ import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useResolvedExportConstraints } from "./use-resolved-export-constraints";
 
-function withV2Settings(patch: Partial<BeaconAppSettings>): BeaconAppSettings {
+function withPresetSettings(patch: Partial<BeaconAppSettings>): BeaconAppSettings {
   return {
     ...getDefaultBeaconAppSettings(),
     ...patch,
@@ -17,8 +17,8 @@ function withV2Settings(patch: Partial<BeaconAppSettings>): BeaconAppSettings {
 }
 
 describe("useResolvedExportConstraints", () => {
-  it("returns null when beaconPresetV2Read is disabled", () => {
-    const settings = withV2Settings({});
+  it("returns null when resolver is disabled", () => {
+    const settings = withPresetSettings({});
     const target: ResolvedUploadTarget = {
       kind: "bare-image",
       siteId: "site-1",
@@ -31,7 +31,7 @@ describe("useResolvedExportConstraints", () => {
   });
 
   it("returns tagged source readout for tagged target", () => {
-    const settings = withV2Settings({});
+    const settings = withPresetSettings({});
     const target: ResolvedUploadTarget = {
       kind: "bare-image",
       siteId: "site-1",
@@ -55,8 +55,8 @@ describe("useResolvedExportConstraints", () => {
       maxFileSizeBytes: 120_000,
       targetKey: { kind: "site-default" as const, siteId: "site-1" },
     };
-    const settings = withV2Settings({
-      imagePresetStorageV2: {
+    const settings = withPresetSettings({
+      imagePresetStorage: {
         siteDefault: siteDefaultRow,
         byTargetKey: {},
       },
@@ -95,8 +95,8 @@ describe("useResolvedExportConstraints", () => {
         imagePropId: "hero-image",
       },
     };
-    const settings = withV2Settings({
-      imagePresetStorageV2: {
+    const settings = withPresetSettings({
+      imagePresetStorage: {
         siteDefault: null,
         byTargetKey: { [key]: row },
       },
@@ -127,8 +127,8 @@ describe("useResolvedExportConstraints", () => {
       kind: "bare-image-element",
       siteId: "site-1",
     });
-    const settings = withV2Settings({
-      imagePresetStorageV2: {
+    const settings = withPresetSettings({
+      imagePresetStorage: {
         siteDefault: null,
         byTargetKey: {
           [instanceKey]: {
@@ -172,9 +172,9 @@ describe("useResolvedExportConstraints", () => {
       pageId: "page-1",
       elementId: "img-1",
     });
-    const settings = withV2Settings({
+    const settings = withPresetSettings({
       defaultExportFormat: "webp",
-      imagePresetStorageV2: {
+      imagePresetStorage: {
         siteDefault: null,
         byTargetKey: {
           [instanceKey]: {
@@ -218,8 +218,8 @@ describe("useResolvedExportConstraints", () => {
       componentDefinitionId: "cmp-def",
       imagePropId: "hero-image",
     });
-    const settings = withV2Settings({
-      imagePresetStorageV2: {
+    const settings = withPresetSettings({
+      imagePresetStorage: {
         siteDefault: null,
         byTargetKey: {
           [instanceKey]: {
@@ -276,8 +276,8 @@ describe("useResolvedExportConstraints", () => {
       componentDefinitionId: "cmp-def",
       imagePropId: "hero-image",
     });
-    const settings = withV2Settings({
-      imagePresetStorageV2: {
+    const settings = withPresetSettings({
+      imagePresetStorage: {
         siteDefault: {
           id: "preset-site-default",
           name: "Site default",
@@ -321,7 +321,7 @@ describe("useResolvedExportConstraints", () => {
   });
 
   it("returns manual fallback when no tagged dimensions and no matching presets exist", () => {
-    const settings = withV2Settings({});
+    const settings = withPresetSettings({});
     const target: ResolvedUploadTarget = {
       kind: "bare-image",
       siteId: "site-1",
@@ -335,7 +335,7 @@ describe("useResolvedExportConstraints", () => {
   });
 
   it("returns ambiguous cms blocker output for cms-ambiguous target", () => {
-    const settings = withV2Settings({});
+    const settings = withPresetSettings({});
     const target: ResolvedUploadTarget = {
       kind: "cms-ambiguous",
       siteId: "site-1",

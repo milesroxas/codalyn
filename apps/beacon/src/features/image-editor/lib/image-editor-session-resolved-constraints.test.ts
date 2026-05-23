@@ -19,7 +19,7 @@ function makeReadout(overrides: Partial<ResolverOutput>): ResolverOutput {
 }
 
 describe("resolveSessionResolvedConstraintsApplication", () => {
-  it("does not apply when beaconPresetV2Apply is disabled", () => {
+  it("does not apply when resolver application is disabled", () => {
     const result = resolveSessionResolvedConstraintsApplication({
       enabled: false,
       imageSrc: "blob://img",

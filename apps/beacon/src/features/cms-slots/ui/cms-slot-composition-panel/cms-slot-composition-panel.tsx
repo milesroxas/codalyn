@@ -2,6 +2,7 @@ import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-
 import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
+import { SectionLabelDivider } from "@/shared/ui/section-label-divider";
 import { CmsSlotCompositionComponentsCatalog } from "./cms-slot-composition-components-catalog";
 import { CmsSlotEngineSelectedRow } from "./cms-slot-engine-selected-row";
 import { CmsSlotListTargetActionsBar } from "./cms-slot-list-target-actions-bar";
@@ -126,11 +127,7 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
       />
 
       <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <div className="h-px min-w-0 flex-1 bg-border" aria-hidden />
-          <span className="shrink-0 text-center text-xs text-muted-foreground">Components</span>
-          <div className="h-px min-w-0 flex-1 bg-border" aria-hidden />
-        </div>
+        <SectionLabelDivider label="Components" variant="plain" lineTone="default" />
         {selected.length === 0 ? (
           <div className="min-h-16 rounded-[10px] border border-dashed border-border bg-muted/10" aria-hidden />
         ) : (

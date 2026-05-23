@@ -22,7 +22,7 @@ export type BeaconThemePreference = z.infer<typeof beaconThemePreferenceSchema>;
 const PRESET_EDGE = z.number().int().min(1).max(8192);
 
 /**
- * Default encoded-size cap for presets (migration + invalid-input fallback).
+ * Default encoded-size cap for presets (invalid-input fallback).
  * ~100 KB keeps exports lean for fast LCP and small transfer sizes.
  */
 export const BEACON_PRESET_DEFAULT_MAX_FILE_BYTES = 100 * 1024;
@@ -31,7 +31,7 @@ export const BEACON_PRESET_DEFAULT_MAX_FILE_BYTES = 100 * 1024;
 export const BEACON_PRESET_MAX_FILE_BYTES_MIN = 1024;
 export const BEACON_PRESET_MAX_FILE_BYTES_MAX = 50 * 1024 * 1024;
 
-export const beaconImagePresetRowSchema = z.object({
+const beaconImagePresetRowSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   width: PRESET_EDGE,
@@ -42,28 +42,24 @@ export const beaconImagePresetRowSchema = z.object({
   maxFileSizeBytes: z.number().int().min(BEACON_PRESET_MAX_FILE_BYTES_MIN).max(BEACON_PRESET_MAX_FILE_BYTES_MAX),
 });
 
-export type BeaconImagePresetRow = z.infer<typeof beaconImagePresetRowSchema>;
-
 const beaconPresetTargetKeySchema = z.custom<BeaconPresetRow["targetKey"]>(isPresetTargetKey);
 
-export const beaconPresetRowV2Schema = beaconImagePresetRowSchema.extend({
+export const beaconPresetRowSchema = beaconImagePresetRowSchema.extend({
   targetKey: beaconPresetTargetKeySchema,
 });
 
-export type BeaconPresetRowV2 = z.infer<typeof beaconPresetRowV2Schema>;
-
-export const beaconPresetStorageV2Schema = z.object({
-  siteDefault: beaconPresetRowV2Schema.nullable(),
-  byTargetKey: z.record(z.string(), beaconPresetRowV2Schema),
+export const beaconPresetStorageSchema = z.object({
+  siteDefault: beaconPresetRowSchema.nullable(),
+  byTargetKey: z.record(z.string(), beaconPresetRowSchema),
 });
 
-export type BeaconPresetStorageV2 = {
-  siteDefault: BeaconPresetRowV2 | null;
-  byTargetKey: Record<PresetTargetKeyString, BeaconPresetRowV2>;
+export type BeaconPresetStorage = {
+  siteDefault: BeaconPresetRow | null;
+  byTargetKey: Record<PresetTargetKeyString, BeaconPresetRow>;
 };
 
 export type BeaconPresetStorageValidationResult =
-  | { ok: true; value: BeaconPresetStorageV2 }
+  | { ok: true; value: BeaconPresetStorage }
   | {
       ok: false;
       errorCode:
@@ -81,16 +77,10 @@ export const beaconAppSettingsSchema = z.object({
   /** Encoder quality, 0–1 (matches image editor slider). */
   defaultExportQuality: z.number().min(0).max(1),
   defaultAspectPreset: beaconAspectPresetSchema,
-  imagePresets: z.array(beaconImagePresetRowSchema),
-  imagePresetStorageV2: beaconPresetStorageV2Schema.default({
+  imagePresetStorage: beaconPresetStorageSchema.default({
     siteDefault: null,
     byTargetKey: {},
   }),
-  /**
-   * Workspace-level export presets visible only to designers (and admins), not to editors.
-   * Stored with team settings; cleared in API responses for editor experience.
-   */
-  designerOnlyImagePresets: z.array(beaconImagePresetRowSchema).default([]),
   /** Built-in aspects removed from the crop preset strip; empty means all built-ins are shown. */
   hiddenBuiltinAspectPresets: z.array(beaconAspectPresetSchema).default([]),
   /**
@@ -110,11 +100,11 @@ export const beaconAppSettingsSchema = z.object({
 
 export type BeaconAppSettings = z.infer<typeof beaconAppSettingsSchema>;
 
-function normalizeBeaconPresetStorageV2Internal(input: BeaconPresetStorageV2): BeaconPresetStorageValidationResult {
-  const byTargetKey: Record<PresetTargetKeyString, BeaconPresetRowV2> = {};
+function normalizeBeaconPresetStorageInternal(input: BeaconPresetStorage): BeaconPresetStorageValidationResult {
+  const byTargetKey: Record<PresetTargetKeyString, BeaconPresetRow> = {};
   const seen = new Set<string>();
 
-  const addRow = (row: BeaconPresetRowV2, includeInByTargetKey: boolean): BeaconPresetStorageValidationResult => {
+  const addRow = (row: BeaconPresetRow, includeInByTargetKey: boolean): BeaconPresetStorageValidationResult => {
     let serialized: PresetTargetKeyString;
     try {
       serialized = serializePresetTargetKey(row.targetKey);
@@ -154,18 +144,18 @@ function normalizeBeaconPresetStorageV2Internal(input: BeaconPresetStorageV2): B
   };
 }
 
-export function normalizeBeaconPresetStorageV2(raw: unknown): BeaconPresetStorageValidationResult {
-  const parsed = beaconPresetStorageV2Schema.safeParse(raw);
+export function normalizeBeaconPresetStorage(raw: unknown): BeaconPresetStorageValidationResult {
+  const parsed = beaconPresetStorageSchema.safeParse(raw);
   if (!parsed.success) {
     return {
       ok: false,
       errorCode: BEACON_IMAGE_ERROR_CODES.PRESET_TARGET_KEY_INVALID,
     };
   }
-  return normalizeBeaconPresetStorageV2Internal(parsed.data as BeaconPresetStorageV2);
+  return normalizeBeaconPresetStorageInternal(parsed.data as BeaconPresetStorage);
 }
 
-export function validateBeaconPresetStorageV2Patch(raw: unknown):
+export function validateBeaconPresetStoragePatch(raw: unknown):
   | {
       ok: true;
       normalizedPatch: unknown;
@@ -178,13 +168,13 @@ export function validateBeaconPresetStorageV2Patch(raw: unknown):
     return { ok: true, normalizedPatch: raw };
   }
   const record = raw as Record<string, unknown>;
-  if (!Object.keys(record).includes("imagePresetStorageV2")) {
-    return { ok: true, normalizedPatch: raw };
+  if (!Object.keys(record).includes("imagePresetStorage")) {
+    return { ok: true, normalizedPatch: record };
   }
-  if (record.imagePresetStorageV2 === undefined) {
-    return { ok: true, normalizedPatch: raw };
+  if (record.imagePresetStorage === undefined) {
+    return { ok: true, normalizedPatch: record };
   }
-  const normalized = normalizeBeaconPresetStorageV2(record.imagePresetStorageV2);
+  const normalized = normalizeBeaconPresetStorage(record.imagePresetStorage);
   if (!normalized.ok) {
     return { ok: false, errorCode: normalized.errorCode };
   }
@@ -192,7 +182,7 @@ export function validateBeaconPresetStorageV2Patch(raw: unknown):
     ok: true,
     normalizedPatch: {
       ...record,
-      imagePresetStorageV2: normalized.value,
+      imagePresetStorage: normalized.value,
     },
   };
 }
@@ -204,12 +194,10 @@ export function getDefaultBeaconAppSettings(): BeaconAppSettings {
     defaultExportFormat: DEFAULT_IMAGE_EXPORT_FORMAT,
     defaultExportQuality: 0.75,
     defaultAspectPreset: "free",
-    imagePresets: [],
-    imagePresetStorageV2: {
+    imagePresetStorage: {
       siteDefault: null,
       byTargetKey: {},
     },
-    designerOnlyImagePresets: [],
     hiddenBuiltinAspectPresets: [],
     limitCropZoomToNativeResolution: false,
     cmsLayout: {
@@ -224,75 +212,23 @@ export function getVisibleBuiltinAspectPresets(settings: BeaconAppSettings): Bea
   return BEACON_BUILTIN_ASPECT_PRESETS.filter((p) => !hidden.has(p));
 }
 
-/** Export strip: workspace presets plus designer-only rows when present. */
-export function getBeaconExportImagePresets(settings: BeaconAppSettings): BeaconImagePresetRow[] {
-  return [...settings.imagePresets, ...settings.designerOnlyImagePresets];
-}
-
-function migrateImagePresetRow(row: unknown): unknown {
-  if (row === null || typeof row !== "object" || Array.isArray(row)) {
-    return row;
-  }
-  const o = row as Record<string, unknown>;
-  const { exportQuality: _legacyQuality, ...rest } = o;
-  const rawMax = rest.maxFileSizeBytes;
-  if (typeof rawMax === "number" && Number.isFinite(rawMax)) {
-    const clamped = Math.min(
-      BEACON_PRESET_MAX_FILE_BYTES_MAX,
-      Math.max(BEACON_PRESET_MAX_FILE_BYTES_MIN, Math.round(rawMax))
-    );
-    return { ...rest, maxFileSizeBytes: clamped };
-  }
-  return { ...rest, maxFileSizeBytes: BEACON_PRESET_DEFAULT_MAX_FILE_BYTES };
-}
-
-function migrateImagePresetsField(raw: unknown): unknown {
-  if (!Array.isArray(raw)) {
-    return raw;
-  }
-  return raw.map(migrateImagePresetRow);
-}
-
 export function parseBeaconAppSettings(raw: unknown): BeaconAppSettings {
-  let normalizedV2: BeaconPresetStorageV2 = {
-    siteDefault: null,
-    byTargetKey: {},
-  };
+  let prepped: unknown = raw;
   if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
-    const maybeV2 = (raw as Record<string, unknown>).imagePresetStorageV2;
-    if (maybeV2 !== undefined) {
-      const normalized = normalizeBeaconPresetStorageV2(maybeV2);
-      if (normalized.ok) {
-        normalizedV2 = normalized.value;
-      }
+    const record = raw as Record<string, unknown>;
+    if (record.imagePresetStorage !== undefined) {
+      const normalized = normalizeBeaconPresetStorage(record.imagePresetStorage);
+      prepped = {
+        ...record,
+        imagePresetStorage: normalized.ok ? normalized.value : getDefaultBeaconAppSettings().imagePresetStorage,
+      };
     }
   }
-  const prepped =
-    raw !== null && typeof raw === "object" && !Array.isArray(raw)
-      ? {
-          ...(raw as Record<string, unknown>),
-          imagePresets: migrateImagePresetsField((raw as Record<string, unknown>).imagePresets),
-          imagePresetStorageV2: normalizedV2,
-          designerOnlyImagePresets: migrateImagePresetsField((raw as Record<string, unknown>).designerOnlyImagePresets),
-        }
-      : raw;
   const parsed = beaconAppSettingsSchema.safeParse(prepped);
   if (parsed.success) {
     return parsed.data;
   }
   return getDefaultBeaconAppSettings();
-}
-
-/** True when a persisted v1 payload predates image preset rows and should be merged with defaults (or re-saved). */
-export function beaconStoredSettingsNeedsImagePresetMigration(raw: unknown): boolean {
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    return false;
-  }
-  const o = raw as Record<string, unknown>;
-  if (o.version !== 1) {
-    return false;
-  }
-  return !Array.isArray(o.imagePresets);
 }
 
 /** Deep-enough merge for persisted JSON: `patch` wins per-field; arrays replaced when provided. */
@@ -303,15 +239,13 @@ export function mergeBeaconAppSettings(base: BeaconAppSettings, patch: Partial<B
   return beaconAppSettingsSchema.parse({
     ...base,
     ...clean,
-    imagePresets: clean.imagePresets ?? base.imagePresets,
-    imagePresetStorageV2: clean.imagePresetStorageV2 ?? base.imagePresetStorageV2,
-    designerOnlyImagePresets: clean.designerOnlyImagePresets ?? base.designerOnlyImagePresets,
+    imagePresetStorage: clean.imagePresetStorage ?? base.imagePresetStorage,
     cmsLayout: clean.cmsLayout ?? base.cmsLayout,
   });
 }
 
 export function parseBeaconAppSettingsPartial(raw: unknown): Partial<BeaconAppSettings> {
-  const normalizedPatch = validateBeaconPresetStorageV2Patch(raw);
+  const normalizedPatch = validateBeaconPresetStoragePatch(raw);
   if (!normalizedPatch.ok) {
     return {};
   }

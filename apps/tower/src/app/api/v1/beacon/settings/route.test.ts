@@ -79,14 +79,14 @@ describe("PUT /api/v1/beacon/settings", () => {
     isTowerTeamAdminRole.mockReturnValue(false);
   });
 
-  it("returns PRESET_TARGET_KEY_INVALID for invalid v2 target keys", async () => {
+  it("returns PRESET_TARGET_KEY_INVALID for invalid target keys", async () => {
     const { PUT } = await import("./route");
     const res = await PUT(
       new Request("http://localhost/api/v1/beacon/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imagePresetStorageV2: {
+          imagePresetStorage: {
             siteDefault: null,
             byTargetKey: {
               bad: {
@@ -119,7 +119,7 @@ describe("PUT /api/v1/beacon/settings", () => {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imagePresetStorageV2: {
+          imagePresetStorage: {
             siteDefault: null,
             byTargetKey: {
               one: {
@@ -158,7 +158,7 @@ describe("PUT /api/v1/beacon/settings", () => {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imagePresetStorageV2: {
+          imagePresetStorage: {
             siteDefault: null,
             byTargetKey: {},
           },
@@ -180,7 +180,7 @@ describe("PUT /api/v1/beacon/settings", () => {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imagePresetStorageV2: {
+          imagePresetStorage: {
             siteDefault: null,
             byTargetKey: {},
           },
@@ -200,7 +200,7 @@ describe("PUT /api/v1/beacon/settings", () => {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imagePresetStorageV2: {
+          imagePresetStorage: {
             siteDefault: null,
             byTargetKey: {},
           },
@@ -211,14 +211,127 @@ describe("PUT /api/v1/beacon/settings", () => {
     expect(persistTeamBeaconPatch).toHaveBeenCalledTimes(1);
   });
 
-  it("accepts site-default target key rows in v2 storage", async () => {
+  it("accepts designer mode team preset mutation when permission is granted", async () => {
+    resolveBeaconMembershipContext.mockResolvedValue({
+      userId: "user_1",
+      appUserRole: "user",
+      activeOrganizationId: "org_1",
+      memberRole: "designer",
+      beaconRestrictToEditorExperience: false,
+      beaconTeamSettings: null,
+    });
+    computeBeaconEditorExperience.mockReturnValue(false);
+    canManageBeaconTeamSettings.mockReturnValue(true);
+
     const { PUT } = await import("./route");
     const res = await PUT(
       new Request("http://localhost/api/v1/beacon/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imagePresetStorageV2: {
+          imagePresetStorage: {
+            siteDefault: null,
+            byTargetKey: {},
+          },
+        }),
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(persistTeamBeaconPatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts manager mode team preset mutation when permission is granted", async () => {
+    resolveBeaconMembershipContext.mockResolvedValue({
+      userId: "user_1",
+      appUserRole: "user",
+      activeOrganizationId: "org_1",
+      memberRole: "manager",
+      beaconRestrictToEditorExperience: false,
+      beaconTeamSettings: null,
+    });
+    computeBeaconEditorExperience.mockReturnValue(false);
+    canManageBeaconTeamSettings.mockReturnValue(true);
+
+    const { PUT } = await import("./route");
+    const res = await PUT(
+      new Request("http://localhost/api/v1/beacon/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imagePresetStorage: {
+            siteDefault: null,
+            byTargetKey: {},
+          },
+        }),
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(persistTeamBeaconPatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts product admin organization override for team settings", async () => {
+    resolveBeaconMembershipContext.mockResolvedValue({
+      userId: "user_1",
+      appUserRole: "product_admin",
+      activeOrganizationId: "org_1",
+      memberRole: "designer",
+      beaconRestrictToEditorExperience: false,
+      beaconTeamSettings: null,
+    });
+    isProductAdminAppRole.mockReturnValue(true);
+    resolveTargetOrganizationIdForTeamSettings.mockResolvedValue("org_2");
+
+    const { PUT } = await import("./route");
+    const res = await PUT(
+      new Request("http://localhost/api/v1/beacon/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: "org_2",
+          imagePresetStorage: {
+            siteDefault: null,
+            byTargetKey: {},
+          },
+        }),
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(persistTeamBeaconPatch).toHaveBeenCalledWith(
+      "user_1",
+      expect.objectContaining({
+        targetOrgId: "org_2",
+      })
+    );
+  });
+
+  it("rejects organization override for non-product-admin", async () => {
+    isProductAdminAppRole.mockReturnValue(false);
+
+    const { PUT } = await import("./route");
+    const res = await PUT(
+      new Request("http://localhost/api/v1/beacon/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: "org_2",
+          imagePresetStorage: {
+            siteDefault: null,
+            byTargetKey: {},
+          },
+        }),
+      })
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts site-default target key rows in preset storage", async () => {
+    const { PUT } = await import("./route");
+    const res = await PUT(
+      new Request("http://localhost/api/v1/beacon/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imagePresetStorage: {
             siteDefault: {
               id: "site_default_1",
               name: "Site default",

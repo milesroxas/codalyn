@@ -21,9 +21,11 @@ export type BeaconAppSettingsPatch =
   | Partial<BeaconAppSettings>
   | ((prev: BeaconAppSettings) => Partial<BeaconAppSettings>);
 
+export type BeaconSettingsUpdateResult = { ok: true } | { ok: false; error: string };
+
 type BeaconAppSettingsContextValue = {
   settings: BeaconAppSettings;
-  updateSettings: (patch: BeaconAppSettingsPatch) => void;
+  updateSettings: (patch: BeaconAppSettingsPatch) => Promise<BeaconSettingsUpdateResult>;
   syncState: BeaconSettingsSyncState;
   /** Re-fetch settings from Tower (no-op when signed out). */
   refreshBeaconSettings: () => void;
@@ -152,6 +154,56 @@ function applyTowerBeaconEnvelope(
   }
 }
 
+function isEmptySettingsPatch(patch: Partial<BeaconAppSettings>): boolean {
+  return Object.keys(patch).length === 0;
+}
+
+function rollbackOptimisticSettings(previous: BeaconAppSettings, setSettings: (s: BeaconAppSettings) => void) {
+  setSettings(previous);
+  writeLocal(previous);
+}
+
+async function persistSettingsPatchToTower(args: {
+  resolved: Partial<BeaconAppSettings>;
+  previous: BeaconAppSettings;
+  generation: number;
+  putGenerationRef: { current: number };
+  setters: Parameters<typeof applyTowerBeaconEnvelope>[1];
+  setSyncState: (state: BeaconSettingsSyncState) => void;
+}): Promise<BeaconSettingsUpdateResult> {
+  const { resolved, previous, generation, putGenerationRef, setters, setSyncState } = args;
+
+  try {
+    const response = await towerFetch("/api/v1/beacon/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(resolved),
+    });
+
+    if (generation !== putGenerationRef.current) {
+      return { ok: true };
+    }
+
+    if (!response.ok) {
+      rollbackOptimisticSettings(previous, setters.setSettings);
+      setSyncState("error");
+      return { ok: false, error: `Could not sync settings (${response.status})` };
+    }
+
+    const data = (await response.json()) as TowerBeaconApiEnvelope;
+    applyTowerBeaconEnvelope(data, setters);
+    setSyncState("synced");
+    return { ok: true };
+  } catch {
+    if (generation !== putGenerationRef.current) {
+      return { ok: true };
+    }
+    rollbackOptimisticSettings(previous, setters.setSettings);
+    setSyncState("error");
+    return { ok: false, error: "Could not sync settings" };
+  }
+}
+
 export function BeaconAppSettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useBeaconTowerSession();
   const [settings, setSettings] = useState<BeaconAppSettings>(() => readLocal());
@@ -173,6 +225,8 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
   const abortRef = useRef<AbortController | null>(null);
   /** Throttle refetch on tab focus to avoid bursty duplicate Tower load. */
   const lastVisibilityPullAtRef = useRef(0);
+  /** Ignore stale Tower PUT responses when a newer update is in flight. */
+  const putGenerationRef = useRef(0);
 
   const pullSettingsFromTower = useCallback(() => {
     if (!user?.id) {
@@ -261,39 +315,53 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
   }, [user?.id, pullSettingsFromTower]);
 
   const updateSettings = useCallback(
-    (patch: BeaconAppSettingsPatch) => {
+    async (patch: BeaconAppSettingsPatch): Promise<BeaconSettingsUpdateResult> => {
       let resolved: Partial<BeaconAppSettings> | undefined;
+      let previous: BeaconAppSettings | undefined;
+      let isNoOp = false;
+
       setSettings((prev) => {
+        previous = prev;
         const toMerge = typeof patch === "function" ? patch(prev) : patch;
         resolved = toMerge;
+        if (isEmptySettingsPatch(toMerge)) {
+          isNoOp = true;
+          return prev;
+        }
         const next = mergeBeaconAppSettings(prev, toMerge);
         writeLocal(next);
         return next;
       });
-      if (user?.id && resolved !== undefined) {
-        void towerFetch("/api/v1/beacon/settings", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(resolved),
-        }).then(async (r) => {
-          if (!r.ok) {
-            return;
-          }
-          const data = (await r.json()) as TowerBeaconApiEnvelope;
-          applyTowerBeaconEnvelope(data, {
-            setSettings,
-            setEditorExperience,
-            setCanManageTeamBeaconSettings,
-            setRestrictToEditorExperience,
-            setWorkspaceMemberRole,
-            setAppUserRole,
-            setHasActiveWorkspace,
-            setBeaconWorkspaces,
-            setActiveOrganizationId,
-            setActiveOrganizationName,
-          });
-        });
+
+      if (isNoOp || resolved === undefined || isEmptySettingsPatch(resolved)) {
+        return { ok: true };
       }
+
+      if (!user?.id || previous === undefined) {
+        return { ok: true };
+      }
+
+      const generation = ++putGenerationRef.current;
+
+      return persistSettingsPatchToTower({
+        resolved,
+        previous,
+        generation,
+        putGenerationRef,
+        setSyncState,
+        setters: {
+          setSettings,
+          setEditorExperience,
+          setCanManageTeamBeaconSettings,
+          setRestrictToEditorExperience,
+          setWorkspaceMemberRole,
+          setAppUserRole,
+          setHasActiveWorkspace,
+          setBeaconWorkspaces,
+          setActiveOrganizationId,
+          setActiveOrganizationName,
+        },
+      });
     },
     [user?.id]
   );

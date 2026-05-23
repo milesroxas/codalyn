@@ -76,7 +76,7 @@ describe("beacon app settings v2 preset storage", () => {
           exportFormat: "avif" as const,
           maxFileSizeBytes: 120_000,
           targetKey: {
-            kind: "bare-image-element" as const,
+            kind: "site-default" as const,
             siteId: "site_1",
           },
         },

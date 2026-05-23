@@ -210,4 +210,32 @@ describe("PUT /api/v1/beacon/settings", () => {
     expect(res.status).toBe(200);
     expect(persistTeamBeaconPatch).toHaveBeenCalledTimes(1);
   });
+
+  it("accepts site-default target key rows in v2 storage", async () => {
+    const { PUT } = await import("./route");
+    const res = await PUT(
+      new Request("http://localhost/api/v1/beacon/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imagePresetStorageV2: {
+            siteDefault: {
+              id: "site_default_1",
+              name: "Site default",
+              width: 1200,
+              height: 800,
+              maxFileSizeBytes: 100_000,
+              targetKey: {
+                kind: "site-default",
+                siteId: "site_1",
+              },
+            },
+            byTargetKey: {},
+          },
+        }),
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(persistTeamBeaconPatch).toHaveBeenCalledTimes(1);
+  });
 });

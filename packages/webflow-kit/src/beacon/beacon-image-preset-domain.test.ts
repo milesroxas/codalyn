@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   type BeaconPresetRow,
   type BeaconPresetSettingsSnapshot,
+  buildPresetTargetKeyForScope,
   createBeaconPresetResolver,
+  createSiteDefaultPresetTargetKey,
   type PresetTargetKey,
   serializePresetTargetKey,
 } from "./beacon-image-preset-domain.js";
@@ -219,7 +221,7 @@ describe("createBeaconPresetResolver", () => {
     const siteDefault = makeRow({
       id: "site",
       targetKey: {
-        kind: "bare-image-element",
+        kind: "site-default",
         siteId: "site_1",
       },
       width: 1400,
@@ -336,6 +338,15 @@ describe("createBeaconPresetResolver", () => {
 });
 
 describe("preset target key serialization", () => {
+  it("serializes site-default target keys deterministically", () => {
+    const a = createSiteDefaultPresetTargetKey("site_1");
+    const b = {
+      kind: "site-default",
+      siteId: "site_1",
+    } as const;
+    expect(serializePresetTargetKey(a)).toBe(serializePresetTargetKey(b));
+  });
+
   it("is deterministic for equivalent target keys", () => {
     const keyA: PresetTargetKey = {
       kind: "component-image-instance",
@@ -376,5 +387,80 @@ describe("preset target key serialization", () => {
     });
     expect(bareA).not.toBe(bareB);
     expect(bareA).not.toBe(component);
+  });
+});
+
+describe("buildPresetTargetKeyForScope", () => {
+  it("builds site-default target key from any resolved target", () => {
+    const key = buildPresetTargetKeyForScope({
+      scope: "site-default",
+      target: {
+        kind: "component-image",
+        siteId: "site_1",
+        pageId: "page_1",
+        instanceElementId: "inst_1",
+        componentDefinitionId: "cmp_1",
+        imagePropId: "prop_1",
+        tagged: null,
+      },
+    });
+    expect(key).toEqual({ kind: "site-default", siteId: "site_1" });
+  });
+
+  it("builds component and instance keys for component-image target", () => {
+    expect(
+      buildPresetTargetKeyForScope({
+        scope: "component",
+        target: {
+          kind: "component-image",
+          siteId: "site_1",
+          pageId: "page_1",
+          instanceElementId: "inst_1",
+          componentDefinitionId: "cmp_1",
+          imagePropId: "prop_1",
+          tagged: null,
+        },
+      })
+    ).toEqual({
+      kind: "component-image",
+      siteId: "site_1",
+      componentDefinitionId: "cmp_1",
+      imagePropId: "prop_1",
+    });
+    expect(
+      buildPresetTargetKeyForScope({
+        scope: "instance",
+        target: {
+          kind: "component-image",
+          siteId: "site_1",
+          pageId: "page_1",
+          instanceElementId: "inst_1",
+          componentDefinitionId: "cmp_1",
+          imagePropId: "prop_1",
+          tagged: null,
+        },
+      })
+    ).toEqual({
+      kind: "component-image-instance",
+      siteId: "site_1",
+      pageId: "page_1",
+      instanceElementId: "inst_1",
+      imagePropId: "prop_1",
+    });
+  });
+
+  it("returns null for invalid scope-target combinations", () => {
+    expect(
+      buildPresetTargetKeyForScope({
+        scope: "component",
+        target: {
+          kind: "bare-image",
+          siteId: "site_1",
+          pageId: "page_1",
+          elementId: "img_1",
+          tagged: null,
+        },
+      })
+    ).toBeNull();
   });
 });

@@ -2,12 +2,24 @@ import {
   BEACON_PRESET_DEFAULT_MAX_FILE_BYTES,
   type BeaconAppSettings,
   type BeaconImagePresetRow,
+  type BeaconPresetRowV2,
+  buildPresetTargetKeyForScope,
+  createBeaconPresetResolver,
+  createSiteDefaultPresetTargetKey,
+  type PresetCrudScope,
+  type ResolvedUploadTarget,
+  serializePresetTargetKey,
 } from "@codalyn/webflow-kit";
 import { Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { setBeaconDesignerExportAttrsOnPageTarget } from "@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target";
 import { parseOutputDimension } from "@/features/image-editor/lib/apply-cropped-export";
+import { readBeaconPresetV2ReadEnabled } from "@/features/image-editor/lib/beacon-preset-v2-flags";
 import { clampExportDimensionsToMaxEdge } from "@/features/image-editor/lib/clamp-export-dimensions";
+import {
+  mapSelectedTargetToResolvedUploadTarget,
+  toBeaconPresetSettingsSnapshot,
+} from "@/features/image-editor/lib/image-editor-resolved-target";
 import {
   getSelectedImageTargetHint,
   type ImagePageTarget,
@@ -73,6 +85,125 @@ type View = "list" | "form";
 /** Add/edit preset form: 1) surface, 2) name + dimensions, 3) save + tag */
 type FormSubStep = 1 | 2 | 3;
 
+type ScopeOption = {
+  scope: PresetCrudScope;
+  label: string;
+  enabled: boolean;
+  reason?: string;
+};
+
+type PresetV2Meta = {
+  row: BeaconPresetRowV2;
+  scope: PresetCrudScope;
+  storageKey: string | null;
+};
+
+function labelForScope(scope: PresetCrudScope): string {
+  if (scope === "site-default") {
+    return "Site default";
+  }
+  if (scope === "element") {
+    return "Element";
+  }
+  if (scope === "component") {
+    return "Component";
+  }
+  return "Instance";
+}
+
+function inferScopeFromTargetKey(row: BeaconPresetRowV2): PresetCrudScope {
+  if (row.targetKey.kind === "site-default") {
+    return "site-default";
+  }
+  if (row.targetKey.kind === "component-image") {
+    return "component";
+  }
+  if (row.targetKey.kind === "bare-image-element" || row.targetKey.kind === "component-image-element") {
+    return "element";
+  }
+  return "instance";
+}
+
+function scopeOptionReason(args: {
+  hasSiteContext: boolean;
+  hasPermission?: boolean;
+  targetKind: ImagePageTarget["kind"] | null;
+  scope: PresetCrudScope;
+}): string | undefined {
+  const { hasSiteContext, hasPermission = true, targetKind, scope } = args;
+  if (!hasSiteContext) {
+    return "Site context unavailable.";
+  }
+  if (scope === "site-default" && !hasPermission) {
+    return "Requires team preset management permission.";
+  }
+  if (scope === "element" && targetKind !== "image") {
+    return "Available for standalone images.";
+  }
+  if (scope === "component" && targetKind !== "component") {
+    return "Available for component image props.";
+  }
+  return undefined;
+}
+
+function buildScopeOptions(input: {
+  presetV2Enabled: boolean;
+  canManageTeamBeaconSettings: boolean;
+  siteId: string | null;
+  targetKind: ImagePageTarget["kind"] | null;
+}): ScopeOption[] {
+  const { presetV2Enabled, canManageTeamBeaconSettings, siteId, targetKind } = input;
+  if (!presetV2Enabled) {
+    return [];
+  }
+  const hasSiteContext = siteId != null;
+  const imageTarget = targetKind === "image";
+  const componentTarget = targetKind === "component";
+  return [
+    {
+      scope: "site-default",
+      label: "Site default preset",
+      enabled: hasSiteContext && canManageTeamBeaconSettings,
+      reason: scopeOptionReason({
+        hasSiteContext,
+        hasPermission: canManageTeamBeaconSettings,
+        targetKind,
+        scope: "site-default",
+      }),
+    },
+    {
+      scope: "element",
+      label: "Element preset",
+      enabled: hasSiteContext && imageTarget,
+      reason: scopeOptionReason({
+        hasSiteContext,
+        targetKind,
+        scope: "element",
+      }),
+    },
+    {
+      scope: "component",
+      label: "Component preset",
+      enabled: hasSiteContext && componentTarget,
+      reason: scopeOptionReason({
+        hasSiteContext,
+        targetKind,
+        scope: "component",
+      }),
+    },
+    {
+      scope: "instance",
+      label: "Instance preset",
+      enabled: hasSiteContext && (imageTarget || componentTarget),
+      reason: scopeOptionReason({
+        hasSiteContext,
+        targetKind,
+        scope: "instance",
+      }),
+    },
+  ];
+}
+
 type ImageEditorConfigurationPresetsStepProps = {
   isGuest: boolean;
   /** Return to the designer start screen (from the preset list). */
@@ -86,6 +217,13 @@ type CommitImagePresetFormArgs = {
   nameDraft: string;
   wStr: string;
   hStr: string;
+  presetV2Enabled: boolean;
+  presetScope: PresetCrudScope;
+  shouldWriteTag: boolean;
+  siteId: string | null;
+  pageId: string | null;
+  settings: BeaconAppSettings;
+  editingV2Meta: PresetV2Meta | null;
   formTarget: ImagePageTarget | null;
   formTargets: ImagePageTarget[];
   editingId: string | null;
@@ -94,6 +232,224 @@ type CommitImagePresetFormArgs = {
   backToList: () => void;
 };
 
+type ParsedPresetDraft = {
+  name: string;
+  width: number;
+  height: number;
+};
+
+function parsePresetDraft(nameDraft: string, wStr: string, hStr: string): ParsedPresetDraft | null {
+  const name = nameDraft.trim();
+  if (!name) {
+    return null;
+  }
+  const wRaw = parseOutputDimension(wStr, 1200);
+  const hRaw = parseOutputDimension(hStr, 1200);
+  const { width, height } = clampExportDimensionsToMaxEdge(wRaw, hRaw);
+  return { name, width, height };
+}
+
+async function resolveScopeTargetForSave(input: {
+  enabled: boolean;
+  scope: PresetCrudScope;
+  siteId: string | null;
+  pageId: string | null;
+  tagTarget: ImagePageTarget | null;
+}): Promise<Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }> | null> {
+  const { enabled, scope, siteId, pageId, tagTarget } = input;
+  if (!enabled || scope === "site-default") {
+    return null;
+  }
+  if (siteId == null || pageId == null || tagTarget == null) {
+    return null;
+  }
+  const resolvedTarget = await mapSelectedTargetToResolvedUploadTarget({
+    siteId,
+    pageId,
+    autoPageTarget: tagTarget,
+    selectedElement: null,
+    selectedComponentImagePropId: tagTarget.kind === "component" ? (tagTarget.imagePropId ?? null) : null,
+    elementCmsBinding: "none",
+  });
+  if (resolvedTarget == null || resolvedTarget.kind === "cms-ambiguous") {
+    return null;
+  }
+  return resolvedTarget;
+}
+
+function saveLegacyPreset(args: {
+  editingId: string | null;
+  name: string;
+  width: number;
+  height: number;
+  defaultExportFormat: BeaconAppSettings["defaultExportFormat"];
+  updateSettings: (patch: BeaconAppSettingsPatch) => void;
+}) {
+  const { editingId, name, width, height, defaultExportFormat, updateSettings } = args;
+  if (editingId) {
+    updateSettings((prev) => ({
+      imagePresets: prev.imagePresets.map((p) => (p.id === editingId ? { ...p, name, width, height } : p)),
+    }));
+    return;
+  }
+  const row: BeaconImagePresetRow = {
+    id: crypto.randomUUID(),
+    name,
+    width,
+    height,
+    exportFormat: defaultExportFormat,
+    maxFileSizeBytes: BEACON_PRESET_DEFAULT_MAX_FILE_BYTES,
+  };
+  updateSettings((prev) => ({ imagePresets: [...prev.imagePresets, row] }));
+}
+
+function saveV2Preset(args: {
+  siteId: string;
+  settings: BeaconAppSettings;
+  editingV2Meta: PresetV2Meta | null;
+  presetScope: PresetCrudScope;
+  resolvedTargetForScope: Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }> | null;
+  draft: ParsedPresetDraft;
+  defaultExportFormat: BeaconAppSettings["defaultExportFormat"];
+  updateSettings: (patch: BeaconAppSettingsPatch) => void;
+  setFormError: (v: string | null) => void;
+}): boolean {
+  const {
+    siteId,
+    settings,
+    editingV2Meta,
+    presetScope,
+    resolvedTargetForScope,
+    draft,
+    defaultExportFormat,
+    updateSettings,
+    setFormError,
+  } = args;
+  const nextId = editingV2Meta?.row.id ?? crypto.randomUUID();
+  const nextTargetKey =
+    editingV2Meta?.row.targetKey ??
+    (presetScope === "site-default"
+      ? createSiteDefaultPresetTargetKey(siteId)
+      : resolvedTargetForScope
+        ? buildPresetTargetKeyForScope({ scope: presetScope, target: resolvedTargetForScope })
+        : null);
+  if (nextTargetKey == null) {
+    setFormError("This scope is unavailable for the selected surface.");
+    return false;
+  }
+  const duplicateResult = createBeaconPresetResolver().assertUniqueTarget(
+    toBeaconPresetSettingsSnapshot(settings),
+    nextTargetKey,
+    editingV2Meta?.row.id
+  );
+  if (duplicateResult !== "ok") {
+    setFormError("A preset already exists for this target.");
+    return false;
+  }
+  const nextRow: BeaconPresetRowV2 = {
+    id: nextId,
+    name: draft.name,
+    width: draft.width,
+    height: draft.height,
+    exportFormat: editingV2Meta?.row.exportFormat ?? defaultExportFormat,
+    maxFileSizeBytes: editingV2Meta?.row.maxFileSizeBytes ?? BEACON_PRESET_DEFAULT_MAX_FILE_BYTES,
+    targetKey: nextTargetKey,
+  };
+  updateSettings((prev) => {
+    const filteredByTargetEntries = Object.entries(prev.imagePresetStorageV2.byTargetKey).filter(
+      ([, row]) => row.id !== nextId
+    );
+    const byTargetKey = Object.fromEntries(filteredByTargetEntries);
+    if (nextTargetKey.kind === "site-default") {
+      return {
+        imagePresetStorageV2: {
+          siteDefault: nextRow,
+          byTargetKey,
+        },
+      };
+    }
+    byTargetKey[serializePresetTargetKey(nextTargetKey)] = nextRow;
+    return {
+      imagePresetStorageV2: {
+        siteDefault:
+          prev.imagePresetStorageV2.siteDefault?.id === nextId ? null : prev.imagePresetStorageV2.siteDefault,
+        byTargetKey,
+      },
+    };
+  });
+  return true;
+}
+
+function validationErrorForTagTarget(input: {
+  editingId: string | null;
+  presetScope: PresetCrudScope;
+  shouldWriteTag: boolean;
+  tagTarget: ImagePageTarget | null;
+}): string | null {
+  const { editingId, presetScope, shouldWriteTag, tagTarget } = input;
+  if (!editingId && presetScope !== "site-default" && !tagTarget) {
+    return "Select an Image on the canvas or pick a surface in the list, then save.";
+  }
+  if (shouldWriteTag && !tagTarget) {
+    return "Select an Image surface before writing export tags.";
+  }
+  return null;
+}
+
+function commitPresetMutation(args: {
+  presetV2Enabled: boolean;
+  siteId: string | null;
+  settings: BeaconAppSettings;
+  editingV2Meta: PresetV2Meta | null;
+  presetScope: PresetCrudScope;
+  resolvedTargetForScope: Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }> | null;
+  draft: ParsedPresetDraft;
+  defaultExportFormat: BeaconAppSettings["defaultExportFormat"];
+  updateSettings: (patch: BeaconAppSettingsPatch) => void;
+  setFormError: (v: string | null) => void;
+  editingId: string | null;
+}): boolean {
+  const {
+    presetV2Enabled,
+    siteId,
+    settings,
+    editingV2Meta,
+    presetScope,
+    resolvedTargetForScope,
+    draft,
+    defaultExportFormat,
+    updateSettings,
+    setFormError,
+    editingId,
+  } = args;
+  if (presetV2Enabled) {
+    if (siteId == null) {
+      setFormError("Could not resolve site context for this preset.");
+      return false;
+    }
+    return saveV2Preset({
+      siteId,
+      settings,
+      editingV2Meta,
+      presetScope,
+      resolvedTargetForScope,
+      draft,
+      defaultExportFormat,
+      updateSettings,
+      setFormError,
+    });
+  }
+  saveLegacyPreset({
+    editingId,
+    name: draft.name,
+    width: draft.width,
+    height: draft.height,
+    defaultExportFormat,
+    updateSettings,
+  });
+  return true;
+}
+
 async function commitImagePresetForm(args: CommitImagePresetFormArgs): Promise<void> {
   const {
     setFormError,
@@ -101,6 +457,13 @@ async function commitImagePresetForm(args: CommitImagePresetFormArgs): Promise<v
     nameDraft,
     wStr,
     hStr,
+    presetV2Enabled,
+    presetScope,
+    shouldWriteTag,
+    siteId,
+    pageId,
+    settings,
+    editingV2Meta,
     formTarget,
     formTargets,
     editingId,
@@ -109,42 +472,57 @@ async function commitImagePresetForm(args: CommitImagePresetFormArgs): Promise<v
     backToList,
   } = args;
   setFormError(null);
-  const name = nameDraft.trim();
-  if (!name) {
+  const parsedDraft = parsePresetDraft(nameDraft, wStr, hStr);
+  if (parsedDraft == null) {
     setFormError("Enter a name for this preset.");
     return;
   }
-  const wRaw = parseOutputDimension(wStr, 1200);
-  const hRaw = parseOutputDimension(hStr, 1200);
-  const { width, height } = clampExportDimensionsToMaxEdge(wRaw, hRaw);
   const tagTarget = await resolvePresetTagTarget(formTarget, formTargets);
-  if (!editingId && !tagTarget) {
-    setFormError("Select an Image on the canvas or pick a surface in the list, then save.");
+  const targetValidationError = validationErrorForTagTarget({
+    editingId,
+    presetScope,
+    shouldWriteTag,
+    tagTarget,
+  });
+  if (targetValidationError) {
+    setFormError(targetValidationError);
+    return;
+  }
+  const resolvedTargetForScope = await resolveScopeTargetForSave({
+    enabled: presetV2Enabled,
+    scope: presetScope,
+    siteId,
+    pageId,
+    tagTarget,
+  });
+  if (presetV2Enabled && presetScope !== "site-default" && resolvedTargetForScope == null) {
+    setFormError("Could not resolve a valid preset target. Refresh and try again.");
     return;
   }
   setSavePending(true);
   try {
-    if (tagTarget) {
-      await setBeaconDesignerExportAttrsOnPageTarget(tagTarget, width, height);
+    if (shouldWriteTag && tagTarget) {
+      await setBeaconDesignerExportAttrsOnPageTarget(tagTarget, parsedDraft.width, parsedDraft.height);
     }
-    if (editingId) {
-      updateSettings((prev) => ({
-        imagePresets: prev.imagePresets.map((p) => (p.id === editingId ? { ...p, name, width, height } : p)),
-      }));
-    } else {
-      const row: BeaconImagePresetRow = {
-        id: crypto.randomUUID(),
-        name,
-        width,
-        height,
-        exportFormat: defaultExportFormat,
-        maxFileSizeBytes: BEACON_PRESET_DEFAULT_MAX_FILE_BYTES,
-      };
-      updateSettings((prev) => ({ imagePresets: [...prev.imagePresets, row] }));
+    const saved = commitPresetMutation({
+      presetV2Enabled,
+      siteId,
+      settings,
+      editingV2Meta,
+      presetScope,
+      resolvedTargetForScope,
+      draft: parsedDraft,
+      defaultExportFormat,
+      updateSettings,
+      setFormError,
+      editingId,
+    });
+    if (!saved) {
+      return;
     }
     void webflow.notify({
       type: "Success",
-      message: tagTarget ? "Saved preset and tagged the Image surface." : "Saved preset.",
+      message: shouldWriteTag ? "Saved preset and tagged the Image surface." : "Saved preset.",
     });
     backToList();
   } catch (e) {
@@ -159,11 +537,12 @@ async function commitImagePresetForm(args: CommitImagePresetFormArgs): Promise<v
 function tryAdvanceFromPresetFormStep1(
   isNewPreset: boolean,
   formTarget: ImagePageTarget | null,
+  presetScope: PresetCrudScope,
   setFormError: (v: string | null) => void,
   goStep2: () => void
 ): void {
   setFormError(null);
-  if (isNewPreset && !formTarget) {
+  if (isNewPreset && presetScope !== "site-default" && !formTarget) {
     setFormError("Select a surface: use the current selection or pick an Image on the page.");
     return;
   }
@@ -566,6 +945,12 @@ function ImageEditorConfigurationPresetsListView(props: {
 function ImageEditorConfigurationPresetsFormView(props: {
   baseId: string;
   editingId: string | null;
+  presetV2Enabled: boolean;
+  presetScope: PresetCrudScope;
+  setPresetScope: (v: PresetCrudScope) => void;
+  scopeOptions: ScopeOption[];
+  shouldWriteTag: boolean;
+  setShouldWriteTag: (v: boolean) => void;
   formSubStep: FormSubStep;
   formError: string | null;
   savePending: boolean;
@@ -598,6 +983,12 @@ function ImageEditorConfigurationPresetsFormView(props: {
   const {
     baseId,
     editingId,
+    presetV2Enabled,
+    presetScope,
+    setPresetScope,
+    scopeOptions,
+    shouldWriteTag,
+    setShouldWriteTag,
     formSubStep,
     formError,
     savePending,
@@ -644,6 +1035,40 @@ function ImageEditorConfigurationPresetsFormView(props: {
 
         {formSubStep === 1 ? (
           <>
+            {presetV2Enabled ? (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Preset scope</Label>
+                <RadioGroup
+                  value={presetScope}
+                  onValueChange={(v) => {
+                    if (v === "site-default" || v === "element" || v === "component" || v === "instance") {
+                      setPresetScope(v);
+                    }
+                  }}
+                  className="grid gap-2"
+                >
+                  {scopeOptions.map((opt) => (
+                    <div
+                      key={opt.scope}
+                      className={cn(
+                        "rounded-sm border border-border/80 px-3 py-2",
+                        !opt.enabled && "cursor-not-allowed opacity-60"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value={opt.scope} disabled={!opt.enabled || Boolean(editingId)} />
+                        <div>
+                          <p className="text-sm leading-tight">{opt.label}</p>
+                          {!opt.enabled && opt.reason ? (
+                            <p className="text-muted-foreground text-[10px] leading-snug">{opt.reason}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+            ) : null}
             <TargetPickSection
               discoverySettled={formDiscoverySettled}
               onChooseAnotherOnPage={onFormChooseAnotherOnPage}
@@ -717,6 +1142,12 @@ function ImageEditorConfigurationPresetsFormView(props: {
         {formSubStep === 3 ? (
           <>
             <div className="space-y-3 rounded-sm border border-border/80 bg-muted/20 p-3 text-sm">
+              {presetV2Enabled ? (
+                <div className="space-y-0.5">
+                  <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">Scope</p>
+                  <p className="leading-snug">{labelForScope(presetScope)}</p>
+                </div>
+              ) : null}
               <div className="space-y-0.5">
                 <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">Surface</p>
                 <p className="min-w-0 wrap-break-word leading-snug">
@@ -731,6 +1162,15 @@ function ImageEditorConfigurationPresetsFormView(props: {
                 </p>
               </div>
             </div>
+            <label className="flex items-center gap-2 rounded-sm border border-border/80 px-3 py-2 text-xs">
+              <input
+                type="checkbox"
+                checked={shouldWriteTag}
+                onChange={(e) => setShouldWriteTag(e.target.checked)}
+                className="accent-primary"
+              />
+              <span>Also write `data-beacon-export-width/height` tags to the selected surface</span>
+            </label>
             <Button
               type="button"
               className="inline-flex w-full items-center justify-center gap-2"
@@ -750,17 +1190,22 @@ function ImageEditorConfigurationPresetsFormView(props: {
 export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurationPresetsStepProps) {
   const { isGuest, onDone, className } = props;
   const baseId = useId();
-  const { settings, updateSettings } = useBeaconAppSettings();
+  const { settings, updateSettings, canManageTeamBeaconSettings } = useBeaconAppSettings();
+  const presetV2Enabled = useMemo(() => readBeaconPresetV2ReadEnabled(), []);
   const [view, setView] = useState<View>("list");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [wStr, setWStr] = useState("1200");
   const [hStr, setHStr] = useState("1200");
+  const [presetScope, setPresetScope] = useState<PresetCrudScope>("instance");
+  const [shouldWriteTag, setShouldWriteTag] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
   const [formTarget, setFormTarget] = useState<ImagePageTarget | null>(null);
   const [formSubStep, setFormSubStep] = useState<FormSubStep>(1);
   const [presetPendingDelete, setPresetPendingDelete] = useState<BeaconImagePresetRow | null>(null);
+  const [siteId, setSiteId] = useState<string | null>(null);
+  const [pageId, setPageId] = useState<string | null>(null);
 
   const isForm = view === "form";
   const {
@@ -774,6 +1219,66 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     dismissedCanvasSelectionPrompt: formDismissedSelection,
     setDismissedCanvasSelectionPrompt: setFormDismissedSelection,
   } = usePresetFormTargets(isForm);
+
+  const presetRowsV2ById = useMemo(() => {
+    const rows = new Map<string, PresetV2Meta>();
+    const siteDefault = settings.imagePresetStorageV2.siteDefault;
+    if (siteDefault != null) {
+      rows.set(siteDefault.id, {
+        row: siteDefault,
+        scope: inferScopeFromTargetKey(siteDefault),
+        storageKey: null,
+      });
+    }
+    for (const [storageKey, row] of Object.entries(settings.imagePresetStorageV2.byTargetKey)) {
+      rows.set(row.id, {
+        row,
+        scope: inferScopeFromTargetKey(row),
+        storageKey,
+      });
+    }
+    return rows;
+  }, [settings.imagePresetStorageV2]);
+
+  useEffect(() => {
+    if (!presetV2Enabled) {
+      setSiteId(null);
+      setPageId(null);
+      return;
+    }
+    let cancelled = false;
+    void webflow
+      .getSiteInfo()
+      .then((site) => {
+        if (!cancelled) {
+          setSiteId(site.siteId);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSiteId(null);
+        }
+      });
+    void webflow
+      .getCurrentPage()
+      .then((page) => {
+        if (!cancelled) {
+          setPageId(page.id);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPageId(null);
+        }
+      });
+    const unsub = webflow.subscribe("currentpage", (page) => {
+      setPageId(page.id);
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [presetV2Enabled]);
 
   useEffect(() => {
     if (!isForm) {
@@ -791,22 +1296,28 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     if (editingId == null) {
       return;
     }
-    if (!settings.imagePresets.some((p) => p.id === editingId)) {
+    const exists = presetV2Enabled
+      ? presetRowsV2ById.has(editingId)
+      : settings.imagePresets.some((p) => p.id === editingId);
+    if (!exists) {
       setEditingId(null);
       setView("list");
       setFormError(null);
       setFormSubStep(1);
     }
-  }, [editingId, settings.imagePresets]);
+  }, [editingId, presetV2Enabled, presetRowsV2ById, settings.imagePresets]);
 
   useEffect(() => {
     if (presetPendingDelete == null) {
       return;
     }
-    if (!settings.imagePresets.some((p) => p.id === presetPendingDelete.id)) {
+    const exists = presetV2Enabled
+      ? presetRowsV2ById.has(presetPendingDelete.id)
+      : settings.imagePresets.some((p) => p.id === presetPendingDelete.id);
+    if (!exists) {
       setPresetPendingDelete(null);
     }
-  }, [presetPendingDelete, settings.imagePresets]);
+  }, [presetPendingDelete, presetRowsV2ById, presetV2Enabled, settings.imagePresets]);
 
   const formShowSelectionChoice =
     isForm &&
@@ -821,16 +1332,21 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     setNameDraft("");
     setWStr("1200");
     setHStr("1200");
+    setPresetScope("instance");
+    setShouldWriteTag(false);
     setFormError(null);
     setFormSubStep(1);
     setView("form");
   };
 
   const openEdit = (p: BeaconImagePresetRow) => {
+    const v2Meta = presetRowsV2ById.get(p.id) ?? null;
     setEditingId(p.id);
     setNameDraft(p.name);
     setWStr(String(p.width));
     setHStr(String(p.height));
+    setPresetScope(v2Meta?.scope ?? "instance");
+    setShouldWriteTag(false);
     setFormError(null);
     setFormSubStep(1);
     setView("form");
@@ -838,10 +1354,25 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
 
   const onDeletePreset = useCallback(
     (id: string) => {
-      updateSettings((prev) => ({ imagePresets: prev.imagePresets.filter((p) => p.id !== id) }));
+      if (presetV2Enabled) {
+        updateSettings((prev) => {
+          const nextByTargetKey = Object.fromEntries(
+            Object.entries(prev.imagePresetStorageV2.byTargetKey).filter(([, row]) => row.id !== id)
+          );
+          return {
+            imagePresetStorageV2: {
+              siteDefault:
+                prev.imagePresetStorageV2.siteDefault?.id === id ? null : prev.imagePresetStorageV2.siteDefault,
+              byTargetKey: nextByTargetKey,
+            },
+          };
+        });
+      } else {
+        updateSettings((prev) => ({ imagePresets: prev.imagePresets.filter((p) => p.id !== id) }));
+      }
       void webflow.notify({ type: "Success", message: "Preset removed." });
     },
-    [updateSettings]
+    [presetV2Enabled, updateSettings]
   );
 
   const backToList = useCallback(() => {
@@ -849,6 +1380,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     setEditingId(null);
     setFormError(null);
     setFormTarget(null);
+    setShouldWriteTag(false);
     setFormSubStep(1);
   }, []);
 
@@ -876,11 +1408,12 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   }, [setFormDismissedSelection]);
 
   const isNewPreset = editingId == null;
-  const canContinueFromStep1 = formDiscoverySettled && (Boolean(editingId) || formTarget !== null);
+  const canContinueFromStep1 =
+    formDiscoverySettled && (Boolean(editingId) || presetScope === "site-default" || formTarget !== null);
 
   const onContinueToDimensions = useCallback(() => {
-    tryAdvanceFromPresetFormStep1(isNewPreset, formTarget, setFormError, () => setFormSubStep(2));
-  }, [isNewPreset, formTarget]);
+    tryAdvanceFromPresetFormStep1(isNewPreset, formTarget, presetScope, setFormError, () => setFormSubStep(2));
+  }, [isNewPreset, formTarget, presetScope]);
 
   const onContinueToSaveStep = useCallback(() => {
     tryAdvanceFromPresetFormStep2(nameDraft, wStr, hStr, setFormError, () => setFormSubStep(3));
@@ -891,12 +1424,20 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   }, [formSubStep, backToList]);
 
   const onSave = useCallback(() => {
+    const editingV2Meta = editingId ? (presetRowsV2ById.get(editingId) ?? null) : null;
     void commitImagePresetForm({
       setFormError,
       setSavePending,
       nameDraft,
       wStr,
       hStr,
+      presetV2Enabled,
+      presetScope,
+      shouldWriteTag,
+      siteId,
+      pageId,
+      settings,
+      editingV2Meta,
       formTarget,
       formTargets,
       editingId,
@@ -909,15 +1450,59 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     wStr,
     hStr,
     editingId,
+    presetV2Enabled,
+    presetScope,
+    shouldWriteTag,
+    siteId,
+    pageId,
+    settings,
     formTarget,
     formTargets,
+    presetRowsV2ById,
     updateSettings,
     settings.defaultExportFormat,
     backToList,
   ]);
 
-  const workspaceRows = settings.imagePresets;
-  const designerRows = settings.designerOnlyImagePresets;
+  const scopeOptions = useMemo(
+    () =>
+      buildScopeOptions({
+        presetV2Enabled,
+        canManageTeamBeaconSettings,
+        siteId,
+        targetKind: formTarget?.kind ?? null,
+      }),
+    [canManageTeamBeaconSettings, formTarget?.kind, presetV2Enabled, siteId]
+  );
+
+  useEffect(() => {
+    if (!presetV2Enabled || editingId != null) {
+      return;
+    }
+    const selected = scopeOptions.find((opt) => opt.scope === presetScope);
+    if (selected?.enabled) {
+      return;
+    }
+    const fallback = scopeOptions.find((opt) => opt.enabled);
+    if (fallback) {
+      setPresetScope(fallback.scope);
+    }
+  }, [editingId, presetScope, presetV2Enabled, scopeOptions]);
+
+  const workspaceRows = useMemo<BeaconImagePresetRow[]>(() => {
+    if (!presetV2Enabled) {
+      return settings.imagePresets;
+    }
+    return Array.from(presetRowsV2ById.values()).map(({ row, scope }) => ({
+      id: row.id,
+      name: `${row.name} (${labelForScope(scope)})`,
+      width: row.width,
+      height: row.height,
+      exportFormat: row.exportFormat,
+      maxFileSizeBytes: row.maxFileSizeBytes,
+    }));
+  }, [presetRowsV2ById, presetV2Enabled, settings.imagePresets]);
+  const designerRows = presetV2Enabled ? [] : settings.designerOnlyImagePresets;
 
   const step3ExportSize =
     formSubStep === 3
@@ -953,6 +1538,12 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
           baseId={baseId}
           canContinueFromStep1={canContinueFromStep1}
           editingId={editingId}
+          presetV2Enabled={presetV2Enabled}
+          presetScope={presetScope}
+          setPresetScope={setPresetScope}
+          scopeOptions={scopeOptions}
+          shouldWriteTag={shouldWriteTag}
+          setShouldWriteTag={setShouldWriteTag}
           formDiscoverySettled={formDiscoverySettled}
           formError={formError}
           formPageScanned={formPageScanned}

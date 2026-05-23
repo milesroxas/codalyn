@@ -1,6 +1,13 @@
 "use client";
 
-import type { BeaconAppSettings, BeaconImagePresetRow, ImageExportFormat } from "@codalyn/webflow-kit";
+import {
+  BEACON_IMAGE_ERROR_CODES,
+  type BeaconAppSettings,
+  type BeaconImagePresetRow,
+  type BeaconPresetRowV2,
+  createSiteDefaultPresetTargetKey,
+  type ImageExportFormat,
+} from "@codalyn/webflow-kit";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
@@ -16,7 +23,17 @@ type BeaconApiPayload = {
   editorExperience: boolean;
   canManageTeamBeaconSettings: boolean;
   restrictToEditorExperience: boolean;
+  workspaceMemberRole: string | null;
+  appUserRole: string | null;
 };
+
+function canEditSiteDefaultPreset(payload: BeaconApiPayload | null, canEditPresets: boolean): boolean {
+  if (!payload || !canEditPresets) {
+    return false;
+  }
+  const normalizedRole = payload.workspaceMemberRole?.toLowerCase() ?? "";
+  return normalizedRole === "admin" || normalizedRole === "owner" || normalizedRole === "designer";
+}
 
 export function TowerBeaconScreen() {
   const baseId = useId();
@@ -91,7 +108,10 @@ export function TowerBeaconScreen() {
           body: JSON.stringify(patch),
         });
         if (!res.ok) {
-          const j = (await res.json().catch(() => null)) as { error?: string } | null;
+          const j = (await res.json().catch(() => null)) as { error?: string; errorCode?: string } | null;
+          if (j?.errorCode === BEACON_IMAGE_ERROR_CODES.DUPLICATE_PRESET_TARGET) {
+            throw new Error("A preset with this target already exists.");
+          }
           throw new Error(j?.error ?? `Save failed (${res.status})`);
         }
         const data = (await res.json()) as BeaconApiPayload;
@@ -137,8 +157,10 @@ export function TowerBeaconScreen() {
   const canManage = Boolean(payload?.canManageTeamBeaconSettings);
   const teamPresetsLocked = Boolean(payload?.editorExperience);
   const canEditPresets = canManage && !teamPresetsLocked;
+  const canEditSiteDefault = canEditSiteDefaultPreset(payload, canEditPresets);
   const presets = settings?.imagePresets ?? [];
   const designerPresets = settings?.designerOnlyImagePresets ?? [];
+  const siteDefaultPreset = settings?.imagePresetStorageV2.siteDefault ?? null;
 
   const addPreset = () => {
     if (!canEditPresets) {
@@ -199,6 +221,47 @@ export function TowerBeaconScreen() {
     }
   };
 
+  const upsertSiteDefaultPreset = () => {
+    if (!canEditSiteDefault) {
+      toast.error("You do not have permission to edit the site default preset.");
+      return;
+    }
+    if (!activeOrg?.id) {
+      toast.error("No active workspace selected.");
+      return;
+    }
+    const w = parsePresetOutputDimension(draftW, 1920);
+    const h = parsePresetOutputDimension(draftH, 1080);
+    const maxFileSizeBytes = draftToMaxBytes(draftMaxStr, draftMaxUnit);
+    const row: BeaconPresetRowV2 = {
+      id: siteDefaultPreset?.id ?? crypto.randomUUID(),
+      name: "Site default",
+      width: w,
+      height: h,
+      exportFormat: draftFormat,
+      maxFileSizeBytes,
+      targetKey: createSiteDefaultPresetTargetKey(activeOrg.id),
+    };
+    void applyPatch({
+      imagePresetStorageV2: {
+        siteDefault: row,
+        byTargetKey: settings?.imagePresetStorageV2.byTargetKey ?? {},
+      },
+    });
+  };
+
+  const clearSiteDefaultPreset = () => {
+    if (!canEditSiteDefault) {
+      return;
+    }
+    void applyPatch({
+      imagePresetStorageV2: {
+        siteDefault: null,
+        byTargetKey: settings?.imagePresetStorageV2.byTargetKey ?? {},
+      },
+    });
+  };
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
       <div className="space-y-2">
@@ -233,25 +296,29 @@ export function TowerBeaconScreen() {
           presets={presets}
           designerPresets={designerPresets}
           presetTarget={presetTarget}
-          setPresetTarget={setPresetTarget}
+          setPresetTargetAction={setPresetTarget}
           canManage={canManage}
           teamPresetsLocked={teamPresetsLocked}
           canEditPresets={canEditPresets}
           draftName={draftName}
-          setDraftName={setDraftName}
+          setDraftNameAction={setDraftName}
           draftW={draftW}
-          setDraftW={setDraftW}
+          setDraftWAction={setDraftW}
           draftH={draftH}
-          setDraftH={setDraftH}
+          setDraftHAction={setDraftH}
           draftFormat={draftFormat}
-          setDraftFormat={setDraftFormat}
+          setDraftFormatAction={setDraftFormat}
           draftMaxStr={draftMaxStr}
-          setDraftMaxStr={setDraftMaxStr}
+          setDraftMaxStrAction={setDraftMaxStr}
           draftMaxUnit={draftMaxUnit}
-          setDraftMaxUnit={setDraftMaxUnit}
-          addPreset={addPreset}
-          removePreset={removePreset}
-          updatePreset={updatePreset}
+          setDraftMaxUnitAction={setDraftMaxUnit}
+          addPresetAction={addPreset}
+          removePresetAction={removePreset}
+          updatePresetAction={updatePreset}
+          siteDefaultPreset={siteDefaultPreset}
+          upsertSiteDefaultPresetAction={upsertSiteDefaultPreset}
+          clearSiteDefaultPresetAction={clearSiteDefaultPreset}
+          canEditSiteDefault={canEditSiteDefault}
         />
       ) : null}
     </main>

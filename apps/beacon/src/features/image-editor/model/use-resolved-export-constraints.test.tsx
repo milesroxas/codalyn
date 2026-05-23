@@ -53,7 +53,7 @@ describe("useResolvedExportConstraints", () => {
       height: 900,
       exportFormat: "webp" as const,
       maxFileSizeBytes: 120_000,
-      targetKey: { kind: "bare-image-element" as const, siteId: "site-1" },
+      targetKey: { kind: "site-default" as const, siteId: "site-1" },
     };
     const settings = withV2Settings({
       imagePresetStorageV2: {
@@ -285,7 +285,7 @@ describe("useResolvedExportConstraints", () => {
           height: 900,
           exportFormat: "webp",
           maxFileSizeBytes: 130_000,
-          targetKey: { kind: "bare-image-element", siteId: "site-1" },
+          targetKey: { kind: "site-default", siteId: "site-1" },
         },
         byTargetKey: {
           [componentKey]: {

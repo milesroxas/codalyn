@@ -11,6 +11,11 @@ export type BareImageInstancePresetTargetKey = {
   elementId: string;
 };
 
+export type SiteDefaultPresetTargetKey = {
+  kind: "site-default";
+  siteId: string;
+};
+
 export type BareImageElementPresetTargetKey = {
   kind: "bare-image-element";
   siteId: string;
@@ -42,6 +47,7 @@ export type ComponentImageElementPresetTargetKey = {
 };
 
 export type PresetTargetKey =
+  | SiteDefaultPresetTargetKey
   | BareImageInstancePresetTargetKey
   | BareImageElementPresetTargetKey
   | ComponentImageInstancePresetTargetKey
@@ -115,6 +121,8 @@ export type ResolverOutput = {
 
 export type DuplicateCheckResult = "ok" | "DUPLICATE_PRESET_TARGET";
 
+export type PresetCrudScope = "site-default" | "element" | "component" | "instance";
+
 export type BeaconPresetResolver = {
   resolve(input: ResolverInput): ResolverOutput;
   assertUniqueTarget(
@@ -139,6 +147,11 @@ function isNonEmptyString(value: unknown): value is string {
 
 function normalizeTargetKey(key: PresetTargetKey): Record<string, string> {
   switch (key.kind) {
+    case "site-default":
+      return {
+        kind: key.kind,
+        siteId: key.siteId,
+      };
     case "bare-image-instance":
       return {
         kind: key.kind,
@@ -189,6 +202,8 @@ export function isPresetTargetKey(value: unknown): value is PresetTargetKey {
     return false;
   }
   switch (v.kind) {
+    case "site-default":
+      return isNonEmptyString(v.siteId);
     case "bare-image-instance":
       return isNonEmptyString(v.siteId) && isNonEmptyString(v.pageId) && isNonEmptyString(v.elementId);
     case "bare-image-element":
@@ -227,6 +242,65 @@ export function deserializePresetTargetKey(serialized: string): PresetTargetKey 
   } catch {
     return null;
   }
+}
+
+function trimSiteId(siteId: string): string {
+  return siteId.trim();
+}
+
+export function createSiteDefaultPresetTargetKey(siteId: string): SiteDefaultPresetTargetKey {
+  return {
+    kind: "site-default",
+    siteId: trimSiteId(siteId),
+  };
+}
+
+export function buildPresetTargetKeyForScope(input: {
+  scope: PresetCrudScope;
+  target: ResolvedUploadTarget;
+}): PresetTargetKey | null {
+  const { scope, target } = input;
+  if (target.kind === "cms-ambiguous") {
+    return scope === "site-default" ? createSiteDefaultPresetTargetKey(target.siteId) : null;
+  }
+  if (scope === "site-default") {
+    return createSiteDefaultPresetTargetKey(target.siteId);
+  }
+  if (target.kind === "bare-image") {
+    if (scope === "element") {
+      return {
+        kind: "bare-image-element",
+        siteId: target.siteId,
+      };
+    }
+    if (scope === "instance") {
+      return {
+        kind: "bare-image-instance",
+        siteId: target.siteId,
+        pageId: target.pageId,
+        elementId: target.elementId,
+      };
+    }
+    return null;
+  }
+  if (scope === "component") {
+    return {
+      kind: "component-image",
+      siteId: target.siteId,
+      componentDefinitionId: target.componentDefinitionId,
+      imagePropId: target.imagePropId,
+    };
+  }
+  if (scope === "instance") {
+    return {
+      kind: "component-image-instance",
+      siteId: target.siteId,
+      pageId: target.pageId,
+      instanceElementId: target.instanceElementId,
+      imagePropId: target.imagePropId,
+    };
+  }
+  return null;
 }
 
 function clampTaggedDimensions(width: number, height: number): { width: number; height: number } {

@@ -32,7 +32,8 @@ function isEditorLikeWorkspaceRole(role: string | null | undefined): boolean {
   if (!role) {
     return false;
   }
-  return role === "editor" || role === "member";
+  const normalizedRole = role.toLowerCase();
+  return normalizedRole === "editor" || normalizedRole === "member";
 }
 
 export function computeBeaconEditorExperience(ctx: BeaconMembershipContext): boolean {
@@ -45,15 +46,13 @@ export function computeBeaconEditorExperience(ctx: BeaconMembershipContext): boo
   return false;
 }
 
-/** Org admins, designers, and product admins may edit team Beacon presets in Tower. */
+/** Org admins/owners and designers may edit team Beacon presets in Tower. */
 export function canManageBeaconTeamSettings(ctx: BeaconMembershipContext): boolean {
-  if (isProductAdminAppRole(ctx.appUserRole)) {
+  const memberRole = ctx.memberRole?.toLowerCase() ?? "";
+  if (isTowerTeamAdminRole(memberRole)) {
     return true;
   }
-  if (isTowerTeamAdminRole(ctx.memberRole)) {
-    return true;
-  }
-  return ctx.memberRole === "designer";
+  return memberRole === "designer";
 }
 
 /**

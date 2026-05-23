@@ -23,6 +23,7 @@ import {
   readBeaconPresetV2ApplyEnabled,
   readBeaconPresetV2EnforceEnabled,
   readBeaconPresetV2NaturalAdvisoryEnabled,
+  readBeaconPresetV2PickerEnabled,
   readBeaconPresetV2ReadEnabled,
 } from "@/features/image-editor/lib/beacon-preset-v2-flags";
 import {
@@ -44,6 +45,11 @@ import { resolveImageEditorPresetFileLimitBlocker } from "@/features/image-edito
 import { resolveImageEditorPlacement } from "@/features/image-editor/lib/image-editor-resolved-placement";
 import { mapSelectedTargetToResolvedUploadTarget } from "@/features/image-editor/lib/image-editor-resolved-target";
 import { resolveSessionResolvedConstraintsApplication } from "@/features/image-editor/lib/image-editor-session-resolved-constraints";
+import {
+  buildUploadPresetPickerOptions,
+  getDefaultUploadPresetOptionId,
+  isManualUploadPresetOptionId,
+} from "@/features/image-editor/lib/image-editor-upload-preset-picker";
 import { loadImage } from "@/features/image-editor/lib/load-image";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
 import { readBeaconDesignerExportForTarget } from "@/features/image-editor/lib/read-beacon-designer-export-for-target";
@@ -64,6 +70,7 @@ import { useRevokeBlobUrlOnChange } from "@/features/image-editor/model/use-revo
 import {
   type CropFrameMode,
   ImageEditorCropExportPanel,
+  type UploadPresetPickerOption,
 } from "@/features/image-editor/ui/image-editor-crop-export-panel";
 import { ImageEditorLoadedColumn } from "@/features/image-editor/ui/image-editor-loaded-column";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
@@ -206,10 +213,42 @@ function imageEditorRouteChromeSlots(options: {
   return { subheader, footer };
 }
 
+type SessionConstraintSetters = {
+  setOutputWidth: (value: number) => void;
+  setOutputHeight: (value: number) => void;
+  setWidthStr: (value: string) => void;
+  setHeightStr: (value: string) => void;
+  setExportFormat: (value: ImageExportFormat) => void;
+  setQuality: (value: number) => void;
+  setCropFrameMode: (value: CropFrameMode) => void;
+  setAspectPreset: (value: EditorAspectSelection) => void;
+};
+
+function applySessionConstraintsFromPickerSelection(
+  constraints: NonNullable<ReturnType<typeof resolveSessionResolvedConstraintsApplication>["constraints"]>,
+  setters: SessionConstraintSetters
+) {
+  setters.setOutputWidth(constraints.width);
+  setters.setOutputHeight(constraints.height);
+  setters.setWidthStr(String(constraints.width));
+  setters.setHeightStr(String(constraints.height));
+  setters.setExportFormat(constraints.exportFormat);
+  setters.setQuality(constraints.quality);
+  setters.setCropFrameMode("custom");
+  setters.setAspectPreset("free");
+}
+
 export function ImageEditor() {
   const navigate = useNavigate();
-  const { settings, updateSettings, canPersistExportDefaults, syncState, isTowerUser, editorExperience } =
-    useBeaconAppSettings();
+  const {
+    settings,
+    updateSettings,
+    canPersistExportDefaults,
+    syncState,
+    isTowerUser,
+    editorExperience,
+    canManageTeamBeaconSettings,
+  } = useBeaconAppSettings();
   const roleReady = useMemo(() => !isTowerUser || syncState === "synced", [isTowerUser, syncState]);
   /** Designers and admins in designer view (not editor-style mode) see the entry step. */
   const isWorkspaceDesigner = useMemo(
@@ -253,6 +292,7 @@ export function ImageEditor() {
   const allowAvifEncoding = Boolean(towerUser);
   const presetV2ReadEnabled = useMemo(() => readBeaconPresetV2ReadEnabled(), []);
   const presetV2ApplyEnabled = useMemo(() => readBeaconPresetV2ApplyEnabled(), []);
+  const presetV2PickerEnabled = useMemo(() => readBeaconPresetV2PickerEnabled(), []);
   const presetV2EnforceEnabled = useMemo(() => readBeaconPresetV2EnforceEnabled(), []);
   const presetV2NaturalAdvisoryEnabled = useMemo(() => readBeaconPresetV2NaturalAdvisoryEnabled(), []);
   const isConfirmedGuest = !towerUser && !towerSessionPending;
@@ -266,7 +306,9 @@ export function ImageEditor() {
   const [resolvedUploadTarget, setResolvedUploadTarget] = useState<ResolvedUploadTarget | null>(null);
   const lastResolvedTargetInputKeyRef = useRef<string | null>(null);
   const lastAppliedResolvedConstraintsKeyRef = useRef<string | null>(null);
+  const lastAppliedUploadPresetOptionIdRef = useRef<string | null>(null);
   const skipNextPersistExportDefaultsRef = useRef(false);
+  const [uploadPresetOptionId, setUploadPresetOptionId] = useState<string>("");
 
   const {
     assetFolders,
@@ -380,6 +422,66 @@ export function ImageEditor() {
     target: resolvedUploadTarget,
   });
 
+  const uploadPresetPickerStateOptions = useMemo(
+    () =>
+      buildUploadPresetPickerOptions({
+        enabled: presetV2PickerEnabled && presetV2ReadEnabled,
+        settings,
+        target: resolvedUploadTarget,
+        readout: resolvedConstraintsReadout,
+        allowTeamPresets: !isConfirmedGuest,
+      }),
+    [
+      presetV2PickerEnabled,
+      presetV2ReadEnabled,
+      settings,
+      resolvedUploadTarget,
+      resolvedConstraintsReadout,
+      isConfirmedGuest,
+    ]
+  );
+
+  const uploadPresetPickerOptions = useMemo<UploadPresetPickerOption[]>(
+    () =>
+      uploadPresetPickerStateOptions.map((option) => ({
+        id: option.id,
+        label: option.label,
+      })),
+    [uploadPresetPickerStateOptions]
+  );
+
+  const uploadPresetPickerOptionMap = useMemo(
+    () => new Map(uploadPresetPickerStateOptions.map((option) => [option.id, option])),
+    [uploadPresetPickerStateOptions]
+  );
+
+  const uploadPresetPickerReadOnly = useMemo(
+    () => Boolean(isTowerUser && editorExperience && !canManageTeamBeaconSettings),
+    [isTowerUser, editorExperience, canManageTeamBeaconSettings]
+  );
+
+  useEffect(() => {
+    if (!presetV2PickerEnabled || !presetV2ReadEnabled || imageSrc == null) {
+      setUploadPresetOptionId("");
+      lastAppliedUploadPresetOptionIdRef.current = null;
+      return;
+    }
+    const fallbackOptionId = getDefaultUploadPresetOptionId(resolvedConstraintsReadout);
+    const nextOptionId = uploadPresetPickerOptionMap.has(uploadPresetOptionId)
+      ? uploadPresetOptionId
+      : fallbackOptionId;
+    if (nextOptionId !== uploadPresetOptionId) {
+      setUploadPresetOptionId(nextOptionId);
+    }
+  }, [
+    presetV2PickerEnabled,
+    presetV2ReadEnabled,
+    imageSrc,
+    resolvedConstraintsReadout,
+    uploadPresetPickerOptionMap,
+    uploadPresetOptionId,
+  ]);
+
   const visibleBuiltinAspectPresets = useMemo(() => getVisibleBuiltinAspectPresets(settings), [settings]);
 
   const useManualAspectAndMaxWidth = !autoTargetHasDesignerExportTag;
@@ -483,23 +585,33 @@ export function ImageEditor() {
     });
   }, [exportFormat, quality, canPersistExportDefaults, updateSettings]);
 
+  const sessionConstraintApplication = useMemo(
+    () =>
+      resolveSessionResolvedConstraintsApplication({
+        enabled: presetV2ApplyEnabled && presetV2ReadEnabled,
+        imageSrc,
+        readout: resolvedConstraintsReadout,
+      }),
+    [presetV2ApplyEnabled, presetV2ReadEnabled, imageSrc, resolvedConstraintsReadout]
+  );
+
   useEffect(() => {
-    const sessionConstraintApplication = resolveSessionResolvedConstraintsApplication({
-      enabled: presetV2ApplyEnabled && presetV2ReadEnabled,
-      imageSrc,
-      readout: resolvedConstraintsReadout,
-    });
     setAutoTargetHasDesignerExportTag(sessionConstraintApplication.taggedDimensionsActive);
+  }, [sessionConstraintApplication.taggedDimensionsActive]);
+
+  useEffect(() => {
+    if (presetV2PickerEnabled && presetV2ReadEnabled) {
+      return;
+    }
     setSessionMaxFileSizeBytes(sessionConstraintApplication.maxFileSizeBytes);
     if (!sessionConstraintApplication.shouldApply || sessionConstraintApplication.constraints == null) {
       lastAppliedResolvedConstraintsKeyRef.current = null;
       return;
     }
-    const constraints = sessionConstraintApplication.constraints;
     const applyKey = JSON.stringify({
       target: resolvedUploadTarget,
       source: sessionConstraintApplication.source,
-      constraints,
+      constraints: sessionConstraintApplication.constraints,
       imageSrc,
     });
     if (lastAppliedResolvedConstraintsKeyRef.current === applyKey) {
@@ -507,15 +619,62 @@ export function ImageEditor() {
     }
     lastAppliedResolvedConstraintsKeyRef.current = applyKey;
     skipNextPersistExportDefaultsRef.current = true;
-    setOutputWidth(constraints.width);
-    setOutputHeight(constraints.height);
-    setWidthStr(String(constraints.width));
-    setHeightStr(String(constraints.height));
-    setExportFormat(constraints.exportFormat);
-    setQuality(constraints.quality);
-    setCropFrameMode("custom");
-    setAspectPreset("free");
-  }, [presetV2ApplyEnabled, presetV2ReadEnabled, imageSrc, resolvedUploadTarget, resolvedConstraintsReadout]);
+    applySessionConstraintsFromPickerSelection(sessionConstraintApplication.constraints, {
+      setOutputWidth,
+      setOutputHeight,
+      setWidthStr,
+      setHeightStr,
+      setExportFormat,
+      setQuality,
+      setCropFrameMode,
+      setAspectPreset,
+    });
+  }, [presetV2PickerEnabled, presetV2ReadEnabled, sessionConstraintApplication, resolvedUploadTarget, imageSrc]);
+
+  useEffect(() => {
+    if (!presetV2PickerEnabled || !presetV2ReadEnabled) {
+      return;
+    }
+    const selectedOption = uploadPresetPickerOptionMap.get(uploadPresetOptionId) ?? null;
+    const selectedConstraints = selectedOption?.constraints ?? null;
+    if (selectedOption == null || isManualUploadPresetOptionId(selectedOption.id)) {
+      setSessionMaxFileSizeBytes(null);
+      lastAppliedUploadPresetOptionIdRef.current = null;
+      return;
+    }
+    setSessionMaxFileSizeBytes(selectedConstraints?.maxFileSizeBytes ?? null);
+    if (selectedConstraints == null) {
+      return;
+    }
+    const applyKey = JSON.stringify({
+      target: resolvedUploadTarget,
+      selectedOptionId: selectedOption.id,
+      constraints: selectedConstraints,
+      imageSrc,
+    });
+    if (lastAppliedUploadPresetOptionIdRef.current === applyKey) {
+      return;
+    }
+    lastAppliedUploadPresetOptionIdRef.current = applyKey;
+    skipNextPersistExportDefaultsRef.current = true;
+    applySessionConstraintsFromPickerSelection(selectedConstraints, {
+      setOutputWidth,
+      setOutputHeight,
+      setWidthStr,
+      setHeightStr,
+      setExportFormat,
+      setQuality,
+      setCropFrameMode,
+      setAspectPreset,
+    });
+  }, [
+    presetV2PickerEnabled,
+    presetV2ReadEnabled,
+    resolvedUploadTarget,
+    uploadPresetOptionId,
+    uploadPresetPickerOptionMap,
+    imageSrc,
+  ]);
 
   useEffect(() => {
     if (!allowAvifEncoding && exportFormat === "avif") {
@@ -1154,6 +1313,11 @@ export function ImageEditor() {
     [imageSrc, flowStep, savePlaceButton, applyToCanvas]
   );
 
+  const uploadPresetPickerVisible = useMemo(
+    () => presetV2PickerEnabled && presetV2ReadEnabled && uploadPresetPickerOptions.length > 0,
+    [presetV2PickerEnabled, presetV2ReadEnabled, uploadPresetPickerOptions.length]
+  );
+
   const loadedEditor =
     imageSrc != null ? (
       <ImageEditorLoadedColumn
@@ -1242,6 +1406,11 @@ export function ImageEditor() {
           naturalSizeAdvisory={naturalSizeAdvisory}
           onDismissNaturalSizeAdvisory={dismissNaturalSizeAdvisory}
           onApplyNaturalSizeSuggestion={applyNaturalSizeSuggestion}
+          uploadPresetPickerVisible={uploadPresetPickerVisible}
+          uploadPresetPickerReadOnly={uploadPresetPickerReadOnly}
+          uploadPresetPickerValue={uploadPresetOptionId}
+          uploadPresetPickerOptions={uploadPresetPickerOptions}
+          onUploadPresetPickerChange={setUploadPresetOptionId}
         />
       </ImageEditorLoadedColumn>
     ) : null;

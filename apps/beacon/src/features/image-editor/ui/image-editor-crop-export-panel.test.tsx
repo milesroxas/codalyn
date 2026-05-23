@@ -135,3 +135,40 @@ describe("ImageEditorCropExportPanel advisory sizing UI", () => {
     expect(onApplyNaturalSizeSuggestion).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("ImageEditorCropExportPanel upload preset picker", () => {
+  it("renders picker when enabled", () => {
+    const onUploadPresetPickerChange = vi.fn();
+    render(
+      <ImageEditorCropExportPanel
+        {...baseProps({
+          flowPhase: "position",
+          uploadPresetPickerVisible: true,
+          uploadPresetPickerValue: "manual-override",
+          uploadPresetPickerOptions: [
+            { id: "active-resolved", label: "Active resolved preset" },
+            { id: "manual-override", label: "Manual override" },
+          ],
+          onUploadPresetPickerChange,
+        })}
+      />
+    );
+    expect(screen.getByText("Upload preset")).toBeInTheDocument();
+    expect(onUploadPresetPickerChange).not.toHaveBeenCalled();
+  });
+
+  it("disables picker in read-only mode", () => {
+    render(
+      <ImageEditorCropExportPanel
+        {...baseProps({
+          flowPhase: "position",
+          uploadPresetPickerVisible: true,
+          uploadPresetPickerReadOnly: true,
+          uploadPresetPickerValue: "manual-override",
+          uploadPresetPickerOptions: [{ id: "manual-override", label: "Manual override" }],
+        })}
+      />
+    );
+    expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
+  });
+});

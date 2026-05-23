@@ -97,6 +97,11 @@ export type CropFrameMode = "aspect" | "custom";
 
 export type { AspectPreset, AssetFolderRow, ComponentImagePropOption, EditorAspectSelection };
 
+export type UploadPresetPickerOption = {
+  id: string;
+  label: string;
+};
+
 export type ImageEditorCropExportPanelProps = {
   baseId: string;
   imageSrc: string;
@@ -192,6 +197,11 @@ export type ImageEditorCropExportPanelProps = {
   naturalSizeAdvisory?: ImageEditorNaturalSizeAdvisory | null;
   onDismissNaturalSizeAdvisory?: () => void;
   onApplyNaturalSizeSuggestion?: () => void;
+  uploadPresetPickerVisible?: boolean;
+  uploadPresetPickerReadOnly?: boolean;
+  uploadPresetPickerValue?: string;
+  uploadPresetPickerOptions?: UploadPresetPickerOption[];
+  onUploadPresetPickerChange?: (value: string) => void;
 };
 
 /** Fade controls below the crop preview; opacity-only so layout width stays stable in the extension iframe. */
@@ -1504,6 +1514,11 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     naturalSizeAdvisory = null,
     onDismissNaturalSizeAdvisory = () => {},
     onApplyNaturalSizeSuggestion = () => {},
+    uploadPresetPickerVisible = false,
+    uploadPresetPickerReadOnly = false,
+    uploadPresetPickerValue,
+    uploadPresetPickerOptions = [],
+    onUploadPresetPickerChange,
   } = props;
 
   const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
@@ -1569,6 +1584,34 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
   if (flowPhase === "position") {
     return (
       <div className={cn(beaconPanelContainClass, "flex flex-col gap-3")}>
+        {uploadPresetPickerVisible ? (
+          <Card size="sm">
+            <CardHeader className="space-y-1 pb-2">
+              <CardTitle className="text-sm font-medium">Upload preset</CardTitle>
+              <CardDescription className="text-xs leading-snug">
+                Choose a preset source or switch to manual session override.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <Select
+                value={uploadPresetPickerValue}
+                onValueChange={(value) => onUploadPresetPickerChange?.(value)}
+                disabled={uploadPresetPickerReadOnly}
+              >
+                <SelectTrigger size="full">
+                  <SelectValue placeholder="Select upload preset source" />
+                </SelectTrigger>
+                <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
+                  {uploadPresetPickerOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        ) : null}
         <CropStageSection
           baseId={baseId}
           imageSrc={imageSrc}
@@ -1608,6 +1651,34 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
 
   return (
     <div className={cn(beaconPanelContainClass, "flex flex-col gap-3")}>
+      {uploadPresetPickerVisible ? (
+        <Card size="sm">
+          <CardHeader className="space-y-1 pb-2">
+            <CardTitle className="text-sm font-medium">Upload preset</CardTitle>
+            <CardDescription className="text-xs leading-snug">
+              Choose a preset source or switch to manual session override.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Select
+              value={uploadPresetPickerValue}
+              onValueChange={(value) => onUploadPresetPickerChange?.(value)}
+              disabled={uploadPresetPickerReadOnly}
+            >
+              <SelectTrigger size="full">
+                <SelectValue placeholder="Select upload preset source" />
+              </SelectTrigger>
+              <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
+                {uploadPresetPickerOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      ) : null}
       <ExportEncodeCard
         baseId={baseId}
         fileBaseName={fileBaseName}

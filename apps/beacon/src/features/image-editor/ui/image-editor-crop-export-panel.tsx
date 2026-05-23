@@ -16,6 +16,7 @@ import type { AssetFolderRow } from "@/features/image-editor/lib/asset-folder-ro
 import type { ElementCmsBindingResolution } from "@/features/image-editor/lib/cms-primary-upload-context";
 import type { ComponentImagePropOption } from "@/features/image-editor/lib/component-image-prop";
 import { formatFileSize } from "@/features/image-editor/lib/format-file-size";
+import type { ImageEditorNaturalSizeAdvisory } from "@/features/image-editor/lib/image-editor-natural-size-advisory";
 import {
   resolvePlacementWhenOptionHidden,
   shouldOfferReplacePlacement,
@@ -188,6 +189,9 @@ export type ImageEditorCropExportPanelProps = {
   resolvedConstraintsReadout?: ResolverOutput | null;
   sessionMaxFileSizeBytes?: number | null;
   presetFileLimitBlocker?: ImageEditorPresetFileLimitBlocker | null;
+  naturalSizeAdvisory?: ImageEditorNaturalSizeAdvisory | null;
+  onDismissNaturalSizeAdvisory?: () => void;
+  onApplyNaturalSizeSuggestion?: () => void;
 };
 
 /** Fade controls below the crop preview; opacity-only so layout width stays stable in the extension iframe. */
@@ -260,6 +264,9 @@ type CropStageProps = {
   frameSummary: string;
   exportSizeUsesAspectAndMaxWidth?: boolean;
   onExportMaxWidthBlur?: () => void;
+  naturalSizeAdvisory: ImageEditorNaturalSizeAdvisory | null;
+  onDismissNaturalSizeAdvisory: () => void;
+  onApplyNaturalSizeSuggestion: () => void;
 };
 
 type CropShapeControlsSectionProps = Pick<
@@ -283,6 +290,48 @@ type CropShapeControlsSectionProps = Pick<
   | "onExportMaxWidthBlur"
   | "strictOutputDimensionInputs"
 >;
+
+function formatDimensionPair(size: { width: number; height: number }): string {
+  return `${size.width}×${size.height}px`;
+}
+
+function NaturalSizeAdvisoryCard(props: {
+  advisory: ImageEditorNaturalSizeAdvisory;
+  onDismiss: () => void;
+  onApply: () => void;
+}) {
+  const { advisory, onDismiss, onApply } = props;
+  const comparisonLabel =
+    advisory.comparisonKind === "source-larger"
+      ? "Source image is much larger than current export size."
+      : "Source image is much smaller than current export size.";
+  return (
+    <Card size="sm">
+      <CardHeader className="space-y-1 pb-2">
+        <CardTitle className="text-sm font-medium">Advisory sizing</CardTitle>
+        <CardDescription className="text-xs leading-snug">{comparisonLabel}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 pt-0">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+          <p className="text-muted-foreground">Source natural size</p>
+          <p className="tabular-nums">{formatDimensionPair(advisory.natural)}</p>
+          <p className="text-muted-foreground">Current export size</p>
+          <p className="tabular-nums">{formatDimensionPair(advisory.comparison)}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {advisory.canApplySuggestion ? (
+            <Button type="button" size="sm" onClick={onApply}>
+              Use source size
+            </Button>
+          ) : null}
+          <Button type="button" size="sm" variant="outline" onClick={onDismiss}>
+            Dismiss
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function CropShapeControlsSection(p: CropShapeControlsSectionProps) {
   const {
@@ -525,6 +574,9 @@ function CropStageSection(p: CropStageProps) {
     exportSizeUsesAspectAndMaxWidth = false,
     onExportMaxWidthBlur,
     strictOutputDimensionInputs = false,
+    naturalSizeAdvisory,
+    onDismissNaturalSizeAdvisory,
+    onApplyNaturalSizeSuggestion,
   } = p;
 
   const [cropMediaSize, setCropMediaSize] = useState<MediaSize | null>(null);
@@ -622,6 +674,13 @@ function CropStageSection(p: CropStageProps) {
           )}
         </CardContent>
       </Card>
+      {naturalSizeAdvisory ? (
+        <NaturalSizeAdvisoryCard
+          advisory={naturalSizeAdvisory}
+          onDismiss={onDismissNaturalSizeAdvisory}
+          onApply={onApplyNaturalSizeSuggestion}
+        />
+      ) : null}
     </section>
   );
 }
@@ -1442,6 +1501,9 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     resolvedConstraintsReadout = null,
     sessionMaxFileSizeBytes = null,
     presetFileLimitBlocker = null,
+    naturalSizeAdvisory = null,
+    onDismissNaturalSizeAdvisory = () => {},
+    onApplyNaturalSizeSuggestion = () => {},
   } = props;
 
   const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
@@ -1536,6 +1598,9 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
           exportSizeUsesAspectAndMaxWidth={exportSizeUsesAspectAndMaxWidth}
           onExportMaxWidthBlur={onExportMaxWidthBlur}
           strictOutputDimensionInputs={strictOutputDimensionInputs}
+          naturalSizeAdvisory={naturalSizeAdvisory}
+          onDismissNaturalSizeAdvisory={onDismissNaturalSizeAdvisory}
+          onApplyNaturalSizeSuggestion={onApplyNaturalSizeSuggestion}
         />
       </div>
     );

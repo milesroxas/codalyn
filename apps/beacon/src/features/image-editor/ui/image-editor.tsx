@@ -22,6 +22,7 @@ import { aspectValue, type EditorAspectSelection } from "@/features/image-editor
 import {
   readBeaconPresetV2ApplyEnabled,
   readBeaconPresetV2EnforceEnabled,
+  readBeaconPresetV2NaturalAdvisoryEnabled,
   readBeaconPresetV2ReadEnabled,
 } from "@/features/image-editor/lib/beacon-preset-v2-flags";
 import {
@@ -30,6 +31,10 @@ import {
 } from "@/features/image-editor/lib/cms-primary-upload-context";
 import { dimensionsFromMaxWidthAndAspect } from "@/features/image-editor/lib/export-dimensions-from-aspect";
 import type { ImageEditorFlowStep, ImageEditorPathMode } from "@/features/image-editor/lib/image-editor-flow-step";
+import {
+  applyNaturalSizeSuggestionToSession,
+  resolveImageEditorNaturalSizeAdvisory,
+} from "@/features/image-editor/lib/image-editor-natural-size-advisory";
 import { getImageEditorPlaceButtonState } from "@/features/image-editor/lib/image-editor-place-button-state";
 import {
   shouldOfferReplacePlacement,
@@ -39,6 +44,7 @@ import { resolveImageEditorPresetFileLimitBlocker } from "@/features/image-edito
 import { resolveImageEditorPlacement } from "@/features/image-editor/lib/image-editor-resolved-placement";
 import { mapSelectedTargetToResolvedUploadTarget } from "@/features/image-editor/lib/image-editor-resolved-target";
 import { resolveSessionResolvedConstraintsApplication } from "@/features/image-editor/lib/image-editor-session-resolved-constraints";
+import { loadImage } from "@/features/image-editor/lib/load-image";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
 import { readBeaconDesignerExportForTarget } from "@/features/image-editor/lib/read-beacon-designer-export-for-target";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
@@ -222,6 +228,8 @@ export function ImageEditor() {
   const [outputHeight, setOutputHeight] = useState(0);
   const [widthStr, setWidthStr] = useState("");
   const [heightStr, setHeightStr] = useState("");
+  const [sourceNaturalSize, setSourceNaturalSize] = useState<{ width: number; height: number } | null>(null);
+  const [dismissedNaturalSizeAdvisoryKey, setDismissedNaturalSizeAdvisoryKey] = useState<string | null>(null);
   const [fileBaseName, setFileBaseName] = useState("edited");
   const [quality, setQuality] = useState(settings.defaultExportQuality);
   const [exportFormat, setExportFormat] = useState<ImageExportFormat>(settings.defaultExportFormat);
@@ -246,6 +254,7 @@ export function ImageEditor() {
   const presetV2ReadEnabled = useMemo(() => readBeaconPresetV2ReadEnabled(), []);
   const presetV2ApplyEnabled = useMemo(() => readBeaconPresetV2ApplyEnabled(), []);
   const presetV2EnforceEnabled = useMemo(() => readBeaconPresetV2EnforceEnabled(), []);
+  const presetV2NaturalAdvisoryEnabled = useMemo(() => readBeaconPresetV2NaturalAdvisoryEnabled(), []);
   const isConfirmedGuest = !towerUser && !towerSessionPending;
   const { isCmsCollectionTemplatePage: cmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
   const guestCmsTemplateRestricted = isConfirmedGuest && cmsCollectionTemplatePage;
@@ -529,6 +538,33 @@ export function ImageEditor() {
 
   useRevokeBlobUrlOnChange(imageSrc);
 
+  useEffect(() => {
+    if (!presetV2NaturalAdvisoryEnabled || imageSrc == null) {
+      setSourceNaturalSize(null);
+      return;
+    }
+    let cancelled = false;
+    void loadImage(imageSrc)
+      .then((img) => {
+        if (cancelled) {
+          return;
+        }
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+          setSourceNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+          return;
+        }
+        setSourceNaturalSize(null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSourceNaturalSize(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [imageSrc, presetV2NaturalAdvisoryEnabled]);
+
   const parsedOutputW = useMemo(() => {
     if (autoTargetHasDesignerExportTag) {
       return parseOutputDimension(widthStr, outputWidth);
@@ -550,6 +586,75 @@ export function ImageEditor() {
     const { width, height } = outputDimensionsMatchingCrop(completedCrop, parsedOutputW, parsedOutputH);
     return { effectiveOutputW: width, effectiveOutputH: height };
   }, [completedCrop, parsedOutputW, parsedOutputH]);
+
+  const advisoryComparisonSize = useMemo(() => {
+    const resolved = resolvedConstraintsReadout?.constraints;
+    if (resolved != null) {
+      return { width: resolved.width, height: resolved.height };
+    }
+    if (parsedOutputW > 0 && parsedOutputH > 0) {
+      return { width: parsedOutputW, height: parsedOutputH };
+    }
+    return null;
+  }, [resolvedConstraintsReadout, parsedOutputW, parsedOutputH]);
+
+  const naturalSizeAdvisoryKey = useMemo(() => {
+    if (imageSrc == null || sourceNaturalSize == null || advisoryComparisonSize == null) {
+      return null;
+    }
+    return JSON.stringify({
+      imageSrc,
+      natural: sourceNaturalSize,
+      comparison: advisoryComparisonSize,
+      source: resolvedConstraintsReadout?.source ?? "manual",
+      targetKind: resolvedUploadTarget?.kind ?? "manual",
+    });
+  }, [imageSrc, sourceNaturalSize, advisoryComparisonSize, resolvedConstraintsReadout, resolvedUploadTarget]);
+
+  const naturalSizeAdvisory = useMemo(
+    () =>
+      resolveImageEditorNaturalSizeAdvisory({
+        enabled: presetV2NaturalAdvisoryEnabled && imageSrc != null,
+        dismissed: naturalSizeAdvisoryKey != null && dismissedNaturalSizeAdvisoryKey === naturalSizeAdvisoryKey,
+        naturalSize: sourceNaturalSize,
+        comparisonSize: advisoryComparisonSize,
+        resolverSource: resolvedConstraintsReadout?.source ?? "manual",
+        taggedDimensionsActive: autoTargetHasDesignerExportTag,
+        canEditSessionDimensions: !autoTargetHasDesignerExportTag,
+      }),
+    [
+      presetV2NaturalAdvisoryEnabled,
+      imageSrc,
+      naturalSizeAdvisoryKey,
+      dismissedNaturalSizeAdvisoryKey,
+      sourceNaturalSize,
+      advisoryComparisonSize,
+      resolvedConstraintsReadout,
+      autoTargetHasDesignerExportTag,
+    ]
+  );
+
+  const dismissNaturalSizeAdvisory = useCallback(() => {
+    if (naturalSizeAdvisoryKey != null) {
+      setDismissedNaturalSizeAdvisoryKey(naturalSizeAdvisoryKey);
+    }
+  }, [naturalSizeAdvisoryKey]);
+
+  const applyNaturalSizeSuggestion = useCallback(() => {
+    if (naturalSizeAdvisory == null || !naturalSizeAdvisory.canApplySuggestion) {
+      return;
+    }
+    const next = applyNaturalSizeSuggestionToSession({
+      width: naturalSizeAdvisory.suggestedSessionWidth,
+      height: naturalSizeAdvisory.suggestedSessionHeight,
+    });
+    setOutputWidth(next.width);
+    setOutputHeight(next.height);
+    setWidthStr(next.widthStr);
+    setHeightStr(next.heightStr);
+    setCropFrameMode(next.cropFrameMode);
+    setAspectPreset(next.aspectPreset);
+  }, [naturalSizeAdvisory]);
 
   const exportDimensionsReady = useMemo((): boolean => {
     if (autoTargetHasDesignerExportTag) {
@@ -1134,6 +1239,9 @@ export function ImageEditor() {
           resolvedConstraintsReadout={resolvedConstraintsReadout}
           sessionMaxFileSizeBytes={sessionMaxFileSizeBytes}
           presetFileLimitBlocker={presetFileLimitBlocker}
+          naturalSizeAdvisory={naturalSizeAdvisory}
+          onDismissNaturalSizeAdvisory={dismissNaturalSizeAdvisory}
+          onApplyNaturalSizeSuggestion={applyNaturalSizeSuggestion}
         />
       </ImageEditorLoadedColumn>
     ) : null;

@@ -56,27 +56,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
-import { StepNav } from "@/shared/ui/step-nav";
 
 type View = "list" | "form";
-
-const PRESET_FORM_STEP_NAV = [
-  { id: "1", label: "Image" },
-  { id: "2", label: "Preset" },
-] as const;
 
 type ImageEditorConfigurationPresetsStepProps = {
   isGuest: boolean;
   /** Return to the designer start screen (from the preset list). */
   onDone: () => void;
   onFooterChange?: (footer: ReactNode | null) => void;
-  onSubheaderChange?: (subheader: ReactNode | null) => void;
   onScrollResetKeyChange?: (key: string | null) => void;
   className?: string;
 };
 
 export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurationPresetsStepProps) {
-  const { isGuest, onDone, onFooterChange, onSubheaderChange, onScrollResetKeyChange, className } = props;
+  const { isGuest, onDone, onFooterChange, onScrollResetKeyChange, className } = props;
   const baseId = useId();
   const { settings, updateSettings, canManageTeamBeaconSettings } = useBeaconAppSettings();
   const [view, setView] = useState<View>("list");
@@ -372,14 +365,6 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     );
   }, [formSubStep, backToList]);
 
-  const onPresetFormStepSelect = useCallback((stepId: string) => {
-    if (stepId !== "1" && stepId !== "2") {
-      return;
-    }
-    setFormError(null);
-    setFormSubStep(Number(stepId) as PresetFormSubStep);
-  }, []);
-
   const onSave = useCallback(() => {
     void commitImagePresetForm({
       saveInFlightRef,
@@ -533,26 +518,6 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
       onFooterChange?.(null);
     };
   }, [footer, onFooterChange]);
-
-  const subheader = useMemo<ReactNode | null>(
-    () =>
-      view === "form" && !isEditing ? (
-        <StepNav
-          aria-label="Configure preset steps"
-          current={String(formSubStep)}
-          onStepSelect={onPresetFormStepSelect}
-          steps={PRESET_FORM_STEP_NAV.map((step) => ({ id: step.id, label: step.label }))}
-        />
-      ) : null,
-    [formSubStep, isEditing, onPresetFormStepSelect, view]
-  );
-
-  useEffect(() => {
-    onSubheaderChange?.(subheader);
-    return () => {
-      onSubheaderChange?.(null);
-    };
-  }, [onSubheaderChange, subheader]);
 
   const scrollResetKey = useMemo(() => {
     if (view === "list") {

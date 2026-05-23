@@ -1,6 +1,7 @@
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { shouldShowCmsSlotsPreInstall } from "@/features/cms-slots/model/cms-slots-access";
 import { CmsSlotPreInstallBlock } from "@/features/cms-slots/ui/cms-slot-pre-install-block";
+import { CmsSlotsRouteMainIntro } from "@/features/cms-slots/ui/cms-slots-route-main-intro";
 import { OnThisPageSection } from "./on-this-page-section";
 
 type CmsSlotHomePanelProps = {
@@ -62,6 +63,7 @@ export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
 
   return (
     <div className="space-y-4" data-slot="beacon_home_installed">
+      <CmsSlotsRouteMainIntro segment="engine" />
       <OnThisPageSection
         nameFieldId={nameFieldId}
         pageBeacons={pageBeacons}

@@ -4,8 +4,8 @@ import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { SectionLabelDivider } from "@/shared/ui/section-label-divider";
 import { CmsSlotCompositionComponentsCatalog } from "./cms-slot-composition-components-catalog";
+import { CmsSlotEngineListContextSection } from "./cms-slot-engine-list-context-section";
 import { CmsSlotEngineSelectedRow } from "./cms-slot-engine-selected-row";
-import { CmsSlotListTargetActionsBar } from "./cms-slot-list-target-actions-bar";
 import { useCompositionComposableMeta } from "./use-composition-composable-meta";
 
 export type CmsSlotCompositionPanelProps = {
@@ -91,28 +91,20 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
 
   return (
     <>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-1.5 text-xs">
-          <span className="shrink-0 font-medium text-foreground">Editing</span>
-          {activeDataList != null ? (
-            <code className="min-w-0 truncate font-mono text-[0.7rem] text-muted-foreground">{activeDataList}</code>
-          ) : null}
-        </div>
-        <CmsSlotListTargetActionsBar
-          activeDataList={activeDataList}
-          removingKey={removingKey}
-          listTargetPhase={listTargetPhase}
-          listTargetActionBusy={listTargetActionBusy}
-          listTargetCreatePending={listTargetCreatePending}
-          listTargetRemovePending={listTargetRemovePending}
-          listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
-          listTargetOnCanvasCount={listTargetOnCanvasCount}
-          onBackToList={onBackToList}
-          onCreateListTarget={onCreateListTarget}
-          onRequestRemoveListTarget={onRequestRemoveListTarget}
-          onPlaceListTargetOnCanvas={onPlaceListTargetOnCanvas}
-        />
-      </div>
+      <CmsSlotEngineListContextSection
+        activeDataList={activeDataList}
+        listTargetActionBusy={listTargetActionBusy}
+        listTargetCreatePending={listTargetCreatePending}
+        listTargetOnCanvasCount={listTargetOnCanvasCount}
+        listTargetPhase={listTargetPhase}
+        listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
+        listTargetRemovePending={listTargetRemovePending}
+        onBackToList={onBackToList}
+        onCreateListTarget={onCreateListTarget}
+        onPlaceListTargetOnCanvas={onPlaceListTargetOnCanvas}
+        onRequestRemoveListTarget={onRequestRemoveListTarget}
+        removingKey={removingKey}
+      />
 
       <CmsSlotCompositionComponentsCatalog
         searchFieldId={searchFieldId}

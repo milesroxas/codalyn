@@ -5,7 +5,16 @@ import {
   IMAGE_UPLOAD_PRESET_EDIT_INSTANCE_MISMATCH_MESSAGE,
   IMAGE_UPLOAD_PRESET_EDIT_INSTANCE_TARGET_REQUIRED_MESSAGE,
 } from "@/shared/lib/beacon-feature-route-copy";
-import { validateInstancePresetEditTarget } from "./image-editor-preset-form-commit";
+import { shouldTagPageTargetOnPresetSave, validateInstancePresetEditTarget } from "./image-editor-preset-form-commit";
+
+describe("shouldTagPageTargetOnPresetSave", () => {
+  it("tags only instance presets", () => {
+    expect(shouldTagPageTargetOnPresetSave("instance")).toBe(true);
+    expect(shouldTagPageTargetOnPresetSave("component")).toBe(false);
+    expect(shouldTagPageTargetOnPresetSave("element")).toBe(false);
+    expect(shouldTagPageTargetOnPresetSave("site-default")).toBe(false);
+  });
+});
 
 describe("validateInstancePresetEditTarget", () => {
   const instanceEntry: BeaconPresetStorageEntry = {

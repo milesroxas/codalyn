@@ -11,8 +11,8 @@ import { ImagePageTargetSurfaceSummary } from "@/features/image-editor/ui/image-
 import {
   IMAGE_UPLOAD_PRESET_CREATE_INTRO,
   IMAGE_UPLOAD_PRESET_CREATE_SECTION_LABEL,
-  IMAGE_UPLOAD_PRESET_CURRENT_SECTION_LABEL,
   IMAGE_UPLOAD_PRESET_EDIT_EXISTING_LABEL,
+  IMAGE_UPLOAD_PRESET_EXISTING_SECTION_LABEL,
 } from "@/shared/lib/beacon-feature-route-copy";
 import { Button } from "@/shared/ui/button";
 import {
@@ -51,7 +51,7 @@ function SelectedSurfaceSection(props: { target: ImagePageTarget | null; discove
   );
 }
 
-function CurrentPresetSection(props: {
+function ExistingPresetSection(props: {
   existingPresets: PresetFormExistingMatch[];
   onEditPreset?: (match: PresetFormExistingMatch) => void;
 }) {
@@ -64,7 +64,7 @@ function CurrentPresetSection(props: {
   return (
     <SurfaceSummaryCardPanelSection showDivider>
       <SurfaceSummaryCardPanelSectionLabel>
-        {IMAGE_UPLOAD_PRESET_CURRENT_SECTION_LABEL}
+        {IMAGE_UPLOAD_PRESET_EXISTING_SECTION_LABEL}
       </SurfaceSummaryCardPanelSectionLabel>
       <SurfaceSummaryCardNestedCardList>
         {existingPresets.map((match) => (
@@ -157,7 +157,7 @@ export function ImageEditorSelectedSurfacePanel(props: ImageEditorSelectedSurfac
   return (
     <SurfaceSummaryCardPanel>
       <SelectedSurfaceSection discoveryPending={discoveryPending} target={target} />
-      <CurrentPresetSection existingPresets={existingPresets} onEditPreset={onEditPreset} />
+      <ExistingPresetSection existingPresets={existingPresets} onEditPreset={onEditPreset} />
       <CreatePresetSection addableScopes={addableScopes} onAddScope={onAddScope} />
     </SurfaceSummaryCardPanel>
   );

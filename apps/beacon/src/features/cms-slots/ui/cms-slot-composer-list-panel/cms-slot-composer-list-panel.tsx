@@ -8,6 +8,7 @@ import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-acce
 import { CmsSlotListTile } from "@/features/cms-slots/ui/cms-slot-list-tile";
 import { CmsSlotPreInstallBlock } from "@/features/cms-slots/ui/cms-slot-pre-install-block";
 import { CmsSlotsEditorNoSlotsEmptyState } from "@/features/cms-slots/ui/cms-slots-editor-no-slots-empty-state";
+import { CmsSlotsRouteMainIntro } from "@/features/cms-slots/ui/cms-slots-route-main-intro";
 
 type CmsSlotComposerListPanelProps = {
   pageScanLoading: boolean;
@@ -81,6 +82,7 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
 
   return (
     <div className="space-y-4" data-slot="beacon_composer_list">
+      <CmsSlotsRouteMainIntro segment="composer" />
       {runtimeOk && eligible.length > 0 ? (
         <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0" aria-label="Lists available in Composer">
           {eligible.map((b) => (

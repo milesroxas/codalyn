@@ -68,7 +68,7 @@ export function IMAGE_UPLOAD_PRESET_EXISTS_DESCRIPTION(displayName: string, dime
 
 export const IMAGE_UPLOAD_PRESET_EDIT_EXISTING_LABEL = "Edit preset";
 
-export const IMAGE_UPLOAD_PRESET_CURRENT_SECTION_LABEL = "Current preset";
+export const IMAGE_UPLOAD_PRESET_EXISTING_SECTION_LABEL = "Existing presets";
 
 export const IMAGE_UPLOAD_PRESET_CREATE_SECTION_LABEL = "Create preset";
 

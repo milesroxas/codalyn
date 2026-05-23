@@ -172,7 +172,6 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
           type="button"
           variant="outline"
           size="sm"
-          className="h-7 shrink-0 px-2.5 text-xs font-normal"
           disabled={removingKey !== null || listTargetActionBusy}
           onClick={openExposeDrawer}
         >

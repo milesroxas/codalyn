@@ -148,7 +148,6 @@ function imageEditorRouteChromeSlots(options: {
   stepExitFade: boolean;
   savePlaceAction: { label: string; disabled: boolean; busy: boolean; onPlace: () => void } | null;
   configurePresetsFooter: ReactNode | null;
-  configurePresetsSubheader: ReactNode | null;
 }): { subheader?: ReactNode; footer?: ReactNode } {
   const {
     showFlowStepNav,
@@ -166,11 +165,14 @@ function imageEditorRouteChromeSlots(options: {
     stepExitFade,
     savePlaceAction,
     configurePresetsFooter,
-    configurePresetsSubheader,
   } = options;
 
-  const defaultSubheader =
-    showFlowStepNav && flowStep !== "success" && shouldShowImageEditorStepNav(pathMode) ? (
+  const subheader =
+    !showGuestOnboarding &&
+    flowStep !== "configurePresets" &&
+    showFlowStepNav &&
+    flowStep !== "success" &&
+    shouldShowImageEditorStepNav(pathMode) ? (
       <StepNav
         aria-label="Image editor steps"
         current={currentStepForNav}
@@ -182,10 +184,6 @@ function imageEditorRouteChromeSlots(options: {
         }))}
       />
     ) : null;
-  const subheader =
-    !showGuestOnboarding && flowStep === "configurePresets"
-      ? (configurePresetsSubheader ?? defaultSubheader)
-      : defaultSubheader;
 
   const footer = resolveImageEditorRouteFooter({
     showGuestOnboarding,
@@ -360,7 +358,6 @@ export function ImageEditor() {
   const [resolverPageId, setResolverPageId] = useState<string | null>(null);
   const [resolvedUploadTarget, setResolvedUploadTarget] = useState<ResolvedUploadTarget | null>(null);
   const [configurePresetsFooter, setConfigurePresetsFooter] = useState<ReactNode | null>(null);
-  const [configurePresetsSubheader, setConfigurePresetsSubheader] = useState<ReactNode | null>(null);
   const [configurePresetsScrollResetKey, setConfigurePresetsScrollResetKey] = useState<string | null>(null);
   const lastResolvedTargetInputKeyRef = useRef<string | null>(null);
   const resolvedTargetForInputKeyRef = useRef<string | null>(null);
@@ -1468,7 +1465,6 @@ export function ImageEditor() {
     stepExitFade,
     savePlaceAction,
     configurePresetsFooter,
-    configurePresetsSubheader,
   });
 
   return (
@@ -1508,7 +1504,6 @@ export function ImageEditor() {
               fileInputId={fileInputId}
               onDoneConfiguringPresets={finishConfigurePath}
               onConfigurePresetsFooterChange={setConfigurePresetsFooter}
-              onConfigurePresetsSubheaderChange={setConfigurePresetsSubheader}
               onConfigurePresetsScrollResetKeyChange={setConfigurePresetsScrollResetKey}
               flowStep={flowStep}
               handleDrag={handleDrag}

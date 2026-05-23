@@ -1,7 +1,10 @@
 import { cva, type VariantProps } from "class-variance-authority";
+import { MoreVertical } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
+import { Button } from "@/shared/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
 
 const surfaceSummaryCardVariants = cva("flex min-w-0 flex-col gap-2 rounded-sm border px-3 py-2.5 text-left", {
   variants: {
@@ -121,6 +124,7 @@ const surfaceSummaryCardSelectRowVariants = cva(
 );
 
 const surfaceSummaryCardSurfaceDisplayClass = "flex min-w-0 w-full items-center gap-3 text-left";
+const surfaceSummaryCardSurfaceActionsClass = "shrink-0";
 
 const surfaceSummaryCardSelectRowListClass = "flex min-w-0 flex-col gap-2";
 
@@ -232,6 +236,50 @@ function SurfaceSummaryCardActionRow({
 
 function SurfaceSummaryCardActionCopy({ className, ...props }: React.ComponentProps<"div">) {
   return <div data-slot="surface-summary-card-action-copy" className={cn("min-w-0 flex-1", className)} {...props} />;
+}
+
+type SurfaceSummaryCardCanvasActionRowProps = {
+  label: string;
+  labelEmphasis?: VariantProps<typeof surfaceSummaryCardMetaVariants>["emphasis"];
+  actionLabel: string;
+  actionPendingLabel?: string;
+  pending?: boolean;
+  disabled?: boolean;
+  onAction: () => void;
+  actionVariant?: "default" | "secondary";
+};
+
+/** Prominent context label with a compact canvas action (e.g. Find on canvas, Focus on canvas). */
+function SurfaceSummaryCardCanvasActionRow(props: SurfaceSummaryCardCanvasActionRowProps) {
+  const {
+    label,
+    labelEmphasis = "prominent",
+    actionLabel,
+    actionPendingLabel,
+    pending = false,
+    disabled = false,
+    onAction,
+    actionVariant = "secondary",
+  } = props;
+  const prominence = labelEmphasis === "prominent" ? "elevated" : "default";
+
+  return (
+    <SurfaceSummaryCardActionRow prominence={prominence}>
+      <SurfaceSummaryCardActionCopy>
+        <SurfaceSummaryCardMeta emphasis={labelEmphasis}>{label}</SurfaceSummaryCardMeta>
+      </SurfaceSummaryCardActionCopy>
+      <Button
+        type="button"
+        variant={actionVariant}
+        size="sm"
+        disabled={disabled}
+        aria-busy={pending}
+        onClick={onAction}
+      >
+        {pending && actionPendingLabel != null ? actionPendingLabel : actionLabel}
+      </Button>
+    </SurfaceSummaryCardActionRow>
+  );
 }
 
 function SurfaceSummaryCardPanel({
@@ -515,11 +563,60 @@ function SurfaceSummaryCardPageIntro(props: { title: string; description?: strin
   );
 }
 
+export type SurfaceSummaryCardSurfaceActionsMenuItem = {
+  id: string;
+  label: string;
+  pendingLabel?: string;
+  variant?: "default" | "destructive";
+  disabled?: boolean;
+  pending?: boolean;
+  onSelect: () => void;
+};
+
+type SurfaceSummaryCardSurfaceActionsMenuProps = {
+  ariaLabel: string;
+  disabled?: boolean;
+  items: SurfaceSummaryCardSurfaceActionsMenuItem[];
+};
+
+function SurfaceSummaryCardSurfaceActionsMenu(props: SurfaceSummaryCardSurfaceActionsMenuProps) {
+  const { ariaLabel, disabled = false, items } = props;
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div data-slot="surface-summary-card-surface-actions" className={surfaceSummaryCardSurfaceActionsClass}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="icon-sm" disabled={disabled} aria-label={ariaLabel}>
+            <MoreVertical aria-hidden strokeWidth={2} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-36">
+          {items.map((item) => (
+            <DropdownMenuItem
+              key={item.id}
+              variant={item.variant}
+              disabled={disabled || item.disabled || item.pending}
+              onSelect={() => void item.onSelect()}
+            >
+              {item.pending && item.pendingLabel != null ? item.pendingLabel : item.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
 export {
   SurfaceSummaryCard,
   SurfaceSummaryCardActionCopy,
   SurfaceSummaryCardActionRow,
   SurfaceSummaryCardBody,
+  SurfaceSummaryCardCanvasActionRow,
   SurfaceSummaryCardEmpty,
   SurfaceSummaryCardFormFields,
   SurfaceSummaryCardIconBox,
@@ -549,6 +646,7 @@ export {
   SurfaceSummaryCardSectionLabel,
   SurfaceSummaryCardSelectRow,
   SurfaceSummaryCardSelectRowList,
+  SurfaceSummaryCardSurfaceActionsMenu,
   SurfaceSummaryCardSurfaceDisplay,
   SurfaceSummaryCardSurfaceSummary,
   SurfaceSummaryCardTitle,

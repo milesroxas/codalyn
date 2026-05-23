@@ -133,6 +133,11 @@ async function attachInstanceLocationToPresetRow(
   return { ...row, instanceLocation: location };
 }
 
+/** Instance presets tag the selected canvas surface; component/element presets are settings-only. */
+export function shouldTagPageTargetOnPresetSave(scope: PresetCrudScope): boolean {
+  return scope === "instance";
+}
+
 export function validateInstancePresetEditTarget(input: {
   editingEntry: BeaconPresetStorageEntry | null;
   resolvedTargetForScope: Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }> | null;
@@ -283,6 +288,24 @@ export type CommitImagePresetFormArgs = {
   backToList: () => void;
 };
 
+async function applyPresetSaveSideEffects(input: {
+  presetScope: PresetCrudScope;
+  tagTarget: ImagePageTarget | null;
+  draft: ParsedPresetDraft;
+}): Promise<void> {
+  const { presetScope, tagTarget, draft } = input;
+  if (tagTarget != null && shouldTagPageTargetOnPresetSave(presetScope)) {
+    await setBeaconDesignerExportAttrsOnPageTarget(tagTarget, draft.width, draft.height);
+  }
+  void webflow.notify({
+    type: "Success",
+    message:
+      tagTarget != null && shouldTagPageTargetOnPresetSave(presetScope)
+        ? "Saved preset and tagged the Image surface."
+        : "Saved preset.",
+  });
+}
+
 export async function commitImagePresetForm(args: CommitImagePresetFormArgs): Promise<void> {
   const {
     saveInFlightRef,
@@ -372,14 +395,7 @@ export async function commitImagePresetForm(args: CommitImagePresetFormArgs): Pr
       return;
     }
 
-    if (tagTarget) {
-      await setBeaconDesignerExportAttrsOnPageTarget(tagTarget, parsedDraft.width, parsedDraft.height);
-    }
-
-    void webflow.notify({
-      type: "Success",
-      message: tagTarget ? "Saved preset and tagged the Image surface." : "Saved preset.",
-    });
+    await applyPresetSaveSideEffects({ presetScope, tagTarget, draft: parsedDraft });
     backToList();
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Could not save";

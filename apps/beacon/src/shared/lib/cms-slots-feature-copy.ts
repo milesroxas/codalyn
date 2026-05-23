@@ -68,3 +68,51 @@ export const CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_NOTIFY_MESSAGE =
 
 /** Screen-reader label for the collection-template prompt control. */
 export const CMS_SLOTS_REQUIRES_COLLECTION_TEMPLATE_ARIA_LABEL = `${CMS_SLOTS_FEATURE_NAME}: ${CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_LABEL}`;
+
+export const CMS_SLOTS_ENGINE_MAIN_TITLE = "Engine";
+
+export const CMS_SLOTS_ENGINE_MAIN_DESCRIPTION = "Set up slots, components, and fields for this collection.";
+
+export const CMS_SLOTS_COMPOSER_MAIN_TITLE = "Composer";
+
+export const CMS_SLOTS_COMPOSER_MAIN_DESCRIPTION = "Pick a list to order parts and set content.";
+
+export const CMS_SLOTS_ENGINE_EDITING_TITLE = "Editing list";
+
+export const CMS_SLOTS_ENGINE_EDITING_DESCRIPTION = "Add components and expose props for this slot list.";
+
+export const CMS_SLOTS_ENGINE_CURRENT_LIST_LABEL = "Current list";
+
+export const CMS_SLOTS_ENGINE_LIST_TARGET_META = "List target";
+
+export const CMS_SLOTS_ENGINE_FOCUS_ON_CANVAS_HINT = "Jump to the list target on the canvas.";
+
+export const CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_HINT = "Place the list target on the canvas.";
+
+export const CMS_SLOTS_ENGINE_CREATE_TARGET_HINT = "Add the hidden list target block to this page.";
+
+export const CMS_SLOTS_ENGINE_LIST_TARGET_STATUS_HINT = "Checking list target on this page.";
+
+export const CMS_SLOTS_ENGINE_FOCUS_ON_CANVAS_LABEL = "Focus on canvas";
+
+export const CMS_SLOTS_ENGINE_FOCUS_ON_CANVAS_PENDING_LABEL = "Focusing…";
+
+export const CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_LABEL = "Place on canvas";
+
+export const CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_PENDING_LABEL = "Placing…";
+
+export const CMS_SLOTS_ENGINE_CREATE_TARGET_LABEL = "Create target";
+
+export const CMS_SLOTS_ENGINE_CREATE_TARGET_PENDING_LABEL = "Creating…";
+
+export const CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_LABEL = "Checking…";
+
+export const CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_LABEL = "Updating…";
+
+export const CMS_SLOTS_ENGINE_REMOVE_TARGET_LABEL = "Remove target…";
+
+export function cmsSlotsEngineListTargetActionsAriaLabel(listName: string): string {
+  return `List target actions for ${listName}`;
+}
+
+export const CMS_SLOTS_ENGINE_BACK_TO_LIST_LABEL = "Back to list";

@@ -1,4 +1,6 @@
 /** @vitest-environment jsdom */
+
+import { BEACON_IMAGE_ERROR_CODES } from "@codalyn/webflow-kit";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -60,6 +62,7 @@ describe("useApplyCroppedToWebflow", () => {
       replaceLibraryAsset: false,
       cmsPrimaryUpload: false,
       exportPlaceBlockedLabel: null,
+      exportPlaceBlockedCode: null,
       ...override,
     };
   }
@@ -67,7 +70,10 @@ describe("useApplyCroppedToWebflow", () => {
   it("blocks apply when preset guard is active", async () => {
     const { result } = renderHook(() =>
       useApplyCroppedToWebflow(
-        options({ exportPlaceBlockedLabel: "Over preset file limit" }) as Parameters<typeof useApplyCroppedToWebflow>[0]
+        options({
+          exportPlaceBlockedLabel: "Over preset file limit",
+          exportPlaceBlockedCode: BEACON_IMAGE_ERROR_CODES.EXPORT_PRESET_FILE_LIMIT_EXCEEDED,
+        }) as Parameters<typeof useApplyCroppedToWebflow>[0]
       )
     );
     await act(async () => {

@@ -15,14 +15,16 @@ import { type AspectPreset, aspectLabels, type EditorAspectSelection } from "@/f
 import type { AssetFolderRow } from "@/features/image-editor/lib/asset-folder-row";
 import type { ElementCmsBindingResolution } from "@/features/image-editor/lib/cms-primary-upload-context";
 import type { ComponentImagePropOption } from "@/features/image-editor/lib/component-image-prop";
+import { formatFileSize } from "@/features/image-editor/lib/format-file-size";
 import {
   resolvePlacementWhenOptionHidden,
   shouldOfferReplacePlacement,
   shouldOfferSelectionPlacement,
 } from "@/features/image-editor/lib/image-editor-placement-readiness";
+import type { ImageEditorPresetFileLimitBlocker } from "@/features/image-editor/lib/image-editor-preset-file-limit-blocker";
 import { resolveImageEditorPlacement } from "@/features/image-editor/lib/image-editor-resolved-placement";
 import { sanitizeAssetBaseName } from "@/features/image-editor/lib/sanitize-asset-base-name";
-import { ExportEncodeSizeFootnote } from "@/features/image-editor/ui/export-size-estimate";
+import { ExportEncodeSizeFootnote, ExportPresetLimitBar } from "@/features/image-editor/ui/export-size-estimate";
 import { QualityComparePreview } from "@/features/image-editor/ui/quality-compare-preview";
 import { beaconPanelContainClass } from "@/shared/lib/beacon-app-route-surface";
 import { cn } from "@/shared/lib/utils";
@@ -185,6 +187,7 @@ export type ImageEditorCropExportPanelProps = {
   resolvedUploadTarget?: ResolvedUploadTarget | null;
   resolvedConstraintsReadout?: ResolverOutput | null;
   sessionMaxFileSizeBytes?: number | null;
+  presetFileLimitBlocker?: ImageEditorPresetFileLimitBlocker | null;
 };
 
 /** Fade controls below the crop preview; opacity-only so layout width stays stable in the extension iframe. */
@@ -648,6 +651,7 @@ type ExportCardProps = {
   effectiveExportHeight: number;
   exportPreviewReady: boolean;
   onOpenQualityPopout: () => void;
+  presetFileLimitBlocker: ImageEditorPresetFileLimitBlocker | null;
 };
 
 function ExportEncodeCard(p: ExportCardProps) {
@@ -676,6 +680,7 @@ function ExportEncodeCard(p: ExportCardProps) {
     effectiveExportHeight,
     exportPreviewReady,
     onOpenQualityPopout,
+    presetFileLimitBlocker,
   } = p;
 
   const exportW = completedCrop ? effectiveExportWidth : parsedExportWidth;
@@ -830,6 +835,20 @@ function ExportEncodeCard(p: ExportCardProps) {
               originalBytes={originalBytes}
               showQualityCommitHint={completedCrop !== null && estimateNonce === 0}
             />
+            {presetFileLimitBlocker ? (
+              <div className="rounded-sm border border-destructive/30 bg-destructive/10 px-3 py-2">
+                <p className="text-sm font-medium text-destructive">Over active preset file-size limit.</p>
+                <p className="text-muted-foreground mt-1 text-xs leading-snug">
+                  Estimated {formatFileSize(presetFileLimitBlocker.estimatedBytes)} exceeds cap{" "}
+                  {formatFileSize(presetFileLimitBlocker.maxFileSizeBytes)}. Reduce quality or dimensions.
+                </p>
+                <ExportPresetLimitBar
+                  className="mt-2"
+                  estimatedBytes={presetFileLimitBlocker.estimatedBytes}
+                  maxBytes={presetFileLimitBlocker.maxFileSizeBytes}
+                />
+              </div>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -1422,6 +1441,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     resolvedUploadTarget = null,
     resolvedConstraintsReadout = null,
     sessionMaxFileSizeBytes = null,
+    presetFileLimitBlocker = null,
   } = props;
 
   const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
@@ -1548,6 +1568,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         effectiveExportHeight={effectiveExportHeight}
         exportPreviewReady={exportPreviewReady}
         onOpenQualityPopout={onOpenQualityPopout}
+        presetFileLimitBlocker={presetFileLimitBlocker}
       />
 
       {showResolvedReadout ? (

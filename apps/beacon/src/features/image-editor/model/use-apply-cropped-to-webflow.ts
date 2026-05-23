@@ -1,4 +1,4 @@
-import type { ImageExportFormat } from "@codalyn/webflow-kit";
+import { BEACON_IMAGE_ERROR_CODES, type BeaconImageErrorCode, type ImageExportFormat } from "@codalyn/webflow-kit";
 import { useCallback, useState } from "react";
 import type { Area } from "react-easy-crop";
 
@@ -156,6 +156,7 @@ export function useApplyCroppedToWebflow(options: {
   cmsPrimaryUpload: boolean;
   /** When set, export must not run (preset size guard). */
   exportPlaceBlockedLabel: string | null;
+  exportPlaceBlockedCode?: BeaconImageErrorCode | null;
 }) {
   const {
     imageSrc,
@@ -179,6 +180,7 @@ export function useApplyCroppedToWebflow(options: {
     replaceLibraryAsset,
     cmsPrimaryUpload,
     exportPlaceBlockedLabel,
+    exportPlaceBlockedCode = null,
   } = options;
 
   const [busy, setBusy] = useState(false);
@@ -186,7 +188,8 @@ export function useApplyCroppedToWebflow(options: {
   const applyToCanvas = useCallback(async () => {
     if (exportPlaceBlockedLabel) {
       await webflow.notify({
-        type: exportPlaceBlockedLabel === "Over preset file limit" ? "Error" : "Warning",
+        type:
+          exportPlaceBlockedCode === BEACON_IMAGE_ERROR_CODES.EXPORT_PRESET_FILE_LIMIT_EXCEEDED ? "Error" : "Warning",
         message: exportPlaceBlockedLabel,
       });
       return;
@@ -272,6 +275,7 @@ export function useApplyCroppedToWebflow(options: {
     replaceLibraryAsset,
     cmsPrimaryUpload,
     exportPlaceBlockedLabel,
+    exportPlaceBlockedCode,
   ]);
 
   return { busy, applyToCanvas };

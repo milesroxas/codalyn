@@ -1,4 +1,5 @@
 import {
+  BEACON_IMAGE_ERROR_CODES,
   getVisibleBuiltinAspectPresets,
   type ImageExportFormat,
   type ResolvedUploadTarget,
@@ -20,6 +21,7 @@ import {
 import { aspectValue, type EditorAspectSelection } from "@/features/image-editor/lib/aspect-preset";
 import {
   readBeaconPresetV2ApplyEnabled,
+  readBeaconPresetV2EnforceEnabled,
   readBeaconPresetV2ReadEnabled,
 } from "@/features/image-editor/lib/beacon-preset-v2-flags";
 import {
@@ -33,6 +35,7 @@ import {
   shouldOfferReplacePlacement,
   shouldOfferSelectionPlacement,
 } from "@/features/image-editor/lib/image-editor-placement-readiness";
+import { resolveImageEditorPresetFileLimitBlocker } from "@/features/image-editor/lib/image-editor-preset-file-limit-blocker";
 import { resolveImageEditorPlacement } from "@/features/image-editor/lib/image-editor-resolved-placement";
 import { mapSelectedTargetToResolvedUploadTarget } from "@/features/image-editor/lib/image-editor-resolved-target";
 import { resolveSessionResolvedConstraintsApplication } from "@/features/image-editor/lib/image-editor-session-resolved-constraints";
@@ -242,6 +245,7 @@ export function ImageEditor() {
   const allowAvifEncoding = Boolean(towerUser);
   const presetV2ReadEnabled = useMemo(() => readBeaconPresetV2ReadEnabled(), []);
   const presetV2ApplyEnabled = useMemo(() => readBeaconPresetV2ApplyEnabled(), []);
+  const presetV2EnforceEnabled = useMemo(() => readBeaconPresetV2EnforceEnabled(), []);
   const isConfirmedGuest = !towerUser && !towerSessionPending;
   const { isCmsCollectionTemplatePage: cmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
   const guestCmsTemplateRestricted = isConfirmedGuest && cmsCollectionTemplatePage;
@@ -565,7 +569,7 @@ export function ImageEditor() {
     return true;
   }, [autoTargetHasDesignerExportTag, cropFrameMode, widthStr, heightStr, aspectPreset]);
 
-  const exportSizeBlockedMessage: string | null = exportDimensionsReady
+  const exportDimensionsBlockedMessage: string | null = exportDimensionsReady
     ? null
     : "Choose export width and height (aspect + max width, or Custom) before placing";
 
@@ -593,7 +597,25 @@ export function ImageEditor() {
     enabled: exportDimensionsReady,
   });
 
-  const exportPlaceBlockedLabel = null;
+  const presetFileLimitBlocker = useMemo(
+    () =>
+      resolveImageEditorPresetFileLimitBlocker({
+        enforceEnabled: presetV2EnforceEnabled && presetV2ReadEnabled,
+        maxFileSizeBytes: sessionMaxFileSizeBytes,
+        estimatedBytes,
+      }),
+    [presetV2EnforceEnabled, presetV2ReadEnabled, sessionMaxFileSizeBytes, estimatedBytes]
+  );
+
+  const exportSizeBlockedMessage = useMemo(() => {
+    if (exportDimensionsBlockedMessage != null) {
+      return exportDimensionsBlockedMessage;
+    }
+    if (presetFileLimitBlocker != null) {
+      return "Over preset file limit";
+    }
+    return null;
+  }, [exportDimensionsBlockedMessage, presetFileLimitBlocker]);
 
   const { originalPreviewUrl, compressedPreviewUrl, previewPending, getPopoutPreviewBlobs } = useExportQualityPreview({
     imageSrc,
@@ -867,12 +889,18 @@ export function ImageEditor() {
 
   const showAutoPageTargetList = autoDiscoverySettled && !autoShowSelectionChoice;
 
-  const exportPlaceBlockedLabelForApply = useMemo(() => {
+  const exportPlaceBlockedForApply = useMemo(() => {
     if (pathMode === "auto" && isConfirmedGuest && currentCmsItemId) {
-      return "Sign in to Tower to place images in this collection";
+      return { label: "Sign in to Tower to place images in this collection", code: null };
     }
-    return exportPlaceBlockedLabel;
-  }, [pathMode, isConfirmedGuest, currentCmsItemId]);
+    if (presetFileLimitBlocker != null) {
+      return {
+        label: "Over preset file limit",
+        code: BEACON_IMAGE_ERROR_CODES.EXPORT_PRESET_FILE_LIMIT_EXCEEDED,
+      };
+    }
+    return { label: null, code: null };
+  }, [pathMode, isConfirmedGuest, currentCmsItemId, presetFileLimitBlocker]);
 
   useEffect(() => {
     if (pathMode === "unset" && flowStep === "entry") {
@@ -909,7 +937,8 @@ export function ImageEditor() {
     placement,
     replaceLibraryAsset,
     cmsPrimaryUpload,
-    exportPlaceBlockedLabel: exportPlaceBlockedLabelForApply,
+    exportPlaceBlockedLabel: exportPlaceBlockedForApply.label,
+    exportPlaceBlockedCode: exportPlaceBlockedForApply.code,
   });
 
   const onCropComplete = useCallback((_c: Area, px: Area) => {
@@ -974,7 +1003,7 @@ export function ImageEditor() {
   const savePlaceButton = useMemo(
     () =>
       getImageEditorPlaceButtonState({
-        exportPlaceBlockedLabel: exportPlaceBlockedLabelForApply,
+        exportPlaceBlockedLabel: exportPlaceBlockedForApply.label,
         exportSizeBlockedMessage,
         busy,
         foldersLoading,
@@ -990,7 +1019,7 @@ export function ImageEditor() {
         selectedComponentImagePropId,
       }),
     [
-      exportPlaceBlockedLabelForApply,
+      exportPlaceBlockedForApply,
       exportSizeBlockedMessage,
       busy,
       foldersLoading,
@@ -1104,6 +1133,7 @@ export function ImageEditor() {
           resolvedUploadTarget={resolvedUploadTarget}
           resolvedConstraintsReadout={resolvedConstraintsReadout}
           sessionMaxFileSizeBytes={sessionMaxFileSizeBytes}
+          presetFileLimitBlocker={presetFileLimitBlocker}
         />
       </ImageEditorLoadedColumn>
     ) : null;

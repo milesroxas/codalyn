@@ -12,7 +12,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
-import { draftToMaxBytes, type MaxSizeUnit, parsePresetOutputDimension } from "@/features/beacon/lib/preset-dimensions";
+import {
+  draftToMaxBytes,
+  type MaxSizeUnit,
+  maxBytesToDraft,
+  parsePresetOutputDimension,
+} from "@/features/beacon/lib/preset-dimensions";
 import { BeaconPageSkeleton } from "@/features/beacon/ui/beacon-page-skeleton";
 import { TowerBeaconPresetsPanel } from "@/features/beacon/ui/tower-beacon-presets-panel";
 import { Button } from "@/shared/ui/button";
@@ -52,6 +57,14 @@ export function TowerBeaconScreen() {
   const [draftMaxStr, setDraftMaxStr] = useState("100");
   const [draftMaxUnit, setDraftMaxUnit] = useState<MaxSizeUnit>("kb");
   const [presetTarget, setPresetTarget] = useState<"workspace" | "designer">("workspace");
+  const settings = payload?.settings;
+  const canManage = Boolean(payload?.canManageTeamBeaconSettings);
+  const teamPresetsLocked = Boolean(payload?.editorExperience);
+  const canEditPresets = canManage && !teamPresetsLocked;
+  const canEditSiteDefault = canEditSiteDefaultPreset(payload, canEditPresets);
+  const presets = settings?.imagePresets ?? [];
+  const designerPresets = settings?.designerOnlyImagePresets ?? [];
+  const siteDefaultPreset = settings?.imagePresetStorageV2.siteDefault ?? null;
 
   const refresh = useCallback(async () => {
     if (!session?.user) {
@@ -92,6 +105,15 @@ export function TowerBeaconScreen() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [refresh, session?.user]);
+
+  useEffect(() => {
+    if (!siteDefaultPreset) {
+      return;
+    }
+    const next = maxBytesToDraft(siteDefaultPreset.maxFileSizeBytes);
+    setDraftMaxStr(next.value);
+    setDraftMaxUnit(next.unit);
+  }, [siteDefaultPreset]);
 
   const applyPatch = useCallback(
     async (patch: Partial<BeaconAppSettings>) => {
@@ -152,15 +174,6 @@ export function TowerBeaconScreen() {
       </main>
     );
   }
-
-  const settings = payload?.settings;
-  const canManage = Boolean(payload?.canManageTeamBeaconSettings);
-  const teamPresetsLocked = Boolean(payload?.editorExperience);
-  const canEditPresets = canManage && !teamPresetsLocked;
-  const canEditSiteDefault = canEditSiteDefaultPreset(payload, canEditPresets);
-  const presets = settings?.imagePresets ?? [];
-  const designerPresets = settings?.designerOnlyImagePresets ?? [];
-  const siteDefaultPreset = settings?.imagePresetStorageV2.siteDefault ?? null;
 
   const addPreset = () => {
     if (!canEditPresets) {

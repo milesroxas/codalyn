@@ -6,7 +6,14 @@
  */
 export type ImageEditorPathMode = "unset" | "auto" | "configurations";
 
-export type ImageEditorFlowStep = "entry" | "autoElement" | "configurePresets" | "upload" | "position" | "save";
+export type ImageEditorFlowStep =
+  | "entry"
+  | "autoElement"
+  | "configurePresets"
+  | "upload"
+  | "position"
+  | "save"
+  | "success";
 
 export type ImageEditorStepOrderOptions = {
   /** When true, `entry` (designer start) is part of the linear order for this path. */

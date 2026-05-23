@@ -1,21 +1,9 @@
 import { findImageElementForComponentInstanceProp } from "@/features/image-editor/lib/find-image-element-for-component-instance-prop";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { searchComponentInstanceImageProps } from "@/features/image-editor/lib/search-component-instance-image-props";
+import { withComponentDefinitionScope } from "@/shared/lib/component-definition-scope";
 
-export async function exitCurrentComponentIfAny(): Promise<void> {
-  try {
-    const getCurrent = (webflow as { getCurrentComponent?: () => Promise<unknown> }).getCurrentComponent;
-    if (typeof getCurrent !== "function") {
-      return;
-    }
-    const cur = await getCurrent.call(webflow).catch(() => null);
-    if (cur != null) {
-      await webflow.exitComponent();
-    }
-  } catch {
-    /* best effort — exit may fail if nothing is entered */
-  }
-}
+export { exitCurrentComponentIfAny, exitUntilPageForComponentEnter } from "@/shared/lib/component-definition-scope";
 
 export async function resolveComponentImagePropId(
   instance: ComponentElement,
@@ -53,25 +41,17 @@ export async function withImageElementForPageTarget<T>(
   if (propId == null) {
     return fn(null);
   }
-  await exitCurrentComponentIfAny();
-  let entered = false;
-  try {
-    await webflow.enterComponent(instance);
-    entered = true;
-  } catch {
-    if (options?.onComponentEnterFailed) {
-      return options.onComponentEnterFailed();
-    }
-    return fn(null);
-  }
-  try {
-    const image = await findImageElementForComponentInstanceProp(instance, propId);
-    return await fn(image);
-  } finally {
-    if (entered) {
-      await webflow.exitComponent().catch(() => {
-        /* best effort */
+
+  const instanceImageProps = await searchComponentInstanceImageProps(instance);
+  return withComponentDefinitionScope(
+    instance,
+    async ({ definitionRoot }) => {
+      const image = await findImageElementForComponentInstanceProp(instance, propId, {
+        definitionRoot,
+        instanceImageProps,
       });
-    }
-  }
+      return fn(image);
+    },
+    { onEnterFailed: options?.onComponentEnterFailed ?? (() => fn(null)) }
+  );
 }

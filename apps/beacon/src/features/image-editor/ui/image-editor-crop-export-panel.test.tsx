@@ -2,7 +2,7 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-
+import { TooltipProvider } from "@/shared/ui/tooltip";
 import type { ImageEditorCropExportPanelProps } from "./image-editor-crop-export-panel";
 import { ImageEditorCropExportPanel } from "./image-editor-crop-export-panel";
 
@@ -146,7 +146,7 @@ describe("ImageEditorCropExportPanel upload preset picker", () => {
           uploadPresetPickerVisible: true,
           uploadPresetPickerValue: "manual-override",
           uploadPresetPickerOptions: [
-            { id: "active-resolved", label: "Active resolved preset" },
+            { id: "preset:preset-instance", label: "Instance" },
             { id: "manual-override", label: "Manual override" },
           ],
           onUploadPresetPickerChange,
@@ -170,5 +170,77 @@ describe("ImageEditorCropExportPanel upload preset picker", () => {
       />
     );
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
+  });
+});
+
+describe("ImageEditorCropExportPanel export size controls", () => {
+  it("shows crop shape controls on position when manual override is active", () => {
+    render(
+      <TooltipProvider>
+        <ImageEditorCropExportPanel
+          {...baseProps({
+            flowPhase: "position",
+            showExportSizeControls: true,
+          })}
+        />
+      </TooltipProvider>
+    );
+    expect(screen.getByText("Crop shape")).toBeInTheDocument();
+  });
+
+  it("hides crop shape controls on position when a preset is active", () => {
+    render(
+      <ImageEditorCropExportPanel
+        {...baseProps({
+          flowPhase: "position",
+          showExportSizeControls: false,
+        })}
+      />
+    );
+    expect(screen.queryByText("Crop shape")).not.toBeInTheDocument();
+  });
+
+  it("shows export size card on save when manual override is active", () => {
+    render(
+      <TooltipProvider>
+        <ImageEditorCropExportPanel
+          {...baseProps({
+            flowPhase: "save",
+            hidePlacementCard: true,
+            placement: "download",
+            showExportSizeControls: true,
+          })}
+        />
+      </TooltipProvider>
+    );
+    expect(screen.getByText("Export size")).toBeInTheDocument();
+    expect(screen.getByText("Crop shape")).toBeInTheDocument();
+  });
+});
+
+describe("ImageEditorCropExportPanel export format lock", () => {
+  function renderSavePanel(overrides: Partial<ImageEditorCropExportPanelProps> = {}) {
+    return render(
+      <TooltipProvider>
+        <ImageEditorCropExportPanel
+          {...baseProps({
+            flowPhase: "save",
+            hidePlacementCard: true,
+            placement: "download",
+            ...overrides,
+          })}
+        />
+      </TooltipProvider>
+    );
+  }
+
+  it("hides file type controls when export format is locked by preset", () => {
+    renderSavePanel({ exportFormatLocked: true, allowAvifEncoding: false });
+    expect(screen.queryByText("File type")).not.toBeInTheDocument();
+  });
+
+  it("shows file type controls when export format is not locked", () => {
+    renderSavePanel({ exportFormatLocked: false, allowAvifEncoding: false });
+    expect(screen.getByText("File type")).toBeInTheDocument();
   });
 });

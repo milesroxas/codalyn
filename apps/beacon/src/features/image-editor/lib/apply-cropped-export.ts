@@ -75,9 +75,14 @@ export function outputDimensionsMatchingCrop(
 }
 
 export type ExportResult =
-  | { kind: "success"; message: string }
+  | { kind: "success"; message: string; cmsFieldUpdated?: boolean }
   | { kind: "info"; message: string }
   | { kind: "error"; message: string };
+
+export type ImageExportSuccessContext = {
+  message: string;
+  cmsFieldUpdated: boolean;
+};
 
 /** Where the export goes: Assets only, canvas placement, replace selected Image, or local WebP download. */
 export type PlacementMode = "library" | "canvas" | "selection" | "replace" | "download";
@@ -264,6 +269,7 @@ async function applyCmsBindingWithAsset(options: {
   return {
     kind: "success",
     message: `Updated CMS field “${binding.fieldName ?? label}”.`,
+    cmsFieldUpdated: true,
   };
 }
 

@@ -202,6 +202,10 @@ export type ImageEditorCropExportPanelProps = {
   uploadPresetPickerValue?: string;
   uploadPresetPickerOptions?: UploadPresetPickerOption[];
   onUploadPresetPickerChange?: (value: string) => void;
+  /** When true, preset export format is fixed and file-type controls are hidden. */
+  exportFormatLocked?: boolean;
+  /** When true, show aspect ratio and export dimension controls (manual override). */
+  showExportSizeControls?: boolean;
 };
 
 /** Fade controls below the crop preview; opacity-only so layout width stays stable in the extension iframe. */
@@ -274,6 +278,7 @@ type CropStageProps = {
   frameSummary: string;
   exportSizeUsesAspectAndMaxWidth?: boolean;
   onExportMaxWidthBlur?: () => void;
+  showExportSizeControls?: boolean;
   naturalSizeAdvisory: ImageEditorNaturalSizeAdvisory | null;
   onDismissNaturalSizeAdvisory: () => void;
   onApplyNaturalSizeSuggestion: () => void;
@@ -584,6 +589,7 @@ function CropStageSection(p: CropStageProps) {
     exportSizeUsesAspectAndMaxWidth = false,
     onExportMaxWidthBlur,
     strictOutputDimensionInputs = false,
+    showExportSizeControls = false,
     naturalSizeAdvisory,
     onDismissNaturalSizeAdvisory,
     onApplyNaturalSizeSuggestion,
@@ -660,7 +666,7 @@ function CropStageSection(p: CropStageProps) {
             </div>
           </div>
 
-          {positionOnly && !exportSizeUsesAspectAndMaxWidth ? null : (
+          {showExportSizeControls ? (
             <CropShapeControlsSection
               baseId={baseId}
               belowCropEntered={belowCropEntered}
@@ -681,7 +687,7 @@ function CropStageSection(p: CropStageProps) {
               onExportMaxWidthBlur={onExportMaxWidthBlur}
               strictOutputDimensionInputs={strictOutputDimensionInputs}
             />
-          )}
+          ) : null}
         </CardContent>
       </Card>
       {naturalSizeAdvisory ? (
@@ -721,6 +727,7 @@ type ExportCardProps = {
   exportPreviewReady: boolean;
   onOpenQualityPopout: () => void;
   presetFileLimitBlocker: ImageEditorPresetFileLimitBlocker | null;
+  exportFormatLocked?: boolean;
 };
 
 function ExportEncodeCard(p: ExportCardProps) {
@@ -750,6 +757,7 @@ function ExportEncodeCard(p: ExportCardProps) {
     exportPreviewReady,
     onOpenQualityPopout,
     presetFileLimitBlocker,
+    exportFormatLocked = false,
   } = p;
 
   const exportW = completedCrop ? effectiveExportWidth : parsedExportWidth;
@@ -789,62 +797,64 @@ function ExportEncodeCard(p: ExportCardProps) {
             />
           </div>
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-1.5">
-              <Label className="text-xs font-medium" id={`${baseId}-format`}>
-                File type
-              </Label>
+          {exportFormatLocked ? null : (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs font-medium" id={`${baseId}-format`}>
+                  File type
+                </Label>
+                {allowAvifEncoding ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                        aria-label="When to use WebP vs AVIF"
+                      >
+                        <Info className="size-3.5" aria-hidden />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[16rem] whitespace-pre-line text-left">
+                      {
+                        "WebP — Default: broad browser support; encodes in Designer.\n\nAVIF — Often smaller at similar quality; encoding uses Tower."
+                      }
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
+              </div>
               {allowAvifEncoding ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                      aria-label="When to use WebP vs AVIF"
-                    >
-                      <Info className="size-3.5" aria-hidden />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[16rem] whitespace-pre-line text-left">
-                    {
-                      "WebP — Default: broad browser support; encodes in Designer.\n\nAVIF — Often smaller at similar quality; encoding uses Tower."
+                <ToggleGroup
+                  type="single"
+                  value={exportFormat}
+                  onValueChange={(v) => {
+                    if (v === "webp" || v === "avif") {
+                      setExportFormat(v);
+                      onExportFormatCommit();
                     }
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
+                  }}
+                  aria-labelledby={`${baseId}-format`}
+                  className="grid w-full min-w-0 grid-cols-2 gap-0"
+                  variant="outline"
+                  size="sm"
+                  spacing={0}
+                >
+                  <ToggleGroupItem value="webp" className="text-xs font-medium">
+                    WebP
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="avif" className="text-xs font-medium">
+                    AVIF
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              ) : (
+                <>
+                  <div className="text-foreground rounded-sm border border-border/60 bg-muted/20 px-3 py-2 text-sm font-medium">
+                    WebP
+                  </div>
+                  <p className="text-muted-foreground text-[10px] leading-snug">Sign in to Tower to enable AVIF.</p>
+                </>
+              )}
             </div>
-            {allowAvifEncoding ? (
-              <ToggleGroup
-                type="single"
-                value={exportFormat}
-                onValueChange={(v) => {
-                  if (v === "webp" || v === "avif") {
-                    setExportFormat(v);
-                    onExportFormatCommit();
-                  }
-                }}
-                aria-labelledby={`${baseId}-format`}
-                className="grid w-full min-w-0 grid-cols-2 gap-0"
-                variant="outline"
-                size="sm"
-                spacing={0}
-              >
-                <ToggleGroupItem value="webp" className="text-xs font-medium">
-                  WebP
-                </ToggleGroupItem>
-                <ToggleGroupItem value="avif" className="text-xs font-medium">
-                  AVIF
-                </ToggleGroupItem>
-              </ToggleGroup>
-            ) : (
-              <>
-                <div className="text-foreground rounded-sm border border-border/60 bg-muted/20 px-3 py-2 text-sm font-medium">
-                  WebP
-                </div>
-                <p className="text-muted-foreground text-[10px] leading-snug">Sign in to Tower to enable AVIF.</p>
-              </>
-            )}
-          </div>
+          )}
 
           <div className="flex flex-col gap-2">
             {completedCrop && exportPreviewReady ? (
@@ -1519,6 +1529,8 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     uploadPresetPickerValue,
     uploadPresetPickerOptions = [],
     onUploadPresetPickerChange,
+    exportFormatLocked = false,
+    showExportSizeControls = false,
   } = props;
 
   const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
@@ -1589,7 +1601,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
             <CardHeader className="space-y-1 pb-2">
               <CardTitle className="text-sm font-medium">Upload preset</CardTitle>
               <CardDescription className="text-xs leading-snug">
-                Choose a preset source or switch to manual session override.
+                Choose the resolved preset, site default, or manual override.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
@@ -1641,6 +1653,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
           exportSizeUsesAspectAndMaxWidth={exportSizeUsesAspectAndMaxWidth}
           onExportMaxWidthBlur={onExportMaxWidthBlur}
           strictOutputDimensionInputs={strictOutputDimensionInputs}
+          showExportSizeControls={showExportSizeControls}
           naturalSizeAdvisory={naturalSizeAdvisory}
           onDismissNaturalSizeAdvisory={onDismissNaturalSizeAdvisory}
           onApplyNaturalSizeSuggestion={onApplyNaturalSizeSuggestion}
@@ -1656,7 +1669,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
           <CardHeader className="space-y-1 pb-2">
             <CardTitle className="text-sm font-medium">Upload preset</CardTitle>
             <CardDescription className="text-xs leading-snug">
-              Choose a preset source or switch to manual session override.
+              Choose the resolved preset, site default, or manual override.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
@@ -1676,6 +1689,38 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
                 ))}
               </SelectContent>
             </Select>
+          </CardContent>
+        </Card>
+      ) : null}
+      {showExportSizeControls ? (
+        <Card size="sm">
+          <CardHeader className="space-y-1 pb-2">
+            <CardTitle className="text-sm font-medium">Export size</CardTitle>
+            <CardDescription className="text-xs leading-snug">
+              Set aspect ratio and output dimensions for this upload.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <CropShapeControlsSection
+              baseId={baseId}
+              belowCropEntered
+              exportSizeUsesAspectAndMaxWidth={exportSizeUsesAspectAndMaxWidth}
+              cropFrameMode={cropFrameMode}
+              setCropFrameMode={setCropFrameMode}
+              aspectPreset={aspectPreset}
+              setAspectPreset={setAspectPreset}
+              visibleBuiltinAspectPresets={visibleBuiltinAspectPresets}
+              widthStr={widthStr}
+              setWidthStr={setWidthStr}
+              outputWidth={outputWidth}
+              setOutputWidth={setOutputWidth}
+              heightStr={heightStr}
+              setHeightStr={setHeightStr}
+              outputHeight={outputHeight}
+              setOutputHeight={setOutputHeight}
+              onExportMaxWidthBlur={onExportMaxWidthBlur}
+              strictOutputDimensionInputs={strictOutputDimensionInputs}
+            />
           </CardContent>
         </Card>
       ) : null}
@@ -1705,6 +1750,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         exportPreviewReady={exportPreviewReady}
         onOpenQualityPopout={onOpenQualityPopout}
         presetFileLimitBlocker={presetFileLimitBlocker}
+        exportFormatLocked={exportFormatLocked}
       />
 
       {showResolvedReadout ? (

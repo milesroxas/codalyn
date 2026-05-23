@@ -47,8 +47,9 @@ import { mapSelectedTargetToResolvedUploadTarget } from "@/features/image-editor
 import { resolveSessionResolvedConstraintsApplication } from "@/features/image-editor/lib/image-editor-session-resolved-constraints";
 import {
   buildUploadPresetPickerOptions,
-  getDefaultUploadPresetOptionId,
   isManualUploadPresetOptionId,
+  isUploadPresetExportFormatLocked,
+  resolveAutoUploadPresetOptionId,
 } from "@/features/image-editor/lib/image-editor-upload-preset-picker";
 import { loadImage } from "@/features/image-editor/lib/load-image";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
@@ -61,17 +62,17 @@ import { useExportQualityPreview } from "@/features/image-editor/model/use-expor
 import { useImageDissolveTransition } from "@/features/image-editor/model/use-image-dissolve-transition";
 import { useImageEditorAssetFolders } from "@/features/image-editor/model/use-image-editor-asset-folders";
 import { useImageEditorAutoTargets } from "@/features/image-editor/model/use-image-editor-auto-targets";
+import { useImageEditorExportSuccessNavigation } from "@/features/image-editor/model/use-image-editor-export-success-navigation";
 import { useImageEditorWorkflow } from "@/features/image-editor/model/use-image-editor-workflow";
 import { useImageOutputDimensionsOnLoad } from "@/features/image-editor/model/use-image-output-dimensions-on-load";
 import { useQualityPopoutBridge } from "@/features/image-editor/model/use-quality-popout-bridge";
 import { useResolvedExportConstraints } from "@/features/image-editor/model/use-resolved-export-constraints";
 import { useRevokeBlobUrlOnChange } from "@/features/image-editor/model/use-revoke-blob-url";
-import {
-  type CropFrameMode,
-  ImageEditorCropExportPanel,
-  type UploadPresetPickerOption,
+import type {
+  CropFrameMode,
+  UploadPresetPickerOption,
 } from "@/features/image-editor/ui/image-editor-crop-export-panel";
-import { ImageEditorLoadedColumn } from "@/features/image-editor/ui/image-editor-loaded-column";
+import { ImageEditorLoadedEditor } from "@/features/image-editor/ui/image-editor-loaded-editor";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
 import { ImageEditorPreimageColumn } from "@/features/image-editor/ui/image-editor-preimage-column";
 import {
@@ -169,7 +170,7 @@ function imageEditorRouteChromeSlots(options: {
   } = options;
 
   const defaultSubheader =
-    showFlowStepNav && shouldShowImageEditorStepNav(pathMode) ? (
+    showFlowStepNav && flowStep !== "success" && shouldShowImageEditorStepNav(pathMode) ? (
       <StepNav
         aria-label="Image editor steps"
         current={currentStepForNav}
@@ -231,6 +232,9 @@ function resolveImageEditorRouteFooter(options: {
   } = options;
 
   if (showGuestOnboarding) {
+    return undefined;
+  }
+  if (flowStep === "success") {
     return undefined;
   }
   if (flowStep === "configurePresets") {
@@ -358,9 +362,17 @@ export function ImageEditor() {
   const [configurePresetsFooter, setConfigurePresetsFooter] = useState<ReactNode | null>(null);
   const [configurePresetsSubheader, setConfigurePresetsSubheader] = useState<ReactNode | null>(null);
   const lastResolvedTargetInputKeyRef = useRef<string | null>(null);
+  const resolvedTargetForInputKeyRef = useRef<string | null>(null);
+  const lastUploadPresetTargetInputKeyRef = useRef<string | null>(null);
+  const userPickedUploadPresetRef = useRef(false);
   const lastAppliedUploadPresetOptionIdRef = useRef<string | null>(null);
   const skipNextPersistExportDefaultsRef = useRef(false);
   const [uploadPresetOptionId, setUploadPresetOptionId] = useState<string>("");
+
+  const handleUploadPresetPickerChange = useCallback((value: string) => {
+    userPickedUploadPresetRef.current = true;
+    setUploadPresetOptionId(value);
+  }, []);
 
   const {
     assetFolders,
@@ -443,6 +455,7 @@ export function ImageEditor() {
   useEffect(() => {
     if (resolverTargetInput == null) {
       lastResolvedTargetInputKeyRef.current = null;
+      resolvedTargetForInputKeyRef.current = null;
       setResolvedUploadTarget(null);
       return;
     }
@@ -451,10 +464,13 @@ export function ImageEditor() {
       return;
     }
     lastResolvedTargetInputKeyRef.current = inputKey;
+    resolvedTargetForInputKeyRef.current = null;
+    setResolvedUploadTarget(null);
     let cancelled = false;
     void mapSelectedTargetToResolvedUploadTarget(resolverTargetInput).then((target) => {
       if (!cancelled) {
         setResolvedUploadTarget(target);
+        resolvedTargetForInputKeyRef.current = inputKey;
       }
     });
     return () => {
@@ -494,29 +510,63 @@ export function ImageEditor() {
     [uploadPresetPickerStateOptions]
   );
 
+  const uploadPresetExportFormatLocked = useMemo(
+    () => isUploadPresetExportFormatLocked(uploadPresetPickerOptionMap.get(uploadPresetOptionId)),
+    [uploadPresetOptionId, uploadPresetPickerOptionMap]
+  );
+
   const uploadPresetPickerReadOnly = useMemo(
     () => Boolean(isTowerUser && editorExperience && !canManageTeamBeaconSettings),
     [isTowerUser, editorExperience, canManageTeamBeaconSettings]
   );
 
+  const uploadPresetPickerVisible = useMemo(
+    () => uploadPresetPickerOptions.length > 0 && !editorExperience,
+    [uploadPresetPickerOptions.length, editorExperience]
+  );
+
+  const uploadPresetManualOverride = useMemo(
+    () => isManualUploadPresetOptionId(uploadPresetOptionId),
+    [uploadPresetOptionId]
+  );
+
+  const showExportSizeControls = useMemo(
+    () => uploadPresetPickerVisible && uploadPresetManualOverride,
+    [uploadPresetPickerVisible, uploadPresetManualOverride]
+  );
+
+  const effectiveTaggedDimensionsActive = autoTargetHasDesignerExportTag && !uploadPresetManualOverride;
+
   useEffect(() => {
     if (imageSrc == null) {
       setUploadPresetOptionId("");
       lastAppliedUploadPresetOptionIdRef.current = null;
+      userPickedUploadPresetRef.current = false;
+      lastUploadPresetTargetInputKeyRef.current = null;
       return;
     }
-    const fallbackOptionId = getDefaultUploadPresetOptionId(resolvedConstraintsReadout);
-    const nextOptionId = uploadPresetPickerOptionMap.has(uploadPresetOptionId)
-      ? uploadPresetOptionId
-      : fallbackOptionId;
-    if (nextOptionId !== uploadPresetOptionId) {
+    const targetInputKey = resolverTargetInput != null ? resolvedTargetInputKey(resolverTargetInput) : null;
+    const targetResolutionSettled =
+      resolverTargetInput == null || resolvedTargetForInputKeyRef.current === targetInputKey;
+    if (targetInputKey !== lastUploadPresetTargetInputKeyRef.current) {
+      lastUploadPresetTargetInputKeyRef.current = targetInputKey;
+      userPickedUploadPresetRef.current = false;
+    }
+    const nextOptionId = resolveAutoUploadPresetOptionId({
+      currentOptionId: uploadPresetOptionId,
+      userPicked: userPickedUploadPresetRef.current,
+      readout: resolvedConstraintsReadout,
+      availableOptionIds: new Set(uploadPresetPickerOptionMap.keys()),
+      targetResolutionSettled,
+    });
+    if (nextOptionId != null && nextOptionId !== uploadPresetOptionId) {
       setUploadPresetOptionId(nextOptionId);
     }
-  }, [imageSrc, resolvedConstraintsReadout, uploadPresetPickerOptionMap, uploadPresetOptionId]);
+  }, [imageSrc, resolverTargetInput, resolvedConstraintsReadout, uploadPresetPickerOptionMap, uploadPresetOptionId]);
 
   const visibleBuiltinAspectPresets = useMemo(() => getVisibleBuiltinAspectPresets(settings), [settings]);
 
-  const useManualAspectAndMaxWidth = !autoTargetHasDesignerExportTag;
+  const useManualAspectAndMaxWidth = !effectiveTaggedDimensionsActive;
 
   const aspectPresetsForCrop = useMemo(() => {
     if (useManualAspectAndMaxWidth) {
@@ -530,8 +580,8 @@ export function ImageEditor() {
     if (autoPageTarget == null) {
       return null;
     }
-    return autoTargetHasDesignerExportTag ? "tag" : "manual";
-  }, [autoPageTarget, autoTargetHasDesignerExportTag]);
+    return autoTargetHasDesignerExportTag && !uploadPresetManualOverride ? "tag" : "manual";
+  }, [autoPageTarget, autoTargetHasDesignerExportTag, uploadPresetManualOverride]);
 
   const widthStrRef = useRef(widthStr);
   widthStrRef.current = widthStr;
@@ -667,10 +717,13 @@ export function ImageEditor() {
   }, [resolvedUploadTarget, uploadPresetOptionId, uploadPresetPickerOptionMap, imageSrc]);
 
   useEffect(() => {
+    if (uploadPresetExportFormatLocked) {
+      return;
+    }
     if (!allowAvifEncoding && exportFormat === "avif") {
       setExportFormat("webp");
     }
-  }, [allowAvifEncoding, exportFormat]);
+  }, [allowAvifEncoding, exportFormat, uploadPresetExportFormatLocked]);
 
   useEffect(() => {
     if (towerUser) {
@@ -715,18 +768,18 @@ export function ImageEditor() {
   }, [imageSrc]);
 
   const parsedOutputW = useMemo(() => {
-    if (autoTargetHasDesignerExportTag) {
+    if (effectiveTaggedDimensionsActive) {
       return parseOutputDimension(widthStr, outputWidth);
     }
     return parseOutputDimensionStrict(widthStr) ?? 0;
-  }, [widthStr, outputWidth, autoTargetHasDesignerExportTag]);
+  }, [widthStr, outputWidth, effectiveTaggedDimensionsActive]);
 
   const parsedOutputH = useMemo(() => {
-    if (autoTargetHasDesignerExportTag) {
+    if (effectiveTaggedDimensionsActive) {
       return parseOutputDimension(heightStr, outputHeight);
     }
     return parseOutputDimensionStrict(heightStr) ?? 0;
-  }, [heightStr, outputHeight, autoTargetHasDesignerExportTag]);
+  }, [heightStr, outputHeight, effectiveTaggedDimensionsActive]);
 
   const { effectiveOutputW, effectiveOutputH } = useMemo(() => {
     if (!completedCrop) {
@@ -768,8 +821,8 @@ export function ImageEditor() {
         naturalSize: sourceNaturalSize,
         comparisonSize: advisoryComparisonSize,
         resolverSource: resolvedConstraintsReadout?.source ?? "manual",
-        taggedDimensionsActive: autoTargetHasDesignerExportTag,
-        canEditSessionDimensions: !autoTargetHasDesignerExportTag,
+        taggedDimensionsActive: effectiveTaggedDimensionsActive,
+        canEditSessionDimensions: showExportSizeControls,
       }),
     [
       imageSrc,
@@ -778,7 +831,8 @@ export function ImageEditor() {
       sourceNaturalSize,
       advisoryComparisonSize,
       resolvedConstraintsReadout,
-      autoTargetHasDesignerExportTag,
+      effectiveTaggedDimensionsActive,
+      showExportSizeControls,
     ]
   );
 
@@ -805,7 +859,12 @@ export function ImageEditor() {
   }, [naturalSizeAdvisory]);
 
   const exportDimensionsReady = useMemo((): boolean => {
-    if (autoTargetHasDesignerExportTag) {
+    if (uploadPresetPickerVisible && !uploadPresetManualOverride) {
+      const selectedOption = uploadPresetPickerOptionMap.get(uploadPresetOptionId);
+      const constraints = selectedOption?.constraints;
+      return constraints != null && constraints.width > 0 && constraints.height > 0;
+    }
+    if (effectiveTaggedDimensionsActive) {
       return true;
     }
     if (cropFrameMode === "custom") {
@@ -820,7 +879,17 @@ export function ImageEditor() {
       return false;
     }
     return true;
-  }, [autoTargetHasDesignerExportTag, cropFrameMode, widthStr, heightStr, aspectPreset]);
+  }, [
+    uploadPresetPickerVisible,
+    uploadPresetManualOverride,
+    uploadPresetPickerOptionMap,
+    uploadPresetOptionId,
+    effectiveTaggedDimensionsActive,
+    cropFrameMode,
+    widthStr,
+    heightStr,
+    aspectPreset,
+  ]);
 
   const exportDimensionsBlockedMessage: string | null = exportDimensionsReady
     ? null
@@ -913,6 +982,8 @@ export function ImageEditor() {
   const {
     pathMode,
     flowStep,
+    setFlowStep,
+    clearImageSourceOnly,
     goToStep,
     chooseAutoPath,
     chooseConfigurePath,
@@ -1131,7 +1202,11 @@ export function ImageEditor() {
     }
   }, [pathMode, flowStep]);
 
-  const { busy, applyToCanvas } = useApplyCroppedToWebflow({
+  const handleExportSuccess = useCallback(() => {
+    setFlowStep("success");
+  }, [setFlowStep]);
+
+  const { busy, applyToCanvas, exportSuccess, clearExportSuccess } = useApplyCroppedToWebflow({
     imageSrc,
     completedCrop,
     effectiveOutputW,
@@ -1154,6 +1229,16 @@ export function ImageEditor() {
     cmsPrimaryUpload,
     exportPlaceBlockedLabel: exportPlaceBlockedForApply.label,
     exportPlaceBlockedCode: exportPlaceBlockedForApply.code,
+    onExportSuccess: handleExportSuccess,
+  });
+
+  const { handleUploadAnotherAfterSuccess, handleSuccessBackHome } = useImageEditorExportSuccessNavigation({
+    clearExportSuccess,
+    setFlowStep,
+    clearImageSourceOnly,
+    pathMode,
+    autoPageTarget,
+    navigate,
   });
 
   const onCropComplete = useCallback((_c: Area, px: Area) => {
@@ -1264,107 +1349,107 @@ export function ImageEditor() {
     [imageSrc, flowStep, savePlaceButton, applyToCanvas]
   );
 
-  const uploadPresetPickerVisible = useMemo(
-    () => uploadPresetPickerOptions.length > 0,
-    [uploadPresetPickerOptions.length]
+  const loadedEditor = (
+    <ImageEditorLoadedEditor
+      imageSrc={imageSrc}
+      flowStep={flowStep}
+      exportSuccess={exportSuccess}
+      cmsCollectionTemplatePage={cmsCollectionTemplatePage}
+      stepExitFade={stepExitFade}
+      onStepExitTransitionEnd={onStepExitTransitionEnd}
+      onUploadAnother={handleUploadAnotherAfterSuccess}
+      onBackHome={handleSuccessBackHome}
+      cropPanelProps={{
+        exportDimensionsReady,
+        strictOutputDimensionInputs: !effectiveTaggedDimensionsActive,
+        aspectPreset,
+        visibleBuiltinAspectPresets: aspectPresetsForCrop,
+        exportSizeUsesAspectAndMaxWidth: useManualAspectAndMaxWidth,
+        showExportSizeControls,
+        onExportMaxWidthBlur,
+        assetFolders,
+        baseId,
+        busy,
+        completedCrop,
+        componentImageProps,
+        crop,
+        cropAspect,
+        cropFrameMode,
+        estimateNonce,
+        estimatePending,
+        estimatedBytes,
+        fileBaseName,
+        folderActionBusy,
+        foldersLoading,
+        heightStr,
+        imageSrc: imageSrc ?? "",
+        onCreateAssetFolder: createAssetFolderNamed,
+        onCropComplete,
+        onQualityCommit,
+        originalBytes,
+        originalPreviewUrl,
+        compressedPreviewUrl,
+        previewPending,
+        outputHeight,
+        outputWidth,
+        placement,
+        quality,
+        replaceLibraryAsset,
+        selectedAssetFolderId,
+        selectedComponentImagePropId,
+        selectedElementType,
+        componentImagePropsResolving,
+        cmsPrimaryUpload,
+        elementCmsBindingLoading,
+        elementCmsBinding,
+        guestCmsTemplateRestricted,
+        setAspectPreset,
+        setCrop,
+        setCropFrameMode,
+        setFileBaseName,
+        setHeightStr,
+        setOutputHeight,
+        setOutputWidth,
+        setPlacement,
+        setQuality,
+        exportFormat,
+        allowAvifEncoding,
+        setExportFormat,
+        onExportFormatCommit: onQualityCommit,
+        setReplaceLibraryAsset,
+        setSelectedAssetFolderId,
+        setSelectedComponentImagePropId,
+        setWidthStr,
+        setZoom,
+        widthStr,
+        zoom,
+        parsedExportWidth: parsedOutputW,
+        parsedExportHeight: parsedOutputH,
+        effectiveExportWidth: effectiveOutputW,
+        effectiveExportHeight: effectiveOutputH,
+        exportPreviewReady: exportDimensionsReady,
+        onOpenQualityPopout: openQualityPopout,
+        limitCropZoomToNativeResolution: settings.limitCropZoomToNativeResolution,
+        flowPhase: flowStep === "position" ? "position" : "save",
+        hidePlacementCard: pathMode === "auto",
+        frameSummary,
+        showResolvedReadout: true,
+        resolvedUploadTarget,
+        resolvedConstraintsReadout,
+        sessionMaxFileSizeBytes,
+        presetFileLimitBlocker,
+        naturalSizeAdvisory,
+        onDismissNaturalSizeAdvisory: dismissNaturalSizeAdvisory,
+        onApplyNaturalSizeSuggestion: applyNaturalSizeSuggestion,
+        uploadPresetPickerVisible,
+        uploadPresetPickerReadOnly,
+        uploadPresetPickerValue: uploadPresetOptionId,
+        uploadPresetPickerOptions,
+        onUploadPresetPickerChange: handleUploadPresetPickerChange,
+        exportFormatLocked: uploadPresetExportFormatLocked,
+      }}
+    />
   );
-
-  const loadedEditor =
-    imageSrc != null ? (
-      <ImageEditorLoadedColumn
-        flowStep={flowStep}
-        stepExitFade={stepExitFade}
-        onStepExitTransitionEnd={onStepExitTransitionEnd}
-      >
-        <ImageEditorCropExportPanel
-          exportDimensionsReady={exportDimensionsReady}
-          strictOutputDimensionInputs={!autoTargetHasDesignerExportTag}
-          aspectPreset={aspectPreset}
-          visibleBuiltinAspectPresets={aspectPresetsForCrop}
-          exportSizeUsesAspectAndMaxWidth={useManualAspectAndMaxWidth}
-          onExportMaxWidthBlur={onExportMaxWidthBlur}
-          assetFolders={assetFolders}
-          baseId={baseId}
-          busy={busy}
-          completedCrop={completedCrop}
-          componentImageProps={componentImageProps}
-          crop={crop}
-          cropAspect={cropAspect}
-          cropFrameMode={cropFrameMode}
-          estimateNonce={estimateNonce}
-          estimatePending={estimatePending}
-          estimatedBytes={estimatedBytes}
-          fileBaseName={fileBaseName}
-          folderActionBusy={folderActionBusy}
-          foldersLoading={foldersLoading}
-          heightStr={heightStr}
-          imageSrc={imageSrc}
-          onCreateAssetFolder={createAssetFolderNamed}
-          onCropComplete={onCropComplete}
-          onQualityCommit={onQualityCommit}
-          originalBytes={originalBytes}
-          originalPreviewUrl={originalPreviewUrl}
-          compressedPreviewUrl={compressedPreviewUrl}
-          previewPending={previewPending}
-          outputHeight={outputHeight}
-          outputWidth={outputWidth}
-          placement={placement}
-          quality={quality}
-          replaceLibraryAsset={replaceLibraryAsset}
-          selectedAssetFolderId={selectedAssetFolderId}
-          selectedComponentImagePropId={selectedComponentImagePropId}
-          selectedElementType={selectedElementType}
-          componentImagePropsResolving={componentImagePropsResolving}
-          cmsPrimaryUpload={cmsPrimaryUpload}
-          elementCmsBindingLoading={elementCmsBindingLoading}
-          elementCmsBinding={elementCmsBinding}
-          guestCmsTemplateRestricted={guestCmsTemplateRestricted}
-          setAspectPreset={setAspectPreset}
-          setCrop={setCrop}
-          setCropFrameMode={setCropFrameMode}
-          setFileBaseName={setFileBaseName}
-          setHeightStr={setHeightStr}
-          setOutputHeight={setOutputHeight}
-          setOutputWidth={setOutputWidth}
-          setPlacement={setPlacement}
-          setQuality={setQuality}
-          exportFormat={exportFormat}
-          allowAvifEncoding={allowAvifEncoding}
-          setExportFormat={setExportFormat}
-          onExportFormatCommit={onQualityCommit}
-          setReplaceLibraryAsset={setReplaceLibraryAsset}
-          setSelectedAssetFolderId={setSelectedAssetFolderId}
-          setSelectedComponentImagePropId={setSelectedComponentImagePropId}
-          setWidthStr={setWidthStr}
-          setZoom={setZoom}
-          widthStr={widthStr}
-          zoom={zoom}
-          parsedExportWidth={parsedOutputW}
-          parsedExportHeight={parsedOutputH}
-          effectiveExportWidth={effectiveOutputW}
-          effectiveExportHeight={effectiveOutputH}
-          exportPreviewReady={exportDimensionsReady}
-          onOpenQualityPopout={openQualityPopout}
-          limitCropZoomToNativeResolution={settings.limitCropZoomToNativeResolution}
-          flowPhase={flowStep === "position" ? "position" : "save"}
-          hidePlacementCard={pathMode === "auto"}
-          frameSummary={frameSummary}
-          showResolvedReadout
-          resolvedUploadTarget={resolvedUploadTarget}
-          resolvedConstraintsReadout={resolvedConstraintsReadout}
-          sessionMaxFileSizeBytes={sessionMaxFileSizeBytes}
-          presetFileLimitBlocker={presetFileLimitBlocker}
-          naturalSizeAdvisory={naturalSizeAdvisory}
-          onDismissNaturalSizeAdvisory={dismissNaturalSizeAdvisory}
-          onApplyNaturalSizeSuggestion={applyNaturalSizeSuggestion}
-          uploadPresetPickerVisible={uploadPresetPickerVisible}
-          uploadPresetPickerReadOnly={uploadPresetPickerReadOnly}
-          uploadPresetPickerValue={uploadPresetOptionId}
-          uploadPresetPickerOptions={uploadPresetPickerOptions}
-          onUploadPresetPickerChange={setUploadPresetOptionId}
-        />
-      </ImageEditorLoadedColumn>
-    ) : null;
 
   const { subheader: stepNavSubheader, footer: routeFooter } = imageEditorRouteChromeSlots({
     showFlowStepNav,

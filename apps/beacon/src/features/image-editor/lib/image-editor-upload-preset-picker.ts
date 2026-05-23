@@ -1,5 +1,6 @@
 import {
   type BeaconAppSettings,
+  type BeaconPresetRow,
   createBeaconPresetResolver,
   type ExportConstraints,
   type PresetConstraintSource,
@@ -8,8 +9,8 @@ import {
   serializePresetTargetKey,
 } from "@codalyn/webflow-kit";
 
-const ACTIVE_RESOLVED_UPLOAD_PRESET_OPTION_ID = "active-resolved";
 const MANUAL_UPLOAD_PRESET_OPTION_ID = "manual-override";
+const RESOLVED_CONSTRAINTS_UPLOAD_PRESET_OPTION_ID = "resolved-constraints";
 
 type UploadPresetPickerScope = "instance" | "component" | "element" | "site-default" | "active" | "manual";
 
@@ -18,28 +19,11 @@ export type UploadPresetPickerOption = {
   label: string;
   scope: UploadPresetPickerScope;
   constraints: ExportConstraints | null;
+  /** True when the preset row has an explicit export format (not workspace default). */
+  exportFormatConfigured: boolean;
 };
 
 const pickerResolver = createBeaconPresetResolver();
-
-function scopeLabel(scope: UploadPresetPickerScope): string {
-  if (scope === "active") {
-    return "Active resolved preset";
-  }
-  if (scope === "site-default") {
-    return "Site default preset";
-  }
-  if (scope === "component") {
-    return "Component preset";
-  }
-  if (scope === "element") {
-    return "Element preset";
-  }
-  if (scope === "instance") {
-    return "Instance preset";
-  }
-  return "Manual override";
-}
 
 function sourceScope(source: PresetConstraintSource): UploadPresetPickerScope {
   if (source === "site-default") {
@@ -55,6 +39,10 @@ function sourceScope(source: PresetConstraintSource): UploadPresetPickerScope {
     return "instance";
   }
   return "active";
+}
+
+function presetOptionId(row: BeaconPresetRow): string {
+  return `preset:${row.id}`;
 }
 
 function resolveSingleRowConstraints(args: {
@@ -81,106 +69,92 @@ function resolveSingleRowConstraints(args: {
   return resolved.constraints;
 }
 
-function optionForRow(args: {
-  row: NonNullable<BeaconAppSettings["imagePresetStorage"]["siteDefault"]>;
+function presetRowExportFormatConfigured(row: BeaconPresetRow): boolean {
+  return row.exportFormat !== undefined;
+}
+
+function findPresetRowById(settings: BeaconAppSettings, presetId: string | null): BeaconPresetRow | null {
+  if (presetId == null) {
+    return null;
+  }
+  const siteDefault = settings.imagePresetStorage.siteDefault;
+  if (siteDefault?.id === presetId) {
+    return siteDefault;
+  }
+  for (const row of Object.values(settings.imagePresetStorage.byTargetKey)) {
+    if (row.id === presetId) {
+      return row;
+    }
+  }
+  return null;
+}
+
+function resolvedPresetOptionLabel(readout: ResolverOutput, presetRow: BeaconPresetRow | null): string {
+  if (presetRow != null) {
+    return presetRow.name;
+  }
+  if (readout.source === "tagged") {
+    return "Tagged export size";
+  }
+  return "Resolved preset";
+}
+
+function optionForPresetRow(args: {
+  row: BeaconPresetRow;
   scope: UploadPresetPickerScope;
   target: ResolvedUploadTarget;
   settings: BeaconAppSettings;
 }): UploadPresetPickerOption {
   const { row, scope, target, settings } = args;
   return {
-    id: `preset:${row.id}`,
-    label: `${scopeLabel(scope)} - ${row.name}`,
+    id: presetOptionId(row),
+    label: row.name,
     scope,
     constraints: resolveSingleRowConstraints({ row, rowScope: scope, target, settings }),
+    exportFormatConfigured: presetRowExportFormatConfigured(row),
   };
 }
 
-function pushActiveResolvedOption(options: UploadPresetPickerOption[], readout: ResolverOutput | null) {
-  if (readout?.constraints == null) {
+function pushResolvedPresetOption(
+  options: UploadPresetPickerOption[],
+  readout: ResolverOutput | null,
+  settings: BeaconAppSettings
+) {
+  if (readout?.constraints == null || readout.source === "manual") {
     return;
   }
+  const presetRow = findPresetRowById(settings, readout.presetId);
   options.push({
-    id: ACTIVE_RESOLVED_UPLOAD_PRESET_OPTION_ID,
-    label: scopeLabel(readout.source === "tagged" ? "active" : sourceScope(readout.source)),
-    scope: "active",
+    id: presetRow != null ? presetOptionId(presetRow) : RESOLVED_CONSTRAINTS_UPLOAD_PRESET_OPTION_ID,
+    label: resolvedPresetOptionLabel(readout, presetRow),
+    scope: readout.source === "tagged" ? "active" : sourceScope(readout.source),
     constraints: readout.constraints,
+    exportFormatConfigured: presetRow != null && presetRowExportFormatConfigured(presetRow),
   });
 }
 
-function pushBareImagePresetOptions(args: {
-  options: UploadPresetPickerOption[];
-  settings: BeaconAppSettings;
-  target: Extract<ResolvedUploadTarget, { kind: "bare-image" }>;
-}) {
-  const { options, settings, target } = args;
-  const bareInstanceRow =
-    settings.imagePresetStorage.byTargetKey[
-      serializePresetTargetKey({
-        kind: "bare-image-instance",
-        siteId: target.siteId,
-        pageId: target.pageId,
-        elementId: target.elementId,
-      })
-    ];
-  if (bareInstanceRow != null) {
-    options.push(optionForRow({ row: bareInstanceRow, scope: "instance", target, settings }));
-  }
-  const bareElementRow =
-    settings.imagePresetStorage.byTargetKey[
-      serializePresetTargetKey({
-        kind: "bare-image-element",
-        siteId: target.siteId,
-      })
-    ];
-  if (bareElementRow != null) {
-    options.push(optionForRow({ row: bareElementRow, scope: "element", target, settings }));
-  }
-}
-
-function pushComponentImagePresetOptions(args: {
-  options: UploadPresetPickerOption[];
-  settings: BeaconAppSettings;
-  target: Extract<ResolvedUploadTarget, { kind: "component-image" }>;
-}) {
-  const { options, settings, target } = args;
-  const componentInstanceRow =
-    settings.imagePresetStorage.byTargetKey[
-      serializePresetTargetKey({
-        kind: "component-image-instance",
-        siteId: target.siteId,
-        pageId: target.pageId,
-        instanceElementId: target.instanceElementId,
-        imagePropId: target.imagePropId,
-      })
-    ];
-  if (componentInstanceRow != null) {
-    options.push(optionForRow({ row: componentInstanceRow, scope: "instance", target, settings }));
-  }
-  const componentRow =
-    settings.imagePresetStorage.byTargetKey[
-      serializePresetTargetKey({
-        kind: "component-image",
-        siteId: target.siteId,
-        componentDefinitionId: target.componentDefinitionId,
-        imagePropId: target.imagePropId,
-      })
-    ];
-  if (componentRow != null) {
-    options.push(optionForRow({ row: componentRow, scope: "component", target, settings }));
-  }
-}
-
-function pushSiteDefaultPresetOption(args: {
+function pushSiteDefaultFallbackOption(args: {
   options: UploadPresetPickerOption[];
   settings: BeaconAppSettings;
   target: Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }>;
+  readout: ResolverOutput | null;
 }) {
-  const { options, settings, target } = args;
+  const { options, settings, target, readout } = args;
   const siteDefaultRow = settings.imagePresetStorage.siteDefault;
-  if (siteDefaultRow?.targetKey.siteId === target.siteId) {
-    options.push(optionForRow({ row: siteDefaultRow, scope: "site-default", target, settings }));
+  if (siteDefaultRow?.targetKey.siteId !== target.siteId) {
+    return;
   }
+  if (readout?.presetId === siteDefaultRow.id) {
+    return;
+  }
+  options.push(
+    optionForPresetRow({
+      row: siteDefaultRow,
+      scope: "site-default",
+      target,
+      settings,
+    })
+  );
 }
 
 export function buildUploadPresetPickerOptions(input: {
@@ -196,22 +170,18 @@ export function buildUploadPresetPickerOptions(input: {
   }
 
   const options: UploadPresetPickerOption[] = [];
-  pushActiveResolvedOption(options, readout);
+  pushResolvedPresetOption(options, readout, settings);
 
   if (allowTeamPresets && target.kind !== "cms-ambiguous") {
-    if (target.kind === "bare-image") {
-      pushBareImagePresetOptions({ options, settings, target });
-    } else {
-      pushComponentImagePresetOptions({ options, settings, target });
-    }
-    pushSiteDefaultPresetOption({ options, settings, target });
+    pushSiteDefaultFallbackOption({ options, settings, target, readout });
   }
 
   options.push({
     id: MANUAL_UPLOAD_PRESET_OPTION_ID,
-    label: scopeLabel("manual"),
+    label: "Manual override",
     scope: "manual",
     constraints: null,
+    exportFormatConfigured: false,
   });
 
   return options;
@@ -221,9 +191,36 @@ export function getDefaultUploadPresetOptionId(readout: ResolverOutput | null): 
   if (readout?.source === "manual" || readout?.constraints == null) {
     return MANUAL_UPLOAD_PRESET_OPTION_ID;
   }
-  return ACTIVE_RESOLVED_UPLOAD_PRESET_OPTION_ID;
+  if (readout.presetId != null) {
+    return `preset:${readout.presetId}`;
+  }
+  return RESOLVED_CONSTRAINTS_UPLOAD_PRESET_OPTION_ID;
+}
+
+export function resolveAutoUploadPresetOptionId(input: {
+  currentOptionId: string;
+  userPicked: boolean;
+  readout: ResolverOutput | null;
+  availableOptionIds: ReadonlySet<string>;
+  targetResolutionSettled: boolean;
+}): string | null {
+  if (!input.targetResolutionSettled) {
+    return null;
+  }
+  const fallbackOptionId = getDefaultUploadPresetOptionId(input.readout);
+  if (input.userPicked && input.availableOptionIds.has(input.currentOptionId)) {
+    return input.currentOptionId;
+  }
+  return fallbackOptionId;
 }
 
 export function isManualUploadPresetOptionId(id: string): boolean {
   return id === MANUAL_UPLOAD_PRESET_OPTION_ID;
+}
+
+export function isUploadPresetExportFormatLocked(selectedOption: UploadPresetPickerOption | null | undefined): boolean {
+  if (selectedOption == null || isManualUploadPresetOptionId(selectedOption.id)) {
+    return false;
+  }
+  return selectedOption.exportFormatConfigured;
 }

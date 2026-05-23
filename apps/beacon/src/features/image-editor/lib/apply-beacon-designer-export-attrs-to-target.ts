@@ -8,11 +8,13 @@ import {
   getBeaconExportDimensionPropIdsOrNull,
 } from "@/features/image-editor/lib/ensure-beacon-export-dimension-props";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
+import { searchComponentInstanceImageProps } from "@/features/image-editor/lib/search-component-instance-image-props";
 import {
-  exitCurrentComponentIfAny,
   resolveComponentImagePropId,
   withImageElementForPageTarget,
 } from "@/features/image-editor/lib/with-image-element-for-page-target";
+import { withComponentDefinitionScope } from "@/shared/lib/component-definition-scope";
+import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
 
 export async function readBeaconDesignerExportAttrsFromPageTarget(
   t: ImagePageTarget
@@ -59,23 +61,23 @@ export async function setBeaconDesignerExportAttrsOnPageTarget(
     if (imagePropId == null) {
       throw new Error("This component has no image field Beacon can use.");
     }
-    await exitCurrentComponentIfAny();
-    await webflow.enterComponent(instance);
-    let propIds: { widthPropId: string; heightPropId: string };
-    try {
-      const def = await webflow.getCurrentComponent();
-      if (def == null) {
-        throw new Error("Select this component on the page and try again.");
-      }
-      propIds = await ensureBeaconExportDimensionPropsOnDefinition(def, instance, imagePropId);
-    } finally {
-      await webflow.exitComponent();
-    }
-    await instance.setProps([
-      { propId: propIds.widthPropId, value: wStr },
-      { propId: propIds.heightPropId, value: hStr },
-    ]);
-    return;
+
+    await runExclusiveDesignerOp(async () => {
+      const instanceImageProps = await searchComponentInstanceImageProps(instance);
+      const propIds = await withComponentDefinitionScope(instance, async ({ definition, definitionRoot }) =>
+        ensureBeaconExportDimensionPropsOnDefinition(
+          definition,
+          instance,
+          imagePropId,
+          definitionRoot,
+          instanceImageProps
+        )
+      );
+      await instance.setProps([
+        { propId: propIds.widthPropId, value: wStr },
+        { propId: propIds.heightPropId, value: hStr },
+      ]);
+    });
   }
 }
 

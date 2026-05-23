@@ -6,6 +6,7 @@ import {
   applyCroppedImageToWebflow,
   downloadCroppedImageWebp,
   type ExportResult,
+  type ImageExportSuccessContext,
   type PlacementMode,
 } from "@/features/image-editor/lib/apply-cropped-export";
 import { resolveAssetFolderHandleForExport } from "@/features/image-editor/lib/asset-folder-ops";
@@ -19,7 +20,6 @@ function folderMissingMessage(assetFolders: AssetFolderRow[]): string {
 
 async function notifyExportResult(result: ExportResult): Promise<void> {
   if (result.kind === "success") {
-    await webflow.notify({ type: "Success", message: result.message });
     return;
   }
   if (result.kind === "info") {
@@ -27,6 +27,13 @@ async function notifyExportResult(result: ExportResult): Promise<void> {
     return;
   }
   await webflow.notify({ type: "Error", message: result.message });
+}
+
+function toExportSuccessContext(result: Extract<ExportResult, { kind: "success" }>): ImageExportSuccessContext {
+  return {
+    message: result.message,
+    cmsFieldUpdated: result.cmsFieldUpdated === true,
+  };
 }
 
 function syncExportDimensionsToState(
@@ -57,8 +64,9 @@ async function exportDownloadPlacement(args: {
   safeName: string;
   dimSetters: Parameters<typeof syncExportDimensionsToState>[3];
   setBusy: (v: boolean) => void;
+  onSuccess: (context: ImageExportSuccessContext) => void;
 }): Promise<void> {
-  const { imageSrc, completedCrop, w, h, quality, safeName, dimSetters, setBusy } = args;
+  const { imageSrc, completedCrop, w, h, quality, safeName, dimSetters, setBusy, onSuccess } = args;
   setBusy(true);
   try {
     syncExportDimensionsToState(w, h, safeName, dimSetters);
@@ -70,6 +78,9 @@ async function exportDownloadPlacement(args: {
       quality,
       fileBaseName: safeName,
     });
+    if (result.kind === "success") {
+      onSuccess(toExportSuccessContext(result));
+    }
     await notifyExportResult(result);
   } finally {
     setBusy(false);
@@ -92,6 +103,7 @@ async function exportWebflowPlacement(args: {
   targetFolder: AssetFolder | null;
   placement: PlacementMode;
   replaceLibraryAsset: boolean;
+  onSuccess: (context: ImageExportSuccessContext) => void;
 }): Promise<void> {
   const {
     imageSrc,
@@ -109,6 +121,7 @@ async function exportWebflowPlacement(args: {
     targetFolder,
     placement,
     replaceLibraryAsset,
+    onSuccess,
   } = args;
   setBusy(true);
   try {
@@ -127,6 +140,9 @@ async function exportWebflowPlacement(args: {
       placement,
       replaceLibraryAsset: placement === "replace" ? replaceLibraryAsset : false,
     });
+    if (result.kind === "success") {
+      onSuccess(toExportSuccessContext(result));
+    }
     await notifyExportResult(result);
   } finally {
     setBusy(false);
@@ -157,6 +173,8 @@ export function useApplyCroppedToWebflow(options: {
   /** When set, export must not run (preset size guard). */
   exportPlaceBlockedLabel: string | null;
   exportPlaceBlockedCode?: BeaconImageErrorCode | null;
+  /** Called synchronously when export succeeds, before busy clears. */
+  onExportSuccess?: (context: ImageExportSuccessContext) => void;
 }) {
   const {
     imageSrc,
@@ -181,9 +199,23 @@ export function useApplyCroppedToWebflow(options: {
     cmsPrimaryUpload,
     exportPlaceBlockedLabel,
     exportPlaceBlockedCode = null,
+    onExportSuccess,
   } = options;
 
   const [busy, setBusy] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState<ImageExportSuccessContext | null>(null);
+
+  const clearExportSuccess = useCallback(() => {
+    setExportSuccess(null);
+  }, []);
+
+  const reportExportSuccess = useCallback(
+    (context: ImageExportSuccessContext) => {
+      setExportSuccess(context);
+      onExportSuccess?.(context);
+    },
+    [onExportSuccess]
+  );
 
   const applyToCanvas = useCallback(async () => {
     if (exportPlaceBlockedLabel) {
@@ -222,6 +254,7 @@ export function useApplyCroppedToWebflow(options: {
         safeName,
         dimSetters,
         setBusy,
+        onSuccess: reportExportSuccess,
       });
       return;
     }
@@ -252,6 +285,7 @@ export function useApplyCroppedToWebflow(options: {
       targetFolder: targetFolder ?? null,
       placement,
       replaceLibraryAsset,
+      onSuccess: reportExportSuccess,
     });
   }, [
     imageSrc,
@@ -276,7 +310,8 @@ export function useApplyCroppedToWebflow(options: {
     cmsPrimaryUpload,
     exportPlaceBlockedLabel,
     exportPlaceBlockedCode,
+    reportExportSuccess,
   ]);
 
-  return { busy, applyToCanvas };
+  return { busy, applyToCanvas, exportSuccess, clearExportSuccess };
 }

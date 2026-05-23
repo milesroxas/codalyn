@@ -12,6 +12,7 @@ import {
   ensurePublishPlaceholderImageAssetId,
   getCachedPublishPlaceholderImageAssetId,
 } from "@/features/cms-slots/model/cms-slot-publish-placeholder-image-asset";
+import { exitUntilPageForComponentEnter } from "@/shared/lib/component-definition-scope";
 
 export { CMS_SLOT_PUBLISH_PLACEHOLDER_URL };
 
@@ -247,8 +248,6 @@ export async function seedHiddenListPublishPlaceholders(
   return entries.length;
 }
 
-const MAX_NESTED_COMPONENT_EXITS = 8;
-
 function resolvedValueMatchesPlaceholder(resolved: ResolvedValue | null | undefined, valueType: string): boolean {
   if (isCmsSlotImageValueType(valueType)) {
     const imageAssetId = getCachedPublishPlaceholderImageAssetId();
@@ -321,13 +320,7 @@ function canonicalPropIdsFromNestedPublishSeedPairs(
 
 /** Instance overrides must be written from page scope, not from inside any component definition. */
 async function exitUntilPageScope(): Promise<void> {
-  for (let step = 0; step < MAX_NESTED_COMPONENT_EXITS; step += 1) {
-    const current = await webflow.getCurrentComponent().catch(() => null);
-    if (current == null) {
-      return;
-    }
-    await webflow.exitComponent().catch(() => undefined);
-  }
+  await exitUntilPageForComponentEnter();
 }
 
 function collectNestedPublishSeedEntries(

@@ -1,29 +1,11 @@
 import { WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
 import { searchComponentInstanceImageProps } from "@/features/image-editor/lib/search-component-instance-image-props";
 import { webflowTreeNodeKey } from "@/features/image-editor/lib/webflow-element-id-key";
-
-type WithChildren = { getChildren?: () => Promise<AnyElement[] | null> };
-type SlotList = Awaited<ReturnType<ComponentElement["getSlots"]>>;
-
-async function getChildList(node: WithChildren | null | undefined): Promise<AnyElement[]> {
-  if (node == null || typeof node.getChildren !== "function") {
-    return [];
-  }
-  const ch = await node.getChildren();
-  return ch ?? [];
-}
+import { enqueueWebflowStructureChildren } from "@/features/image-editor/lib/webflow-element-structure-walk";
 
 /** Descendants to traverse from a component: main children + each slot’s children. */
-async function collectComponentInstanceDescendantsToQueue(inst: ComponentElement, queue: AnyElement[]) {
-  for (const c of await getChildList(inst as WithChildren)) {
-    queue.push(c);
-  }
-  const slots: SlotList = await inst.getSlots().catch(() => [] as SlotList);
-  for (const slot of slots) {
-    for (const c of await getChildList(slot as unknown as WithChildren)) {
-      queue.push(c);
-    }
-  }
+async function collectComponentInstanceDescendantsToQueue(instance: ComponentElement, queue: AnyElement[]) {
+  await enqueueWebflowStructureChildren(instance, queue);
 }
 
 export type ImagePageTarget = {

@@ -8,6 +8,19 @@ export const IMAGE_UPLOAD_CONTINUE_TO_ADD_LABEL = "Continue to add image";
 
 export const IMAGE_UPLOAD_CONTINUE_TO_SAVE_LABEL = "Continue to export";
 
+export const IMAGE_UPLOAD_SUCCESS_TITLE = "Image saved";
+
+export const IMAGE_UPLOAD_SUCCESS_UPLOAD_ANOTHER_LABEL = "Upload another image";
+
+export const IMAGE_UPLOAD_SUCCESS_BACK_HOME_LABEL = "Back to home";
+
+/** Shown after a CMS field upload on a collection template — same Designer cache refresh as CMS Slots. */
+export const IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_HINT =
+  "Switch to CMS in Webflow, then return to the Designer to see the updated image.";
+
+export const IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_READY =
+  "You're back in the Designer — your image should appear on the canvas.";
+
 export const IMAGE_UPLOAD_ADD_PRESET_LABEL = "Add preset";
 
 /** Section heading for saved export presets (configure home grid). */

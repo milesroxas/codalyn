@@ -139,4 +139,44 @@ describe("useApplyCroppedToWebflow", () => {
     const arg = vi.mocked(applyCroppedImageToWebflow).mock.calls[0][0];
     expect(arg.targetFolder).toBeNull();
   });
+
+  it("sets exportSuccess on successful library placement", async () => {
+    vi.mocked(applyCroppedImageToWebflow).mockResolvedValueOnce({
+      kind: "success",
+      message: "Saved to Assets.",
+    });
+    const { result } = renderHook(() =>
+      useApplyCroppedToWebflow(options({ placement: "library" }) as Parameters<typeof useApplyCroppedToWebflow>[0])
+    );
+    await act(async () => {
+      await result.current.applyToCanvas();
+    });
+    expect(result.current.exportSuccess).toEqual({
+      message: "Saved to Assets.",
+      cmsFieldUpdated: false,
+    });
+    const wf = (globalThis as unknown as { webflow: { notify: ReturnType<typeof vi.fn> } }).webflow;
+    expect(wf.notify).not.toHaveBeenCalled();
+  });
+
+  it("marks cmsFieldUpdated when CMS field upload succeeds", async () => {
+    vi.mocked(applyCroppedImageToWebflow).mockResolvedValueOnce({
+      kind: "success",
+      message: "Updated CMS field.",
+      cmsFieldUpdated: true,
+    });
+    const { result } = renderHook(() =>
+      useApplyCroppedToWebflow(
+        options({
+          placement: "selection",
+          cmsPrimaryUpload: true,
+          currentCmsItemId: "item-1",
+        }) as Parameters<typeof useApplyCroppedToWebflow>[0]
+      )
+    );
+    await act(async () => {
+      await result.current.applyToCanvas();
+    });
+    expect(result.current.exportSuccess?.cmsFieldUpdated).toBe(true);
+  });
 });

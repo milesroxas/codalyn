@@ -11,20 +11,11 @@ import {
   nestedAliasForComponentInstance,
   nestedPublishSeedPairKey,
 } from "@/features/cms-slots/model/cms-slot-nested-prop-alias";
-import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
-import { exitCurrentComponentIfAny } from "@/features/image-editor/lib/with-image-element-for-page-target";
-
-const MAX_NESTED_COMPONENT_EXITS = 8;
-
-/** Exit nested component edit scope until `getCurrentComponent()` is null, so `enterComponent(instance)` can run. */
-async function exitUntilPageForInstanceEnter(): Promise<void> {
-  for (let step = 0; step < MAX_NESTED_COMPONENT_EXITS; step += 1) {
-    await exitCurrentComponentIfAny();
-    if ((await webflow.getCurrentComponent().catch(() => null)) == null) {
-      return;
-    }
-  }
-}
+import {
+  exitUntilPageForComponentEnter,
+  MAX_DESIGNER_COMPONENT_NESTING,
+} from "@/shared/lib/component-definition-scope";
+import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
 
 export type EngineCodalynAttrSyncResult = {
   tagged: number;
@@ -201,7 +192,7 @@ async function enterNestedDefinitionIfLinked(
   nestedPublishSeedPairKeys: Set<string>,
   nestedDepth: number
 ): Promise<void> {
-  if (nestedDepth > MAX_NESTED_COMPONENT_EXITS) {
+  if (nestedDepth > MAX_DESIGNER_COMPONENT_NESTING) {
     return;
   }
   const link = await nestedAliasForInstance(inst, exposedIds, upstreamAlias);
@@ -295,7 +286,7 @@ async function enterComponentDefinitionsAndWalk(
   const exposedIds = new Set(exposed.map((e) => e.propId));
   const taggedPropIds = new Set<string>();
   const nestedPublishSeedPairKeys = new Set<string>();
-  await exitUntilPageForInstanceEnter();
+  await exitUntilPageForComponentEnter();
   await webflow.enterComponent(instance);
   gate.entered = true;
 
@@ -316,7 +307,7 @@ export function syncEngineCodalynSlotPropAttributes(
   instance: ComponentElement,
   exposed: readonly ComposableInstancePropMeta[]
 ): Promise<EngineCodalynAttrSyncResult> {
-  return runExclusiveDesignerStyleOp(async () => {
+  return runExclusiveDesignerOp(async () => {
     const out: EngineCodalynAttrSyncResult = {
       tagged: 0,
       removed: 0,

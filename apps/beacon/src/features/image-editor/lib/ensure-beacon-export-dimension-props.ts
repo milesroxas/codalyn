@@ -3,6 +3,7 @@ import {
   BEACON_EXPORT_WIDTH_ATTR,
 } from "@/features/image-editor/lib/beacon-designer-image-export-attrs";
 import { findImageElementForComponentInstanceProp } from "@/features/image-editor/lib/find-image-element-for-component-instance-prop";
+import type { ComponentInstanceImageProp } from "@/features/image-editor/lib/search-component-instance-image-props";
 import {
   CMS_SLOT_COMPONENT_STRING_PROPS_GROUP,
   type CmsSlotStringComponentPropOptions,
@@ -64,7 +65,9 @@ export async function getBeaconExportDimensionPropIdsOrNull(
 export async function ensureBeaconExportDimensionPropsOnDefinition(
   def: Component,
   instance: ComponentElement,
-  imagePropId: string
+  imagePropId: string,
+  definitionRoot: AnyElement | null,
+  instanceImageProps: readonly ComponentInstanceImageProp[]
 ): Promise<{ widthPropId: string; heightPropId: string }> {
   const perms = await webflow.canForAppMode([webflow.appModes.canModifyComponents]);
   if (!perms[webflow.appModes.canModifyComponents]) {
@@ -93,9 +96,14 @@ export async function ensureBeaconExportDimensionPropsOnDefinition(
     throw new Error("Could not add Beacon export width/height fields on this component.");
   }
 
-  const img = await findImageElementForComponentInstanceProp(instance, imagePropId);
+  const img = await findImageElementForComponentInstanceProp(instance, imagePropId, {
+    definitionRoot,
+    instanceImageProps,
+  });
   if (img == null) {
-    throw new Error("Could not find the image field inside this component.");
+    throw new Error(
+      "Could not find the image field inside this component. Make sure the image inside the component is bound to the same image field as this instance."
+    );
   }
   if (img.customAttributes !== true) {
     throw new Error("This image does not support custom attributes in the Designer API.");

@@ -9,6 +9,7 @@ import {
   walkWebflowStructureBfs,
 } from "@/features/image-editor/lib/webflow-element-structure-walk";
 import { MAX_DESIGNER_COMPONENT_NESTING } from "@/shared/lib/component-definition-scope";
+import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
 import {
   bindingPropIdFromSettingValue,
   canonicalExposedPropId,
@@ -19,8 +20,8 @@ function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === "object" && x !== null;
 }
 
-const IMAGE_SETTING_VALUE_TYPES = new Set(["image", "imageAsset", "cmsImage", "imageSet"]);
 const IMAGE_VALUE_TYPES = ["image", "imageAsset", "cmsImage", "imageSet"] as const;
+const IMAGE_SETTING_VALUE_TYPES = new Set<string>(IMAGE_VALUE_TYPES);
 
 type SearchSettingsImage = {
   searchSettings: (o?: { valueType?: string }) => Promise<Record<string, unknown>>;
@@ -106,7 +107,7 @@ function resolveInstanceImageProp(
   instanceImageProps: readonly ComponentInstanceImageProp[],
   propId: string
 ): ComponentInstanceImageProp | null {
-  return instanceImageProps.find((prop) => prop.propId === propId) ?? instanceImageProps[0] ?? null;
+  return instanceImageProps.find((prop) => prop.propId === propId) ?? null;
 }
 
 export async function imageElementMatchesComponentImageProp(
@@ -332,28 +333,6 @@ async function findSingleImagePropFallback(
   return findFirstImageDescendantBfs(startNodes);
 }
 
-async function findUniqueMatchingImageOnPage(
-  instance: ComponentElement,
-  imagePropId: string,
-  instanceImageProps: readonly ComponentInstanceImageProp[]
-): Promise<ImageElement | null> {
-  const all = await webflow.getAllElements();
-  const onPage: ImageElement[] = [];
-  for (const element of all) {
-    if (element.type !== WEBFLOW_IMAGE_ELEMENT_TYPE) {
-      continue;
-    }
-    const img = element as ImageElement;
-    if (await imageElementMatchesComponentImageProp(instance, img, imagePropId, instanceImageProps)) {
-      onPage.push(img);
-    }
-  }
-  if (onPage.length === 1) {
-    return onPage[0] ?? null;
-  }
-  return null;
-}
-
 async function findFromDefinitionRoot(
   instance: ComponentElement,
   imagePropId: string,
@@ -375,25 +354,22 @@ export async function findImageElementForComponentInstanceProp(
   imagePropId: string,
   options?: FindComponentInstanceImageOptions
 ): Promise<ImageElement | null> {
-  const instanceImageProps = options?.instanceImageProps ?? (await searchComponentInstanceImageProps(instance));
-  const definitionRoot = options?.definitionRoot ?? null;
+  return runExclusiveDesignerOp(async () => {
+    const instanceImageProps = options?.instanceImageProps ?? (await searchComponentInstanceImageProps(instance));
+    const definitionRoot = options?.definitionRoot ?? null;
 
-  if (definitionRoot != null) {
-    const fromDefinition = await findFromDefinitionRoot(instance, imagePropId, definitionRoot, instanceImageProps);
-    if (fromDefinition != null) {
-      return fromDefinition;
+    if (definitionRoot != null) {
+      const fromDefinition = await findFromDefinitionRoot(instance, imagePropId, definitionRoot, instanceImageProps);
+      if (fromDefinition != null) {
+        return fromDefinition;
+      }
     }
-  }
 
-  const underInstance = await collectMatchingImagesBfs([instance], instance, imagePropId, instanceImageProps);
-  if (underInstance.length > 0) {
-    return underInstance[0] ?? null;
-  }
+    const underInstance = await collectMatchingImagesBfs([instance], instance, imagePropId, instanceImageProps);
+    if (underInstance.length > 0) {
+      return underInstance[0] ?? null;
+    }
 
-  const onPage = await findUniqueMatchingImageOnPage(instance, imagePropId, instanceImageProps);
-  if (onPage != null) {
-    return onPage;
-  }
-
-  return findSingleImagePropFallback(instanceImageProps, [instance]);
+    return findSingleImagePropFallback(instanceImageProps, [instance], definitionRoot, instance, imagePropId);
+  });
 }

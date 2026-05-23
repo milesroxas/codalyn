@@ -3,17 +3,23 @@ import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-function Empty({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="empty"
-      className={cn(
-        "flex min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-sm border-dashed p-6 text-center text-balance",
-        className
-      )}
-      {...props}
-    />
-  );
+const emptyVariants = cva(
+  "flex min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-sm border-dashed p-6 text-center text-balance",
+  {
+    variants: {
+      tone: {
+        default: "",
+        successPanel: "min-h-[min(44vh,16rem)] border border-border bg-muted/20",
+      },
+    },
+    defaultVariants: {
+      tone: "default",
+    },
+  }
+);
+
+function Empty({ className, tone, ...props }: React.ComponentProps<"div"> & VariantProps<typeof emptyVariants>) {
+  return <div data-slot="empty" className={cn(emptyVariants({ tone }), className)} {...props} />;
 }
 
 function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
@@ -75,14 +81,25 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
   );
 }
 
-function EmptyContent({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="empty-content"
-      className={cn("flex w-full max-w-sm min-w-0 flex-col items-center gap-2.5 text-sm text-balance", className)}
-      {...props}
-    />
-  );
+const emptyContentVariants = cva("flex w-full min-w-0 flex-col items-center text-sm text-balance", {
+  variants: {
+    layout: {
+      default: "max-w-sm gap-2.5",
+      hint: "max-w-md gap-2.5",
+      actions: "max-w-sm gap-2",
+    },
+  },
+  defaultVariants: {
+    layout: "default",
+  },
+});
+
+function EmptyContent({
+  className,
+  layout,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof emptyContentVariants>) {
+  return <div data-slot="empty-content" className={cn(emptyContentVariants({ layout }), className)} {...props} />;
 }
 
 export { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle };

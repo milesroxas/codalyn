@@ -238,6 +238,51 @@ describe("findImageElementForComponentInstanceProp", () => {
     expect(found).toBe(loneImage);
   });
 
+  it("does not treat another image prop as a match when the requested propId is absent", async () => {
+    const heroImage = imageEl(
+      "hero-img",
+      vi.fn().mockResolvedValue({
+        main: {
+          valueType: "image",
+          value: { sourceType: "prop", propId: "hero-image" },
+        },
+      })
+    );
+    const avatarImage = imageEl(
+      "avatar-img",
+      vi.fn().mockResolvedValue({
+        main: {
+          valueType: "image",
+          value: { sourceType: "prop", propId: "avatar-image" },
+        },
+      })
+    );
+    const root = {
+      type: "Block",
+      id: { component: "cmp", element: "root" },
+      getChildren: vi.fn().mockResolvedValue([heroImage, avatarImage]),
+    } as unknown as AnyElement;
+    const instance = instanceEl();
+
+    searchPropsMock.mockResolvedValue([
+      {
+        propId: "hero-image",
+        value: { sourceType: "prop", propId: "hero-image" },
+        isCmsBinding: false,
+      },
+      {
+        propId: "avatar-image",
+        value: { sourceType: "prop", propId: "avatar-image" },
+        isCmsBinding: false,
+      },
+    ]);
+
+    const found = await findImageElementForComponentInstanceProp(instance, "missing-prop", {
+      definitionRoot: root,
+    });
+    expect(found).toBeNull();
+  });
+
   it("reuses preloaded instance image props during tree walks", async () => {
     const loneImage = imageEl("def-img", vi.fn().mockResolvedValue({}));
     const root = {

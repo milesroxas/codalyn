@@ -104,6 +104,7 @@ import {
   CMS_SLOTS_TOAST_LIST_REMOVED,
   CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED,
 } from "@/shared/lib/cms-slots-feature-copy";
+import { useDesignerViewReturnDetect } from "@/shared/lib/use-designer-view-return-detect";
 import { formatWebflowDesignerError } from "@/shared/lib/webflow-designer-error";
 
 const LIST_TARGET_COMPONENT_NOT_FOUND_MESSAGE =
@@ -637,10 +638,10 @@ export function CmsSlotsScreen() {
   const [listTargetOnCanvasCount, setListTargetOnCanvasCount] = useState(0);
   const [removeListTargetDialogOpen, setRemoveListTargetDialogOpen] = useState(false);
   const [cmsFieldLinkPromptOpen, setCmsFieldLinkPromptOpen] = useState(false);
-  const [cmsFieldLinkNavReady, setCmsFieldLinkNavReady] = useState(false);
+  const [cmsFieldLinkDetectEpoch, setCmsFieldLinkDetectEpoch] = useState(0);
   const [cmsFieldLinkRetryPending, setCmsFieldLinkRetryPending] = useState(false);
   const cmsFieldLinkBindingRef = useRef<{ collectionId: string; fieldId: string } | null>(null);
-  const cmsFieldLinkNavBaselineRef = useRef<{ pageId: string; appMode: string | null } | null>(null);
+  const cmsFieldLinkNavReady = useDesignerViewReturnDetect(cmsFieldLinkPromptOpen, cmsFieldLinkDetectEpoch);
   const [activeBeaconKey, setActiveBeaconKey] = useState<string | null>(null);
   const listTargetResolveGen = useRef(0);
   /** Last known list target registration for a beacon; avoids re-querying Webflow on repeat opens. */
@@ -1017,17 +1018,10 @@ export function CmsSlotsScreen() {
     }
   };
 
-  const openCmsFieldLinkPrompt = useCallback(async (binding: { collectionId: string; fieldId: string }) => {
+  const openCmsFieldLinkPrompt = useCallback((binding: { collectionId: string; fieldId: string }) => {
     cmsFieldLinkBindingRef.current = binding;
-    setCmsFieldLinkNavReady(false);
+    setCmsFieldLinkDetectEpoch((epoch) => epoch + 1);
     setCmsFieldLinkPromptOpen(true);
-    try {
-      const page = await webflow.getCurrentPage();
-      const appMode = typeof webflow.getCurrentMode === "function" ? await webflow.getCurrentMode() : null;
-      cmsFieldLinkNavBaselineRef.current = { pageId: String(page.id), appMode };
-    } catch {
-      cmsFieldLinkNavBaselineRef.current = null;
-    }
   }, []);
 
   const promptCmsFieldLinkIfCreated = useCallback(
@@ -1036,37 +1030,6 @@ export function CmsSlotsScreen() {
     },
     [openCmsFieldLinkPrompt]
   );
-
-  useEffect(() => {
-    if (!cmsFieldLinkPromptOpen || typeof webflow.subscribe !== "function") {
-      return undefined;
-    }
-    const checkReturn = async () => {
-      const baseline = cmsFieldLinkNavBaselineRef.current;
-      if (baseline == null) {
-        return;
-      }
-      try {
-        const page = await webflow.getCurrentPage();
-        const appMode = typeof webflow.getCurrentMode === "function" ? await webflow.getCurrentMode() : null;
-        if (String(page.id) !== baseline.pageId || appMode !== baseline.appMode) {
-          setCmsFieldLinkNavReady(true);
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    const unsubPage = webflow.subscribe("currentpage", () => {
-      void checkReturn();
-    });
-    const unsubMode = webflow.subscribe("currentappmode", () => {
-      void checkReturn();
-    });
-    return () => {
-      unsubPage();
-      unsubMode();
-    };
-  }, [cmsFieldLinkPromptOpen]);
 
   const handleRetryCmsFieldLink = async () => {
     if (cmsFieldLinkRetryPending || activeDataList == null) {

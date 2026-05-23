@@ -318,11 +318,6 @@ function canonicalPropIdsFromNestedPublishSeedPairs(
   return [...ids];
 }
 
-/** Instance overrides must be written from page scope, not from inside any component definition. */
-async function exitUntilPageScope(): Promise<void> {
-  await exitUntilPageForComponentEnter();
-}
-
 function collectNestedPublishSeedEntries(
   canonicalPropIds: readonly string[],
   liveProps: readonly InstanceProp[],
@@ -371,7 +366,7 @@ export async function seedNestedPublishPlaceholdersOnPlacedInstance(
     return 0;
   }
 
-  await exitUntilPageScope();
+  await exitUntilPageForComponentEnter();
 
   const liveProps = await parentInstance.searchProps().catch(() => [] as InstanceProp[]);
   const imagePlaceholderAssetId = canonicalPropIds.some((propId) => {

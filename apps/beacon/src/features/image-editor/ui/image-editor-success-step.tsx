@@ -23,10 +23,7 @@ export function ImageEditorSuccessStep(props: ImageEditorSuccessStepProps) {
   const designerViewReturned = useDesignerViewReturnDetect(showCmsDesignerRefreshHint);
 
   return (
-    <Empty
-      data-slot="image_upload_success"
-      className="min-h-[min(44vh,16rem)] gap-4 border border-dashed border-border bg-muted/20 px-6 py-10"
-    >
+    <Empty data-slot="image_upload_success" tone="successPanel">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <CircleCheck aria-hidden />
@@ -35,7 +32,7 @@ export function ImageEditorSuccessStep(props: ImageEditorSuccessStepProps) {
         <EmptyDescription>{message}</EmptyDescription>
       </EmptyHeader>
       {showCmsDesignerRefreshHint ? (
-        <EmptyContent className="max-w-md">
+        <EmptyContent layout="hint">
           <Alert variant="info">
             <AlertDescription>
               {designerViewReturned ? IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_READY : IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_HINT}
@@ -43,7 +40,7 @@ export function ImageEditorSuccessStep(props: ImageEditorSuccessStepProps) {
           </Alert>
         </EmptyContent>
       ) : null}
-      <EmptyContent className="max-w-sm gap-2">
+      <EmptyContent layout="actions">
         <Button type="button" className="w-full" onClick={onUploadAnother}>
           {IMAGE_UPLOAD_SUCCESS_UPLOAD_ANOTHER_LABEL}
         </Button>

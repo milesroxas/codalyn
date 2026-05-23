@@ -7,19 +7,23 @@ type DesignerViewBaseline = {
 
 /**
  * True after the user leaves and returns to the Designer (page or app mode change).
- * Matches the CMS Slots “Refresh CMS in Webflow” dialog return detection.
+ * Used by CMS Slots field-link dialog and image upload success refresh hints.
+ *
+ * Pass `resetToken` when re-arming detection without toggling `enabled` (e.g. reopening a dialog).
  */
-export function useDesignerViewReturnDetect(enabled: boolean): boolean {
+export function useDesignerViewReturnDetect(enabled: boolean, resetToken?: unknown): boolean {
   const [returned, setReturned] = useState(false);
   const baselineRef = useRef<DesignerViewBaseline | null>(null);
+  const sessionKey = enabled ? String(resetToken ?? 0) : "disabled";
 
   useEffect(() => {
-    if (!enabled) {
+    if (sessionKey === "disabled") {
       baselineRef.current = null;
       setReturned(false);
       return undefined;
     }
 
+    setReturned(false);
     let cancelled = false;
 
     void (async () => {
@@ -70,7 +74,7 @@ export function useDesignerViewReturnDetect(enabled: boolean): boolean {
       unsubPage();
       unsubMode();
     };
-  }, [enabled]);
+  }, [sessionKey]);
 
   return returned;
 }

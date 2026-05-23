@@ -1,85 +1,10 @@
 import type { ImageExportFormat, MaxSizeUnit, PresetCrudScope } from "@codalyn/webflow-kit";
-import type {
-  PresetFormAddableScope,
-  PresetFormExistingMatch,
-} from "@/features/image-editor/lib/image-editor-preset-form-existing";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
-import { ImagePageTargetScanListSection } from "@/features/image-editor/ui/image-editor-page-target-select-list";
 import { ImagePageTargetSurfaceSummary } from "@/features/image-editor/ui/image-editor-page-target-surface-summary";
-import {
-  ImageEditorTargetStepActions,
-  ImageEditorTargetStepScanButton,
-} from "@/features/image-editor/ui/image-editor-target-step-actions";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
-import { SurfaceSummaryCardFormFields } from "@/shared/ui/surface-summary-card";
-
-export function TargetPickSection(props: {
-  discoverySettled: boolean;
-  targets: ImagePageTarget[];
-  scanPending: boolean;
-  scanError: string | null;
-  pageScanned: boolean;
-  onRescan: () => void;
-  selectedTarget: ImagePageTarget | null;
-  onSelectTarget: (t: ImagePageTarget) => void;
-  surfaceTarget: ImagePageTarget | null;
-  existingPresets: PresetFormExistingMatch[];
-  addableScopes: PresetFormAddableScope[];
-  onEditPreset: (match: PresetFormExistingMatch) => void;
-  onAddPresetScope: (scope: PresetCrudScope) => void;
-}) {
-  const {
-    discoverySettled,
-    targets,
-    scanPending,
-    scanError,
-    pageScanned,
-    onRescan,
-    selectedTarget,
-    onSelectTarget,
-    surfaceTarget,
-    existingPresets,
-    addableScopes,
-    onEditPreset,
-    onAddPresetScope,
-  } = props;
-
-  return (
-    <div className="flex min-w-0 flex-col gap-3">
-      <ImageEditorTargetStepActions
-        onScanPage={onRescan}
-        pageScanned={pageScanned}
-        scanPending={scanPending}
-        showScanButton={false}
-        surface={{
-          addableScopes,
-          discoveryPending: !discoverySettled,
-          existingPresets,
-          onAddScope: onAddPresetScope,
-          onEditPreset,
-          target: surfaceTarget,
-        }}
-      />
-      {discoverySettled ? (
-        <ImagePageTargetScanListSection
-          idPrefix="preset-form-tgt"
-          onRescan={onRescan}
-          onSelectTarget={onSelectTarget}
-          pageScanned={pageScanned}
-          scanError={scanError}
-          scanPending={scanPending}
-          scrollable
-          selectedTarget={selectedTarget}
-          targets={targets}
-        />
-      ) : null}
-      <ImageEditorTargetStepScanButton onScanPage={onRescan} scanPending={scanPending} />
-    </div>
-  );
-}
 
 function PresetFormEncodingFields(props: {
   baseId: string;
@@ -207,7 +132,7 @@ export function PresetFormStep2(props: {
   const showSurfaceSummary = presetScope !== "site-default";
 
   return (
-    <SurfaceSummaryCardFormFields>
+    <>
       {showSurfaceSummary ? (
         <ImagePageTargetSurfaceSummary discoveryPending={surfaceDiscoveryPending} target={surfaceTarget} />
       ) : null}
@@ -264,6 +189,6 @@ export function PresetFormStep2(props: {
         formatDraft={formatDraft}
         setFormatDraft={setFormatDraft}
       />
-    </SurfaceSummaryCardFormFields>
+    </>
   );
 }

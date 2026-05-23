@@ -60,11 +60,12 @@ type ImageEditorConfigurationPresetsStepProps = {
   onDone: () => void;
   onFooterChange?: (footer: ReactNode | null) => void;
   onSubheaderChange?: (subheader: ReactNode | null) => void;
+  onScrollResetKeyChange?: (key: string | null) => void;
   className?: string;
 };
 
 export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurationPresetsStepProps) {
-  const { isGuest, onDone, onFooterChange, onSubheaderChange, className } = props;
+  const { isGuest, onDone, onFooterChange, onSubheaderChange, onScrollResetKeyChange, className } = props;
   const baseId = useId();
   const { settings, updateSettings, canManageTeamBeaconSettings } = useBeaconAppSettings();
   const [view, setView] = useState<View>("list");
@@ -454,6 +455,23 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
       onSubheaderChange?.(null);
     };
   }, [onSubheaderChange, subheader]);
+
+  const scrollResetKey = useMemo(() => {
+    if (view === "list") {
+      return "list";
+    }
+    if (isEditing) {
+      return "form:edit";
+    }
+    return `form:${formSubStep}`;
+  }, [formSubStep, isEditing, view]);
+
+  useEffect(() => {
+    onScrollResetKeyChange?.(scrollResetKey);
+    return () => {
+      onScrollResetKeyChange?.(null);
+    };
+  }, [onScrollResetKeyChange, scrollResetKey]);
 
   return (
     <div className={cn("flex min-w-0 flex-col gap-4", className)}>

@@ -1,4 +1,4 @@
-import type { VariantProps } from "class-variance-authority";
+import { cva, type VariantProps } from "class-variance-authority";
 import { ChevronLeft } from "lucide-react";
 import type * as React from "react";
 import type { ReactNode } from "react";
@@ -83,20 +83,33 @@ export function BeaconFeatureRouteScrollBody(props: BeaconFeatureRouteScrollBody
   );
 }
 
-export type BeaconFeatureRouteFooterProps = React.ComponentProps<"footer"> & {
-  children: ReactNode;
-  dataSlot?: string;
-};
+const beaconFeatureRouteFooterVariants = cva(
+  "mt-auto flex shrink-0 border-t border-border/65 bg-background px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.375rem)]",
+  {
+    variants: {
+      layout: {
+        default: "",
+        dockActions: "items-stretch gap-2",
+      },
+    },
+    defaultVariants: {
+      layout: "default",
+    },
+  }
+);
+
+export type BeaconFeatureRouteFooterProps = React.ComponentProps<"footer"> &
+  VariantProps<typeof beaconFeatureRouteFooterVariants> & {
+    children: ReactNode;
+    dataSlot?: string;
+  };
 
 export function BeaconFeatureRouteFooter(props: BeaconFeatureRouteFooterProps) {
-  const { children, dataSlot = "beacon_feature_route_footer", className, ...footerProps } = props;
+  const { children, dataSlot = "beacon_feature_route_footer", className, layout, ...footerProps } = props;
   return (
     <footer
       data-slot={dataSlot}
-      className={cn(
-        "mt-auto flex shrink-0 border-t border-border/65 bg-background px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.375rem)]",
-        className
-      )}
+      className={cn(beaconFeatureRouteFooterVariants({ layout }), className)}
       {...footerProps}
     >
       {children}

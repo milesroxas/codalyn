@@ -31,6 +31,7 @@ type ImageEditorPreimageColumnProps = {
   onDoneConfiguringPresets: () => void;
   onConfigurePresetsFooterChange?: (footer: ReactNode | null) => void;
   onConfigurePresetsSubheaderChange?: (subheader: ReactNode | null) => void;
+  onConfigurePresetsScrollResetKeyChange?: (key: string | null) => void;
   /** Auto path: element scan */
   autoTargets: ImagePageTarget[];
   autoScanPending: boolean;
@@ -64,6 +65,7 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
     onDoneConfiguringPresets,
     onConfigurePresetsFooterChange,
     onConfigurePresetsSubheaderChange,
+    onConfigurePresetsScrollResetKeyChange,
     autoTargets,
     autoScanPending,
     autoScanError,
@@ -98,6 +100,7 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
           onDone={onDoneConfiguringPresets}
           onFooterChange={onConfigurePresetsFooterChange}
           onSubheaderChange={onConfigurePresetsSubheaderChange}
+          onScrollResetKeyChange={onConfigurePresetsScrollResetKeyChange}
         />
       ) : null}
 

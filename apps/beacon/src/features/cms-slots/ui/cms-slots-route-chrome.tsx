@@ -435,14 +435,14 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
       return null;
     }
     return (
-      <BeaconFeatureRouteFooter dataSlot="cms_slots_dock" data-composer-only="" className="items-stretch gap-2">
+      <BeaconFeatureRouteFooter dataSlot="cms_slots_dock" data-composer-only="" layout="dockActions">
         {composerSaveButton}
       </BeaconFeatureRouteFooter>
     );
   }
 
   return (
-    <BeaconFeatureRouteFooter dataSlot="cms_slots_dock" className="items-stretch gap-2">
+    <BeaconFeatureRouteFooter dataSlot="cms_slots_dock" layout="dockActions">
       <nav className="flex min-w-0 flex-1 items-stretch gap-1.5" aria-label={CMS_SLOTS_AREA_NAV_LABEL}>
         <NavLink
           to="/cms-slots/engine"

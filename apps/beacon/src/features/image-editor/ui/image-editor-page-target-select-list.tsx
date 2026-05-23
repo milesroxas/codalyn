@@ -20,7 +20,6 @@ import {
   SurfaceSummaryCardMeta,
   SurfaceSummaryCardOptionRowChevron,
   SurfaceSummaryCardScanListError,
-  SurfaceSummaryCardScanListScroll,
   SurfaceSummaryCardScanListSection,
   SurfaceSummaryCardScanListSectionHeader,
   SurfaceSummaryCardScanListSectionLabel,
@@ -87,7 +86,6 @@ type ImagePageTargetScanListSectionProps = {
   onRescan: () => void;
   selectedTarget: ImagePageTarget | null;
   onSelectTarget: (target: ImagePageTarget) => void;
-  scrollable?: boolean;
 };
 
 function ImagePageTargetScanListHeader(props: { scanPending: boolean; onRescan: () => void }) {
@@ -135,34 +133,15 @@ function ImagePageTargetScanListMessages(props: {
 }
 
 export function ImagePageTargetScanListSection(props: ImagePageTargetScanListSectionProps) {
-  const {
-    idPrefix,
-    targets,
-    scanPending,
-    scanError,
-    pageScanned,
-    onRescan,
-    selectedTarget,
-    onSelectTarget,
-    scrollable = false,
-  } = props;
+  const { idPrefix, targets, scanPending, scanError, pageScanned, onRescan, selectedTarget, onSelectTarget } = props;
   const hasListRows = targets.length > 0;
 
   if (!pageScanned && !scanPending && !scanError) {
     return null;
   }
 
-  const list = (
-    <ImagePageTargetSelectList
-      idPrefix={idPrefix}
-      onSelectTarget={onSelectTarget}
-      selectedTarget={selectedTarget}
-      targets={targets}
-    />
-  );
-
   return (
-    <SurfaceSummaryCardScanListSection scrollable={scrollable && hasListRows}>
+    <SurfaceSummaryCardScanListSection>
       {pageScanned && (hasListRows || scanPending) ? (
         <ImagePageTargetScanListHeader onRescan={onRescan} scanPending={scanPending} />
       ) : null}
@@ -173,11 +152,12 @@ export function ImagePageTargetScanListSection(props: ImagePageTargetScanListSec
         targetCount={targets.length}
       />
       {hasListRows ? (
-        scrollable ? (
-          <SurfaceSummaryCardScanListScroll>{list}</SurfaceSummaryCardScanListScroll>
-        ) : (
-          list
-        )
+        <ImagePageTargetSelectList
+          idPrefix={idPrefix}
+          onSelectTarget={onSelectTarget}
+          selectedTarget={selectedTarget}
+          targets={targets}
+        />
       ) : null}
     </SurfaceSummaryCardScanListSection>
   );

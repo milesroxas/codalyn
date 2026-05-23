@@ -361,6 +361,7 @@ export function ImageEditor() {
   const [resolvedUploadTarget, setResolvedUploadTarget] = useState<ResolvedUploadTarget | null>(null);
   const [configurePresetsFooter, setConfigurePresetsFooter] = useState<ReactNode | null>(null);
   const [configurePresetsSubheader, setConfigurePresetsSubheader] = useState<ReactNode | null>(null);
+  const [configurePresetsScrollResetKey, setConfigurePresetsScrollResetKey] = useState<string | null>(null);
   const lastResolvedTargetInputKeyRef = useRef<string | null>(null);
   const resolvedTargetForInputKeyRef = useRef<string | null>(null);
   const lastUploadPresetTargetInputKeyRef = useRef<string | null>(null);
@@ -1471,7 +1472,15 @@ export function ImageEditor() {
   });
 
   return (
-    <ImageEditorRouteChrome scrollResetKey={flowStep} subheader={stepNavSubheader} footer={routeFooter}>
+    <ImageEditorRouteChrome
+      scrollResetKey={
+        flowStep === "configurePresets" && configurePresetsScrollResetKey
+          ? `configurePresets:${configurePresetsScrollResetKey}`
+          : flowStep
+      }
+      subheader={stepNavSubheader}
+      footer={routeFooter}
+    >
       <ImageEditorWorkspace
         emptyStateContent={
           showGuestOnboarding ? (
@@ -1500,6 +1509,7 @@ export function ImageEditor() {
               onDoneConfiguringPresets={finishConfigurePath}
               onConfigurePresetsFooterChange={setConfigurePresetsFooter}
               onConfigurePresetsSubheaderChange={setConfigurePresetsSubheader}
+              onConfigurePresetsScrollResetKeyChange={setConfigurePresetsScrollResetKey}
               flowStep={flowStep}
               handleDrag={handleDrag}
               handleDragState={handleDragState}

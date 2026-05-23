@@ -15,7 +15,7 @@ export type ImageEditorRouteChromeProps = {
   children: ReactNode;
   subheader?: ReactNode;
   footer?: ReactNode;
-  scrollResetKey?: string;
+  scrollResetKey?: string | number | boolean | null;
 };
 
 export function ImageEditorRouteChrome(props: ImageEditorRouteChromeProps) {
@@ -29,7 +29,7 @@ export function ImageEditorRouteChrome(props: ImageEditorRouteChromeProps) {
       subheader={routeSubheader}
       footer={
         footer ? (
-          <BeaconFeatureRouteFooter dataSlot="image_upload_route_footer" className="items-stretch gap-2">
+          <BeaconFeatureRouteFooter dataSlot="image_upload_route_footer" layout="dockActions">
             {footer}
           </BeaconFeatureRouteFooter>
         ) : null

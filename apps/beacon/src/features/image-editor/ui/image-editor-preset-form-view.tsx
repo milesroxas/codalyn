@@ -5,8 +5,20 @@ import type {
   PresetFormExistingMatch,
 } from "@/features/image-editor/lib/image-editor-preset-form-existing";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
-import { PresetFormStep2, TargetPickSection } from "@/features/image-editor/ui/image-editor-preset-form-fields";
+import { PresetFormStep2 } from "@/features/image-editor/ui/image-editor-preset-form-fields";
+import { ImageEditorTargetStepColumn } from "@/features/image-editor/ui/image-editor-target-step-column";
+import {
+  IMAGE_UPLOAD_PRESET_ADD_DESCRIPTION,
+  IMAGE_UPLOAD_PRESET_ADD_TITLE,
+  IMAGE_UPLOAD_PRESET_EDIT_DESCRIPTION,
+  IMAGE_UPLOAD_PRESET_EDIT_TITLE,
+} from "@/shared/lib/beacon-feature-route-copy";
 import { Button } from "@/shared/ui/button";
+import {
+  SurfaceSummaryCardFormFields,
+  SurfaceSummaryCardPageIntro,
+  SurfaceSummaryCardScanListError,
+} from "@/shared/ui/surface-summary-card";
 
 export function ImageEditorConfigurationPresetsFormView(props: {
   baseId: string;
@@ -85,64 +97,65 @@ export function ImageEditorConfigurationPresetsFormView(props: {
   const isEditing = editingId != null;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="space-y-1">
-        <h3 className="text-sm font-medium">{isEditing ? "Edit preset" : "Add preset"}</h3>
-        <p className="text-muted-foreground text-xs">
-          {isEditing ? "Update name and export settings for this preset." : "Configure export preset details."}
-        </p>
-      </div>
-      <div className="flex flex-col gap-4">
-        {formError ? <p className="text-destructive text-xs">{formError}</p> : null}
+    <SurfaceSummaryCardFormFields>
+      <SurfaceSummaryCardPageIntro
+        title={isEditing ? IMAGE_UPLOAD_PRESET_EDIT_TITLE : IMAGE_UPLOAD_PRESET_ADD_TITLE}
+        description={isEditing ? IMAGE_UPLOAD_PRESET_EDIT_DESCRIPTION : IMAGE_UPLOAD_PRESET_ADD_DESCRIPTION}
+      />
+      {formError ? <SurfaceSummaryCardScanListError>{formError}</SurfaceSummaryCardScanListError> : null}
 
-        {isEditing || formSubStep === 2 ? (
-          <PresetFormStep2
-            baseId={baseId}
-            formatDraft={formatDraft}
-            formatEnabled={formatEnabled}
-            hStr={hStr}
-            maxSizeStr={maxSizeStr}
-            maxSizeUnit={maxSizeUnit}
-            nameDraft={nameDraft}
-            presetScope={presetScope}
-            savePending={savePending}
-            setFormatDraft={setFormatDraft}
-            setFormatEnabled={setFormatEnabled}
-            setHStr={setHStr}
-            setMaxSizeStr={setMaxSizeStr}
-            setMaxSizeUnit={setMaxSizeUnit}
-            setNameDraft={setNameDraft}
-            setWStr={setWStr}
-            surfaceDiscoveryPending={!isEditing && !formDiscoverySettled}
-            surfaceTarget={presetFormSurfaceTarget}
-            wStr={wStr}
-          />
-        ) : null}
+      {isEditing || formSubStep === 2 ? (
+        <PresetFormStep2
+          baseId={baseId}
+          formatDraft={formatDraft}
+          formatEnabled={formatEnabled}
+          hStr={hStr}
+          maxSizeStr={maxSizeStr}
+          maxSizeUnit={maxSizeUnit}
+          nameDraft={nameDraft}
+          presetScope={presetScope}
+          savePending={savePending}
+          setFormatDraft={setFormatDraft}
+          setFormatEnabled={setFormatEnabled}
+          setHStr={setHStr}
+          setMaxSizeStr={setMaxSizeStr}
+          setMaxSizeUnit={setMaxSizeUnit}
+          setNameDraft={setNameDraft}
+          setWStr={setWStr}
+          surfaceDiscoveryPending={!isEditing && !formDiscoverySettled}
+          surfaceTarget={presetFormSurfaceTarget}
+          wStr={wStr}
+        />
+      ) : null}
 
-        {!isEditing && formSubStep === 1 ? (
-          <TargetPickSection
-            addableScopes={addableScopes}
-            discoverySettled={formDiscoverySettled}
-            existingPresets={existingPresets}
-            onAddPresetScope={onAddPresetScope}
-            onEditPreset={onEditPreset}
-            onRescan={formRescan}
-            onSelectTarget={formTargetSelect}
-            pageScanned={formPageScanned}
-            scanError={formScanError}
-            scanPending={formScanPending}
-            selectedTarget={formTarget}
-            surfaceTarget={surfaceTarget}
-            targets={formTargets}
-          />
-        ) : null}
+      {!isEditing && formSubStep === 1 ? (
+        <ImageEditorTargetStepColumn
+          discoverySettled={formDiscoverySettled}
+          idPrefix="preset-form-tgt"
+          onRescan={formRescan}
+          onSelectTarget={formTargetSelect}
+          pageScanned={formPageScanned}
+          scanButtonPlacement="trailing"
+          scanError={formScanError}
+          scanPending={formScanPending}
+          selectedTarget={formTarget}
+          surface={{
+            addableScopes,
+            discoveryPending: !formDiscoverySettled,
+            existingPresets,
+            onAddScope: onAddPresetScope,
+            onEditPreset,
+            target: surfaceTarget,
+          }}
+          targets={formTargets}
+        />
+      ) : null}
 
-        {isEditing && onRequestDelete ? (
-          <Button type="button" variant="destructive" size="sm" disabled={savePending} onClick={onRequestDelete}>
-            Delete preset
-          </Button>
-        ) : null}
-      </div>
-    </div>
+      {isEditing && onRequestDelete ? (
+        <Button type="button" variant="destructive" size="sm" disabled={savePending} onClick={onRequestDelete}>
+          Delete preset
+        </Button>
+      ) : null}
+    </SurfaceSummaryCardFormFields>
   );
 }

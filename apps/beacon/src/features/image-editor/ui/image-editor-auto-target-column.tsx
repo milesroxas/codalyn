@@ -1,6 +1,5 @@
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
-import { ImagePageTargetScanListSection } from "@/features/image-editor/ui/image-editor-page-target-select-list";
-import { ImageEditorTargetStepActions } from "@/features/image-editor/ui/image-editor-target-step-actions";
+import { ImageEditorTargetStepColumn } from "@/features/image-editor/ui/image-editor-target-step-column";
 
 type ImageEditorAutoTargetColumnProps = {
   discoverySettled: boolean;
@@ -32,31 +31,23 @@ export function ImageEditorAutoTargetColumn(props: ImageEditorAutoTargetColumnPr
   } = props;
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <ImageEditorTargetStepActions
-        hasCanvasImageTarget={hasCanvasImageTarget && discoverySettled}
-        onScanPage={onRescan}
-        onUseCanvasSelection={onUseCanvasSelection}
-        pageScanned={pageScanned}
-        scanPending={scanPending}
-        showUseSelection
-        surface={{
-          discoveryPending: !discoverySettled,
-          target: displaySurfaceTarget,
-        }}
-      />
-      {discoverySettled ? (
-        <ImagePageTargetScanListSection
-          idPrefix="auto-tgt"
-          onRescan={onRescan}
-          onSelectTarget={onSelectTarget}
-          pageScanned={pageScanned}
-          scanError={scanError}
-          scanPending={scanPending}
-          selectedTarget={selectedTarget}
-          targets={targets}
-        />
-      ) : null}
-    </div>
+    <ImageEditorTargetStepColumn
+      discoverySettled={discoverySettled}
+      hasCanvasImageTarget={hasCanvasImageTarget}
+      idPrefix="auto-tgt"
+      onRescan={onRescan}
+      onSelectTarget={onSelectTarget}
+      onUseCanvasSelection={onUseCanvasSelection}
+      pageScanned={pageScanned}
+      scanError={scanError}
+      scanPending={scanPending}
+      selectedTarget={selectedTarget}
+      showUseSelection
+      surface={{
+        discoveryPending: !discoverySettled,
+        target: displaySurfaceTarget,
+      }}
+      targets={targets}
+    />
   );
 }

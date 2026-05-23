@@ -23,6 +23,14 @@ export const IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_READY =
 
 export const IMAGE_UPLOAD_ADD_PRESET_LABEL = "Add preset";
 
+export const IMAGE_UPLOAD_PRESET_ADD_TITLE = "Add preset";
+
+export const IMAGE_UPLOAD_PRESET_EDIT_TITLE = "Edit preset";
+
+export const IMAGE_UPLOAD_PRESET_ADD_DESCRIPTION = "Configure export preset details.";
+
+export const IMAGE_UPLOAD_PRESET_EDIT_DESCRIPTION = "Update name and export settings for this preset.";
+
 /** Section heading for saved export presets (configure home grid). */
 export const IMAGE_UPLOAD_PRESETS_SECTION_LABEL = "Export presets";
 

@@ -2,7 +2,6 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
-import { ScrollArea } from "@/shared/ui/scroll-area";
 
 const surfaceSummaryCardVariants = cva("flex min-w-0 flex-col gap-2 rounded-sm border px-3 py-2.5 text-left", {
   variants: {
@@ -105,23 +104,14 @@ const surfaceSummaryCardSurfaceSummaryClass = "flex min-w-0 flex-col gap-2";
 const surfaceSummaryCardFormFieldsClass = "flex min-w-0 flex-col gap-4";
 
 const surfaceSummaryCardScanListSectionClass = "flex w-full min-w-0 flex-col gap-2";
-
-const surfaceSummaryCardScanListSectionVariants = cva(surfaceSummaryCardScanListSectionClass, {
-  variants: {
-    scrollable: {
-      true: "max-h-48 min-h-0 overflow-hidden",
-      false: "",
-    },
-  },
-  defaultVariants: {
-    scrollable: false,
-  },
-});
 const surfaceSummaryCardScanListSectionHeaderClass = "flex min-w-0 shrink-0 items-center justify-between gap-2";
 const surfaceSummaryCardScanListSectionLabelClass = "text-muted-foreground text-xs";
 const surfaceSummaryCardScanListStatusClass = "text-muted-foreground flex shrink-0 items-center gap-2 text-xs";
 const surfaceSummaryCardScanListErrorClass = "shrink-0 text-destructive text-xs";
-const surfaceSummaryCardScanListScrollClass = "h-44 w-full min-w-0 pr-2";
+
+const surfaceSummaryCardPageIntroClass = "space-y-1";
+const surfaceSummaryCardPageIntroTitleClass = "text-sm font-medium";
+const surfaceSummaryCardPageIntroDescriptionClass = "text-muted-foreground text-xs";
 
 const surfaceSummaryCardNestedCardListClass = "flex min-w-0 flex-col gap-2";
 
@@ -430,15 +420,11 @@ function SurfaceSummaryCardFormFields({ className, ...props }: React.ComponentPr
   );
 }
 
-function SurfaceSummaryCardScanListSection({
-  className,
-  scrollable = false,
-  ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardScanListSectionVariants>) {
+function SurfaceSummaryCardScanListSection({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="surface-summary-card-scan-list-section"
-      className={cn(surfaceSummaryCardScanListSectionVariants({ scrollable }), className)}
+      className={cn(surfaceSummaryCardScanListSectionClass, className)}
       {...props}
     />
   );
@@ -484,11 +470,14 @@ function SurfaceSummaryCardScanListError({ className, ...props }: React.Componen
   );
 }
 
-function SurfaceSummaryCardScanListScroll({ children }: { children: React.ReactNode }) {
+function SurfaceSummaryCardPageIntro(props: { title: string; description?: string }) {
+  const { title, description } = props;
+
   return (
-    <ScrollArea className={surfaceSummaryCardScanListScrollClass} data-slot="surface-summary-card-scan-list-scroll">
-      {children}
-    </ScrollArea>
+    <div data-slot="surface-summary-card-page-intro" className={surfaceSummaryCardPageIntroClass}>
+      <h3 className={surfaceSummaryCardPageIntroTitleClass}>{title}</h3>
+      {description ? <p className={surfaceSummaryCardPageIntroDescriptionClass}>{description}</p> : null}
+    </div>
   );
 }
 
@@ -512,12 +501,12 @@ export {
   SurfaceSummaryCardOptionRowChevron,
   SurfaceSummaryCardOptionRowCopy,
   SurfaceSummaryCardOptionRows,
+  SurfaceSummaryCardPageIntro,
   SurfaceSummaryCardPanel,
   SurfaceSummaryCardPanelSection,
   SurfaceSummaryCardPanelSectionLabel,
   SurfaceSummaryCardPending,
   SurfaceSummaryCardScanListError,
-  SurfaceSummaryCardScanListScroll,
   SurfaceSummaryCardScanListSection,
   SurfaceSummaryCardScanListSectionHeader,
   SurfaceSummaryCardScanListSectionLabel,

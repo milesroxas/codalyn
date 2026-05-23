@@ -24,6 +24,10 @@ import {
   presetFormExistingMatchToListRow,
 } from "@/features/image-editor/lib/image-editor-preset-form-existing";
 import { buildPresetScopeOptions } from "@/features/image-editor/lib/image-editor-preset-scope-options";
+import {
+  findImagePageTargetForPresetOnCurrentPage,
+  locatePresetTarget,
+} from "@/features/image-editor/lib/locate-preset-target";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { usePresetFormTargets } from "@/features/image-editor/model/use-image-editor-auto-targets";
 import { useResolvedImagePageTarget } from "@/features/image-editor/model/use-resolved-image-page-target";
@@ -34,6 +38,10 @@ import {
   type PresetListRow,
 } from "@/features/image-editor/ui/image-editor-preset-list-view";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
+import {
+  IMAGE_UPLOAD_PRESET_LOCATE_OPENED_COMPONENT_MESSAGE,
+  IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
+} from "@/shared/lib/beacon-feature-route-copy";
 import { cn } from "@/shared/lib/utils";
 import {
   AlertDialog,
@@ -83,6 +91,9 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   const [formError, setFormError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
   const saveInFlightRef = useRef(false);
+  const [locatePending, setLocatePending] = useState(false);
+  const locateInFlightRef = useRef(false);
+  const editTargetResolveGenRef = useRef(0);
   const [formTarget, setFormTarget] = useState<ImagePageTarget | null>(null);
   const [formSubStep, setFormSubStep] = useState<PresetFormSubStep>(1);
   const [presetPendingDelete, setPresetPendingDelete] = useState<PresetListRow | null>(null);
@@ -105,6 +116,11 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     const entries = listBeaconPresetStorageEntries(settings.imagePresetStorage);
     return new Map(entries.map((entry) => [entry.row.id, entry]));
   }, [settings.imagePresetStorage]);
+
+  const editingEntry = useMemo(
+    () => (editingId != null ? (presetEntriesById.get(editingId) ?? null) : null),
+    [editingId, presetEntriesById]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -146,6 +162,19 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
       setFormTarget(null);
     }
   }, [isForm]);
+
+  useEffect(() => {
+    if (!isForm || editingEntry == null || formTarget != null || pageId == null) {
+      return;
+    }
+    const gen = ++editTargetResolveGenRef.current;
+    void findImagePageTargetForPresetOnCurrentPage(editingEntry.row.targetKey).then((target) => {
+      if (gen !== editTargetResolveGenRef.current || target == null) {
+        return;
+      }
+      setFormTarget(target);
+    });
+  }, [editingEntry, formTarget, isForm, pageId]);
 
   useEffect(() => {
     if (view !== "list") {
@@ -250,6 +279,45 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     }
   }, []);
 
+  const onLocatePresetTarget = useCallback(() => {
+    if (locateInFlightRef.current || editingEntry == null) {
+      return;
+    }
+    locateInFlightRef.current = true;
+    setLocatePending(true);
+    setFormError(null);
+    void locatePresetTarget({
+      siteId,
+      targetKey: editingEntry.row.targetKey,
+    })
+      .then(async (result) => {
+        if (!result.ok) {
+          setFormError(result.error);
+          void webflow.notify({ type: "Error", message: result.error });
+          return;
+        }
+        if (result.target != null) {
+          editTargetResolveGenRef.current += 1;
+          await applyFormTarget(result.target);
+          void webflow.notify({
+            type: "Success",
+            message: IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
+          });
+          return;
+        }
+        if (result.navigatedToComponent) {
+          void webflow.notify({
+            type: "Success",
+            message: IMAGE_UPLOAD_PRESET_LOCATE_OPENED_COMPONENT_MESSAGE,
+          });
+        }
+      })
+      .finally(() => {
+        locateInFlightRef.current = false;
+        setLocatePending(false);
+      });
+  }, [applyFormTarget, editingEntry, siteId]);
+
   const displaySurfaceTarget = useMemo(
     () => resolveDisplayedSurfaceTarget(formSelectionHint, formTarget),
     [formSelectionHint, formTarget]
@@ -285,7 +353,6 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   }, []);
 
   const onSave = useCallback(() => {
-    const editingEntry = editingId ? (presetEntriesById.get(editingId) ?? null) : null;
     void commitImagePresetForm({
       saveInFlightRef,
       setFormError,
@@ -316,12 +383,12 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     maxSizeStr,
     maxSizeUnit,
     editingId,
+    editingEntry,
     presetScope,
     siteId,
     pageId,
     formTarget,
     formTargets,
-    presetEntriesById,
     updateSettings,
     backToList,
   ]);
@@ -487,6 +554,9 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
         <ImageEditorConfigurationPresetsFormView
           baseId={baseId}
           editingId={editingId}
+          editingTargetKey={editingEntry?.row.targetKey ?? null}
+          locatePending={locatePending}
+          onLocatePresetTarget={onLocatePresetTarget}
           formDiscoverySettled={formDiscoverySettled}
           formError={formError}
           formPageScanned={formPageScanned}

@@ -293,7 +293,7 @@ export async function commitImagePresetForm(args: CommitImagePresetFormArgs): Pr
       pageId,
       tagTarget,
     });
-    if (presetScope !== "site-default" && resolvedTargetForScope == null) {
+    if (presetScope !== "site-default" && resolvedTargetForScope == null && editingEntry == null) {
       setFormError("Could not resolve a valid preset target. Refresh and try again.");
       return;
     }

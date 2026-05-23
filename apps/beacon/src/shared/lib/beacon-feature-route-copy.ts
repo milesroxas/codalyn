@@ -31,6 +31,15 @@ export const IMAGE_UPLOAD_PRESET_ADD_DESCRIPTION = "Configure export preset deta
 
 export const IMAGE_UPLOAD_PRESET_EDIT_DESCRIPTION = "Update name and export settings for this preset.";
 
+export const IMAGE_UPLOAD_PRESET_LOCATE_COMPONENT_HINT =
+  "Open this component in the Designer to edit the bound image field.";
+
+export const IMAGE_UPLOAD_PRESET_LOCATE_INSTANCE_HINT = "Select the canvas element this preset is bound to.";
+
+export const IMAGE_UPLOAD_PRESET_LOCATE_OPENED_COMPONENT_MESSAGE = "Opened component in the Designer.";
+
+export const IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE = "Selected the preset target on the canvas.";
+
 /** Section heading for saved export presets (configure home grid). */
 export const IMAGE_UPLOAD_PRESETS_SECTION_LABEL = "Export presets";
 

@@ -1,4 +1,4 @@
-import type { ImageExportFormat, MaxSizeUnit, PresetCrudScope } from "@codalyn/webflow-kit";
+import type { ImageExportFormat, MaxSizeUnit, PresetCrudScope, PresetTargetKey } from "@codalyn/webflow-kit";
 import type { PresetFormSubStep } from "@/features/image-editor/lib/image-editor-preset-form-commit";
 import type {
   PresetFormAddableScope,
@@ -7,6 +7,7 @@ import type {
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { PresetFormStep2 } from "@/features/image-editor/ui/image-editor-preset-form-fields";
 import { ImageEditorTargetStepColumn } from "@/features/image-editor/ui/image-editor-target-step-column";
+import { PresetTargetLocateControl } from "@/features/image-editor/ui/preset-target-locate-control";
 import {
   IMAGE_UPLOAD_PRESET_ADD_DESCRIPTION,
   IMAGE_UPLOAD_PRESET_ADD_TITLE,
@@ -23,6 +24,9 @@ import {
 export function ImageEditorConfigurationPresetsFormView(props: {
   baseId: string;
   editingId: string | null;
+  editingTargetKey: PresetTargetKey | null;
+  locatePending: boolean;
+  onLocatePresetTarget: () => void;
   formSubStep: PresetFormSubStep;
   formError: string | null;
   savePending: boolean;
@@ -60,6 +64,9 @@ export function ImageEditorConfigurationPresetsFormView(props: {
   const {
     baseId,
     editingId,
+    editingTargetKey,
+    locatePending,
+    onLocatePresetTarget,
     formSubStep,
     formError,
     savePending,
@@ -103,6 +110,14 @@ export function ImageEditorConfigurationPresetsFormView(props: {
         description={isEditing ? IMAGE_UPLOAD_PRESET_EDIT_DESCRIPTION : IMAGE_UPLOAD_PRESET_ADD_DESCRIPTION}
       />
       {formError ? <SurfaceSummaryCardScanListError>{formError}</SurfaceSummaryCardScanListError> : null}
+
+      {isEditing && editingTargetKey != null ? (
+        <PresetTargetLocateControl
+          locatePending={locatePending}
+          onLocate={onLocatePresetTarget}
+          targetKey={editingTargetKey}
+        />
+      ) : null}
 
       {isEditing || formSubStep === 2 ? (
         <PresetFormStep2

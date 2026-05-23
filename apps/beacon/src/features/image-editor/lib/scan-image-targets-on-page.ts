@@ -73,7 +73,7 @@ async function tryPushScannedImageTarget(el: AnyElement, out: ImagePageTarget[])
  * {@link webflow.getAllElements} alone (see parent-graph notes in
  * `webflow-page-parent-map.ts`).
  */
-async function collectAllPageElementsForImageScan(): Promise<AnyElement[]> {
+export async function collectAllPageElementsForImageScan(): Promise<AnyElement[]> {
   const seed = await webflow.getAllElements();
   const seen = new Set<string>();
   const out: AnyElement[] = [];

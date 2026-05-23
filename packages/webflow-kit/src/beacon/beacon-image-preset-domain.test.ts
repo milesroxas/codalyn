@@ -6,8 +6,11 @@ import {
   buildPresetTargetKeyForScope,
   createBeaconPresetResolver,
   createSiteDefaultPresetTargetKey,
+  doesResolvedUploadTargetMatchPresetTargetKey,
   findBeaconPresetRowByTargetKey,
   formatBeaconPresetDisplayName,
+  formatBeaconPresetInstanceLocationLabel,
+  isInstancePresetTargetKey,
   listBeaconPresetStorageEntries,
   type PresetTargetKey,
   serializePresetTargetKey,
@@ -526,5 +529,77 @@ describe("preset storage listing helpers", () => {
     expect(entries).toHaveLength(2);
     expect(entries[0]?.scope).toBe("site-default");
     expect(formatBeaconPresetDisplayName(instance, "instance")).toBe(`${instance.name} (Instance)`);
+  });
+});
+
+describe("instance preset target helpers", () => {
+  it("identifies instance preset target keys", () => {
+    expect(
+      isInstancePresetTargetKey({
+        kind: "bare-image-instance",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+      })
+    ).toBe(true);
+    expect(isInstancePresetTargetKey({ kind: "site-default", siteId: "site_1" })).toBe(false);
+  });
+
+  it("matches resolved upload targets to instance preset keys", () => {
+    const key: PresetTargetKey = {
+      kind: "component-image-instance",
+      siteId: "site_1",
+      pageId: "page_1",
+      instanceElementId: "inst_1",
+      imagePropId: "hero-image",
+    };
+    expect(
+      doesResolvedUploadTargetMatchPresetTargetKey(
+        {
+          kind: "component-image",
+          siteId: "site_1",
+          pageId: "page_1",
+          instanceElementId: "inst_1",
+          componentDefinitionId: "cmp_1",
+          imagePropId: "hero-image",
+          tagged: null,
+        },
+        key
+      )
+    ).toBe(true);
+  });
+
+  it("formats collection template location labels", () => {
+    expect(
+      formatBeaconPresetInstanceLocationLabel({
+        pageId: "page_1",
+        pageName: "Blog post collection",
+        pageKind: "cms",
+        collectionId: "col_1",
+      })
+    ).toBe("Blog Post Template");
+    expect(
+      formatBeaconPresetInstanceLocationLabel({
+        pageId: "page_1",
+        pageName: "Blog Posts Collection Template",
+        pageKind: "cms",
+        collectionId: "col_1",
+      })
+    ).toBe("Blog Posts Template");
+    expect(
+      formatBeaconPresetInstanceLocationLabel({
+        pageId: "page_1",
+        pageName: "Collection template · Blog posts",
+        pageKind: "cms",
+        collectionId: "col_1",
+      })
+    ).toBe("Blog Posts Template");
+    expect(
+      formatBeaconPresetInstanceLocationLabel({
+        pageId: "page_1",
+        pageName: "Blog Posts Collection Template",
+        pageKind: "static",
+      })
+    ).toBe("Blog Posts Template");
   });
 });

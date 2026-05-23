@@ -67,4 +67,17 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-export { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle };
+const formFieldsCardContentClass = "flex min-w-0 flex-col gap-4 pt-0";
+
+/** Compact card shell for stacked form controls (inputs, selects, checkboxes). */
+function FormFieldsCard(props: { children: React.ReactNode }) {
+  return (
+    <Card size="sm" data-slot="form-fields-card">
+      <CardContent data-slot="form-fields-card-content" className={formFieldsCardContentClass}>
+        {props.children}
+      </CardContent>
+    </Card>
+  );
+}
+
+export { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, FormFieldsCard };

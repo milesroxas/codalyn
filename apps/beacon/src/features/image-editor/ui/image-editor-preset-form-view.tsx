@@ -25,6 +25,7 @@ export function ImageEditorConfigurationPresetsFormView(props: {
   baseId: string;
   editingId: string | null;
   editingTargetKey: PresetTargetKey | null;
+  instanceLocationLabel: string | null;
   locatePending: boolean;
   onLocatePresetTarget: () => void;
   formSubStep: PresetFormSubStep;
@@ -65,6 +66,7 @@ export function ImageEditorConfigurationPresetsFormView(props: {
     baseId,
     editingId,
     editingTargetKey,
+    instanceLocationLabel,
     locatePending,
     onLocatePresetTarget,
     formSubStep,
@@ -113,6 +115,7 @@ export function ImageEditorConfigurationPresetsFormView(props: {
 
       {isEditing && editingTargetKey != null ? (
         <PresetTargetLocateControl
+          instanceLocationLabel={instanceLocationLabel}
           locatePending={locatePending}
           onLocate={onLocatePresetTarget}
           targetKey={editingTargetKey}

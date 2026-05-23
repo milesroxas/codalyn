@@ -1,6 +1,7 @@
 import {
   BEACON_PRESET_DEFAULT_MAX_FILE_BYTES,
   formatBeaconPresetDisplayName,
+  formatBeaconPresetInstanceLocationLabel,
   type ImageExportFormat,
   listBeaconPresetStorageEntries,
   type MaxSizeUnit,
@@ -26,6 +27,7 @@ import {
 import { buildPresetScopeOptions } from "@/features/image-editor/lib/image-editor-preset-scope-options";
 import {
   findImagePageTargetForPresetOnCurrentPage,
+  getPresetLocateAction,
   locatePresetTarget,
 } from "@/features/image-editor/lib/locate-preset-target";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
@@ -39,6 +41,7 @@ import {
 } from "@/features/image-editor/ui/image-editor-preset-list-view";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import {
+  IMAGE_UPLOAD_PRESET_EDIT_OPENING_LOCATION_MESSAGE,
   IMAGE_UPLOAD_PRESET_LOCATE_OPENED_COMPONENT_MESSAGE,
   IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
 } from "@/shared/lib/beacon-feature-route-copy";
@@ -221,25 +224,6 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     setView("form");
   }, [settings.defaultExportFormat]);
 
-  const openEdit = useCallback(
-    (p: PresetListRow, options?: { pageTarget?: ImagePageTarget | null }) => {
-      setEditingId(p.id);
-      setNameDraft(p.name);
-      setWStr(String(p.width));
-      setHStr(String(p.height));
-      setFormatEnabled(p.exportFormat !== undefined);
-      setFormatDraft(p.exportFormat ?? settings.defaultExportFormat);
-      const maxDraft = maxBytesToDraft(p.maxFileSizeBytes);
-      setMaxSizeStr(maxDraft.value);
-      setMaxSizeUnit(maxDraft.unit);
-      setPresetScope(p.scope);
-      setFormError(null);
-      setFormTarget(options?.pageTarget ?? null);
-      setView("form");
-    },
-    [settings.defaultExportFormat]
-  );
-
   const onDeletePreset = useCallback(
     async (id: string) => {
       const result = await updateSettings((prev) => {
@@ -279,18 +263,19 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     }
   }, []);
 
-  const onLocatePresetTarget = useCallback(() => {
-    if (locateInFlightRef.current || editingEntry == null) {
-      return;
-    }
-    locateInFlightRef.current = true;
-    setLocatePending(true);
-    setFormError(null);
-    void locatePresetTarget({
-      siteId,
-      targetKey: editingEntry.row.targetKey,
-    })
-      .then(async (result) => {
+  const runPresetLocate = useCallback(
+    async (input: { targetKey: NonNullable<typeof editingEntry>["row"]["targetKey"]; notifyOnSuccess?: boolean }) => {
+      if (locateInFlightRef.current) {
+        return;
+      }
+      locateInFlightRef.current = true;
+      setLocatePending(true);
+      setFormError(null);
+      try {
+        const result = await locatePresetTarget({
+          siteId,
+          targetKey: input.targetKey,
+        });
         if (!result.ok) {
           setFormError(result.error);
           void webflow.notify({ type: "Error", message: result.error });
@@ -299,24 +284,67 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
         if (result.target != null) {
           editTargetResolveGenRef.current += 1;
           await applyFormTarget(result.target);
-          void webflow.notify({
-            type: "Success",
-            message: IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
-          });
+          if (input.notifyOnSuccess) {
+            void webflow.notify({
+              type: "Success",
+              message: IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
+            });
+          }
           return;
         }
-        if (result.navigatedToComponent) {
+        if (result.navigatedToComponent && input.notifyOnSuccess) {
           void webflow.notify({
             type: "Success",
             message: IMAGE_UPLOAD_PRESET_LOCATE_OPENED_COMPONENT_MESSAGE,
           });
         }
-      })
-      .finally(() => {
+      } finally {
         locateInFlightRef.current = false;
         setLocatePending(false);
+      }
+    },
+    [applyFormTarget, siteId]
+  );
+
+  const openEdit = useCallback(
+    (p: PresetListRow, options?: { pageTarget?: ImagePageTarget | null; skipAutoLocate?: boolean }) => {
+      const entry = presetEntriesById.get(p.id) ?? null;
+      setEditingId(p.id);
+      setNameDraft(p.name);
+      setWStr(String(p.width));
+      setHStr(String(p.height));
+      setFormatEnabled(p.exportFormat !== undefined);
+      setFormatDraft(p.exportFormat ?? settings.defaultExportFormat);
+      const maxDraft = maxBytesToDraft(p.maxFileSizeBytes);
+      setMaxSizeStr(maxDraft.value);
+      setMaxSizeUnit(maxDraft.unit);
+      setPresetScope(p.scope);
+      setFormError(null);
+      setFormTarget(options?.pageTarget ?? null);
+      setView("form");
+
+      if (options?.skipAutoLocate || options?.pageTarget != null || entry == null) {
+        return;
+      }
+      const action = getPresetLocateAction(entry.row.targetKey);
+      if (action.kind === "none") {
+        return;
+      }
+      void webflow.notify({
+        type: "Info",
+        message: IMAGE_UPLOAD_PRESET_EDIT_OPENING_LOCATION_MESSAGE,
       });
-  }, [applyFormTarget, editingEntry, siteId]);
+      void runPresetLocate({ targetKey: entry.row.targetKey, notifyOnSuccess: true });
+    },
+    [presetEntriesById, runPresetLocate, settings.defaultExportFormat]
+  );
+
+  const onLocatePresetTarget = useCallback(() => {
+    if (editingEntry == null) {
+      return;
+    }
+    void runPresetLocate({ targetKey: editingEntry.row.targetKey, notifyOnSuccess: true });
+  }, [editingEntry, runPresetLocate]);
 
   const displaySurfaceTarget = useMemo(
     () => resolveDisplayedSurfaceTarget(formSelectionHint, formTarget),
@@ -425,7 +453,10 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
 
   const onEditPresetFromMatch = useCallback(
     (match: PresetFormExistingMatch) => {
-      openEdit(presetFormExistingMatchToListRow(match), { pageTarget: displaySurfaceTarget });
+      openEdit(presetFormExistingMatchToListRow(match), {
+        pageTarget: displaySurfaceTarget,
+        skipAutoLocate: true,
+      });
     },
     [displaySurfaceTarget, openEdit]
   );
@@ -540,6 +571,11 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     };
   }, [onScrollResetKeyChange, scrollResetKey]);
 
+  const editingInstanceLocationLabel = useMemo(() => {
+    const location = editingEntry?.row.instanceLocation;
+    return location != null ? formatBeaconPresetInstanceLocationLabel(location) : null;
+  }, [editingEntry?.row.instanceLocation]);
+
   return (
     <div className={cn("flex min-w-0 flex-col gap-4", className)}>
       {view === "list" ? (
@@ -555,6 +591,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
           baseId={baseId}
           editingId={editingId}
           editingTargetKey={editingEntry?.row.targetKey ?? null}
+          instanceLocationLabel={editingInstanceLocationLabel}
           locatePending={locatePending}
           onLocatePresetTarget={onLocatePresetTarget}
           formDiscoverySettled={formDiscoverySettled}

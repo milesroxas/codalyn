@@ -31,6 +31,13 @@ export const BEACON_PRESET_DEFAULT_MAX_FILE_BYTES = 100 * 1024;
 export const BEACON_PRESET_MAX_FILE_BYTES_MIN = 1024;
 export const BEACON_PRESET_MAX_FILE_BYTES_MAX = 50 * 1024 * 1024;
 
+const beaconPresetInstanceLocationSchema = z.object({
+  pageId: z.string().min(1),
+  pageName: z.string().min(1),
+  pageKind: z.enum(["static", "cms"]),
+  collectionId: z.string().min(1).optional(),
+});
+
 const beaconImagePresetRowSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -40,6 +47,7 @@ const beaconImagePresetRowSchema = z.object({
   exportFormat: WEBP_AVIF.optional(),
   /** Export must not exceed this encoded size when the preset is active (bytes). */
   maxFileSizeBytes: z.number().int().min(BEACON_PRESET_MAX_FILE_BYTES_MIN).max(BEACON_PRESET_MAX_FILE_BYTES_MAX),
+  instanceLocation: beaconPresetInstanceLocationSchema.optional(),
 });
 
 const beaconPresetTargetKeySchema = z.custom<BeaconPresetRow["targetKey"]>(isPresetTargetKey);

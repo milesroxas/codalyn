@@ -17,7 +17,30 @@ const surfaceSummaryCardVariants = cva("flex min-w-0 flex-col gap-2 rounded-sm b
 
 const surfaceSummaryCardLabelClass = "text-[11px] font-medium text-muted-foreground";
 const surfaceSummaryCardTitleClass = "text-sm font-medium leading-snug";
-const surfaceSummaryCardMetaClass = "text-muted-foreground text-[10px] leading-snug";
+const surfaceSummaryCardMetaVariants = cva("leading-snug", {
+  variants: {
+    emphasis: {
+      default: "text-muted-foreground text-[10px]",
+      hint: "text-muted-foreground text-xs leading-relaxed",
+      prominent: "text-sm font-semibold text-foreground",
+    },
+  },
+  defaultVariants: {
+    emphasis: "default",
+  },
+});
+
+const surfaceSummaryCardActionRowVariants = cva("flex min-w-0 items-center justify-between gap-2", {
+  variants: {
+    prominence: {
+      default: "",
+      elevated: "rounded-md border border-border/70 bg-muted/25 px-3 py-2.5",
+    },
+  },
+  defaultVariants: {
+    prominence: "default",
+  },
+});
 const surfaceSummaryCardEmptyClass = "text-muted-foreground text-xs leading-relaxed";
 const surfaceSummaryCardPendingClass = "text-muted-foreground flex items-center gap-2 text-xs leading-relaxed";
 const surfaceSummaryCardSectionLabelClass = "text-[10px] font-medium text-muted-foreground";
@@ -97,6 +120,8 @@ const surfaceSummaryCardSelectRowVariants = cva(
   }
 );
 
+const surfaceSummaryCardSurfaceDisplayClass = "flex min-w-0 w-full items-center gap-3 text-left";
+
 const surfaceSummaryCardSelectRowListClass = "flex min-w-0 flex-col gap-2";
 
 const surfaceSummaryCardSurfaceSummaryClass = "flex min-w-0 flex-col gap-2";
@@ -145,8 +170,18 @@ function SurfaceSummaryCardTitle({ className, ...props }: React.ComponentProps<"
   );
 }
 
-function SurfaceSummaryCardMeta({ className, ...props }: React.ComponentProps<"p">) {
-  return <p data-slot="surface-summary-card-meta" className={cn(surfaceSummaryCardMetaClass, className)} {...props} />;
+function SurfaceSummaryCardMeta({
+  className,
+  emphasis,
+  ...props
+}: React.ComponentProps<"p"> & VariantProps<typeof surfaceSummaryCardMetaVariants>) {
+  return (
+    <p
+      data-slot="surface-summary-card-meta"
+      className={cn(surfaceSummaryCardMetaVariants({ emphasis }), className)}
+      {...props}
+    />
+  );
 }
 
 function SurfaceSummaryCardPending({ className, ...props }: React.ComponentProps<"p">) {
@@ -181,11 +216,15 @@ function SurfaceSummaryCardSectionLabel({ className, ...props }: React.Component
   );
 }
 
-function SurfaceSummaryCardActionRow({ className, ...props }: React.ComponentProps<"div">) {
+function SurfaceSummaryCardActionRow({
+  className,
+  prominence,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardActionRowVariants>) {
   return (
     <div
       data-slot="surface-summary-card-action-row"
-      className={cn("flex min-w-0 items-center justify-between gap-2", className)}
+      className={cn(surfaceSummaryCardActionRowVariants({ prominence }), className)}
       {...props}
     />
   );
@@ -375,16 +414,11 @@ function SurfaceSummaryCardSelectRow({
   );
 }
 
-function SurfaceSummaryCardSurfaceDisplay({
-  className,
-  selected = true,
-  ...props
-}: React.ComponentProps<"div"> & Pick<VariantProps<typeof surfaceSummaryCardSelectRowVariants>, "selected">) {
+function SurfaceSummaryCardSurfaceDisplay({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="surface-summary-card-surface-display"
-      data-selected={selected ? "true" : "false"}
-      className={cn(surfaceSummaryCardSelectRowVariants({ selected, interactive: false }), className)}
+      className={cn(surfaceSummaryCardSurfaceDisplayClass, className)}
       {...props}
     />
   );

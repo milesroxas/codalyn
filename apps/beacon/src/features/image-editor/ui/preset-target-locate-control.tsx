@@ -14,26 +14,29 @@ import {
 
 type PresetTargetLocateControlProps = {
   targetKey: PresetTargetKey;
+  instanceLocationLabel: string | null;
   locatePending: boolean;
   onLocate: () => void;
 };
 
 export function PresetTargetLocateControl(props: PresetTargetLocateControlProps) {
-  const { targetKey, locatePending, onLocate } = props;
+  const { targetKey, instanceLocationLabel, locatePending, onLocate } = props;
   const action = getPresetLocateAction(targetKey);
   if (action.kind === "none") {
     return null;
   }
 
   const hint =
-    action.kind === "open-component"
+    instanceLocationLabel ??
+    (action.kind === "open-component"
       ? IMAGE_UPLOAD_PRESET_LOCATE_COMPONENT_HINT
-      : IMAGE_UPLOAD_PRESET_LOCATE_INSTANCE_HINT;
+      : IMAGE_UPLOAD_PRESET_LOCATE_INSTANCE_HINT);
+  const hasLocationLabel = instanceLocationLabel != null;
 
   return (
-    <SurfaceSummaryCardActionRow>
+    <SurfaceSummaryCardActionRow prominence={hasLocationLabel ? "elevated" : "default"}>
       <SurfaceSummaryCardActionCopy>
-        <SurfaceSummaryCardMeta>{hint}</SurfaceSummaryCardMeta>
+        <SurfaceSummaryCardMeta emphasis={hasLocationLabel ? "prominent" : "hint"}>{hint}</SurfaceSummaryCardMeta>
       </SurfaceSummaryCardActionCopy>
       <Button
         type="button"

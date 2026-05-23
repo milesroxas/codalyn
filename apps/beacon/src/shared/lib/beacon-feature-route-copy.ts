@@ -40,6 +40,14 @@ export const IMAGE_UPLOAD_PRESET_LOCATE_OPENED_COMPONENT_MESSAGE = "Opened compo
 
 export const IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE = "Selected the preset target on the canvas.";
 
+export const IMAGE_UPLOAD_PRESET_EDIT_INSTANCE_TARGET_REQUIRED_MESSAGE =
+  "Find this preset's canvas target before saving.";
+
+export const IMAGE_UPLOAD_PRESET_EDIT_INSTANCE_MISMATCH_MESSAGE =
+  "The selected element does not match this preset's saved instance. Use Find on canvas.";
+
+export const IMAGE_UPLOAD_PRESET_EDIT_OPENING_LOCATION_MESSAGE = "Opening preset location in the Designer…";
+
 /** Section heading for saved export presets (configure home grid). */
 export const IMAGE_UPLOAD_PRESETS_SECTION_LABEL = "Export presets";
 

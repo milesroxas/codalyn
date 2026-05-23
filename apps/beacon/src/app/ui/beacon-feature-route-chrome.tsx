@@ -37,9 +37,9 @@ export function BeaconFeatureRouteHeader(props: BeaconFeatureRouteHeaderProps) {
       <div className={cn(beaconPanelContainClass, "flex h-8 items-center gap-2 px-3")}>
         <Button
           type="button"
-          variant="ghost"
+          variant="routeHeaderBack"
           size="icon-sm"
-          className="-ml-1 shrink-0 text-foreground"
+          className="-ml-1 shrink-0"
           aria-label={backAriaLabel}
           onClick={() => void (onBack ? onBack() : navigate("/home"))}
         >

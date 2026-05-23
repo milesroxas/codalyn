@@ -1,6 +1,7 @@
 import type { ImageExportFormat, MaxSizeUnit, PresetCrudScope } from "@codalyn/webflow-kit";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { ImagePageTargetSurfaceSummary } from "@/features/image-editor/ui/image-editor-page-target-surface-summary";
+import { FormFieldsCard } from "@/shared/ui/card";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -132,7 +133,7 @@ export function PresetFormStep2(props: {
   const showSurfaceSummary = presetScope !== "site-default";
 
   return (
-    <>
+    <FormFieldsCard>
       {showSurfaceSummary ? (
         <ImagePageTargetSurfaceSummary discoveryPending={surfaceDiscoveryPending} target={surfaceTarget} />
       ) : null}
@@ -189,6 +190,6 @@ export function PresetFormStep2(props: {
         formatDraft={formatDraft}
         setFormatDraft={setFormatDraft}
       />
-    </>
+    </FormFieldsCard>
   );
 }

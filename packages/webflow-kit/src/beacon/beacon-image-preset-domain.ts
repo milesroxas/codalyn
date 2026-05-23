@@ -56,6 +56,15 @@ export type PresetTargetKey =
 
 export type PresetTargetKeyString = string & { readonly __brand: "PresetTargetKeyString" };
 
+/** Designer page context captured when an instance-scoped preset is saved. */
+export type BeaconPresetInstanceLocation = {
+  pageId: string;
+  pageName: string;
+  pageKind: "static" | "cms";
+  /** Present when {@link pageKind} is `"cms"` (collection template page). */
+  collectionId?: string;
+};
+
 export type BeaconPresetRow = {
   id: string;
   targetKey: PresetTargetKey;
@@ -64,6 +73,8 @@ export type BeaconPresetRow = {
   height: number;
   exportFormat?: "webp" | "avif";
   maxFileSizeBytes: number;
+  /** Where the instance preset was saved; used for navigation and edit validation. */
+  instanceLocation?: BeaconPresetInstanceLocation;
 };
 
 export type BeaconPresetSettingsSnapshot = {
@@ -598,4 +609,88 @@ export function listBeaconPresetStorageEntries(storage: {
 
 export function formatBeaconPresetDisplayName(row: BeaconPresetRow, scope: PresetCrudScope): string {
   return `${row.name} (${labelForPresetCrudScope(scope)})`;
+}
+
+export function isInstancePresetTargetKey(
+  key: PresetTargetKey
+): key is BareImageInstancePresetTargetKey | ComponentImageInstancePresetTargetKey {
+  return key.kind === "bare-image-instance" || key.kind === "component-image-instance";
+}
+
+export function readPageIdFromInstancePresetTargetKey(
+  key: BareImageInstancePresetTargetKey | ComponentImageInstancePresetTargetKey
+): string {
+  return key.pageId;
+}
+
+export function doesResolvedUploadTargetMatchPresetTargetKey(
+  resolved: Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }>,
+  key: PresetTargetKey
+): boolean {
+  if (key.kind === "bare-image-instance") {
+    return (
+      resolved.kind === "bare-image" &&
+      resolved.siteId === key.siteId &&
+      resolved.pageId === key.pageId &&
+      resolved.elementId === key.elementId
+    );
+  }
+  if (key.kind === "component-image-instance") {
+    return (
+      resolved.kind === "component-image" &&
+      resolved.siteId === key.siteId &&
+      resolved.pageId === key.pageId &&
+      resolved.instanceElementId === key.instanceElementId &&
+      resolved.imagePropId === key.imagePropId
+    );
+  }
+  if (key.kind === "bare-image-element") {
+    return resolved.kind === "bare-image" && resolved.siteId === key.siteId;
+  }
+  if (key.kind === "component-image") {
+    return (
+      resolved.kind === "component-image" &&
+      resolved.siteId === key.siteId &&
+      resolved.componentDefinitionId === key.componentDefinitionId &&
+      resolved.imagePropId === key.imagePropId
+    );
+  }
+  if (key.kind === "site-default") {
+    return resolved.siteId === key.siteId;
+  }
+  return false;
+}
+
+function toTitleCaseWords(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter((word) => word.length > 0)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function looksLikeCmsCollectionTemplatePageName(pageName: string): boolean {
+  return /\bcollection(\s+template)?\b/i.test(pageName);
+}
+
+function formatCmsCollectionTemplateLocationLabel(pageName: string): string {
+  let base = pageName.trim();
+  if (base.length === 0) {
+    return "Template";
+  }
+  base = base.replace(/^collection\s+template\s*[·•\-–—:]\s*/i, "");
+  base = base.replace(/\s+collection(\s+template)?$/i, "");
+  base = base.replace(/\s+template$/i, "");
+  base = base.trim();
+  if (base.length === 0) {
+    return "Template";
+  }
+  return `${toTitleCaseWords(base)} Template`;
+}
+
+export function formatBeaconPresetInstanceLocationLabel(location: BeaconPresetInstanceLocation): string {
+  if (location.pageKind === "cms" || looksLikeCmsCollectionTemplatePageName(location.pageName)) {
+    return formatCmsCollectionTemplateLocationLabel(location.pageName);
+  }
+  return location.pageName;
 }

@@ -4,11 +4,16 @@ import {
   buildPresetTargetKeyForScope,
   createBeaconPresetResolver,
   createSiteDefaultPresetTargetKey,
+  doesResolvedUploadTargetMatchPresetTargetKey,
   draftToMaxBytes,
   type ImageExportFormat,
+  inferPresetCrudScopeFromTargetKey,
+  isInstancePresetTargetKey,
   type MaxSizeUnit,
   type PresetCrudScope,
+  type PresetTargetKey,
   type ResolvedUploadTarget,
+  readPageIdFromInstancePresetTargetKey,
   serializePresetTargetKey,
 } from "@codalyn/webflow-kit";
 import type { MutableRefObject } from "react";
@@ -19,6 +24,7 @@ import {
   mapSelectedTargetToResolvedUploadTarget,
   toBeaconPresetSettingsSnapshot,
 } from "@/features/image-editor/lib/image-editor-resolved-target";
+import { readPresetInstanceLocationForPage } from "@/features/image-editor/lib/preset-instance-location";
 import {
   getSelectedImageTargetHint,
   type ImagePageTarget,
@@ -28,12 +34,21 @@ import type {
   BeaconSettingsUpdateResult,
 } from "@/features/settings/model/beacon-app-settings-provider";
 
+import {
+  IMAGE_UPLOAD_PRESET_EDIT_INSTANCE_MISMATCH_MESSAGE,
+  IMAGE_UPLOAD_PRESET_EDIT_INSTANCE_TARGET_REQUIRED_MESSAGE,
+} from "@/shared/lib/beacon-feature-route-copy";
+
 async function resolvePresetTagTarget(
   picked: ImagePageTarget | null,
-  scanned: ImagePageTarget[]
+  scanned: ImagePageTarget[],
+  options?: { requireExplicitTarget?: boolean }
 ): Promise<ImagePageTarget | null> {
   if (picked) {
     return picked;
+  }
+  if (options?.requireExplicitTarget) {
+    return null;
   }
   const hint = await getSelectedImageTargetHint(scanned);
   if (hint.kind === "image" || hint.kind === "component") {
@@ -103,6 +118,41 @@ async function resolveScopeTargetForSave(input: {
   return resolvedTarget;
 }
 
+async function attachInstanceLocationToPresetRow(
+  row: BeaconPresetRow,
+  scope: PresetCrudScope,
+  targetKey: PresetTargetKey
+): Promise<BeaconPresetRow> {
+  if (scope !== "instance" || !isInstancePresetTargetKey(targetKey)) {
+    return row;
+  }
+  const location = await readPresetInstanceLocationForPage(readPageIdFromInstancePresetTargetKey(targetKey));
+  if (location == null) {
+    return row;
+  }
+  return { ...row, instanceLocation: location };
+}
+
+export function validateInstancePresetEditTarget(input: {
+  editingEntry: BeaconPresetStorageEntry | null;
+  resolvedTargetForScope: Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }> | null;
+}): string | null {
+  const { editingEntry, resolvedTargetForScope } = input;
+  if (editingEntry == null) {
+    return null;
+  }
+  if (inferPresetCrudScopeFromTargetKey(editingEntry.row) !== "instance") {
+    return null;
+  }
+  if (resolvedTargetForScope == null) {
+    return IMAGE_UPLOAD_PRESET_EDIT_INSTANCE_TARGET_REQUIRED_MESSAGE;
+  }
+  if (!doesResolvedUploadTargetMatchPresetTargetKey(resolvedTargetForScope, editingEntry.row.targetKey)) {
+    return IMAGE_UPLOAD_PRESET_EDIT_INSTANCE_MISMATCH_MESSAGE;
+  }
+  return null;
+}
+
 async function savePreset(args: {
   siteId: string;
   editingEntry: BeaconPresetStorageEntry | null;
@@ -125,7 +175,7 @@ async function savePreset(args: {
   }
 
   let validationResult: { ok: true } | { ok: false; error: string } = { ok: true };
-  const nextRow: BeaconPresetRow = {
+  let nextRow: BeaconPresetRow = {
     id: nextId,
     name: draft.name,
     width: draft.width,
@@ -134,6 +184,7 @@ async function savePreset(args: {
     maxFileSizeBytes: draft.maxFileSizeBytes,
     targetKey: nextTargetKey,
   };
+  nextRow = await attachInstanceLocationToPresetRow(nextRow, presetScope, nextTargetKey);
 
   const syncResult = await updateSettings((prev) => {
     const duplicateResult = createBeaconPresetResolver().assertUniqueTarget(
@@ -277,7 +328,9 @@ export async function commitImagePresetForm(args: CommitImagePresetFormArgs): Pr
   saveInFlightRef.current = true;
   setSavePending(true);
   try {
-    const tagTarget = await resolvePresetTagTarget(formTarget, formTargets);
+    const requireExplicitTarget =
+      editingEntry != null && inferPresetCrudScopeFromTargetKey(editingEntry.row) === "instance";
+    const tagTarget = await resolvePresetTagTarget(formTarget, formTargets, { requireExplicitTarget });
     const targetValidationError = validationErrorForTagTarget({
       editingId,
       presetScope,
@@ -293,6 +346,14 @@ export async function commitImagePresetForm(args: CommitImagePresetFormArgs): Pr
       pageId,
       tagTarget,
     });
+    const instanceEditValidationError = validateInstancePresetEditTarget({
+      editingEntry,
+      resolvedTargetForScope,
+    });
+    if (instanceEditValidationError != null) {
+      setFormError(instanceEditValidationError);
+      return;
+    }
     if (presetScope !== "site-default" && resolvedTargetForScope == null && editingEntry == null) {
       setFormError("Could not resolve a valid preset target. Refresh and try again.");
       return;

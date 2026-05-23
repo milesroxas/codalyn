@@ -1,7 +1,6 @@
 import { ArrowLeft } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { HeaderLogo } from "@/app/ui/Header";
-import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { GuestSettingsUpsell } from "@/features/settings/ui/guest-settings-upsell";
 import { SettingsPanelSkeleton } from "@/features/settings/ui/settings-panel-skeleton";
@@ -15,9 +14,6 @@ import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
-const LazyPresets = lazy(() =>
-  import("@/features/settings/ui/settings-presets-panel").then((m) => ({ default: m.SettingsPresetsPanel }))
-);
 const LazyPreferences = lazy(() =>
   import("@/features/settings/ui/settings-preferences-panel").then((m) => ({ default: m.SettingsPreferencesPanel }))
 );
@@ -25,16 +21,8 @@ const LazyAccount = lazy(() =>
   import("@/features/settings/ui/settings-account-panel").then((m) => ({ default: m.SettingsAccountPanel }))
 );
 
-function SettingsSectionBody({
-  section,
-  allowPresetsPanel,
-}: {
-  section: SettingsSectionId;
-  allowPresetsPanel: boolean;
-}) {
-  const effectiveSection: SettingsSectionId = !allowPresetsPanel && section === "presets" ? "preferences" : section;
-  const Comp =
-    effectiveSection === "presets" ? LazyPresets : effectiveSection === "preferences" ? LazyPreferences : LazyAccount;
+function SettingsSectionBody({ section }: { section: SettingsSectionId }) {
+  const Comp = section === "preferences" ? LazyPreferences : LazyAccount;
   return (
     <Suspense fallback={<SettingsPanelSkeleton />}>
       <Comp />
@@ -49,21 +37,8 @@ export type BeaconSettingsScreenProps = {
 
 export function BeaconSettingsScreen(props: BeaconSettingsScreenProps) {
   const { onBack, initialSection = DEFAULT_SETTINGS_SECTION } = props;
-  const { isTowerUser, editorExperience } = useBeaconAppSettings();
-  const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
-  /** Presets require Tower; while a session token is resolving, keep Export available to avoid flicker for signed-in users. */
-  const allowPresetsSection = (Boolean(towerUser?.id) || towerSessionPending) && !editorExperience;
-
-  const [section, setSection] = useState<SettingsSectionId>(() => {
-    const guestForPresets = !towerUser && !towerSessionPending;
-    return guestForPresets && initialSection === "presets" ? "preferences" : initialSection;
-  });
-
-  useEffect(() => {
-    if (!allowPresetsSection && section === "presets") {
-      setSection("preferences");
-    }
-  }, [allowPresetsSection, section]);
+  const { isTowerUser } = useBeaconAppSettings();
+  const [section, setSection] = useState<SettingsSectionId>(initialSection);
 
   return (
     <div className={beaconAppRouteSurfaceClass}>
@@ -80,14 +55,14 @@ export function BeaconSettingsScreen(props: BeaconSettingsScreenProps) {
           </div>
           <div className="min-w-0" aria-hidden />
         </div>
-        <SettingsSectionNav value={section} onValueChange={setSection} showPresetsSection={allowPresetsSection} />
+        <SettingsSectionNav value={section} onValueChange={setSection} />
       </header>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-3 pt-3">
         <ScrollArea className="h-full min-h-0 min-w-0 flex-1">
           <div className={cn(beaconPanelContainClass, "overflow-x-clip px-3")}>
             {!isTowerUser && section !== "account" ? <GuestSettingsUpsell /> : null}
-            <SettingsSectionBody section={section} allowPresetsPanel={allowPresetsSection} />
+            <SettingsSectionBody section={section} />
           </div>
         </ScrollArea>
       </div>

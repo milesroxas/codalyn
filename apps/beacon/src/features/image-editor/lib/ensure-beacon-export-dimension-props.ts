@@ -1,9 +1,14 @@
+import { WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
 import {
   BEACON_EXPORT_HEIGHT_ATTR,
   BEACON_EXPORT_WIDTH_ATTR,
 } from "@/features/image-editor/lib/beacon-designer-image-export-attrs";
-import { findImageElementForComponentInstanceProp } from "@/features/image-editor/lib/find-image-element-for-component-instance-prop";
+import {
+  findImageElementForComponentInstanceProp,
+  imageElementBindsToComponentProp,
+} from "@/features/image-editor/lib/find-image-element-for-component-instance-prop";
 import type { ComponentInstanceImageProp } from "@/features/image-editor/lib/search-component-instance-image-props";
+import { walkWebflowStructureBfs } from "@/features/image-editor/lib/webflow-element-structure-walk";
 import {
   CMS_SLOT_COMPONENT_STRING_PROPS_GROUP,
   type CmsSlotStringComponentPropOptions,
@@ -57,22 +62,17 @@ export async function getBeaconExportDimensionPropIdsOrNull(
   return { widthPropId: w.id, heightPropId: h.id };
 }
 
-/**
- * Creates two `string` props on the component (when missing) and binds
- * `data-beacon-export-width` / `data-beacon-export-height` to them via
- * `ImageElement.setSettings({ attributes })` (see Webflow setSettings for custom attributes).
- */
-export async function ensureBeaconExportDimensionPropsOnDefinition(
-  def: Component,
-  instance: ComponentElement,
-  imagePropId: string,
-  definitionRoot: AnyElement | null,
-  instanceImageProps: readonly ComponentInstanceImageProp[]
-): Promise<{ widthPropId: string; heightPropId: string }> {
+async function assertCanModifyComponents(): Promise<void> {
   const perms = await webflow.canForAppMode([webflow.appModes.canModifyComponents]);
   if (!perms[webflow.appModes.canModifyComponents]) {
     throw new Error("Components cannot be edited in the current Designer mode.");
   }
+}
+
+async function ensureExportDimensionPropIdsOnDefinition(
+  def: Component
+): Promise<{ widthPropId: string; heightPropId: string }> {
+  await assertCanModifyComponents();
 
   const props0 = await def.getProps();
   let w = props0.find((p) => p.type === "string" && p.name === BEACON_EXPORT_WIDTH_PROP_NAME);
@@ -96,6 +96,103 @@ export async function ensureBeaconExportDimensionPropsOnDefinition(
     throw new Error("Could not add Beacon export width/height fields on this component.");
   }
 
+  return { widthPropId: w.id, heightPropId: h.id };
+}
+
+async function bindExportDimensionAttributesOnImage(
+  img: ImageElement,
+  widthPropId: string,
+  heightPropId: string
+): Promise<void> {
+  if (img.customAttributes !== true) {
+    throw new Error("This image does not support custom attributes in the Designer API.");
+  }
+  const existing = await img.getAllCustomAttributes();
+  const settings = mergeAttributeBindings(existing, widthPropId, heightPropId);
+  await img.setSettings(settings as SetSettingsInput);
+}
+
+export async function applyExportDimensionDefaultValuesOnDefinition(
+  def: Component,
+  propIds: { widthPropId: string; heightPropId: string },
+  width: string | null,
+  height: string | null
+): Promise<void> {
+  const setProp = (def as { setProp?: (id: string, updates: { defaultValue: string | null }) => Promise<unknown> })
+    .setProp;
+  if (typeof setProp !== "function") {
+    throw new Error("This Webflow Designer version cannot set component prop defaults.");
+  }
+  await setProp.call(def, propIds.widthPropId, { defaultValue: width });
+  await setProp.call(def, propIds.heightPropId, { defaultValue: height });
+}
+
+export async function clearExportDimensionDefaultValuesOnDefinition(
+  def: Component,
+  propIds: { widthPropId: string; heightPropId: string }
+): Promise<void> {
+  await applyExportDimensionDefaultValuesOnDefinition(def, propIds, null, null);
+}
+
+export async function findImageElementInDefinitionForImageProp(
+  definitionRoot: AnyElement,
+  imagePropId: string
+): Promise<ImageElement | null> {
+  let found: ImageElement | null = null;
+  await walkWebflowStructureBfs([definitionRoot], async (el) => {
+    if (found != null || el.type !== WEBFLOW_IMAGE_ELEMENT_TYPE) {
+      return "continue";
+    }
+    const img = el as ImageElement;
+    if (await imageElementBindsToComponentProp(img, imagePropId)) {
+      found = img;
+      return "stop";
+    }
+    return "continue";
+  });
+  return found;
+}
+
+/**
+ * Ensures export dimension props + attribute bindings on a component definition opened via `openCanvas`.
+ * Sets default prop values on the definition (all new instances inherit unless overridden).
+ */
+export async function ensureBeaconExportDimensionPropsOnOpenDefinition(
+  def: Component,
+  definitionRoot: AnyElement | null,
+  imagePropId: string,
+  width: string,
+  height: string
+): Promise<{ widthPropId: string; heightPropId: string }> {
+  const propIds = await ensureExportDimensionPropIdsOnDefinition(def);
+  if (definitionRoot == null) {
+    throw new Error("Could not read this component definition.");
+  }
+  const img = await findImageElementInDefinitionForImageProp(definitionRoot, imagePropId);
+  if (img == null) {
+    throw new Error(
+      "Could not find the image field inside this component. Make sure the image is bound to the selected component image field."
+    );
+  }
+  await bindExportDimensionAttributesOnImage(img, propIds.widthPropId, propIds.heightPropId);
+  await applyExportDimensionDefaultValuesOnDefinition(def, propIds, width, height);
+  return propIds;
+}
+
+/**
+ * Creates two `string` props on the component (when missing) and binds
+ * `data-beacon-export-width` / `data-beacon-export-height` to them via
+ * `ImageElement.setSettings({ attributes })` (see Webflow setSettings for custom attributes).
+ */
+export async function ensureBeaconExportDimensionPropsOnDefinition(
+  def: Component,
+  instance: ComponentElement,
+  imagePropId: string,
+  definitionRoot: AnyElement | null,
+  instanceImageProps: readonly ComponentInstanceImageProp[]
+): Promise<{ widthPropId: string; heightPropId: string }> {
+  const propIds = await ensureExportDimensionPropIdsOnDefinition(def);
+
   const img = await findImageElementForComponentInstanceProp(instance, imagePropId, {
     definitionRoot,
     instanceImageProps,
@@ -105,12 +202,6 @@ export async function ensureBeaconExportDimensionPropsOnDefinition(
       "Could not find the image field inside this component. Make sure the image inside the component is bound to the same image field as this instance."
     );
   }
-  if (img.customAttributes !== true) {
-    throw new Error("This image does not support custom attributes in the Designer API.");
-  }
-
-  const existing = await img.getAllCustomAttributes();
-  const settings = mergeAttributeBindings(existing, w.id, h.id);
-  await img.setSettings(settings as SetSettingsInput);
-  return { widthPropId: w.id, heightPropId: h.id };
+  await bindExportDimensionAttributesOnImage(img, propIds.widthPropId, propIds.heightPropId);
+  return propIds;
 }

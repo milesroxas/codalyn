@@ -13,6 +13,7 @@ import {
   resolveDisplayedSurfaceTarget,
   targetFromSelectionHint,
 } from "@/features/image-editor/lib/image-editor-display-surface-target";
+import { cleanupDesignerTagsForPresetEntry } from "@/features/image-editor/lib/image-editor-preset-delete-cleanup";
 import {
   commitImagePresetForm,
   type PresetFormSubStep,
@@ -46,6 +47,7 @@ import {
   IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
 } from "@/shared/lib/beacon-feature-route-copy";
 import { cn } from "@/shared/lib/utils";
+import { readCurrentPageIdOrNull } from "@/shared/lib/webflow-page-canvas-context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -98,15 +100,6 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
 
   const isForm = view === "form";
   const isEditing = editingId != null;
-  const {
-    targets: formTargets,
-    scanPending: formScanPending,
-    scanError: formScanError,
-    pageScanned: formPageScanned,
-    rescan: formRescan,
-    selectionHint: formSelectionHint,
-    discoverySettled: formDiscoverySettled,
-  } = usePresetFormTargets(isForm);
 
   const presetEntriesById = useMemo(() => {
     const entries = listBeaconPresetStorageEntries(settings.imagePresetStorage);
@@ -117,6 +110,18 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     () => (editingId != null ? (presetEntriesById.get(editingId) ?? null) : null),
     [editingId, presetEntriesById]
   );
+
+  const editingPresetUsesComponentCanvas =
+    editingEntry != null && getPresetLocateAction(editingEntry.row.targetKey).kind === "open-component";
+  const {
+    targets: formTargets,
+    scanPending: formScanPending,
+    scanError: formScanError,
+    pageScanned: formPageScanned,
+    rescan: formRescan,
+    selectionHint: formSelectionHint,
+    discoverySettled: formDiscoverySettled,
+  } = usePresetFormTargets(isForm && !locatePending && !editingPresetUsesComponentCanvas);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,20 +137,15 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
           setSiteId(null);
         }
       });
-    void webflow
-      .getCurrentPage()
-      .then((page) => {
-        if (!cancelled) {
-          setPageId(page.id);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPageId(null);
-        }
-      });
+    void readCurrentPageIdOrNull().then((id) => {
+      if (!cancelled && id != null) {
+        setPageId(id);
+      }
+    });
     const unsub = webflow.subscribe("currentpage", (page) => {
-      setPageId(page.id);
+      if (page?.id != null) {
+        setPageId(page.id);
+      }
     });
     return () => {
       cancelled = true;
@@ -160,7 +160,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   }, [isForm]);
 
   useEffect(() => {
-    if (!isForm || editingEntry == null || formTarget != null || pageId == null) {
+    if (!isForm || editingEntry == null || formTarget != null || pageId == null || locatePending) {
       return;
     }
     const gen = ++editTargetResolveGenRef.current;
@@ -170,7 +170,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
       }
       setFormTarget(target);
     });
-  }, [editingEntry, formTarget, isForm, pageId]);
+  }, [editingEntry, formTarget, isForm, locatePending, pageId]);
 
   useEffect(() => {
     if (view !== "list") {
@@ -219,6 +219,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
 
   const onDeletePreset = useCallback(
     async (id: string) => {
+      const entry = presetEntriesById.get(id) ?? null;
       const result = await updateSettings((prev) => {
         const nextByTargetKey = Object.fromEntries(
           Object.entries(prev.imagePresetStorage.byTargetKey).filter(([, row]) => row.id !== id)
@@ -230,13 +231,29 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
           },
         };
       });
-      if (result.ok) {
-        void webflow.notify({ type: "Success", message: "Preset removed." });
-      } else {
+      if (!result.ok) {
         void webflow.notify({ type: "Error", message: result.error });
+        return;
       }
+
+      if (entry != null) {
+        const cleanup = await cleanupDesignerTagsForPresetEntry({ entry, pageIdHint: pageId });
+        if (!cleanup.ok) {
+          void webflow.notify({
+            type: "Warning",
+            message: `Preset removed, but Designer tags could not be cleared: ${cleanup.error}`,
+          });
+          return;
+        }
+        if (cleanup.cleaned) {
+          void webflow.notify({ type: "Success", message: "Preset removed and Designer tags cleared." });
+          return;
+        }
+      }
+
+      void webflow.notify({ type: "Success", message: "Preset removed." });
     },
-    [updateSettings]
+    [pageId, presetEntriesById, updateSettings]
   );
 
   const backToList = useCallback(() => {
@@ -268,6 +285,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
         const result = await locatePresetTarget({
           siteId,
           targetKey: input.targetKey,
+          pageIdHint: pageId,
         });
         if (!result.ok) {
           setFormError(result.error);
@@ -296,7 +314,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
         setLocatePending(false);
       }
     },
-    [applyFormTarget, siteId]
+    [applyFormTarget, pageId, siteId]
   );
 
   const openEdit = useCallback(
@@ -314,13 +332,18 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
       setPresetScope(p.scope);
       setFormError(null);
       setFormTarget(options?.pageTarget ?? null);
+      const willAutoLocate =
+        !options?.skipAutoLocate &&
+        options?.pageTarget == null &&
+        entry != null &&
+        getPresetLocateAction(entry.row.targetKey).kind !== "none";
+      if (willAutoLocate) {
+        locateInFlightRef.current = true;
+        setLocatePending(true);
+      }
       setView("form");
 
-      if (options?.skipAutoLocate || options?.pageTarget != null || entry == null) {
-        return;
-      }
-      const action = getPresetLocateAction(entry.row.targetKey);
-      if (action.kind === "none") {
+      if (!willAutoLocate || entry == null) {
         return;
       }
       void webflow.notify({

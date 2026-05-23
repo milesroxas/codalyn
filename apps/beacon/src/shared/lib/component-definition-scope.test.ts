@@ -20,6 +20,8 @@ describe("component-definition-scope", () => {
       exitComponent,
       enterComponent,
       getCurrentComponent,
+      getCurrentPage: vi.fn().mockRejectedValue(new Error("Missing current page!")),
+      openCanvas: vi.fn().mockResolvedValue(undefined),
     });
   });
 
@@ -40,6 +42,14 @@ describe("component-definition-scope", () => {
     const root = { type: "Block" };
     getCurrentComponent.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue(definition);
     getRootElement.mockResolvedValue(root);
+    const getCurrentPage = vi.fn().mockResolvedValue({ id: "page_1" });
+    vi.stubGlobal("webflow", {
+      exitComponent,
+      enterComponent,
+      getCurrentComponent,
+      getCurrentPage,
+      openCanvas: vi.fn().mockResolvedValue(undefined),
+    });
 
     const result = await withComponentDefinitionScope(instance, async (scope) => {
       expect(scope.definition).toBe(definition);

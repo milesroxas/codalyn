@@ -112,7 +112,7 @@ describe("locatePresetTarget", () => {
     const component = { id: "cmp_1" };
     const openCanvas = vi.fn().mockResolvedValue(undefined);
     installWebflow({
-      getCurrentPage: vi.fn().mockResolvedValue({ id: "page_1" }),
+      getCurrentPage: vi.fn().mockRejectedValue(new Error("Missing current page!")),
       getCurrentComponent: vi.fn().mockResolvedValue(null),
       exitComponent: vi.fn().mockResolvedValue(undefined),
       getComponent: vi.fn().mockResolvedValue(component),
@@ -121,6 +121,7 @@ describe("locatePresetTarget", () => {
 
     const result = await locatePresetTarget({
       siteId: "site_1",
+      pageIdHint: "page_1",
       targetKey: {
         kind: "component-image",
         siteId: "site_1",
@@ -134,7 +135,38 @@ describe("locatePresetTarget", () => {
       expect(result.navigatedToComponent).toBe(true);
       expect(result.target).toBeNull();
     }
+    expect(openCanvas).toHaveBeenCalledWith({ pageId: "page_1" });
     expect(openCanvas).toHaveBeenCalledWith(component);
+  });
+
+  it("restores the page canvas before locating an instance preset", async () => {
+    const image = {
+      type: WEBFLOW_IMAGE_ELEMENT_TYPE,
+      id: { component: "page_1", element: "img_1" },
+    };
+    const openCanvas = vi.fn().mockResolvedValue(undefined);
+    const setSelectedElement = vi.fn().mockResolvedValue(undefined);
+    installWebflow({
+      getCurrentPage: vi.fn().mockRejectedValue(new Error("Missing current page!")),
+      getAllElements: vi.fn().mockResolvedValue([image]),
+      openCanvas,
+      setSelectedElement,
+    });
+
+    const result = await locatePresetTarget({
+      siteId: "site_1",
+      pageIdHint: "page_1",
+      targetKey: {
+        kind: "bare-image-instance",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(openCanvas).toHaveBeenCalledWith({ pageId: "page_1" });
+    expect(setSelectedElement).toHaveBeenCalledWith(image);
   });
 
   it("rejects presets from another site", async () => {

@@ -5,7 +5,12 @@ import {
   IMAGE_UPLOAD_PRESET_EDIT_INSTANCE_MISMATCH_MESSAGE,
   IMAGE_UPLOAD_PRESET_EDIT_INSTANCE_TARGET_REQUIRED_MESSAGE,
 } from "@/shared/lib/beacon-feature-route-copy";
-import { shouldTagPageTargetOnPresetSave, validateInstancePresetEditTarget } from "./image-editor-preset-form-commit";
+import {
+  readComponentDefinitionTagTarget,
+  shouldTagComponentDefinitionOnPresetSave,
+  shouldTagPageTargetOnPresetSave,
+  validateInstancePresetEditTarget,
+} from "./image-editor-preset-form-commit";
 
 describe("shouldTagPageTargetOnPresetSave", () => {
   it("tags only instance presets", () => {
@@ -13,6 +18,60 @@ describe("shouldTagPageTargetOnPresetSave", () => {
     expect(shouldTagPageTargetOnPresetSave("component")).toBe(false);
     expect(shouldTagPageTargetOnPresetSave("element")).toBe(false);
     expect(shouldTagPageTargetOnPresetSave("site-default")).toBe(false);
+  });
+});
+
+describe("shouldTagComponentDefinitionOnPresetSave", () => {
+  it("tags only component presets on the library definition", () => {
+    expect(shouldTagComponentDefinitionOnPresetSave("component")).toBe(true);
+    expect(shouldTagComponentDefinitionOnPresetSave("instance")).toBe(false);
+    expect(shouldTagComponentDefinitionOnPresetSave("element")).toBe(false);
+    expect(shouldTagComponentDefinitionOnPresetSave("site-default")).toBe(false);
+  });
+});
+
+describe("readComponentDefinitionTagTarget", () => {
+  it("reads from an existing component preset row when editing", () => {
+    expect(
+      readComponentDefinitionTagTarget({
+        presetScope: "component",
+        editingEntry: {
+          scope: "component",
+          row: {
+            id: "preset_1",
+            name: "Hero",
+            width: 1200,
+            height: 800,
+            maxFileSizeBytes: 200_000,
+            targetKey: {
+              kind: "component-image",
+              siteId: "site_1",
+              componentDefinitionId: "cmp_1",
+              imagePropId: "hero-image",
+            },
+          },
+        },
+        resolvedTargetForScope: null,
+      })
+    ).toEqual({ componentDefinitionId: "cmp_1", imagePropId: "hero-image" });
+  });
+
+  it("reads from a resolved upload target when creating", () => {
+    expect(
+      readComponentDefinitionTagTarget({
+        presetScope: "component",
+        editingEntry: null,
+        resolvedTargetForScope: {
+          kind: "component-image",
+          siteId: "site_1",
+          pageId: "page_1",
+          instanceElementId: "inst_1",
+          componentDefinitionId: "cmp_1",
+          imagePropId: "hero-image",
+          tagged: null,
+        },
+      })
+    ).toEqual({ componentDefinitionId: "cmp_1", imagePropId: "hero-image" });
   });
 });
 

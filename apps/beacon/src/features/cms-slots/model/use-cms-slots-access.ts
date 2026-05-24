@@ -19,9 +19,9 @@ export type CmsSlotsAccess = {
 };
 
 export function useCmsSlotsAccess(): CmsSlotsAccess {
-  const { editorExperience, restrictToEditorExperience, workspaceMemberRole, syncState, isTowerUser } =
+  const { editorExperience, restrictToEditorExperience, workspaceMemberRole, settingsPullSynced } =
     useBeaconAppSettings();
-  const accessResolved = !isTowerUser || syncState === "synced";
+  const accessResolved = settingsPullSynced;
 
   return useMemo(() => {
     const membershipEditorExperience = computeEditorExperienceFromMembership(

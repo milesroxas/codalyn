@@ -5,5 +5,6 @@ export * from "./beacon/beacon-image-preset-domain.js";
 export * from "./beacon/beacon-org-team-settings.js";
 export * from "./beacon/beacon-preset-dimensions.js";
 export * from "./beacon/beacon-preset-storage-migration.js";
+export * from "./beacon/beacon-settings-tower-put.js";
 export * from "./image/output-formats.js";
 export * from "./webflow/constants.js";

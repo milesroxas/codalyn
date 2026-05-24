@@ -303,12 +303,13 @@ export function ImageEditor() {
     settings,
     updateSettings,
     canPersistExportDefaults,
-    syncState,
+    settingsPullSettled,
+    settingsPullSynced,
     isTowerUser,
     editorExperience,
     canManageTeamBeaconSettings,
   } = useBeaconAppSettings();
-  const roleReady = useMemo(() => !isTowerUser || syncState === "synced", [isTowerUser, syncState]);
+  const roleReady = settingsPullSettled;
   /** Designers and admins in designer view (not editor-style mode) see the entry step. */
   const isWorkspaceDesigner = useMemo(
     () => Boolean(roleReady && isTowerUser && !editorExperience),
@@ -642,14 +643,14 @@ export function ImageEditor() {
   }, [towerUser?.id]);
 
   useEffect(() => {
-    if (!towerUser?.id || syncState !== "synced" || serverExportDefaultsAppliedRef.current) {
+    if (!towerUser?.id || !settingsPullSynced || serverExportDefaultsAppliedRef.current) {
       return;
     }
     serverExportDefaultsAppliedRef.current = true;
     setExportFormat(settings.defaultExportFormat);
     setQuality(settings.defaultExportQuality);
     exportDefaultsHydratedRef.current = true;
-  }, [towerUser?.id, syncState, settings]);
+  }, [towerUser?.id, settingsPullSynced, settings]);
 
   useEffect(() => {
     if (skipNextPersistExportDefaultsRef.current) {

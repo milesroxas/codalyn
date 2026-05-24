@@ -1,11 +1,20 @@
 import {
+  BEACON_IMAGE_ERROR_CODES,
   type BeaconAppSettings,
+  canPersistBeaconTeamExportDefaults,
+  getBeaconSettingsTowerPutRejection,
   getDefaultBeaconAppSettings,
   mergeBeaconAppSettings,
   parseBeaconAppSettings,
 } from "@codalyn/webflow-kit";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import {
+  type BeaconSettingsSyncState,
+  isBeaconTowerSettingsPullPending,
+  isBeaconTowerSettingsPullSettled,
+  isBeaconTowerSettingsSynced,
+} from "@/features/settings/lib/beacon-settings-sync";
 import { towerFetch } from "@/shared/lib/tower-client";
 import { ThemeProvider } from "@/shared/providers/theme-provider";
 
@@ -13,7 +22,7 @@ const STORAGE_KEY = "beacon:app-settings-v1";
 const LEGACY_THEME_KEY = "beacon-ui-theme";
 const LEGACY_FORMAT_KEY = "beacon:image-export-format";
 
-export type BeaconSettingsSyncState = "idle" | "loading" | "synced" | "error";
+export type { BeaconSettingsSyncState } from "@/features/settings/lib/beacon-settings-sync";
 
 export type BeaconTowerWorkspace = { id: string; name: string };
 
@@ -33,6 +42,12 @@ type BeaconAppSettingsContextValue = {
   isTowerUser: boolean;
   /** Persist export defaults from the image editor after Tower sync (or always for guests). */
   canPersistExportDefaults: boolean;
+  /** Signed-in Tower user and initial settings pull still in flight. */
+  settingsPullPending: boolean;
+  /** Tower settings pull succeeded; workspace role flags are authoritative. */
+  settingsPullSynced: boolean;
+  /** Tower settings pull finished (synced or failed); UI may use local settings. */
+  settingsPullSettled: boolean;
   /** Team editors + team admins who opt in: limited UI; uses designer team presets. */
   editorExperience: boolean;
   /** Designers and product admins may edit workspace team presets (stored on the organization). */
@@ -163,6 +178,15 @@ function rollbackOptimisticSettings(previous: BeaconAppSettings, setSettings: (s
   writeLocal(previous);
 }
 
+function beaconSettingsTowerPutRejectionMessage(
+  rejection: NonNullable<ReturnType<typeof getBeaconSettingsTowerPutRejection>>
+): string {
+  if (rejection === BEACON_IMAGE_ERROR_CODES.TEAM_PRESETS_LOCKED_EDITOR_MODE) {
+    return "Team presets are locked in editor mode.";
+  }
+  return "Preset mutation denied.";
+}
+
 async function persistSettingsPatchToTower(args: {
   resolved: Partial<BeaconAppSettings>;
   previous: BeaconAppSettings;
@@ -186,7 +210,6 @@ async function persistSettingsPatchToTower(args: {
 
     if (!response.ok) {
       rollbackOptimisticSettings(previous, setters.setSettings);
-      setSyncState("error");
       return { ok: false, error: `Could not sync settings (${response.status})` };
     }
 
@@ -199,7 +222,6 @@ async function persistSettingsPatchToTower(args: {
       return { ok: true };
     }
     rollbackOptimisticSettings(previous, setters.setSettings);
-    setSyncState("error");
     return { ok: false, error: "Could not sync settings" };
   }
 }
@@ -220,7 +242,20 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
 
   const isTowerUser = Boolean(user?.id);
 
-  const canPersistExportDefaults = !isTowerUser || syncState === "synced";
+  const towerPutPolicy = useMemo(
+    () => ({
+      editorExperience,
+      canManageTeamBeaconSettings,
+    }),
+    [editorExperience, canManageTeamBeaconSettings]
+  );
+
+  const settingsPullPending = isBeaconTowerSettingsPullPending(isTowerUser, syncState);
+  const settingsPullSynced = isBeaconTowerSettingsSynced(isTowerUser, syncState);
+  const settingsPullSettled = isBeaconTowerSettingsPullSettled(isTowerUser, syncState);
+
+  const canPersistExportDefaults =
+    !isTowerUser || (settingsPullSynced && canPersistBeaconTeamExportDefaults(towerPutPolicy));
 
   const abortRef = useRef<AbortController | null>(null);
   /** Throttle refetch on tab focus to avoid bursty duplicate Tower load. */
@@ -341,6 +376,16 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
         return { ok: true };
       }
 
+      const rejection = getBeaconSettingsTowerPutRejection(resolved, towerPutPolicy);
+      if (rejection !== null) {
+        rollbackOptimisticSettings(previous, setSettings);
+        return { ok: false, error: beaconSettingsTowerPutRejectionMessage(rejection) };
+      }
+
+      if (syncState !== "synced") {
+        return { ok: true };
+      }
+
       const generation = ++putGenerationRef.current;
 
       return persistSettingsPatchToTower({
@@ -363,7 +408,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
         },
       });
     },
-    [user?.id]
+    [user?.id, syncState, towerPutPolicy]
   );
 
   const setActiveBeaconWorkspace = useCallback(
@@ -403,6 +448,9 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
       refreshBeaconSettings,
       isTowerUser,
       canPersistExportDefaults,
+      settingsPullPending,
+      settingsPullSynced,
+      settingsPullSettled,
       editorExperience,
       canManageTeamBeaconSettings,
       restrictToEditorExperience,
@@ -421,6 +469,9 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
       refreshBeaconSettings,
       isTowerUser,
       canPersistExportDefaults,
+      settingsPullPending,
+      settingsPullSynced,
+      settingsPullSettled,
       editorExperience,
       canManageTeamBeaconSettings,
       restrictToEditorExperience,

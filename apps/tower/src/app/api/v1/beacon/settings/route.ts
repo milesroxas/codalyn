@@ -1,12 +1,14 @@
 import {
   BEACON_IMAGE_ERROR_CODES,
   type BeaconAppSettings,
+  getBeaconSettingsTowerPutRejection,
   getDefaultBeaconAppSettings,
   mergeOrgTeamSettingsIntoUser,
   parseBeaconAppSettings,
   parseBeaconAppSettingsPartial,
   parseBeaconOrgTeamSettingsPartial,
   splitBeaconSettingsPatch,
+  stripBeaconSettingsPersonalForEditorExperience,
   validateBeaconPresetStoragePatch,
 } from "@codalyn/webflow-kit";
 import { eq } from "drizzle-orm";
@@ -30,12 +32,13 @@ function jsonError(status: number, error: string, errorCode?: string): Response 
   return Response.json(errorCode ? { error, errorCode } : { error }, { status });
 }
 
-function stripPersonalForEditor(patch: Partial<BeaconAppSettings>): Partial<BeaconAppSettings> {
-  const out: Partial<BeaconAppSettings> = {};
-  if (patch.theme !== undefined) {
-    out.theme = patch.theme;
+function towerPutRejectionResponse(
+  rejection: NonNullable<ReturnType<typeof getBeaconSettingsTowerPutRejection>>
+): Response {
+  if (rejection === BEACON_IMAGE_ERROR_CODES.TEAM_PRESETS_LOCKED_EDITOR_MODE) {
+    return jsonError(403, "Team presets are locked in editor mode", rejection);
   }
-  return out;
+  return jsonError(403, "Preset mutation denied", rejection);
 }
 
 function extractBody(raw: unknown): { organizationId?: string; patch: Partial<BeaconAppSettings> } {
@@ -67,20 +70,16 @@ function hasOrganizationIdOverride(raw: unknown): boolean {
 function validateTeamMutationPermissions(opts: {
   editorExperience: boolean;
   canManageTeam: boolean;
-  hasTeamMutation: boolean;
+  patch: Partial<BeaconAppSettings>;
 }): Response | null {
-  const { editorExperience, canManageTeam, hasTeamMutation } = opts;
-  if (editorExperience && hasTeamMutation) {
-    return jsonError(
-      403,
-      "Team presets are locked in editor mode",
-      BEACON_IMAGE_ERROR_CODES.TEAM_PRESETS_LOCKED_EDITOR_MODE
-    );
+  const rejection = getBeaconSettingsTowerPutRejection(opts.patch, {
+    editorExperience: opts.editorExperience,
+    canManageTeamBeaconSettings: opts.canManageTeam,
+  });
+  if (rejection === null) {
+    return null;
   }
-  if (!canManageTeam && hasTeamMutation) {
-    return jsonError(403, "Preset mutation denied", BEACON_IMAGE_ERROR_CODES.PRESET_PERMISSION_DENIED);
-  }
-  return null;
+  return towerPutRejectionResponse(rejection);
 }
 
 async function loadEffectiveSettings(userId: string, ctx: Awaited<ReturnType<typeof resolveBeaconMembershipContext>>) {
@@ -180,20 +179,19 @@ export async function PUT(req: Request) {
   const editorExperience = computeBeaconEditorExperience(ctx);
   const canManageTeam = canManageBeaconTeamSettings(ctx);
   const { team, personal } = splitBeaconSettingsPatch(patch);
-
   const teamPatch = parseBeaconOrgTeamSettingsPartial(team);
   const hasTeamMutation = Object.keys(teamPatch).length > 0;
 
   const permissionError = validateTeamMutationPermissions({
     editorExperience,
     canManageTeam,
-    hasTeamMutation,
+    patch,
   });
   if (permissionError) {
     return permissionError;
   }
 
-  const personalToApply = editorExperience ? stripPersonalForEditor(personal) : personal;
+  const personalToApply = editorExperience ? stripBeaconSettingsPersonalForEditorExperience(personal) : personal;
 
   const targetOrgId = await resolveTargetOrganizationIdForTeamSettings(ctx, organizationIdFromBody);
   if (hasTeamMutation && !targetOrgId) {

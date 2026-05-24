@@ -45,7 +45,7 @@ function CmsSlotsCollectionTemplateBlocked() {
 export function CmsSlotsAccessGate(props: { children: ReactNode }) {
   const { children } = props;
   const { user, isPending: sessionPending } = useBeaconTowerSession();
-  const { syncState, refreshBeaconSettings } = useBeaconAppSettings();
+  const { syncState, refreshBeaconSettings, settingsPullPending } = useBeaconAppSettings();
   const { ready: pageKindReady, isCmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
   const base = getTowerAuthBaseUrl();
 
@@ -84,7 +84,7 @@ export function CmsSlotsAccessGate(props: { children: ReactNode }) {
     );
   }
 
-  if (syncState === "loading" || syncState === "idle") {
+  if (settingsPullPending) {
     return <AccessGateLoadingStatus message="Checking workspace access…" />;
   }
 

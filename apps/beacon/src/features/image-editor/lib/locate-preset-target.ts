@@ -1,9 +1,11 @@
-import type {
-  BareImageInstancePresetTargetKey,
-  ComponentImageElementPresetTargetKey,
-  ComponentImageInstancePresetTargetKey,
-  ComponentImagePresetTargetKey,
-  PresetTargetKey,
+import {
+  type BareImageInstancePresetTargetKey,
+  type ComponentImageElementPresetTargetKey,
+  type ComponentImageInstancePresetTargetKey,
+  type ComponentImagePresetTargetKey,
+  isInstancePresetTargetKey,
+  type PresetTargetKey,
+  readPageIdFromInstancePresetTargetKey,
 } from "@codalyn/webflow-kit";
 
 import { WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
@@ -12,9 +14,8 @@ import {
   type ImagePageTarget,
 } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { searchComponentInstanceImageProps } from "@/features/image-editor/lib/search-component-instance-image-props";
-import { exitUntilPageForComponentEnter } from "@/shared/lib/component-definition-scope";
+import { exitUntilPageForComponentEnter, preparePageCanvasForWork } from "@/shared/lib/component-definition-scope";
 import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
-import { ensurePageCanvas, readCurrentPageIdOrNull } from "@/shared/lib/webflow-page-canvas-context";
 
 export type PresetLocateAction =
   | { kind: "open-component"; label: string; pendingLabel: string }
@@ -96,14 +97,6 @@ function siteMismatchError(siteId: string | null, targetKey: PresetTargetKey): s
   return null;
 }
 
-async function ensurePresetTargetPage(pageId: string): Promise<void> {
-  const current = await readCurrentPageIdOrNull();
-  if (current === pageId) {
-    return;
-  }
-  await webflow.openCanvas({ pageId });
-}
-
 async function selectCanvasElement(element: AnyElement): Promise<void> {
   await webflow.setSelectedElement(element);
 }
@@ -155,10 +148,20 @@ export async function findImagePageTargetForPresetOnCurrentPage(
   return null;
 }
 
+export function resolvePageIdForInstancePresetWork(
+  targetKey: PresetTargetKey,
+  pageIdHint?: string | null
+): string | null {
+  if (isInstancePresetTargetKey(targetKey)) {
+    return readPageIdFromInstancePresetTargetKey(targetKey);
+  }
+  return pageIdHint ?? null;
+}
+
 async function locateInstancePresetTarget(
   targetKey: BareImageInstancePresetTargetKey | ComponentImageInstancePresetTargetKey
 ): Promise<LocatePresetTargetResult> {
-  await ensurePresetTargetPage(targetKey.pageId);
+  await preparePageCanvasForWork(targetKey.pageId);
   const target = await findImagePageTargetForPresetOnCurrentPage(targetKey);
   if (target == null) {
     return {
@@ -179,16 +182,6 @@ async function locateComponentPresetTarget(
   return { ok: true, target: null, navigatedToComponent: true };
 }
 
-function readPageIdHintFromTargetKey(
-  targetKey: PresetTargetKey,
-  pageIdHint: string | null | undefined
-): string | null | undefined {
-  if (targetKey.kind === "bare-image-instance" || targetKey.kind === "component-image-instance") {
-    return targetKey.pageId;
-  }
-  return pageIdHint;
-}
-
 export async function locatePresetTarget(input: {
   targetKey: PresetTargetKey;
   siteId: string | null;
@@ -205,7 +198,7 @@ export async function locatePresetTarget(input: {
     return { ok: false, error: "This preset has no canvas target to locate." };
   }
 
-  const pageIdHint = readPageIdHintFromTargetKey(input.targetKey, input.pageIdHint);
+  const pageIdHint = resolvePageIdForInstancePresetWork(input.targetKey, input.pageIdHint);
 
   try {
     return await runExclusiveDesignerOp(async () => {
@@ -213,7 +206,6 @@ export async function locatePresetTarget(input: {
         return await locateComponentPresetTarget(input.targetKey, pageIdHint);
       }
       if (input.targetKey.kind === "component-image-instance" || input.targetKey.kind === "bare-image-instance") {
-        await ensurePageCanvas(pageIdHint ?? null);
         return await locateInstancePresetTarget(input.targetKey);
       }
       return { ok: false, error: "This preset has no canvas target to locate." };

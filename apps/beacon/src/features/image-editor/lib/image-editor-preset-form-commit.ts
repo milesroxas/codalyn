@@ -148,6 +148,11 @@ export function shouldTagComponentDefinitionOnPresetSave(scope: PresetCrudScope)
   return scope === "component";
 }
 
+/** Scopes that write Designer export tags on save — delete must undo them. */
+export function presetScopeWritesDesignerTags(scope: PresetCrudScope): boolean {
+  return shouldTagPageTargetOnPresetSave(scope) || shouldTagComponentDefinitionOnPresetSave(scope);
+}
+
 export function readComponentDefinitionTagTarget(input: {
   presetScope: PresetCrudScope;
   editingEntry: BeaconPresetStorageEntry | null;

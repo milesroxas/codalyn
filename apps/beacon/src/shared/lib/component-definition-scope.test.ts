@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   exitCurrentComponentIfAny,
   exitUntilPageForComponentEnter,
+  preparePageCanvasForWork,
   withComponentDefinitionScope,
 } from "@/shared/lib/component-definition-scope";
 
@@ -34,6 +35,24 @@ describe("component-definition-scope", () => {
     await exitUntilPageForComponentEnter();
 
     expect(exitComponent).toHaveBeenCalledTimes(1);
+  });
+
+  it("preparePageCanvasForWork exits component scope then opens the target page", async () => {
+    const openCanvas = vi.fn().mockResolvedValue(undefined);
+    const getCurrentPage = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Missing current page!"))
+      .mockResolvedValueOnce({ id: "page_2" });
+    vi.stubGlobal("webflow", {
+      exitComponent,
+      getCurrentComponent,
+      getCurrentPage,
+      openCanvas,
+    });
+
+    await preparePageCanvasForWork("page_2");
+
+    expect(openCanvas).toHaveBeenCalledWith({ pageId: "page_2" });
   });
 
   it("runs fn inside enter/exit and passes definition root", async () => {

@@ -6,6 +6,7 @@ import {
   IMAGE_UPLOAD_PRESET_EDIT_INSTANCE_TARGET_REQUIRED_MESSAGE,
 } from "@/shared/lib/beacon-feature-route-copy";
 import {
+  presetScopeWritesDesignerTags,
   readComponentDefinitionTagTarget,
   shouldTagComponentDefinitionOnPresetSave,
   shouldTagPageTargetOnPresetSave,
@@ -27,6 +28,15 @@ describe("shouldTagComponentDefinitionOnPresetSave", () => {
     expect(shouldTagComponentDefinitionOnPresetSave("instance")).toBe(false);
     expect(shouldTagComponentDefinitionOnPresetSave("element")).toBe(false);
     expect(shouldTagComponentDefinitionOnPresetSave("site-default")).toBe(false);
+  });
+});
+
+describe("presetScopeWritesDesignerTags", () => {
+  it("matches instance and component save tagging scopes", () => {
+    expect(presetScopeWritesDesignerTags("instance")).toBe(true);
+    expect(presetScopeWritesDesignerTags("component")).toBe(true);
+    expect(presetScopeWritesDesignerTags("element")).toBe(false);
+    expect(presetScopeWritesDesignerTags("site-default")).toBe(false);
   });
 });
 

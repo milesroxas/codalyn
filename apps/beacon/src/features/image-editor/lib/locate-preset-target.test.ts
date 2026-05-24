@@ -169,6 +169,36 @@ describe("locatePresetTarget", () => {
     expect(setSelectedElement).toHaveBeenCalledWith(image);
   });
 
+  it("switches pages before locating an instance preset on another page", async () => {
+    const image = {
+      type: WEBFLOW_IMAGE_ELEMENT_TYPE,
+      id: { component: "page_2", element: "img_1" },
+    };
+    const openCanvas = vi.fn().mockResolvedValue(undefined);
+    const setSelectedElement = vi.fn().mockResolvedValue(undefined);
+    installWebflow({
+      getCurrentPage: vi.fn().mockResolvedValue({ id: "page_1" }),
+      getAllElements: vi.fn().mockResolvedValue([image]),
+      openCanvas,
+      setSelectedElement,
+    });
+
+    const result = await locatePresetTarget({
+      siteId: "site_1",
+      pageIdHint: "page_1",
+      targetKey: {
+        kind: "bare-image-instance",
+        siteId: "site_1",
+        pageId: "page_2",
+        elementId: "img_1",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(openCanvas).toHaveBeenCalledWith({ pageId: "page_2" });
+    expect(setSelectedElement).toHaveBeenCalledWith(image);
+  });
+
   it("rejects presets from another site", async () => {
     const result = await locatePresetTarget({
       siteId: "site_1",

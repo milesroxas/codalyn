@@ -24,6 +24,22 @@ export async function readCurrentPageIdOrNull(): Promise<string | null> {
 }
 
 /**
+ * Opens the Designer page canvas when it is not already active (including from a component definition canvas).
+ * Returns the active page id after navigation, or `null` when the canvas is not a page.
+ */
+export async function openPageCanvas(pageId: string): Promise<string | null> {
+  if (pageId.length === 0 || typeof webflow.openCanvas !== "function") {
+    return readCurrentPageIdOrNull();
+  }
+  const current = await readCurrentPageIdOrNull();
+  if (current === pageId) {
+    return current;
+  }
+  await webflow.openCanvas({ pageId });
+  return readCurrentPageIdOrNull();
+}
+
+/**
  * Ensures a page canvas is active before page-scoped Designer APIs (`enterComponent`, `getAllElements`, etc.).
  * When the user opened a component via `openCanvas`, restores the last known page with the same API.
  */
@@ -32,9 +48,8 @@ export async function ensurePageCanvas(pageIdHint: string | null | undefined): P
   if (current != null) {
     return current;
   }
-  if (pageIdHint == null || pageIdHint.length === 0 || typeof webflow.openCanvas !== "function") {
+  if (pageIdHint == null || pageIdHint.length === 0) {
     return null;
   }
-  await webflow.openCanvas({ pageId: pageIdHint });
-  return readCurrentPageIdOrNull();
+  return openPageCanvas(pageIdHint);
 }

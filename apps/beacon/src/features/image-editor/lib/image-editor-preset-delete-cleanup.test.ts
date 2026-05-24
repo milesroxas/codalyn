@@ -1,31 +1,27 @@
 import type { BeaconPresetStorageEntry } from "@codalyn/webflow-kit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  cleanupDesignerTagsForPresetEntry,
-  presetDeleteRequiresDesignerCleanup,
-} from "./image-editor-preset-delete-cleanup";
+import { cleanupDesignerTagsForPresetEntry } from "./image-editor-preset-delete-cleanup";
 
 vi.mock("@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target", () => ({
   clearBeaconDesignerExportAttrsOnPageTarget: vi.fn().mockResolvedValue(undefined),
   clearBeaconDesignerExportAttrsOnComponentDefinition: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("@/features/image-editor/lib/locate-preset-target", () => ({
-  findImagePageTargetForPresetOnCurrentPage: vi.fn().mockResolvedValue(null),
-}));
+vi.mock("@/features/image-editor/lib/locate-preset-target", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./locate-preset-target")>();
+  return {
+    ...actual,
+    findImagePageTargetForPresetOnCurrentPage: vi.fn().mockResolvedValue(null),
+  };
+});
 
-vi.mock("@/shared/lib/webflow-page-canvas-context", () => ({
-  ensurePageCanvas: vi.fn().mockResolvedValue("page_1"),
-}));
-
-describe("presetDeleteRequiresDesignerCleanup", () => {
-  it("requires cleanup for instance and component presets", () => {
-    expect(presetDeleteRequiresDesignerCleanup("instance")).toBe(true);
-    expect(presetDeleteRequiresDesignerCleanup("component")).toBe(true);
-    expect(presetDeleteRequiresDesignerCleanup("element")).toBe(false);
-    expect(presetDeleteRequiresDesignerCleanup("site-default")).toBe(false);
-  });
+vi.mock("@/shared/lib/component-definition-scope", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/lib/component-definition-scope")>();
+  return {
+    ...actual,
+    preparePageCanvasForWork: vi.fn().mockResolvedValue(undefined),
+  };
 });
 
 describe("cleanupDesignerTagsForPresetEntry", () => {
@@ -50,6 +46,48 @@ describe("cleanupDesignerTagsForPresetEntry", () => {
       ok: true,
       cleaned: false,
     });
+  });
+
+  it("clears page target tags for instance presets", async () => {
+    const { clearBeaconDesignerExportAttrsOnPageTarget } = await import(
+      "@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target"
+    );
+    const { findImagePageTargetForPresetOnCurrentPage } = await import(
+      "@/features/image-editor/lib/locate-preset-target"
+    );
+    const { preparePageCanvasForWork } = await import("@/shared/lib/component-definition-scope");
+
+    const target = {
+      id: "locate-image-img_1",
+      kind: "image" as const,
+      element: { type: "Image" } as AnyElement,
+      label: "Image",
+    };
+    vi.mocked(findImagePageTargetForPresetOnCurrentPage).mockResolvedValueOnce(target);
+
+    const entry: BeaconPresetStorageEntry = {
+      scope: "instance",
+      row: {
+        id: "preset_1",
+        name: "Hero",
+        width: 1200,
+        height: 800,
+        maxFileSizeBytes: 200_000,
+        targetKey: {
+          kind: "bare-image-instance",
+          siteId: "site_1",
+          pageId: "page_1",
+          elementId: "img_1",
+        },
+      },
+    };
+
+    await expect(cleanupDesignerTagsForPresetEntry({ entry, pageIdHint: "page_2" })).resolves.toEqual({
+      ok: true,
+      cleaned: true,
+    });
+    expect(preparePageCanvasForWork).toHaveBeenCalledWith("page_1");
+    expect(clearBeaconDesignerExportAttrsOnPageTarget).toHaveBeenCalledWith(target);
   });
 
   it("clears component definition defaults for component presets", async () => {

@@ -338,7 +338,6 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
         entry != null &&
         getPresetLocateAction(entry.row.targetKey).kind !== "none";
       if (willAutoLocate) {
-        locateInFlightRef.current = true;
         setLocatePending(true);
       }
       setView("form");

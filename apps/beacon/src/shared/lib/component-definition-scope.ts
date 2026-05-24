@@ -1,5 +1,5 @@
 import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
-import { ensurePageCanvas } from "@/shared/lib/webflow-page-canvas-context";
+import { ensurePageCanvas, openPageCanvas } from "@/shared/lib/webflow-page-canvas-context";
 
 /** Max nested component edit depth / exit unwind attempts for Designer scope helpers. */
 export const MAX_DESIGNER_COMPONENT_NESTING = 8;
@@ -34,6 +34,16 @@ export async function exitUntilPageForComponentEnter(pageIdHint?: string | null)
     }
   }
   await ensurePageCanvas(pageIdHint ?? null);
+}
+
+/**
+ * Unwind component edit scopes, then open `pageId` when the caller needs a specific page canvas.
+ */
+export async function preparePageCanvasForWork(pageId: string | null | undefined): Promise<void> {
+  await exitUntilPageForComponentEnter(pageId ?? null);
+  if (pageId != null && pageId.length > 0) {
+    await openPageCanvas(pageId);
+  }
 }
 
 export type ComponentDefinitionScope = {

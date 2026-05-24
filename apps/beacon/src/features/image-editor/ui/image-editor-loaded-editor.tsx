@@ -14,7 +14,6 @@ export type ImageEditorLoadedEditorProps = {
   stepExitFade: boolean;
   onStepExitTransitionEnd: (e: TransitionEvent<HTMLDivElement>) => void;
   onUploadAnother: () => void;
-  onBackHome: () => void;
   cropPanelProps: ImageEditorCropExportPanelProps;
 };
 
@@ -27,7 +26,6 @@ export function ImageEditorLoadedEditor(props: ImageEditorLoadedEditorProps) {
     stepExitFade,
     onStepExitTransitionEnd,
     onUploadAnother,
-    onBackHome,
     cropPanelProps,
   } = props;
 
@@ -41,7 +39,6 @@ export function ImageEditorLoadedEditor(props: ImageEditorLoadedEditorProps) {
         message={exportSuccess.message}
         showCmsDesignerRefreshHint={exportSuccess.cmsFieldUpdated && cmsCollectionTemplatePage}
         onUploadAnother={onUploadAnother}
-        onBackHome={onBackHome}
       />
     );
   }

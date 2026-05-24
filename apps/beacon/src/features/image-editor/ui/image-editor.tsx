@@ -1231,7 +1231,7 @@ export function ImageEditor() {
     onExportSuccess: handleExportSuccess,
   });
 
-  const { handleUploadAnotherAfterSuccess, handleSuccessBackHome } = useImageEditorExportSuccessNavigation({
+  const { handleUploadAnotherAfterSuccess } = useImageEditorExportSuccessNavigation({
     clearExportSuccess,
     setFlowStep,
     clearImageSourceOnly,
@@ -1357,7 +1357,6 @@ export function ImageEditor() {
       stepExitFade={stepExitFade}
       onStepExitTransitionEnd={onStepExitTransitionEnd}
       onUploadAnother={handleUploadAnotherAfterSuccess}
-      onBackHome={handleSuccessBackHome}
       cropPanelProps={{
         exportDimensionsReady,
         strictOutputDimensionInputs: !effectiveTaggedDimensionsActive,

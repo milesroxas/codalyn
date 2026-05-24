@@ -3,29 +3,40 @@ import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-const emptyVariants = cva(
-  "flex min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-sm border-dashed p-6 text-center text-balance",
-  {
-    variants: {
-      tone: {
-        default: "",
-        successPanel: "min-h-[min(44vh,16rem)] border border-border bg-muted/20",
-      },
+const emptyVariants = cva("flex min-w-0 flex-1 flex-col gap-4 text-balance", {
+  variants: {
+    tone: {
+      default: "items-center justify-center rounded-sm border border-dashed p-6 text-center",
+      plain: "w-full items-stretch border-0 bg-transparent p-0 text-left",
     },
-    defaultVariants: {
-      tone: "default",
-    },
-  }
-);
+  },
+  defaultVariants: {
+    tone: "default",
+  },
+});
 
 function Empty({ className, tone, ...props }: React.ComponentProps<"div"> & VariantProps<typeof emptyVariants>) {
   return <div data-slot="empty" className={cn(emptyVariants({ tone }), className)} {...props} />;
 }
 
-function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div data-slot="empty-header" className={cn("flex max-w-sm flex-col items-center gap-2", className)} {...props} />
-  );
+const emptyHeaderVariants = cva("flex flex-col gap-2", {
+  variants: {
+    width: {
+      default: "max-w-sm items-center",
+      full: "w-full max-w-none items-center",
+    },
+  },
+  defaultVariants: {
+    width: "default",
+  },
+});
+
+function EmptyHeader({
+  className,
+  width,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof emptyHeaderVariants>) {
+  return <div data-slot="empty-header" className={cn(emptyHeaderVariants({ width }), className)} {...props} />;
 }
 
 const emptyMediaVariants = cva(
@@ -81,12 +92,12 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
   );
 }
 
-const emptyContentVariants = cva("flex w-full min-w-0 flex-col items-center text-sm text-balance", {
+const emptyContentVariants = cva("flex w-full min-w-0 flex-col text-sm text-balance", {
   variants: {
     layout: {
-      default: "max-w-sm gap-2.5",
-      hint: "max-w-sm items-stretch gap-2.5 text-left",
-      actions: "max-w-sm gap-2",
+      default: "max-w-sm items-center gap-2.5",
+      hint: "max-w-none items-stretch gap-2.5 text-left",
+      actions: "max-w-sm items-center gap-2",
     },
   },
   defaultVariants: {

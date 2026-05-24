@@ -10,13 +10,9 @@ export const IMAGE_UPLOAD_CONTINUE_TO_SAVE_LABEL = "Continue to export";
 
 export const IMAGE_UPLOAD_SUCCESS_TITLE = "Image saved";
 
-export const IMAGE_UPLOAD_SUCCESS_UPLOAD_ANOTHER_LABEL = "Upload another image";
+export const IMAGE_UPLOAD_SUCCESS_CHANGE_IMAGE_LABEL = "Change image and select new target";
 
-export const IMAGE_UPLOAD_SUCCESS_BACK_HOME_LABEL = "Back to home";
-
-export const IMAGE_UPLOAD_SUCCESS_NEXT_STEPS_LABEL = "Next steps";
-
-export const IMAGE_UPLOAD_SUCCESS_GO_TO_CMS_LABEL = "Go to Webflow CMS";
+export const IMAGE_UPLOAD_SUCCESS_CHANGE_IMAGE_HINT = "Upload a new file or pick another target on the page";
 
 export const IMAGE_UPLOAD_SUCCESS_RETURN_TO_DESIGNER_LABEL = "Return to Designer";
 

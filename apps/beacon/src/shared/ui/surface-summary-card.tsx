@@ -413,7 +413,7 @@ function SurfaceSummaryCardOptionRows({ className, ...props }: React.ComponentPr
   return (
     <div
       data-slot="surface-summary-card-option-rows"
-      className={cn("flex min-w-0 flex-col gap-2", className)}
+      className={cn("flex min-w-0 w-full flex-col gap-2", className)}
       {...props}
     />
   );

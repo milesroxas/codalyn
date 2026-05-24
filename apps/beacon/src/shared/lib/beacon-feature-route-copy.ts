@@ -14,9 +14,14 @@ export const IMAGE_UPLOAD_SUCCESS_UPLOAD_ANOTHER_LABEL = "Upload another image";
 
 export const IMAGE_UPLOAD_SUCCESS_BACK_HOME_LABEL = "Back to home";
 
+export const IMAGE_UPLOAD_SUCCESS_NEXT_STEPS_LABEL = "Next steps";
+
+export const IMAGE_UPLOAD_SUCCESS_GO_TO_CMS_LABEL = "Go to Webflow CMS";
+
+export const IMAGE_UPLOAD_SUCCESS_RETURN_TO_DESIGNER_LABEL = "Return to Designer";
+
 /** Shown after a CMS field upload on a collection template — same Designer cache refresh as CMS Slots. */
-export const IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_HINT =
-  "Switch to CMS in Webflow, then return to the Designer to see the updated image.";
+export const IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_HINT = "Refresh the page page to see the updated image in the Designer.";
 
 export const IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_READY =
   "You're back in the Designer — your image should appear on the canvas.";

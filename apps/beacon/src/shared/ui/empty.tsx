@@ -73,7 +73,7 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
     <div
       data-slot="empty-description"
       className={cn(
-        "text-sm/relaxed text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
+        "text-sm/relaxed text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary [&>strong]:font-medium [&>strong]:text-primary",
         className
       )}
       {...props}
@@ -85,7 +85,7 @@ const emptyContentVariants = cva("flex w-full min-w-0 flex-col items-center text
   variants: {
     layout: {
       default: "max-w-sm gap-2.5",
-      hint: "max-w-md gap-2.5",
+      hint: "max-w-sm items-stretch gap-2.5 text-left",
       actions: "max-w-sm gap-2",
     },
   },

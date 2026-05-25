@@ -1,14 +1,9 @@
-import { WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
 import {
   BEACON_EXPORT_HEIGHT_ATTR,
   BEACON_EXPORT_WIDTH_ATTR,
 } from "@/features/image-editor/lib/beacon-designer-image-export-attrs";
-import {
-  findImageElementForComponentInstanceProp,
-  imageElementBindsToComponentProp,
-} from "@/features/image-editor/lib/find-image-element-for-component-instance-prop";
+import { findImageElementForComponentInstanceProp } from "@/features/image-editor/lib/find-image-element-for-component-instance-prop";
 import type { ComponentInstanceImageProp } from "@/features/image-editor/lib/search-component-instance-image-props";
-import { walkWebflowStructureBfs } from "@/features/image-editor/lib/webflow-element-structure-walk";
 import {
   CMS_SLOT_COMPONENT_STRING_PROPS_GROUP,
   type CmsSlotStringComponentPropOptions,
@@ -134,51 +129,6 @@ export async function clearExportDimensionDefaultValuesOnDefinition(
   await applyExportDimensionDefaultValuesOnDefinition(def, propIds, null, null);
 }
 
-export async function findImageElementInDefinitionForImageProp(
-  definitionRoot: AnyElement,
-  imagePropId: string
-): Promise<ImageElement | null> {
-  let found: ImageElement | null = null;
-  await walkWebflowStructureBfs([definitionRoot], async (el) => {
-    if (found != null || el.type !== WEBFLOW_IMAGE_ELEMENT_TYPE) {
-      return "continue";
-    }
-    const img = el as ImageElement;
-    if (await imageElementBindsToComponentProp(img, imagePropId)) {
-      found = img;
-      return "stop";
-    }
-    return "continue";
-  });
-  return found;
-}
-
-/**
- * Ensures export dimension props + attribute bindings on a component definition opened via `openCanvas`.
- * Sets default prop values on the definition (all new instances inherit unless overridden).
- */
-export async function ensureBeaconExportDimensionPropsOnOpenDefinition(
-  def: Component,
-  definitionRoot: AnyElement | null,
-  imagePropId: string,
-  width: string,
-  height: string
-): Promise<{ widthPropId: string; heightPropId: string }> {
-  const propIds = await ensureExportDimensionPropIdsOnDefinition(def);
-  if (definitionRoot == null) {
-    throw new Error("Could not read this component definition.");
-  }
-  const img = await findImageElementInDefinitionForImageProp(definitionRoot, imagePropId);
-  if (img == null) {
-    throw new Error(
-      "Could not find the image field inside this component. Make sure the image is bound to the selected component image field."
-    );
-  }
-  await bindExportDimensionAttributesOnImage(img, propIds.widthPropId, propIds.heightPropId);
-  await applyExportDimensionDefaultValuesOnDefinition(def, propIds, width, height);
-  return propIds;
-}
-
 /**
  * Creates two `string` props on the component (when missing) and binds
  * `data-beacon-export-width` / `data-beacon-export-height` to them via
@@ -189,7 +139,8 @@ export async function ensureBeaconExportDimensionPropsOnDefinition(
   instance: ComponentElement,
   imagePropId: string,
   definitionRoot: AnyElement | null,
-  instanceImageProps: readonly ComponentInstanceImageProp[]
+  instanceImageProps: readonly ComponentInstanceImageProp[],
+  options?: { defaultValues?: { width: string; height: string } }
 ): Promise<{ widthPropId: string; heightPropId: string }> {
   const propIds = await ensureExportDimensionPropIdsOnDefinition(def);
 
@@ -203,5 +154,13 @@ export async function ensureBeaconExportDimensionPropsOnDefinition(
     );
   }
   await bindExportDimensionAttributesOnImage(img, propIds.widthPropId, propIds.heightPropId);
+  if (options?.defaultValues != null) {
+    await applyExportDimensionDefaultValuesOnDefinition(
+      def,
+      propIds,
+      options.defaultValues.width,
+      options.defaultValues.height
+    );
+  }
   return propIds;
 }

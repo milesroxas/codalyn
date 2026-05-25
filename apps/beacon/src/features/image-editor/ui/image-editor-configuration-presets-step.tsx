@@ -43,7 +43,6 @@ import {
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import {
   IMAGE_UPLOAD_PRESET_EDIT_OPENING_LOCATION_MESSAGE,
-  IMAGE_UPLOAD_PRESET_LOCATE_OPENED_COMPONENT_MESSAGE,
   IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
 } from "@/shared/lib/beacon-feature-route-copy";
 import { cn } from "@/shared/lib/utils";
@@ -111,8 +110,6 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     [editingId, presetEntriesById]
   );
 
-  const editingPresetUsesComponentCanvas =
-    editingEntry != null && getPresetLocateAction(editingEntry.row.targetKey).kind === "open-component";
   const {
     targets: formTargets,
     scanPending: formScanPending,
@@ -121,7 +118,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     rescan: formRescan,
     selectionHint: formSelectionHint,
     discoverySettled: formDiscoverySettled,
-  } = usePresetFormTargets(isForm && !locatePending && !editingPresetUsesComponentCanvas);
+  } = usePresetFormTargets(isForm && !locatePending);
 
   useEffect(() => {
     let cancelled = false;
@@ -301,13 +298,6 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
               message: IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
             });
           }
-          return;
-        }
-        if (result.navigatedToComponent && input.notifyOnSuccess) {
-          void webflow.notify({
-            type: "Success",
-            message: IMAGE_UPLOAD_PRESET_LOCATE_OPENED_COMPONENT_MESSAGE,
-          });
         }
       } finally {
         locateInFlightRef.current = false;

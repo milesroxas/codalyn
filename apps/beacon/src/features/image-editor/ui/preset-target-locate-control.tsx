@@ -1,10 +1,7 @@
 import type { PresetTargetKey } from "@codalyn/webflow-kit";
 
 import { getPresetLocateAction } from "@/features/image-editor/lib/locate-preset-target";
-import {
-  IMAGE_UPLOAD_PRESET_LOCATE_COMPONENT_HINT,
-  IMAGE_UPLOAD_PRESET_LOCATE_INSTANCE_HINT,
-} from "@/shared/lib/beacon-feature-route-copy";
+import { IMAGE_UPLOAD_PRESET_LOCATE_INSTANCE_HINT } from "@/shared/lib/beacon-feature-route-copy";
 import { SurfaceSummaryCardCanvasActionRow } from "@/shared/ui/surface-summary-card";
 
 type PresetTargetLocateControlProps = {
@@ -21,11 +18,7 @@ export function PresetTargetLocateControl(props: PresetTargetLocateControlProps)
     return null;
   }
 
-  const label =
-    instanceLocationLabel ??
-    (action.kind === "open-component"
-      ? IMAGE_UPLOAD_PRESET_LOCATE_COMPONENT_HINT
-      : IMAGE_UPLOAD_PRESET_LOCATE_INSTANCE_HINT);
+  const label = instanceLocationLabel ?? IMAGE_UPLOAD_PRESET_LOCATE_INSTANCE_HINT;
 
   return (
     <SurfaceSummaryCardCanvasActionRow

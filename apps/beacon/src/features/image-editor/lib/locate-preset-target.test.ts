@@ -16,14 +16,14 @@ function installWebflow(overrides: Record<string, unknown>) {
 }
 
 describe("getPresetLocateAction", () => {
-  it("returns open-component for component-scoped keys", () => {
+  it("returns find-on-canvas for component-scoped keys", () => {
     const action = getPresetLocateAction({
       kind: "component-image",
       siteId: "site_1",
       componentDefinitionId: "cmp_1",
       imagePropId: "hero-image",
     });
-    expect(action.kind).toBe("open-component");
+    expect(action.kind).toBe("find-on-canvas");
   });
 
   it("returns find-on-canvas for instance-scoped keys", () => {
@@ -73,7 +73,7 @@ describe("findImagePageTargetForPresetOnCurrentPage", () => {
     const instance = {
       type: "ComponentInstance",
       id: { component: "page_1", element: "inst_1" },
-      getComponent: vi.fn().mockResolvedValue({ getName: vi.fn().mockResolvedValue("Hero") }),
+      getComponent: vi.fn().mockResolvedValue({ id: "cmp_1", getName: vi.fn().mockResolvedValue("Hero") }),
       searchProps: vi.fn().mockImplementation(({ valueType }: { valueType: string }) => {
         if (valueType === "imageAsset") {
           return Promise.resolve([
@@ -105,18 +105,71 @@ describe("findImagePageTargetForPresetOnCurrentPage", () => {
     expect(target?.imagePropId).toBe("hero-image");
     expect(target?.element).toBe(instance);
   });
+
+  it("finds a component-scoped target by definition id and image prop", async () => {
+    const instance = {
+      type: "ComponentInstance",
+      id: { component: "page_1", element: "inst_1" },
+      getComponent: vi.fn().mockResolvedValue({ id: "cmp_1", getName: vi.fn().mockResolvedValue("Hero") }),
+      searchProps: vi.fn().mockImplementation(({ valueType }: { valueType: string }) => {
+        if (valueType === "imageAsset") {
+          return Promise.resolve([
+            {
+              propId: "hero-image",
+              value: null,
+              display: { label: "Hero image" },
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      }),
+      getChildren: vi.fn().mockResolvedValue([]),
+      getSlots: vi.fn().mockResolvedValue([]),
+    };
+    installWebflow({
+      getAllElements: vi.fn().mockResolvedValue([instance]),
+    });
+
+    const target = await findImagePageTargetForPresetOnCurrentPage({
+      kind: "component-image",
+      siteId: "site_1",
+      componentDefinitionId: "cmp_1",
+      imagePropId: "hero-image",
+    });
+
+    expect(target?.kind).toBe("component");
+    expect(target?.element).toBe(instance);
+  });
 });
 
 describe("locatePresetTarget", () => {
-  it("opens the component definition canvas for component presets", async () => {
-    const component = { id: "cmp_1" };
+  it("finds a component preset instance on the current page", async () => {
+    const instance = {
+      type: "ComponentInstance",
+      id: { component: "page_1", element: "inst_1" },
+      getComponent: vi.fn().mockResolvedValue({ id: "cmp_1", getName: vi.fn().mockResolvedValue("Hero") }),
+      searchProps: vi.fn().mockImplementation(({ valueType }: { valueType: string }) => {
+        if (valueType === "imageAsset") {
+          return Promise.resolve([
+            {
+              propId: "hero-image",
+              value: null,
+              display: { label: "Hero image" },
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      }),
+      getChildren: vi.fn().mockResolvedValue([]),
+      getSlots: vi.fn().mockResolvedValue([]),
+    };
     const openCanvas = vi.fn().mockResolvedValue(undefined);
+    const setSelectedElement = vi.fn().mockResolvedValue(undefined);
     installWebflow({
       getCurrentPage: vi.fn().mockRejectedValue(new Error("Missing current page!")),
-      getCurrentComponent: vi.fn().mockResolvedValue(null),
-      exitComponent: vi.fn().mockResolvedValue(undefined),
-      getComponent: vi.fn().mockResolvedValue(component),
+      getAllElements: vi.fn().mockResolvedValue([instance]),
       openCanvas,
+      setSelectedElement,
     });
 
     const result = await locatePresetTarget({
@@ -132,11 +185,11 @@ describe("locatePresetTarget", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.navigatedToComponent).toBe(true);
-      expect(result.target).toBeNull();
+      expect(result.navigatedToComponent).toBe(false);
+      expect(result.target?.kind).toBe("component");
     }
     expect(openCanvas).toHaveBeenCalledWith({ pageId: "page_1" });
-    expect(openCanvas).toHaveBeenCalledWith(component);
+    expect(setSelectedElement).toHaveBeenCalledWith(instance);
   });
 
   it("restores the page canvas before locating an instance preset", async () => {

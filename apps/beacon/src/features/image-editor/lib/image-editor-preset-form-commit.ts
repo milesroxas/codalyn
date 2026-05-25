@@ -18,7 +18,7 @@ import {
 } from "@codalyn/webflow-kit";
 import type { MutableRefObject } from "react";
 import {
-  setBeaconDesignerExportAttrsOnComponentDefinition,
+  type BeaconExportDimensionWriteMode,
   setBeaconDesignerExportAttrsOnPageTarget,
 } from "@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target";
 import { parseOutputDimension } from "@/features/image-editor/lib/apply-cropped-export";
@@ -153,27 +153,12 @@ export function presetScopeWritesDesignerTags(scope: PresetCrudScope): boolean {
   return shouldTagPageTargetOnPresetSave(scope) || shouldTagComponentDefinitionOnPresetSave(scope);
 }
 
-export function readComponentDefinitionTagTarget(input: {
-  presetScope: PresetCrudScope;
-  editingEntry: BeaconPresetStorageEntry | null;
-  resolvedTargetForScope: Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }> | null;
-}): { componentDefinitionId: string; imagePropId: string } | null {
-  if (!shouldTagComponentDefinitionOnPresetSave(input.presetScope)) {
-    return null;
+export function readPresetExportDimensionWriteMode(scope: PresetCrudScope): BeaconExportDimensionWriteMode | null {
+  if (shouldTagPageTargetOnPresetSave(scope)) {
+    return "instance-props";
   }
-  const key = input.editingEntry?.row.targetKey;
-  if (key?.kind === "component-image") {
-    return {
-      componentDefinitionId: key.componentDefinitionId,
-      imagePropId: key.imagePropId,
-    };
-  }
-  const resolved = input.resolvedTargetForScope;
-  if (resolved?.kind === "component-image") {
-    return {
-      componentDefinitionId: resolved.componentDefinitionId,
-      imagePropId: resolved.imagePropId,
-    };
+  if (shouldTagComponentDefinitionOnPresetSave(scope)) {
+    return "definition-defaults";
   }
   return null;
 }
@@ -331,33 +316,25 @@ export type CommitImagePresetFormArgs = {
 async function applyPresetSaveSideEffects(input: {
   presetScope: PresetCrudScope;
   tagTarget: ImagePageTarget | null;
-  componentDefinitionTagTarget: { componentDefinitionId: string; imagePropId: string } | null;
   draft: ParsedPresetDraft;
   pageId: string | null;
 }): Promise<void> {
-  const { presetScope, tagTarget, componentDefinitionTagTarget, draft, pageId } = input;
-  if (tagTarget != null && shouldTagPageTargetOnPresetSave(presetScope)) {
-    await setBeaconDesignerExportAttrsOnPageTarget(tagTarget, draft.width, draft.height, { pageIdHint: pageId });
-  }
-  if (componentDefinitionTagTarget != null && shouldTagComponentDefinitionOnPresetSave(presetScope)) {
-    await setBeaconDesignerExportAttrsOnComponentDefinition({
-      componentDefinitionId: componentDefinitionTagTarget.componentDefinitionId,
-      imagePropId: componentDefinitionTagTarget.imagePropId,
-      width: draft.width,
-      height: draft.height,
+  const { presetScope, tagTarget, draft, pageId } = input;
+  const writeMode = readPresetExportDimensionWriteMode(presetScope);
+  if (tagTarget != null && writeMode != null) {
+    await setBeaconDesignerExportAttrsOnPageTarget(tagTarget, draft.width, draft.height, {
       pageIdHint: pageId,
+      writeMode,
     });
   }
-  const taggedInstance = tagTarget != null && shouldTagPageTargetOnPresetSave(presetScope);
-  const taggedComponentDefinition =
-    componentDefinitionTagTarget != null && shouldTagComponentDefinitionOnPresetSave(presetScope);
   void webflow.notify({
     type: "Success",
-    message: taggedInstance
-      ? "Saved preset and tagged the Image surface."
-      : taggedComponentDefinition
-        ? "Saved preset and updated the component definition."
-        : "Saved preset.",
+    message:
+      tagTarget != null && writeMode === "instance-props"
+        ? "Saved preset and tagged the Image surface."
+        : tagTarget != null && writeMode === "definition-defaults"
+          ? "Saved preset and updated the component definition."
+          : "Saved preset.",
   });
 }
 
@@ -424,7 +401,9 @@ export async function commitImagePresetForm(args: CommitImagePresetFormArgs): Pr
     }
 
     const requireExplicitTarget =
-      editingEntry != null && inferPresetCrudScopeFromTargetKey(editingEntry.row) === "instance";
+      editingEntry != null &&
+      (inferPresetCrudScopeFromTargetKey(editingEntry.row) === "instance" ||
+        inferPresetCrudScopeFromTargetKey(editingEntry.row) === "component");
     const tagTarget = await resolvePresetTagTarget(formTarget, formTargets, { requireExplicitTarget });
     const targetValidationError = validationErrorForTagTarget({
       editingId,
@@ -470,11 +449,6 @@ export async function commitImagePresetForm(args: CommitImagePresetFormArgs): Pr
     await applyPresetSaveSideEffects({
       presetScope,
       tagTarget,
-      componentDefinitionTagTarget: readComponentDefinitionTagTarget({
-        presetScope,
-        editingEntry,
-        resolvedTargetForScope,
-      }),
       draft: parsedDraft,
       pageId: activePageId,
     });

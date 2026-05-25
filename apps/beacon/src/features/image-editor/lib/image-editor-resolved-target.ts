@@ -7,6 +7,7 @@ import type {
 import { readBeaconDesignerExportAttrsFromPageTarget } from "@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target";
 import type { ElementCmsBindingResolution } from "@/features/image-editor/lib/cms-primary-upload-context";
 import { getBeaconExportDimensionPropIdsOrNull } from "@/features/image-editor/lib/ensure-beacon-export-dimension-props";
+import { readComponentDefinitionIdForInstance } from "@/features/image-editor/lib/read-component-definition-id";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 
 const POSITIVE_INTEGER_RE = /^[1-9]\d*$/;
@@ -79,25 +80,6 @@ function asImagePageTarget(
 function readElementId(element: AnyElement): string | null {
   const elementId = (element.id as { element?: unknown }).element;
   return typeof elementId === "string" && elementId.length > 0 ? elementId : null;
-}
-
-function readComponentDefinitionIdFromInstance(instance: ComponentElement): string | null {
-  const componentId = (instance.id as { component?: unknown }).component;
-  return typeof componentId === "string" && componentId.length > 0 ? componentId : null;
-}
-
-function readComponentDefinitionId(component: Component): string | null {
-  const id = (component as { id?: unknown }).id;
-  if (typeof id === "string" && id.length > 0) {
-    return id;
-  }
-  if (id && typeof id === "object") {
-    const componentId = (id as { component?: unknown }).component;
-    if (typeof componentId === "string" && componentId.length > 0) {
-      return componentId;
-    }
-  }
-  return null;
 }
 
 async function readTaggedDimensionsFromComponentProps(
@@ -183,9 +165,7 @@ export async function mapSelectedTargetToResolvedUploadTarget(input: {
   if (instanceElementId == null || imagePropId == null || imagePropId.length === 0) {
     return null;
   }
-  const component = await instance.getComponent().catch(() => null);
-  const componentDefinitionId =
-    (component ? readComponentDefinitionId(component) : null) ?? readComponentDefinitionIdFromInstance(instance);
+  const componentDefinitionId = await readComponentDefinitionIdForInstance(instance);
   if (componentDefinitionId == null) {
     return null;
   }

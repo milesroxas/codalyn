@@ -5,7 +5,6 @@ import { cleanupDesignerTagsForPresetEntry } from "./image-editor-preset-delete-
 
 vi.mock("@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target", () => ({
   clearBeaconDesignerExportAttrsOnPageTarget: vi.fn().mockResolvedValue(undefined),
-  clearBeaconDesignerExportAttrsOnComponentDefinition: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/features/image-editor/lib/locate-preset-target", async (importOriginal) => {
@@ -87,13 +86,29 @@ describe("cleanupDesignerTagsForPresetEntry", () => {
       cleaned: true,
     });
     expect(preparePageCanvasForWork).toHaveBeenCalledWith("page_1");
-    expect(clearBeaconDesignerExportAttrsOnPageTarget).toHaveBeenCalledWith(target);
+    expect(clearBeaconDesignerExportAttrsOnPageTarget).toHaveBeenCalledWith(target, {
+      writeMode: "instance-props",
+      pageIdHint: "page_2",
+    });
   });
 
-  it("clears component definition defaults for component presets", async () => {
-    const { clearBeaconDesignerExportAttrsOnComponentDefinition } = await import(
+  it("clears component definition defaults via a page instance", async () => {
+    const { clearBeaconDesignerExportAttrsOnPageTarget } = await import(
       "@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target"
     );
+    const { findImagePageTargetForPresetOnCurrentPage } = await import(
+      "@/features/image-editor/lib/locate-preset-target"
+    );
+    const { preparePageCanvasForWork } = await import("@/shared/lib/component-definition-scope");
+
+    const target = {
+      id: "locate-comp-inst_1",
+      kind: "component" as const,
+      element: { type: "ComponentInstance" } as AnyElement,
+      label: "Hero",
+      imagePropId: "hero-image",
+    };
+    vi.mocked(findImagePageTargetForPresetOnCurrentPage).mockResolvedValueOnce(target);
 
     const entry: BeaconPresetStorageEntry = {
       scope: "component",
@@ -116,8 +131,9 @@ describe("cleanupDesignerTagsForPresetEntry", () => {
       ok: true,
       cleaned: true,
     });
-    expect(clearBeaconDesignerExportAttrsOnComponentDefinition).toHaveBeenCalledWith({
-      componentDefinitionId: "cmp_1",
+    expect(preparePageCanvasForWork).toHaveBeenCalledWith("page_1");
+    expect(clearBeaconDesignerExportAttrsOnPageTarget).toHaveBeenCalledWith(target, {
+      writeMode: "definition-defaults",
       pageIdHint: "page_1",
     });
   });

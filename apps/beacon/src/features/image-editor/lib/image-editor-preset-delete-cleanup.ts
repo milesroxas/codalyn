@@ -1,12 +1,8 @@
-import type { BeaconPresetStorageEntry, PresetTargetKey } from "@codalyn/webflow-kit";
-import {
-  clearBeaconDesignerExportAttrsOnComponentDefinition,
-  clearBeaconDesignerExportAttrsOnPageTarget,
-} from "@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target";
+import type { BeaconPresetStorageEntry } from "@codalyn/webflow-kit";
+import { clearBeaconDesignerExportAttrsOnPageTarget } from "@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target";
 import {
   presetScopeWritesDesignerTags,
-  shouldTagComponentDefinitionOnPresetSave,
-  shouldTagPageTargetOnPresetSave,
+  readPresetExportDimensionWriteMode,
 } from "@/features/image-editor/lib/image-editor-preset-form-commit";
 import {
   findImagePageTargetForPresetOnCurrentPage,
@@ -15,30 +11,22 @@ import {
 import { preparePageCanvasForWork } from "@/shared/lib/component-definition-scope";
 import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
 
-async function cleanupInstancePresetDesignerTags(input: {
-  targetKey: PresetTargetKey;
+async function cleanupPresetDesignerTags(input: {
+  entry: BeaconPresetStorageEntry;
   pageIdHint: string | null;
 }): Promise<void> {
-  const pageId = resolvePageIdForInstancePresetWork(input.targetKey, input.pageIdHint);
+  const { entry, pageIdHint } = input;
+  const writeMode = readPresetExportDimensionWriteMode(entry.scope);
+  if (writeMode == null) {
+    return;
+  }
+  const pageId = resolvePageIdForInstancePresetWork(entry.row.targetKey, pageIdHint);
   await preparePageCanvasForWork(pageId);
-  const target = await findImagePageTargetForPresetOnCurrentPage(input.targetKey);
+  const target = await findImagePageTargetForPresetOnCurrentPage(entry.row.targetKey);
   if (target == null) {
     return;
   }
-  await clearBeaconDesignerExportAttrsOnPageTarget(target);
-}
-
-async function cleanupComponentPresetDesignerTags(input: {
-  targetKey: PresetTargetKey;
-  pageIdHint: string | null;
-}): Promise<void> {
-  if (input.targetKey.kind !== "component-image") {
-    return;
-  }
-  await clearBeaconDesignerExportAttrsOnComponentDefinition({
-    componentDefinitionId: input.targetKey.componentDefinitionId,
-    pageIdHint: input.pageIdHint,
-  });
+  await clearBeaconDesignerExportAttrsOnPageTarget(target, { writeMode, pageIdHint });
 }
 
 /**
@@ -55,15 +43,8 @@ export async function cleanupDesignerTagsForPresetEntry(input: {
 
   try {
     return await runExclusiveDesignerOp(async () => {
-      if (shouldTagPageTargetOnPresetSave(entry.scope)) {
-        await cleanupInstancePresetDesignerTags({ targetKey: entry.row.targetKey, pageIdHint });
-        return { ok: true, cleaned: true } as const;
-      }
-      if (shouldTagComponentDefinitionOnPresetSave(entry.scope)) {
-        await cleanupComponentPresetDesignerTags({ targetKey: entry.row.targetKey, pageIdHint });
-        return { ok: true, cleaned: true } as const;
-      }
-      return { ok: true, cleaned: false } as const;
+      await cleanupPresetDesignerTags({ entry, pageIdHint });
+      return { ok: true, cleaned: true } as const;
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not clear Designer tags for this preset.";

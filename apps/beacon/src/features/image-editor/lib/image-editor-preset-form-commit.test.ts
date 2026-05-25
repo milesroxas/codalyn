@@ -7,7 +7,7 @@ import {
 } from "@/shared/lib/beacon-feature-route-copy";
 import {
   presetScopeWritesDesignerTags,
-  readComponentDefinitionTagTarget,
+  readPresetExportDimensionWriteMode,
   shouldTagComponentDefinitionOnPresetSave,
   shouldTagPageTargetOnPresetSave,
   validateInstancePresetEditTarget,
@@ -40,48 +40,12 @@ describe("presetScopeWritesDesignerTags", () => {
   });
 });
 
-describe("readComponentDefinitionTagTarget", () => {
-  it("reads from an existing component preset row when editing", () => {
-    expect(
-      readComponentDefinitionTagTarget({
-        presetScope: "component",
-        editingEntry: {
-          scope: "component",
-          row: {
-            id: "preset_1",
-            name: "Hero",
-            width: 1200,
-            height: 800,
-            maxFileSizeBytes: 200_000,
-            targetKey: {
-              kind: "component-image",
-              siteId: "site_1",
-              componentDefinitionId: "cmp_1",
-              imagePropId: "hero-image",
-            },
-          },
-        },
-        resolvedTargetForScope: null,
-      })
-    ).toEqual({ componentDefinitionId: "cmp_1", imagePropId: "hero-image" });
-  });
-
-  it("reads from a resolved upload target when creating", () => {
-    expect(
-      readComponentDefinitionTagTarget({
-        presetScope: "component",
-        editingEntry: null,
-        resolvedTargetForScope: {
-          kind: "component-image",
-          siteId: "site_1",
-          pageId: "page_1",
-          instanceElementId: "inst_1",
-          componentDefinitionId: "cmp_1",
-          imagePropId: "hero-image",
-          tagged: null,
-        },
-      })
-    ).toEqual({ componentDefinitionId: "cmp_1", imagePropId: "hero-image" });
+describe("readPresetExportDimensionWriteMode", () => {
+  it("maps preset scopes to export dimension write modes", () => {
+    expect(readPresetExportDimensionWriteMode("instance")).toBe("instance-props");
+    expect(readPresetExportDimensionWriteMode("component")).toBe("definition-defaults");
+    expect(readPresetExportDimensionWriteMode("element")).toBeNull();
+    expect(readPresetExportDimensionWriteMode("site-default")).toBeNull();
   });
 });
 

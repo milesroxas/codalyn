@@ -13,12 +13,20 @@ import { resolveAssetFolderHandleForExport } from "@/features/image-editor/lib/a
 import type { AssetFolderRow } from "@/features/image-editor/lib/asset-folder-row";
 import type { ComponentImagePropOption } from "@/features/image-editor/lib/component-image-prop";
 import { sanitizeAssetBaseName } from "@/features/image-editor/lib/sanitize-asset-base-name";
+import type { TowerUsageLimitDetails } from "@/shared/lib/tower-usage-limit-error";
 
 function folderMissingMessage(assetFolders: AssetFolderRow[]): string {
   return assetFolders.length === 0 ? "Create an Assets folder first." : "Choose an Assets folder first.";
 }
 
-async function notifyExportResult(result: ExportResult): Promise<void> {
+async function notifyExportResult(
+  result: ExportResult,
+  onUsageLimit?: (details: TowerUsageLimitDetails) => void
+): Promise<void> {
+  if (result.kind === "usage-limit") {
+    onUsageLimit?.(result.details);
+    return;
+  }
   if (result.kind === "success") {
     return;
   }
@@ -65,8 +73,9 @@ async function exportDownloadPlacement(args: {
   dimSetters: Parameters<typeof syncExportDimensionsToState>[3];
   setBusy: (v: boolean) => void;
   onSuccess: (context: ImageExportSuccessContext) => void;
+  onUsageLimit?: (details: TowerUsageLimitDetails) => void;
 }): Promise<void> {
-  const { imageSrc, completedCrop, w, h, quality, safeName, dimSetters, setBusy, onSuccess } = args;
+  const { imageSrc, completedCrop, w, h, quality, safeName, dimSetters, setBusy, onSuccess, onUsageLimit } = args;
   setBusy(true);
   try {
     syncExportDimensionsToState(w, h, safeName, dimSetters);
@@ -81,7 +90,7 @@ async function exportDownloadPlacement(args: {
     if (result.kind === "success") {
       onSuccess(toExportSuccessContext(result));
     }
-    await notifyExportResult(result);
+    await notifyExportResult(result, onUsageLimit);
   } finally {
     setBusy(false);
   }
@@ -104,6 +113,7 @@ async function exportWebflowPlacement(args: {
   placement: PlacementMode;
   replaceLibraryAsset: boolean;
   onSuccess: (context: ImageExportSuccessContext) => void;
+  onUsageLimit?: (details: TowerUsageLimitDetails) => void;
 }): Promise<void> {
   const {
     imageSrc,
@@ -122,6 +132,7 @@ async function exportWebflowPlacement(args: {
     placement,
     replaceLibraryAsset,
     onSuccess,
+    onUsageLimit,
   } = args;
   setBusy(true);
   try {
@@ -143,7 +154,7 @@ async function exportWebflowPlacement(args: {
     if (result.kind === "success") {
       onSuccess(toExportSuccessContext(result));
     }
-    await notifyExportResult(result);
+    await notifyExportResult(result, onUsageLimit);
   } finally {
     setBusy(false);
   }
@@ -175,6 +186,7 @@ export function useApplyCroppedToWebflow(options: {
   exportPlaceBlockedCode?: BeaconImageErrorCode | null;
   /** Called synchronously when export succeeds, before busy clears. */
   onExportSuccess?: (context: ImageExportSuccessContext) => void;
+  onTowerUsageLimit?: (details: TowerUsageLimitDetails) => void;
 }) {
   const {
     imageSrc,
@@ -200,6 +212,7 @@ export function useApplyCroppedToWebflow(options: {
     exportPlaceBlockedLabel,
     exportPlaceBlockedCode = null,
     onExportSuccess,
+    onTowerUsageLimit,
   } = options;
 
   const [busy, setBusy] = useState(false);
@@ -255,6 +268,7 @@ export function useApplyCroppedToWebflow(options: {
         dimSetters,
         setBusy,
         onSuccess: reportExportSuccess,
+        onUsageLimit: onTowerUsageLimit,
       });
       return;
     }
@@ -286,6 +300,7 @@ export function useApplyCroppedToWebflow(options: {
       placement,
       replaceLibraryAsset,
       onSuccess: reportExportSuccess,
+      onUsageLimit: onTowerUsageLimit,
     });
   }, [
     imageSrc,
@@ -311,6 +326,7 @@ export function useApplyCroppedToWebflow(options: {
     exportPlaceBlockedLabel,
     exportPlaceBlockedCode,
     reportExportSuccess,
+    onTowerUsageLimit,
   ]);
 
   return { busy, applyToCanvas, exportSuccess, clearExportSuccess };

@@ -10,9 +10,13 @@ export const IMAGE_UPLOAD_CONTINUE_TO_SAVE_LABEL = "Continue to export";
 
 export const IMAGE_UPLOAD_SUCCESS_TITLE = "Image saved";
 
-export const IMAGE_UPLOAD_SUCCESS_CHANGE_IMAGE_LABEL = "Change image and select new target";
+export const IMAGE_UPLOAD_SUCCESS_UPLOAD_ANOTHER_LABEL = "Upload another image";
 
-export const IMAGE_UPLOAD_SUCCESS_CHANGE_IMAGE_HINT = "Upload a new file or pick another target on the page";
+export const IMAGE_UPLOAD_SUCCESS_UPLOAD_ANOTHER_HINT = "Keep the same target and choose a new file";
+
+export const IMAGE_UPLOAD_SUCCESS_RESELECT_TARGET_LABEL = "Select a different target";
+
+export const IMAGE_UPLOAD_SUCCESS_RESELECT_TARGET_HINT = "Pick another image or component field on the page";
 
 export const IMAGE_UPLOAD_SUCCESS_RETURN_TO_DESIGNER_LABEL = "Return to Designer";
 

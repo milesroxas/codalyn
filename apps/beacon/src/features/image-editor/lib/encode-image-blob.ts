@@ -6,6 +6,7 @@ import {
 } from "@codalyn/webflow-kit";
 import { sanitizeAssetBaseName } from "@/features/image-editor/lib/sanitize-asset-base-name";
 import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
+import { parseTowerUsageLimitBody, TowerUsageLimitError } from "@/shared/lib/tower-usage-limit-error";
 import { waitForNextPaint } from "@/shared/lib/wait-for-next-paint";
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
@@ -30,6 +31,49 @@ export type EncodedImage = {
   mimeType: string;
 };
 
+async function assertTowerOptimizeResponseOk(res: Response): Promise<void> {
+  if (res.ok) {
+    return;
+  }
+  const detail = await res.text();
+  if (res.status === 402) {
+    const usageLimit = parseTowerUsageLimitBody(detail);
+    if (usageLimit != null) {
+      throw new TowerUsageLimitError(usageLimit);
+    }
+  }
+  if (res.status === 401) {
+    throw new Error(
+      "Tower rejected the request (401). Set VITE_BEACON_API_KEY to match Tower BEACON_API_KEY, or use a session that can call /api/v1."
+    );
+  }
+  const detailSnippet = detail.slice(0, 240);
+  throw new Error(`Tower image optimize failed (${res.status}): ${detailSnippet || res.statusText}`);
+}
+
+async function encodeAvifViaTower(
+  canvas: HTMLCanvasElement,
+  qualityPercent: number,
+  baseName: string
+): Promise<EncodedImage> {
+  const png = await canvasToBlob(canvas, "image/png");
+  const res = await towerFetch(
+    `/api/v1/images/optimize?format=${encodeURIComponent("avif")}&quality=${qualityPercent}`,
+    {
+      method: "POST",
+      body: png,
+      headers: { "Content-Type": "image/png" },
+    }
+  );
+  await assertTowerOptimizeResponseOk(res);
+  const blob = await res.blob();
+  return {
+    blob,
+    fileName: `${baseName}.${fileExtensionForFormat("avif")}`,
+    mimeType: blob.type || mimeTypeForFormat("avif"),
+  };
+}
+
 export async function encodeCanvasToOptimizedFile(
   canvas: HTMLCanvasElement,
   quality: number,
@@ -44,32 +88,7 @@ export async function encodeCanvasToOptimizedFile(
   // WebP is encoded in-browser so guest mode works without Tower auth; Tower handles AVIF only (sharp).
   if (tower && format === "avif") {
     const qualityPercent = Math.min(100, Math.max(1, Math.round(q * 100)));
-    const png = await canvasToBlob(canvas, "image/png");
-    const res = await towerFetch(
-      `/api/v1/images/optimize?format=${encodeURIComponent(format)}&quality=${qualityPercent}`,
-      {
-        method: "POST",
-        body: png,
-        headers: { "Content-Type": "image/png" },
-      }
-    );
-
-    if (!res.ok) {
-      const detail = (await res.text()).slice(0, 240);
-      if (res.status === 401) {
-        throw new Error(
-          "Tower rejected the request (401). Set VITE_BEACON_API_KEY to match Tower BEACON_API_KEY, or use a session that can call /api/v1."
-        );
-      }
-      throw new Error(`Tower image optimize failed (${res.status}): ${detail || res.statusText}`);
-    }
-
-    const blob = await res.blob();
-    return {
-      blob,
-      fileName: `${base}.${fileExtensionForFormat(format)}`,
-      mimeType: blob.type || mimeTypeForFormat(format),
-    };
+    return encodeAvifViaTower(canvas, qualityPercent, base);
   }
 
   if (format === "avif") {

@@ -150,12 +150,44 @@ function AlertDialogCancel({
   );
 }
 
+const alertDialogFactPanelClass =
+  "flex w-full min-w-0 flex-col gap-3 rounded-md border border-border/70 bg-muted/25 px-3 py-2.5 text-left";
+const alertDialogFactClass = "flex min-w-0 flex-col gap-0.5";
+const alertDialogFactLabelClass = "text-[10px] font-medium uppercase tracking-wide text-muted-foreground";
+const alertDialogFactValueClass = "text-sm font-semibold tabular-nums text-foreground";
+const alertDialogFactHintClass = "text-muted-foreground text-sm leading-snug";
+
+function AlertDialogFactPanel({ className, ...props }: React.ComponentProps<"div">) {
+  return <div data-slot="alert-dialog-fact-panel" className={cn(alertDialogFactPanelClass, className)} {...props} />;
+}
+
+function AlertDialogFact({ className, ...props }: React.ComponentProps<"div">) {
+  return <div data-slot="alert-dialog-fact" className={cn(alertDialogFactClass, className)} {...props} />;
+}
+
+function AlertDialogFactLabel({ className, ...props }: React.ComponentProps<"p">) {
+  return <p data-slot="alert-dialog-fact-label" className={cn(alertDialogFactLabelClass, className)} {...props} />;
+}
+
+function AlertDialogFactValue({ className, ...props }: React.ComponentProps<"p">) {
+  return <p data-slot="alert-dialog-fact-value" className={cn(alertDialogFactValueClass, className)} {...props} />;
+}
+
+function AlertDialogFactHint({ className, ...props }: React.ComponentProps<"p">) {
+  return <p data-slot="alert-dialog-fact-hint" className={cn(alertDialogFactHintClass, className)} {...props} />;
+}
+
 export {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
+  AlertDialogFact,
+  AlertDialogFactHint,
+  AlertDialogFactLabel,
+  AlertDialogFactPanel,
+  AlertDialogFactValue,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogMedia,

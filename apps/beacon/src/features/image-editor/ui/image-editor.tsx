@@ -54,6 +54,10 @@ import {
 import { loadImage } from "@/features/image-editor/lib/load-image";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
+import {
+  isAvifPresetOverriddenByTowerLimit,
+  resolveEffectiveExportFormat,
+} from "@/features/image-editor/lib/tower-avif-export-format";
 import { webflowElementIdKey } from "@/features/image-editor/lib/webflow-element-id-key";
 import { useApplyCroppedToWebflow } from "@/features/image-editor/model/use-apply-cropped-to-webflow";
 import { useComponentInstanceImageProps } from "@/features/image-editor/model/use-component-instance-image-props";
@@ -68,6 +72,7 @@ import { useImageOutputDimensionsOnLoad } from "@/features/image-editor/model/us
 import { useQualityPopoutBridge } from "@/features/image-editor/model/use-quality-popout-bridge";
 import { useResolvedExportConstraints } from "@/features/image-editor/model/use-resolved-export-constraints";
 import { useRevokeBlobUrlOnChange } from "@/features/image-editor/model/use-revoke-blob-url";
+import { useTowerUsageLimitDialog } from "@/features/image-editor/model/use-tower-usage-limit-dialog";
 import type {
   CropFrameMode,
   UploadPresetPickerOption,
@@ -80,11 +85,13 @@ import {
   ImageEditorRouteFooterAction,
 } from "@/features/image-editor/ui/image-editor-route-chrome";
 import { ImageEditorWorkspace } from "@/features/image-editor/ui/image-editor-workspace";
+import { TowerUsageLimitDialog } from "@/features/image-editor/ui/tower-usage-limit-dialog";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import {
   IMAGE_UPLOAD_CONTINUE_TO_ADD_LABEL,
   IMAGE_UPLOAD_CONTINUE_TO_SAVE_LABEL,
 } from "@/shared/lib/beacon-feature-route-copy";
+import type { TowerUsageLimitDetails } from "@/shared/lib/tower-usage-limit-error";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 import { StepNav } from "@/shared/ui/step-nav";
 
@@ -367,6 +374,23 @@ export function ImageEditor() {
   const lastAppliedUploadPresetOptionIdRef = useRef<string | null>(null);
   const skipNextPersistExportDefaultsRef = useRef(false);
   const [uploadPresetOptionId, setUploadPresetOptionId] = useState<string>("");
+  const {
+    open: usageLimitDialogOpen,
+    details: usageLimitDialogDetails,
+    imageOptimizeLimitReached,
+    reportUsageLimit,
+    onOpenChange: onUsageLimitDialogOpenChange,
+  } = useTowerUsageLimitDialog();
+
+  const reportTowerUsageLimit = useCallback(
+    (details: TowerUsageLimitDetails) => {
+      reportUsageLimit(details);
+      if (details.kind === "image") {
+        setExportFormat("webp");
+      }
+    },
+    [reportUsageLimit]
+  );
 
   const handleUploadPresetPickerChange = useCallback((value: string) => {
     userPickedUploadPresetRef.current = true;
@@ -512,6 +536,22 @@ export function ImageEditor() {
   const uploadPresetExportFormatLocked = useMemo(
     () => isUploadPresetExportFormatLocked(uploadPresetPickerOptionMap.get(uploadPresetOptionId)),
     [uploadPresetOptionId, uploadPresetPickerOptionMap]
+  );
+
+  const selectedUploadPresetConstraints = uploadPresetPickerOptionMap.get(uploadPresetOptionId)?.constraints ?? null;
+
+  const effectiveExportFormat = useMemo(
+    () => resolveEffectiveExportFormat(exportFormat, imageOptimizeLimitReached),
+    [exportFormat, imageOptimizeLimitReached]
+  );
+
+  const avifPresetOverriddenByTowerLimit = useMemo(
+    () =>
+      isAvifPresetOverriddenByTowerLimit({
+        imageOptimizeLimitReached,
+        presetExportFormat: selectedUploadPresetConstraints?.exportFormat,
+      }),
+    [selectedUploadPresetConstraints?.exportFormat, imageOptimizeLimitReached]
   );
 
   const uploadPresetPickerReadOnly = useMemo(
@@ -703,26 +743,38 @@ export function ImageEditor() {
     }
     lastAppliedUploadPresetOptionIdRef.current = applyKey;
     skipNextPersistExportDefaultsRef.current = true;
-    applySessionConstraintsFromPickerSelection(selectedConstraints, {
-      setOutputWidth,
-      setOutputHeight,
-      setWidthStr,
-      setHeightStr,
-      setExportFormat,
-      setQuality,
-      setCropFrameMode,
-      setAspectPreset,
-    });
-  }, [resolvedUploadTarget, uploadPresetOptionId, uploadPresetPickerOptionMap, imageSrc]);
+    applySessionConstraintsFromPickerSelection(
+      {
+        ...selectedConstraints,
+        exportFormat: resolveEffectiveExportFormat(selectedConstraints.exportFormat, imageOptimizeLimitReached),
+      },
+      {
+        setOutputWidth,
+        setOutputHeight,
+        setWidthStr,
+        setHeightStr,
+        setExportFormat,
+        setQuality,
+        setCropFrameMode,
+        setAspectPreset,
+      }
+    );
+  }, [resolvedUploadTarget, uploadPresetOptionId, uploadPresetPickerOptionMap, imageSrc, imageOptimizeLimitReached]);
 
   useEffect(() => {
-    if (uploadPresetExportFormatLocked) {
+    if (uploadPresetExportFormatLocked && !avifPresetOverriddenByTowerLimit) {
       return;
     }
-    if (!allowAvifEncoding && exportFormat === "avif") {
+    if ((!allowAvifEncoding || imageOptimizeLimitReached) && exportFormat === "avif") {
       setExportFormat("webp");
     }
-  }, [allowAvifEncoding, exportFormat, uploadPresetExportFormatLocked]);
+  }, [
+    allowAvifEncoding,
+    avifPresetOverriddenByTowerLimit,
+    exportFormat,
+    uploadPresetExportFormatLocked,
+    imageOptimizeLimitReached,
+  ]);
 
   useEffect(() => {
     if (towerUser) {
@@ -914,8 +966,9 @@ export function ImageEditor() {
     effectiveOutputW,
     effectiveOutputH,
     quality,
-    exportFormat,
+    exportFormat: effectiveExportFormat,
     enabled: exportDimensionsReady,
+    onTowerUsageLimit: reportTowerUsageLimit,
   });
 
   const presetFileLimitBlocker = useMemo(
@@ -944,8 +997,9 @@ export function ImageEditor() {
     effectiveOutputW,
     effectiveOutputH,
     quality,
-    exportFormat,
+    exportFormat: effectiveExportFormat,
     enabled: exportDimensionsReady,
+    onTowerUsageLimit: reportTowerUsageLimit,
   });
 
   const qualityPopoutWindowRef = useRef<Window | null>(null);
@@ -954,10 +1008,11 @@ export function ImageEditor() {
     completedCrop,
     effectiveOutputW,
     effectiveOutputH,
-    exportFormat,
+    exportFormat: effectiveExportFormat,
     setQuality,
     onQualityCommit,
     popoutWindowRef: qualityPopoutWindowRef,
+    onTowerUsageLimit: reportTowerUsageLimit,
   });
 
   const openQualityPopout = useCallback(() => {
@@ -1118,7 +1173,7 @@ export function ImageEditor() {
     setHeightStr(String(height));
   }, [useManualAspectAndMaxWidth, cropFrameMode, aspectPreset]);
 
-  const onChooseAddImageEntry = useCallback(() => {
+  const resetAutoTargetSelection = useCallback(() => {
     setAutoPageTarget(null);
     setAutoTargetHasDesignerExportTag(false);
     setAspectPreset("unset");
@@ -1127,20 +1182,17 @@ export function ImageEditor() {
     setHeightStr("");
     setOutputWidth(0);
     setOutputHeight(0);
+  }, []);
+
+  const onChooseAddImageEntry = useCallback(() => {
+    resetAutoTargetSelection();
     chooseAutoPath();
-  }, [chooseAutoPath]);
+  }, [resetAutoTargetSelection, chooseAutoPath]);
 
   const onChooseConfigureEntry = useCallback(() => {
-    setAutoPageTarget(null);
-    setAutoTargetHasDesignerExportTag(false);
-    setAspectPreset("unset");
-    setCropFrameMode("aspect");
-    setWidthStr("");
-    setHeightStr("");
-    setOutputWidth(0);
-    setOutputHeight(0);
+    resetAutoTargetSelection();
     chooseConfigurePath();
-  }, [chooseConfigurePath]);
+  }, [resetAutoTargetSelection, chooseConfigurePath]);
 
   const onAutoSelectTarget = useCallback(
     (t: ImagePageTarget) => {
@@ -1211,7 +1263,7 @@ export function ImageEditor() {
     effectiveOutputW,
     effectiveOutputH,
     quality,
-    exportFormat,
+    exportFormat: effectiveExportFormat,
     fileBaseName,
     setFileBaseName,
     setOutputWidth,
@@ -1229,14 +1281,14 @@ export function ImageEditor() {
     exportPlaceBlockedLabel: exportPlaceBlockedForApply.label,
     exportPlaceBlockedCode: exportPlaceBlockedForApply.code,
     onExportSuccess: handleExportSuccess,
+    onTowerUsageLimit: reportTowerUsageLimit,
   });
 
-  const { handleUploadAnotherAfterSuccess } = useImageEditorExportSuccessNavigation({
+  const { handleUploadAnotherAfterSuccess, handleReselectTargetAfterSuccess } = useImageEditorExportSuccessNavigation({
     clearExportSuccess,
     setFlowStep,
     clearImageSourceOnly,
-    pathMode,
-    autoPageTarget,
+    resetAutoTargetSelection,
     navigate,
   });
 
@@ -1356,7 +1408,9 @@ export function ImageEditor() {
       cmsCollectionTemplatePage={cmsCollectionTemplatePage}
       stepExitFade={stepExitFade}
       onStepExitTransitionEnd={onStepExitTransitionEnd}
+      showReselectTarget={pathMode === "auto"}
       onUploadAnother={handleUploadAnotherAfterSuccess}
+      onReselectTarget={handleReselectTargetAfterSuccess}
       cropPanelProps={{
         exportDimensionsReady,
         strictOutputDimensionInputs: !effectiveTaggedDimensionsActive,
@@ -1445,6 +1499,7 @@ export function ImageEditor() {
         uploadPresetPickerOptions,
         onUploadPresetPickerChange: handleUploadPresetPickerChange,
         exportFormatLocked: uploadPresetExportFormatLocked,
+        avifPresetOverriddenByTowerLimit,
       }}
     />
   );
@@ -1468,76 +1523,83 @@ export function ImageEditor() {
   });
 
   return (
-    <ImageEditorRouteChrome
-      scrollResetKey={
-        flowStep === "configurePresets" && configurePresetsScrollResetKey
-          ? `configurePresets:${configurePresetsScrollResetKey}`
-          : flowStep
-      }
-      subheader={stepNavSubheader}
-      footer={routeFooter}
-    >
-      <ImageEditorWorkspace
-        emptyStateContent={
-          showGuestOnboarding ? (
-            <ImageEditorOnboarding
-              towerConfigured={towerConfigured}
-              onSignInToTower={openTowerEmailSignInPopup}
-              onContinueAsGuest={() => {
-                markGuestWelcomeComplete();
-                navigate("/home");
-              }}
-            />
-          ) : (
-            <ImageEditorPreimageColumn
-              autoPageScanned={autoPageScanned}
-              autoScanError={autoScanError}
-              autoScanPending={autoScanPending}
-              autoSelectedTarget={autoPageTarget}
-              autoDisplaySurfaceTarget={autoDisplaySurfaceTarget}
-              autoDiscoverySettled={autoDiscoverySettled}
-              autoTargets={autoScanTargets}
-              hasCanvasImageTarget={hasCanvasImageTarget}
-              onAutoUseCanvasSelection={onAutoUseCanvasSelection}
-              dragActive={dragActive}
-              stepExitFade={stepExitFade}
-              fileInputId={fileInputId}
-              onDoneConfiguringPresets={finishConfigurePath}
-              onConfigurePresetsFooterChange={setConfigurePresetsFooter}
-              onConfigurePresetsScrollResetKeyChange={setConfigurePresetsScrollResetKey}
-              flowStep={flowStep}
-              handleDrag={handleDrag}
-              handleDragState={handleDragState}
-              handleDrop={handleDrop}
-              isConfirmedGuest={isConfirmedGuest}
-              isTowerUser={isTowerUser}
-              isWorkspaceDesigner={isWorkspaceDesigner}
-              onAutoRescan={onAutoRescan}
-              onAutoSelectTarget={onAutoSelectTarget}
-              onChooseAddImage={onChooseAddImageEntry}
-              onChooseConfigure={onChooseConfigureEntry}
-              onStepExitTransitionEnd={onStepExitTransitionEnd}
-              roleReady={roleReady}
-            />
-          )
+    <>
+      <ImageEditorRouteChrome
+        scrollResetKey={
+          flowStep === "configurePresets" && configurePresetsScrollResetKey
+            ? `configurePresets:${configurePresetsScrollResetKey}`
+            : flowStep
         }
-        beginOutgoingFade={beginOutgoingFade}
-        dissolve={dissolve}
-        dissolving={dissolving}
-        dragActive={dragActive}
-        fileInputId={fileInputId}
-        fileInputRef={fileInputRef}
-        finishDissolve={finishDissolve}
-        handleDrag={handleDrag}
-        handleDragState={handleDragState}
-        handleDrop={handleDrop}
-        handleOutgoingFadeComplete={handleOutgoingFadeComplete}
-        imageSrc={imageSrc}
-        incomingEnter={incomingEnter}
-        loadedEditor={loadedEditor}
-        queueFile={queueFile}
-        showIncomingPreview={showIncomingPreview}
+        subheader={stepNavSubheader}
+        footer={routeFooter}
+      >
+        <ImageEditorWorkspace
+          emptyStateContent={
+            showGuestOnboarding ? (
+              <ImageEditorOnboarding
+                towerConfigured={towerConfigured}
+                onSignInToTower={openTowerEmailSignInPopup}
+                onContinueAsGuest={() => {
+                  markGuestWelcomeComplete();
+                  navigate("/home");
+                }}
+              />
+            ) : (
+              <ImageEditorPreimageColumn
+                autoPageScanned={autoPageScanned}
+                autoScanError={autoScanError}
+                autoScanPending={autoScanPending}
+                autoSelectedTarget={autoPageTarget}
+                autoDisplaySurfaceTarget={autoDisplaySurfaceTarget}
+                autoDiscoverySettled={autoDiscoverySettled}
+                autoTargets={autoScanTargets}
+                hasCanvasImageTarget={hasCanvasImageTarget}
+                onAutoUseCanvasSelection={onAutoUseCanvasSelection}
+                dragActive={dragActive}
+                stepExitFade={stepExitFade}
+                fileInputId={fileInputId}
+                onDoneConfiguringPresets={finishConfigurePath}
+                onConfigurePresetsFooterChange={setConfigurePresetsFooter}
+                onConfigurePresetsScrollResetKeyChange={setConfigurePresetsScrollResetKey}
+                flowStep={flowStep}
+                handleDrag={handleDrag}
+                handleDragState={handleDragState}
+                handleDrop={handleDrop}
+                isConfirmedGuest={isConfirmedGuest}
+                isTowerUser={isTowerUser}
+                isWorkspaceDesigner={isWorkspaceDesigner}
+                onAutoRescan={onAutoRescan}
+                onAutoSelectTarget={onAutoSelectTarget}
+                onChooseAddImage={onChooseAddImageEntry}
+                onChooseConfigure={onChooseConfigureEntry}
+                onStepExitTransitionEnd={onStepExitTransitionEnd}
+                roleReady={roleReady}
+              />
+            )
+          }
+          beginOutgoingFade={beginOutgoingFade}
+          dissolve={dissolve}
+          dissolving={dissolving}
+          dragActive={dragActive}
+          fileInputId={fileInputId}
+          fileInputRef={fileInputRef}
+          finishDissolve={finishDissolve}
+          handleDrag={handleDrag}
+          handleDragState={handleDragState}
+          handleDrop={handleDrop}
+          handleOutgoingFadeComplete={handleOutgoingFadeComplete}
+          imageSrc={imageSrc}
+          incomingEnter={incomingEnter}
+          loadedEditor={loadedEditor}
+          queueFile={queueFile}
+          showIncomingPreview={showIncomingPreview}
+        />
+      </ImageEditorRouteChrome>
+      <TowerUsageLimitDialog
+        open={usageLimitDialogOpen}
+        details={usageLimitDialogDetails}
+        onOpenChange={onUsageLimitDialogOpenChange}
       />
-    </ImageEditorRouteChrome>
+    </>
   );
 }

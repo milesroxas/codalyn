@@ -13,7 +13,9 @@ export type ImageEditorLoadedEditorProps = {
   cmsCollectionTemplatePage: boolean;
   stepExitFade: boolean;
   onStepExitTransitionEnd: (e: TransitionEvent<HTMLDivElement>) => void;
+  showReselectTarget: boolean;
   onUploadAnother: () => void;
+  onReselectTarget: () => void;
   cropPanelProps: ImageEditorCropExportPanelProps;
 };
 
@@ -25,7 +27,9 @@ export function ImageEditorLoadedEditor(props: ImageEditorLoadedEditorProps) {
     cmsCollectionTemplatePage,
     stepExitFade,
     onStepExitTransitionEnd,
+    showReselectTarget,
     onUploadAnother,
+    onReselectTarget,
     cropPanelProps,
   } = props;
 
@@ -38,7 +42,9 @@ export function ImageEditorLoadedEditor(props: ImageEditorLoadedEditorProps) {
       <ImageEditorSuccessStep
         message={exportSuccess.message}
         showCmsDesignerRefreshHint={exportSuccess.cmsFieldUpdated && cmsCollectionTemplatePage}
+        showReselectTarget={showReselectTarget}
         onUploadAnother={onUploadAnother}
+        onReselectTarget={onReselectTarget}
       />
     );
   }

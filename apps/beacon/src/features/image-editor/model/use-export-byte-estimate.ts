@@ -4,6 +4,7 @@ import type { Area } from "react-easy-crop";
 
 import { estimateEncodedOutputBytes } from "@/features/image-editor/lib/estimate-encoded-size";
 import { getExportGeometryKey } from "@/features/image-editor/lib/export-geometry-key";
+import { getTowerUsageLimitFromError, type TowerUsageLimitDetails } from "@/shared/lib/tower-usage-limit-error";
 
 /** When Tower is set, both formats call optimize — debounce so sliders do not queue many requests. */
 const ESTIMATE_DEBOUNCE_MS = 400;
@@ -17,6 +18,7 @@ export function useExportByteEstimate(options: {
   exportFormat: ImageExportFormat;
   /** When false, skips estimate (e.g. export W×H not chosen yet). */
   enabled?: boolean;
+  onTowerUsageLimit?: (details: TowerUsageLimitDetails) => void;
 }) {
   const {
     imageSrc,
@@ -26,6 +28,7 @@ export function useExportByteEstimate(options: {
     quality,
     exportFormat,
     enabled = true,
+    onTowerUsageLimit,
   } = options;
 
   const [estimatedBytes, setEstimatedBytes] = useState<number | null>(null);
@@ -70,9 +73,13 @@ export function useExportByteEstimate(options: {
           setEstimatedBytes(bytes);
           setEstimatePending(false);
         })
-        .catch(() => {
+        .catch((err) => {
           if (estimateGenRef.current !== gen) {
             return;
+          }
+          const usageLimit = getTowerUsageLimitFromError(err);
+          if (usageLimit != null) {
+            onTowerUsageLimit?.(usageLimit);
           }
           setEstimatedBytes(null);
           setEstimatePending(false);
@@ -81,7 +88,17 @@ export function useExportByteEstimate(options: {
     return () => {
       window.clearTimeout(t);
     };
-  }, [enabled, estimateNonce, quality, exportFormat, imageSrc, completedCrop, effectiveOutputW, effectiveOutputH]);
+  }, [
+    enabled,
+    estimateNonce,
+    quality,
+    exportFormat,
+    imageSrc,
+    completedCrop,
+    effectiveOutputW,
+    effectiveOutputH,
+    onTowerUsageLimit,
+  ]);
 
   const onQualityCommit = useCallback(() => {
     setEstimateNonce((n) => n + 1);

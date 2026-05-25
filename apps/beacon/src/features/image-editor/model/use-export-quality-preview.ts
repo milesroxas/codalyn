@@ -5,6 +5,7 @@ import type { Area } from "react-easy-crop";
 import { clampEdge } from "@/features/image-editor/lib/apply-cropped-export";
 import { getExportGeometryKey } from "@/features/image-editor/lib/export-geometry-key";
 import { encodeExportPreviewPair } from "@/features/image-editor/lib/export-preview-encode";
+import { getTowerUsageLimitFromError, type TowerUsageLimitDetails } from "@/shared/lib/tower-usage-limit-error";
 
 const PREVIEW_DEBOUNCE_MS = 400;
 
@@ -21,7 +22,8 @@ async function runDebouncedPreviewJob(
     h: number;
     quality: number;
     exportFormat: ImageExportFormat;
-  }
+  },
+  onTowerUsageLimit?: (details: TowerUsageLimitDetails) => void
 ): Promise<void> {
   try {
     const { originalUrl, compressedUrl, pngBlob, compressedBlob } = await encodeExportPreviewPair(encodeArgs);
@@ -32,7 +34,11 @@ async function runDebouncedPreviewJob(
     }
     previewBlobsRef.current = { png: pngBlob, compressed: compressedBlob };
     assignUrls(originalUrl, compressedUrl);
-  } catch {
+  } catch (err) {
+    const usageLimit = getTowerUsageLimitFromError(err);
+    if (usageLimit != null) {
+      onTowerUsageLimit?.(usageLimit);
+    }
     if (previewGenRef.current !== gen) {
       return;
     }
@@ -54,6 +60,7 @@ export function useExportQualityPreview(options: {
   exportFormat: ImageExportFormat;
   /** When false, skips encode (e.g. export W×H not chosen yet). */
   enabled?: boolean;
+  onTowerUsageLimit?: (details: TowerUsageLimitDetails) => void;
 }) {
   const {
     imageSrc,
@@ -63,6 +70,7 @@ export function useExportQualityPreview(options: {
     quality,
     exportFormat,
     enabled = true,
+    onTowerUsageLimit,
   } = options;
 
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
@@ -157,19 +165,37 @@ export function useExportQualityPreview(options: {
     const w = clampEdge(effectiveOutputW);
     const h = clampEdge(effectiveOutputH);
     const t = window.setTimeout(() => {
-      void runDebouncedPreviewJob(jobGen, previewGenRef, previewBlobsRef, assignUrls, setPreviewPending, {
-        imageSrc,
-        completedCrop,
-        w,
-        h,
-        quality,
-        exportFormat,
-      });
+      void runDebouncedPreviewJob(
+        jobGen,
+        previewGenRef,
+        previewBlobsRef,
+        assignUrls,
+        setPreviewPending,
+        {
+          imageSrc,
+          completedCrop,
+          w,
+          h,
+          quality,
+          exportFormat,
+        },
+        onTowerUsageLimit
+      );
     }, PREVIEW_DEBOUNCE_MS);
     return () => {
       window.clearTimeout(t);
     };
-  }, [enabled, imageSrc, completedCrop, effectiveOutputW, effectiveOutputH, quality, exportFormat, assignUrls]);
+  }, [
+    enabled,
+    imageSrc,
+    completedCrop,
+    effectiveOutputW,
+    effectiveOutputH,
+    quality,
+    exportFormat,
+    assignUrls,
+    onTowerUsageLimit,
+  ]);
 
   return {
     originalPreviewUrl: originalUrl,

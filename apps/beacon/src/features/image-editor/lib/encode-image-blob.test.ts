@@ -59,6 +59,25 @@ describe("encodeCanvasToOptimizedFile", () => {
     expect(out.fileName.endsWith(".avif")).toBe(true);
   });
 
+  it("throws TowerUsageLimitError when Tower returns 402 usage limit", async () => {
+    mockGetTowerOrigin.mockReturnValue("http://localhost:3100");
+    mockTowerFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "usage_limit",
+          code: "TOWER_USAGE_LIMIT",
+          kind: "image",
+          used: 50,
+          limit: 50,
+        }),
+        { status: 402 }
+      )
+    );
+    await expect(encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif" })).rejects.toMatchObject({
+      details: { kind: "image", used: 50, limit: 50 },
+    });
+  });
+
   it("throws when AVIF is requested but Tower origin is missing", async () => {
     mockGetTowerOrigin.mockReturnValue("");
     await expect(encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif" })).rejects.toThrow(

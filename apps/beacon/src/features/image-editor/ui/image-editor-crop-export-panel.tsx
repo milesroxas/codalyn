@@ -25,6 +25,7 @@ import {
 import type { ImageEditorPresetFileLimitBlocker } from "@/features/image-editor/lib/image-editor-preset-file-limit-blocker";
 import { resolveImageEditorPlacement } from "@/features/image-editor/lib/image-editor-resolved-placement";
 import { sanitizeAssetBaseName } from "@/features/image-editor/lib/sanitize-asset-base-name";
+import { AvifTowerLimitFallbackNotice } from "@/features/image-editor/ui/avif-tower-limit-fallback-notice";
 import { ExportEncodeSizeFootnote, ExportPresetLimitBar } from "@/features/image-editor/ui/export-size-estimate";
 import { QualityComparePreview } from "@/features/image-editor/ui/quality-compare-preview";
 import { beaconPanelContainClass } from "@/shared/lib/beacon-app-route-surface";
@@ -204,6 +205,8 @@ export type ImageEditorCropExportPanelProps = {
   onUploadPresetPickerChange?: (value: string) => void;
   /** When true, preset export format is fixed and file-type controls are hidden. */
   exportFormatLocked?: boolean;
+  /** AVIF preset forced to WebP because Tower image optimize limit was reached. */
+  avifPresetOverriddenByTowerLimit?: boolean;
   /** When true, show aspect ratio and export dimension controls (manual override). */
   showExportSizeControls?: boolean;
 };
@@ -728,7 +731,144 @@ type ExportCardProps = {
   onOpenQualityPopout: () => void;
   presetFileLimitBlocker: ImageEditorPresetFileLimitBlocker | null;
   exportFormatLocked?: boolean;
+  avifPresetOverriddenByTowerLimit?: boolean;
 };
+
+function UploadPresetPickerCard(props: {
+  uploadPresetPickerValue?: string;
+  onUploadPresetPickerChange?: (value: string) => void;
+  uploadPresetPickerReadOnly: boolean;
+  uploadPresetPickerOptions: UploadPresetPickerOption[];
+  showAvifLimitNotice: boolean;
+}) {
+  const {
+    uploadPresetPickerValue,
+    onUploadPresetPickerChange,
+    uploadPresetPickerReadOnly,
+    uploadPresetPickerOptions,
+    showAvifLimitNotice,
+  } = props;
+
+  return (
+    <Card size="sm">
+      <CardHeader className="space-y-1 pb-2">
+        <CardTitle className="text-sm font-medium">Upload preset</CardTitle>
+        <CardDescription className="text-xs leading-snug">
+          Choose the resolved preset, site default, or manual override.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2 pt-0">
+        <Select
+          value={uploadPresetPickerValue}
+          onValueChange={(value) => onUploadPresetPickerChange?.(value)}
+          disabled={uploadPresetPickerReadOnly}
+        >
+          <SelectTrigger size="full">
+            <SelectValue placeholder="Select upload preset source" />
+          </SelectTrigger>
+          <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
+            {uploadPresetPickerOptions.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {showAvifLimitNotice ? <AvifTowerLimitFallbackNotice /> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ExportFormatFields(props: {
+  baseId: string;
+  exportFormat: ImageExportFormat;
+  allowAvifEncoding: boolean;
+  setExportFormat: (f: ImageExportFormat) => void;
+  onExportFormatCommit: () => void;
+  exportFormatLocked: boolean;
+  avifPresetOverriddenByTowerLimit: boolean;
+}) {
+  const {
+    baseId,
+    exportFormat,
+    allowAvifEncoding,
+    setExportFormat,
+    onExportFormatCommit,
+    exportFormatLocked,
+    avifPresetOverriddenByTowerLimit,
+  } = props;
+
+  if (exportFormatLocked && !avifPresetOverriddenByTowerLimit) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <Label className="text-xs font-medium" id={`${baseId}-format`}>
+          File type
+        </Label>
+        {allowAvifEncoding && !avifPresetOverriddenByTowerLimit ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                aria-label="When to use WebP vs AVIF"
+              >
+                <Info className="size-3.5" aria-hidden />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[16rem] whitespace-pre-line text-left">
+              {
+                "WebP — Default: broad browser support; encodes in Designer.\n\nAVIF — Often smaller at similar quality; encoding uses Tower."
+              }
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
+      </div>
+      {avifPresetOverriddenByTowerLimit ? (
+        <>
+          <div className="text-foreground rounded-sm border border-border/60 bg-muted/20 px-3 py-2 text-sm font-medium">
+            WebP
+          </div>
+          <AvifTowerLimitFallbackNotice />
+        </>
+      ) : allowAvifEncoding ? (
+        <ToggleGroup
+          type="single"
+          value={exportFormat}
+          onValueChange={(v) => {
+            if (v === "webp" || v === "avif") {
+              setExportFormat(v);
+              onExportFormatCommit();
+            }
+          }}
+          aria-labelledby={`${baseId}-format`}
+          className="grid w-full min-w-0 grid-cols-2 gap-0"
+          variant="outline"
+          size="sm"
+          spacing={0}
+        >
+          <ToggleGroupItem value="webp" className="text-xs font-medium">
+            WebP
+          </ToggleGroupItem>
+          <ToggleGroupItem value="avif" className="text-xs font-medium">
+            AVIF
+          </ToggleGroupItem>
+        </ToggleGroup>
+      ) : (
+        <>
+          <div className="text-foreground rounded-sm border border-border/60 bg-muted/20 px-3 py-2 text-sm font-medium">
+            WebP
+          </div>
+          <p className="text-muted-foreground text-[10px] leading-snug">Sign in to Tower to enable AVIF.</p>
+        </>
+      )}
+    </div>
+  );
+}
 
 function ExportEncodeCard(p: ExportCardProps) {
   const {
@@ -758,6 +898,7 @@ function ExportEncodeCard(p: ExportCardProps) {
     onOpenQualityPopout,
     presetFileLimitBlocker,
     exportFormatLocked = false,
+    avifPresetOverriddenByTowerLimit = false,
   } = p;
 
   const exportW = completedCrop ? effectiveExportWidth : parsedExportWidth;
@@ -797,64 +938,15 @@ function ExportEncodeCard(p: ExportCardProps) {
             />
           </div>
 
-          {exportFormatLocked ? null : (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-1.5">
-                <Label className="text-xs font-medium" id={`${baseId}-format`}>
-                  File type
-                </Label>
-                {allowAvifEncoding ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                        aria-label="When to use WebP vs AVIF"
-                      >
-                        <Info className="size-3.5" aria-hidden />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[16rem] whitespace-pre-line text-left">
-                      {
-                        "WebP — Default: broad browser support; encodes in Designer.\n\nAVIF — Often smaller at similar quality; encoding uses Tower."
-                      }
-                    </TooltipContent>
-                  </Tooltip>
-                ) : null}
-              </div>
-              {allowAvifEncoding ? (
-                <ToggleGroup
-                  type="single"
-                  value={exportFormat}
-                  onValueChange={(v) => {
-                    if (v === "webp" || v === "avif") {
-                      setExportFormat(v);
-                      onExportFormatCommit();
-                    }
-                  }}
-                  aria-labelledby={`${baseId}-format`}
-                  className="grid w-full min-w-0 grid-cols-2 gap-0"
-                  variant="outline"
-                  size="sm"
-                  spacing={0}
-                >
-                  <ToggleGroupItem value="webp" className="text-xs font-medium">
-                    WebP
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="avif" className="text-xs font-medium">
-                    AVIF
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              ) : (
-                <>
-                  <div className="text-foreground rounded-sm border border-border/60 bg-muted/20 px-3 py-2 text-sm font-medium">
-                    WebP
-                  </div>
-                  <p className="text-muted-foreground text-[10px] leading-snug">Sign in to Tower to enable AVIF.</p>
-                </>
-              )}
-            </div>
-          )}
+          <ExportFormatFields
+            baseId={baseId}
+            exportFormat={exportFormat}
+            allowAvifEncoding={allowAvifEncoding}
+            setExportFormat={setExportFormat}
+            onExportFormatCommit={onExportFormatCommit}
+            exportFormatLocked={exportFormatLocked}
+            avifPresetOverriddenByTowerLimit={avifPresetOverriddenByTowerLimit}
+          />
 
           <div className="flex flex-col gap-2">
             {completedCrop && exportPreviewReady ? (
@@ -1530,6 +1622,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     uploadPresetPickerOptions = [],
     onUploadPresetPickerChange,
     exportFormatLocked = false,
+    avifPresetOverriddenByTowerLimit = false,
     showExportSizeControls = false,
   } = props;
 
@@ -1597,32 +1690,13 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     return (
       <div className={cn(beaconPanelContainClass, "flex flex-col gap-3")}>
         {uploadPresetPickerVisible ? (
-          <Card size="sm">
-            <CardHeader className="space-y-1 pb-2">
-              <CardTitle className="text-sm font-medium">Upload preset</CardTitle>
-              <CardDescription className="text-xs leading-snug">
-                Choose the resolved preset, site default, or manual override.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <Select
-                value={uploadPresetPickerValue}
-                onValueChange={(value) => onUploadPresetPickerChange?.(value)}
-                disabled={uploadPresetPickerReadOnly}
-              >
-                <SelectTrigger size="full">
-                  <SelectValue placeholder="Select upload preset source" />
-                </SelectTrigger>
-                <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
-                  {uploadPresetPickerOptions.map((option) => (
-                    <SelectItem key={option.id} value={option.id}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
+          <UploadPresetPickerCard
+            uploadPresetPickerValue={uploadPresetPickerValue}
+            onUploadPresetPickerChange={onUploadPresetPickerChange}
+            uploadPresetPickerReadOnly={uploadPresetPickerReadOnly}
+            uploadPresetPickerOptions={uploadPresetPickerOptions}
+            showAvifLimitNotice={avifPresetOverriddenByTowerLimit}
+          />
         ) : null}
         <CropStageSection
           baseId={baseId}
@@ -1665,32 +1739,13 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
   return (
     <div className={cn(beaconPanelContainClass, "flex flex-col gap-3")}>
       {uploadPresetPickerVisible ? (
-        <Card size="sm">
-          <CardHeader className="space-y-1 pb-2">
-            <CardTitle className="text-sm font-medium">Upload preset</CardTitle>
-            <CardDescription className="text-xs leading-snug">
-              Choose the resolved preset, site default, or manual override.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <Select
-              value={uploadPresetPickerValue}
-              onValueChange={(value) => onUploadPresetPickerChange?.(value)}
-              disabled={uploadPresetPickerReadOnly}
-            >
-              <SelectTrigger size="full">
-                <SelectValue placeholder="Select upload preset source" />
-              </SelectTrigger>
-              <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
-                {uploadPresetPickerOptions.map((option) => (
-                  <SelectItem key={option.id} value={option.id}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
+        <UploadPresetPickerCard
+          uploadPresetPickerValue={uploadPresetPickerValue}
+          onUploadPresetPickerChange={onUploadPresetPickerChange}
+          uploadPresetPickerReadOnly={uploadPresetPickerReadOnly}
+          uploadPresetPickerOptions={uploadPresetPickerOptions}
+          showAvifLimitNotice={false}
+        />
       ) : null}
       {showExportSizeControls ? (
         <Card size="sm">
@@ -1751,6 +1806,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         onOpenQualityPopout={onOpenQualityPopout}
         presetFileLimitBlocker={presetFileLimitBlocker}
         exportFormatLocked={exportFormatLocked}
+        avifPresetOverriddenByTowerLimit={avifPresetOverriddenByTowerLimit}
       />
 
       {showResolvedReadout ? (

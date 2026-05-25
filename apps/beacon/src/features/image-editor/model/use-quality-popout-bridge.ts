@@ -6,6 +6,8 @@ import { clampEdge } from "@/features/image-editor/lib/apply-cropped-export";
 import { encodeExportCompressedPreviewBlob } from "@/features/image-editor/lib/export-preview-encode";
 import { dispatchQualityPopoutMessage } from "@/features/image-editor/lib/quality-popout-dispatch";
 import { BEACON_QUALITY_PARENT_SOURCE } from "@/features/image-editor/lib/quality-popout-protocol";
+import type { TowerUsageLimitDetails } from "@/shared/lib/tower-usage-limit-error";
+import { getTowerUsageLimitFromError } from "@/shared/lib/tower-usage-limit-error";
 
 function clampExportQuality(q: number): number {
   return Math.min(1, Math.max(0.05, q));
@@ -20,6 +22,7 @@ export function useQualityPopoutBridge(options: {
   setQuality: (q: number) => void;
   onQualityCommit: () => void;
   popoutWindowRef: MutableRefObject<Window | null>;
+  onTowerUsageLimit?: (details: TowerUsageLimitDetails) => void;
 }) {
   const {
     imageSrc,
@@ -30,6 +33,7 @@ export function useQualityPopoutBridge(options: {
     setQuality,
     onQualityCommit,
     popoutWindowRef,
+    onTowerUsageLimit,
   } = options;
 
   const encodeGenRef = useRef(0);
@@ -62,7 +66,11 @@ export function useQualityPopoutBridge(options: {
           { source: BEACON_QUALITY_PARENT_SOURCE, type: "compressed-updated", compressedBlob },
           targetOrigin
         );
-      } catch {
+      } catch (err) {
+        const usageLimit = getTowerUsageLimitFromError(err);
+        if (usageLimit != null) {
+          onTowerUsageLimit?.(usageLimit);
+        }
         if (popoutWindowRef.current && !popoutWindowRef.current.closed) {
           popoutWindowRef.current.postMessage(
             { source: BEACON_QUALITY_PARENT_SOURCE, type: "compressed-error" },
@@ -71,7 +79,7 @@ export function useQualityPopoutBridge(options: {
         }
       }
     },
-    [imageSrc, completedCrop, effectiveOutputW, effectiveOutputH, exportFormat, popoutWindowRef]
+    [imageSrc, completedCrop, effectiveOutputW, effectiveOutputH, exportFormat, popoutWindowRef, onTowerUsageLimit]
   );
 
   useEffect(() => {

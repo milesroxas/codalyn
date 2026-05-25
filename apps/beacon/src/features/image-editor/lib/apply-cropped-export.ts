@@ -6,6 +6,7 @@ import {
   resolveSingleElementCmsImageBinding,
 } from "@/features/image-editor/lib/element-cms-image-binding";
 import { towerFetch } from "@/shared/lib/tower-client";
+import { isTowerUsageLimitError, type TowerUsageLimitDetails } from "@/shared/lib/tower-usage-limit-error";
 import { renderCroppedRegionToCanvas } from "./crop-image";
 import { encodeCanvasToOptimizedFile } from "./encode-image-blob";
 import { placeImageOnCanvasAtBody, placeImageOnCanvasWithAsset } from "./insert-on-canvas";
@@ -77,7 +78,16 @@ export function outputDimensionsMatchingCrop(
 export type ExportResult =
   | { kind: "success"; message: string; cmsFieldUpdated?: boolean }
   | { kind: "info"; message: string }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string }
+  | { kind: "usage-limit"; details: TowerUsageLimitDetails };
+
+function toExportErrorResult(err: unknown): ExportResult {
+  if (isTowerUsageLimitError(err)) {
+    return { kind: "usage-limit", details: err.details };
+  }
+  const message = err instanceof Error ? err.message : "Could not process the image.";
+  return { kind: "error", message };
+}
 
 export type ImageExportSuccessContext = {
   message: string;
@@ -546,8 +556,7 @@ export async function applyCroppedImageToWebflow(options: {
       currentCmsItemId,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Could not process the image.";
-    return { kind: "error", message };
+    return toExportErrorResult(err);
   }
 }
 
@@ -581,7 +590,6 @@ export async function downloadCroppedImageWebp(options: {
     }
     return { kind: "success", message: "Image downloaded." };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Could not process the image.";
-    return { kind: "error", message };
+    return toExportErrorResult(err);
   }
 }

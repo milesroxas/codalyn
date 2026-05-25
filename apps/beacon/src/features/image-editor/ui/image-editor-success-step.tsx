@@ -1,12 +1,21 @@
-import { IconChevronRight, IconCircleCheck, IconDeviceDesktop, IconInfoCircle, IconPhoto } from "@tabler/icons-react";
+import {
+  IconChevronRight,
+  IconCircleCheck,
+  IconDeviceDesktop,
+  IconInfoCircle,
+  IconPhoto,
+  IconPointer,
+} from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import {
   IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_HINT,
   IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_READY,
-  IMAGE_UPLOAD_SUCCESS_CHANGE_IMAGE_HINT,
-  IMAGE_UPLOAD_SUCCESS_CHANGE_IMAGE_LABEL,
+  IMAGE_UPLOAD_SUCCESS_RESELECT_TARGET_HINT,
+  IMAGE_UPLOAD_SUCCESS_RESELECT_TARGET_LABEL,
   IMAGE_UPLOAD_SUCCESS_RETURN_TO_DESIGNER_LABEL,
   IMAGE_UPLOAD_SUCCESS_TITLE,
+  IMAGE_UPLOAD_SUCCESS_UPLOAD_ANOTHER_HINT,
+  IMAGE_UPLOAD_SUCCESS_UPLOAD_ANOTHER_LABEL,
 } from "@/shared/lib/beacon-feature-route-copy";
 import { useDesignerViewReturnDetect } from "@/shared/lib/use-designer-view-return-detect";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
@@ -25,7 +34,9 @@ import {
 export type ImageEditorSuccessStepProps = {
   message: string;
   showCmsDesignerRefreshHint: boolean;
+  showReselectTarget: boolean;
   onUploadAnother: () => void;
+  onReselectTarget: () => void;
 };
 
 const CMS_FIELD_SUCCESS_MESSAGE_PATTERN = /^Updated CMS field [\u201c"](.+?)[\u201d"]\.$/;
@@ -60,8 +71,13 @@ function ImageEditorSuccessCmsRefreshAlert(props: { designerViewReturned: boolea
   );
 }
 
-function ImageEditorSuccessActionRows(props: { showReturnToDesigner: boolean; onUploadAnother: () => void }) {
-  const { showReturnToDesigner, onUploadAnother } = props;
+function ImageEditorSuccessActionRows(props: {
+  showReturnToDesigner: boolean;
+  showReselectTarget: boolean;
+  onUploadAnother: () => void;
+  onReselectTarget: () => void;
+}) {
+  const { showReturnToDesigner, showReselectTarget, onUploadAnother, onReselectTarget } = props;
 
   return (
     <SurfaceSummaryCardOptionRows>
@@ -70,13 +86,27 @@ function ImageEditorSuccessActionRows(props: { showReturnToDesigner: boolean; on
           <IconPhoto aria-hidden stroke={1.5} />
         </SurfaceSummaryCardIconBox>
         <SurfaceSummaryCardOptionRowCopy>
-          <SurfaceSummaryCardTitle>{IMAGE_UPLOAD_SUCCESS_CHANGE_IMAGE_LABEL}</SurfaceSummaryCardTitle>
-          <SurfaceSummaryCardMeta emphasis="hint">{IMAGE_UPLOAD_SUCCESS_CHANGE_IMAGE_HINT}</SurfaceSummaryCardMeta>
+          <SurfaceSummaryCardTitle>{IMAGE_UPLOAD_SUCCESS_UPLOAD_ANOTHER_LABEL}</SurfaceSummaryCardTitle>
+          <SurfaceSummaryCardMeta emphasis="hint">{IMAGE_UPLOAD_SUCCESS_UPLOAD_ANOTHER_HINT}</SurfaceSummaryCardMeta>
         </SurfaceSummaryCardOptionRowCopy>
         <SurfaceSummaryCardOptionRowChevron aria-hidden>
           <IconChevronRight stroke={1.5} />
         </SurfaceSummaryCardOptionRowChevron>
       </SurfaceSummaryCardOptionRow>
+      {showReselectTarget ? (
+        <SurfaceSummaryCardOptionRow type="button" onClick={onReselectTarget}>
+          <SurfaceSummaryCardIconBox>
+            <IconPointer aria-hidden stroke={1.5} />
+          </SurfaceSummaryCardIconBox>
+          <SurfaceSummaryCardOptionRowCopy>
+            <SurfaceSummaryCardTitle>{IMAGE_UPLOAD_SUCCESS_RESELECT_TARGET_LABEL}</SurfaceSummaryCardTitle>
+            <SurfaceSummaryCardMeta emphasis="hint">{IMAGE_UPLOAD_SUCCESS_RESELECT_TARGET_HINT}</SurfaceSummaryCardMeta>
+          </SurfaceSummaryCardOptionRowCopy>
+          <SurfaceSummaryCardOptionRowChevron aria-hidden>
+            <IconChevronRight stroke={1.5} />
+          </SurfaceSummaryCardOptionRowChevron>
+        </SurfaceSummaryCardOptionRow>
+      ) : null}
       {showReturnToDesigner ? (
         <SurfaceSummaryCardOptionRow type="button" onClick={dismissExtensionForWebflowNavigation}>
           <SurfaceSummaryCardIconBox>
@@ -95,7 +125,7 @@ function ImageEditorSuccessActionRows(props: { showReturnToDesigner: boolean; on
 }
 
 export function ImageEditorSuccessStep(props: ImageEditorSuccessStepProps) {
-  const { message, showCmsDesignerRefreshHint, onUploadAnother } = props;
+  const { message, showCmsDesignerRefreshHint, showReselectTarget, onUploadAnother, onReselectTarget } = props;
   const designerViewReturned = useDesignerViewReturnDetect(showCmsDesignerRefreshHint);
   const showReturnToDesigner = showCmsDesignerRefreshHint && !designerViewReturned;
   const showActionRows = !showCmsDesignerRefreshHint || !designerViewReturned;
@@ -120,6 +150,8 @@ export function ImageEditorSuccessStep(props: ImageEditorSuccessStepProps) {
               {showCmsDesignerRefreshHint ? <Separator /> : null}
               <ImageEditorSuccessActionRows
                 onUploadAnother={onUploadAnother}
+                onReselectTarget={onReselectTarget}
+                showReselectTarget={showReselectTarget}
                 showReturnToDesigner={showReturnToDesigner}
               />
             </>

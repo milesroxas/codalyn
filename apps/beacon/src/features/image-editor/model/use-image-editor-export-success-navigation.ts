@@ -1,32 +1,33 @@
 import { useCallback } from "react";
 import type { NavigateFunction } from "react-router-dom";
-import type { ImageEditorFlowStep, ImageEditorPathMode } from "@/features/image-editor/lib/image-editor-flow-step";
-import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
+import type { ImageEditorFlowStep } from "@/features/image-editor/lib/image-editor-flow-step";
 
 export function useImageEditorExportSuccessNavigation(options: {
   clearExportSuccess: () => void;
   setFlowStep: (step: ImageEditorFlowStep) => void;
   clearImageSourceOnly: () => void;
-  pathMode: ImageEditorPathMode;
-  autoPageTarget: ImagePageTarget | null;
+  resetAutoTargetSelection: () => void;
   navigate: NavigateFunction;
 }) {
-  const { clearExportSuccess, setFlowStep, clearImageSourceOnly, pathMode, autoPageTarget, navigate } = options;
+  const { clearExportSuccess, setFlowStep, clearImageSourceOnly, resetAutoTargetSelection, navigate } = options;
 
   const handleUploadAnotherAfterSuccess = useCallback(() => {
     clearExportSuccess();
     clearImageSourceOnly();
-    if (pathMode === "auto") {
-      setFlowStep(autoPageTarget != null ? "upload" : "autoElement");
-      return;
-    }
     setFlowStep("upload");
-  }, [clearExportSuccess, clearImageSourceOnly, pathMode, autoPageTarget, setFlowStep]);
+  }, [clearExportSuccess, clearImageSourceOnly, setFlowStep]);
+
+  const handleReselectTargetAfterSuccess = useCallback(() => {
+    clearExportSuccess();
+    clearImageSourceOnly();
+    resetAutoTargetSelection();
+    setFlowStep("autoElement");
+  }, [clearExportSuccess, clearImageSourceOnly, resetAutoTargetSelection, setFlowStep]);
 
   const handleSuccessBackHome = useCallback(() => {
     clearExportSuccess();
     navigate("/home");
   }, [clearExportSuccess, navigate]);
 
-  return { handleUploadAnotherAfterSuccess, handleSuccessBackHome };
+  return { handleUploadAnotherAfterSuccess, handleReselectTargetAfterSuccess, handleSuccessBackHome };
 }

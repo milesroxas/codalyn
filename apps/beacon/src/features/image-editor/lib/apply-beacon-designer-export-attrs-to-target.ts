@@ -8,6 +8,7 @@ import {
   ensureBeaconExportDimensionPropsOnDefinition,
   getBeaconExportDimensionPropIdsOrNull,
 } from "@/features/image-editor/lib/ensure-beacon-export-dimension-props";
+import { withPageComponentInstanceForDefinitionWork } from "@/features/image-editor/lib/page-component-instance-for-preset-work";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { searchComponentInstanceImageProps } from "@/features/image-editor/lib/search-component-instance-image-props";
 import {
@@ -22,6 +23,12 @@ export type BeaconExportDimensionWriteMode = "instance-props" | "definition-defa
 type BeaconExportDimensionTargetOptions = {
   pageIdHint?: string | null;
   writeMode?: BeaconExportDimensionWriteMode;
+};
+
+export type ComponentDefinitionExportDimensionOptions = {
+  pageIdHint?: string | null;
+  /** Reuses this page instance when the preset target is already on the canvas. */
+  instance?: ComponentElement | null;
 };
 
 export async function readBeaconDesignerExportAttrsFromPageTarget(
@@ -39,9 +46,61 @@ export async function readBeaconDesignerExportAttrsFromPageTarget(
   });
 }
 
+/** Tags a component definition via a page instance (`enterComponent`) — places temporarily when needed. */
+export async function setBeaconDesignerExportAttrsOnComponentDefinition(
+  componentDefinitionId: string,
+  imagePropId: string,
+  width: number,
+  height: number,
+  options?: ComponentDefinitionExportDimensionOptions
+): Promise<void> {
+  const clamped = clampExportDimensionsToMaxEdge(width, height);
+  const wStr = String(clamped.width);
+  const hStr = String(clamped.height);
+
+  await runExclusiveDesignerOp(async () => {
+    await withPageComponentInstanceForDefinitionWork({
+      componentDefinitionId,
+      pageIdHint: options?.pageIdHint ?? null,
+      instance: options?.instance ?? null,
+      fn: async ({ definition, definitionRoot, instance }) => {
+        const instanceImageProps = await searchComponentInstanceImageProps(instance);
+        await ensureBeaconExportDimensionPropsOnDefinition(
+          definition,
+          instance,
+          imagePropId,
+          definitionRoot,
+          instanceImageProps,
+          { defaultValues: { width: wStr, height: hStr } }
+        );
+      },
+    });
+  });
+}
+
+export async function clearBeaconDesignerExportAttrsOnComponentDefinition(
+  componentDefinitionId: string,
+  options?: Pick<ComponentDefinitionExportDimensionOptions, "pageIdHint" | "instance">
+): Promise<void> {
+  await runExclusiveDesignerOp(async () => {
+    await withPageComponentInstanceForDefinitionWork({
+      componentDefinitionId,
+      pageIdHint: options?.pageIdHint ?? null,
+      instance: options?.instance ?? null,
+      fn: async ({ definition }) => {
+        const propIds = await getBeaconExportDimensionPropIdsOrNull(definition);
+        if (propIds == null) {
+          return;
+        }
+        await clearExportDimensionDefaultValuesOnDefinition(definition, propIds);
+      },
+    });
+  });
+}
+
 /**
  * Sets both Beacon export dimension tags. On a **plain Image**, writes custom attributes. On a **component
- * instance**, enters the component definition and either sets instance prop values or definition default values.
+ * instance**, enters the component definition and sets instance prop values.
  */
 export async function setBeaconDesignerExportAttrsOnPageTarget(
   t: ImagePageTarget,
@@ -82,8 +141,7 @@ export async function setBeaconDesignerExportAttrsOnPageTarget(
             instance,
             imagePropId,
             definitionRoot,
-            instanceImageProps,
-            writeMode === "definition-defaults" ? { defaultValues: { width: wStr, height: hStr } } : undefined
+            instanceImageProps
           );
           if (writeMode === "instance-props") {
             await instance.setProps([
@@ -103,24 +161,9 @@ export async function clearBeaconDesignerExportAttrsOnPageTarget(
   options?: BeaconExportDimensionTargetOptions
 ): Promise<void> {
   const writeMode = options?.writeMode ?? "instance-props";
-  const pageIdHint = options?.pageIdHint ?? null;
 
   if (t.kind === "component" && writeMode === "definition-defaults") {
-    const instance = t.element as ComponentElement;
-    await runExclusiveDesignerOp(async () => {
-      await withComponentDefinitionScope(
-        instance,
-        async ({ definition }) => {
-          const propIds = await getBeaconExportDimensionPropIdsOrNull(definition);
-          if (propIds == null) {
-            return;
-          }
-          await clearExportDimensionDefaultValuesOnDefinition(definition, propIds);
-        },
-        { pageIdHint }
-      );
-    });
-    return;
+    throw new Error("Use clearBeaconDesignerExportAttrsOnComponentDefinition for component definition presets.");
   }
 
   if (t.kind === "component") {

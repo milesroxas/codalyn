@@ -2,14 +2,17 @@ import {
   type BareImageInstancePresetTargetKey,
   type ComponentImageElementPresetTargetKey,
   type ComponentImageInstancePresetTargetKey,
-  type ComponentImagePresetTargetKey,
   isInstancePresetTargetKey,
   type PresetTargetKey,
   readPageIdFromInstancePresetTargetKey,
 } from "@codalyn/webflow-kit";
 
 import { WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
-import { readComponentDefinitionIdForInstance } from "@/features/image-editor/lib/read-component-definition-id";
+import {
+  ensureComponentInstanceOnPage,
+  findComponentInstanceByDefinitionIdOnPage,
+  removeTemporaryPageComponentInstance,
+} from "@/features/image-editor/lib/page-component-instance-for-preset-work";
 import {
   collectAllPageElementsForImageScan,
   type ImagePageTarget,
@@ -21,7 +24,12 @@ import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
 export type PresetLocateAction = { kind: "find-on-canvas"; label: string; pendingLabel: string } | { kind: "none" };
 
 export type LocatePresetTargetResult =
-  | { ok: true; target: ImagePageTarget | null; navigatedToComponent: boolean }
+  | {
+      ok: true;
+      target: ImagePageTarget | null;
+      navigatedToComponent: boolean;
+      temporaryInstance?: ComponentElement | null;
+    }
   | { ok: false; error: string };
 
 function readElementId(element: AnyElement): string | null {
@@ -125,19 +133,11 @@ async function findComponentImageInstanceTarget(
 }
 
 async function findComponentImageTarget(targetKey: Extract<PresetTargetKey, { kind: "component-image" }>) {
-  const all = await collectAllPageElementsForImageScan();
-  for (const el of all) {
-    if (el.type !== "ComponentInstance") {
-      continue;
-    }
-    const inst = el as ComponentElement;
-    const definitionId = await readComponentDefinitionIdForInstance(inst);
-    if (definitionId !== targetKey.componentDefinitionId) {
-      continue;
-    }
-    return await imagePageTargetFromComponentInstance(inst, targetKey.imagePropId);
+  const inst = await findComponentInstanceByDefinitionIdOnPage(targetKey.componentDefinitionId);
+  if (inst == null) {
+    return null;
   }
-  return null;
+  return await imagePageTargetFromComponentInstance(inst, targetKey.imagePropId);
 }
 
 export async function findImagePageTargetForPresetOnCurrentPage(
@@ -165,11 +165,46 @@ export function resolvePageIdForInstancePresetWork(
   return pageIdHint ?? null;
 }
 
+async function locateComponentImagePresetTarget(
+  targetKey: Extract<PresetTargetKey, { kind: "component-image" }>,
+  pageIdHint: string | null | undefined
+): Promise<LocatePresetTargetResult> {
+  const pageId = resolvePageIdForInstancePresetWork(targetKey, pageIdHint);
+  let instance: ComponentElement;
+  let temporary = false;
+  try {
+    ({ instance, temporary } = await ensureComponentInstanceOnPage({
+      componentDefinitionId: targetKey.componentDefinitionId,
+      pageIdHint: pageId,
+    }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not place this component on the page.";
+    return { ok: false, error: message };
+  }
+
+  const target = await imagePageTargetFromComponentInstance(instance, targetKey.imagePropId);
+  if (target == null) {
+    if (temporary) {
+      await removeTemporaryPageComponentInstance(instance);
+    }
+    return {
+      ok: false,
+      error: "Could not resolve the image field for this component preset.",
+    };
+  }
+  await selectCanvasElement(target.element);
+  return {
+    ok: true,
+    target,
+    navigatedToComponent: false,
+    temporaryInstance: temporary ? instance : null,
+  };
+}
+
 async function locateCanvasPresetTarget(
   targetKey:
     | BareImageInstancePresetTargetKey
     | ComponentImageInstancePresetTargetKey
-    | ComponentImagePresetTargetKey
     | ComponentImageElementPresetTargetKey,
   pageIdHint: string | null | undefined
 ): Promise<LocatePresetTargetResult> {
@@ -206,8 +241,10 @@ export async function locatePresetTarget(input: {
 
   try {
     return await runExclusiveDesignerOp(async () => {
+      if (input.targetKey.kind === "component-image") {
+        return await locateComponentImagePresetTarget(input.targetKey, pageIdHint);
+      }
       if (
-        input.targetKey.kind === "component-image" ||
         input.targetKey.kind === "component-image-element" ||
         input.targetKey.kind === "component-image-instance" ||
         input.targetKey.kind === "bare-image-instance"

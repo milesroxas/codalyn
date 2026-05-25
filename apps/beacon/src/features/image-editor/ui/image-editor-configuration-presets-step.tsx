@@ -31,6 +31,7 @@ import {
   getPresetLocateAction,
   locatePresetTarget,
 } from "@/features/image-editor/lib/locate-preset-target";
+import { removeTemporaryPageComponentInstance } from "@/features/image-editor/lib/page-component-instance-for-preset-work";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { usePresetFormTargets } from "@/features/image-editor/model/use-image-editor-auto-targets";
 import { useResolvedImagePageTarget } from "@/features/image-editor/model/use-resolved-image-page-target";
@@ -45,6 +46,7 @@ import {
   IMAGE_UPLOAD_PRESET_EDIT_OPENING_LOCATION_MESSAGE,
   IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
 } from "@/shared/lib/beacon-feature-route-copy";
+import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
 import { cn } from "@/shared/lib/utils";
 import { readCurrentPageIdOrNull } from "@/shared/lib/webflow-page-canvas-context";
 import {
@@ -90,6 +92,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   const saveInFlightRef = useRef(false);
   const [locatePending, setLocatePending] = useState(false);
   const locateInFlightRef = useRef(false);
+  const temporaryPresetInstanceRef = useRef<ComponentElement | null>(null);
   const editTargetResolveGenRef = useRef(0);
   const [formTarget, setFormTarget] = useState<ImagePageTarget | null>(null);
   const [formSubStep, setFormSubStep] = useState<PresetFormSubStep>(1);
@@ -234,7 +237,12 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
       }
 
       if (entry != null) {
-        const cleanup = await cleanupDesignerTagsForPresetEntry({ entry, pageIdHint: pageId });
+        const cleanup = await cleanupDesignerTagsForPresetEntry({
+          entry,
+          pageIdHint: pageId,
+          componentInstance: temporaryPresetInstanceRef.current,
+        });
+        temporaryPresetInstanceRef.current = null;
         if (!cleanup.ok) {
           void webflow.notify({
             type: "Warning",
@@ -253,13 +261,25 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     [pageId, presetEntriesById, updateSettings]
   );
 
+  const cleanupTemporaryPresetInstance = useCallback(async () => {
+    const instance = temporaryPresetInstanceRef.current;
+    if (instance == null) {
+      return;
+    }
+    temporaryPresetInstanceRef.current = null;
+    await runExclusiveDesignerOp(async () => {
+      await removeTemporaryPageComponentInstance(instance);
+    });
+  }, []);
+
   const backToList = useCallback(() => {
+    void cleanupTemporaryPresetInstance();
     setView("list");
     setEditingId(null);
     setFormError(null);
     setFormTarget(null);
     setFormSubStep(1);
-  }, []);
+  }, [cleanupTemporaryPresetInstance]);
 
   const applyFormTarget = useCallback(async (t: ImagePageTarget) => {
     setFormTarget(t);
@@ -289,6 +309,10 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
           void webflow.notify({ type: "Error", message: result.error });
           return;
         }
+        await cleanupTemporaryPresetInstance();
+        if (result.temporaryInstance != null) {
+          temporaryPresetInstanceRef.current = result.temporaryInstance;
+        }
         if (result.target != null) {
           editTargetResolveGenRef.current += 1;
           await applyFormTarget(result.target);
@@ -304,7 +328,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
         setLocatePending(false);
       }
     },
-    [applyFormTarget, pageId, siteId]
+    [applyFormTarget, cleanupTemporaryPresetInstance, pageId, siteId]
   );
 
   const openEdit = useCallback(

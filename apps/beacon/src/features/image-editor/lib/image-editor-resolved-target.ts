@@ -1,6 +1,8 @@
 import type {
   BeaconAppSettings,
   BeaconPresetSettingsSnapshot,
+  ComponentImagePresetTargetKey,
+  PresetTargetKey,
   PresetTargetKeyString,
   ResolvedUploadTarget,
 } from "@codalyn/webflow-kit";
@@ -178,6 +180,27 @@ export async function mapSelectedTargetToResolvedUploadTarget(input: {
     imagePropId,
     tagged: shouldResolveTaggedDimensions ? await resolveTaggedDimensions(target) : null,
   };
+}
+
+export function resolvedUploadTargetFromComponentImagePresetKey(
+  siteId: string,
+  targetKey: ComponentImagePresetTargetKey
+): Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }> {
+  return {
+    kind: "component-image",
+    siteId,
+    pageId: "",
+    instanceElementId: "",
+    componentDefinitionId: targetKey.componentDefinitionId,
+    imagePropId: targetKey.imagePropId,
+    tagged: null,
+  };
+}
+
+export function isComponentImagePresetTargetKey(
+  targetKey: PresetTargetKey
+): targetKey is ComponentImagePresetTargetKey {
+  return targetKey.kind === "component-image";
 }
 
 export function toBeaconPresetSettingsSnapshot(settings: BeaconAppSettings): BeaconPresetSettingsSnapshot {

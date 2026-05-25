@@ -53,34 +53,10 @@ export type ComponentDefinitionScope = {
 };
 
 type WithComponentDefinitionOptions<T> = {
-  /** Restores page canvas when the user opened a component definition via `openCanvas`. */
   pageIdHint?: string | null;
   onEnterFailed?: () => T | Promise<T>;
 };
 
-/**
- * Opens a component definition canvas (`openCanvas`), runs `fn`, then returns to `pageIdHint` when provided.
- */
-export async function withOpenComponentDefinitionCanvas<T>(
-  componentDefinitionId: string,
-  fn: (scope: { definition: Component; definitionRoot: AnyElement | null }) => Promise<T>,
-  options?: { pageIdHint?: string | null }
-): Promise<T> {
-  return runExclusiveDesignerOp(async () => {
-    await exitUntilPageForComponentEnter(options?.pageIdHint);
-    const definition = await webflow.getComponent(componentDefinitionId);
-    await webflow.openCanvas(definition);
-    try {
-      const definitionRoot = await definition.getRootElement().catch(() => null);
-      return await fn({ definition, definitionRoot });
-    } finally {
-      const pageIdHint = options?.pageIdHint;
-      if (pageIdHint != null && pageIdHint.length > 0 && typeof webflow.openCanvas === "function") {
-        await webflow.openCanvas({ pageId: pageIdHint }).catch(() => undefined);
-      }
-    }
-  });
-}
 /**
  * Enters a component definition, resolves its root element, runs `fn`, then exits in `finally`.
  */

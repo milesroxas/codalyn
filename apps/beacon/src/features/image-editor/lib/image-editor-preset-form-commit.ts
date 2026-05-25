@@ -19,12 +19,15 @@ import {
 import type { MutableRefObject } from "react";
 import {
   type BeaconExportDimensionWriteMode,
+  setBeaconDesignerExportAttrsOnComponentDefinition,
   setBeaconDesignerExportAttrsOnPageTarget,
 } from "@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target";
 import { parseOutputDimension } from "@/features/image-editor/lib/apply-cropped-export";
 import { clampExportDimensionsToMaxEdge } from "@/features/image-editor/lib/clamp-export-dimensions";
 import {
+  isComponentImagePresetTargetKey,
   mapSelectedTargetToResolvedUploadTarget,
+  resolvedUploadTargetFromComponentImagePresetKey,
   toBeaconPresetSettingsSnapshot,
 } from "@/features/image-editor/lib/image-editor-resolved-target";
 import { readPresetInstanceLocationForPage } from "@/features/image-editor/lib/preset-instance-location";
@@ -100,12 +103,24 @@ async function resolveScopeTargetForSave(input: {
   siteId: string | null;
   pageId: string | null;
   tagTarget: ImagePageTarget | null;
+  editingEntry: BeaconPresetStorageEntry | null;
 }): Promise<Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }> | null> {
-  const { scope, siteId, pageId, tagTarget } = input;
+  const { scope, siteId, pageId, tagTarget, editingEntry } = input;
   if (scope === "site-default") {
     return null;
   }
-  if (siteId == null || pageId == null || tagTarget == null) {
+  if (siteId == null) {
+    return null;
+  }
+  if (
+    scope === "component" &&
+    tagTarget == null &&
+    editingEntry != null &&
+    isComponentImagePresetTargetKey(editingEntry.row.targetKey)
+  ) {
+    return resolvedUploadTargetFromComponentImagePresetKey(siteId, editingEntry.row.targetKey);
+  }
+  if (pageId == null || tagTarget == null) {
     return null;
   }
   const resolvedTarget = await mapSelectedTargetToResolvedUploadTarget({
@@ -318,10 +333,20 @@ async function applyPresetSaveSideEffects(input: {
   tagTarget: ImagePageTarget | null;
   draft: ParsedPresetDraft;
   pageId: string | null;
+  resolvedTargetForScope: Exclude<ResolvedUploadTarget, { kind: "cms-ambiguous" }> | null;
 }): Promise<void> {
-  const { presetScope, tagTarget, draft, pageId } = input;
+  const { presetScope, tagTarget, draft, pageId, resolvedTargetForScope } = input;
   const writeMode = readPresetExportDimensionWriteMode(presetScope);
-  if (tagTarget != null && writeMode != null) {
+  if (writeMode === "definition-defaults" && resolvedTargetForScope?.kind === "component-image") {
+    const pageInstance = tagTarget?.kind === "component" ? (tagTarget.element as ComponentElement) : null;
+    await setBeaconDesignerExportAttrsOnComponentDefinition(
+      resolvedTargetForScope.componentDefinitionId,
+      resolvedTargetForScope.imagePropId,
+      draft.width,
+      draft.height,
+      { pageIdHint: pageId, instance: pageInstance }
+    );
+  } else if (tagTarget != null && writeMode != null) {
     await setBeaconDesignerExportAttrsOnPageTarget(tagTarget, draft.width, draft.height, {
       pageIdHint: pageId,
       writeMode,
@@ -330,10 +355,10 @@ async function applyPresetSaveSideEffects(input: {
   void webflow.notify({
     type: "Success",
     message:
-      tagTarget != null && writeMode === "instance-props"
-        ? "Saved preset and tagged the Image surface."
-        : tagTarget != null && writeMode === "definition-defaults"
-          ? "Saved preset and updated the component definition."
+      writeMode === "definition-defaults"
+        ? "Saved preset and updated the component definition."
+        : tagTarget != null && writeMode === "instance-props"
+          ? "Saved preset and tagged the Image surface."
           : "Saved preset.",
   });
 }
@@ -401,9 +426,7 @@ export async function commitImagePresetForm(args: CommitImagePresetFormArgs): Pr
     }
 
     const requireExplicitTarget =
-      editingEntry != null &&
-      (inferPresetCrudScopeFromTargetKey(editingEntry.row) === "instance" ||
-        inferPresetCrudScopeFromTargetKey(editingEntry.row) === "component");
+      editingEntry != null && inferPresetCrudScopeFromTargetKey(editingEntry.row) === "instance";
     const tagTarget = await resolvePresetTagTarget(formTarget, formTargets, { requireExplicitTarget });
     const targetValidationError = validationErrorForTagTarget({
       editingId,
@@ -419,6 +442,7 @@ export async function commitImagePresetForm(args: CommitImagePresetFormArgs): Pr
       siteId,
       pageId: activePageId,
       tagTarget,
+      editingEntry,
     });
     const instanceEditValidationError = validateInstancePresetEditTarget({
       editingEntry,
@@ -451,6 +475,7 @@ export async function commitImagePresetForm(args: CommitImagePresetFormArgs): Pr
       tagTarget,
       draft: parsedDraft,
       pageId: activePageId,
+      resolvedTargetForScope,
     });
     backToList();
   } catch (e) {

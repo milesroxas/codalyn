@@ -1,38 +1,32 @@
 import { eq } from "drizzle-orm";
-import { auth } from "@/server/auth";
-import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
-import { getStripe } from "@/server/billing/stripe-client";
+import { getStripePricePro, requireStripeBillingSession } from "@/server/billing/stripe-billing-routes";
+import { ensureStripeCustomerForUser } from "@/server/billing/stripe-customer";
+import { userRowHasStripePro } from "@/server/billing/stripe-subscription-status";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { db } from "@/shared/lib/db";
 import { user } from "@/shared/lib/db/auth-schema";
 
 export const runtime = "nodejs";
 
-const PRICE = process.env.STRIPE_PRICE_PRO?.trim();
-
 /**
- * Start Stripe Checkout for individual Pro. Requires a signed-in Tower user.
+ * Start Stripe Checkout for individual Pro. Requires a signed-in Tower user (POST only).
  * Configure `STRIPE_SECRET_KEY` and `STRIPE_PRICE_PRO` (recurring price id) in the environment.
  */
-export async function GET(request: Request) {
-  if (!isTowerBillingEnabled()) {
-    return Response.json({ error: "Billing is disabled" }, { status: 404 });
+export async function POST(request: Request) {
+  const gate = await requireStripeBillingSession(request);
+  if (!gate.ok) {
+    return gate.response;
   }
-  if (!PRICE) {
+  const { stripe, userId } = gate;
+
+  const price = getStripePricePro();
+  if (!price) {
     return Response.json(
-      { error: "STRIPE_PRICE_PRO is not set. Add your Stripe Price id (Pro subscription) to the environment." },
+      {
+        error: "STRIPE_PRICE_PRO is not set. Add your Stripe Price id (Pro subscription) to the environment.",
+      },
       { status: 501 }
     );
-  }
-  const stripe = getStripe();
-  if (!stripe) {
-    return Response.json({ error: "STRIPE_SECRET_KEY is not set" }, { status: 501 });
-  }
-
-  const session = await auth.api.getSession({ headers: request.headers });
-  const userId = session?.user?.id;
-  if (!userId) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const [u] = await db
@@ -40,6 +34,9 @@ export async function GET(request: Request) {
       id: user.id,
       email: user.email,
       stripeCustomerId: user.stripeCustomerId,
+      subscriptionPlan: user.subscriptionPlan,
+      subscriptionStatus: user.subscriptionStatus,
+      stripeSubscriptionId: user.stripeSubscriptionId,
     })
     .from(user)
     .where(eq(user.id, userId))
@@ -49,21 +46,17 @@ export async function GET(request: Request) {
     return Response.json({ error: "User not found" }, { status: 404 });
   }
 
-  const base = resolveTowerPublicBaseUrl();
-  let customerId = u.stripeCustomerId;
-  if (!customerId) {
-    const c = await stripe.customers.create({
-      email: u.email,
-      metadata: { towerUserId: u.id },
-    });
-    customerId = c.id;
-    await db.update(user).set({ stripeCustomerId: customerId }).where(eq(user.id, u.id));
+  if (userRowHasStripePro(u)) {
+    return Response.json({ error: "You already have an active Pro subscription." }, { status: 409 });
   }
+
+  const customerId = await ensureStripeCustomerForUser(stripe, u);
+  const base = resolveTowerPublicBaseUrl();
 
   const checkout = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
-    line_items: [{ price: PRICE, quantity: 1 }],
+    line_items: [{ price, quantity: 1 }],
     success_url: `${base}/billing?checkout=success`,
     cancel_url: `${base}/billing?checkout=canceled`,
     client_reference_id: u.id,

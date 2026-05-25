@@ -6,7 +6,7 @@ import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
-import { getStripe } from "@/server/billing/stripe-client";
+import { isStripeCheckoutConfigured } from "@/server/billing/stripe-billing-routes";
 import { getTowerLimitsSnapshot, tierLimitsFromSnapshot } from "@/server/billing/tower-limits-config";
 import { getUsageSnapshot } from "@/server/billing/usage-gate";
 import { db } from "@/shared/lib/db";
@@ -43,7 +43,7 @@ export default async function BillingPage() {
     .where(eq(user.id, userId))
     .limit(1);
 
-  const checkoutAvailable = Boolean(getStripe() && process.env.STRIPE_PRICE_PRO?.trim());
+  const checkoutAvailable = isStripeCheckoutConfigured();
   const showPortal = Boolean(row?.stripeCustomerId);
 
   return (
@@ -67,9 +67,9 @@ export default async function BillingPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           {checkoutAvailable && ent.tier === "free" ? (
-            <Button asChild>
-              <a href="/api/billing/checkout">Upgrade to Pro</a>
-            </Button>
+            <form action="/api/billing/checkout" method="post">
+              <Button type="submit">Upgrade to Pro</Button>
+            </form>
           ) : null}
           {checkoutAvailable && showPortal ? (
             <Button asChild variant="outline">

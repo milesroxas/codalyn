@@ -1,7 +1,5 @@
 import { eq } from "drizzle-orm";
-import { auth } from "@/server/auth";
-import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
-import { getStripe } from "@/server/billing/stripe-client";
+import { requireStripeBillingSession } from "@/server/billing/stripe-billing-routes";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { db } from "@/shared/lib/db";
 import { user } from "@/shared/lib/db/auth-schema";
@@ -12,19 +10,11 @@ export const runtime = "nodejs";
  * Redirect to Stripe Customer Portal (manage/cancel subscription). Requires a Stripe customer id on the user.
  */
 export async function GET(request: Request) {
-  if (!isTowerBillingEnabled()) {
-    return Response.json({ error: "Billing is disabled" }, { status: 404 });
+  const gate = await requireStripeBillingSession(request);
+  if (!gate.ok) {
+    return gate.response;
   }
-  const stripe = getStripe();
-  if (!stripe) {
-    return Response.json({ error: "STRIPE_SECRET_KEY is not set" }, { status: 501 });
-  }
-
-  const session = await auth.api.getSession({ headers: request.headers });
-  const userId = session?.user?.id;
-  if (!userId) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const { stripe, userId } = gate;
 
   const [u] = await db
     .select({ stripeCustomerId: user.stripeCustomerId })

@@ -51,6 +51,7 @@ Documented in `../.env.example`. Summary:
 Subscribe to at least:
 
 - `checkout.session.completed`
+- `customer.subscription.created`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
 
@@ -59,7 +60,7 @@ Subscribe to at least:
 | Route | Method | Behavior |
 | ----- | ------ | -------- |
 | `/billing` | GET | Server page: plan, usage, links to checkout/portal. |
-| `/api/billing/checkout` | GET | Creates Stripe Customer if needed, redirects to Checkout (session required). |
+| `/api/billing/checkout` | POST | Creates Stripe Customer if needed, redirects to Checkout (session required). |
 | `/api/billing/portal` | GET | Redirects to Stripe Customer Portal (requires `stripe_customer_id` on user). |
 | `/api/stripe/webhook` | POST | Verifies signature, updates `user` from events. |
 
@@ -70,9 +71,11 @@ Subscribe to at least:
 | Flag | `src/server/billing/billing-feature.ts` |
 | Entitlements (incl. org Pro) | `src/server/billing/entitlements.ts` |
 | Usage caps (Webflow + image) | `src/server/billing/usage-gate.ts`, `limits.ts` |
+| Subscription status (Pro entitled) | `src/server/billing/stripe-subscription-status.ts` |
 | Webhook application | `src/server/billing/stripe-webhook-apply.ts` |
 | API route | `src/app/api/stripe/webhook/route.ts` |
 | User sync helpers | `src/server/billing/stripe-app.ts` |
+| Checkout/portal route guards | `src/server/billing/stripe-billing-routes.ts` |
 
 Checkout embeds `towerUserId` in `client_reference_id`, `metadata`, and `subscription_data.metadata` so webhooks can resolve the user.
 

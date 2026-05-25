@@ -1,16 +1,19 @@
 import { eq, inArray } from "drizzle-orm";
+import type Stripe from "stripe";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
+import { isStripeSubscriptionProEntitled, userRowHasStripePro } from "@/server/billing/stripe-subscription-status";
 import { db } from "@/shared/lib/db";
 import { member, organization, user } from "@/shared/lib/db/auth-schema";
-
-const STRIPE_ACTIVE = new Set(["active", "trialing", "past_due"]);
 
 function orgLooksPaid(row: {
   subscriptionStatus: string | null;
   billingPlan: string | null;
   stripeSubscriptionId: string | null;
 }): boolean {
-  if (!row.subscriptionStatus || !STRIPE_ACTIVE.has(row.subscriptionStatus)) {
+  if (
+    !row.subscriptionStatus ||
+    !isStripeSubscriptionProEntitled(row.subscriptionStatus as Stripe.Subscription.Status)
+  ) {
     return false;
   }
   if (row.stripeSubscriptionId) {
@@ -18,22 +21,6 @@ function orgLooksPaid(row: {
   }
   const plan = row.billingPlan?.trim().toLowerCase() ?? "";
   return plan === "pro" || plan === "pro+" || plan === "pro team" || plan === "team pro";
-}
-
-function userIsProFromStripe(u: {
-  subscriptionPlan: string | null;
-  subscriptionStatus: string | null;
-  stripeSubscriptionId: string | null;
-}): boolean {
-  if (
-    u.subscriptionPlan === "pro" &&
-    u.stripeSubscriptionId &&
-    u.subscriptionStatus &&
-    STRIPE_ACTIVE.has(u.subscriptionStatus)
-  ) {
-    return true;
-  }
-  return false;
 }
 
 export type TowerTier = "free" | "pro";
@@ -61,7 +48,7 @@ export async function resolveTowerEntitlement(
     .where(eq(user.id, userId))
     .limit(1);
 
-  if (isTowerBillingEnabled() && u && userIsProFromStripe(u)) {
+  if (isTowerBillingEnabled() && u && userRowHasStripePro(u)) {
     return { tier: "pro", source: "user_stripe" };
   }
 

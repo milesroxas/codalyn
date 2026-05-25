@@ -16,7 +16,7 @@ export type PresetFormExistingMatch = {
   dimensionsLabel: string;
 };
 
-/** Surface add/edit preset form scopes. Site default is global fallback, not a per-surface preset. */
+/** Surface add/edit preset form scopes. Site default is a global fallback shown when no surface preset exists. */
 export function isSurfaceTargetPresetScope(scope: PresetCrudScope): scope is Exclude<PresetCrudScope, "site-default"> {
   return scope !== "site-default";
 }
@@ -78,6 +78,17 @@ export function listExistingPresetsForFormTarget(input: {
     });
     if (match) {
       matches.push(match);
+    }
+  }
+  if (matches.length === 0 && input.siteId != null) {
+    const siteDefaultFallback = findExistingPresetForFormScope({
+      settings: input.settings,
+      scope: "site-default",
+      siteId: input.siteId,
+      resolvedTarget: input.resolvedTarget,
+    });
+    if (siteDefaultFallback != null && siteDefaultFallback.row.targetKey.siteId === input.siteId) {
+      matches.push(siteDefaultFallback);
     }
   }
   return matches;

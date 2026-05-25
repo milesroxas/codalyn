@@ -117,7 +117,7 @@ describe("listExistingPresetsForFormTarget", () => {
     expect(matches.map((match) => match.scope)).toEqual(["instance"]);
   });
 
-  it("does not treat site default as an existing surface preset", () => {
+  it("falls back to site default when no surface presets exist", () => {
     const settings = makeSettings({
       siteDefault: {
         id: "site_row",
@@ -144,7 +144,58 @@ describe("listExistingPresetsForFormTarget", () => {
         { scope: "element", enabled: true },
       ],
     });
-    expect(matches).toEqual([]);
+    expect(matches).toEqual([
+      expect.objectContaining({
+        scope: "site-default",
+        row: expect.objectContaining({ id: "site_row" }),
+      }),
+    ]);
+  });
+
+  it("prefers surface presets over site default fallback", () => {
+    const targetKey = {
+      kind: "bare-image-instance" as const,
+      siteId: "site_1",
+      pageId: "page_1",
+      elementId: "img_1",
+    };
+    const settings = makeSettings({
+      siteDefault: {
+        id: "site_row",
+        name: "Site hero",
+        width: 1600,
+        height: 900,
+        maxFileSizeBytes: 200_000,
+        targetKey: { kind: "site-default", siteId: "site_1" },
+      },
+      byTargetKey: {
+        [serializePresetTargetKey(targetKey)]: {
+          id: "instance_row",
+          name: "Card",
+          width: 800,
+          height: 600,
+          maxFileSizeBytes: 200_000,
+          targetKey,
+        },
+      },
+    });
+    const matches = listExistingPresetsForFormTarget({
+      settings,
+      siteId: "site_1",
+      resolvedTarget: {
+        kind: "bare-image",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+        tagged: null,
+      },
+      scopeOptions: [
+        { scope: "site-default", enabled: true },
+        { scope: "instance", enabled: true },
+        { scope: "element", enabled: true },
+      ],
+    });
+    expect(matches.map((match) => match.scope)).toEqual(["instance"]);
   });
 });
 

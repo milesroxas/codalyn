@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   if (auth.userId) {
     const activeOrg = await getActiveOrganizationIdForApiRequest(req);
     const entitlement = await resolveTowerEntitlement(auth.userId, activeOrg);
-    const usage = await consumeImageOptimize(auth.userId, entitlement);
+    const usage = await consumeImageOptimize(auth.userId, entitlement, activeOrg);
     if (!usage.ok) {
       return usage.response;
     }

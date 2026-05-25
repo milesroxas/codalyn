@@ -2,6 +2,12 @@ import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch } from "@/server/operator/types";
+import {
+  defaultOperatorWorkspaceUsageLimits,
+  fetchOperatorWorkspaceUsageLimits,
+  sanitizeUsageLimitsPatch,
+  usageLimitsPatchToDbUpdates,
+} from "@/server/operator/usage-limits";
 import { db } from "@/shared/lib/db";
 import { invitation, member, organization, user } from "@/shared/lib/db/auth-schema";
 
@@ -83,6 +89,7 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
     stripeSubscriptionId: row.stripeSubscriptionId ?? null,
     memberCount: Number(row.memberCount ?? 0),
     pendingInvitations: Number(row.pendingInvitations ?? 0),
+    usage: (await fetchOperatorWorkspaceUsageLimits(orgId)) ?? (await defaultOperatorWorkspaceUsageLimits()),
     createdAt: toIso(row.createdAt),
     members: memberRows.map((m) => ({
       memberId: m.memberId,
@@ -177,6 +184,11 @@ function sanitizePatch(raw: unknown): OperatorWorkspacePatch | { error: string }
   }
   const body = raw as Record<string, unknown>;
   const patch: OperatorWorkspacePatch = {};
+  const usageParsed = sanitizeUsageLimitsPatch(body);
+  if ("error" in usageParsed) {
+    return usageParsed;
+  }
+  Object.assign(patch, usageParsed);
   const err =
     applyNameField(body, patch) ??
     applySlugField(body, patch) ??
@@ -204,6 +216,7 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
   const updates: Record<string, unknown> = { ...parsed };
+  Object.assign(updates, usageLimitsPatchToDbUpdates(parsed));
   if (Object.keys(updates).length > 0) {
     await db.update(organization).set(updates).where(eq(organization.id, orgId));
   }

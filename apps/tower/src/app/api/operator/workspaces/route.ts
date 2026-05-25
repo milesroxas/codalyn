@@ -2,6 +2,7 @@ import { and, count, desc, eq, ilike, or, type SQL, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorWorkspaceListResponse, OperatorWorkspaceRow } from "@/server/operator/types";
+import { defaultOperatorWorkspaceUsageLimits, fetchOperatorWorkspaceUsageLimits } from "@/server/operator/usage-limits";
 import { db } from "@/shared/lib/db";
 import { invitation, member, organization } from "@/shared/lib/db/auth-schema";
 
@@ -69,20 +70,34 @@ export async function GET(req: Request): Promise<NextResponse<OperatorWorkspaceL
   ]);
 
   const total = Number(totalRows[0]?.total ?? 0);
-  const mapped: OperatorWorkspaceRow[] = rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    slug: r.slug,
-    logo: r.logo ?? null,
-    seatLimit: r.seatLimit ?? null,
-    billingPlan: r.billingPlan ?? null,
-    subscriptionStatus: r.subscriptionStatus ?? null,
-    stripeCustomerId: r.stripeCustomerId ?? null,
-    stripeSubscriptionId: r.stripeSubscriptionId ?? null,
-    memberCount: Number(r.memberCount ?? 0),
-    pendingInvitations: Number(r.pendingInvitations ?? 0),
-    createdAt: toIso(r.createdAt),
-  }));
+  const usageByOrgId = new Map(
+    (
+      await Promise.all(
+        rows.map(async (r) => {
+          const usage = await fetchOperatorWorkspaceUsageLimits(r.id);
+          return [r.id, usage] as const;
+        })
+      )
+    ).filter((entry): entry is readonly [string, NonNullable<(typeof entry)[1]>] => entry[1] !== null)
+  );
+
+  const mapped: OperatorWorkspaceRow[] = await Promise.all(
+    rows.map(async (r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      logo: r.logo ?? null,
+      seatLimit: r.seatLimit ?? null,
+      billingPlan: r.billingPlan ?? null,
+      subscriptionStatus: r.subscriptionStatus ?? null,
+      stripeCustomerId: r.stripeCustomerId ?? null,
+      stripeSubscriptionId: r.stripeSubscriptionId ?? null,
+      memberCount: Number(r.memberCount ?? 0),
+      pendingInvitations: Number(r.pendingInvitations ?? 0),
+      usage: usageByOrgId.get(r.id) ?? (await defaultOperatorWorkspaceUsageLimits()),
+      createdAt: toIso(r.createdAt),
+    }))
+  );
 
   return NextResponse.json({ rows: mapped, total, limit, offset });
 }

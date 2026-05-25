@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
   const activeOrg = await getActiveOrganizationIdForApiRequest(req);
   const entitlement = await resolveTowerEntitlement(auth.userId, activeOrg);
-  const usage = await consumeWebflowRequest(auth.userId, entitlement);
+  const usage = await consumeWebflowRequest(auth.userId, entitlement, activeOrg);
   if (!usage.ok) {
     return usage.response;
   }

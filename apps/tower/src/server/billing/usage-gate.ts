@@ -1,51 +1,97 @@
 import { and, eq, sql } from "drizzle-orm";
-import type { TowerEntitlement, TowerTier } from "@/server/billing/entitlements";
-import { meteringDisabled, TOWER_LIMITS } from "@/server/billing/limits";
+import type { TowerEntitlement } from "@/server/billing/entitlements";
+import {
+  EMPTY_METERING_OVERRIDES,
+  type MeteringOverrideFields,
+  resolveMeteringPolicyFromEntitlement,
+  utcYearMonth,
+} from "@/server/billing/metering-policy";
+import { getTowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 import { db } from "@/shared/lib/db";
-import { towerUsageMonth } from "@/shared/lib/db/auth-schema";
+import { member, organization, towerUsageMonth, user } from "@/shared/lib/db/auth-schema";
 
 type TowerDbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-function utcYearMonth(): string {
-  const d = new Date();
-  const y = d.getUTCFullYear();
-  const m = d.getUTCMonth() + 1;
-  return `${y}-${m < 10 ? "0" : ""}${m}`;
-}
+type GateOk = { ok: true; used: number; limit: number | null; tier: TowerEntitlement["tier"] };
+type GateNo = { ok: false; used: number; limit: number; tier: TowerEntitlement["tier"]; response: Response };
 
-function limitFor(kind: "webflow" | "image", tier: TowerTier): number {
-  if (tier === "pro") {
-    return kind === "webflow" ? TOWER_LIMITS.pro.webflowRequestsPerMonth : TOWER_LIMITS.pro.imageOptimizesPerMonth;
+async function loadMeteringOverrideFields(
+  userId: string,
+  activeOrganizationId: string | null
+): Promise<{ user: MeteringOverrideFields; organization: MeteringOverrideFields | null }> {
+  const [userRow] = await db
+    .select({
+      meteringEnabled: user.meteringEnabled,
+      webflowRequestLimitOverride: user.webflowRequestLimitOverride,
+      imageOptimizeLimitOverride: user.imageOptimizeLimitOverride,
+    })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+
+  const userFields: MeteringOverrideFields = userRow
+    ? {
+        meteringEnabled: Boolean(userRow.meteringEnabled),
+        webflowRequestLimitOverride: userRow.webflowRequestLimitOverride ?? null,
+        imageOptimizeLimitOverride: userRow.imageOptimizeLimitOverride ?? null,
+      }
+    : EMPTY_METERING_OVERRIDES;
+
+  if (!activeOrganizationId) {
+    return { user: userFields, organization: null };
   }
-  return kind === "webflow" ? TOWER_LIMITS.free.webflowRequestsPerMonth : TOWER_LIMITS.free.imageOptimizesPerMonth;
-}
 
-type GateOk = { ok: true; used: number; limit: number; tier: TowerTier };
-type GateNo = { ok: false; used: number; limit: number; tier: TowerTier; response: Response };
+  const [orgRow] = await db
+    .select({
+      meteringEnabled: organization.meteringEnabled,
+      webflowRequestLimitOverride: organization.webflowRequestLimitOverride,
+      imageOptimizeLimitOverride: organization.imageOptimizeLimitOverride,
+    })
+    .from(organization)
+    .where(eq(organization.id, activeOrganizationId))
+    .limit(1);
+
+  return {
+    user: userFields,
+    organization: orgRow
+      ? {
+          meteringEnabled: Boolean(orgRow.meteringEnabled),
+          webflowRequestLimitOverride: orgRow.webflowRequestLimitOverride ?? null,
+          imageOptimizeLimitOverride: orgRow.imageOptimizeLimitOverride ?? null,
+        }
+      : null,
+  };
+}
 
 /**
  * Reserves one unit in a transaction. Returns 429 + JSON when the cap is exceeded.
  */
-export async function consumeWebflowRequest(userId: string, entitlement: TowerEntitlement): Promise<GateOk | GateNo> {
-  if (meteringDisabled()) {
-    return { ok: true, used: 0, limit: Number.POSITIVE_INFINITY, tier: entitlement.tier };
+export async function consumeWebflowRequest(
+  userId: string,
+  entitlement: TowerEntitlement,
+  activeOrganizationId: string | null
+): Promise<GateOk | GateNo> {
+  const overrides = await loadMeteringOverrideFields(userId, activeOrganizationId);
+  const limits = await getTowerLimitsSnapshot();
+  const policy = resolveMeteringPolicyFromEntitlement(entitlement, overrides.user, overrides.organization, limits);
+  if (policy.skipMetering || policy.webflowCap === null) {
+    return { ok: true, used: 0, limit: null, tier: entitlement.tier };
   }
-  if (entitlement.tier === "pro") {
-    return { ok: true, used: 0, limit: limitFor("webflow", "pro"), tier: "pro" };
-  }
-  const cap = limitFor("webflow", "free");
-  return runConsume(userId, "webflow", "free", cap);
+  return runConsume(userId, "webflow", entitlement.tier, policy.webflowCap);
 }
 
-export async function consumeImageOptimize(userId: string, entitlement: TowerEntitlement): Promise<GateOk | GateNo> {
-  if (meteringDisabled()) {
-    return { ok: true, used: 0, limit: Number.POSITIVE_INFINITY, tier: entitlement.tier };
+export async function consumeImageOptimize(
+  userId: string,
+  entitlement: TowerEntitlement,
+  activeOrganizationId: string | null
+): Promise<GateOk | GateNo> {
+  const overrides = await loadMeteringOverrideFields(userId, activeOrganizationId);
+  const limits = await getTowerLimitsSnapshot();
+  const policy = resolveMeteringPolicyFromEntitlement(entitlement, overrides.user, overrides.organization, limits);
+  if (policy.skipMetering || policy.imageCap === null) {
+    return { ok: true, used: 0, limit: null, tier: entitlement.tier };
   }
-  if (entitlement.tier === "pro") {
-    return { ok: true, used: 0, limit: limitFor("image", "pro"), tier: "pro" };
-  }
-  const cap = limitFor("image", "free");
-  return runConsume(userId, "image", "free", cap);
+  return runConsume(userId, "image", entitlement.tier, policy.imageCap);
 }
 
 type TxBlock = { blocked: true; used: number; limit: number } | { blocked: false; used: number; limit: number };
@@ -93,7 +139,7 @@ async function reserveMonthlyCount(
 async function runConsume(
   userId: string,
   column: "webflow" | "image",
-  tier: TowerTier,
+  tier: TowerEntitlement["tier"],
   cap: number
 ): Promise<GateOk | GateNo> {
   const ym = utcYearMonth();
@@ -122,7 +168,6 @@ async function runConsume(
   return { ok: true, used: res.used, limit: res.limit, tier };
 }
 
-/** Read-only: current month counts (no lock). */
 export async function getUsageSnapshot(userId: string): Promise<{
   yearMonth: string;
   webflowRequestCount: number;
@@ -139,4 +184,23 @@ export async function getUsageSnapshot(userId: string): Promise<{
     webflowRequestCount: row?.webflowRequestCount ?? 0,
     imageOptimizeCount: row?.imageOptimizeCount ?? 0,
   };
+}
+
+export async function resetUsageForUser(userId: string, yearMonth = utcYearMonth()): Promise<void> {
+  await db
+    .update(towerUsageMonth)
+    .set({ webflowRequestCount: 0, imageOptimizeCount: 0 })
+    .where(and(eq(towerUsageMonth.userId, userId), eq(towerUsageMonth.yearMonth, yearMonth)));
+}
+
+export async function resetUsageForOrganizationMembers(
+  organizationId: string,
+  yearMonth = utcYearMonth()
+): Promise<void> {
+  const memberRows = await db
+    .select({ userId: member.userId })
+    .from(member)
+    .where(eq(member.organizationId, organizationId));
+
+  await Promise.all(memberRows.map((row) => resetUsageForUser(row.userId, yearMonth)));
 }

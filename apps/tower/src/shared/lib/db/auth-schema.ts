@@ -32,6 +32,12 @@ export const user = pgTable("user", {
   subscriptionPlan: text("subscription_plan").default("free").notNull(),
   /** Stripe subscription `status` (e.g. `active`, `canceled`); null when no Stripe sub. */
   subscriptionStatus: text("subscription_status"),
+  /** When false, this user bypasses monthly usage metering (operator override). */
+  meteringEnabled: boolean("metering_enabled").default(true).notNull(),
+  /** Operator override for free-tier Webflow proxy cap; null uses tier default. */
+  webflowRequestLimitOverride: integer("webflow_request_limit_override"),
+  /** Operator override for free-tier image optimize cap; null uses tier default. */
+  imageOptimizeLimitOverride: integer("image_optimize_limit_override"),
   /** Set when operator early-access invite, team invite signup, or org join grants Tower/Beacon sign-in during MVP. */
   earlyAccessGrantedAt: timestamp("early_access_granted_at"),
   /**
@@ -133,6 +139,12 @@ export const organization = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     /** Nullable cap on members; null means use a high default (free tier). Wired to Stripe seat count later. */
     seatLimit: integer("seat_limit"),
+    /** When false, members bypass monthly usage metering while this workspace is active (operator override). */
+    meteringEnabled: boolean("metering_enabled").default(true).notNull(),
+    /** Operator override for member Webflow proxy cap when this workspace is active; null uses tier/user default. */
+    webflowRequestLimitOverride: integer("webflow_request_limit_override"),
+    /** Operator override for member image optimize cap when this workspace is active; null uses tier/user default. */
+    imageOptimizeLimitOverride: integer("image_optimize_limit_override"),
     stripeCustomerId: text("stripe_customer_id"),
     stripeSubscriptionId: text("stripe_subscription_id"),
     subscriptionStatus: text("subscription_status"),
@@ -258,6 +270,20 @@ export const towerUsageMonth = pgTable(
   },
   (table) => [uniqueIndex("tower_usage_month_user_ym").on(table.userId, table.yearMonth)]
 );
+
+/** Singleton platform defaults for monthly usage metering (Operator-managed). */
+export const towerPlatformMetering = pgTable("tower_platform_metering", {
+  id: text("id").primaryKey(),
+  globalMeteringEnabled: boolean("global_metering_enabled").default(true).notNull(),
+  freeWebflowRequestsPerMonth: integer("free_webflow_requests_per_month").notNull(),
+  freeImageOptimizesPerMonth: integer("free_image_optimizes_per_month").notNull(),
+  proWebflowRequestsPerMonth: integer("pro_webflow_requests_per_month").notNull(),
+  proImageOptimizesPerMonth: integer("pro_image_optimizes_per_month").notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
 
 export const userRelations = relations(user, ({ many, one }) => ({
   sessions: many(session),

@@ -1,3 +1,29 @@
+export type OperatorPlatformMeteringConfig = {
+  globalMeteringEnabled: boolean;
+  envEmergencyMeteringDisabled: boolean;
+  free: {
+    webflowRequestsPerMonth: number;
+    imageOptimizesPerMonth: number;
+  };
+  pro: {
+    webflowRequestsPerMonth: number;
+    imageOptimizesPerMonth: number;
+  };
+  updatedAt: string | null;
+};
+
+export type OperatorPlatformMeteringPatch = {
+  globalMeteringEnabled?: boolean;
+  free?: {
+    webflowRequestsPerMonth?: number;
+    imageOptimizesPerMonth?: number;
+  };
+  pro?: {
+    webflowRequestsPerMonth?: number;
+    imageOptimizesPerMonth?: number;
+  };
+};
+
 export type OperatorMetrics = {
   totals: {
     users: number;
@@ -31,6 +57,28 @@ export type OperatorMetrics = {
   }>;
 };
 
+export type OperatorUsageLimitsPatch = {
+  meteringEnabled?: boolean;
+  webflowRequestLimitOverride?: number | null;
+  imageOptimizeLimitOverride?: number | null;
+};
+
+export type OperatorUsageLimitsView = {
+  scope: "user" | "workspace";
+  tier: "free" | "pro";
+  meteringEnabled: boolean;
+  globalMeteringDisabled: boolean;
+  webflowRequestLimitOverride: number | null;
+  imageOptimizeLimitOverride: number | null;
+  yearMonth: string;
+  webflowRequestCount: number;
+  imageOptimizeCount: number;
+  effectiveWebflowLimit: number | null;
+  effectiveImageLimit: number | null;
+  memberWebflowRequestCount?: number;
+  memberImageOptimizeCount?: number;
+};
+
 export type OperatorUserRow = {
   id: string;
   email: string;
@@ -43,6 +91,7 @@ export type OperatorUserRow = {
   canCreateOrganization: boolean;
   webflowConnected: boolean;
   memberships: number;
+  usage: OperatorUsageLimitsView;
   createdAt: string;
   updatedAt: string;
 };
@@ -91,6 +140,7 @@ export type OperatorWorkspaceRow = {
   stripeSubscriptionId: string | null;
   memberCount: number;
   pendingInvitations: number;
+  usage: OperatorUsageLimitsView;
   createdAt: string;
 };
 
@@ -127,7 +177,7 @@ export type OperatorWorkspaceDetail = OperatorWorkspaceRow & {
   invitations: OperatorWorkspaceInvitation[];
 };
 
-export type OperatorUserPatch = {
+export type OperatorUserPatch = OperatorUsageLimitsPatch & {
   role?: "user" | "product_admin" | null;
   canCreateOrganization?: boolean;
   banned?: boolean;
@@ -135,7 +185,7 @@ export type OperatorUserPatch = {
   banExpires?: string | null;
 };
 
-export type OperatorWorkspacePatch = {
+export type OperatorWorkspacePatch = OperatorUsageLimitsPatch & {
   name?: string;
   slug?: string;
   seatLimit?: number | null;

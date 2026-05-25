@@ -19,6 +19,7 @@ import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { appRoleLabel, formatRelative, initialsFor } from "@/features/operator/model/format";
 import { OperatorCustomerDetail } from "@/features/operator/ui/operator-customer-detail";
 import { OperatorInviteCustomer } from "@/features/operator/ui/operator-invite-customer";
+import { OperatorUsageLimitsTableCell } from "@/features/operator/ui/operator-usage-limits-section";
 import type { OperatorUserRow } from "@/server/operator/types";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Badge } from "@/shared/ui/badge";
@@ -223,6 +224,7 @@ export function OperatorCustomers() {
               <TableHead>Customer</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Flags</TableHead>
+              <TableHead>Usage</TableHead>
               <TableHead className="text-right">Workspaces</TableHead>
               <TableHead className="text-right">Created</TableHead>
             </TableRow>
@@ -318,6 +320,9 @@ function CustomersTableBody({
             <TableCell>
               <Skeleton className="h-4 w-24" />
             </TableCell>
+            <TableCell>
+              <Skeleton className="h-10 w-28" />
+            </TableCell>
             <TableCell className="text-right">
               <Skeleton className="ml-auto h-4 w-8" />
             </TableCell>
@@ -332,7 +337,7 @@ function CustomersTableBody({
   if (rows.length === 0) {
     return (
       <TableRow>
-        <TableCell colSpan={5}>
+        <TableCell colSpan={6}>
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
             <span className="flex size-10 items-center justify-center rounded-lg bg-muted">
               <IconUsers className="size-5" />
@@ -403,6 +408,9 @@ function CustomerRow({
           <VerifiedBadge verified={user.emailVerified} />
           {noFlags ? <span className="text-xs text-muted-foreground">—</span> : null}
         </div>
+      </TableCell>
+      <TableCell>
+        <OperatorUsageLimitsTableCell usage={user.usage} />
       </TableCell>
       <TableCell className="text-right text-sm tabular-nums text-foreground">{user.memberships}</TableCell>
       <TableCell className="text-right text-xs text-muted-foreground">{formatRelative(user.createdAt)}</TableCell>

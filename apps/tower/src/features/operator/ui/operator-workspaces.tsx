@@ -14,6 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { formatRelative } from "@/features/operator/model/format";
+import { OperatorUsageLimitsTableCell } from "@/features/operator/ui/operator-usage-limits-section";
 import { OperatorWorkspaceDetailSheet } from "@/features/operator/ui/operator-workspace-detail";
 import type { OperatorWorkspaceRow } from "@/server/operator/types";
 import { Badge } from "@/shared/ui/badge";
@@ -175,6 +176,7 @@ export function OperatorWorkspaces() {
               <TableHead>Workspace</TableHead>
               <TableHead>Billing</TableHead>
               <TableHead className="text-right">Seats</TableHead>
+              <TableHead>Usage</TableHead>
               <TableHead className="text-right">Members</TableHead>
               <TableHead className="text-right">Pending</TableHead>
               <TableHead className="text-right">Created</TableHead>
@@ -270,6 +272,9 @@ function WorkspacesTableBody({
             <TableCell className="text-right">
               <Skeleton className="ml-auto h-4 w-10" />
             </TableCell>
+            <TableCell>
+              <Skeleton className="h-10 w-28" />
+            </TableCell>
             <TableCell className="text-right">
               <Skeleton className="ml-auto h-4 w-8" />
             </TableCell>
@@ -287,7 +292,7 @@ function WorkspacesTableBody({
   if (rows.length === 0) {
     return (
       <TableRow>
-        <TableCell colSpan={6}>
+        <TableCell colSpan={7}>
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
             <span className="flex size-10 items-center justify-center rounded-lg bg-muted">
               <IconBuilding className="size-5" />
@@ -348,6 +353,9 @@ function WorkspaceRow({
       </TableCell>
       <TableCell className="text-right text-sm tabular-nums text-foreground">
         {workspace.seatLimit === null ? "∞" : workspace.seatLimit}
+      </TableCell>
+      <TableCell>
+        <OperatorUsageLimitsTableCell usage={workspace.usage} />
       </TableCell>
       <TableCell className="text-right text-sm tabular-nums text-foreground">
         <span className="inline-flex items-center gap-1">

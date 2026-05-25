@@ -2,6 +2,7 @@ import { and, count, desc, eq, ilike, or, type SQL, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorUserListResponse, OperatorUserRow } from "@/server/operator/types";
+import { defaultOperatorUserUsageLimits, fetchOperatorUserUsageLimits } from "@/server/operator/usage-limits";
 import { db } from "@/shared/lib/db";
 import { member, organizationWebflowOAuthToken, user } from "@/shared/lib/db/auth-schema";
 
@@ -111,21 +112,35 @@ export async function GET(req: Request): Promise<NextResponse<OperatorUserListRe
   ]);
 
   const total = Number(totalRows[0]?.total ?? 0);
-  const mapped: OperatorUserRow[] = rows.map((r) => ({
-    id: r.id,
-    email: r.email,
-    name: r.name,
-    role: r.role ?? null,
-    emailVerified: Boolean(r.emailVerified),
-    banned: Boolean(r.banned),
-    banReason: r.banReason ?? null,
-    banExpires: r.banExpires ? toIso(r.banExpires) : null,
-    canCreateOrganization: Boolean(r.canCreateOrganization),
-    webflowConnected: Boolean(r.webflowConnected),
-    memberships: Number(r.memberships ?? 0),
-    createdAt: toIso(r.createdAt),
-    updatedAt: toIso(r.updatedAt),
-  }));
+  const usageByUserId = new Map(
+    (
+      await Promise.all(
+        rows.map(async (r) => {
+          const usage = await fetchOperatorUserUsageLimits(r.id);
+          return [r.id, usage] as const;
+        })
+      )
+    ).filter((entry): entry is readonly [string, NonNullable<(typeof entry)[1]>] => entry[1] !== null)
+  );
+
+  const mapped: OperatorUserRow[] = await Promise.all(
+    rows.map(async (r) => ({
+      id: r.id,
+      email: r.email,
+      name: r.name,
+      role: r.role ?? null,
+      emailVerified: Boolean(r.emailVerified),
+      banned: Boolean(r.banned),
+      banReason: r.banReason ?? null,
+      banExpires: r.banExpires ? toIso(r.banExpires) : null,
+      canCreateOrganization: Boolean(r.canCreateOrganization),
+      webflowConnected: Boolean(r.webflowConnected),
+      memberships: Number(r.memberships ?? 0),
+      usage: usageByUserId.get(r.id) ?? (await defaultOperatorUserUsageLimits()),
+      createdAt: toIso(r.createdAt),
+      updatedAt: toIso(r.updatedAt),
+    }))
+  );
 
   return NextResponse.json({ rows: mapped, total, limit, offset });
 }

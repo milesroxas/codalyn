@@ -14,6 +14,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { formatDateTime, formatRelative, initialsFor } from "@/features/operator/model/format";
+import {
+  OperatorUsageLimitsSection,
+  reloadWorkspaceUsageLimits,
+} from "@/features/operator/ui/operator-usage-limits-section";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch, OperatorWorkspaceRow } from "@/server/operator/types";
 import {
   AlertDialog,
@@ -63,6 +67,7 @@ function detailToRow(d: OperatorWorkspaceDetail): OperatorWorkspaceRow {
     stripeSubscriptionId: d.stripeSubscriptionId,
     memberCount: d.memberCount,
     pendingInvitations: d.pendingInvitations,
+    usage: d.usage,
     createdAt: d.createdAt,
   };
 }
@@ -288,6 +293,30 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
                 dirty={billingDirty}
                 patchBusy={patchBusy}
                 onSave={onSaveBilling}
+              />
+              <OperatorUsageLimitsSection
+                scope="workspace"
+                usage={detail.usage}
+                busy={patchBusy}
+                onSave={async (update) => {
+                  const next = await operatorApi.patchWorkspace(detail.id, update);
+                  setDetail(next);
+                  onUpdated?.(detailToRow(next));
+                  return next.usage;
+                }}
+                onReset={async () => {
+                  await operatorApi.resetWorkspaceUsage(detail.id);
+                  const usage = await reloadWorkspaceUsageLimits(detail.id);
+                  setDetail((current) => {
+                    if (!current) {
+                      return current;
+                    }
+                    const next = { ...current, usage };
+                    onUpdated?.(detailToRow(next));
+                    return next;
+                  });
+                  return usage;
+                }}
               />
 
               <MembersSection members={detail.members} onCloseSheet={() => onOpenChange(false)} />

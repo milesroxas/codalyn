@@ -5,9 +5,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
-import { TOWER_LIMITS } from "@/server/billing/limits";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { getStripe } from "@/server/billing/stripe-client";
+import { getTowerLimitsSnapshot, tierLimitsFromSnapshot } from "@/server/billing/tower-limits-config";
 import { getUsageSnapshot } from "@/server/billing/usage-gate";
 import { db } from "@/shared/lib/db";
 import { user } from "@/shared/lib/db/auth-schema";
@@ -30,6 +30,8 @@ export default async function BillingPage() {
   const activeOrg = await getActiveOrganizationIdForAuthHeaders(h);
   const ent = await resolveTowerEntitlement(userId, activeOrg);
   const usage = await getUsageSnapshot(userId);
+  const limitsSnapshot = await getTowerLimitsSnapshot();
+  const limits = tierLimitsFromSnapshot(limitsSnapshot, ent.tier);
   const [row] = await db
     .select({
       email: user.email,
@@ -41,7 +43,6 @@ export default async function BillingPage() {
     .where(eq(user.id, userId))
     .limit(1);
 
-  const limits = ent.tier === "pro" ? TOWER_LIMITS.pro : TOWER_LIMITS.free;
   const checkoutAvailable = Boolean(getStripe() && process.env.STRIPE_PRICE_PRO?.trim());
   const showPortal = Boolean(row?.stripeCustomerId);
 

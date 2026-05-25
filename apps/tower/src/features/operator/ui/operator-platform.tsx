@@ -4,6 +4,7 @@ import { IconActivity, IconExternalLink, IconPlug, IconRefresh } from "@tabler/i
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
+import { OperatorPlatformMeteringCard } from "@/features/operator/ui/operator-platform-metering";
 import type { OperatorMetrics } from "@/server/operator/types";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -84,6 +85,7 @@ export function OperatorPlatform() {
       </div>
 
       <HealthCard health={health} loading={healthLoading} />
+      <OperatorPlatformMeteringCard />
       <IntegrationsCard metrics={metrics} loading={metricsLoading} error={metricsError} />
 
       <Separator />

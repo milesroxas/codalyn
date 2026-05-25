@@ -23,6 +23,10 @@ import {
   initialsFor,
   userAgentSummary,
 } from "@/features/operator/model/format";
+import {
+  OperatorUsageLimitsSection,
+  reloadUserUsageLimits,
+} from "@/features/operator/ui/operator-usage-limits-section";
 import type { OperatorUserDetail, OperatorUserPatch, OperatorUserRow } from "@/server/operator/types";
 import {
   AlertDialog,
@@ -95,6 +99,7 @@ function detailToRow(d: OperatorUserDetail): OperatorUserRow {
     canCreateOrganization: d.canCreateOrganization,
     webflowConnected: d.webflowConnected,
     memberships: d.memberships,
+    usage: d.usage,
     createdAt: d.createdAt,
     updatedAt: d.updatedAt,
   };
@@ -282,6 +287,36 @@ export function OperatorCustomerDetail(props: OperatorCustomerDetailProps) {
                 isSelf={isSelf}
                 onBan={onBan}
                 onUnban={onUnban}
+              />
+              <OperatorUsageLimitsSection
+                scope="user"
+                usage={state.detail.usage}
+                busy={state.patchBusy}
+                onSave={async (update) => {
+                  if (!state.detail) {
+                    throw new Error("missing_detail");
+                  }
+                  const next = await operatorApi.patchUser(state.detail.id, update);
+                  setState((s) => ({ ...s, detail: next }));
+                  onUpdated?.(detailToRow(next));
+                  return next.usage;
+                }}
+                onReset={async () => {
+                  if (!state.detail) {
+                    throw new Error("missing_detail");
+                  }
+                  await operatorApi.resetUserUsage(state.detail.id);
+                  const usage = await reloadUserUsageLimits(state.detail.id);
+                  setState((s) => {
+                    if (!s.detail) {
+                      return s;
+                    }
+                    const nextDetail = { ...s.detail, usage };
+                    onUpdated?.(detailToRow(nextDetail));
+                    return { ...s, detail: nextDetail };
+                  });
+                  return usage;
+                }}
               />
               <WorkspacesSection detail={state.detail} onCloseSheet={() => onOpenChange(false)} />
               <SessionsSection detail={state.detail} />

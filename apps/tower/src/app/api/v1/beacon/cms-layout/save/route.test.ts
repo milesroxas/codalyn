@@ -8,6 +8,7 @@ const resolveUserCmsLayoutFieldSlug = vi.fn();
 const webflowCmsItemUrl = vi.fn();
 const resolveTowerEntitlement = vi.fn();
 const getActiveOrganizationIdForApiRequest = vi.fn();
+const consumeWebflowRequest = vi.fn();
 
 vi.mock("@/server/tower-api-auth", () => ({
   verifyTowerApiRequest,
@@ -32,6 +33,10 @@ vi.mock("@/server/billing/session-org", () => ({
   getActiveOrganizationIdForApiRequest,
 }));
 
+vi.mock("@/server/billing/usage-gate", () => ({
+  consumeWebflowRequest,
+}));
+
 describe("POST /api/v1/beacon/cms-layout/save", () => {
   const prevCmsSlotsSurface = process.env.NEXT_PUBLIC_CMS_SLOTS_SURFACE_ENABLED;
 
@@ -45,6 +50,7 @@ describe("POST /api/v1/beacon/cms-layout/save", () => {
     webflowCmsItemUrl.mockReset();
     resolveTowerEntitlement.mockReset();
     getActiveOrganizationIdForApiRequest.mockReset();
+    consumeWebflowRequest.mockReset();
     vi.restoreAllMocks();
   });
 
@@ -80,6 +86,7 @@ describe("POST /api/v1/beacon/cms-layout/save", () => {
     };
     getActiveOrganizationIdForApiRequest.mockResolvedValue(null);
     resolveTowerEntitlement.mockResolvedValue({ tier: "pro", source: "user_stripe" });
+    consumeWebflowRequest.mockResolvedValue({ ok: true, used: 0, limit: null, tier: "pro" });
     verifyTowerApiRequest.mockResolvedValue({ ok: true, userId: "user_1" });
     parseCmsLayoutSaveRequest.mockReturnValue({
       collectionId: "col_1",

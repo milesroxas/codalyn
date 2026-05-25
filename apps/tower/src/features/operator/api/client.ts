@@ -1,5 +1,7 @@
 import type {
   OperatorMetrics,
+  OperatorPlatformMeteringConfig,
+  OperatorPlatformMeteringPatch,
   OperatorUserDetail,
   OperatorUserListResponse,
   OperatorUserPatch,
@@ -119,6 +121,21 @@ export const operatorApi = {
     requestJson<OperatorWorkspaceDetail>(`/api/operator/workspaces/${encodeURIComponent(orgId)}`),
   patchWorkspace: async (orgId: string, patch: OperatorWorkspacePatch): Promise<OperatorWorkspaceDetail> =>
     requestJson<OperatorWorkspaceDetail>(`/api/operator/workspaces/${encodeURIComponent(orgId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+  resetUserUsage: async (userId: string): Promise<{ ok: true }> =>
+    requestJson<{ ok: true }>(`/api/operator/users/${encodeURIComponent(userId)}/usage-reset`, {
+      method: "POST",
+    }),
+  resetWorkspaceUsage: async (orgId: string): Promise<{ ok: true }> =>
+    requestJson<{ ok: true }>(`/api/operator/workspaces/${encodeURIComponent(orgId)}/usage-reset`, {
+      method: "POST",
+    }),
+  getPlatformMetering: async (): Promise<OperatorPlatformMeteringConfig> =>
+    requestJson<OperatorPlatformMeteringConfig>("/api/operator/platform/metering"),
+  patchPlatformMetering: async (patch: OperatorPlatformMeteringPatch): Promise<OperatorPlatformMeteringConfig> =>
+    requestJson<OperatorPlatformMeteringConfig>("/api/operator/platform/metering", {
       method: "PATCH",
       body: JSON.stringify(patch),
     }),

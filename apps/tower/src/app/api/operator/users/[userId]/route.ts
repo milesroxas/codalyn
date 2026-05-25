@@ -4,6 +4,12 @@ import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorUserDetail, OperatorUserPatch } from "@/server/operator/types";
+import {
+  defaultOperatorUserUsageLimits,
+  fetchOperatorUserUsageLimits,
+  sanitizeUsageLimitsPatch,
+  usageLimitsPatchToDbUpdates,
+} from "@/server/operator/usage-limits";
 import { db } from "@/shared/lib/db";
 import {
   member,
@@ -95,6 +101,7 @@ async function fetchUserDetail(userId: string): Promise<OperatorUserDetail | nul
     webflowAuthorizedUserId: row.webflowAuthorizedUserId ?? null,
     webflowConnected: webflowConnected.length > 0,
     memberships: memberRows.length,
+    usage: (await fetchOperatorUserUsageLimits(userId)) ?? (await defaultOperatorUserUsageLimits()),
     createdAt: toIso(row.createdAt) ?? new Date(0).toISOString(),
     updatedAt: toIso(row.updatedAt) ?? new Date(0).toISOString(),
     memberOf: memberRows.map((m) => ({
@@ -181,6 +188,11 @@ function sanitizePatch(raw: unknown): OperatorUserPatch | { error: string } {
   }
   const body = raw as Record<string, unknown>;
   const patch: OperatorUserPatch = {};
+  const usageParsed = sanitizeUsageLimitsPatch(body);
+  if ("error" in usageParsed) {
+    return usageParsed;
+  }
+  Object.assign(patch, usageParsed);
   const err =
     applyRoleField(body, patch) ??
     applyBooleanField(body, patch, "canCreateOrganization") ??
@@ -230,6 +242,7 @@ export async function PATCH(
   if (parsed.banExpires !== undefined) {
     updates.banExpires = parsed.banExpires ? new Date(parsed.banExpires) : null;
   }
+  Object.assign(updates, usageLimitsPatchToDbUpdates(parsed));
 
   if (Object.keys(updates).length > 0) {
     await db.update(user).set(updates).where(eq(user.id, userId));

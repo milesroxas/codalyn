@@ -55,7 +55,7 @@ async function forward(req: Request, segments: string[]) {
   if (auth.userId) {
     const activeOrg = await getActiveOrganizationIdForApiRequest(req);
     const entitlement = await resolveTowerEntitlement(auth.userId, activeOrg);
-    const usage = await consumeWebflowRequest(auth.userId, entitlement);
+    const usage = await consumeWebflowRequest(auth.userId, entitlement, activeOrg);
     if (!usage.ok) {
       return usage.response;
     }

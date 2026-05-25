@@ -5,35 +5,39 @@ import type { TowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 describe("resolveMeteringPolicy", () => {
   const user = {
     meteringEnabled: true,
-    webflowRequestLimitOverride: null,
+    webflowProxyLimitOverride: null,
+    cmsWriteLimitOverride: null,
     imageOptimizeLimitOverride: null,
   };
 
   const organization = {
     meteringEnabled: true,
-    webflowRequestLimitOverride: null,
+    webflowProxyLimitOverride: null,
+    cmsWriteLimitOverride: null,
     imageOptimizeLimitOverride: null,
   };
 
   const limits: TowerLimitsSnapshot = {
     globalMeteringEnabled: true,
     envEmergencyMeteringDisabled: false,
-    free: { webflowRequestsPerMonth: 3_000, imageOptimizesPerMonth: 50 },
-    pro: { webflowRequestsPerMonth: 200_000, imageOptimizesPerMonth: 10_000 },
+    free: { webflowProxyRequestsPerMonth: 2_500, cmsWritesPerMonth: 500, imageOptimizesPerMonth: 50 },
+    pro: { webflowProxyRequestsPerMonth: 150_000, cmsWritesPerMonth: 50_000, imageOptimizesPerMonth: 10_000 },
     updatedAt: null,
   };
 
   it("applies free tier defaults when metering is enabled", () => {
     const policy = resolveMeteringPolicy({ tier: "free", user, organization, limits });
     expect(policy.skipMetering).toBe(false);
-    expect(policy.webflowCap).toBe(3_000);
+    expect(policy.webflowProxyCap).toBe(2_500);
+    expect(policy.cmsWriteCap).toBe(500);
     expect(policy.imageCap).toBe(50);
   });
 
   it("skips metering for pro tier", () => {
     const policy = resolveMeteringPolicy({ tier: "pro", user, organization, limits });
     expect(policy.skipMetering).toBe(true);
-    expect(policy.webflowCap).toBeNull();
+    expect(policy.webflowProxyCap).toBeNull();
+    expect(policy.cmsWriteCap).toBeNull();
     expect(policy.imageCap).toBeNull();
   });
 
@@ -70,15 +74,22 @@ describe("resolveMeteringPolicy", () => {
   it("prefers user override over organization override", () => {
     const policy = resolveMeteringPolicy({
       tier: "free",
-      user: { ...user, webflowRequestLimitOverride: 120, imageOptimizeLimitOverride: 7 },
+      user: {
+        ...user,
+        webflowProxyLimitOverride: 120,
+        cmsWriteLimitOverride: 30,
+        imageOptimizeLimitOverride: 7,
+      },
       organization: {
         ...organization,
-        webflowRequestLimitOverride: 500,
+        webflowProxyLimitOverride: 500,
+        cmsWriteLimitOverride: 100,
         imageOptimizeLimitOverride: 20,
       },
       limits,
     });
-    expect(policy.webflowCap).toBe(120);
+    expect(policy.webflowProxyCap).toBe(120);
+    expect(policy.cmsWriteCap).toBe(30);
     expect(policy.imageCap).toBe(7);
   });
 
@@ -88,12 +99,14 @@ describe("resolveMeteringPolicy", () => {
       user,
       organization: {
         ...organization,
-        webflowRequestLimitOverride: 500,
+        webflowProxyLimitOverride: 500,
+        cmsWriteLimitOverride: 100,
         imageOptimizeLimitOverride: 20,
       },
       limits,
     });
-    expect(policy.webflowCap).toBe(500);
+    expect(policy.webflowProxyCap).toBe(500);
+    expect(policy.cmsWriteCap).toBe(100);
     expect(policy.imageCap).toBe(20);
   });
 });

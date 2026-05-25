@@ -2,11 +2,13 @@ export type OperatorPlatformMeteringConfig = {
   globalMeteringEnabled: boolean;
   envEmergencyMeteringDisabled: boolean;
   free: {
-    webflowRequestsPerMonth: number;
+    webflowProxyRequestsPerMonth: number;
+    cmsWritesPerMonth: number;
     imageOptimizesPerMonth: number;
   };
   pro: {
-    webflowRequestsPerMonth: number;
+    webflowProxyRequestsPerMonth: number;
+    cmsWritesPerMonth: number;
     imageOptimizesPerMonth: number;
   };
   updatedAt: string | null;
@@ -15,11 +17,13 @@ export type OperatorPlatformMeteringConfig = {
 export type OperatorPlatformMeteringPatch = {
   globalMeteringEnabled?: boolean;
   free?: {
-    webflowRequestsPerMonth?: number;
+    webflowProxyRequestsPerMonth?: number;
+    cmsWritesPerMonth?: number;
     imageOptimizesPerMonth?: number;
   };
   pro?: {
-    webflowRequestsPerMonth?: number;
+    webflowProxyRequestsPerMonth?: number;
+    cmsWritesPerMonth?: number;
     imageOptimizesPerMonth?: number;
   };
 };
@@ -59,7 +63,8 @@ export type OperatorMetrics = {
 
 export type OperatorUsageLimitsPatch = {
   meteringEnabled?: boolean;
-  webflowRequestLimitOverride?: number | null;
+  webflowProxyLimitOverride?: number | null;
+  cmsWriteLimitOverride?: number | null;
   imageOptimizeLimitOverride?: number | null;
 };
 
@@ -68,14 +73,18 @@ export type OperatorUsageLimitsView = {
   tier: "free" | "pro";
   meteringEnabled: boolean;
   globalMeteringDisabled: boolean;
-  webflowRequestLimitOverride: number | null;
+  webflowProxyLimitOverride: number | null;
+  cmsWriteLimitOverride: number | null;
   imageOptimizeLimitOverride: number | null;
   yearMonth: string;
-  webflowRequestCount: number;
+  webflowProxyRequestCount: number;
+  cmsWriteCount: number;
   imageOptimizeCount: number;
-  effectiveWebflowLimit: number | null;
+  effectiveWebflowProxyLimit: number | null;
+  effectiveCmsWriteLimit: number | null;
   effectiveImageLimit: number | null;
-  memberWebflowRequestCount?: number;
+  memberWebflowProxyRequestCount?: number;
+  memberCmsWriteCount?: number;
   memberImageOptimizeCount?: number;
 };
 

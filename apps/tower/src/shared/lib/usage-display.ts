@@ -1,9 +1,8 @@
+import { formatTowerUsageRatio } from "@codalyn/webflow-kit";
+
 /** Formats monthly usage for tables and detail panels. `limit === null` means unlimited. */
 export function formatUsageRatio(used: number, limit: number | null): string {
-  if (limit === null) {
-    return `${used} / ∞`;
-  }
-  return `${used} / ${limit}`;
+  return formatTowerUsageRatio(used, limit);
 }
 
 export function meteringStatusLabel(opts: {

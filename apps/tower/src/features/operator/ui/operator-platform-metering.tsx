@@ -17,54 +17,76 @@ import { Switch } from "@/shared/ui/switch";
 
 type DraftState = {
   globalMeteringEnabled: boolean;
-  freeWebflow: string;
+  freeWebflowProxy: string;
+  freeCmsWrites: string;
   freeImage: string;
-  proWebflow: string;
+  proWebflowProxy: string;
+  proCmsWrites: string;
   proImage: string;
 };
 
 function configToDraft(config: OperatorPlatformMeteringConfig): DraftState {
   return {
     globalMeteringEnabled: config.globalMeteringEnabled,
-    freeWebflow: limitIntegerToDraft(config.free.webflowRequestsPerMonth),
+    freeWebflowProxy: limitIntegerToDraft(config.free.webflowProxyRequestsPerMonth),
+    freeCmsWrites: limitIntegerToDraft(config.free.cmsWritesPerMonth),
     freeImage: limitIntegerToDraft(config.free.imageOptimizesPerMonth),
-    proWebflow: limitIntegerToDraft(config.pro.webflowRequestsPerMonth),
+    proWebflowProxy: limitIntegerToDraft(config.pro.webflowProxyRequestsPerMonth),
+    proCmsWrites: limitIntegerToDraft(config.pro.cmsWritesPerMonth),
     proImage: limitIntegerToDraft(config.pro.imageOptimizesPerMonth),
   };
 }
 
 function TierLimitFields({
   tierLabel,
-  webflowId,
+  webflowProxyId,
+  cmsWritesId,
   imageId,
-  webflowValue,
+  webflowProxyValue,
+  cmsWritesValue,
   imageValue,
-  onWebflowChange,
+  onWebflowProxyChange,
+  onCmsWritesChange,
   onImageChange,
   disabled,
 }: {
   tierLabel: string;
-  webflowId: string;
+  webflowProxyId: string;
+  cmsWritesId: string;
   imageId: string;
-  webflowValue: string;
+  webflowProxyValue: string;
+  cmsWritesValue: string;
   imageValue: string;
-  onWebflowChange: (next: string) => void;
+  onWebflowProxyChange: (next: string) => void;
+  onCmsWritesChange: (next: string) => void;
   onImageChange: (next: string) => void;
   disabled: boolean;
 }) {
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium text-foreground">{tierLabel}</p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1.5">
-          <Label htmlFor={webflowId}>Webflow proxy + CMS writes / month</Label>
+          <Label htmlFor={webflowProxyId}>Webflow proxy / month</Label>
           <Input
-            id={webflowId}
+            id={webflowProxyId}
             type="number"
             min={0}
             step={1}
-            value={webflowValue}
-            onChange={(event) => onWebflowChange(event.target.value)}
+            value={webflowProxyValue}
+            onChange={(event) => onWebflowProxyChange(event.target.value)}
+            disabled={disabled}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={cmsWritesId}>CMS writes / month</Label>
+          <Input
+            id={cmsWritesId}
+            type="number"
+            min={0}
+            step={1}
+            value={cmsWritesValue}
+            onChange={(event) => onCmsWritesChange(event.target.value)}
             disabled={disabled}
           />
         </div>
@@ -87,26 +109,45 @@ function TierLimitFields({
 
 type DraftPatch = {
   globalMeteringEnabled: boolean;
-  free: { webflowRequestsPerMonth: number; imageOptimizesPerMonth: number };
-  pro: { webflowRequestsPerMonth: number; imageOptimizesPerMonth: number };
+  free: {
+    webflowProxyRequestsPerMonth: number;
+    cmsWritesPerMonth: number;
+    imageOptimizesPerMonth: number;
+  };
+  pro: {
+    webflowProxyRequestsPerMonth: number;
+    cmsWritesPerMonth: number;
+    imageOptimizesPerMonth: number;
+  };
 };
 
 function parseDraftPatch(draft: DraftState): DraftPatch | "invalid" {
-  const freeWebflow = parseRequiredLimitInteger(draft.freeWebflow);
+  const freeWebflowProxy = parseRequiredLimitInteger(draft.freeWebflowProxy);
+  const freeCmsWrites = parseRequiredLimitInteger(draft.freeCmsWrites);
   const freeImage = parseRequiredLimitInteger(draft.freeImage);
-  const proWebflow = parseRequiredLimitInteger(draft.proWebflow);
+  const proWebflowProxy = parseRequiredLimitInteger(draft.proWebflowProxy);
+  const proCmsWrites = parseRequiredLimitInteger(draft.proCmsWrites);
   const proImage = parseRequiredLimitInteger(draft.proImage);
-  if (freeWebflow === "invalid" || freeImage === "invalid" || proWebflow === "invalid" || proImage === "invalid") {
+  if (
+    freeWebflowProxy === "invalid" ||
+    freeCmsWrites === "invalid" ||
+    freeImage === "invalid" ||
+    proWebflowProxy === "invalid" ||
+    proCmsWrites === "invalid" ||
+    proImage === "invalid"
+  ) {
     return "invalid";
   }
   return {
     globalMeteringEnabled: draft.globalMeteringEnabled,
     free: {
-      webflowRequestsPerMonth: freeWebflow,
+      webflowProxyRequestsPerMonth: freeWebflowProxy,
+      cmsWritesPerMonth: freeCmsWrites,
       imageOptimizesPerMonth: freeImage,
     },
     pro: {
-      webflowRequestsPerMonth: proWebflow,
+      webflowProxyRequestsPerMonth: proWebflowProxy,
+      cmsWritesPerMonth: proCmsWrites,
       imageOptimizesPerMonth: proImage,
     },
   };
@@ -119,9 +160,11 @@ function isDraftDirty(config: OperatorPlatformMeteringConfig, draft: DraftState)
   }
   return (
     parsed.globalMeteringEnabled !== config.globalMeteringEnabled ||
-    parsed.free.webflowRequestsPerMonth !== config.free.webflowRequestsPerMonth ||
+    parsed.free.webflowProxyRequestsPerMonth !== config.free.webflowProxyRequestsPerMonth ||
+    parsed.free.cmsWritesPerMonth !== config.free.cmsWritesPerMonth ||
     parsed.free.imageOptimizesPerMonth !== config.free.imageOptimizesPerMonth ||
-    parsed.pro.webflowRequestsPerMonth !== config.pro.webflowRequestsPerMonth ||
+    parsed.pro.webflowProxyRequestsPerMonth !== config.pro.webflowProxyRequestsPerMonth ||
+    parsed.pro.cmsWritesPerMonth !== config.pro.cmsWritesPerMonth ||
     parsed.pro.imageOptimizesPerMonth !== config.pro.imageOptimizesPerMonth
   );
 }
@@ -181,11 +224,14 @@ function PlatformMeteringFormBody({
 
       <TierLimitFields
         tierLabel="Free tier defaults"
-        webflowId="platform-free-webflow"
+        webflowProxyId="platform-free-webflow-proxy"
+        cmsWritesId="platform-free-cms-writes"
         imageId="platform-free-image"
-        webflowValue={draft.freeWebflow}
+        webflowProxyValue={draft.freeWebflowProxy}
+        cmsWritesValue={draft.freeCmsWrites}
         imageValue={draft.freeImage}
-        onWebflowChange={(next) => onDraftChange({ ...draft, freeWebflow: next })}
+        onWebflowProxyChange={(next) => onDraftChange({ ...draft, freeWebflowProxy: next })}
+        onCmsWritesChange={(next) => onDraftChange({ ...draft, freeCmsWrites: next })}
         onImageChange={(next) => onDraftChange({ ...draft, freeImage: next })}
         disabled={disabled}
       />
@@ -194,11 +240,14 @@ function PlatformMeteringFormBody({
 
       <TierLimitFields
         tierLabel="Pro tier display defaults"
-        webflowId="platform-pro-webflow"
+        webflowProxyId="platform-pro-webflow-proxy"
+        cmsWritesId="platform-pro-cms-writes"
         imageId="platform-pro-image"
-        webflowValue={draft.proWebflow}
+        webflowProxyValue={draft.proWebflowProxy}
+        cmsWritesValue={draft.proCmsWrites}
         imageValue={draft.proImage}
-        onWebflowChange={(next) => onDraftChange({ ...draft, proWebflow: next })}
+        onWebflowProxyChange={(next) => onDraftChange({ ...draft, proWebflowProxy: next })}
+        onCmsWritesChange={(next) => onDraftChange({ ...draft, proCmsWrites: next })}
         onImageChange={(next) => onDraftChange({ ...draft, proImage: next })}
         disabled={disabled}
       />

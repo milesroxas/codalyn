@@ -34,8 +34,10 @@ export const user = pgTable("user", {
   subscriptionStatus: text("subscription_status"),
   /** When false, this user bypasses monthly usage metering (operator override). */
   meteringEnabled: boolean("metering_enabled").default(true).notNull(),
-  /** Operator override for free-tier Webflow proxy cap; null uses tier default. */
-  webflowRequestLimitOverride: integer("webflow_request_limit_override"),
+  /** Operator override for free-tier Webflow Data API proxy cap; null uses tier default. */
+  webflowProxyLimitOverride: integer("webflow_proxy_limit_override"),
+  /** Operator override for free-tier CMS layout write cap; null uses tier default. */
+  cmsWriteLimitOverride: integer("cms_write_limit_override"),
   /** Operator override for free-tier image optimize cap; null uses tier default. */
   imageOptimizeLimitOverride: integer("image_optimize_limit_override"),
   /** Set when operator early-access invite, team invite signup, or org join grants Tower/Beacon sign-in during MVP. */
@@ -142,7 +144,9 @@ export const organization = pgTable(
     /** When false, members bypass monthly usage metering while this workspace is active (operator override). */
     meteringEnabled: boolean("metering_enabled").default(true).notNull(),
     /** Operator override for member Webflow proxy cap when this workspace is active; null uses tier/user default. */
-    webflowRequestLimitOverride: integer("webflow_request_limit_override"),
+    webflowProxyLimitOverride: integer("webflow_proxy_limit_override"),
+    /** Operator override for member CMS write cap when this workspace is active; null uses tier/user default. */
+    cmsWriteLimitOverride: integer("cms_write_limit_override"),
     /** Operator override for member image optimize cap when this workspace is active; null uses tier/user default. */
     imageOptimizeLimitOverride: integer("image_optimize_limit_override"),
     stripeCustomerId: text("stripe_customer_id"),
@@ -261,7 +265,8 @@ export const towerUsageMonth = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     /** `YYYY-MM` (UTC) */
     yearMonth: text("year_month").notNull(),
-    webflowRequestCount: integer("webflow_request_count").notNull().default(0),
+    webflowProxyRequestCount: integer("webflow_proxy_request_count").notNull().default(0),
+    cmsWriteCount: integer("cms_write_count").notNull().default(0),
     imageOptimizeCount: integer("image_optimize_count").notNull().default(0),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -275,9 +280,11 @@ export const towerUsageMonth = pgTable(
 export const towerPlatformMetering = pgTable("tower_platform_metering", {
   id: text("id").primaryKey(),
   globalMeteringEnabled: boolean("global_metering_enabled").default(true).notNull(),
-  freeWebflowRequestsPerMonth: integer("free_webflow_requests_per_month").notNull(),
+  freeWebflowProxyRequestsPerMonth: integer("free_webflow_proxy_requests_per_month").notNull(),
+  freeCmsWritesPerMonth: integer("free_cms_writes_per_month").notNull(),
   freeImageOptimizesPerMonth: integer("free_image_optimizes_per_month").notNull(),
-  proWebflowRequestsPerMonth: integer("pro_webflow_requests_per_month").notNull(),
+  proWebflowProxyRequestsPerMonth: integer("pro_webflow_proxy_requests_per_month").notNull(),
+  proCmsWritesPerMonth: integer("pro_cms_writes_per_month").notNull(),
   proImageOptimizesPerMonth: integer("pro_image_optimizes_per_month").notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

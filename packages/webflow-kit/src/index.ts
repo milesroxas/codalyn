@@ -1,3 +1,5 @@
+export * from "./tower/tower-usage-metering-copy.js";
+export * from "./tower/tower-usage-metering.js";
 export * from "./beacon/beacon-app-settings.js";
 export * from "./beacon/beacon-composition.js";
 export * from "./beacon/beacon-image-errors.js";

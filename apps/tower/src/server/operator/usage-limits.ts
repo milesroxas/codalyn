@@ -12,21 +12,7 @@ import type { OperatorUsageLimitsPatch, OperatorUsageLimitsView } from "@/server
 import { db } from "@/shared/lib/db";
 import { member, organization, towerUsageMonth, user } from "@/shared/lib/db/auth-schema";
 
-function mapUsageLimitsView(input: {
-  scope: OperatorUsageLimitsView["scope"];
-  tier: OperatorUsageLimitsView["tier"];
-  meteringEnabled: boolean;
-  globalMeteringDisabled: boolean;
-  webflowRequestLimitOverride: number | null;
-  imageOptimizeLimitOverride: number | null;
-  yearMonth: string;
-  webflowRequestCount: number;
-  imageOptimizeCount: number;
-  effectiveWebflowLimit: number | null;
-  effectiveImageLimit: number | null;
-  memberWebflowRequestCount?: number;
-  memberImageOptimizeCount?: number;
-}): OperatorUsageLimitsView {
+function mapUsageLimitsView(input: OperatorUsageLimitsView): OperatorUsageLimitsView {
   return input;
 }
 
@@ -34,7 +20,8 @@ export async function fetchOperatorUserUsageLimits(userId: string): Promise<Oper
   const [row] = await db
     .select({
       meteringEnabled: user.meteringEnabled,
-      webflowRequestLimitOverride: user.webflowRequestLimitOverride,
+      webflowProxyLimitOverride: user.webflowProxyLimitOverride,
+      cmsWriteLimitOverride: user.cmsWriteLimitOverride,
       imageOptimizeLimitOverride: user.imageOptimizeLimitOverride,
     })
     .from(user)
@@ -50,7 +37,8 @@ export async function fetchOperatorUserUsageLimits(userId: string): Promise<Oper
   const limits = await getTowerLimitsSnapshot();
   const userFields = {
     meteringEnabled: Boolean(row.meteringEnabled),
-    webflowRequestLimitOverride: row.webflowRequestLimitOverride ?? null,
+    webflowProxyLimitOverride: row.webflowProxyLimitOverride ?? null,
+    cmsWriteLimitOverride: row.cmsWriteLimitOverride ?? null,
     imageOptimizeLimitOverride: row.imageOptimizeLimitOverride ?? null,
   };
   const policy = resolveMeteringPolicy({
@@ -65,12 +53,15 @@ export async function fetchOperatorUserUsageLimits(userId: string): Promise<Oper
     tier: entitlement.tier,
     meteringEnabled: userFields.meteringEnabled,
     globalMeteringDisabled: policy.globalMeteringDisabled,
-    webflowRequestLimitOverride: userFields.webflowRequestLimitOverride,
+    webflowProxyLimitOverride: userFields.webflowProxyLimitOverride,
+    cmsWriteLimitOverride: userFields.cmsWriteLimitOverride,
     imageOptimizeLimitOverride: userFields.imageOptimizeLimitOverride,
     yearMonth: usage.yearMonth,
-    webflowRequestCount: usage.webflowRequestCount,
+    webflowProxyRequestCount: usage.webflowProxyRequestCount,
+    cmsWriteCount: usage.cmsWriteCount,
     imageOptimizeCount: usage.imageOptimizeCount,
-    effectiveWebflowLimit: policy.webflowCap,
+    effectiveWebflowProxyLimit: policy.webflowProxyCap,
+    effectiveCmsWriteLimit: policy.cmsWriteCap,
     effectiveImageLimit: policy.imageCap,
   });
 }
@@ -79,7 +70,8 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
   const [row] = await db
     .select({
       meteringEnabled: organization.meteringEnabled,
-      webflowRequestLimitOverride: organization.webflowRequestLimitOverride,
+      webflowProxyLimitOverride: organization.webflowProxyLimitOverride,
+      cmsWriteLimitOverride: organization.cmsWriteLimitOverride,
       imageOptimizeLimitOverride: organization.imageOptimizeLimitOverride,
     })
     .from(organization)
@@ -93,7 +85,8 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
   const ym = utcYearMonth();
   const [memberUsage] = await db
     .select({
-      webflowRequestCount: sql<number>`COALESCE(SUM(${towerUsageMonth.webflowRequestCount}), 0)`,
+      webflowProxyRequestCount: sql<number>`COALESCE(SUM(${towerUsageMonth.webflowProxyRequestCount}), 0)`,
+      cmsWriteCount: sql<number>`COALESCE(SUM(${towerUsageMonth.cmsWriteCount}), 0)`,
       imageOptimizeCount: sql<number>`COALESCE(SUM(${towerUsageMonth.imageOptimizeCount}), 0)`,
     })
     .from(member)
@@ -102,7 +95,8 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
 
   const orgFields = {
     meteringEnabled: Boolean(row.meteringEnabled),
-    webflowRequestLimitOverride: row.webflowRequestLimitOverride ?? null,
+    webflowProxyLimitOverride: row.webflowProxyLimitOverride ?? null,
+    cmsWriteLimitOverride: row.cmsWriteLimitOverride ?? null,
     imageOptimizeLimitOverride: row.imageOptimizeLimitOverride ?? null,
   };
   const limits = await getTowerLimitsSnapshot();
@@ -118,14 +112,18 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
     tier: "free",
     meteringEnabled: orgFields.meteringEnabled,
     globalMeteringDisabled: policy.globalMeteringDisabled,
-    webflowRequestLimitOverride: orgFields.webflowRequestLimitOverride,
+    webflowProxyLimitOverride: orgFields.webflowProxyLimitOverride,
+    cmsWriteLimitOverride: orgFields.cmsWriteLimitOverride,
     imageOptimizeLimitOverride: orgFields.imageOptimizeLimitOverride,
     yearMonth: ym,
-    webflowRequestCount: 0,
+    webflowProxyRequestCount: 0,
+    cmsWriteCount: 0,
     imageOptimizeCount: 0,
-    effectiveWebflowLimit: policy.webflowCap,
+    effectiveWebflowProxyLimit: policy.webflowProxyCap,
+    effectiveCmsWriteLimit: policy.cmsWriteCap,
     effectiveImageLimit: policy.imageCap,
-    memberWebflowRequestCount: Number(memberUsage?.webflowRequestCount ?? 0),
+    memberWebflowProxyRequestCount: Number(memberUsage?.webflowProxyRequestCount ?? 0),
+    memberCmsWriteCount: Number(memberUsage?.cmsWriteCount ?? 0),
     memberImageOptimizeCount: Number(memberUsage?.imageOptimizeCount ?? 0),
   });
 }
@@ -144,12 +142,20 @@ export function sanitizeUsageLimitsPatch(raw: unknown): OperatorUsageLimitsPatch
     patch.meteringEnabled = body.meteringEnabled;
   }
 
-  if ("webflowRequestLimitOverride" in body) {
-    const parsed = parseLimitOverrideField(body.webflowRequestLimitOverride);
+  if ("webflowProxyLimitOverride" in body) {
+    const parsed = parseLimitOverrideField(body.webflowProxyLimitOverride);
     if (parsed === "invalid") {
-      return { error: "invalid_webflowRequestLimitOverride" };
+      return { error: "invalid_webflowProxyLimitOverride" };
     }
-    patch.webflowRequestLimitOverride = parsed;
+    patch.webflowProxyLimitOverride = parsed;
+  }
+
+  if ("cmsWriteLimitOverride" in body) {
+    const parsed = parseLimitOverrideField(body.cmsWriteLimitOverride);
+    if (parsed === "invalid") {
+      return { error: "invalid_cmsWriteLimitOverride" };
+    }
+    patch.cmsWriteLimitOverride = parsed;
   }
 
   if ("imageOptimizeLimitOverride" in body) {
@@ -168,8 +174,11 @@ export function usageLimitsPatchToDbUpdates(patch: OperatorUsageLimitsPatch): Re
   if (patch.meteringEnabled !== undefined) {
     updates.meteringEnabled = patch.meteringEnabled;
   }
-  if (patch.webflowRequestLimitOverride !== undefined) {
-    updates.webflowRequestLimitOverride = patch.webflowRequestLimitOverride;
+  if (patch.webflowProxyLimitOverride !== undefined) {
+    updates.webflowProxyLimitOverride = patch.webflowProxyLimitOverride;
+  }
+  if (patch.cmsWriteLimitOverride !== undefined) {
+    updates.cmsWriteLimitOverride = patch.cmsWriteLimitOverride;
   }
   if (patch.imageOptimizeLimitOverride !== undefined) {
     updates.imageOptimizeLimitOverride = patch.imageOptimizeLimitOverride;
@@ -199,12 +208,15 @@ export async function defaultOperatorUserUsageLimits(): Promise<OperatorUsageLim
     tier: "free",
     meteringEnabled: true,
     globalMeteringDisabled: policy.globalMeteringDisabled,
-    webflowRequestLimitOverride: null,
+    webflowProxyLimitOverride: null,
+    cmsWriteLimitOverride: null,
     imageOptimizeLimitOverride: null,
     yearMonth: ym,
-    webflowRequestCount: 0,
+    webflowProxyRequestCount: 0,
+    cmsWriteCount: 0,
     imageOptimizeCount: 0,
-    effectiveWebflowLimit: policy.webflowCap,
+    effectiveWebflowProxyLimit: policy.webflowProxyCap,
+    effectiveCmsWriteLimit: policy.cmsWriteCap,
     effectiveImageLimit: policy.imageCap,
   };
 }
@@ -223,14 +235,18 @@ export async function defaultOperatorWorkspaceUsageLimits(): Promise<OperatorUsa
     tier: "free",
     meteringEnabled: true,
     globalMeteringDisabled: policy.globalMeteringDisabled,
-    webflowRequestLimitOverride: null,
+    webflowProxyLimitOverride: null,
+    cmsWriteLimitOverride: null,
     imageOptimizeLimitOverride: null,
     yearMonth: ym,
-    webflowRequestCount: 0,
+    webflowProxyRequestCount: 0,
+    cmsWriteCount: 0,
     imageOptimizeCount: 0,
-    effectiveWebflowLimit: policy.webflowCap,
+    effectiveWebflowProxyLimit: policy.webflowProxyCap,
+    effectiveCmsWriteLimit: policy.cmsWriteCap,
     effectiveImageLimit: policy.imageCap,
-    memberWebflowRequestCount: 0,
+    memberWebflowProxyRequestCount: 0,
+    memberCmsWriteCount: 0,
     memberImageOptimizeCount: 0,
   };
 }

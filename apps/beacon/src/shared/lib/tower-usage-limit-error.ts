@@ -1,12 +1,12 @@
-export type TowerUsageMeterKind = "webflow" | "image";
+import { parseTowerUsageLimitBody, TOWER_USAGE_LIMIT_CODE, type TowerUsageMeterKind } from "@codalyn/webflow-kit";
+
+export type { TowerUsageMeterKind };
 
 export type TowerUsageLimitDetails = {
   kind: TowerUsageMeterKind;
   used: number;
   limit: number;
 };
-
-const TOWER_USAGE_LIMIT_CODE = "TOWER_USAGE_LIMIT";
 
 export class TowerUsageLimitError extends Error {
   readonly code = TOWER_USAGE_LIMIT_CODE;
@@ -19,45 +19,7 @@ export class TowerUsageLimitError extends Error {
   }
 }
 
-type TowerUsageLimitPayload = {
-  code?: string;
-  kind?: string;
-  used?: number;
-  limit?: number;
-};
-
-function parseMeterKind(raw: string | undefined): TowerUsageMeterKind | null {
-  if (raw === "webflow" || raw === "image") {
-    return raw;
-  }
-  return null;
-}
-
-function parseUsageCount(raw: unknown): number | null {
-  if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) {
-    return null;
-  }
-  return Math.trunc(raw);
-}
-
-/** Parses Tower `/api/v1/*` 402 JSON bodies (`TOWER_USAGE_LIMIT`). */
-export function parseTowerUsageLimitBody(body: string): TowerUsageLimitDetails | null {
-  try {
-    const payload = JSON.parse(body) as TowerUsageLimitPayload;
-    if (payload.code !== TOWER_USAGE_LIMIT_CODE) {
-      return null;
-    }
-    const kind = parseMeterKind(payload.kind);
-    const used = parseUsageCount(payload.used);
-    const limit = parseUsageCount(payload.limit);
-    if (kind == null || used == null || limit == null) {
-      return null;
-    }
-    return { kind, used, limit };
-  } catch {
-    return null;
-  }
-}
+export { parseTowerUsageLimitBody };
 
 export function isTowerUsageLimitError(error: unknown): error is TowerUsageLimitError {
   return error instanceof TowerUsageLimitError;

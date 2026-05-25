@@ -88,4 +88,4 @@ Checkout embeds `towerUserId` in `client_reference_id`, `metadata`, and `subscri
 
 ## Usage metering (Vercel cost control)
 
-Independent of **Stripe** but part of the same “billing” story: the **free** tier applies monthly caps (UTC) to Webflow proxy/CMS writes and to `POST /api/v1/images/optimize` for session-authenticated users on Vercel. **Pro** (via Stripe when enabled, or **paid org** in operator) skips incrementing those counters. See `src/server/billing/limits.ts` and `.env.example` for override env names.
+Independent of **Stripe** but part of the same “billing” story: the **free** tier applies separate monthly caps (UTC) to Webflow Data API proxy traffic (`/api/v2/webflow/*`), CMS layout writes (`POST /api/v1/beacon/cms-layout/save`), and `POST /api/v1/images/optimize` for session-authenticated users on Vercel. **Pro** (via Stripe when enabled, or **paid org** in operator) skips incrementing those counters. See `src/server/billing/limits.ts` and `.env.example` for override env names.

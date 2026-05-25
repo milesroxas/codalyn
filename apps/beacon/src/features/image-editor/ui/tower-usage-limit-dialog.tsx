@@ -55,7 +55,7 @@ export function TowerUsageLimitDialog(props: TowerUsageLimitDialogProps) {
               <AlertDialogFactValue>
                 {towerUsageLimitDialogUsageLine(details.used, details.limit, details.kind)}
               </AlertDialogFactValue>
-              {details.kind === "webflow" ? (
+              {details.kind === "image" ? (
                 <AlertDialogFactHint>{TOWER_USAGE_LIMIT_DIALOG_WEBP_HINT}</AlertDialogFactHint>
               ) : null}
             </AlertDialogFact>

@@ -6,7 +6,7 @@ import {
 } from "@/server/beacon-cms-layout";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import { getActiveOrganizationIdForApiRequest } from "@/server/billing/session-org";
-import { consumeWebflowRequest } from "@/server/billing/usage-gate";
+import { consumeCmsWrite } from "@/server/billing/usage-gate";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
   const activeOrg = await getActiveOrganizationIdForApiRequest(req);
   const entitlement = await resolveTowerEntitlement(auth.userId, activeOrg);
-  const usage = await consumeWebflowRequest(auth.userId, entitlement, activeOrg);
+  const usage = await consumeCmsWrite(auth.userId, entitlement, activeOrg);
   if (!usage.ok) {
     return usage.response;
   }

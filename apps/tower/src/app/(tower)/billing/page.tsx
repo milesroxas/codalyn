@@ -89,9 +89,15 @@ export default async function BillingPage() {
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p>
-            <span className="text-muted-foreground">Webflow proxy + CMS write units</span>{" "}
+            <span className="text-muted-foreground">Webflow proxy units</span>{" "}
             <span className="font-mono">
-              {usage.webflowRequestCount} / {limits.webflowRequestsPerMonth}
+              {usage.webflowProxyRequestCount} / {limits.webflowProxyRequestsPerMonth}
+            </span>
+          </p>
+          <p>
+            <span className="text-muted-foreground">CMS write units</span>{" "}
+            <span className="font-mono">
+              {usage.cmsWriteCount} / {limits.cmsWritesPerMonth}
             </span>
           </p>
           <p>

@@ -5,7 +5,8 @@ import { towerPlatformMetering } from "@/shared/lib/db/auth-schema";
 export const TOWER_PLATFORM_METERING_ID = "default";
 
 export type TowerTierLimits = {
-  webflowRequestsPerMonth: number;
+  webflowProxyRequestsPerMonth: number;
+  cmsWritesPerMonth: number;
   imageOptimizesPerMonth: number;
 };
 
@@ -26,11 +27,13 @@ export type TowerLimitsPatch = {
 const CODE_DEFAULTS = {
   globalMeteringEnabled: true,
   free: {
-    webflowRequestsPerMonth: 3_000,
+    webflowProxyRequestsPerMonth: 2_500,
+    cmsWritesPerMonth: 500,
     imageOptimizesPerMonth: 50,
   },
   pro: {
-    webflowRequestsPerMonth: 200_000,
+    webflowProxyRequestsPerMonth: 150_000,
+    cmsWritesPerMonth: 50_000,
     imageOptimizesPerMonth: 10_000,
   },
 } as const satisfies Pick<TowerLimitsSnapshot, "globalMeteringEnabled" | "free" | "pro">;
@@ -53,17 +56,19 @@ function envEmergencyMeteringDisabled(): boolean {
 function seedTierLimitsFromEnv(): { free: TowerTierLimits; pro: TowerTierLimits } {
   return {
     free: {
-      webflowRequestsPerMonth: envNum(
-        "TOWER_FREE_WEBFLOW_REQUESTS_PER_MONTH",
-        CODE_DEFAULTS.free.webflowRequestsPerMonth
+      webflowProxyRequestsPerMonth: envNum(
+        "TOWER_FREE_WEBFLOW_PROXY_REQUESTS_PER_MONTH",
+        CODE_DEFAULTS.free.webflowProxyRequestsPerMonth
       ),
+      cmsWritesPerMonth: envNum("TOWER_FREE_CMS_WRITES_PER_MONTH", CODE_DEFAULTS.free.cmsWritesPerMonth),
       imageOptimizesPerMonth: envNum("TOWER_FREE_IMAGE_OPTIMIZES_PER_MONTH", CODE_DEFAULTS.free.imageOptimizesPerMonth),
     },
     pro: {
-      webflowRequestsPerMonth: envNum(
-        "TOWER_PRO_WEBFLOW_REQUESTS_PER_MONTH",
-        CODE_DEFAULTS.pro.webflowRequestsPerMonth
+      webflowProxyRequestsPerMonth: envNum(
+        "TOWER_PRO_WEBFLOW_PROXY_REQUESTS_PER_MONTH",
+        CODE_DEFAULTS.pro.webflowProxyRequestsPerMonth
       ),
+      cmsWritesPerMonth: envNum("TOWER_PRO_CMS_WRITES_PER_MONTH", CODE_DEFAULTS.pro.cmsWritesPerMonth),
       imageOptimizesPerMonth: envNum("TOWER_PRO_IMAGE_OPTIMIZES_PER_MONTH", CODE_DEFAULTS.pro.imageOptimizesPerMonth),
     },
   };
@@ -81,11 +86,13 @@ function rowToSnapshot(row: typeof towerPlatformMetering.$inferSelect): TowerLim
     globalMeteringEnabled: Boolean(row.globalMeteringEnabled),
     envEmergencyMeteringDisabled: envEmergencyMeteringDisabled(),
     free: {
-      webflowRequestsPerMonth: row.freeWebflowRequestsPerMonth,
+      webflowProxyRequestsPerMonth: row.freeWebflowProxyRequestsPerMonth,
+      cmsWritesPerMonth: row.freeCmsWritesPerMonth,
       imageOptimizesPerMonth: row.freeImageOptimizesPerMonth,
     },
     pro: {
-      webflowRequestsPerMonth: row.proWebflowRequestsPerMonth,
+      webflowProxyRequestsPerMonth: row.proWebflowProxyRequestsPerMonth,
+      cmsWritesPerMonth: row.proCmsWritesPerMonth,
       imageOptimizesPerMonth: row.proImageOptimizesPerMonth,
     },
     updatedAt: toIso(row.updatedAt),
@@ -139,9 +146,11 @@ export async function getTowerLimitsSnapshot(): Promise<TowerLimitsSnapshot> {
     .values({
       id: TOWER_PLATFORM_METERING_ID,
       globalMeteringEnabled: CODE_DEFAULTS.globalMeteringEnabled,
-      freeWebflowRequestsPerMonth: seeded.free.webflowRequestsPerMonth,
+      freeWebflowProxyRequestsPerMonth: seeded.free.webflowProxyRequestsPerMonth,
+      freeCmsWritesPerMonth: seeded.free.cmsWritesPerMonth,
       freeImageOptimizesPerMonth: seeded.free.imageOptimizesPerMonth,
-      proWebflowRequestsPerMonth: seeded.pro.webflowRequestsPerMonth,
+      proWebflowProxyRequestsPerMonth: seeded.pro.webflowProxyRequestsPerMonth,
+      proCmsWritesPerMonth: seeded.pro.cmsWritesPerMonth,
       proImageOptimizesPerMonth: seeded.pro.imageOptimizesPerMonth,
     })
     .onConflictDoNothing()
@@ -176,12 +185,20 @@ function parseTierLimitsPatch(tier: "free" | "pro", tierRaw: unknown): Partial<T
   const tierBody = tierRaw as Record<string, unknown>;
   const tierPatch: Partial<TowerTierLimits> = {};
 
-  if ("webflowRequestsPerMonth" in tierBody) {
-    const parsed = parseRequiredPlatformLimitField(tierBody.webflowRequestsPerMonth);
+  if ("webflowProxyRequestsPerMonth" in tierBody) {
+    const parsed = parseRequiredPlatformLimitField(tierBody.webflowProxyRequestsPerMonth);
     if (parsed === "invalid") {
-      return { error: `invalid_${tier}_webflowRequestsPerMonth` };
+      return { error: `invalid_${tier}_webflowProxyRequestsPerMonth` };
     }
-    tierPatch.webflowRequestsPerMonth = parsed;
+    tierPatch.webflowProxyRequestsPerMonth = parsed;
+  }
+
+  if ("cmsWritesPerMonth" in tierBody) {
+    const parsed = parseRequiredPlatformLimitField(tierBody.cmsWritesPerMonth);
+    if (parsed === "invalid") {
+      return { error: `invalid_${tier}_cmsWritesPerMonth` };
+    }
+    tierPatch.cmsWritesPerMonth = parsed;
   }
 
   if ("imageOptimizesPerMonth" in tierBody) {
@@ -232,14 +249,20 @@ export async function saveTowerLimitsSnapshot(patch: TowerLimitsPatch): Promise<
   if (patch.globalMeteringEnabled !== undefined) {
     updates.globalMeteringEnabled = patch.globalMeteringEnabled;
   }
-  if (patch.free?.webflowRequestsPerMonth !== undefined) {
-    updates.freeWebflowRequestsPerMonth = patch.free.webflowRequestsPerMonth;
+  if (patch.free?.webflowProxyRequestsPerMonth !== undefined) {
+    updates.freeWebflowProxyRequestsPerMonth = patch.free.webflowProxyRequestsPerMonth;
+  }
+  if (patch.free?.cmsWritesPerMonth !== undefined) {
+    updates.freeCmsWritesPerMonth = patch.free.cmsWritesPerMonth;
   }
   if (patch.free?.imageOptimizesPerMonth !== undefined) {
     updates.freeImageOptimizesPerMonth = patch.free.imageOptimizesPerMonth;
   }
-  if (patch.pro?.webflowRequestsPerMonth !== undefined) {
-    updates.proWebflowRequestsPerMonth = patch.pro.webflowRequestsPerMonth;
+  if (patch.pro?.webflowProxyRequestsPerMonth !== undefined) {
+    updates.proWebflowProxyRequestsPerMonth = patch.pro.webflowProxyRequestsPerMonth;
+  }
+  if (patch.pro?.cmsWritesPerMonth !== undefined) {
+    updates.proCmsWritesPerMonth = patch.pro.cmsWritesPerMonth;
   }
   if (patch.pro?.imageOptimizesPerMonth !== undefined) {
     updates.proImageOptimizesPerMonth = patch.pro.imageOptimizesPerMonth;

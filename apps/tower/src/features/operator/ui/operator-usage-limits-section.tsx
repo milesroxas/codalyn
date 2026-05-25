@@ -28,33 +28,40 @@ function limitDraftValue(value: number | null): string {
 export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProps) {
   const { scope, usage, busy = false, onSave, onReset } = props;
   const [meteringEnabledDraft, setMeteringEnabledDraft] = useState(usage.meteringEnabled);
-  const [webflowLimitDraft, setWebflowLimitDraft] = useState(limitDraftValue(usage.webflowRequestLimitOverride));
+  const [webflowProxyLimitDraft, setWebflowProxyLimitDraft] = useState(
+    limitDraftValue(usage.webflowProxyLimitOverride)
+  );
+  const [cmsWriteLimitDraft, setCmsWriteLimitDraft] = useState(limitDraftValue(usage.cmsWriteLimitOverride));
   const [imageLimitDraft, setImageLimitDraft] = useState(limitDraftValue(usage.imageOptimizeLimitOverride));
   const [actionBusy, setActionBusy] = useState(false);
 
   useEffect(() => {
     setMeteringEnabledDraft(usage.meteringEnabled);
-    setWebflowLimitDraft(limitDraftValue(usage.webflowRequestLimitOverride));
+    setWebflowProxyLimitDraft(limitDraftValue(usage.webflowProxyLimitOverride));
+    setCmsWriteLimitDraft(limitDraftValue(usage.cmsWriteLimitOverride));
     setImageLimitDraft(limitDraftValue(usage.imageOptimizeLimitOverride));
   }, [usage]);
 
   const dirty = useMemo(() => {
-    const webflowNext = parseOptionalLimitInteger(webflowLimitDraft);
+    const webflowProxyNext = parseOptionalLimitInteger(webflowProxyLimitDraft);
+    const cmsWriteNext = parseOptionalLimitInteger(cmsWriteLimitDraft);
     const imageNext = parseOptionalLimitInteger(imageLimitDraft);
-    if (webflowNext === "invalid" || imageNext === "invalid") {
+    if (webflowProxyNext === "invalid" || cmsWriteNext === "invalid" || imageNext === "invalid") {
       return false;
     }
     return (
       meteringEnabledDraft !== usage.meteringEnabled ||
-      webflowNext !== usage.webflowRequestLimitOverride ||
+      webflowProxyNext !== usage.webflowProxyLimitOverride ||
+      cmsWriteNext !== usage.cmsWriteLimitOverride ||
       imageNext !== usage.imageOptimizeLimitOverride
     );
-  }, [usage, meteringEnabledDraft, webflowLimitDraft, imageLimitDraft]);
+  }, [usage, meteringEnabledDraft, webflowProxyLimitDraft, cmsWriteLimitDraft, imageLimitDraft]);
 
   const onSaveLimits = useCallback(async () => {
-    const webflowNext = parseOptionalLimitInteger(webflowLimitDraft);
+    const webflowProxyNext = parseOptionalLimitInteger(webflowProxyLimitDraft);
+    const cmsWriteNext = parseOptionalLimitInteger(cmsWriteLimitDraft);
     const imageNext = parseOptionalLimitInteger(imageLimitDraft);
-    if (webflowNext === "invalid" || imageNext === "invalid") {
+    if (webflowProxyNext === "invalid" || cmsWriteNext === "invalid" || imageNext === "invalid") {
       toast.error("Limit overrides must be blank or a non-negative integer.");
       return;
     }
@@ -62,7 +69,8 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
     try {
       await onSave({
         meteringEnabled: meteringEnabledDraft,
-        webflowRequestLimitOverride: webflowNext,
+        webflowProxyLimitOverride: webflowProxyNext,
+        cmsWriteLimitOverride: cmsWriteNext,
         imageOptimizeLimitOverride: imageNext,
       });
       toast.success("Usage limits updated");
@@ -71,7 +79,7 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
     } finally {
       setActionBusy(false);
     }
-  }, [webflowLimitDraft, imageLimitDraft, meteringEnabledDraft, onSave]);
+  }, [webflowProxyLimitDraft, cmsWriteLimitDraft, imageLimitDraft, meteringEnabledDraft, onSave]);
 
   const onResetUsage = useCallback(async () => {
     setActionBusy(true);
@@ -104,11 +112,17 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
         </div>
 
         {scope === "user" ? (
-          <dl className="grid gap-2 text-xs sm:grid-cols-2">
+          <dl className="grid gap-2 text-xs sm:grid-cols-3">
             <div>
-              <dt className="text-muted-foreground">Webflow proxy + CMS writes</dt>
+              <dt className="text-muted-foreground">Webflow proxy</dt>
               <dd className="font-mono text-foreground">
-                {formatUsageRatio(usage.webflowRequestCount, usage.effectiveWebflowLimit)}
+                {formatUsageRatio(usage.webflowProxyRequestCount, usage.effectiveWebflowProxyLimit)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">CMS writes</dt>
+              <dd className="font-mono text-foreground">
+                {formatUsageRatio(usage.cmsWriteCount, usage.effectiveCmsWriteLimit)}
               </dd>
             </div>
             <div>
@@ -119,11 +133,17 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
             </div>
           </dl>
         ) : (
-          <dl className="grid gap-2 text-xs sm:grid-cols-2">
+          <dl className="grid gap-2 text-xs sm:grid-cols-3">
             <div>
-              <dt className="text-muted-foreground">Member Webflow usage (sum)</dt>
+              <dt className="text-muted-foreground">Member Webflow proxy (sum)</dt>
               <dd className="font-mono text-foreground">
-                {formatUsageRatio(usage.memberWebflowRequestCount ?? 0, usage.effectiveWebflowLimit)}
+                {formatUsageRatio(usage.memberWebflowProxyRequestCount ?? 0, usage.effectiveWebflowProxyLimit)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Member CMS writes (sum)</dt>
+              <dd className="font-mono text-foreground">
+                {formatUsageRatio(usage.memberCmsWriteCount ?? 0, usage.effectiveCmsWriteLimit)}
               </dd>
             </div>
             <div>
@@ -153,17 +173,30 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
-            <Label htmlFor={`${scope}-webflow-limit`}>Webflow cap override</Label>
+            <Label htmlFor={`${scope}-webflow-proxy-limit`}>Webflow proxy cap override</Label>
             <Input
-              id={`${scope}-webflow-limit`}
+              id={`${scope}-webflow-proxy-limit`}
               type="number"
               min={0}
               step={1}
               placeholder="Tier default"
-              value={webflowLimitDraft}
-              onChange={(event) => setWebflowLimitDraft(event.target.value)}
+              value={webflowProxyLimitDraft}
+              onChange={(event) => setWebflowProxyLimitDraft(event.target.value)}
+              disabled={disabled}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${scope}-cms-write-limit`}>CMS write cap override</Label>
+            <Input
+              id={`${scope}-cms-write-limit`}
+              type="number"
+              min={0}
+              step={1}
+              placeholder="Tier default"
+              value={cmsWriteLimitDraft}
+              onChange={(event) => setCmsWriteLimitDraft(event.target.value)}
               disabled={disabled}
             />
           </div>
@@ -230,7 +263,9 @@ export function OperatorUsageLimitsTableCell({ usage }: { usage: OperatorUsageLi
     globalMeteringDisabled: usage.globalMeteringDisabled,
     tier: usage.tier,
   });
-  const webflowUsed = usage.scope === "workspace" ? (usage.memberWebflowRequestCount ?? 0) : usage.webflowRequestCount;
+  const webflowProxyUsed =
+    usage.scope === "workspace" ? (usage.memberWebflowProxyRequestCount ?? 0) : usage.webflowProxyRequestCount;
+  const cmsWriteUsed = usage.scope === "workspace" ? (usage.memberCmsWriteCount ?? 0) : usage.cmsWriteCount;
   const imageUsed = usage.scope === "workspace" ? (usage.memberImageOptimizeCount ?? 0) : usage.imageOptimizeCount;
 
   return (
@@ -239,7 +274,10 @@ export function OperatorUsageLimitsTableCell({ usage }: { usage: OperatorUsageLi
         {status}
       </Badge>
       <p className="font-mono tabular-nums text-muted-foreground">
-        WF {formatUsageRatio(webflowUsed, usage.effectiveWebflowLimit)}
+        PROXY {formatUsageRatio(webflowProxyUsed, usage.effectiveWebflowProxyLimit)}
+      </p>
+      <p className="font-mono tabular-nums text-muted-foreground">
+        CMS {formatUsageRatio(cmsWriteUsed, usage.effectiveCmsWriteLimit)}
       </p>
       <p className="font-mono tabular-nums text-muted-foreground">
         IMG {formatUsageRatio(imageUsed, usage.effectiveImageLimit)}

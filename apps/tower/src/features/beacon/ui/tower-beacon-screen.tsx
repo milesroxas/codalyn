@@ -177,10 +177,7 @@ export function TowerBeaconScreen(props: { oauthConfigured?: boolean }) {
 
   return (
     <TowerPageMain>
-      <TowerPageHeader
-        title="Beacon presets"
-        description="Image presets per Webflow site. Edit site defaults here; manage scoped presets in Beacon."
-      />
+      <TowerPageHeader title="Beacon App" description="Configure settings for the designer extension." />
 
       {error ? (
         <div className="mb-6 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">

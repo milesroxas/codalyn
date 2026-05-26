@@ -9,14 +9,16 @@ import {
   formatTeamWorkspaceDeleteError,
   TeamWorkspaceApiError,
 } from "@/features/team/api/delete-workspace";
+import { normalizeInvitationRows, normalizeMemberRows } from "@/features/team/lib/team-org-boundary";
+import type { InvitationRow } from "@/features/team/model/workspace-types";
 import { TeamDashboardSkeleton } from "@/features/team/ui/team-dashboard-skeleton";
 import { TeamWorkspacePanel } from "@/features/team/ui/team-workspace-panel";
-import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import {
   isTowerTeamAdminRole,
+  parseOrganizationMemberRole,
+  parseTowerTeamRole,
   TOWER_TEAM_ROLES,
-  type TowerTeamRole,
 } from "@/shared/lib/membership/tower-organization-access";
 import { parseWorkspaceSlug } from "@/shared/lib/membership/workspace-slug";
 import { workspaceSlugErrorMessage } from "@/shared/lib/membership/workspace-slug-messages";
@@ -24,11 +26,10 @@ import { Button } from "@/shared/ui/button";
 import { TowerPageHeader, TowerPageMain } from "@/shared/ui/tower-page-shell";
 
 export function TeamDashboard(props: {
-  billingEnabled?: boolean;
   workspaceBilling?: WorkspaceBillingView | null;
   activeOrganizationId?: string | null;
 }) {
-  const { billingEnabled = false, workspaceBilling = null, activeOrganizationId = null } = props;
+  const { workspaceBilling = null, activeOrganizationId = null } = props;
   const { session, sessionPending } = useRequireTowerSession("/team");
   const { refetch: refetchOrgs } = authClient.useListOrganizations();
   const {
@@ -144,10 +145,15 @@ export function TeamDashboard(props: {
     if (!email) {
       return;
     }
+    const role = parseTowerTeamRole(inviteRole);
+    if (!role) {
+      toast.error("Invalid role");
+      return;
+    }
     setBusy(true);
     const res = await authClient.organization.inviteMember({
       email,
-      role: inviteRole as TowerTeamRole,
+      role,
     });
     setBusy(false);
     if (res.error) {
@@ -163,10 +169,15 @@ export function TeamDashboard(props: {
 
   const onResendInvite = async (inv: InvitationRow) => {
     setError(null);
+    const role = parseTowerTeamRole(inv.role ?? TOWER_TEAM_ROLES[1]);
+    if (!role) {
+      toast.error("Invalid role");
+      return;
+    }
     setResendingInvitationId(inv.id);
     const res = await authClient.organization.inviteMember({
       email: inv.email.toLowerCase(),
-      role: (inv.role ?? TOWER_TEAM_ROLES[1]) as TowerTeamRole,
+      role,
       resend: true,
     });
     setResendingInvitationId(null);
@@ -197,10 +208,15 @@ export function TeamDashboard(props: {
 
   const onUpdateMemberRole = async (memberId: string, role: string) => {
     setError(null);
+    const parsedRole = parseOrganizationMemberRole(role);
+    if (!parsedRole) {
+      toast.error("Invalid role");
+      return;
+    }
     setBusy(true);
     const res = await authClient.organization.updateMemberRole({
       memberId,
-      role: role as TowerTeamRole | "owner" | "member",
+      role: parsedRole,
     });
     setBusy(false);
     if (res.error) {
@@ -228,21 +244,12 @@ export function TeamDashboard(props: {
     toast.success("Member removed");
   };
 
-  const members = useMemo(() => (activeOrg?.members ?? []) as MemberRow[], [activeOrg?.members]);
+  const members = useMemo(() => normalizeMemberRows(activeOrg?.members), [activeOrg?.members]);
   const memberRoleOptions = useMemo(() => {
     const fromMembers = members.map((m) => m.role);
     return [...new Set([...TOWER_TEAM_ROLES, ...fromMembers])];
   }, [members]);
-  const invitations = useMemo(() => {
-    const raw = activeOrg?.invitations ?? [];
-    return raw.map((inv) => ({
-      ...inv,
-      expiresAt:
-        inv && typeof inv === "object" && "expiresAt" in inv
-          ? (inv as { expiresAt?: string | Date | null }).expiresAt
-          : undefined,
-    })) as InvitationRow[];
-  }, [activeOrg?.invitations]);
+  const invitations = useMemo(() => normalizeInvitationRows(activeOrg?.invitations), [activeOrg?.invitations]);
 
   if (sessionPending || !session?.user) {
     return <TeamDashboardSkeleton />;
@@ -252,7 +259,7 @@ export function TeamDashboard(props: {
     <TowerPageMain>
       <TowerPageHeader
         title="Team"
-        description="Manage members, roles, and invites for this workspace."
+        description="Manage members, invites, roles, and workspace access."
         actions={
           <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void refreshTeam()}>
             Sync
@@ -270,7 +277,6 @@ export function TeamDashboard(props: {
         activeOrgPending={activeOrgPending}
         activeOrg={activeOrg}
         canManageTeam={canManageTeam}
-        billingEnabled={billingEnabled}
         workspaceBilling={workspaceBilling}
         billingOrganizationId={activeOrganizationId ?? activeOrg?.id ?? null}
         activeTeamNameEdit={activeTeamNameEdit}

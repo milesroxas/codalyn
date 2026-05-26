@@ -33,9 +33,13 @@ vi.mock("@/shared/lib/membership/product-admin-role", () => ({
   isProductAdminAppRole,
 }));
 
-vi.mock("@/shared/lib/membership/tower-organization-access", () => ({
-  isTowerTeamAdminRole,
-}));
+vi.mock("@/shared/lib/membership/tower-organization-access", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/lib/membership/tower-organization-access")>();
+  return {
+    ...actual,
+    isTowerTeamAdminRole,
+  };
+});
 
 vi.mock("@/shared/lib/db", () => ({
   db: {

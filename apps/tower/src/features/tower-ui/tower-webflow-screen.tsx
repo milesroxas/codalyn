@@ -96,7 +96,7 @@ function WebflowConnectionSection({ summary, sites }: Pick<WebflowScreenContext,
         <CardContent>
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant={summary.webflowOAuthConnected ? "default" : "secondary"}>{status.value}</Badge>
-            <span className="text-sm text-muted-foreground">{status.hint}</span>
+            <span className="text-sm text-muted-foreground">{status.caption}</span>
           </div>
         </CardContent>
       </Card>
@@ -192,8 +192,8 @@ export function TowerWebflowScreen({ summary, oauthConfigured, billingEnabled }:
   return (
     <TowerPageMain>
       <TowerPageHeader
-        title="Webflow"
-        description="One Webflow connection per workspace, shared by all members."
+        title="Webflow connection"
+        description="Manage the shared Webflow connection for this workspace."
         actions={
           canManage && oauthConfigured ? (
             <TowerWebflowOAuthPopupButton

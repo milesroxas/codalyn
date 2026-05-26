@@ -3,6 +3,7 @@ import type * as React from "react";
 import { cn } from "@/shared/lib/utils";
 
 const towerAppShellContentWidths = {
+  full: "",
   default: "max-w-4xl",
   wide: "max-w-6xl",
   narrow: "max-w-2xl",
@@ -10,17 +11,22 @@ const towerAppShellContentWidths = {
 
 type TowerAppShellContentWidth = keyof typeof towerAppShellContentWidths;
 
-/** Shared horizontal bounds for Tower header chrome and page main content. */
+/** Shared horizontal bounds for logged-out header chrome. */
 function towerAppShellContentClassName(width: TowerAppShellContentWidth = "default", className?: string) {
   return cn("mx-auto w-full px-4 sm:px-6", towerAppShellContentWidths[width], className);
 }
 
-type TowerPageMainProps = React.ComponentProps<"main"> & {
+function towerPageMainClassName(width: TowerAppShellContentWidth = "full", className?: string) {
+  const maxWidth = towerAppShellContentWidths[width];
+  return cn("w-full", maxWidth ? cn("mx-auto", maxWidth) : null, className);
+}
+
+type TowerPageMainProps = React.ComponentProps<"div"> & {
   width?: TowerAppShellContentWidth;
 };
 
-function TowerPageMain({ className, width = "default", ...props }: TowerPageMainProps) {
-  return <main className={towerAppShellContentClassName(width, cn("py-8 sm:py-10", className))} {...props} />;
+function TowerPageMain({ className, width = "full", ...props }: TowerPageMainProps) {
+  return <div className={towerPageMainClassName(width, className)} {...props} />;
 }
 
 type TowerPageHeaderProps = {
@@ -91,4 +97,5 @@ export {
   TowerPageMain,
   TowerPageSection,
   towerAppShellContentClassName,
+  towerPageMainClassName,
 };

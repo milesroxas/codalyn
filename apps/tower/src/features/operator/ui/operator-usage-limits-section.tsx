@@ -1,6 +1,5 @@
 "use client";
 
-import { UsageMeterLabel } from "@codalyn/webflow-kit/react";
 import { IconRefresh } from "@tabler/icons-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -14,6 +13,7 @@ import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Switch } from "@/shared/ui/switch";
+import { UsageMeterLabel } from "@/shared/ui/usage-meter-label";
 
 type OperatorUsageLimitsSectionProps = {
   scope: OperatorUsageLimitsView["scope"];

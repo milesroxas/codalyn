@@ -21,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { SidebarMenuButton } from "@/shared/ui/sidebar";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 export type WorkspaceOrgRow = { id: string; name: string; slug: string };
@@ -52,23 +53,34 @@ export function TeamWorkspaceSwitcher(props: {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={disabled}
-            size={props.compact ? "workspace-compact" : "workspace"}
-            aria-label="Workspace menu"
-          >
-            <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
-              <IconBuildingCommunity className="size-4 shrink-0 opacity-60" aria-hidden />
+          {props.compact ? (
+            <SidebarMenuButton
+              variant="outline"
+              disabled={disabled}
+              className="font-normal"
+              aria-label="Workspace menu"
+            >
+              <IconBuildingCommunity className="opacity-60" aria-hidden />
               {props.orgsPending ? (
                 <Skeleton className="h-3 w-24" aria-hidden />
               ) : (
-                <span className="truncate">{props.triggerLabel}</span>
+                <span className="min-w-0 flex-1 truncate">{props.triggerLabel}</span>
               )}
-            </span>
-            <IconChevronDown className="size-4 shrink-0 opacity-50" aria-hidden />
-          </Button>
+              <IconChevronDown className="ml-auto opacity-50" aria-hidden />
+            </SidebarMenuButton>
+          ) : (
+            <Button type="button" variant="outline" disabled={disabled} size="workspace" aria-label="Workspace menu">
+              <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                <IconBuildingCommunity className="size-4 shrink-0 opacity-60" aria-hidden />
+                {props.orgsPending ? (
+                  <Skeleton className="h-3 w-24" aria-hidden />
+                ) : (
+                  <span className="truncate">{props.triggerLabel}</span>
+                )}
+              </span>
+              <IconChevronDown className="size-4 shrink-0 opacity-50" aria-hidden />
+            </Button>
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" size="panel">
           <DropdownMenuLabel>Workspaces</DropdownMenuLabel>

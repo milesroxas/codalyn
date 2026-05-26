@@ -8,7 +8,7 @@ import type { TowerDashboardSummary } from "@/server/dashboard-summary";
 import { TOWER_CONNECTION_PATH } from "@/shared/lib/navigation/tower-app-paths";
 import { ActionTile, ActionTileGrid } from "@/shared/ui/action-tile";
 import { Button } from "@/shared/ui/button";
-import { StatTile } from "@/shared/ui/stat-tile";
+import { StatTile, type StatTileTone, type StatTileValueVariant } from "@/shared/ui/stat-tile";
 import {
   TowerDashboardGrid,
   TowerDashboardSignals,
@@ -25,29 +25,62 @@ type TowerDashboardProps = {
   oauthConfigured: boolean;
 };
 
-function teamSnapshot(summary: TowerDashboardSummary) {
+type DashboardStatSnapshot = {
+  value: string;
+  valueVariant: StatTileValueVariant;
+  detail?: string;
+  caption?: string;
+  tone: StatTileTone;
+};
+
+function teamSnapshot(summary: TowerDashboardSummary): DashboardStatSnapshot {
   if (!summary.activeOrganizationId) {
-    return { value: "—", hint: "No workspace selected", tone: "default" as const };
+    return {
+      value: "—",
+      valueVariant: "status",
+      caption: "No workspace selected",
+      tone: "default",
+    };
   }
 
   const members = summary.workspaceMemberCount ?? 0;
   const pending = summary.workspacePendingInviteCount ?? 0;
-  const memberWord = members === 1 ? "member" : "members";
-  const hint = summary.activeOrgTeamAdmin && pending > 0 ? `${memberWord} · ${pending} pending` : memberWord;
+  const value = `${members} ${members === 1 ? "member" : "members"}`;
 
-  return { value: members, hint, tone: "default" as const };
+  return {
+    value,
+    valueVariant: "metric",
+    detail: pending > 0 ? `${pending} pending ${pending === 1 ? "invite" : "invites"}` : undefined,
+    caption: pending > 0 ? "People invited to this workspace." : "People with access to this workspace.",
+    tone: "default",
+  };
 }
 
-function beaconSnapshot(summary: TowerDashboardSummary) {
+function imagePresetsSnapshot(summary: TowerDashboardSummary): DashboardStatSnapshot {
   if (!summary.activeOrganizationId) {
-    return { value: "—", hint: "No workspace selected", tone: "default" as const };
+    return {
+      value: "—",
+      valueVariant: "status",
+      caption: "No workspace selected",
+      tone: "default",
+    };
   }
 
   const count = summary.beaconPresetCount ?? 0;
+  if (count === 0) {
+    return {
+      value: "No presets set",
+      valueVariant: "status",
+      caption: "Default settings for Webflow image uploads.",
+      tone: "default",
+    };
+  }
+
   return {
-    value: count,
-    hint: count === 0 ? "Add in Beacon or Tower" : "Synced from workspace",
-    tone: count === 0 ? ("default" as const) : ("positive" as const),
+    value: `${count} ${count === 1 ? "preset" : "presets"}`,
+    valueVariant: "metric",
+    caption: "Reusable settings for Webflow image uploads.",
+    tone: "positive",
   };
 }
 
@@ -138,7 +171,7 @@ function DashboardSignalsColumn({ summary }: { summary: TowerDashboardSummary })
         href={TOWER_CONNECTION_PATH}
       />
       <StatTile label="Team" {...teamSnapshot(summary)} icon={IconUsers} href="/team" />
-      <StatTile label="Beacon presets" {...beaconSnapshot(summary)} icon={IconRadar2} href="/beacon" />
+      <StatTile label="Image presets" {...imagePresetsSnapshot(summary)} icon={IconRadar2} href="/beacon" />
     </TowerDashboardSignals>
   );
 }
@@ -179,7 +212,7 @@ export function TowerDashboard({ summary, usage, billingEnabled, oauthConfigured
     <TowerPageMain>
       <TowerPageHeader
         title="Dashboard"
-        description="Workspace status, integrations, and usage at a glance."
+        description="Monitor workspace usage, connection status, and account activity."
         actions={
           summary.activeOrgTeamAdmin || !summary.webflowOAuthConnected ? (
             <Button variant="outline" size="sm" asChild>

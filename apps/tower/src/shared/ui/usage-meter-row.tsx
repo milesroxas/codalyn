@@ -1,8 +1,8 @@
 import { formatTowerUsageRatio, type TowerUsageMeterSnapshot, towerUsageMeterLabel } from "@codalyn/webflow-kit";
-import { UsageMeterLabel } from "@codalyn/webflow-kit/react";
 import { usageMeterLevelLabel, usageMeterProgressValue } from "@/shared/lib/usage-meter-ui";
 import { Badge } from "@/shared/ui/badge";
 import { Progress, type ProgressIndicatorLevel } from "@/shared/ui/progress";
+import { UsageMeterLabel } from "@/shared/ui/usage-meter-label";
 
 function progressLevelForMeter(level: TowerUsageMeterSnapshot["level"]): ProgressIndicatorLevel {
   switch (level) {

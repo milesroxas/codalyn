@@ -1,4 +1,4 @@
-import type { InvitationRow } from "@/features/team/ui/workspace-types";
+import type { InvitationRow } from "@/features/team/model/workspace-types";
 
 export function formatInvitationExpiry(v: InvitationRow["expiresAt"]): string | null {
   if (v == null) {

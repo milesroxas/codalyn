@@ -1,4 +1,5 @@
 import { IconCreditCard } from "@tabler/icons-react";
+import { WorkspaceTeamCheckoutForm } from "@/features/team/ui/workspace-team-checkout-form";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -17,10 +18,7 @@ function WorkspaceBillingActions(props: { organizationId: string; billing: Works
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {!billing.isPaid && billing.teamCheckoutConfigured && !billing.isOverSeatCap ? (
-          <form action="/api/billing/workspace/checkout" method="post">
-            <input type="hidden" name="organizationId" value={organizationId} />
-            <Button type="submit">Subscribe to Team</Button>
-          </form>
+          <WorkspaceTeamCheckoutForm organizationId={organizationId} />
         ) : null}
         {billing.hasStripeCustomer ? (
           <Button asChild variant="outline">

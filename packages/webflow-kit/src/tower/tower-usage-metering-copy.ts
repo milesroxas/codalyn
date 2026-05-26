@@ -29,18 +29,35 @@ export const TOWER_USAGE_METER_CONTRIBUTING_ACTIONS: Record<TowerUsageMeterKind,
   ],
 };
 
-function formatContributingActions(actions: readonly string[]): string {
-  return actions.map((action) => `• ${action}`).join("\n");
+export type TowerUsageMeterTooltipAction = {
+  feature: string;
+  detail: string;
+};
+
+export type TowerUsageMeterTooltipContent = {
+  summary: string;
+  sectionHeading: string;
+  actions: readonly TowerUsageMeterTooltipAction[];
+  footnote: string;
+};
+
+const TOWER_USAGE_METER_TOOLTIP_SECTION_HEADING = "Counts when you:";
+
+function parseContributingAction(action: string): TowerUsageMeterTooltipAction {
+  const separatorIndex = action.indexOf(" — ");
+  if (separatorIndex === -1) {
+    return { feature: action, detail: "" };
+  }
+
+  return {
+    feature: action.slice(0, separatorIndex).trim(),
+    detail: action.slice(separatorIndex + 3).trim(),
+  };
 }
 
 function uniqueMeterFeatureNames(kind: TowerUsageMeterKind): string {
   const names = [
-    ...new Set(
-      TOWER_USAGE_METER_CONTRIBUTING_ACTIONS[kind].map((action) => {
-        const parts = action.split(" — ");
-        return parts[0]?.trim() ?? action;
-      })
-    ),
+    ...new Set(TOWER_USAGE_METER_CONTRIBUTING_ACTIONS[kind].map((action) => parseContributingAction(action).feature)),
   ];
   if (names.length === 0) {
     return "";
@@ -54,16 +71,43 @@ function uniqueMeterFeatureNames(kind: TowerUsageMeterKind): string {
   return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }
 
-export function towerUsageMeterTooltip(kind: TowerUsageMeterKind): string {
-  const actions = formatContributingActions(TOWER_USAGE_METER_CONTRIBUTING_ACTIONS[kind]);
+export function towerUsageMeterTooltipContent(kind: TowerUsageMeterKind): TowerUsageMeterTooltipContent {
+  const actions = TOWER_USAGE_METER_CONTRIBUTING_ACTIONS[kind].map(parseContributingAction);
+
   switch (kind) {
     case "webflowProxy":
-      return `Each Webflow Data API request through Tower counts as one. A single action may use several requests.\n\nCounts when you:\n${actions}\n\nComposer saves to a CMS text field and CMS field uploads use this meter. AVIF exports and layout API saves are counted separately.`;
+      return {
+        summary: "Each Webflow Data API request through Tower counts as one. A single action may use several requests.",
+        sectionHeading: TOWER_USAGE_METER_TOOLTIP_SECTION_HEADING,
+        actions,
+        footnote:
+          "Composer saves to a CMS text field and CMS field uploads use this meter. AVIF exports and layout API saves are counted separately.",
+      };
     case "cmsWrite":
-      return `Each layout save through Tower's CMS layout API counts as one.\n\nCounts when you:\n${actions}\n\nSaving slot order in Composer to a CMS text field counts toward Webflow proxy instead. Loading layouts does not count.`;
+      return {
+        summary: "Each layout save through Tower's CMS layout API counts as one.",
+        sectionHeading: TOWER_USAGE_METER_TOOLTIP_SECTION_HEADING,
+        actions,
+        footnote:
+          "Saving slot order in Composer to a CMS text field counts toward Webflow proxy instead. Loading layouts does not count.",
+      };
     case "image":
-      return `Each AVIF optimize request through Tower counts as one.\n\nCounts when you:\n${actions}\n\nWebP exports in the Designer do not count toward this limit.`;
+      return {
+        summary: "Each AVIF optimize request through Tower counts as one.",
+        sectionHeading: TOWER_USAGE_METER_TOOLTIP_SECTION_HEADING,
+        actions,
+        footnote: "WebP exports in the Designer do not count toward this limit.",
+      };
   }
+}
+
+export function towerUsageMeterTooltip(kind: TowerUsageMeterKind): string {
+  const content = towerUsageMeterTooltipContent(kind);
+  const actionLines = content.actions
+    .map((action) => (action.detail ? `• ${action.feature} — ${action.detail}` : `• ${action.feature}`))
+    .join("\n");
+
+  return `${content.summary}\n\n${content.sectionHeading}\n${actionLines}\n\n${content.footnote}`;
 }
 
 export function towerUsageApproachingAlertDescription(

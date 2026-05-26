@@ -1,11 +1,10 @@
 import { headers } from "next/headers";
 import type * as React from "react";
 import { TowerUsageApproachingBanner } from "@/features/billing/ui/tower-usage-approaching-banner";
-import { TowerHeader } from "@/features/tower-ui/tower-header";
+import { TowerAppShell } from "@/features/tower-ui/tower-app-shell";
 import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
-import { towerAppShellContentClassName } from "@/shared/ui/tower-page-shell";
 
 export default async function TowerLayout({ children }: { children: React.ReactNode }) {
   const billingEnabled = isTowerBillingEnabled();
@@ -14,19 +13,13 @@ export default async function TowerLayout({ children }: { children: React.ReactN
   const h = await headers();
   const activeOrg = userId ? await getActiveOrganizationIdForAuthHeaders(h) : null;
 
+  const usageBanner = userId ? (
+    <TowerUsageApproachingBanner userId={userId} activeOrganizationId={activeOrg} billingEnabled={billingEnabled} />
+  ) : null;
+
   return (
-    <>
-      <TowerHeader billingEnabled={billingEnabled} />
-      {userId ? (
-        <div className={towerAppShellContentClassName("default", "pt-4")}>
-          <TowerUsageApproachingBanner
-            userId={userId}
-            activeOrganizationId={activeOrg}
-            billingEnabled={billingEnabled}
-          />
-        </div>
-      ) : null}
+    <TowerAppShell billingEnabled={billingEnabled} signedIn={Boolean(userId)} usageBanner={usageBanner}>
       {children}
-    </>
+    </TowerAppShell>
   );
 }

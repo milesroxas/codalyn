@@ -1,16 +1,16 @@
 "use client";
 
 import type { FormEvent } from "react";
+import { countPendingInvitations } from "@/features/team/lib/team-org-boundary";
+import type { InvitationRow, MemberRow } from "@/features/team/model/workspace-types";
 import { TeamWorkspacePanelSkeleton } from "@/features/team/ui/team-workspace-panel-skeleton";
-import { WorkspaceTabsShell } from "@/features/team/ui/workspace-subviews";
-import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
+import { WorkspaceTabsShell } from "@/features/team/ui/workspace-tabs-shell";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 
 export function TeamWorkspacePanel(props: {
   activeOrgPending: boolean;
   activeOrg: { id: string; name: string; slug: string } | null | undefined;
   canManageTeam: boolean;
-  billingEnabled: boolean;
   workspaceBilling: WorkspaceBillingView | null;
   billingOrganizationId: string | null;
   activeTeamNameEdit: string;
@@ -40,7 +40,7 @@ export function TeamWorkspacePanel(props: {
   onDeleteWorkspace: () => void | Promise<void>;
 }) {
   const { activeOrgPending, activeOrg, invitations } = props;
-  const pendingInviteCount = invitations.filter((i) => i.status === "pending").length;
+  const pendingInviteCount = countPendingInvitations(invitations);
 
   return (
     <div className="space-y-8">
@@ -63,7 +63,6 @@ export function TeamWorkspacePanel(props: {
           memberRoleOptions={props.memberRoleOptions}
           invitations={invitations}
           canManageTeam={props.canManageTeam}
-          billingEnabled={props.billingEnabled}
           workspaceBilling={props.workspaceBilling}
           billingOrganizationId={props.billingOrganizationId}
           busy={props.busy}

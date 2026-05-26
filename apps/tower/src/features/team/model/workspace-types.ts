@@ -12,3 +12,10 @@ export type InvitationRow = {
   status: string;
   expiresAt?: string | Date | null;
 };
+
+export type WorkspaceOrgSummary = {
+  id: string;
+  name: string;
+  slug: string;
+  seatLimit?: number | null;
+};

@@ -1,4 +1,4 @@
-import type { StatTileTone } from "@/shared/ui/stat-tile";
+import type { StatTileTone, StatTileValueVariant } from "@/shared/ui/stat-tile";
 
 type WebflowIntegrationStatusInput = {
   webflowOAuthConnected: boolean;
@@ -6,23 +6,36 @@ type WebflowIntegrationStatusInput = {
   webflowSitesCount: number | null;
 };
 
-export function formatWebflowIntegrationStatus(input: WebflowIntegrationStatusInput): {
+export type WebflowIntegrationStatusSnapshot = {
   value: string;
-  hint: string;
+  valueVariant: StatTileValueVariant;
+  caption: string;
   tone: StatTileTone;
-} {
+};
+
+export function formatWebflowIntegrationStatus(input: WebflowIntegrationStatusInput): WebflowIntegrationStatusSnapshot {
   if (!input.webflowOAuthConnected) {
-    return { value: "Not connected", hint: "Data API proxy off", tone: "warn" };
+    return {
+      value: "Not connected",
+      valueVariant: "status",
+      caption: "Connect Webflow to sync sites and use workspace tools.",
+      tone: "warn",
+    };
   }
 
-  const siteCount = input.webflowSitesCount;
-  if (siteCount === null) {
-    return { value: "Connected", hint: "Manage connection & sites", tone: "positive" };
+  if (input.webflowSitesCount === 0) {
+    return {
+      value: "Action needed",
+      valueVariant: "status",
+      caption: "Reconnect Webflow to keep site data in sync.",
+      tone: "warn",
+    };
   }
 
   return {
     value: "Connected",
-    hint: siteCount === 0 ? "No sites returned" : `${siteCount} site${siteCount === 1 ? "" : "s"} available`,
+    valueVariant: "status",
+    caption: "Your workspace can access Webflow sites.",
     tone: "positive",
   };
 }

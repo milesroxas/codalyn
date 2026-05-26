@@ -23,6 +23,17 @@ export function isTowerTeamAdminRole(role: string | null | undefined): boolean {
   return (TOWER_TEAM_ADMIN_ROLE_KEYS as readonly string[]).includes(role);
 }
 
+export function parseTowerTeamRole(role: string): TowerTeamRole | null {
+  return (TOWER_TEAM_ROLES as readonly string[]).includes(role) ? (role as TowerTeamRole) : null;
+}
+
+export function parseOrganizationMemberRole(role: string): TowerTeamRole | "owner" | "member" | null {
+  if (role === "owner" || role === "member") {
+    return role;
+  }
+  return parseTowerTeamRole(role);
+}
+
 const towerOrgStatements = {
   organization: ["update", "delete"],
   member: ["create", "update", "delete"],

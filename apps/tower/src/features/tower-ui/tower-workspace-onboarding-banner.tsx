@@ -113,7 +113,7 @@ function TowerWorkspaceCreateWorkspacePanel({
   const [orgName, setOrgName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const copy = towerWorkspaceOnboardingCopy(blocker, summary.canCreateOrganization);
+  const copy = towerWorkspaceOnboardingCopy(blocker);
 
   async function onCreateWorkspace(event: FormEvent): Promise<boolean> {
     event.preventDefault();
@@ -176,7 +176,7 @@ function TowerWorkspaceOnboardingAlert({
   blocker: TowerWorkspaceOnboardingBlocker;
   onWebflowConnectSuccess: () => void;
 }) {
-  const copy = towerWorkspaceOnboardingCopy(blocker, summary.canCreateOrganization);
+  const copy = towerWorkspaceOnboardingCopy(blocker);
 
   return (
     <Alert variant={copy.variant}>

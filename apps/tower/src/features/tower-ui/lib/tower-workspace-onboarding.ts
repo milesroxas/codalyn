@@ -47,18 +47,13 @@ export function parseTowerWebflowQueryStatus(value: string | null): TowerWebflow
   return null;
 }
 
-export function towerWorkspaceOnboardingCopy(
-  blocker: TowerWorkspaceOnboardingBlocker,
-  canCreateOrganization: boolean
-): TowerOnboardingAlertCopy {
+export function towerWorkspaceOnboardingCopy(blocker: TowerWorkspaceOnboardingBlocker): TowerOnboardingAlertCopy {
   switch (blocker) {
     case "needs_workspace":
       return {
         variant: "warning",
-        title: "Create a workspace before connecting Webflow",
-        description: canCreateOrganization
-          ? "Webflow connects to a workspace, not your account."
-          : "Create or join a workspace first.",
+        title: "Create a workspace to connect Webflow",
+        description: "Webflow needs a workspace before it can connect.",
       };
     case "needs_active_workspace":
       return {

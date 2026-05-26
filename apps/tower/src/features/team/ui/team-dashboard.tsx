@@ -4,6 +4,11 @@ import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
+import {
+  deleteTeamWorkspace,
+  formatTeamWorkspaceDeleteError,
+  TeamWorkspaceApiError,
+} from "@/features/team/api/delete-workspace";
 import { BeaconEditorExperienceSection } from "@/features/team/ui/beacon-editor-experience-section";
 import { TeamDashboardSkeleton } from "@/features/team/ui/team-dashboard-skeleton";
 import { TeamWorkspacePanel } from "@/features/team/ui/team-workspace-panel";
@@ -39,6 +44,8 @@ export function TeamDashboard(props: {
   const [inviteRole, setInviteRole] = useState<string>(TOWER_TEAM_ROLES[1]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
   const [resendingInvitationId, setResendingInvitationId] = useState<string | null>(null);
   const canManageTeam = isTowerTeamAdminRole(activeMember?.role);
 
@@ -50,8 +57,28 @@ export function TeamDashboard(props: {
     if (activeOrg) {
       setActiveTeamNameEdit(activeOrg.name);
       setActiveTeamSlugEdit(activeOrg.slug);
+      setDeleteConfirm("");
     }
   }, [activeOrg]);
+
+  const onDeleteWorkspace = useCallback(async () => {
+    if (!activeOrg) {
+      return;
+    }
+    setError(null);
+    setDeleteBusy(true);
+    try {
+      await deleteTeamWorkspace(activeOrg.id, deleteConfirm);
+      toast.success("Workspace deleted");
+      window.location.assign("/");
+    } catch (err) {
+      const msg = err instanceof TeamWorkspaceApiError ? formatTeamWorkspaceDeleteError(err) : "Delete failed";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [activeOrg, deleteConfirm]);
 
   const onUpdateActiveTeamName = async (e: FormEvent) => {
     e.preventDefault();
@@ -319,6 +346,10 @@ export function TeamDashboard(props: {
         onResendInvite={(inv) => void onResendInvite(inv)}
         onCancelInvite={onCancelInvite}
         resendingInvitationId={resendingInvitationId}
+        deleteBusy={deleteBusy}
+        deleteConfirm={deleteConfirm}
+        onDeleteConfirmChange={setDeleteConfirm}
+        onDeleteWorkspace={onDeleteWorkspace}
       />
     </main>
   );

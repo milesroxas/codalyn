@@ -26,6 +26,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { NativeSelect } from "@/shared/ui/native-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { DangerZoneTypedDelete } from "@/shared/ui/typed-confirm-alert-dialog";
 import { WorkspaceSlugField } from "@/shared/ui/workspace-slug-field";
 
 type WorkspaceSeatState = {
@@ -438,23 +439,38 @@ function WorkspaceInvitesTab(props: {
 function WorkspaceSettingsTab(props: {
   activeOrg: { id: string; name: string; slug: string };
   busy: boolean;
+  deleteBusy: boolean;
+  deleteConfirm: string;
+  memberCount: number;
+  pendingInviteCount: number;
   activeTeamNameEdit: string;
   activeTeamSlugEdit: string;
   onActiveTeamNameEditChange: (v: string) => void;
   onActiveTeamSlugEditChange: (v: string) => void;
   onUpdateActiveTeamName: (e: FormEvent) => void;
   onUpdateActiveTeamSlug: () => void | Promise<void>;
+  onDeleteConfirmChange: (value: string) => void;
+  onDeleteWorkspace: () => void | Promise<void>;
 }) {
   const {
     activeOrg,
     busy,
+    deleteBusy,
+    deleteConfirm,
+    memberCount,
+    pendingInviteCount,
     activeTeamNameEdit,
     activeTeamSlugEdit,
     onActiveTeamNameEditChange,
     onActiveTeamSlugEditChange,
     onUpdateActiveTeamName,
     onUpdateActiveTeamSlug,
+    onDeleteConfirmChange,
+    onDeleteWorkspace,
   } = props;
+
+  const memberLabel = memberCount === 1 ? "member" : "members";
+  const inviteLabel = pendingInviteCount === 1 ? "pending invitation" : "pending invitations";
 
   return (
     <TabsContent value="settings" className="mt-6 space-y-6">
@@ -517,6 +533,26 @@ function WorkspaceSettingsTab(props: {
           </form>
         </CardContent>
       </Card>
+      <DangerZoneTypedDelete
+        panelDescription={
+          <>
+            Permanently delete this workspace. All {memberCount} {memberLabel} lose access immediately; their Tower
+            accounts are not deleted.
+            {pendingInviteCount > 0 ? ` ${pendingInviteCount} ${inviteLabel} will be revoked.` : null} Webflow
+            connections, team presets, and billing for this workspace are removed. An active Team subscription is
+            canceled.
+          </>
+        }
+        triggerLabel="Delete workspace"
+        title="Delete workspace?"
+        confirmFieldLabel="Slug"
+        confirmFieldId="team-delete-workspace-slug"
+        expectedValue={activeOrg.slug}
+        confirmValue={deleteConfirm}
+        onConfirmValueChange={onDeleteConfirmChange}
+        busy={deleteBusy}
+        onConfirm={() => void onDeleteWorkspace()}
+      />
     </TabsContent>
   );
 }
@@ -583,6 +619,10 @@ export function WorkspaceTabsShell(props: {
   activeTeamNameEdit: string;
   activeTeamSlugEdit: string;
   resendingInvitationId: string | null;
+  deleteBusy: boolean;
+  deleteConfirm: string;
+  onDeleteConfirmChange: (value: string) => void;
+  onDeleteWorkspace: () => void | Promise<void>;
   onInviteEmailChange: (v: string) => void;
   onInviteRoleChange: (v: string) => void;
   onInvite: (e: FormEvent) => void;
@@ -611,6 +651,10 @@ export function WorkspaceTabsShell(props: {
     activeTeamNameEdit,
     activeTeamSlugEdit,
     resendingInvitationId,
+    deleteBusy,
+    deleteConfirm,
+    onDeleteConfirmChange,
+    onDeleteWorkspace,
     onInviteEmailChange,
     onInviteRoleChange,
     onInvite,
@@ -707,12 +751,18 @@ export function WorkspaceTabsShell(props: {
             <WorkspaceSettingsTab
               activeOrg={activeOrg}
               busy={busy}
+              deleteBusy={deleteBusy}
+              deleteConfirm={deleteConfirm}
+              memberCount={members.length}
+              pendingInviteCount={pendingInviteCount}
               activeTeamNameEdit={activeTeamNameEdit}
               activeTeamSlugEdit={activeTeamSlugEdit}
               onActiveTeamNameEditChange={onActiveTeamNameEditChange}
               onActiveTeamSlugEditChange={onActiveTeamSlugEditChange}
               onUpdateActiveTeamName={onUpdateActiveTeamName}
               onUpdateActiveTeamSlug={onUpdateActiveTeamSlug}
+              onDeleteConfirmChange={onDeleteConfirmChange}
+              onDeleteWorkspace={onDeleteWorkspace}
             />
 
             {workspaceBilling && billingOrganizationId ? (

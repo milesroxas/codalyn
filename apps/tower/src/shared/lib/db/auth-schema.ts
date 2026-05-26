@@ -292,6 +292,13 @@ export const towerPlatformMetering = pgTable("tower_platform_metering", {
     .notNull(),
 });
 
+/** Sliding-window counters for destructive API actions (workspace delete, etc.). */
+export const towerDestructiveActionRateLimit = pgTable("tower_destructive_action_rate_limit", {
+  key: text("key").primaryKey(),
+  windowStartedAt: timestamp("window_started_at").notNull(),
+  attemptCount: integer("attempt_count").notNull(),
+});
+
 export const userRelations = relations(user, ({ many, one }) => ({
   sessions: many(session),
   accounts: many(account),

@@ -46,6 +46,19 @@ export class OperatorApiError extends Error {
   }
 }
 
+export function formatOperatorWorkspaceDeleteError(error: OperatorApiError): string {
+  if (error.message === "confirm_mismatch") {
+    return "Slug does not match.";
+  }
+  if (error.message === "rate_limited") {
+    return "Too many delete attempts. Wait a few minutes and try again.";
+  }
+  if (error.message === "deletion_incomplete") {
+    return "Billing was canceled but deletion did not finish. Try again.";
+  }
+  return error.message;
+}
+
 export type OperatorUserListQuery = {
   q?: string;
   limit?: number;
@@ -147,8 +160,8 @@ export const operatorApi = {
       body: JSON.stringify(patch),
     }),
   deleteWorkspace: async (orgId: string, confirmSlug: string): Promise<{ ok: true }> =>
-    requestJson<{ ok: true }>(
-      `/api/operator/workspaces/${encodeURIComponent(orgId)}?confirm=${encodeURIComponent(confirmSlug)}`,
-      { method: "DELETE" }
-    ),
+    requestJson<{ ok: true }>(`/api/operator/workspaces/${encodeURIComponent(orgId)}`, {
+      method: "DELETE",
+      body: JSON.stringify({ confirmSlug }),
+    }),
 };

@@ -2,6 +2,11 @@ import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { buildOrganizationSeatSnapshot, countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
+import { deleteWorkspace } from "@/server/membership/delete-workspace";
+import {
+  parseWorkspaceDeleteConfirmBody,
+  workspaceDeleteErrorResponse,
+} from "@/server/membership/workspace-delete-http";
 import { resolveWorkspaceSlugPatch } from "@/server/membership/workspace-slug-update";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch } from "@/server/operator/types";
@@ -11,6 +16,7 @@ import {
   sanitizeUsageLimitsPatch,
   usageLimitsPatchToDbUpdates,
 } from "@/server/operator/usage-limits";
+import { assertWorkspaceDeleteRateLimit } from "@/server/security/destructive-action-rate-limit";
 import { db } from "@/shared/lib/db";
 import { invitation, member, organization, user } from "@/shared/lib/db/auth-schema";
 import { parseWorkspaceSlug } from "@/shared/lib/membership/workspace-slug";
@@ -276,21 +282,20 @@ export async function DELETE(
     return authRes.response;
   }
   const { orgId } = await ctx.params;
-  const url = new URL(req.url);
-  const confirm = (url.searchParams.get("confirm") ?? "").toLowerCase();
-
-  const [target] = await db
-    .select({ slug: organization.slug })
-    .from(organization)
-    .where(eq(organization.id, orgId))
-    .limit(1);
-  if (!target) {
-    return NextResponse.json({ error: "not_found" }, { status: 404 });
-  }
-  if (confirm !== target.slug.toLowerCase()) {
-    return NextResponse.json({ error: "confirm_mismatch" }, { status: 400 });
+  const parsedConfirm = parseWorkspaceDeleteConfirmBody(await req.json().catch(() => null));
+  if ("error" in parsedConfirm) {
+    return NextResponse.json({ error: parsedConfirm.error }, { status: 400 });
   }
 
-  await db.delete(organization).where(eq(organization.id, orgId));
+  try {
+    await assertWorkspaceDeleteRateLimit(authRes.user.id);
+    await deleteWorkspace({ organizationId: orgId, confirmSlug: parsedConfirm.confirmSlug });
+  } catch (error) {
+    const response = workspaceDeleteErrorResponse(error);
+    if (response) {
+      return response;
+    }
+    throw error;
+  }
   return NextResponse.json({ ok: true });
 }

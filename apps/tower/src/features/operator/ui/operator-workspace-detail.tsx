@@ -4,7 +4,7 @@ import { IconBuilding, IconCreditCard, IconMail, IconUserPlus, IconUsers } from 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
+import { formatOperatorWorkspaceDeleteError, OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { formatDateTime, formatRelative, initialsFor } from "@/features/operator/model/format";
 import {
   OperatorUsageLimitsSection,
@@ -203,12 +203,7 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
       onDeleted?.(detail.id);
       onOpenChange(false);
     } catch (err) {
-      const msg =
-        err instanceof OperatorApiError
-          ? err.message === "confirm_mismatch"
-            ? "Slug does not match."
-            : err.message
-          : "Delete failed";
+      const msg = err instanceof OperatorApiError ? formatOperatorWorkspaceDeleteError(err) : "Delete failed";
       setError(msg);
       toast.error(msg);
     } finally {

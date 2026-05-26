@@ -1,5 +1,6 @@
 import { APIError } from "better-auth/api";
 import { eq, inArray } from "drizzle-orm";
+import { deleteWorkspacesForAccountCleanup } from "@/server/membership/delete-workspace";
 import { db } from "@/shared/lib/db";
 import { member, organization } from "@/shared/lib/db/auth-schema";
 import { isTowerTeamAdminRole } from "@/shared/lib/membership/tower-organization-access";
@@ -105,6 +106,6 @@ export async function prepareUserAccountDeletion(userId: string): Promise<UserAc
     return plan;
   }
 
-  await db.delete(organization).where(inArray(organization.id, plan.soleMemberOrganizationIds));
+  await deleteWorkspacesForAccountCleanup(plan.soleMemberOrganizationIds);
   return plan;
 }

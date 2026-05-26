@@ -32,6 +32,8 @@ export const towerOrganization = organization({
   creatorRole: "admin",
   roles: towerOrganizationRoles,
   schema: towerOrganizationClientSchema,
+  /** All workspace deletes go through `deleteWorkspace` (Stripe cancel, session cleanup, slug confirm). */
+  disableOrganizationDeletion: true,
   /**
    * Team workspaces are a product tier: only SaaS operators (`product_admin`) or users with
    * `canCreateOrganization` (billing upgrade, signup intent, etc.) may create organizations.

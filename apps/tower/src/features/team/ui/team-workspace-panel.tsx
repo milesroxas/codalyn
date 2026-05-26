@@ -35,6 +35,10 @@ export function TeamWorkspacePanel(props: {
   onResendInvite: (inv: InvitationRow) => void;
   onCancelInvite: (invitationId: string) => void | Promise<void>;
   resendingInvitationId: string | null;
+  deleteBusy: boolean;
+  deleteConfirm: string;
+  onDeleteConfirmChange: (value: string) => void;
+  onDeleteWorkspace: () => void | Promise<void>;
 }) {
   const { activeOrgPending, activeOrg, invitations } = props;
   const pendingInviteCount = invitations.filter((i) => i.status === "pending").length;
@@ -81,6 +85,10 @@ export function TeamWorkspacePanel(props: {
           onRemoveMember={props.onRemoveMember}
           onResendInvite={props.onResendInvite}
           onCancelInvite={props.onCancelInvite}
+          deleteBusy={props.deleteBusy}
+          deleteConfirm={props.deleteConfirm}
+          onDeleteConfirmChange={props.onDeleteConfirmChange}
+          onDeleteWorkspace={props.onDeleteWorkspace}
         />
       ) : null}
 

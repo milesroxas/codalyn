@@ -6,11 +6,8 @@ import {
 } from "@codalyn/webflow-kit";
 import { and, count, eq } from "drizzle-orm";
 import { headers } from "next/headers";
-import { auth } from "@/server/auth";
-import { isTowerProductAdmin } from "@/server/membership/product-admin";
-import { resolveActiveOrganizationId } from "@/server/resolve-active-organization-id";
-import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
-import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
+import { cache } from "react";
+import { getTowerSessionOnboardingContext } from "@/server/tower-onboarding-context";
 import { listWebflowSitesForUser, type WebflowSiteSummary } from "@/server/webflow-sites";
 import { db } from "@/shared/lib/db";
 import { beaconAppSettings, invitation, member, organization } from "@/shared/lib/db/auth-schema";
@@ -83,16 +80,10 @@ async function resolveWorkspaceCounts(activeOrganizationId: string): Promise<{
   };
 }
 
-export async function getTowerDashboardSummary(
-  options: GetTowerDashboardSummaryOptions = {}
-): Promise<TowerDashboardSummary> {
-  const includeWebflowSites = options.includeWebflowSites ?? false;
-  const requestHeaders = await headers();
-  const sessionData = await auth.api.getSession({ headers: requestHeaders });
-  const userId = sessionData?.user?.id;
-  const userEmail = typeof sessionData?.user?.email === "string" ? sessionData.user.email : null;
+async function loadTowerDashboardSummary(includeWebflowSites: boolean): Promise<TowerDashboardSummary> {
+  const ctx = await getTowerSessionOnboardingContext();
 
-  if (!userId) {
+  if (!ctx.signedIn || !ctx.userId) {
     return {
       signedIn: false,
       userEmail: null,
@@ -109,14 +100,7 @@ export async function getTowerDashboardSummary(
     };
   }
 
-  const rawSession = sessionData.session as { id?: string } | undefined;
-  const activeOrganizationId = await resolveActiveOrganizationId(userId, rawSession?.id);
-
-  const [membershipRow] = await db.select({ total: count() }).from(member).where(eq(member.userId, userId));
-  const workspaceMembershipCount = membershipRow?.total ?? 0;
-  const canCreateOrganization =
-    isTowerProductAdmin(sessionData.user) ||
-    Boolean((sessionData.user as { canCreateOrganization?: boolean }).canCreateOrganization);
+  const { userId, userEmail, activeOrganizationId } = ctx;
 
   let activeOrganizationName: string | null = null;
   let workspaceMemberCount: number | null = null;
@@ -139,28 +123,36 @@ export async function getTowerDashboardSummary(
     beaconPresetCount = presetCount;
   }
 
-  const activeOrgTeamAdmin = activeOrganizationId
-    ? await isTowerTeamAdminMemberOfOrg(userId, activeOrganizationId)
-    : false;
-
-  const token = await resolveWebflowBearerToken({ userId, requestHeaders });
-  const webflowOAuthConnected = Boolean(token);
-
+  const requestHeaders = await headers();
   const webflowSites =
-    includeWebflowSites && token ? await listWebflowSitesForUser({ userId, requestHeaders, accessToken: token }) : null;
+    includeWebflowSites && ctx.webflowAccessToken
+      ? await listWebflowSitesForUser({
+          userId,
+          requestHeaders,
+          accessToken: ctx.webflowAccessToken,
+        })
+      : null;
 
   return {
     signedIn: true,
     userEmail,
     activeOrganizationId,
     activeOrganizationName,
-    workspaceMembershipCount,
-    canCreateOrganization,
+    workspaceMembershipCount: ctx.workspaceMembershipCount,
+    canCreateOrganization: ctx.canCreateOrganization,
     workspaceMemberCount,
     workspacePendingInviteCount,
     beaconPresetCount,
-    webflowOAuthConnected,
+    webflowOAuthConnected: ctx.webflowOAuthConnected,
     webflowSites,
-    activeOrgTeamAdmin,
+    activeOrgTeamAdmin: ctx.activeOrgTeamAdmin,
   };
+}
+
+const getTowerDashboardSummaryCached = cache(loadTowerDashboardSummary);
+
+export async function getTowerDashboardSummary(
+  options: GetTowerDashboardSummaryOptions = {}
+): Promise<TowerDashboardSummary> {
+  return getTowerDashboardSummaryCached(options.includeWebflowSites ?? false);
 }

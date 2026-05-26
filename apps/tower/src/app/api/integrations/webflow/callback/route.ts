@@ -156,16 +156,8 @@ export async function GET(request: Request) {
   let tokenResponse: WebflowOAuthTokenResponse;
   try {
     tokenResponse = await exchangeWebflowAuthorizationCode(code, redirectUri);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "token_exchange_failed";
-    return oauthErrorRedirect(
-      appUrl,
-      {
-        error: "token_exchange",
-        detail: msg,
-      },
-      { popup: isPopupFlow }
-    );
+  } catch {
+    return oauthErrorRedirect(appUrl, { error: "token_exchange" }, { popup: isPopupFlow });
   }
 
   await persistOrganizationWebflowOAuthToken(organizationId, tokenResponse);

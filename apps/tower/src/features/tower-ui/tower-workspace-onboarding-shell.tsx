@@ -1,10 +1,10 @@
 import { TowerWorkspaceOnboardingBanner } from "@/features/tower-ui/tower-workspace-onboarding-banner";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
-import { getTowerDashboardSummary } from "@/server/dashboard-summary";
+import { getTowerOnboardingBannerSummary } from "@/server/tower-onboarding-banner-summary";
 import { hasWebflowOAuthCredentials } from "@/server/webflow-proxy-token";
 
 export async function TowerWorkspaceOnboardingShell() {
-  const summary = await getTowerDashboardSummary();
+  const summary = await getTowerOnboardingBannerSummary();
   if (!summary.signedIn) {
     return null;
   }

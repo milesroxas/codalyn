@@ -9,14 +9,18 @@ import {
   towerWebflowQueryStatusCopy,
 } from "@/features/tower-ui/lib/tower-workspace-onboarding";
 
-export function notifyWebflowOAuthPopupResult(status: "success" | "error", error?: string, detail?: string): void {
+export function notifyWebflowOAuthPopupResult(status: "success" | "error", error?: string): void {
   if (status === "success") {
     toast.success(TOWER_WEBFLOW_CONNECTED_TOAST.title, {
       description: TOWER_WEBFLOW_CONNECTED_TOAST.description,
     });
     return;
   }
-  toast.error(messageForWebflowOAuthCallbackError(error, detail));
+  toast.error(messageForWebflowOAuthCallbackError(error));
+}
+
+export function notifyWebflowOAuthAuthorizeFailure(message: string): void {
+  toast.error(message);
 }
 
 export function notifyWebflowConnectionQueryStatus(

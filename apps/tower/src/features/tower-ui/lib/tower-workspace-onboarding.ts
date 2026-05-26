@@ -1,4 +1,7 @@
 import type { TowerDashboardSummary } from "@/server/dashboard-summary";
+import type { TowerOnboardingBannerSummary } from "@/server/tower-onboarding-banner-summary";
+
+export type TowerOnboardingGateSummary = TowerOnboardingBannerSummary | TowerDashboardSummary;
 
 export type TowerWorkspaceOnboardingBlocker =
   | "needs_workspace"
@@ -19,7 +22,7 @@ export const TOWER_CREATE_WORKSPACE_DIALOG_DISMISSED_KEY = "tower.create-workspa
 
 export function resolveTowerWorkspaceOnboardingBlocker(
   summary: Pick<
-    TowerDashboardSummary,
+    TowerOnboardingGateSummary,
     "workspaceMembershipCount" | "activeOrganizationId" | "webflowOAuthConnected" | "activeOrgTeamAdmin"
   >,
   opts?: { includeWebflowConnect?: boolean }
@@ -45,7 +48,7 @@ export function resolveTowerWorkspaceOnboardingBlocker(
 
 export function shouldShowPageHeaderWebflowAction(
   summary: Pick<
-    TowerDashboardSummary,
+    TowerOnboardingGateSummary,
     "workspaceMembershipCount" | "activeOrganizationId" | "webflowOAuthConnected" | "activeOrgTeamAdmin"
   >
 ): boolean {
@@ -140,9 +143,8 @@ export function messageForWebflowOAuthAuthorizeError(error: WebflowOAuthAuthoriz
   }
 }
 
-export function messageForWebflowOAuthCallbackError(error?: string | null, detail?: string | null): string {
+export function messageForWebflowOAuthCallbackError(error?: string | null): string {
   const code = error?.trim();
-  const desc = detail?.trim();
   switch (code) {
     case "access_denied":
       return "Webflow authorization was cancelled.";
@@ -153,20 +155,40 @@ export function messageForWebflowOAuthCallbackError(error?: string | null, detai
     case "missing_code":
       return "Webflow authorization did not finish. Try connecting again.";
     case "token_exchange":
-      return desc
-        ? `Could not complete Webflow connection: ${desc}`
-        : "Could not complete Webflow connection. Try again.";
+    case "token_exchange_failed":
+      return "Could not complete Webflow connection. Try again.";
     case "no_active_workspace":
       return messageForWebflowOAuthAuthorizeError("no_active_workspace");
     default:
-      if (desc) {
-        return desc;
-      }
       if (code) {
-        return `Webflow connection failed (${code}).`;
+        return "Webflow connection failed. Try again.";
       }
       return "Webflow connection failed. Try again.";
   }
+}
+
+export type WebflowOAuthPostMessage = {
+  type: "codalyn:webflow-oauth";
+  status: "success" | "error";
+  error?: string;
+};
+
+export function parseWebflowOAuthPostMessage(data: unknown): WebflowOAuthPostMessage | null {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+  const record = data as Record<string, unknown>;
+  if (record.type !== "codalyn:webflow-oauth") {
+    return null;
+  }
+  if (record.status === "success") {
+    return { type: "codalyn:webflow-oauth", status: "success" };
+  }
+  if (record.status === "error") {
+    const error = typeof record.error === "string" ? record.error : undefined;
+    return { type: "codalyn:webflow-oauth", status: "error", error };
+  }
+  return null;
 }
 
 export const TOWER_WEBFLOW_CONNECTED_TOAST = {

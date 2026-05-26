@@ -3,7 +3,7 @@
 import { IconAlertCircle, IconCircleCheck } from "@tabler/icons-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, Suspense, useCallback, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { createWorkspaceOrganization } from "@/features/team/api/create-workspace-organization";
@@ -14,25 +14,42 @@ import {
   resolveTowerWorkspaceOnboardingBlocker,
   shouldSuppressOnboardingForQuery,
   TOWER_CREATE_WORKSPACE_DIALOG_DISMISSED_KEY,
+  TOWER_WEBFLOW_CONNECTION_NOT_SAVED_TOAST,
+  type TowerOnboardingAlertCopy,
   type TowerWorkspaceOnboardingBlocker,
   towerWebflowQueryStatusCopy,
   towerWorkspaceOnboardingCopy,
 } from "@/features/tower-ui/lib/tower-workspace-onboarding";
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
-import type { TowerDashboardSummary } from "@/server/dashboard-summary";
+import type { TowerOnboardingBannerSummary } from "@/server/tower-onboarding-banner-summary";
 import { TOWER_CONNECTION_PATH, TOWER_CONNECTION_STATUS_QUERY } from "@/shared/lib/navigation/tower-app-paths";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 
 type TowerWorkspaceOnboardingBannerProps = {
-  summary: TowerDashboardSummary;
+  summary: TowerOnboardingBannerSummary;
   billingEnabled: boolean;
   oauthConfigured?: boolean;
-  /** Dashboard only: nudge admins who still need to connect. Omit on `/connection` (page has connect actions). */
+  /** When true, nudge workspace admins who still need to connect Webflow. */
   includeWebflowConnect?: boolean;
-  /** When nested inside another alert stack, omit outer bottom margin. */
-  embedded?: boolean;
 };
+
+type OnboardingBlockerAlertProps = {
+  copy: TowerOnboardingAlertCopy;
+  actions?: ReactNode;
+  icon?: typeof IconAlertCircle;
+};
+
+function OnboardingBlockerAlert({ copy, actions, icon: Icon = IconAlertCircle }: OnboardingBlockerAlertProps) {
+  return (
+    <Alert variant={copy.variant}>
+      <Icon />
+      <AlertTitle>{copy.title}</AlertTitle>
+      <AlertDescription>{copy.description}</AlertDescription>
+      {actions ? <AlertAction>{actions}</AlertAction> : null}
+    </Alert>
+  );
+}
 
 function OnboardingAlertActions({
   blocker,
@@ -43,7 +60,7 @@ function OnboardingAlertActions({
   onWebflowConnectSuccess,
 }: {
   blocker: TowerWorkspaceOnboardingBlocker;
-  summary: TowerDashboardSummary;
+  summary: TowerOnboardingBannerSummary;
   billingEnabled: boolean;
   oauthConfigured: boolean;
   onOpenCreate: () => void;
@@ -102,7 +119,7 @@ function TowerWorkspaceCreateWorkspacePanel({
   blocker,
   onWebflowConnectSuccess,
 }: {
-  summary: TowerDashboardSummary;
+  summary: TowerOnboardingBannerSummary;
   billingEnabled: boolean;
   oauthConfigured: boolean;
   blocker: TowerWorkspaceOnboardingBlocker;
@@ -165,11 +182,9 @@ function TowerWorkspaceCreateWorkspacePanel({
 
   return (
     <>
-      <Alert variant={copy.variant}>
-        <IconAlertCircle />
-        <AlertTitle>{copy.title}</AlertTitle>
-        <AlertDescription>{copy.description}</AlertDescription>
-        <AlertAction>
+      <OnboardingBlockerAlert
+        copy={copy}
+        actions={
           <OnboardingAlertActions
             blocker={blocker}
             summary={summary}
@@ -178,8 +193,8 @@ function TowerWorkspaceCreateWorkspacePanel({
             onOpenCreate={() => setCreateOpen(true)}
             onWebflowConnectSuccess={onWebflowConnectSuccess}
           />
-        </AlertAction>
-      </Alert>
+        }
+      />
 
       {summary.canCreateOrganization ? (
         <CreateWorkspaceDialog
@@ -197,46 +212,11 @@ function TowerWorkspaceCreateWorkspacePanel({
   );
 }
 
-function TowerWorkspaceOnboardingAlert({
-  summary,
-  billingEnabled,
-  oauthConfigured,
-  blocker,
-  onWebflowConnectSuccess,
-}: {
-  summary: TowerDashboardSummary;
-  billingEnabled: boolean;
-  oauthConfigured: boolean;
-  blocker: TowerWorkspaceOnboardingBlocker;
-  onWebflowConnectSuccess: () => void;
-}) {
-  const copy = towerWorkspaceOnboardingCopy(blocker);
-
-  return (
-    <Alert variant={copy.variant}>
-      <IconAlertCircle />
-      <AlertTitle>{copy.title}</AlertTitle>
-      <AlertDescription>{copy.description}</AlertDescription>
-      <AlertAction>
-        <OnboardingAlertActions
-          blocker={blocker}
-          summary={summary}
-          billingEnabled={billingEnabled}
-          oauthConfigured={oauthConfigured}
-          onOpenCreate={() => undefined}
-          onWebflowConnectSuccess={onWebflowConnectSuccess}
-        />
-      </AlertAction>
-    </Alert>
-  );
-}
-
 function TowerWorkspaceOnboardingBannerInner({
   summary,
   billingEnabled,
   oauthConfigured = false,
   includeWebflowConnect = false,
-  embedded = false,
 }: TowerWorkspaceOnboardingBannerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -252,36 +232,40 @@ function TowerWorkspaceOnboardingBannerInner({
     return null;
   }
 
-  const needsCreateHooks = blocker === "needs_workspace" && summary.canCreateOrganization;
-  const content = needsCreateHooks ? (
-    <TowerWorkspaceCreateWorkspacePanel
-      summary={summary}
-      billingEnabled={billingEnabled}
-      oauthConfigured={oauthConfigured}
-      blocker={blocker}
-      onWebflowConnectSuccess={onWebflowConnectSuccess}
-    />
-  ) : (
-    <TowerWorkspaceOnboardingAlert
-      summary={summary}
-      billingEnabled={billingEnabled}
-      oauthConfigured={oauthConfigured}
-      blocker={blocker}
-      onWebflowConnectSuccess={onWebflowConnectSuccess}
-    />
-  );
-
-  if (embedded) {
-    return content;
+  if (blocker === "needs_workspace" && summary.canCreateOrganization) {
+    return (
+      <TowerWorkspaceCreateWorkspacePanel
+        summary={summary}
+        billingEnabled={billingEnabled}
+        oauthConfigured={oauthConfigured}
+        blocker={blocker}
+        onWebflowConnectSuccess={onWebflowConnectSuccess}
+      />
+    );
   }
 
-  return content;
+  const copy = towerWorkspaceOnboardingCopy(blocker);
+  return (
+    <OnboardingBlockerAlert
+      copy={copy}
+      actions={
+        <OnboardingAlertActions
+          blocker={blocker}
+          summary={summary}
+          billingEnabled={billingEnabled}
+          oauthConfigured={oauthConfigured}
+          onOpenCreate={() => undefined}
+          onWebflowConnectSuccess={onWebflowConnectSuccess}
+        />
+      }
+    />
+  );
 }
 
 export function TowerWorkspaceOnboardingBanner(props: TowerWorkspaceOnboardingBannerProps) {
   return (
     <Suspense fallback={null}>
-      <TowerWorkspaceOnboardingBannerInner {...props} embedded />
+      <TowerWorkspaceOnboardingBannerInner {...props} />
     </Suspense>
   );
 }
@@ -290,9 +274,14 @@ type TowerWebflowQueryBannerProps = {
   webflowOAuthConnected: boolean;
 };
 
+function connectionStatusQueryKey(status: string, webflowOAuthConnected: boolean): string {
+  return `${status}:${webflowOAuthConnected ? "1" : "0"}`;
+}
+
 function TowerWebflowQueryBannerInner({ webflowOAuthConnected }: TowerWebflowQueryBannerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const notifiedRef = useRef<string | null>(null);
   const [status] = useState(() =>
     parseTowerWebflowQueryStatus(searchParams.get(TOWER_CONNECTION_STATUS_QUERY) ?? searchParams.get("webflow"))
   );
@@ -301,7 +290,11 @@ function TowerWebflowQueryBannerInner({ webflowOAuthConnected }: TowerWebflowQue
     if (!status || (!searchParams.has(TOWER_CONNECTION_STATUS_QUERY) && !searchParams.has("webflow"))) {
       return;
     }
-    notifyWebflowConnectionQueryStatus(status, webflowOAuthConnected);
+    const notifyKey = connectionStatusQueryKey(status, webflowOAuthConnected);
+    if (notifiedRef.current !== notifyKey) {
+      notifiedRef.current = notifyKey;
+      notifyWebflowConnectionQueryStatus(status, webflowOAuthConnected);
+    }
     const url = new URL(window.location.href);
     url.searchParams.delete(TOWER_CONNECTION_STATUS_QUERY);
     url.searchParams.delete("webflow");
@@ -312,29 +305,27 @@ function TowerWebflowQueryBannerInner({ webflowOAuthConnected }: TowerWebflowQue
     return null;
   }
 
+  if (status === "connected" && webflowOAuthConnected) {
+    return null;
+  }
+
   if (status === "connected" && !webflowOAuthConnected) {
     return (
-      <Alert variant="warning">
-        <IconAlertCircle />
-        <AlertTitle>Connection not saved</AlertTitle>
-        <AlertDescription>
-          Authorization finished, but this workspace has no Webflow token yet. Connect again or switch to the workspace
-          you authorized.
-        </AlertDescription>
-      </Alert>
+      <OnboardingBlockerAlert
+        copy={{
+          variant: "warning",
+          title: TOWER_WEBFLOW_CONNECTION_NOT_SAVED_TOAST.title,
+          description: TOWER_WEBFLOW_CONNECTION_NOT_SAVED_TOAST.description,
+        }}
+        actions={null}
+      />
     );
   }
 
   const copy = towerWebflowQueryStatusCopy(status);
   const Icon = status === "connected" ? IconCircleCheck : IconAlertCircle;
 
-  return (
-    <Alert variant={copy.variant}>
-      <Icon />
-      <AlertTitle>{copy.title}</AlertTitle>
-      <AlertDescription>{copy.description}</AlertDescription>
-    </Alert>
-  );
+  return <OnboardingBlockerAlert copy={copy} actions={null} icon={Icon} />;
 }
 
 export function TowerWebflowQueryBanner(props: TowerWebflowQueryBannerProps) {
@@ -346,14 +337,14 @@ export function TowerWebflowQueryBanner(props: TowerWebflowQueryBannerProps) {
 }
 
 type TowerWebflowSetupAlertsProps = {
-  summary: TowerDashboardSummary;
+  webflowOAuthConnected: boolean;
   oauthConfigured: boolean;
 };
 
-function TowerWebflowSetupAlertsInner({ summary, oauthConfigured }: TowerWebflowSetupAlertsProps) {
+function TowerWebflowSetupAlertsInner({ webflowOAuthConnected, oauthConfigured }: TowerWebflowSetupAlertsProps) {
   return (
     <div className="space-y-3">
-      <TowerWebflowQueryBanner webflowOAuthConnected={summary.webflowOAuthConnected} />
+      <TowerWebflowQueryBanner webflowOAuthConnected={webflowOAuthConnected} />
       {!oauthConfigured ? (
         <Alert variant="warning">
           <IconAlertCircle />

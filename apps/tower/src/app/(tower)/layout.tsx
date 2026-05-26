@@ -9,10 +9,10 @@ import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-
 
 export default async function TowerLayout({ children }: { children: React.ReactNode }) {
   const billingEnabled = isTowerBillingEnabled();
-  const session = await auth.api.getSession({ headers: await headers() });
+  const requestHeaders = await headers();
+  const session = await auth.api.getSession({ headers: requestHeaders });
   const userId = session?.user?.id;
-  const h = await headers();
-  const activeOrg = userId ? await getActiveOrganizationIdForAuthHeaders(h) : null;
+  const activeOrg = userId ? await getActiveOrganizationIdForAuthHeaders(requestHeaders) : null;
 
   const usageBanner = userId ? (
     <TowerUsageApproachingBanner userId={userId} activeOrganizationId={activeOrg} billingEnabled={billingEnabled} />

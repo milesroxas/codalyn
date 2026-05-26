@@ -8,22 +8,19 @@ function ErrorInner() {
   const searchParams = useSearchParams();
   const popup = searchParams.get("popup");
   const error = searchParams.get("error");
-  const detail = searchParams.get("detail") ?? searchParams.get("error_description");
-
   useEffect(() => {
     if (popup === "1" && window.opener) {
       window.opener.postMessage(
-        { type: "codalyn:webflow-oauth", status: "error", error: error ?? "unknown", detail },
+        { type: "codalyn:webflow-oauth", status: "error", error: error ?? "unknown" },
         window.location.origin
       );
       window.close();
     }
-  }, [popup, error, detail]);
+  }, [popup, error]);
 
   return (
     <main className="p-6">
-      <p className="text-red-600">Webflow connection failed{error ? `: ${error}` : ""}</p>
-      {detail ? <p className="mt-2 text-sm text-neutral-600">{detail}</p> : null}
+      <p className="text-red-600">Webflow connection failed. You can close this window and try again from Tower.</p>
     </main>
   );
 }

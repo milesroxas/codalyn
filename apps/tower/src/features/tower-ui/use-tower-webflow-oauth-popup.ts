@@ -1,21 +1,17 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { toast } from "sonner";
-import { notifyWebflowOAuthPopupResult } from "@/features/tower-ui/lib/tower-webflow-connection-toasts";
+import {
+  notifyWebflowOAuthAuthorizeFailure,
+  notifyWebflowOAuthPopupResult,
+} from "@/features/tower-ui/lib/tower-webflow-connection-toasts";
 import {
   messageForWebflowOAuthAuthorizeError,
   parseWebflowOAuthAuthorizeError,
+  parseWebflowOAuthPostMessage,
 } from "@/features/tower-ui/lib/tower-workspace-onboarding";
 
 const WEBFLOW_OAUTH_POPUP_FEATURES = "popup=yes,width=480,height=700,scrollbars=yes,resizable=yes";
-
-type WebflowOAuthMessage = {
-  type?: string;
-  status?: string;
-  error?: string;
-  detail?: string;
-};
 
 function isTrustedOAuthMessageOrigin(origin: string): boolean {
   if (typeof window === "undefined") {
@@ -32,20 +28,18 @@ function handleWebflowOAuthMessage(event: MessageEvent): void {
     return;
   }
 
-  const data = event.data as WebflowOAuthMessage | null;
-  if (data?.type !== "codalyn:webflow-oauth") {
+  const message = parseWebflowOAuthPostMessage(event.data);
+  if (!message) {
     return;
   }
-  if (data.status === "success") {
+  if (message.status === "success") {
     notifyWebflowOAuthPopupResult("success");
     for (const listener of webflowOAuthSuccessListeners) {
       listener();
     }
     return;
   }
-  if (data.status === "error") {
-    notifyWebflowOAuthPopupResult("error", data.error, data.detail);
-  }
+  notifyWebflowOAuthPopupResult("error", message.error);
 }
 
 function ensureWebflowOAuthMessageListener(): void {
@@ -76,7 +70,7 @@ export function useTowerWebflowOAuthPopup(onSuccess?: () => void) {
     const data = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
     if (!res.ok || !data?.url) {
       const error = parseWebflowOAuthAuthorizeError(res.status, data);
-      toast.error(messageForWebflowOAuthAuthorizeError(error));
+      notifyWebflowOAuthAuthorizeFailure(messageForWebflowOAuthAuthorizeError(error));
       return false;
     }
     window.open(data.url, "tower-webflow-oauth", WEBFLOW_OAUTH_POPUP_FEATURES);

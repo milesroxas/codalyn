@@ -249,7 +249,10 @@ export function TowerWebflowScreen({ summary, oauthConfigured, webflowAppClientI
       />
 
       <div className="mb-8">
-        <TowerWebflowSetupAlerts summary={summary} oauthConfigured={oauthConfigured} />
+        <TowerWebflowSetupAlerts
+          webflowOAuthConnected={summary.webflowOAuthConnected}
+          oauthConfigured={oauthConfigured}
+        />
       </div>
       <WebflowConnectionSection summary={summary} sites={sites} />
       <WebflowSitesSection {...context} />

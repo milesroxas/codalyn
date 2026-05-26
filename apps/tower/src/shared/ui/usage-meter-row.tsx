@@ -11,7 +11,7 @@ function progressLevelForMeter(level: TowerUsageMeterSnapshot["level"]): Progres
     case "exceeded":
       return "exceeded";
     case "unmetered":
-      return "unmetered";
+      return "ok";
     default:
       return "ok";
   }
@@ -19,7 +19,7 @@ function progressLevelForMeter(level: TowerUsageMeterSnapshot["level"]): Progres
 
 export function UsageMeterRow({ meter }: { meter: TowerUsageMeterSnapshot }) {
   const statusLabel = usageMeterLevelLabel(meter.level);
-  const progressValue = usageMeterProgressValue(meter.used, meter.limit);
+  const progressValue = usageMeterProgressValue(meter.used, meter.progressMax);
 
   return (
     <div className="space-y-2">
@@ -36,13 +36,11 @@ export function UsageMeterRow({ meter }: { meter: TowerUsageMeterSnapshot }) {
           {formatTowerUsageRatio(meter.used, meter.limit)}
         </span>
       </div>
-      {meter.limit === null ? null : (
-        <Progress
-          value={progressValue}
-          indicatorLevel={progressLevelForMeter(meter.level)}
-          aria-label={`${towerUsageMeterLabel(meter.kind)} ${formatTowerUsageRatio(meter.used, meter.limit)}`}
-        />
-      )}
+      <Progress
+        value={progressValue}
+        indicatorLevel={progressLevelForMeter(meter.level)}
+        aria-label={`${towerUsageMeterLabel(meter.kind)} ${formatTowerUsageRatio(meter.used, meter.limit)}`}
+      />
     </div>
   );
 }

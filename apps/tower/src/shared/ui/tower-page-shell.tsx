@@ -74,7 +74,7 @@ function TowerPageSection({ title, description, actions, children, className }: 
 function TowerDashboardGrid({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("mb-10 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]", className)}
+      className={cn("mb-10 grid items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]", className)}
       {...props}
     />
   );

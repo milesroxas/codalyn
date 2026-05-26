@@ -50,10 +50,7 @@ export function WorkspaceBillingSection(props: { organizationId: string; billing
           <IconCreditCard className="size-4 text-muted-foreground" aria-hidden />
           <CardTitle className="text-base">Workspace seats</CardTitle>
         </div>
-        <CardDescription>
-          Unpaid workspaces are solo (1 seat). Team billing is per seat — Pro limits for every member, shared Webflow
-          connection, and team presets.
-        </CardDescription>
+        <CardDescription>Manage seats and subscription for this workspace.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
@@ -75,8 +72,8 @@ export function WorkspaceBillingSection(props: { organizationId: string; billing
 
         {billing.isOverSeatCap ? (
           <p className="text-sm text-destructive">
-            This workspace exceeds its seat limit ({billing.seatsUsed} used, limit {billing.effectiveSeatLimit}). Remove
-            members or resubscribe to Team billing. New invitations cannot be accepted until resolved.
+            Over seat limit ({billing.seatsUsed}/{billing.effectiveSeatLimit}). Remove members or resubscribe before
+            inviting.
           </p>
         ) : null}
 

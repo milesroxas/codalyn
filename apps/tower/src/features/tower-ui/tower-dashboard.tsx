@@ -64,7 +64,7 @@ function buildQuickActions(summary: TowerDashboardSummary, billingEnabled: boole
     actions.push({
       key: "connect-webflow",
       label: summary.activeOrgTeamAdmin ? "Connect Webflow" : "Webflow settings",
-      description: "Authorize Webflow to enable the Data API proxy for your sites.",
+      description: "Connect Webflow to enable the Data API proxy.",
       href: "/webflow",
       icon: IconPlug,
       variant: "emphasis",
@@ -74,14 +74,14 @@ function buildQuickActions(summary: TowerDashboardSummary, billingEnabled: boole
   actions.push({
     key: "team",
     label: summary.activeOrgTeamAdmin ? "Manage team" : "View team",
-    description: "Invite members, manage roles, and review pending invitations.",
+    description: "Invite members and manage roles.",
     href: "/team",
     icon: IconUsers,
   });
   actions.push({
     key: "beacon",
     label: "Beacon presets",
-    description: "Configure image export presets synced to the Beacon extension.",
+    description: "Manage image presets for Beacon.",
     href: "/beacon",
     icon: IconRadar2,
   });
@@ -90,7 +90,7 @@ function buildQuickActions(summary: TowerDashboardSummary, billingEnabled: boole
     actions.push({
       key: "billing",
       label: "Billing",
-      description: "Review your plan, usage limits, and subscription details.",
+      description: "View plan, usage, and subscription.",
       href: "/billing",
       icon: IconCreditCard,
     });
@@ -178,7 +178,7 @@ export function TowerDashboard({ summary, usage, billingEnabled, oauthConfigured
     <TowerPageMain>
       <TowerPageHeader
         title="Dashboard"
-        description="At-a-glance status for your workspace, integrations, and monthly usage."
+        description="Workspace status, integrations, and usage at a glance."
         actions={
           summary.activeOrgTeamAdmin || !summary.webflowOAuthConnected ? (
             <Button variant="outline" size="sm" asChild>
@@ -217,8 +217,9 @@ export function TowerDashboard({ summary, usage, billingEnabled, oauthConfigured
           status={usage}
           billingEnabled={billingEnabled}
           showBillingLink
+          fillHeight
           title="Usage this month"
-          description="Webflow proxy traffic, CMS writes, and AVIF image processing."
+          description="Proxy traffic, CMS writes, and image processing."
         />
       </TowerDashboardGrid>
 

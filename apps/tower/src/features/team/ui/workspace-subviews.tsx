@@ -5,6 +5,7 @@ import {
   IconCopy,
   IconCreditCard,
   IconMailForward,
+  IconSettings,
   IconTrash,
   IconUserPlus,
   IconUsers,
@@ -12,7 +13,6 @@ import {
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { BeaconEditorExperienceSection } from "@/features/team/ui/beacon-editor-experience-section";
 import { WorkspaceBillingSection } from "@/features/team/ui/workspace-billing-section";
 import { formatInvitationExpiry } from "@/features/team/ui/workspace-invitation-utils";
 import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
@@ -224,6 +224,36 @@ function WorkspaceMemberDirectoryCard(props: {
   );
 }
 
+function WorkspaceInvitesUpsellState(props: { organizationId: string; canManageBilling: boolean }) {
+  const { organizationId, canManageBilling } = props;
+
+  return (
+    <TabsContent value="invites" className="space-y-6">
+      <Card size="sm">
+        <CardContent className="flex flex-col items-center gap-4 px-6 py-14 text-center">
+          <span className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <IconUsers className="size-6" aria-hidden />
+          </span>
+          <div className="max-w-md space-y-2">
+            <p className="text-base font-semibold text-foreground">Bring your team in</p>
+            <p className="text-sm text-muted-foreground">
+              Subscribe to Team to invite colleagues, assign roles, and track pending invites here.
+            </p>
+          </div>
+          {canManageBilling ? (
+            <form action="/api/billing/workspace/checkout" method="post">
+              <input type="hidden" name="organizationId" value={organizationId} />
+              <Button type="submit">Subscribe to Team</Button>
+            </form>
+          ) : (
+            <p className="text-xs text-muted-foreground">Ask a workspace admin to subscribe.</p>
+          )}
+        </CardContent>
+      </Card>
+    </TabsContent>
+  );
+}
+
 function WorkspaceInvitesTab(props: {
   busy: boolean;
   inviteEmail: string;
@@ -231,6 +261,8 @@ function WorkspaceInvitesTab(props: {
   invitations: InvitationRow[];
   resendingInvitationId: string | null;
   seatState: WorkspaceSeatState;
+  organizationId: string | null;
+  canManageBilling: boolean;
   onInviteEmailChange: (v: string) => void;
   onInviteRoleChange: (v: string) => void;
   onInvite: (e: FormEvent) => void;
@@ -244,12 +276,25 @@ function WorkspaceInvitesTab(props: {
     invitations,
     resendingInvitationId,
     seatState,
+    organizationId,
+    canManageBilling,
     onInviteEmailChange,
     onInviteRoleChange,
     onInvite,
     onResendInvite,
     onRequestRevoke,
   } = props;
+
+  const showInvitesUpsellState =
+    !seatState.isPaid &&
+    seatState.billingEnabled &&
+    seatState.teamCheckoutConfigured &&
+    !seatState.isOverSeatCap &&
+    invitations.length === 0;
+
+  if (showInvitesUpsellState && organizationId) {
+    return <WorkspaceInvitesUpsellState organizationId={organizationId} canManageBilling={canManageBilling} />;
+  }
 
   const inviteBlocked = seatState.isAtSeatCap || seatState.isOverSeatCap;
   const showTeamUpgradeHint =
@@ -269,27 +314,24 @@ function WorkspaceInvitesTab(props: {
             </span>
             <div>
               <CardTitle className="text-base">Invite someone</CardTitle>
-              <CardDescription>They will receive an email with a link to join this workspace.</CardDescription>
+              <CardDescription>They receive an email to join this workspace.</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {seatState.isOverSeatCap ? (
             <p className="text-sm text-destructive">
-              This workspace exceeds its seat limit. Remove members or resubscribe to Team billing before inviting
-              anyone new.
+              Seat limit exceeded. Remove members or resubscribe on Billing before inviting.
             </p>
           ) : null}
           {showTeamUpgradeHint ? (
             <p className="text-sm text-muted-foreground">
-              Free workspaces include one member. Open the Billing tab and subscribe to Team (per seat) to invite
-              collaborators.
+              Free includes one seat. Upgrade on Billing to invite others.
             </p>
           ) : null}
           {inviteBlocked && !showTeamUpgradeHint && !seatState.isOverSeatCap ? (
             <p className="text-sm text-muted-foreground">
-              This workspace is at its seat limit ({seatState.effectiveSeatLimit}). Remove a member, revoke a pending
-              invite, or add seats via billing before sending new invites.
+              At seat limit ({seatState.effectiveSeatLimit}). Free a seat or upgrade on Billing to invite.
             </p>
           ) : null}
           <form
@@ -343,9 +385,7 @@ function WorkspaceInvitesTab(props: {
       <Card size="sm" layout="table-section">
         <CardHeader>
           <CardTitle>Invitations</CardTitle>
-          <CardDescription>
-            Track sent invitations. Pending rows can be resent or revoked before they are accepted.
-          </CardDescription>
+          <CardDescription>Resend or revoke pending invitations before they&apos;re accepted.</CardDescription>
         </CardHeader>
         <CardContent>
           {invitations.length === 0 ? (
@@ -353,7 +393,7 @@ function WorkspaceInvitesTab(props: {
               <IconMailForward className="size-10 text-muted-foreground/40" aria-hidden />
               <p className="text-sm font-medium text-foreground">No invitations yet</p>
               <p className="max-w-sm text-xs text-muted-foreground">
-                When you send an invite, it will appear here with status and actions.
+                Sent invites appear here with status and actions.
               </p>
             </div>
           ) : (
@@ -472,7 +512,7 @@ function WorkspaceSettingsTab(props: {
       <Card size="sm">
         <CardHeader>
           <CardTitle className="text-base">Workspace profile</CardTitle>
-          <CardDescription>This name is shown across Tower for everyone in the workspace.</CardDescription>
+          <CardDescription>Shown across Tower for everyone in this workspace.</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -503,10 +543,7 @@ function WorkspaceSettingsTab(props: {
       <Card size="sm">
         <CardHeader>
           <CardTitle className="text-base">Workspace slug</CardTitle>
-          <CardDescription>
-            A stable identifier used in support, integrations, and operator tools. Changing it does not affect member
-            access.
-          </CardDescription>
+          <CardDescription>Used for support and integrations. Does not affect member access.</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -528,15 +565,12 @@ function WorkspaceSettingsTab(props: {
           </form>
         </CardContent>
       </Card>
-      <BeaconEditorExperienceSection />
       <DangerZoneTypedDelete
         panelDescription={
           <>
-            Permanently delete this workspace. All {memberCount} {memberLabel} lose access immediately; their Tower
-            accounts are not deleted.
-            {pendingInviteCount > 0 ? ` ${pendingInviteCount} ${inviteLabel} will be revoked.` : null} Webflow
-            connections, team presets, and billing for this workspace are removed. An active Team subscription is
-            canceled.
+            Permanently deletes this workspace. {memberCount} {memberLabel} lose access; Tower accounts are kept.
+            {pendingInviteCount > 0 ? ` ${pendingInviteCount} ${inviteLabel} are revoked.` : null} Removes Webflow,
+            presets, and billing. Active Team subscriptions are canceled.
           </>
         }
         triggerLabel="Delete workspace"
@@ -569,8 +603,8 @@ function RevokeInvitationDialog(props: {
           <DialogDescription>
             {revokeTarget ? (
               <>
-                This will invalidate the invite for <span className="font-medium">{revokeTarget.email}</span>. They will
-                need a new invitation to join.
+                Invalidates the invite for <span className="font-medium">{revokeTarget.email}</span>. Send a new one to
+                add them.
               </>
             ) : null}
           </DialogDescription>
@@ -706,6 +740,7 @@ export function WorkspaceTabsShell(props: {
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="settings" className="gap-2 px-3 py-2 sm:flex-1">
+                <IconSettings className="size-4 opacity-70" aria-hidden />
                 Settings
               </TabsTrigger>
               {workspaceBilling ? (
@@ -727,6 +762,8 @@ export function WorkspaceTabsShell(props: {
               invitations={invitations}
               resendingInvitationId={resendingInvitationId}
               seatState={seatState}
+              organizationId={billingOrganizationId}
+              canManageBilling={workspaceBilling?.canManageBilling ?? false}
               onInviteEmailChange={onInviteEmailChange}
               onInviteRoleChange={onInviteRoleChange}
               onInvite={onInvite}

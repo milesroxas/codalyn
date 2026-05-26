@@ -28,9 +28,7 @@ export function CreateWorkspaceDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New workspace</DialogTitle>
-          <DialogDescription>
-            Webflow, Beacon presets, and team settings are scoped to each workspace. Create one to connect Webflow.
-          </DialogDescription>
+          <DialogDescription>Each workspace has its own Webflow, presets, and team.</DialogDescription>
         </DialogHeader>
         <form
           className="grid gap-4"

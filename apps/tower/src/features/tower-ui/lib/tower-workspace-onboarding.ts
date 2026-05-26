@@ -57,21 +57,20 @@ export function towerWorkspaceOnboardingCopy(
         variant: "warning",
         title: "Create a workspace before connecting Webflow",
         description: canCreateOrganization
-          ? "Webflow connects to your team workspace, not your personal account."
-          : "Webflow connects to a team workspace, not your personal account. Accept or create a workspace to continue.",
+          ? "Webflow connects to a workspace, not your account."
+          : "Create or join a workspace first.",
       };
     case "needs_active_workspace":
       return {
         variant: "warning",
         title: "Select an active workspace",
-        description:
-          "You belong to at least one workspace, but none is active. Choose one from the workspace menu in the header before connecting Webflow.",
+        description: "Select a workspace from the header menu.",
       };
     case "webflow_admin_only":
       return {
         variant: "info",
         title: "Webflow must be connected by a workspace admin",
-        description: "Only workspace admins and owners can link Webflow. Ask an admin to connect on the Webflow page.",
+        description: "Ask a workspace admin to connect Webflow.",
       };
     case "needs_webflow_connect":
       return {
@@ -88,21 +87,19 @@ export function towerWebflowQueryStatusCopy(status: TowerWebflowQueryStatus): To
       return {
         variant: "info",
         title: "Webflow connected",
-        description: "This workspace is linked to Webflow. ",
+        description: "Webflow is connected for this workspace.",
       };
     case "no_active_workspace":
       return {
         variant: "warning",
         title: "Select or create a workspace first",
-        description:
-          "Webflow connects to a team workspace. Create one or choose an active workspace from the header menu, then try again.",
+        description: "Select or create a workspace from the header menu.",
       };
     case "team_admin_required":
       return {
         variant: "info",
         title: "Workspace admin required",
-        description:
-          "Only a workspace admin or owner can connect Webflow. Contact your admin to complete the connection.",
+        description: "Ask a workspace admin to connect Webflow.",
       };
   }
 }

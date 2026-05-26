@@ -12,6 +12,8 @@ export type TowerUsageMeterSnapshot = {
   kind: TowerUsageMeterKind;
   used: number;
   limit: number | null;
+  /** Denominator for the usage progress bar (tier reference when `limit` is null). */
+  progressMax: number;
   level: UsageMeterLevel;
 };
 
@@ -54,12 +56,15 @@ export function classifyUsageMeter(used: number, limit: number | null): UsageMet
 export function buildTowerUsageMeterSnapshot(
   kind: TowerUsageMeterKind,
   used: number,
-  limit: number | null
+  limit: number | null,
+  progressMax?: number
 ): TowerUsageMeterSnapshot {
+  const chartMax = progressMax ?? limit ?? Math.max(used, 1);
   return {
     kind,
     used,
     limit,
+    progressMax: chartMax,
     level: classifyUsageMeter(used, limit),
   };
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
@@ -14,7 +13,6 @@ import { TowerWebflowSetupAlerts } from "@/features/tower-ui/tower-workspace-onb
 import type { TowerDashboardSummary } from "@/server/dashboard-summary";
 import type { WebflowSiteSummary } from "@/server/webflow-sites";
 import { Badge } from "@/shared/ui/badge";
-import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { TowerPageHeader, TowerPageMain, TowerPageSection } from "@/shared/ui/tower-page-shell";
@@ -40,10 +38,7 @@ function WebflowSitesTable({ sites }: { sites: WebflowSiteSummary[] }) {
       <Card>
         <CardHeader>
           <CardTitle>No sites returned</CardTitle>
-          <CardDescription>
-            Webflow is connected, but no sites were returned for this account. Relink if you recently gained access to
-            new sites.
-          </CardDescription>
+          <CardDescription>Connected, but no sites found. Relink if access changed recently.</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -54,7 +49,7 @@ function WebflowSitesTable({ sites }: { sites: WebflowSiteSummary[] }) {
       <CardHeader>
         <CardTitle>Authorized sites</CardTitle>
         <CardDescription>
-          {sites.length} site{sites.length === 1 ? "" : "s"} available to the Data API proxy for this workspace.
+          {sites.length} site{sites.length === 1 ? "" : "s"} available through Tower.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -95,7 +90,7 @@ function WebflowConnectionSection({ summary, sites }: Pick<WebflowScreenContext,
           <CardDescription>
             {summary.webflowOAuthConnected
               ? "This workspace can call the Webflow Data API through Tower."
-              : "Connect Webflow to enable the Data API proxy for Beacon and Tower."}
+              : "Connect Webflow to enable the Data API proxy."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -117,7 +112,7 @@ function WebflowSitesSection({ summary, oauthConfigured, canManage, sites, onRef
   return (
     <TowerPageSection
       title="Sites"
-      description="Sites returned from Webflow for the connected account."
+      description="Webflow sites available to this workspace."
       actions={
         canManage && oauthConfigured ? (
           <TowerWebflowOAuthPopupButton variant="ghost" size="sm" onSuccess={onRefresh}>
@@ -161,7 +156,7 @@ function WebflowDisconnectSection({
 
   return (
     <DangerZoneTypedDelete
-      panelDescription="Disconnecting removes the stored OAuth token for this workspace. Beacon and the Data API proxy will stop working until an admin reconnects."
+      panelDescription="Removes OAuth access for this workspace. Reconnect to restore Beacon and the proxy."
       triggerLabel="Disconnect Webflow"
       title="Disconnect Webflow?"
       confirmFieldLabel="Confirmation"
@@ -174,21 +169,6 @@ function WebflowDisconnectSection({
       busy={disconnectBusy}
       onConfirm={() => void onDisconnect()}
     />
-  );
-}
-
-function WebflowScreenFooter({ connected }: { connected: boolean }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/">Back to dashboard</Link>
-      </Button>
-      {connected ? (
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/beacon">Beacon presets</Link>
-        </Button>
-      ) : null}
-    </div>
   );
 }
 
@@ -213,7 +193,7 @@ export function TowerWebflowScreen({ summary, oauthConfigured, billingEnabled }:
     <TowerPageMain>
       <TowerPageHeader
         title="Webflow"
-        description="Webflow is linked once per workspace. All members share the same connection for Beacon and the Data API proxy."
+        description="One Webflow connection per workspace, shared by all members."
         actions={
           canManage && oauthConfigured ? (
             <TowerWebflowOAuthPopupButton
@@ -239,7 +219,6 @@ export function TowerWebflowScreen({ summary, oauthConfigured, billingEnabled }:
       <WebflowConnectionSection summary={summary} sites={sites} />
       <WebflowSitesSection {...context} />
       <WebflowDisconnectSection summary={summary} canManage={canManage} onRefresh={onRefresh} />
-      <WebflowScreenFooter connected={summary.webflowOAuthConnected} />
     </TowerPageMain>
   );
 }

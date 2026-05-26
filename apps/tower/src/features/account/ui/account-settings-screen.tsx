@@ -161,7 +161,7 @@ export function AccountSettingsScreen() {
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Tower</p>
         <h1 className="text-2xl font-semibold tracking-tight">Account</h1>
-        <p className="text-muted-foreground">Sign-in email, password, and account deletion for {u.email}.</p>
+        <p className="text-muted-foreground">Email, password, and account deletion for {u.email}.</p>
       </div>
 
       <Separator className="my-8" />
@@ -170,7 +170,7 @@ export function AccountSettingsScreen() {
         <Card className="border-border/80">
           <CardHeader>
             <CardTitle className="text-lg">Profile</CardTitle>
-            <CardDescription>Your name appears in Tower and in the account menu.</CardDescription>
+            <CardDescription>Shown in Tower and the account menu.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onUpdateProfile} className="flex flex-col gap-4">
@@ -220,7 +220,7 @@ export function AccountSettingsScreen() {
         <Card className="border-border/80">
           <CardHeader>
             <CardTitle className="text-lg">Email</CardTitle>
-            <CardDescription>Changing your email sends a confirmation link to your current address.</CardDescription>
+            <CardDescription>We email your current address to confirm.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onChangeEmail} className="flex flex-col gap-4">
@@ -260,7 +260,7 @@ export function AccountSettingsScreen() {
         <Card className="border-border/80">
           <CardHeader>
             <CardTitle className="text-lg">Password</CardTitle>
-            <CardDescription>Updates your Tower password and signs out other sessions.</CardDescription>
+            <CardDescription>Signs out other sessions when saved.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onChangePassword} className="flex flex-col gap-4">

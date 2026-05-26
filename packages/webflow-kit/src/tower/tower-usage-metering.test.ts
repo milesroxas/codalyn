@@ -24,6 +24,28 @@ describe("classifyUsageMeter", () => {
   });
 });
 
+describe("buildTowerUsageMeterSnapshot", () => {
+  it("uses limit as progressMax when metered", () => {
+    expect(buildTowerUsageMeterSnapshot("webflowProxy", 10, 100)).toEqual({
+      kind: "webflowProxy",
+      used: 10,
+      limit: 100,
+      progressMax: 100,
+      level: "ok",
+    });
+  });
+
+  it("uses explicit progressMax when limit is null", () => {
+    expect(buildTowerUsageMeterSnapshot("image", 25, null, 50)).toEqual({
+      kind: "image",
+      used: 25,
+      limit: null,
+      progressMax: 50,
+      level: "unmetered",
+    });
+  });
+});
+
 describe("pickApproachingUsageMeters", () => {
   it("returns only approaching meters", () => {
     const meters = [

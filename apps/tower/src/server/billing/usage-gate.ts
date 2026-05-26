@@ -191,7 +191,7 @@ async function runConsume(
           error: "usage_limit",
           code: "TOWER_USAGE_LIMIT",
           message:
-            "Monthly usage limit reached for your plan. Upgrade to Pro in Tower, or try again after the month resets (UTC).",
+            "Monthly usage limit reached for your plan. Upgrade to Pro in Tower, or try again after the month resets.",
           kind,
           used: res.used,
           limit: res.limit,

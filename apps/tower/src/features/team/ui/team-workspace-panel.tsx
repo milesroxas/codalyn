@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { FormEvent } from "react";
 import { TeamWorkspacePanelSkeleton } from "@/features/team/ui/team-workspace-panel-skeleton";
 import { WorkspaceTabsShell } from "@/features/team/ui/workspace-subviews";
@@ -91,12 +90,6 @@ export function TeamWorkspacePanel(props: {
           onDeleteWorkspace={props.onDeleteWorkspace}
         />
       ) : null}
-
-      <p className="text-sm text-muted-foreground">
-        <Link href="/" className="text-foreground underline underline-offset-4 hover:text-foreground/80">
-          ← Home
-        </Link>
-      </p>
     </div>
   );
 }

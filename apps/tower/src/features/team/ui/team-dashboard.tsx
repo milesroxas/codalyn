@@ -252,7 +252,7 @@ export function TeamDashboard(props: {
     <TowerPageMain>
       <TowerPageHeader
         title="Team"
-        description="Workspaces group people and permissions. Switch workspace anytime — invites and roles are scoped per workspace."
+        description="Manage members, roles, and invites for this workspace."
         actions={
           <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void refreshTeam()}>
             Sync

@@ -154,10 +154,7 @@ export function BeaconDashboardActivity() {
     <Card className="h-full">
       <CardHeader>
         <CardTitle>Export presets</CardTitle>
-        <CardDescription>
-          Synced from this workspace, grouped by Webflow site. Site defaults are editable in Tower; scoped presets are
-          managed in Beacon.
-        </CardDescription>
+        <CardDescription>Grouped by site. Edit defaults here; manage scoped presets in Beacon.</CardDescription>
         <CardAction>
           <Button
             type="button"

@@ -44,22 +44,4 @@ function TeamWorkspacePanelSkeleton() {
   );
 }
 
-function BeaconEditorExperienceSkeleton() {
-  return (
-    <Card size="sm">
-      <CardHeader>
-        <Skeleton className="h-5 w-44" />
-        <Skeleton className="h-4 w-full max-w-md" />
-      </CardHeader>
-      <CardContent className="flex flex-row items-center justify-between gap-4">
-        <div className="space-y-1">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-3 w-48" />
-        </div>
-        <Skeleton className="h-6 w-11 rounded-full" />
-      </CardContent>
-    </Card>
-  );
-}
-
-export { BeaconEditorExperienceSkeleton, TeamWorkspacePanelSkeleton, TeamWorkspacePanelSkeletonContent };
+export { TeamWorkspacePanelSkeleton, TeamWorkspacePanelSkeletonContent };

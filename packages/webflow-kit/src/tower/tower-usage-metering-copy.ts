@@ -75,7 +75,7 @@ export function towerUsageApproachingAlertDescription(
   const lines = meters.map(
     (meter) => `${towerUsageMeterLabel(meter.kind)}: ${formatTowerUsageRatio(meter.used, meter.limit)}`
   );
-  return `You have used at least 80% of your monthly allowance for ${lines.join("; ")}. Upgrade to Pro or wait until the month resets (UTC).`;
+  return `You have used at least 80% of your monthly allowance for ${lines.join("; ")}. Upgrade to Pro or wait until the month resets.`;
 }
 
 export const TOWER_USAGE_LIMIT_DIALOG_TITLE = "Monthly limit reached";
@@ -105,7 +105,7 @@ export function towerUsageLimitDialogDescription(kind: TowerUsageMeterKind): str
 
 export function towerUsageLimitDialogUsageLine(used: number, limit: number, kind: TowerUsageMeterKind): string {
   const label = kind === "image" ? "AVIF optimizes" : kind === "cmsWrite" ? "CMS writes" : "Webflow proxy requests";
-  return `${used.toLocaleString()} / ${limit.toLocaleString()} ${label} used this month (UTC).`;
+  return `${used.toLocaleString()} / ${limit.toLocaleString()} ${label} used this month.`;
 }
 
 export const TOWER_USAGE_LIMIT_DIALOG_WEBP_HINT = "Switch to WebP to export in the Designer without using Tower.";
@@ -114,6 +114,21 @@ export const TOWER_USAGE_LIMIT_DIALOG_DISMISS_LABEL = "Close";
 
 export const TOWER_USAGE_LIMIT_RESET_LABEL = "Resets";
 
+const UTC_MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
 /** First instant of the next UTC calendar month (Tower monthly metering boundary). */
 export function towerUsageLimitResetsAtUtc(now: Date = new Date()): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
@@ -121,11 +136,6 @@ export function towerUsageLimitResetsAtUtc(now: Date = new Date()): Date {
 
 export function towerUsageLimitResetDetailLine(now: Date = new Date()): string {
   const resetsAt = towerUsageLimitResetsAtUtc(now);
-  const date = new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(resetsAt);
-  return `${date} · UTC`;
+  const month = UTC_MONTH_NAMES[resetsAt.getUTCMonth()];
+  return `${month} ${resetsAt.getUTCDate()}, ${resetsAt.getUTCFullYear()}`;
 }

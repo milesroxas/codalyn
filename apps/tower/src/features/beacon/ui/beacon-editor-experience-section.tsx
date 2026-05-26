@@ -1,46 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { BeaconEditorExperienceSkeleton } from "@/features/team/ui/team-workspace-panel-skeleton";
+import { BeaconEditorExperienceSkeleton } from "@/features/beacon/ui/beacon-page-skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Label } from "@/shared/ui/label";
 import { Switch } from "@/shared/ui/switch";
 
 type BeaconEditorExperienceSectionProps = {
   enabled?: boolean;
+  restrictToEditorExperience: boolean;
+  loading?: boolean;
+  onUpdated?: () => void | Promise<void>;
 };
 
-export function BeaconEditorExperienceSection({ enabled = true }: BeaconEditorExperienceSectionProps) {
-  const [designerFeaturesOn, setDesignerFeaturesOn] = useState(false);
-  const [loading, setLoading] = useState(true);
+export function BeaconEditorExperienceSection({
+  enabled = true,
+  restrictToEditorExperience,
+  loading = false,
+  onUpdated,
+}: BeaconEditorExperienceSectionProps) {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!enabled) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const r = await fetch("/api/v1/beacon/settings", { credentials: "include" });
-      if (!r.ok) {
-        throw new Error(`HTTP ${r.status}`);
-      }
-      const data = (await r.json()) as { restrictToEditorExperience?: boolean };
-      setDesignerFeaturesOn(!data.restrictToEditorExperience);
-    } catch {
-      setLoadError("Could not load Beacon settings");
-    } finally {
-      setLoading(false);
-    }
-  }, [enabled]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const designerFeaturesOn = !restrictToEditorExperience;
 
   const onToggle = async (nextDesignerOn: boolean) => {
     setSaving(true);
@@ -55,8 +37,8 @@ export function BeaconEditorExperienceSection({ enabled = true }: BeaconEditorEx
       if (!r.ok) {
         throw new Error(`HTTP ${r.status}`);
       }
-      setDesignerFeaturesOn(nextDesignerOn);
       toast.success("Designer features updated");
+      await onUpdated?.();
     } catch {
       setLoadError("Could not update");
       toast.error("Could not update designer features");
@@ -77,15 +59,12 @@ export function BeaconEditorExperienceSection({ enabled = true }: BeaconEditorEx
     <Card size="sm">
       <CardHeader>
         <CardTitle className="text-base">Beacon in the Designer</CardTitle>
-        <CardDescription>
-          Preset configuration, manual changes, and related controls. Off by default; turn the switch on to use them in
-          Beacon in Webflow.
-        </CardDescription>
+        <CardDescription>Enable advanced Beacon controls in the Webflow Designer.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-row items-center justify-between gap-4">
         <div className="space-y-1">
           <Label htmlFor="beacon-designer-features">Designer features</Label>
-          <p className="text-xs text-muted-foreground">Full Beacon controls in the Webflow panel.</p>
+          <p className="text-xs text-muted-foreground">Advanced controls in the Beacon panel.</p>
         </div>
         <Switch
           id="beacon-designer-features"

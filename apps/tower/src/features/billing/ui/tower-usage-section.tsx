@@ -10,6 +10,7 @@ type TowerUsageSectionProps = {
   status: TowerUsageStatusSnapshot;
   billingEnabled?: boolean;
   showBillingLink?: boolean;
+  fillHeight?: boolean;
   title?: string;
   description?: string;
 };
@@ -19,14 +20,15 @@ export function TowerUsageSection(props: TowerUsageSectionProps) {
     status,
     billingEnabled = false,
     showBillingLink = false,
+    fillHeight = false,
     title = "Monthly usage",
-    description = "Beacon and Tower API traffic for your signed-in account. Limits reset on the first day of each UTC month.",
+    description = "Beacon and Tower API traffic for your signed-in account. Limits reset on the first day of each month.",
   } = props;
 
   const resetLine = towerUsageLimitResetDetailLine();
 
   return (
-    <Card>
+    <Card layout={fillHeight ? "fill" : "default"}>
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="space-y-1">
@@ -34,19 +36,14 @@ export function TowerUsageSection(props: TowerUsageSectionProps) {
             <CardDescription>{description}</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">UTC {status.yearMonth}</Badge>
             <Badge variant="secondary">{status.tier === "pro" ? "Pro" : "Free"}</Badge>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!status.metered || status.meters.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {status.tier === "pro" ? "No usage limits on the Pro plan." : "No usage limits on the Free plan."}
-          </p>
-        ) : (
-          status.meters.map((meter) => <UsageMeterRow key={meter.kind} meter={meter} />)
-        )}
+        {status.meters.map((meter) => (
+          <UsageMeterRow key={meter.kind} meter={meter} />
+        ))}
         <p className="text-xs text-muted-foreground">Resets {resetLine}</p>
       </CardContent>
       {showBillingLink && billingEnabled && status.tier === "free" ? (

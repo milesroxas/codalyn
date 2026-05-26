@@ -2,7 +2,7 @@ import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-type CardLayout = "default" | "table-section";
+type CardLayout = "default" | "fill" | "table-section";
 
 function Card({
   className,
@@ -16,7 +16,7 @@ function Card({
       data-size={size}
       data-layout={layout}
       className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[layout=table-section]:gap-0 data-[layout=table-section]:py-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 data-[size=sm]:data-[layout=table-section]:gap-0 data-[size=sm]:data-[layout=table-section]:py-0 data-[layout=table-section]:[&_[data-slot=table-header]]:bg-muted/20 data-[layout=table-section]:[&_[data-slot=table-header]_tr]:border-border data-[layout=table-section]:[&_[data-slot=table-header]_tr]:hover:bg-transparent data-[layout=table-section]:[&_[data-slot=table-head]:first-child]:pl-4 data-[layout=table-section]:[&_[data-slot=table-head]:last-child]:pr-4 data-[layout=table-section]:[&_[data-slot=table-head]]:py-3 data-[layout=table-section]:[&_[data-slot=table-head]]:uppercase data-[layout=table-section]:[&_[data-slot=table-head]]:tracking-wide data-[layout=table-section]:[&_[data-slot=table-cell]:first-child]:pl-4 data-[layout=table-section]:[&_[data-slot=table-cell]:last-child]:pr-4 data-[layout=table-section]:[&_[data-slot=table-cell]]:py-3 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[layout=fill]:h-full data-[layout=table-section]:gap-0 data-[layout=table-section]:py-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 data-[size=sm]:data-[layout=table-section]:gap-0 data-[size=sm]:data-[layout=table-section]:py-0 data-[layout=table-section]:[&_[data-slot=table-header]]:bg-muted/20 data-[layout=table-section]:[&_[data-slot=table-header]_tr]:border-border data-[layout=table-section]:[&_[data-slot=table-header]_tr]:hover:bg-transparent data-[layout=table-section]:[&_[data-slot=table-head]:first-child]:pl-4 data-[layout=table-section]:[&_[data-slot=table-head]:last-child]:pr-4 data-[layout=table-section]:[&_[data-slot=table-head]]:py-3 data-[layout=table-section]:[&_[data-slot=table-head]]:uppercase data-[layout=table-section]:[&_[data-slot=table-head]]:tracking-wide data-[layout=table-section]:[&_[data-slot=table-cell]:first-child]:pl-4 data-[layout=table-section]:[&_[data-slot=table-cell]:last-child]:pr-4 data-[layout=table-section]:[&_[data-slot=table-cell]]:py-3 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
         className
       )}
       {...props}
@@ -68,7 +68,10 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-content"
-      className={cn("px-4 group-data-[size=sm]/card:px-3 group-data-[layout=table-section]/card:p-0", className)}
+      className={cn(
+        "px-4 group-data-[size=sm]/card:px-3 group-data-[layout=fill]/card:flex-1 group-data-[layout=table-section]/card:p-0",
+        className
+      )}
       {...props}
     />
   );

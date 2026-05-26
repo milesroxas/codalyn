@@ -1,7 +1,11 @@
 import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
 import { buildTowerUsageMeterSnapshot, pickApproachingUsageMeters } from "@codalyn/webflow-kit";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
-import { capForMeterKind, resolveMeteringPolicyFromEntitlement } from "@/server/billing/metering-policy";
+import {
+  capForMeterKind,
+  referenceCapForMeterKind,
+  resolveMeteringPolicyFromEntitlement,
+} from "@/server/billing/metering-policy";
 import { getTowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 import { getUsageSnapshot, loadMeteringOverrideFields } from "@/server/billing/usage-gate";
 
@@ -15,30 +19,31 @@ export async function fetchEndUserUsageStatus(
   const limits = await getTowerLimitsSnapshot();
   const policy = resolveMeteringPolicyFromEntitlement(entitlement, overrides.user, overrides.organization, limits);
 
-  if (policy.skipMetering) {
-    return {
-      yearMonth: usage.yearMonth,
-      tier: entitlement.tier,
-      metered: false,
-      meters: [],
-      approachingMeters: [],
-    };
-  }
-
   const meters = [
     buildTowerUsageMeterSnapshot(
       "webflowProxy",
       usage.webflowProxyRequestCount,
-      capForMeterKind(policy, "webflowProxy")
+      capForMeterKind(policy, "webflowProxy"),
+      referenceCapForMeterKind(policy.tier, "webflowProxy", limits)
     ),
-    buildTowerUsageMeterSnapshot("cmsWrite", usage.cmsWriteCount, capForMeterKind(policy, "cmsWrite")),
-    buildTowerUsageMeterSnapshot("image", usage.imageOptimizeCount, capForMeterKind(policy, "image")),
+    buildTowerUsageMeterSnapshot(
+      "cmsWrite",
+      usage.cmsWriteCount,
+      capForMeterKind(policy, "cmsWrite"),
+      referenceCapForMeterKind(policy.tier, "cmsWrite", limits)
+    ),
+    buildTowerUsageMeterSnapshot(
+      "image",
+      usage.imageOptimizeCount,
+      capForMeterKind(policy, "image"),
+      referenceCapForMeterKind(policy.tier, "image", limits)
+    ),
   ];
 
   return {
     yearMonth: usage.yearMonth,
     tier: entitlement.tier,
-    metered: true,
+    metered: !policy.skipMetering,
     meters,
     approachingMeters: pickApproachingUsageMeters(meters),
   };

@@ -126,6 +126,11 @@ export function capForMeterKind(policy: MeteringPolicy, kind: MeterKind): number
   }
 }
 
+/** Tier default cap for progress bar scale when metering is skipped (`limit` is null). */
+export function referenceCapForMeterKind(tier: TowerTier, kind: MeterKind, limits: TowerLimitsSnapshot): number {
+  return tierDefaultCap(kind, tier, limits);
+}
+
 export function parseLimitOverrideField(raw: unknown): number | null | "invalid" {
   if (raw === null) {
     return null;

@@ -5,14 +5,21 @@ import {
   BEACON_IMAGE_ERROR_CODES,
   type BeaconAppSettings,
   type BeaconPresetRow,
+  buildBeaconPresetSiteGroups,
 } from "@codalyn/webflow-kit";
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useRequireTowerSession } from "@/features/auth/model/use-require-tower-session";
+import { BeaconEditorExperienceSection } from "@/features/beacon/ui/beacon-editor-experience-section";
 import { BeaconPageSkeleton } from "@/features/beacon/ui/beacon-page-skeleton";
-import { TowerBeaconPresetsPanel, type TowerBeaconWebflowSite } from "@/features/beacon/ui/tower-beacon-presets-panel";
+import {
+  TowerBeaconConnectEmptyState,
+  TowerBeaconPresetsPanel,
+  type TowerBeaconWebflowSite,
+} from "@/features/beacon/ui/tower-beacon-presets-panel";
+import { isTowerTeamAdminRole } from "@/shared/lib/membership/tower-organization-access";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { TowerPageMain } from "@/shared/ui/tower-page-shell";
+import { TowerPageHeader, TowerPageMain } from "@/shared/ui/tower-page-shell";
 
 type BeaconApiPayload = {
   settings: BeaconAppSettings;
@@ -32,7 +39,8 @@ function canEditSiteDefaultPreset(payload: BeaconApiPayload | null, canEditPrese
   return normalizedRole === "admin" || normalizedRole === "owner" || normalizedRole === "designer";
 }
 
-export function TowerBeaconScreen() {
+export function TowerBeaconScreen(props: { oauthConfigured?: boolean }) {
+  const { oauthConfigured = false } = props;
   const baseId = useId();
   const { session, sessionPending } = useRequireTowerSession("/beacon");
 
@@ -46,6 +54,20 @@ export function TowerBeaconScreen() {
   const teamPresetsLocked = Boolean(payload?.editorExperience);
   const canEditPresets = canManage && !teamPresetsLocked;
   const canEditSiteDefault = canEditSiteDefaultPreset(payload, canEditPresets);
+  const canConnectWebflow = Boolean(payload?.workspaceMemberRole && isTowerTeamAdminRole(payload.workspaceMemberRole));
+
+  const siteGroups = useMemo(() => {
+    if (!payload?.settings) {
+      return [];
+    }
+    return buildBeaconPresetSiteGroups(payload.settings.imagePresetStorage, payload.webflowSites ?? []);
+  }, [payload?.settings, payload?.webflowSites]);
+
+  const showBeaconConnectState =
+    Boolean(payload) &&
+    !loading &&
+    siteGroups.length === 0 &&
+    (payload?.webflowSites === null || (payload?.webflowSites?.length ?? 0) === 0);
 
   const refresh = useCallback(async () => {
     if (!session?.user) {
@@ -153,20 +175,41 @@ export function TowerBeaconScreen() {
 
   return (
     <TowerPageMain>
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Beacon</p>
-        <h1 className="text-2xl font-semibold tracking-tight">Site presets</h1>
-        <p className="max-w-2xl text-muted-foreground">
-          Presets are scoped to each Webflow site in this workspace. Site defaults are editable here; scoped element,
-          component, and instance presets are managed in the Beacon image editor.
-        </p>
-      </div>
+      <TowerPageHeader
+        title="Beacon presets"
+        description="Image presets per Webflow site. Edit site defaults here; manage scoped presets in Beacon."
+      />
 
-      {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <div className="mb-6 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      ) : null}
 
-      {loading && !payload ? <Skeleton className="mt-6 h-48 w-full rounded-xl" aria-hidden /> : null}
+      {loading && !payload ? <Skeleton className="mb-6 h-48 w-full rounded-xl" aria-hidden /> : null}
 
-      {payload ? (
+      {showBeaconConnectState ? (
+        <TowerBeaconConnectEmptyState
+          webflowOAuthConnected={payload?.webflowSites !== null}
+          oauthConfigured={oauthConfigured}
+          canConnectWebflow={canConnectWebflow}
+          onConnectSuccess={() => {
+            void refresh();
+          }}
+        />
+      ) : null}
+
+      {payload && !showBeaconConnectState && isTowerTeamAdminRole(payload.workspaceMemberRole) ? (
+        <div className="mb-6">
+          <BeaconEditorExperienceSection
+            restrictToEditorExperience={payload.restrictToEditorExperience}
+            loading={loading}
+            onUpdated={refresh}
+          />
+        </div>
+      ) : null}
+
+      {payload && !showBeaconConnectState ? (
         <TowerBeaconPresetsPanel
           baseId={baseId}
           loading={loading}

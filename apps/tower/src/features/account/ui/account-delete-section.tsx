@@ -132,8 +132,8 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
       <CardHeader>
         <CardTitle className="text-lg text-destructive">Delete account</CardTitle>
         <CardDescription>
-          Permanently removes your Tower user, sessions, and personal data. Workspaces where you are the only admin with
-          other members must have another admin promoted first.
+          Permanently removes your account and personal data. Promote another admin first if you are the only admin in a
+          workspace with other members.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

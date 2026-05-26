@@ -108,7 +108,7 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={status === "Metered" ? "outline" : "secondary"}>{status}</Badge>
           <Badge variant="outline">Tier: {usage.tier}</Badge>
-          <Badge variant="outline">UTC {usage.yearMonth}</Badge>
+          <Badge variant="outline">{usage.yearMonth}</Badge>
           {usage.globalMeteringDisabled ? <Badge variant="secondary">Global metering off</Badge> : null}
         </div>
 

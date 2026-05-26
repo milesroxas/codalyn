@@ -9,13 +9,16 @@ import {
   formatBeaconPresetMax,
   formatBeaconPresetStorageSummary,
 } from "@codalyn/webflow-kit";
+import { IconPlug } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import {
   draftToMaxBytes,
   type MaxSizeUnit,
   maxBytesToDraft,
   parsePresetOutputDimension,
 } from "@/features/beacon/lib/preset-dimensions";
+import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -27,6 +30,45 @@ export type TowerBeaconWebflowSite = {
   id: string;
   displayName?: string;
 };
+
+export function TowerBeaconConnectEmptyState(props: {
+  webflowOAuthConnected: boolean;
+  oauthConfigured: boolean;
+  canConnectWebflow: boolean;
+  onConnectSuccess: () => void;
+}) {
+  const { webflowOAuthConnected, oauthConfigured, canConnectWebflow, onConnectSuccess } = props;
+  const connectLabel = webflowOAuthConnected ? "Relink Webflow" : "Connect Webflow";
+
+  return (
+    <Card size="sm">
+      <CardContent className="flex flex-col items-center gap-4 px-6 py-14 text-center">
+        <span className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <IconPlug className="size-6" aria-hidden />
+        </span>
+        <div className="max-w-md space-y-2">
+          <p className="text-base font-semibold text-foreground">
+            {webflowOAuthConnected ? "No Webflow sites yet" : "Connect Webflow to get started"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {webflowOAuthConnected
+              ? "Your workspace is linked, but no sites were returned. Relink if access changed recently."
+              : "Authorize Webflow for this workspace to list sites and configure Beacon image presets per site."}
+          </p>
+        </div>
+        {canConnectWebflow && oauthConfigured ? (
+          <TowerWebflowOAuthPopupButton variant="default" onSuccess={onConnectSuccess}>
+            {connectLabel}
+          </TowerWebflowOAuthPopupButton>
+        ) : canConnectWebflow ? (
+          <p className="text-xs text-muted-foreground">Webflow OAuth is not configured on this Tower instance.</p>
+        ) : (
+          <p className="text-xs text-muted-foreground">Ask a workspace admin to connect Webflow.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export type TowerBeaconPresetsPanelProps = {
   baseId: string;
@@ -56,7 +98,7 @@ function TowerBeaconPanelStatus(props: { canManage: boolean; teamPresetsLocked: 
       ) : null}
       {canManage && teamPresetsLocked ? (
         <p className="text-sm text-muted-foreground">
-          Team presets are read-only while designer features are off. Turn them on under Team, or in Beacon settings.
+          Team presets are read-only while designer features are off. Enable designer features above.
         </p>
       ) : null}
     </>
@@ -306,9 +348,7 @@ function SitePresetsGroupCard(props: {
         <div className="space-y-2">
           <p className="text-sm font-medium">Scoped presets</p>
           {group.scopedPresets.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Element, component, and instance presets are managed in the Beacon image editor.
-            </p>
+            <p className="text-sm text-muted-foreground">Managed in the Beacon image editor.</p>
           ) : (
             <ul className="space-y-2 text-sm">
               {group.scopedPresets.map((entry) => (
@@ -328,8 +368,7 @@ function SitePresetsGroupCard(props: {
 }
 
 export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
-  const { loading, settings, webflowSites, canManage, teamPresetsLocked, canEditSiteDefault, ...siteDefaultActions } =
-    props;
+  const { settings, webflowSites, canManage, teamPresetsLocked, canEditSiteDefault, ...siteDefaultActions } = props;
 
   const siteGroups = useMemo(() => {
     if (!settings) {
@@ -341,27 +380,15 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
   return (
     <div className="mt-8 space-y-6">
       <TowerBeaconPanelStatus canManage={canManage} teamPresetsLocked={teamPresetsLocked} />
-      {siteGroups.length === 0 && !loading ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No Webflow sites</CardTitle>
-            <CardDescription>
-              Connect Webflow OAuth for this workspace to list sites, or create presets in Beacon to populate site IDs
-              here.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        siteGroups.map((group) => (
-          <SitePresetsGroupCard
-            key={group.siteId}
-            group={group}
-            settings={settings}
-            canEditSiteDefault={canEditSiteDefault}
-            {...siteDefaultActions}
-          />
-        ))
-      )}
+      {siteGroups.map((group) => (
+        <SitePresetsGroupCard
+          key={group.siteId}
+          group={group}
+          settings={settings}
+          canEditSiteDefault={canEditSiteDefault}
+          {...siteDefaultActions}
+        />
+      ))}
     </div>
   );
 }

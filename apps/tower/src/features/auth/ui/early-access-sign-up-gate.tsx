@@ -25,7 +25,7 @@ export function EarlyAccessSignUpGate(props: { signInHref: string; requestAccess
           <p className="text-sm text-muted-foreground">
             If you received a team invitation, use that email and link when creating your account.
           </p>
-          <Button asChild className="h-10 w-full rounded-lg font-medium">
+          <Button asChild size="form" width="full">
             <Link href={requestHref}>Request early access</Link>
           </Button>
         </CardContent>

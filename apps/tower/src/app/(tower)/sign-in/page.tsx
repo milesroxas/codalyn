@@ -17,6 +17,7 @@ import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
@@ -159,7 +160,7 @@ function SignInForm() {
         </CardHeader>
         <CardContent className="pt-4">
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
+            <FormField>
               <Label htmlFor={emailId}>Email</Label>
               <Input
                 id={emailId}
@@ -171,8 +172,8 @@ function SignInForm() {
                 surface="elevated"
                 required
               />
-            </div>
-            <div className="flex flex-col gap-2">
+            </FormField>
+            <FormField>
               <Label htmlFor={passwordId}>Password</Label>
               <Input
                 id={passwordId}
@@ -184,13 +185,13 @@ function SignInForm() {
                 surface="elevated"
                 required
               />
-            </div>
+            </FormField>
             {error ? (
               <p className="text-sm text-destructive" role="alert">
                 {error}
               </p>
             ) : null}
-            <Button type="submit" disabled={pending} className="h-10 w-full rounded-lg font-medium">
+            <Button type="submit" disabled={pending} size="form" width="full">
               {pending ? "Signing in…" : "Sign in"}
             </Button>
           </form>

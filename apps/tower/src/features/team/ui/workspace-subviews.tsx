@@ -23,6 +23,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { NativeSelect } from "@/shared/ui/native-select";
@@ -173,7 +174,7 @@ function WorkspaceMemberDirectoryCard(props: {
                     {canManageTeam ? (
                       <NativeSelect
                         fieldSize="sm"
-                        className="min-w-28"
+                        fieldWidth="role"
                         value={m.role}
                         disabled={busy || m.userId === currentUserId}
                         aria-label={`Role for ${m.user.email}`}
@@ -340,8 +341,8 @@ function WorkspaceInvitesTab(props: {
               void onInvite(ev);
             }}
           >
-            <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
+            <FormFieldGrid className="min-w-0 flex-1">
+              <FormField>
                 <Label htmlFor="ws-invite-email">Email</Label>
                 <Input
                   id="ws-invite-email"
@@ -353,8 +354,8 @@ function WorkspaceInvitesTab(props: {
                   required
                   disabled={inviteBlocked}
                 />
-              </div>
-              <div className="space-y-2">
+              </FormField>
+              <FormField>
                 <Label htmlFor="ws-invite-role">Role</Label>
                 <NativeSelect
                   id="ws-invite-role"
@@ -368,9 +369,9 @@ function WorkspaceInvitesTab(props: {
                     </option>
                   ))}
                 </NativeSelect>
-              </div>
-            </div>
-            <div className="flex min-w-0 flex-col space-y-2 lg:shrink-0">
+              </FormField>
+            </FormFieldGrid>
+            <div className="flex min-w-0 flex-col space-y-1.5 lg:shrink-0">
               <span className="hidden text-sm font-medium leading-none select-none lg:block lg:invisible" aria-hidden>
                 &nbsp;
               </span>
@@ -521,7 +522,7 @@ function WorkspaceSettingsTab(props: {
               void onUpdateActiveTeamName(ev);
             }}
           >
-            <div className="min-w-0 flex-1 space-y-2">
+            <FormField className="min-w-0 flex-1">
               <Label htmlFor="ws-name">Display name</Label>
               <Input
                 id="ws-name"
@@ -530,7 +531,7 @@ function WorkspaceSettingsTab(props: {
                 autoComplete="organization"
                 placeholder="Workspace name"
               />
-            </div>
+            </FormField>
             <Button
               type="submit"
               disabled={busy || !activeTeamNameEdit.trim() || activeTeamNameEdit.trim() === activeOrg.name}

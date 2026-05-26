@@ -10,6 +10,7 @@ import { limitIntegerToDraft, parseRequiredLimitInteger } from "@/shared/lib/usa
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Separator } from "@/shared/ui/separator";
@@ -66,8 +67,8 @@ function TierLimitFields({
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium text-foreground">{tierLabel}</p>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="space-y-1.5">
+      <FormFieldGrid className="sm:grid-cols-3">
+        <FormField>
           <Label htmlFor={webflowProxyId}>
             <UsageMeterLabel kind="webflowProxy" label="Webflow proxy / month" />
           </Label>
@@ -80,8 +81,8 @@ function TierLimitFields({
             onChange={(event) => onWebflowProxyChange(event.target.value)}
             disabled={disabled}
           />
-        </div>
-        <div className="space-y-1.5">
+        </FormField>
+        <FormField>
           <Label htmlFor={cmsWritesId}>
             <UsageMeterLabel kind="cmsWrite" label="CMS writes / month" />
           </Label>
@@ -94,8 +95,8 @@ function TierLimitFields({
             onChange={(event) => onCmsWritesChange(event.target.value)}
             disabled={disabled}
           />
-        </div>
-        <div className="space-y-1.5">
+        </FormField>
+        <FormField>
           <Label htmlFor={imageId}>
             <UsageMeterLabel kind="image" label="Image optimize (AVIF) / month" />
           </Label>
@@ -108,8 +109,8 @@ function TierLimitFields({
             onChange={(event) => onImageChange(event.target.value)}
             disabled={disabled}
           />
-        </div>
-      </div>
+        </FormField>
+      </FormFieldGrid>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
@@ -40,7 +41,7 @@ export function CreateWorkspaceDialog({
             }
           }}
         >
-          <div className="grid gap-2">
+          <FormField>
             <Label htmlFor="tower-create-workspace-name">Workspace name</Label>
             <Input
               id="tower-create-workspace-name"
@@ -50,7 +51,7 @@ export function CreateWorkspaceDialog({
               autoComplete="organization"
               autoFocus
             />
-          </div>
+          </FormField>
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

@@ -25,6 +25,7 @@ import {
 } from "@/shared/lib/access/early-access-copy";
 import { normalizeAccessEmail, parseAccessEmailInput } from "@/shared/lib/access/email-input";
 import { Button } from "@/shared/ui/button";
+import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { TagsInput } from "@/shared/ui/tags-input";
@@ -132,7 +133,7 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
           </p>
         ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
+            <FormField>
               <Label htmlFor={emailId}>{EARLY_ACCESS_REQUEST_EMAIL_LABEL}</Label>
               <Input
                 id={emailId}
@@ -144,8 +145,8 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
                 surface="elevated"
                 required
               />
-            </div>
-            <div className="flex flex-col gap-2">
+            </FormField>
+            <FormField>
               <Label htmlFor={nameId}>{EARLY_ACCESS_REQUEST_NAME_LABEL}</Label>
               <Input
                 id={nameId}
@@ -156,8 +157,8 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
                 fieldSize="lg"
                 surface="elevated"
               />
-            </div>
-            <div className="flex flex-col gap-2">
+            </FormField>
+            <FormField>
               <Label id={`${teamEmailsId}-label`} htmlFor={teamEmailsId}>
                 {EARLY_ACCESS_REQUEST_TEAM_EMAILS_LABEL}
               </Label>
@@ -173,8 +174,8 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
               <p id={teamEmailsHintId} className="text-xs leading-relaxed text-muted-foreground">
                 {EARLY_ACCESS_REQUEST_TEAM_EMAILS_HINT}
               </p>
-            </div>
-            <div className="flex flex-col gap-2">
+            </FormField>
+            <FormField>
               <Label htmlFor={noteId}>{EARLY_ACCESS_REQUEST_NOTE_LABEL}</Label>
               <Textarea
                 id={noteId}
@@ -185,13 +186,13 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
                 fieldSize="lg"
                 surface="elevated"
               />
-            </div>
+            </FormField>
             {error ? (
               <p className="text-sm text-destructive" role="alert">
                 {error}
               </p>
             ) : null}
-            <Button type="submit" disabled={pending} className="h-10 w-full rounded-lg font-medium">
+            <Button type="submit" disabled={pending} size="form" width="full">
               {pending ? EARLY_ACCESS_REQUEST_SUBMIT_PENDING : EARLY_ACCESS_REQUEST_SUBMIT_LABEL}
             </Button>
           </form>

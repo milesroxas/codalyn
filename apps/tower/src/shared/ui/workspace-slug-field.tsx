@@ -2,6 +2,7 @@
 
 import { WORKSPACE_SLUG_HINT } from "@/shared/lib/membership/workspace-slug";
 import { Button } from "@/shared/ui/button";
+import { FormField, FormFieldRow } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
@@ -20,23 +21,23 @@ export function WorkspaceSlugField(props: WorkspaceSlugFieldProps) {
   const saveDisabled = disabled || busy || value.trim() === "" || value.trim() === currentSlug;
 
   return (
-    <div className="space-y-1.5">
+    <FormField>
       <Label htmlFor={id}>Slug</Label>
-      <div className="flex items-center gap-2">
+      <FormFieldRow>
         <Input
           id={id}
           value={value}
           disabled={disabled || busy}
           autoComplete="off"
           spellCheck={false}
-          className="font-mono"
+          mono
           onChange={(event) => onChange(event.target.value)}
         />
         <Button type="button" size="sm" variant="outline" disabled={saveDisabled} onClick={onSave}>
           Save
         </Button>
-      </div>
+      </FormFieldRow>
       <p className="text-xs text-muted-foreground">{WORKSPACE_SLUG_HINT}</p>
-    </div>
+    </FormField>
   );
 }

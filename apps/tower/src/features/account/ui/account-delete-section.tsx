@@ -21,6 +21,7 @@ import {
 } from "@/shared/ui/alert-dialog";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
@@ -143,7 +144,7 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
         {!deleteEligibilityPending && deleteBlockedMessage ? (
           <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
             <p className="text-sm text-destructive">{deleteBlockedMessage}</p>
-            <Button asChild variant="outline" size="sm" className="h-9 w-fit">
+            <Button asChild variant="outline" size="sm">
               <Link href="/team">Open Team settings</Link>
             </Button>
           </div>
@@ -160,7 +161,7 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
             <Button
               type="button"
               variant="destructive"
-              className="h-10 font-medium"
+              width="fit"
               disabled={deleteEligibilityPending || deleteBlocked}
             >
               Delete my account…
@@ -183,7 +184,7 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
                   {deleteBlockedMessage}
                 </p>
               ) : null}
-              <div className="flex flex-col gap-2">
+              <FormField>
                 <Label htmlFor={deletePassId}>Password</Label>
                 <Input
                   id={deletePassId}
@@ -191,13 +192,11 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
                   autoComplete="current-password"
                   value={deletePassword}
                   onChange={(ev) => setDeletePassword(ev.target.value)}
-                  fieldSize="lg"
-                  surface="elevated"
                   required
                   autoFocus
                 />
-              </div>
-              <div className="flex flex-col gap-2">
+              </FormField>
+              <FormField>
                 <Label htmlFor={deleteConfirmPhraseId}>Type DELETE to confirm</Label>
                 <Input
                   id={deleteConfirmPhraseId}
@@ -205,11 +204,9 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
                   autoComplete="off"
                   value={deleteConfirm}
                   onChange={(ev) => setDeleteConfirm(ev.target.value)}
-                  fieldSize="lg"
-                  surface="elevated"
                   required
                 />
-              </div>
+              </FormField>
               {deleteErr ? (
                 <p className="text-sm text-destructive" role="alert">
                   {deleteErr}

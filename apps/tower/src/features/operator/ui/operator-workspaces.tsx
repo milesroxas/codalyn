@@ -133,7 +133,7 @@ export function OperatorWorkspaces() {
             placeholder="Search by name, slug, or id"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="pl-8"
+            leadingIcon
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -141,13 +141,15 @@ export function OperatorWorkspaces() {
             value={plan}
             onChange={(event) => setPlan(event.target.value)}
             placeholder="Plan filter"
-            className="h-9 w-36"
+            fieldSize="toolbar"
+            width="filter"
           />
           <Input
             value={status}
             onChange={(event) => setStatus(event.target.value)}
             placeholder="Status filter"
-            className="h-9 w-36"
+            fieldSize="toolbar"
+            width="filter"
           />
           <Button
             type="button"

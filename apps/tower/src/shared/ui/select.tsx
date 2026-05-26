@@ -18,6 +18,9 @@ const selectTriggerVariants = cva(
         compact: "w-20 shrink-0",
         menu: "w-56 max-w-full",
         fit: "w-fit",
+        filter: "w-36",
+        filterMd: "w-40",
+        filterLg: "w-44",
       },
     },
     defaultVariants: {

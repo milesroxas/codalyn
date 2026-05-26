@@ -8,10 +8,10 @@ import { authClient } from "@/features/auth/model/auth-client";
 import { useRequireTowerSession } from "@/features/auth/model/use-require-tower-session";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { Separator } from "@/shared/ui/separator";
-import { TowerPageMain } from "@/shared/ui/tower-page-shell";
+import { TowerPageHeader, TowerPageMain } from "@/shared/ui/tower-page-shell";
 
 export function AccountSettingsScreen() {
   const { session, sessionPending, refetch: refetchSession } = useRequireTowerSession("/account");
@@ -158,13 +158,7 @@ export function AccountSettingsScreen() {
 
   return (
     <TowerPageMain width="narrow">
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Tower</p>
-        <h1 className="text-2xl font-semibold tracking-tight">Account</h1>
-        <p className="text-muted-foreground">Email, password, and account deletion for {u.email}.</p>
-      </div>
-
-      <Separator className="my-8" />
+      <TowerPageHeader title="Account" description={<>Email, password, and account deletion for {u.email}.</>} />
 
       <div className="space-y-8">
         <Card className="border-border/80">
@@ -174,8 +168,8 @@ export function AccountSettingsScreen() {
           </CardHeader>
           <CardContent>
             <form onSubmit={onUpdateProfile} className="flex flex-col gap-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-2">
+              <FormFieldGrid>
+                <FormField>
                   <Label htmlFor={firstNameId}>First name</Label>
                   <Input
                     id={firstNameId}
@@ -183,11 +177,9 @@ export function AccountSettingsScreen() {
                     autoComplete="given-name"
                     value={firstName}
                     onChange={(ev) => setFirstName(ev.target.value)}
-                    fieldSize="lg"
-                    surface="elevated"
                   />
-                </div>
-                <div className="flex flex-col gap-2">
+                </FormField>
+                <FormField>
                   <Label htmlFor={lastNameId}>Last name</Label>
                   <Input
                     id={lastNameId}
@@ -195,11 +187,9 @@ export function AccountSettingsScreen() {
                     autoComplete="family-name"
                     value={lastName}
                     onChange={(ev) => setLastName(ev.target.value)}
-                    fieldSize="lg"
-                    surface="elevated"
                   />
-                </div>
-              </div>
+                </FormField>
+              </FormFieldGrid>
               {profileErr ? (
                 <p className="text-sm text-destructive" role="alert">
                   {profileErr}
@@ -210,7 +200,7 @@ export function AccountSettingsScreen() {
                   {profileMsg}
                 </p>
               ) : null}
-              <Button type="submit" disabled={profileBusy} className="h-10 w-fit rounded-lg font-medium">
+              <Button type="submit" width="fit" disabled={profileBusy}>
                 {profileBusy ? "Saving…" : "Save profile"}
               </Button>
             </form>
@@ -227,7 +217,7 @@ export function AccountSettingsScreen() {
               <p className="text-sm text-muted-foreground">
                 Current: <span className="font-medium text-foreground">{u.email}</span>
               </p>
-              <div className="flex flex-col gap-2">
+              <FormField>
                 <Label htmlFor={emailNewId}>New email</Label>
                 <Input
                   id={emailNewId}
@@ -235,11 +225,9 @@ export function AccountSettingsScreen() {
                   autoComplete="email"
                   value={newEmail}
                   onChange={(ev) => setNewEmail(ev.target.value)}
-                  fieldSize="lg"
-                  surface="elevated"
                   required
                 />
-              </div>
+              </FormField>
               {emailErr ? (
                 <p className="text-sm text-destructive" role="alert">
                   {emailErr}
@@ -250,7 +238,7 @@ export function AccountSettingsScreen() {
                   {emailMsg}
                 </p>
               ) : null}
-              <Button type="submit" disabled={emailBusy} className="h-10 w-fit rounded-lg font-medium">
+              <Button type="submit" width="fit" disabled={emailBusy}>
                 {emailBusy ? "Sending…" : "Change email"}
               </Button>
             </form>
@@ -264,7 +252,7 @@ export function AccountSettingsScreen() {
           </CardHeader>
           <CardContent>
             <form onSubmit={onChangePassword} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
+              <FormField>
                 <Label htmlFor={curPassId}>Current password</Label>
                 <Input
                   id={curPassId}
@@ -272,12 +260,10 @@ export function AccountSettingsScreen() {
                   autoComplete="current-password"
                   value={currentPassword}
                   onChange={(ev) => setCurrentPassword(ev.target.value)}
-                  fieldSize="lg"
-                  surface="elevated"
                   required
                 />
-              </div>
-              <div className="flex flex-col gap-2">
+              </FormField>
+              <FormField>
                 <Label htmlFor={newPassId}>New password</Label>
                 <Input
                   id={newPassId}
@@ -285,13 +271,11 @@ export function AccountSettingsScreen() {
                   autoComplete="new-password"
                   value={newPassword}
                   onChange={(ev) => setNewPassword(ev.target.value)}
-                  fieldSize="lg"
-                  surface="elevated"
                   required
                   minLength={8}
                 />
-              </div>
-              <div className="flex flex-col gap-2">
+              </FormField>
+              <FormField>
                 <Label htmlFor={confirmPassId}>Confirm new password</Label>
                 <Input
                   id={confirmPassId}
@@ -299,12 +283,10 @@ export function AccountSettingsScreen() {
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(ev) => setConfirmPassword(ev.target.value)}
-                  fieldSize="lg"
-                  surface="elevated"
                   required
                   minLength={8}
                 />
-              </div>
+              </FormField>
               {passErr ? (
                 <p className="text-sm text-destructive" role="alert">
                   {passErr}
@@ -315,7 +297,7 @@ export function AccountSettingsScreen() {
                   {passMsg}
                 </p>
               ) : null}
-              <Button type="submit" disabled={passBusy} className="h-10 w-fit rounded-lg font-medium">
+              <Button type="submit" width="fit" disabled={passBusy}>
                 {passBusy ? "Updating…" : "Update password"}
               </Button>
             </form>

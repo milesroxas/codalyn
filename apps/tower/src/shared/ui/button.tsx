@@ -26,6 +26,7 @@ const buttonVariants = cva(
         sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         "account-toolbar": "h-7 gap-2 pl-1.5 pr-1.5 font-normal",
         lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        form: "h-10 gap-1.5 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5",
         icon: "size-8",
         "icon-xs":
           "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
@@ -36,10 +37,16 @@ const buttonVariants = cva(
           "h-8 min-w-32 max-w-[11rem] justify-between gap-1.5 px-2 text-xs font-normal sm:min-w-36 sm:max-w-[14rem]",
         workspace: "min-w-48 max-w-[min(18rem,100%)] justify-between gap-2 px-3 font-normal",
       },
+      width: {
+        auto: "",
+        fit: "w-fit self-start",
+        full: "w-full",
+      },
     },
     defaultVariants: {
       variant: "default",
       size: "default",
+      width: "auto",
     },
   }
 );
@@ -48,6 +55,7 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  width = "auto",
   asChild = false,
   ...props
 }: React.ComponentProps<"button"> &
@@ -61,7 +69,7 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant, size, width }), className)}
       {...props}
     />
   );

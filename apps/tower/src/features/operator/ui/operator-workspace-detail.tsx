@@ -14,6 +14,7 @@ import type { OperatorWorkspaceDetail, OperatorWorkspacePatch, OperatorWorkspace
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { FormField, FormFieldGrid, FormFieldRow } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import {
@@ -382,15 +383,15 @@ function IdentitySection({
     <section className="space-y-3">
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Identity</h3>
       <div className="space-y-3 rounded-lg border border-border bg-card p-3">
-        <div className="space-y-1.5">
+        <FormField>
           <Label htmlFor="workspace-name">Name</Label>
-          <div className="flex items-center gap-2">
+          <FormFieldRow>
             <Input id="workspace-name" value={nameDraft} onChange={(event) => onNameDraftChange(event.target.value)} />
             <Button type="button" size="sm" variant="outline" disabled={nameDisabled} onClick={onSaveName}>
               Save
             </Button>
-          </div>
-        </div>
+          </FormFieldRow>
+        </FormField>
         <WorkspaceSlugField
           id="workspace-slug"
           value={slugDraft}
@@ -426,12 +427,12 @@ function SeatsSection({
     <section className="space-y-3">
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Seats</h3>
       <div className="space-y-3 rounded-lg border border-border bg-card p-3">
-        <div className="space-y-1.5">
+        <FormField>
           <Label htmlFor="workspace-seat-limit">
             Seat limit (blank = unpaid solo cap)
             {detail.stripeSubscriptionId ? " — managed by Stripe when billing is on" : null}
           </Label>
-          <div className="flex items-center gap-2">
+          <FormFieldRow>
             <Input
               id="workspace-seat-limit"
               type="number"
@@ -450,8 +451,8 @@ function SeatsSection({
             >
               Save
             </Button>
-          </div>
-        </div>
+          </FormFieldRow>
+        </FormField>
         <p className="text-xs text-muted-foreground">
           Current usage: <span className="text-foreground">{detail.memberCount + detail.pendingInvitations}</span> of{" "}
           <span className="text-foreground">{detail.effectiveSeatLimit}</span> seats
@@ -498,8 +499,8 @@ function BillingSection({
     <section className="space-y-3">
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Billing</h3>
       <div className="space-y-3 rounded-lg border border-border bg-card p-3">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
+        <FormFieldGrid className="sm:grid-cols-2">
+          <FormField>
             <Label htmlFor="billing-plan">Plan</Label>
             <Input
               id="billing-plan"
@@ -507,8 +508,8 @@ function BillingSection({
               onChange={(event) => onBillingPlanDraftChange(event.target.value)}
               placeholder="starter · pro · scale"
             />
-          </div>
-          <div className="space-y-1.5">
+          </FormField>
+          <FormField>
             <Label htmlFor="subscription-status">Subscription status</Label>
             <Input
               id="subscription-status"
@@ -516,8 +517,8 @@ function BillingSection({
               onChange={(event) => onSubscriptionStatusDraftChange(event.target.value)}
               placeholder="active · past_due · canceled"
             />
-          </div>
-        </div>
+          </FormField>
+        </FormFieldGrid>
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <IconCreditCard className="size-3.5" />

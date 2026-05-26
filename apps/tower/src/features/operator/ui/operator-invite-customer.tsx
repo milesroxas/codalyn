@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shared/ui/dialog";
+import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
@@ -110,7 +111,7 @@ export function OperatorInviteCustomer({ onInvited, trigger }: OperatorInviteCus
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-3">
-          <div className="space-y-1.5">
+          <FormField>
             <Label htmlFor="operator-invite-email">Email</Label>
             <Input
               id="operator-invite-email"
@@ -120,7 +121,7 @@ export function OperatorInviteCustomer({ onInvited, trigger }: OperatorInviteCus
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
-          </div>
+          </FormField>
           {error ? (
             <p role="alert" className="text-sm text-destructive">
               {error}

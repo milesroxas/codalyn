@@ -153,12 +153,12 @@ export function OperatorCustomers() {
             placeholder="Search by email, name, or id"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="pl-8"
+            leadingIcon
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as RoleFilter)}>
-            <SelectTrigger size="sm" className="w-36">
+            <SelectTrigger size="sm" width="filter">
               <SelectValue placeholder="Role" />
             </SelectTrigger>
             <SelectContent>
@@ -168,7 +168,7 @@ export function OperatorCustomers() {
             </SelectContent>
           </Select>
           <Select value={banned} onValueChange={(v) => setBanned(v as TriFilter)}>
-            <SelectTrigger size="sm" className="w-36">
+            <SelectTrigger size="sm" width="filter">
               <SelectValue placeholder="Banned" />
             </SelectTrigger>
             <SelectContent>
@@ -178,7 +178,7 @@ export function OperatorCustomers() {
             </SelectContent>
           </Select>
           <Select value={eligible} onValueChange={(v) => setEligible(v as TriFilter)}>
-            <SelectTrigger size="sm" className="w-44">
+            <SelectTrigger size="sm" width="filterLg">
               <SelectValue placeholder="Eligible" />
             </SelectTrigger>
             <SelectContent>
@@ -188,7 +188,7 @@ export function OperatorCustomers() {
             </SelectContent>
           </Select>
           <Select value={verified} onValueChange={(v) => setVerified(v as TriFilter)}>
-            <SelectTrigger size="sm" className="w-40">
+            <SelectTrigger size="sm" width="filterMd">
               <SelectValue placeholder="Verified" />
             </SelectTrigger>
             <SelectContent>

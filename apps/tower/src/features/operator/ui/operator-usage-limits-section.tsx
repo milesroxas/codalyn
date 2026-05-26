@@ -10,6 +10,7 @@ import { formatUsageRatio, meteringStatusLabel } from "@/shared/lib/usage-displa
 import { parseOptionalLimitInteger } from "@/shared/lib/usage-limit-input";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Switch } from "@/shared/ui/switch";
@@ -186,8 +187,8 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="space-y-1.5">
+        <FormFieldGrid className="sm:grid-cols-3">
+          <FormField>
             <Label htmlFor={`${scope}-webflow-proxy-limit`}>
               <UsageMeterLabel kind="webflowProxy" label="Webflow proxy cap override" />
             </Label>
@@ -201,8 +202,8 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
               onChange={(event) => setWebflowProxyLimitDraft(event.target.value)}
               disabled={disabled}
             />
-          </div>
-          <div className="space-y-1.5">
+          </FormField>
+          <FormField>
             <Label htmlFor={`${scope}-cms-write-limit`}>
               <UsageMeterLabel kind="cmsWrite" label="CMS write cap override" />
             </Label>
@@ -216,8 +217,8 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
               onChange={(event) => setCmsWriteLimitDraft(event.target.value)}
               disabled={disabled}
             />
-          </div>
-          <div className="space-y-1.5">
+          </FormField>
+          <FormField>
             <Label htmlFor={`${scope}-image-limit`}>
               <UsageMeterLabel kind="image" label="Image cap override" />
             </Label>
@@ -231,8 +232,8 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
               onChange={(event) => setImageLimitDraft(event.target.value)}
               disabled={disabled}
             />
-          </div>
-        </div>
+          </FormField>
+        </FormFieldGrid>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">

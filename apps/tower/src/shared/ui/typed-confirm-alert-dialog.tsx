@@ -15,6 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/shared/ui/alert-dialog";
 import { Button } from "@/shared/ui/button";
+import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
@@ -76,7 +77,7 @@ function TypedConfirmAlertDialog({
             <ConfirmPromptValue>{expectedValue}</ConfirmPromptValue> to confirm.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="space-y-2 py-2">
+        <FormField className="py-2">
           <Label htmlFor={confirmFieldId}>{confirmFieldLabel}</Label>
           <Input
             id={confirmFieldId}
@@ -85,7 +86,7 @@ function TypedConfirmAlertDialog({
             placeholder={expectedValue}
             autoComplete="off"
           />
-        </div>
+        </FormField>
         <AlertDialogFooter>
           <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
           <AlertDialogAction type="button" variant="destructive" disabled={busy || !matches} onClick={onConfirm}>

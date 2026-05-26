@@ -33,6 +33,7 @@ export const formFieldVariants = cva(formFieldSharedClass, {
     fieldSize: {
       sm: "h-7 px-2 text-xs",
       default: "h-8 px-2.5 py-1 text-sm",
+      toolbar: "h-9 px-2.5 py-1 text-sm",
       lg: "h-10 px-3 py-2 text-sm",
     },
     surface: {
@@ -43,11 +44,26 @@ export const formFieldVariants = cva(formFieldSharedClass, {
       true: "tabular-nums",
       false: "",
     },
+    mono: {
+      true: "font-mono",
+      false: "",
+    },
+    leadingIcon: {
+      true: "pl-8",
+      false: "",
+    },
+    width: {
+      default: "",
+      filter: "w-36",
+    },
   },
   defaultVariants: {
     fieldSize: "default",
     surface: "default",
     numeric: false,
+    mono: false,
+    leadingIcon: false,
+    width: "default",
   },
 });
 

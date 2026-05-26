@@ -29,6 +29,7 @@ import type { OperatorUserDetail, OperatorUserPatch, OperatorUserRow } from "@/s
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
@@ -367,7 +368,7 @@ function AccessSection({
             onValueChange={onToggleRole}
             disabled={patchBusy || isSelf}
           >
-            <SelectTrigger size="sm" className="w-36">
+            <SelectTrigger size="sm" width="filter">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -473,10 +474,8 @@ function BanBlock({
   onBan: () => void;
 }) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor="ban-reason" className="text-sm">
-        Ban reason (optional)
-      </Label>
+    <FormField>
+      <Label htmlFor="ban-reason">Ban reason (optional)</Label>
       <Input
         id="ban-reason"
         value={banReasonDraft}
@@ -495,7 +494,7 @@ function BanBlock({
         Ban account
       </Button>
       {isSelf ? <p className="text-xs text-muted-foreground">You cannot ban yourself.</p> : null}
-    </div>
+    </FormField>
   );
 }
 

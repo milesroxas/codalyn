@@ -19,6 +19,7 @@ import { TOWER_OPERATOR_INVITE_HEADER } from "@/shared/lib/access/operator-invit
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Switch } from "@/shared/ui/switch";
@@ -229,8 +230,8 @@ function SignUpForm() {
         </CardHeader>
         <CardContent className="pt-4">
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
+            <FormFieldGrid>
+              <FormField>
                 <Label htmlFor={firstNameId}>First name</Label>
                 <Input
                   id={firstNameId}
@@ -241,8 +242,8 @@ function SignUpForm() {
                   fieldSize="lg"
                   surface="elevated"
                 />
-              </div>
-              <div className="flex flex-col gap-2">
+              </FormField>
+              <FormField>
                 <Label htmlFor={lastNameId}>Last name</Label>
                 <Input
                   id={lastNameId}
@@ -253,9 +254,9 @@ function SignUpForm() {
                   fieldSize="lg"
                   surface="elevated"
                 />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
+              </FormField>
+            </FormFieldGrid>
+            <FormField>
               <Label htmlFor={emailId}>Email</Label>
               <Input
                 id={emailId}
@@ -269,8 +270,8 @@ function SignUpForm() {
                 readOnly={inviteEmailLocked}
                 aria-readonly={inviteEmailLocked}
               />
-            </div>
-            <div className="flex flex-col gap-2">
+            </FormField>
+            <FormField>
               <Label htmlFor={passwordId}>Password</Label>
               <Input
                 id={passwordId}
@@ -284,7 +285,7 @@ function SignUpForm() {
                 minLength={8}
               />
               <p className="text-xs text-muted-foreground">At least 8 characters.</p>
-            </div>
+            </FormField>
             {!beaconOrigin ? (
               <div className="flex items-start justify-between gap-4 rounded-xl border border-border/60 bg-muted/25 p-4 dark:bg-muted/15">
                 <div className="min-w-0 space-y-1">
@@ -312,7 +313,7 @@ function SignUpForm() {
                 {error}
               </p>
             ) : null}
-            <Button type="submit" disabled={pending} className="h-10 w-full rounded-lg font-medium">
+            <Button type="submit" disabled={pending} size="form" width="full">
               {pending ? "Creating account…" : "Create account"}
             </Button>
           </form>

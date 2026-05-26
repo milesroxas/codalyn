@@ -22,7 +22,7 @@ import { BeaconSiteDefaultPresetFields } from "@/features/beacon/ui/beacon-prese
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { FormFieldInset } from "@/shared/ui/form-field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
@@ -90,10 +90,11 @@ function TowerBeaconPanelStatus(props: { canManage: boolean; teamPresetsLocked: 
   const { canManage, teamPresetsLocked } = props;
   return (
     <>
-      <div className="flex flex-wrap gap-2">
-        {canManage ? <Badge>Designer</Badge> : <Badge variant="secondary">View only</Badge>}
-        {teamPresetsLocked ? <Badge variant="outline">Designer features off · locked</Badge> : null}
-      </div>
+      {teamPresetsLocked ? (
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline">Designer features off · locked</Badge>
+        </div>
+      ) : null}
       {!canManage ? (
         <p className="text-sm text-muted-foreground">
           Only workspace designers (and operators) can edit shared presets. Ask a designer to update them in Beacon.
@@ -165,7 +166,7 @@ function SiteDefaultPresetEmptyState(props: { canEdit: boolean; onSet?: () => vo
 
   return (
     <Card size="sm">
-      <CardContent className="flex flex-col gap-4 px-4 py-6">
+      <CardContent className="flex flex-col items-center gap-4 px-4 py-6 text-center">
         <div className="space-y-1">
           <p className="text-sm font-medium text-foreground">No site default preset has been set</p>
           <p className="text-sm text-muted-foreground">
@@ -321,6 +322,9 @@ function ScopedPresetListItem(props: { entry: BeaconPresetStorageEntry; defaultE
 function SitePresetsDetail(props: {
   baseId: string;
   group: BeaconPresetSiteGroup;
+  siteGroups: BeaconPresetSiteGroup[];
+  selectedSiteId: string;
+  onSelectedSiteIdChange: Dispatch<SetStateAction<string>>;
   saving: boolean;
   settings: BeaconAppSettings | undefined;
   canEditSiteDefault: boolean;
@@ -332,6 +336,9 @@ function SitePresetsDetail(props: {
   const {
     baseId,
     group,
+    siteGroups,
+    selectedSiteId,
+    onSelectedSiteIdChange,
     saving,
     settings,
     canEditSiteDefault,
@@ -340,16 +347,17 @@ function SitePresetsDetail(props: {
     upsertSiteDefaultPresetAction,
     clearSiteDefaultPresetAction,
   } = props;
-  const presetCount = countSitePresets(group);
   const [siteDefaultFormOpen, setSiteDefaultFormOpen] = useState(false);
   const siteDefaultPreset = group.siteDefault;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          {presetCount > 0 ? `${presetCount} preset${presetCount === 1 ? "" : "s"}` : "No presets yet"}
-        </p>
+        <BeaconSitePicker
+          siteGroups={siteGroups}
+          selectedSiteId={selectedSiteId}
+          onSelectedSiteIdChange={onSelectedSiteIdChange}
+        />
         <BeaconDesignerOpenLink
           siteDisplayName={group.displayName}
           shortName={group.shortName}
@@ -462,20 +470,14 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                 ? "Choose a site to manage its image export presets."
                 : "Manage image export presets for this site."}
             </CardDescription>
-            {multipleSites ? (
-              <CardAction>
-                <BeaconSitePicker
-                  siteGroups={siteGroups}
-                  selectedSiteId={selectedSiteId}
-                  onSelectedSiteIdChange={setSelectedSiteId}
-                />
-              </CardAction>
-            ) : null}
           </CardHeader>
           <CardContent>
             <SitePresetsDetail
               key={selectedGroup.siteId}
               group={selectedGroup}
+              siteGroups={siteGroups}
+              selectedSiteId={selectedSiteId}
+              onSelectedSiteIdChange={setSelectedSiteId}
               settings={settings}
               canEditSiteDefault={canEditSiteDefault}
               webflowAppClientId={webflowAppClientId}

@@ -33,6 +33,27 @@ function formatContributingActions(actions: readonly string[]): string {
   return actions.map((action) => `• ${action}`).join("\n");
 }
 
+function uniqueMeterFeatureNames(kind: TowerUsageMeterKind): string {
+  const names = [
+    ...new Set(
+      TOWER_USAGE_METER_CONTRIBUTING_ACTIONS[kind].map((action) => {
+        const parts = action.split(" — ");
+        return parts[0]?.trim() ?? action;
+      })
+    ),
+  ];
+  if (names.length === 0) {
+    return "";
+  }
+  if (names.length === 1) {
+    return names[0] ?? "";
+  }
+  if (names.length === 2) {
+    return `${names[0]} and ${names[1]}`;
+  }
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
 export function towerUsageMeterTooltip(kind: TowerUsageMeterKind): string {
   const actions = formatContributingActions(TOWER_USAGE_METER_CONTRIBUTING_ACTIONS[kind]);
   switch (kind) {
@@ -72,13 +93,14 @@ export function towerUsageLimitDialogTitle(kind: TowerUsageMeterKind): string {
 }
 
 export function towerUsageLimitDialogDescription(kind: TowerUsageMeterKind): string {
+  const scope = uniqueMeterFeatureNames(kind);
   if (kind === "image") {
-    return `${TOWER_AVIF_LIMIT_FALLBACK_DESCRIPTION} Counts AVIF exports and size estimates in Image Upload.`;
+    return `${TOWER_AVIF_LIMIT_FALLBACK_DESCRIPTION} Applies to ${scope}.`;
   }
   if (kind === "cmsWrite") {
-    return "You've used your free plan allowance for CMS layout saves through Tower this month. Counts block-based layout saves in CMS Slots, not Composer text-field saves.";
+    return `You've used your free plan allowance for CMS layout saves through Tower this month. Applies to ${scope}. Composer text-field saves count toward Webflow proxy instead.`;
   }
-  return "You've used your free plan allowance for Webflow Data API traffic through Tower this month. Counts CMS Slots sync and CMS actions plus Image Upload CMS field publishes.";
+  return `You've used your free plan allowance for Webflow Data API traffic through Tower this month. Applies to ${scope}.`;
 }
 
 export function towerUsageLimitDialogUsageLine(used: number, limit: number, kind: TowerUsageMeterKind): string {

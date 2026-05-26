@@ -1,5 +1,6 @@
 "use client";
 
+import { UsageMeterLabel } from "@codalyn/webflow-kit/react";
 import { IconGauge } from "@tabler/icons-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -14,7 +15,6 @@ import { Label } from "@/shared/ui/label";
 import { Separator } from "@/shared/ui/separator";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Switch } from "@/shared/ui/switch";
-import { UsageMeterLabel } from "@/shared/ui/usage-meter-label";
 
 type DraftState = {
   globalMeteringEnabled: boolean;

@@ -4,10 +4,10 @@ import {
   TOWER_USAGE_APPROACHING_ALERT_TITLE,
   towerUsageApproachingAlertDescription,
 } from "@codalyn/webflow-kit";
+import { UsageMeterLabel } from "@codalyn/webflow-kit/react";
 import { TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
-import { UsageMeterLabel } from "@/shared/ui/usage-meter-label";
 
 type UsageApproachingLimitAlertProps = {
   meters: ReadonlyArray<{ kind: TowerUsageMeterKind; used: number; limit: number }>;

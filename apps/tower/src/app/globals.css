@@ -153,6 +153,17 @@ body {
   }
 }
 
+@keyframes tl-landing-rise-interactive {
+  from {
+    opacity: 0;
+    pointer-events: none;
+  }
+  to {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 @keyframes tl-landing-veil-out {
   to {
     opacity: 0;
@@ -178,7 +189,15 @@ body {
 
 .tl-landing-enter {
   opacity: 0;
+  pointer-events: none;
   animation: tl-landing-rise var(--tl-enter-duration, 1.05s) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--tl-enter-delay, 0ms);
+}
+
+.tl-landing-enter-interactive {
+  opacity: 0;
+  pointer-events: none;
+  animation: tl-landing-rise-interactive var(--tl-enter-duration, 1.05s) cubic-bezier(0.22, 1, 0.36, 1) forwards;
   animation-delay: var(--tl-enter-delay, 0ms);
 }
 
@@ -202,9 +221,11 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .tl-landing-enter,
+  .tl-landing-enter-interactive,
   .tl-landing-enter-graphic {
     animation: none;
     opacity: 1;
+    pointer-events: auto;
     transform: none;
   }
 

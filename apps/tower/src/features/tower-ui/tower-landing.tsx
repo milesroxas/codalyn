@@ -21,7 +21,7 @@ export function TowerLanding(props: { earlyAccessRequired?: boolean }) {
               A connected layer for the tools, workflows, and infrastructure your workspace depends on.
             </p>
 
-            <div className="tl-landing-enter mt-10 flex flex-wrap items-center gap-3 [--tl-enter-delay:1860ms]">
+            <div className="tl-landing-enter-interactive relative z-10 mt-10 flex flex-wrap items-center gap-3 [--tl-enter-delay:1860ms]">
               {earlyAccessRequired ? (
                 <>
                   <Button asChild size="lg" className="rounded-full px-8">

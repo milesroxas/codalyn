@@ -3,7 +3,7 @@ import { IconCreditCard, IconPlug, IconRadar2, IconUsers } from "@tabler/icons-r
 import Link from "next/link";
 import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
 import { formatWebflowIntegrationStatus } from "@/features/tower-ui/lib/tower-webflow-integration-status";
-import { TowerWorkspaceOnboardingBanner } from "@/features/tower-ui/tower-workspace-onboarding-banner";
+import { shouldShowPageHeaderWebflowAction } from "@/features/tower-ui/lib/tower-workspace-onboarding";
 import type { TowerDashboardSummary } from "@/server/dashboard-summary";
 import { TOWER_CONNECTION_PATH } from "@/shared/lib/navigation/tower-app-paths";
 import { ActionTile, ActionTileGrid } from "@/shared/ui/action-tile";
@@ -22,7 +22,6 @@ type TowerDashboardProps = {
   summary: TowerDashboardSummary;
   usage: TowerUsageStatusSnapshot;
   billingEnabled: boolean;
-  oauthConfigured: boolean;
 };
 
 type DashboardStatSnapshot = {
@@ -203,7 +202,7 @@ function DashboardQuickActions({
   );
 }
 
-export function TowerDashboard({ summary, usage, billingEnabled, oauthConfigured }: TowerDashboardProps) {
+export function TowerDashboard({ summary, usage, billingEnabled }: TowerDashboardProps) {
   const approachingMeters = usage.approachingMeters.flatMap((meter) =>
     meter.limit === null ? [] : [{ kind: meter.kind, used: meter.used, limit: meter.limit }]
   );
@@ -214,7 +213,7 @@ export function TowerDashboard({ summary, usage, billingEnabled, oauthConfigured
         title="Dashboard"
         description="Monitor workspace usage, connection status, and account activity."
         actions={
-          summary.activeOrgTeamAdmin || !summary.webflowOAuthConnected ? (
+          shouldShowPageHeaderWebflowAction(summary) ? (
             <Button variant="outline" size="sm" asChild>
               <Link href={TOWER_CONNECTION_PATH}>
                 {summary.webflowOAuthConnected ? "Manage Webflow" : "Connect Webflow"}
@@ -239,13 +238,6 @@ export function TowerDashboard({ summary, usage, billingEnabled, oauthConfigured
           />
         </div>
       ) : null}
-
-      <TowerWorkspaceOnboardingBanner
-        summary={summary}
-        billingEnabled={billingEnabled}
-        oauthConfigured={oauthConfigured}
-        includeWebflowConnect
-      />
 
       <TowerDashboardGrid>
         <DashboardSignalsColumn summary={summary} />

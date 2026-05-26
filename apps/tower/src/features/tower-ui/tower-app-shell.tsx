@@ -20,16 +20,19 @@ type TowerAppShellProps = {
   /** Server session hint — keeps authenticated chrome stable while client session hydrates. */
   signedIn: boolean;
   usageBanner?: React.ReactNode;
+  workspaceOnboarding?: React.ReactNode;
   children: React.ReactNode;
 };
 
 function TowerAuthenticatedShell({
   billingEnabled,
   usageBanner,
+  workspaceOnboarding,
   children,
 }: {
   billingEnabled: boolean;
   usageBanner?: React.ReactNode;
+  workspaceOnboarding?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -41,7 +44,12 @@ function TowerAuthenticatedShell({
           <div className="@container/main flex min-h-0 flex-1 flex-col gap-2">
             <ScrollArea className="min-h-0 flex-1">
               <div className="flex flex-col gap-4 pt-2 pb-8 md:gap-6 md:pt-3 md:pb-10">
-                {usageBanner ? <div className="px-4 lg:px-6">{usageBanner}</div> : null}
+                {usageBanner || workspaceOnboarding ? (
+                  <div className="flex flex-col gap-3 px-4 lg:px-6">
+                    {usageBanner}
+                    {workspaceOnboarding}
+                  </div>
+                ) : null}
                 <div className="flex w-full flex-col px-4 lg:px-6">{children}</div>
               </div>
             </ScrollArea>
@@ -52,7 +60,13 @@ function TowerAuthenticatedShell({
   );
 }
 
-export function TowerAppShell({ billingEnabled, signedIn, usageBanner, children }: TowerAppShellProps) {
+export function TowerAppShell({
+  billingEnabled,
+  signedIn,
+  usageBanner,
+  workspaceOnboarding,
+  children,
+}: TowerAppShellProps) {
   const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
 
@@ -72,7 +86,11 @@ export function TowerAppShell({ billingEnabled, signedIn, usageBanner, children 
   }
 
   return (
-    <TowerAuthenticatedShell billingEnabled={billingEnabled} usageBanner={usageBanner}>
+    <TowerAuthenticatedShell
+      billingEnabled={billingEnabled}
+      usageBanner={usageBanner}
+      workspaceOnboarding={workspaceOnboarding}
+    >
       {children}
     </TowerAuthenticatedShell>
   );

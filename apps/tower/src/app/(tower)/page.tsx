@@ -11,7 +11,6 @@ import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { getTowerDashboardSummary } from "@/server/dashboard-summary";
 import { isTowerProductAdmin } from "@/server/membership/product-admin";
 import { buildTowerLandingAppLinks, isMarketingHost, normalizeHostname } from "@/server/tower-hosts";
-import { hasWebflowOAuthCredentials } from "@/server/webflow-proxy-token";
 
 export default async function HomePage() {
   const host = normalizeHostname((await headers()).get("host") ?? "");
@@ -48,14 +47,7 @@ export default async function HomePage() {
     const activeOrg = await getActiveOrganizationIdForAuthHeaders(h);
     const usage = await fetchEndUserUsageStatus(userId, activeOrg);
 
-    return (
-      <TowerDashboard
-        summary={summary}
-        usage={usage}
-        billingEnabled={isTowerBillingEnabled()}
-        oauthConfigured={hasWebflowOAuthCredentials()}
-      />
-    );
+    return <TowerDashboard summary={summary} usage={usage} billingEnabled={isTowerBillingEnabled()} />;
   }
 
   return (

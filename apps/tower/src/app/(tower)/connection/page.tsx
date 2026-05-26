@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { TowerWebflowScreen } from "@/features/tower-ui/tower-webflow-screen";
-import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getTowerDashboardSummary } from "@/server/dashboard-summary";
 import { resolveWebflowBeaconPublicConfig } from "@/server/webflow-beacon-public-config";
 import { hasWebflowOAuthCredentials } from "@/server/webflow-proxy-token";
@@ -20,7 +19,6 @@ export default async function ConnectionPage() {
     <TowerWebflowScreen
       summary={summary}
       oauthConfigured={hasWebflowOAuthCredentials()}
-      billingEnabled={isTowerBillingEnabled()}
       {...webflowBeaconPublicConfig}
     />
   );

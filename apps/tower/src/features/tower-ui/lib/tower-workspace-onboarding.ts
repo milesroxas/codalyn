@@ -14,6 +14,9 @@ export type TowerOnboardingAlertCopy = {
   variant: "warning" | "info";
 };
 
+/** Session flag: user closed the first-workspace dialog without creating one. */
+export const TOWER_CREATE_WORKSPACE_DIALOG_DISMISSED_KEY = "tower.create-workspace-dialog.dismissed";
+
 export function resolveTowerWorkspaceOnboardingBlocker(
   summary: Pick<
     TowerDashboardSummary,
@@ -40,6 +43,19 @@ export function resolveTowerWorkspaceOnboardingBlocker(
   return null;
 }
 
+export function shouldShowPageHeaderWebflowAction(
+  summary: Pick<
+    TowerDashboardSummary,
+    "workspaceMembershipCount" | "activeOrganizationId" | "webflowOAuthConnected" | "activeOrgTeamAdmin"
+  >
+): boolean {
+  const blocker = resolveTowerWorkspaceOnboardingBlocker(summary, { includeWebflowConnect: true });
+  if (summary.webflowOAuthConnected) {
+    return summary.activeOrgTeamAdmin;
+  }
+  return blocker === null;
+}
+
 export function parseTowerWebflowQueryStatus(value: string | null): TowerWebflowQueryStatus | null {
   if (value === "connected" || value === "no_active_workspace" || value === "team_admin_required") {
     return value;
@@ -52,26 +68,26 @@ export function towerWorkspaceOnboardingCopy(blocker: TowerWorkspaceOnboardingBl
     case "needs_workspace":
       return {
         variant: "warning",
-        title: "Create a workspace to connect Webflow",
-        description: "Webflow needs a workspace before it can connect.",
+        title: "Create your first workspace",
+        description: "Tower links to Webflow through a workspace. Create one to connect Webflow and invite your team.",
       };
     case "needs_active_workspace":
       return {
         variant: "warning",
-        title: "Select an active workspace",
-        description: "Select a workspace from the header menu.",
+        title: "Choose a workspace",
+        description: "Select the workspace you want to work in from the menu in the header.",
       };
     case "webflow_admin_only":
       return {
         variant: "info",
-        title: "Webflow must be connected by a workspace admin",
-        description: "Ask a workspace admin to connect Webflow.",
+        title: "Webflow connection needed",
+        description: "A workspace admin must connect Webflow before you can use Beacon and connected features.",
       };
     case "needs_webflow_connect":
       return {
         variant: "warning",
-        title: "Connect Webflow for this workspace",
-        description: "Link Webflow once as a workspace admin.",
+        title: "Connect Webflow",
+        description: "Authorize Webflow for this workspace once. Your team can then use Beacon and integrations.",
       };
   }
 }
@@ -82,19 +98,19 @@ export function towerWebflowQueryStatusCopy(status: TowerWebflowQueryStatus): To
       return {
         variant: "info",
         title: "Webflow connected",
-        description: "Webflow is connected for this workspace.",
+        description: "This workspace is linked to Webflow. You can manage sites and presets from Tower.",
       };
     case "no_active_workspace":
       return {
         variant: "warning",
-        title: "Select or create a workspace first",
-        description: "Select or create a workspace from the header menu.",
+        title: "Choose a workspace first",
+        description: "Select or create a workspace from the header, then connect Webflow.",
       };
     case "team_admin_required":
       return {
         variant: "info",
-        title: "Workspace admin required",
-        description: "Ask a workspace admin to connect Webflow.",
+        title: "Admin access required",
+        description: "Only a workspace admin can connect Webflow. Ask an admin to finish setup.",
       };
   }
 }
@@ -112,9 +128,9 @@ export function messageForWebflowOAuthAuthorizeError(error: WebflowOAuthAuthoriz
     case "unauthorized":
       return "Sign in to connect Webflow.";
     case "no_active_workspace":
-      return "Select or create a workspace before connecting Webflow.";
+      return "Choose or create a workspace before connecting Webflow.";
     case "team_admin_required":
-      return "Only a workspace admin or owner can connect Webflow.";
+      return "Only a workspace admin can connect Webflow.";
     case "oauth_config":
       return "Webflow OAuth is not configured on this Tower instance.";
     case "oauth_url_failed":
@@ -123,6 +139,45 @@ export function messageForWebflowOAuthAuthorizeError(error: WebflowOAuthAuthoriz
       return "Could not start Webflow authorization.";
   }
 }
+
+export function messageForWebflowOAuthCallbackError(error?: string | null, detail?: string | null): string {
+  const code = error?.trim();
+  const desc = detail?.trim();
+  switch (code) {
+    case "access_denied":
+      return "Webflow authorization was cancelled.";
+    case "invalid_state":
+      return "This connection session expired. Try connecting again.";
+    case "team_admin_required":
+      return messageForWebflowOAuthAuthorizeError("team_admin_required");
+    case "missing_code":
+      return "Webflow authorization did not finish. Try connecting again.";
+    case "token_exchange":
+      return desc
+        ? `Could not complete Webflow connection: ${desc}`
+        : "Could not complete Webflow connection. Try again.";
+    case "no_active_workspace":
+      return messageForWebflowOAuthAuthorizeError("no_active_workspace");
+    default:
+      if (desc) {
+        return desc;
+      }
+      if (code) {
+        return `Webflow connection failed (${code}).`;
+      }
+      return "Webflow connection failed. Try again.";
+  }
+}
+
+export const TOWER_WEBFLOW_CONNECTED_TOAST = {
+  title: "Webflow connected",
+  description: "This workspace is linked to Webflow.",
+} as const;
+
+export const TOWER_WEBFLOW_CONNECTION_NOT_SAVED_TOAST = {
+  title: "Connection not saved",
+  description: "Authorization finished, but this workspace has no Webflow token. Connect again or switch workspace.",
+} as const;
 
 export function shouldSuppressOnboardingForQuery(
   query: TowerWebflowQueryStatus | null,

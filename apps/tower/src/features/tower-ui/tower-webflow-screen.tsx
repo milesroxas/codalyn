@@ -12,6 +12,7 @@ import {
   formatWebflowIntegrationStatus,
   getWebflowConnectionCardCopy,
 } from "@/features/tower-ui/lib/tower-webflow-integration-status";
+import { shouldShowPageHeaderWebflowAction } from "@/features/tower-ui/lib/tower-workspace-onboarding";
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
 import { TowerWebflowSetupAlerts } from "@/features/tower-ui/tower-workspace-onboarding-banner";
 import type { TowerDashboardSummary } from "@/server/dashboard-summary";
@@ -31,7 +32,6 @@ import { DangerZoneTypedDelete } from "@/shared/ui/typed-confirm-alert-dialog";
 type TowerWebflowScreenProps = {
   summary: TowerDashboardSummary;
   oauthConfigured: boolean;
-  billingEnabled: boolean;
 } & WebflowBeaconPublicConfig;
 
 type WebflowScreenContext = {
@@ -212,12 +212,7 @@ function WebflowDisconnectSection({
   );
 }
 
-export function TowerWebflowScreen({
-  summary,
-  oauthConfigured,
-  billingEnabled,
-  webflowAppClientId,
-}: TowerWebflowScreenProps) {
+export function TowerWebflowScreen({ summary, oauthConfigured, webflowAppClientId }: TowerWebflowScreenProps) {
   const router = useRouter();
   const sites = summary.webflowSites ?? [];
   const canManage = summary.activeOrgTeamAdmin;
@@ -241,7 +236,7 @@ export function TowerWebflowScreen({
         title="Webflow connection"
         description="Manage the shared Webflow connection for this workspace."
         actions={
-          canManage && oauthConfigured ? (
+          canManage && oauthConfigured && shouldShowPageHeaderWebflowAction(summary) ? (
             <TowerWebflowOAuthPopupButton
               variant={summary.webflowOAuthConnected ? "outline" : "default"}
               onSuccess={onRefresh}
@@ -254,7 +249,7 @@ export function TowerWebflowScreen({
       />
 
       <div className="mb-8">
-        <TowerWebflowSetupAlerts summary={summary} billingEnabled={billingEnabled} oauthConfigured={oauthConfigured} />
+        <TowerWebflowSetupAlerts summary={summary} oauthConfigured={oauthConfigured} />
       </div>
       <WebflowConnectionSection summary={summary} sites={sites} />
       <WebflowSitesSection {...context} />

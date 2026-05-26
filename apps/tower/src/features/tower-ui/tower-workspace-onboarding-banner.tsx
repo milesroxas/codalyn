@@ -8,10 +8,12 @@ import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { createWorkspaceOrganization } from "@/features/team/api/create-workspace-organization";
 import { CreateWorkspaceDialog } from "@/features/team/ui/create-workspace-dialog";
+import { notifyWebflowConnectionQueryStatus } from "@/features/tower-ui/lib/tower-webflow-connection-toasts";
 import {
   parseTowerWebflowQueryStatus,
   resolveTowerWorkspaceOnboardingBlocker,
   shouldSuppressOnboardingForQuery,
+  TOWER_CREATE_WORKSPACE_DIALOG_DISMISSED_KEY,
   type TowerWorkspaceOnboardingBlocker,
   towerWebflowQueryStatusCopy,
   towerWorkspaceOnboardingCopy,
@@ -59,7 +61,7 @@ function OnboardingAlertActions({
     return (
       <>
         <Button variant="outline" size="sm" asChild>
-          <Link href="/team">Team settings</Link>
+          <Link href="/team">View team</Link>
         </Button>
         {billingEnabled ? (
           <Button variant="default" size="sm" asChild>
@@ -113,7 +115,32 @@ function TowerWorkspaceCreateWorkspacePanel({
   const [orgName, setOrgName] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    if (blocker !== "needs_workspace" || !summary.canCreateOrganization) {
+      return;
+    }
+    try {
+      if (sessionStorage.getItem(TOWER_CREATE_WORKSPACE_DIALOG_DISMISSED_KEY) === "1") {
+        return;
+      }
+    } catch {
+      return;
+    }
+    setCreateOpen(true);
+  }, [blocker, summary.canCreateOrganization]);
+
   const copy = towerWorkspaceOnboardingCopy(blocker);
+
+  function onCreateDialogOpenChange(open: boolean): void {
+    setCreateOpen(open);
+    if (!open) {
+      try {
+        sessionStorage.setItem(TOWER_CREATE_WORKSPACE_DIALOG_DISMISSED_KEY, "1");
+      } catch {
+        // ignore storage failures
+      }
+    }
+  }
 
   async function onCreateWorkspace(event: FormEvent): Promise<boolean> {
     event.preventDefault();
@@ -125,6 +152,11 @@ function TowerWorkspaceCreateWorkspacePanel({
       return false;
     }
     setOrgName("");
+    try {
+      sessionStorage.removeItem(TOWER_CREATE_WORKSPACE_DIALOG_DISMISSED_KEY);
+    } catch {
+      // ignore storage failures
+    }
     await Promise.all([refetchOrgs(), refetchActiveOrg()]);
     toast.success("Workspace created");
     router.refresh();
@@ -152,11 +184,13 @@ function TowerWorkspaceCreateWorkspacePanel({
       {summary.canCreateOrganization ? (
         <CreateWorkspaceDialog
           open={createOpen}
-          onOpenChange={setCreateOpen}
+          onOpenChange={onCreateDialogOpenChange}
           orgName={orgName}
           onOrgNameChange={setOrgName}
           busy={busy}
           onSubmit={onCreateWorkspace}
+          title="Create your workspace"
+          description="Name your workspace, then connect Webflow from Connection or the dashboard."
         />
       ) : null}
     </>
@@ -197,7 +231,7 @@ function TowerWorkspaceOnboardingAlert({
   );
 }
 
-export function TowerWorkspaceOnboardingBanner({
+function TowerWorkspaceOnboardingBannerInner({
   summary,
   billingEnabled,
   oauthConfigured = false,
@@ -205,12 +239,16 @@ export function TowerWorkspaceOnboardingBanner({
   embedded = false,
 }: TowerWorkspaceOnboardingBannerProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const onWebflowConnectSuccess = useCallback(() => {
     router.refresh();
   }, [router]);
   const blocker = resolveTowerWorkspaceOnboardingBlocker(summary, { includeWebflowConnect });
+  const queryStatus = parseTowerWebflowQueryStatus(
+    searchParams.get(TOWER_CONNECTION_STATUS_QUERY) ?? searchParams.get("webflow")
+  );
 
-  if (!blocker) {
+  if (!blocker || shouldSuppressOnboardingForQuery(queryStatus, blocker)) {
     return null;
   }
 
@@ -237,7 +275,15 @@ export function TowerWorkspaceOnboardingBanner({
     return content;
   }
 
-  return <div className="mb-8">{content}</div>;
+  return content;
+}
+
+export function TowerWorkspaceOnboardingBanner(props: TowerWorkspaceOnboardingBannerProps) {
+  return (
+    <Suspense fallback={null}>
+      <TowerWorkspaceOnboardingBannerInner {...props} embedded />
+    </Suspense>
+  );
 }
 
 type TowerWebflowQueryBannerProps = {
@@ -255,11 +301,12 @@ function TowerWebflowQueryBannerInner({ webflowOAuthConnected }: TowerWebflowQue
     if (!status || (!searchParams.has(TOWER_CONNECTION_STATUS_QUERY) && !searchParams.has("webflow"))) {
       return;
     }
+    notifyWebflowConnectionQueryStatus(status, webflowOAuthConnected);
     const url = new URL(window.location.href);
     url.searchParams.delete(TOWER_CONNECTION_STATUS_QUERY);
     url.searchParams.delete("webflow");
     router.replace(`${url.pathname}${url.search}`, { scroll: false });
-  }, [status, router, searchParams]);
+  }, [status, router, searchParams, webflowOAuthConnected]);
 
   if (!status) {
     return null;
@@ -269,10 +316,10 @@ function TowerWebflowQueryBannerInner({ webflowOAuthConnected }: TowerWebflowQue
     return (
       <Alert variant="warning">
         <IconAlertCircle />
-        <AlertTitle>Webflow is not connected yet</AlertTitle>
+        <AlertTitle>Connection not saved</AlertTitle>
         <AlertDescription>
-          This page was opened after authorization, but this workspace still has no stored Webflow token. Try connecting
-          again or switch to the workspace you linked.
+          Authorization finished, but this workspace has no Webflow token yet. Connect again or switch to the workspace
+          you authorized.
         </AlertDescription>
       </Alert>
     );
@@ -300,29 +347,13 @@ export function TowerWebflowQueryBanner(props: TowerWebflowQueryBannerProps) {
 
 type TowerWebflowSetupAlertsProps = {
   summary: TowerDashboardSummary;
-  billingEnabled: boolean;
   oauthConfigured: boolean;
 };
 
-function TowerWebflowSetupAlertsInner({ summary, billingEnabled, oauthConfigured }: TowerWebflowSetupAlertsProps) {
-  const searchParams = useSearchParams();
-  const queryStatus = parseTowerWebflowQueryStatus(
-    searchParams.get(TOWER_CONNECTION_STATUS_QUERY) ?? searchParams.get("webflow")
-  );
-  const blocker = resolveTowerWorkspaceOnboardingBlocker(summary);
-  const suppressOnboarding = shouldSuppressOnboardingForQuery(queryStatus, blocker);
-
+function TowerWebflowSetupAlertsInner({ summary, oauthConfigured }: TowerWebflowSetupAlertsProps) {
   return (
     <div className="space-y-3">
       <TowerWebflowQueryBanner webflowOAuthConnected={summary.webflowOAuthConnected} />
-      {suppressOnboarding ? null : (
-        <TowerWorkspaceOnboardingBanner
-          summary={summary}
-          billingEnabled={billingEnabled}
-          oauthConfigured={oauthConfigured}
-          embedded
-        />
-      )}
       {!oauthConfigured ? (
         <Alert variant="warning">
           <IconAlertCircle />

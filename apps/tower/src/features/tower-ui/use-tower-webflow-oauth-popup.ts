@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from "react";
 import { toast } from "sonner";
+import { notifyWebflowOAuthPopupResult } from "@/features/tower-ui/lib/tower-webflow-connection-toasts";
 import {
   messageForWebflowOAuthAuthorizeError,
   parseWebflowOAuthAuthorizeError,
@@ -12,6 +13,8 @@ const WEBFLOW_OAUTH_POPUP_FEATURES = "popup=yes,width=480,height=700,scrollbars=
 type WebflowOAuthMessage = {
   type?: string;
   status?: string;
+  error?: string;
+  detail?: string;
 };
 
 function isTrustedOAuthMessageOrigin(origin: string): boolean {
@@ -21,37 +24,49 @@ function isTrustedOAuthMessageOrigin(origin: string): boolean {
   return origin === window.location.origin;
 }
 
-export function useTowerWebflowOAuthPopupListener(onSuccess?: () => void) {
-  useEffect(() => {
-    if (!onSuccess) {
-      return;
+const webflowOAuthSuccessListeners = new Set<() => void>();
+let webflowOAuthMessageListenerAttached = false;
+
+function handleWebflowOAuthMessage(event: MessageEvent): void {
+  if (!isTrustedOAuthMessageOrigin(event.origin)) {
+    return;
+  }
+
+  const data = event.data as WebflowOAuthMessage | null;
+  if (data?.type !== "codalyn:webflow-oauth") {
+    return;
+  }
+  if (data.status === "success") {
+    notifyWebflowOAuthPopupResult("success");
+    for (const listener of webflowOAuthSuccessListeners) {
+      listener();
     }
+    return;
+  }
+  if (data.status === "error") {
+    notifyWebflowOAuthPopupResult("error", data.error, data.detail);
+  }
+}
 
-    function handleMessage(event: MessageEvent) {
-      if (!isTrustedOAuthMessageOrigin(event.origin)) {
-        return;
-      }
-
-      const data = event.data as WebflowOAuthMessage | null;
-      if (data?.type !== "codalyn:webflow-oauth") {
-        return;
-      }
-      if (data.status === "success") {
-        onSuccess?.();
-        return;
-      }
-      if (data.status === "error") {
-        toast.error("Webflow authorization was cancelled or failed.");
-      }
-    }
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [onSuccess]);
+function ensureWebflowOAuthMessageListener(): void {
+  if (webflowOAuthMessageListenerAttached || typeof window === "undefined") {
+    return;
+  }
+  webflowOAuthMessageListenerAttached = true;
+  window.addEventListener("message", handleWebflowOAuthMessage);
 }
 
 export function useTowerWebflowOAuthPopup(onSuccess?: () => void) {
-  useTowerWebflowOAuthPopupListener(onSuccess);
+  useEffect(() => {
+    ensureWebflowOAuthMessageListener();
+    if (!onSuccess) {
+      return;
+    }
+    webflowOAuthSuccessListeners.add(onSuccess);
+    return () => {
+      webflowOAuthSuccessListeners.delete(onSuccess);
+    };
+  }, [onSuccess]);
 
   const openPopup = useCallback(async (): Promise<boolean> => {
     const res = await fetch("/api/integrations/webflow/authorize", {

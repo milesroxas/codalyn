@@ -14,6 +14,8 @@ type CreateWorkspaceDialogProps = {
   onOrgNameChange: (value: string) => void;
   busy: boolean;
   onSubmit: (event: FormEvent) => Promise<boolean>;
+  title?: string;
+  description?: string;
 };
 
 export function CreateWorkspaceDialog({
@@ -23,13 +25,15 @@ export function CreateWorkspaceDialog({
   onOrgNameChange,
   busy,
   onSubmit,
+  title = "New workspace",
+  description = "Each workspace has its own Webflow connection, Beacon presets, and team.",
 }: CreateWorkspaceDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New workspace</DialogTitle>
-          <DialogDescription>Each workspace has its own Webflow, presets, and team.</DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <form
           className="grid gap-4"

@@ -79,6 +79,14 @@ describe("tower-hosts", () => {
     expect(isHostSplitEnabled()).toBe(true);
   });
 
+  it("auto-enables split when app URL uses tower-preview subdomain", () => {
+    snapshotEnv();
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    expect(isHostSplitEnabled()).toBe(true);
+    expect(isAppHost("tower-preview.codalyn.app")).toBe(true);
+    expect(isMarketingHost("tower-preview.codalyn.app")).toBe(false);
+  });
+
   it("builds app and marketing URLs from env", () => {
     snapshotEnv();
     process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";

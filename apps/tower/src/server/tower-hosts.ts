@@ -68,6 +68,10 @@ function resolveMarketingOriginFromEnv(): string {
   return DEFAULT_MARKETING_ORIGIN;
 }
 
+function isTowerAppSubdomain(hostname: string): boolean {
+  return /^tower[.-]/.test(normalizeHostname(hostname));
+}
+
 function resolveSplitEnabledFromEnv(): boolean {
   if (process.env.TOWER_HOST_SPLIT === "0" || process.env.TOWER_HOST_SPLIT === "false") {
     return false;
@@ -80,7 +84,7 @@ function resolveSplitEnabledFromEnv(): boolean {
   }
   try {
     const hostname = normalizeHostname(new URL(resolveTowerPublicBaseUrl()).hostname);
-    return hostname.startsWith("tower.");
+    return isTowerAppSubdomain(hostname);
   } catch {
     return false;
   }

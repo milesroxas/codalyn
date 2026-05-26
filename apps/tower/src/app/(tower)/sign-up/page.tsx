@@ -7,10 +7,8 @@ import {
   syncExistingTowerSessionToBeaconIfPopup,
   tryFinishBeaconTowerAuthPopup,
 } from "@/features/auth/lib/beacon-opener-auth";
-import {
-  resolveTowerAppCallbackUrl,
-  resolveTowerEmailVerificationCallbackUrl,
-} from "@/features/auth/lib/email-verification";
+import { buildTowerAuthSurfaceHref } from "@/features/auth/lib/build-tower-auth-surface-href";
+import { resolveTowerEmailVerificationAppCallbackUrl } from "@/features/auth/lib/email-verification";
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
@@ -143,7 +141,7 @@ function SignUpForm() {
     const displayName =
       [firstName.trim(), lastName.trim()].filter(Boolean).join(" ").trim() || email.split("@")[0] || "User";
     const inviteToken = operatorInviteToken ?? operatorInviteParam?.trim() ?? null;
-    const verificationCallback = resolveTowerAppCallbackUrl(resolveTowerEmailVerificationCallbackUrl(callbackUrl));
+    const verificationCallback = resolveTowerEmailVerificationAppCallbackUrl(callbackUrl);
     const { data, error: err } = await authClient.signUp.email({
       email,
       password,
@@ -179,8 +177,12 @@ function SignUpForm() {
     await finishSignUp(data);
   }
 
-  const signInHref = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`;
-  const requestAccessHref = `/request-access?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`;
+  const authSearchParams = {
+    beaconOrigin,
+    invite: operatorInviteParam,
+  };
+  const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl, authSearchParams);
+  const requestAccessHref = buildTowerAuthSurfaceHref("/request-access", callbackUrl, authSearchParams);
   const joiningViaTeamInvite = callbackUrl.includes("/invitations/accept");
 
   if (sessionPending || redirectingSignedInUser || earlyAccessRequired === null || !inviteValidated) {
@@ -288,10 +290,7 @@ function SignUpForm() {
         <CardFooter className="flex-col border-t border-border/60 bg-muted/20 px-6 py-4">
           <p className="text-left text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link
-              href={`/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`}
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
+            <Link href={signInHref} className="font-medium text-foreground underline-offset-4 hover:underline">
               Sign in
             </Link>
           </p>

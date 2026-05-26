@@ -1,6 +1,6 @@
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 
-export type TowerAuthSurfacePath = "/sign-in" | "/sign-up" | "/forgot-password" | "/reset-password";
+export type TowerAuthSurfacePath = "/sign-in" | "/sign-up" | "/forgot-password" | "/reset-password" | "/request-access";
 
 export function buildTowerAuthSurfaceHref(
   path: TowerAuthSurfacePath,

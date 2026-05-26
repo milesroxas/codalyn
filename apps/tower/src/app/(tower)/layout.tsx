@@ -20,7 +20,8 @@ export default async function TowerLayout({ children }: { children: React.ReactN
   const usageBanner = userId ? (
     <TowerUsageApproachingBanner userId={userId} activeOrganizationId={activeOrg} billingEnabled={billingEnabled} />
   ) : null;
-  const emailVerificationBanner = userId ? <TowerEmailVerificationBanner /> : null;
+  const emailVerificationBanner =
+    userId && session?.user && !session.user.emailVerified ? <TowerEmailVerificationBanner /> : null;
   const workspaceOnboarding = userId ? <TowerWorkspaceOnboardingShell /> : null;
 
   return (

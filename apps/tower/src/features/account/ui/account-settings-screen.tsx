@@ -1,9 +1,10 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
+import { type FormEvent, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { AccountDeleteSection } from "@/features/account/ui/account-delete-section";
 import { AccountSettingsSkeleton } from "@/features/account/ui/account-settings-skeleton";
+import { resolveTowerAppCallbackUrl } from "@/features/auth/lib/email-verification";
 import { authClient } from "@/features/auth/model/auth-client";
 import { useRequireTowerSession } from "@/features/auth/model/use-require-tower-session";
 import { Button } from "@/shared/ui/button";
@@ -50,17 +51,6 @@ export function AccountSettingsScreen() {
     setLastName(u.lastName?.trim() ?? "");
   }, [session?.user]);
 
-  const appCallbackUrl = useCallback((path: string) => {
-    const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
-    if (base) {
-      return `${base}${path.startsWith("/") ? path : `/${path}`}`;
-    }
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}${path.startsWith("/") ? path : `/${path}`}`;
-    }
-    return path;
-  }, []);
-
   async function onUpdateProfile(e: FormEvent) {
     e.preventDefault();
     if (!session?.user) {
@@ -102,7 +92,7 @@ export function AccountSettingsScreen() {
     setEmailBusy(true);
     const { error } = await authClient.changeEmail({
       newEmail: newEmail.trim(),
-      callbackURL: appCallbackUrl("/account"),
+      callbackURL: resolveTowerAppCallbackUrl("/account"),
       fetchOptions: { credentials: "include" },
     });
     setEmailBusy(false);

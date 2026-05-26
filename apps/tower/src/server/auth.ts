@@ -24,6 +24,7 @@ import {
 import { resolveTowerCookieDomain } from "@/server/tower-hosts";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { resolveTowerTrustedOrigins } from "@/server/tower-trusted-origins";
+import { TOWER_SKIP_VERIFICATION_EMAIL_HEADER } from "@/shared/lib/auth/tower-email-verification-header";
 import { db } from "@/shared/lib/db";
 import * as schema from "@/shared/lib/db/auth-schema";
 
@@ -64,7 +65,10 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, url }) => {
+    sendVerificationEmail: async ({ user, url }, request) => {
+      if (request?.headers.get(TOWER_SKIP_VERIFICATION_EMAIL_HEADER) === "1") {
+        return;
+      }
       await sendEmailVerificationEmail({
         user: { email: user.email, name: user.name },
         url,

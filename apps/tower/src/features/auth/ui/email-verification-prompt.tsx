@@ -6,10 +6,8 @@ import { toast } from "sonner";
 import {
   CHECK_EMAIL_PROMPT_COPY,
   EMAIL_VERIFICATION_BANNER_COPY,
-  resolveTowerAppCallbackUrl,
-  resolveTowerEmailVerificationCallbackUrl,
+  sendTowerVerificationEmail,
 } from "@/features/auth/lib/email-verification";
-import { authClient } from "@/features/auth/model/auth-client";
 import { AuthCheckEmailCard } from "@/features/auth/ui/auth-check-email-card";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
@@ -21,14 +19,7 @@ type CheckEmailPromptProps = {
 };
 
 export function CheckEmailPrompt({ email, callbackPath = "/", signInHref = "/sign-in" }: CheckEmailPromptProps) {
-  const onResend = useCallback(async () => {
-    const { error } = await authClient.sendVerificationEmail({
-      email,
-      callbackURL: resolveTowerAppCallbackUrl(resolveTowerEmailVerificationCallbackUrl(callbackPath)),
-      fetchOptions: { credentials: "include" },
-    });
-    return { error: error?.message ?? null };
-  }, [callbackPath, email]);
+  const onResend = useCallback(() => sendTowerVerificationEmail(email, callbackPath), [callbackPath, email]);
 
   return (
     <AuthCheckEmailCard
@@ -53,14 +44,10 @@ export function EmailVerificationResendButton({ email, callbackPath = "/" }: Ema
 
   const onResend = useCallback(async () => {
     setPending(true);
-    const { error } = await authClient.sendVerificationEmail({
-      email,
-      callbackURL: resolveTowerAppCallbackUrl(resolveTowerEmailVerificationCallbackUrl(callbackPath)),
-      fetchOptions: { credentials: "include" },
-    });
+    const { error } = await sendTowerVerificationEmail(email, callbackPath);
     setPending(false);
     if (error) {
-      toast.error(error.message ?? "Could not send verification email");
+      toast.error(error);
       return;
     }
     toast.success(CHECK_EMAIL_PROMPT_COPY.resendSuccess);

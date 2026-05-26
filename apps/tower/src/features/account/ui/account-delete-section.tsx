@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
+import { resolveTowerAppCallbackUrl } from "@/features/auth/lib/email-verification";
 import { authClient } from "@/features/auth/model/auth-client";
 import {
   formatSoleAdminWorkspacesMessage,
@@ -29,17 +30,6 @@ type DeleteEligibility = {
   blockers: WorkspaceDeletionBlocker[];
   soleMemberWorkspaceCount: number;
 };
-
-function resolveAppCallbackUrl(path: string): string {
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
-  if (base) {
-    return `${base}${path.startsWith("/") ? path : `/${path}`}`;
-  }
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}${path.startsWith("/") ? path : `/${path}`}`;
-  }
-  return path;
-}
 
 async function fetchDeleteEligibility(): Promise<DeleteEligibility> {
   const res = await fetch("/api/account/delete-eligibility", { credentials: "include" });
@@ -98,7 +88,7 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
     setDeleteBusy(true);
     const { error } = await authClient.deleteUser({
       password: deletePassword,
-      callbackURL: resolveAppCallbackUrl("/"),
+      callbackURL: resolveTowerAppCallbackUrl("/"),
       fetchOptions: { credentials: "include" },
     });
     setDeleteBusy(false);

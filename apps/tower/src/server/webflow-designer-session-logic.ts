@@ -5,6 +5,7 @@ import { assertEmailMaySignUp, assertUserMaySignInByEmail } from "@/server/acces
 import { auth } from "@/server/auth";
 import { deriveWebflowDesignerCredentialPassword } from "@/server/derive-webflow-designer-password";
 import type { WebflowResolvedDesignerUser } from "@/server/webflow-resolve-designer-id-token";
+import { TOWER_SKIP_VERIFICATION_EMAIL_HEADER } from "@/shared/lib/auth/tower-email-verification-header";
 import { db } from "@/shared/lib/db";
 import { account, user } from "@/shared/lib/db/auth-schema";
 
@@ -46,6 +47,12 @@ async function markEmailVerifiedForWebflowDesigner(email: string): Promise<void>
   await db.update(user).set({ emailVerified: true }).where(eq(user.email, email));
 }
 
+function webflowDesignerAuthHeaders(request: Request): Headers {
+  const headers = new Headers(request.headers);
+  headers.set(TOWER_SKIP_VERIFICATION_EMAIL_HEADER, "1");
+  return headers;
+}
+
 async function signUpNewDesignerUser(
   request: Request,
   resolved: WebflowResolvedDesignerUser,
@@ -67,7 +74,7 @@ async function signUpNewDesignerUser(
         firstName: resolved.firstName ?? undefined,
         lastName: resolved.lastName ?? undefined,
       },
-      headers: request.headers,
+      headers: webflowDesignerAuthHeaders(request),
     });
     await db
       .update(user)
@@ -87,7 +94,7 @@ async function signUpNewDesignerUser(
         password,
         rememberMe: true,
       },
-      headers: request.headers,
+      headers: webflowDesignerAuthHeaders(request),
     });
     if (!signedIn.token) {
       return { ok: false, status: 500, message: "session_not_issued" };
@@ -119,7 +126,7 @@ async function signInExistingDesignerUser(
         password,
         rememberMe: true,
       },
-      headers: request.headers,
+      headers: webflowDesignerAuthHeaders(request),
     });
     return { ok: true, user: signedIn.user, token: signedIn.token };
   } catch (e: unknown) {

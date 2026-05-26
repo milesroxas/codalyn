@@ -11,8 +11,7 @@ import {
 import { buildTowerAuthSurfaceHref } from "@/features/auth/lib/build-tower-auth-surface-href";
 import {
   isEmailNotVerifiedAuthError,
-  resolveTowerAppCallbackUrl,
-  resolveTowerEmailVerificationCallbackUrl,
+  resolveTowerEmailVerificationAppCallbackUrl,
 } from "@/features/auth/lib/email-verification";
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import {
@@ -164,7 +163,7 @@ function SignInForm() {
     e.preventDefault();
     setError(null);
     setPending(true);
-    const verificationCallback = resolveTowerAppCallbackUrl(resolveTowerEmailVerificationCallbackUrl(callbackUrl));
+    const verificationCallback = resolveTowerEmailVerificationAppCallbackUrl(callbackUrl);
     const { data, error: err } = await authClient.signIn.email({
       email,
       password,

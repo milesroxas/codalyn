@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { createWorkspaceOrganization } from "@/features/team/api/create-workspace-organization";
 import { TeamWorkspaceSwitcher } from "@/features/team/ui/team-workspace-switcher";
-import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 
 type SessionUserWithPreferred = {
   preferredOrganizationId?: string | null;
@@ -24,7 +23,7 @@ function pickAutoWorkspaceId(orgList: { id: string }[], preferred: string | null
   return orgList[0].id;
 }
 
-export function TowerHeaderWorkspaceSwitcher() {
+export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; canCreateWorkspace: boolean }) {
   const { data: session, isPending: sessionPending, refetch: refetchSession } = authClient.useSession();
   const { data: orgs, isPending: orgsPending, refetch: refetchOrgs } = authClient.useListOrganizations();
   const {
@@ -43,11 +42,6 @@ export function TowerHeaderWorkspaceSwitcher() {
   }, [refetchOrgs, refetchActiveOrg]);
 
   const preferredOrgId = (session?.user as SessionUserWithPreferred | undefined)?.preferredOrganizationId ?? undefined;
-
-  const isProductAdmin = isProductAdminAppRole(session?.user?.role);
-  const canCreateTeam =
-    isProductAdmin ||
-    Boolean((session?.user as { canCreateOrganization?: boolean } | undefined)?.canCreateOrganization);
 
   useEffect(() => {
     const uid = session?.user?.id;
@@ -184,7 +178,8 @@ export function TowerHeaderWorkspaceSwitcher() {
       triggerLabel={workspaceTriggerLabel}
       busy={busy}
       compact
-      canCreateTeam={canCreateTeam}
+      canCreateTeam={props.canCreateWorkspace}
+      billingEnabled={props.billingEnabled}
       orgName={orgName}
       onOrgNameChange={setOrgName}
       onCreateOrg={onCreateOrg}

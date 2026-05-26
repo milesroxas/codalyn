@@ -19,6 +19,7 @@ type TowerAppShellProps = {
   billingEnabled: boolean;
   /** Server session hint — keeps authenticated chrome stable while client session hydrates. */
   signedIn: boolean;
+  canCreateWorkspace?: boolean;
   usageBanner?: React.ReactNode;
   workspaceOnboarding?: React.ReactNode;
   children: React.ReactNode;
@@ -26,18 +27,20 @@ type TowerAppShellProps = {
 
 function TowerAuthenticatedShell({
   billingEnabled,
+  canCreateWorkspace,
   usageBanner,
   workspaceOnboarding,
   children,
 }: {
   billingEnabled: boolean;
+  canCreateWorkspace: boolean;
   usageBanner?: React.ReactNode;
   workspaceOnboarding?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <SidebarProvider className="h-dvh overflow-hidden" style={shellStyle}>
-      <TowerAppSidebar billingEnabled={billingEnabled} variant="inset" />
+      <TowerAppSidebar billingEnabled={billingEnabled} canCreateWorkspace={canCreateWorkspace} variant="inset" />
       <SidebarInset>
         <TowerSiteHeader />
         <div className="flex min-h-0 flex-1 flex-col">
@@ -63,6 +66,7 @@ function TowerAuthenticatedShell({
 export function TowerAppShell({
   billingEnabled,
   signedIn,
+  canCreateWorkspace = false,
   usageBanner,
   workspaceOnboarding,
   children,
@@ -88,6 +92,7 @@ export function TowerAppShell({
   return (
     <TowerAuthenticatedShell
       billingEnabled={billingEnabled}
+      canCreateWorkspace={canCreateWorkspace}
       usageBanner={usageBanner}
       workspaceOnboarding={workspaceOnboarding}
     >

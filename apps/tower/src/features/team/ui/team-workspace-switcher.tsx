@@ -8,6 +8,7 @@ import {
   IconStar,
   IconStarFilled,
 } from "@tabler/icons-react";
+import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { CreateWorkspaceDialog } from "@/features/team/ui/create-workspace-dialog";
 import { Button } from "@/shared/ui/button";
@@ -26,6 +27,47 @@ import { Skeleton } from "@/shared/ui/skeleton";
 
 export type WorkspaceOrgRow = { id: string; name: string; slug: string };
 
+function workspaceEmptyStateMessage(canCreateTeam: boolean, billingEnabled: boolean | undefined): string {
+  if (canCreateTeam) {
+    return "No workspaces yet. Create one to connect Webflow and manage Beacon presets.";
+  }
+  if (billingEnabled) {
+    return "Upgrade to Pro to create a workspace.";
+  }
+  return "No workspaces yet.";
+}
+
+function WorkspaceSwitcherCreateActions(props: {
+  canCreateTeam: boolean;
+  billingEnabled: boolean | undefined;
+  onOpenCreate: () => void;
+}) {
+  if (props.canCreateTeam) {
+    return (
+      <>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={props.onOpenCreate}>
+          <IconPlus className="size-4" />
+          New workspace
+        </DropdownMenuItem>
+      </>
+    );
+  }
+
+  if (!props.billingEnabled) {
+    return null;
+  }
+
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem asChild>
+        <Link href="/billing">Upgrade to Pro for another workspace</Link>
+      </DropdownMenuItem>
+    </>
+  );
+}
+
 export function TeamWorkspaceSwitcher(props: {
   orgs: WorkspaceOrgRow[] | null | undefined;
   orgsPending: boolean;
@@ -36,6 +78,7 @@ export function TeamWorkspaceSwitcher(props: {
   /** Narrow trigger for app header. */
   compact?: boolean;
   canCreateTeam: boolean;
+  billingEnabled?: boolean;
   orgName: string;
   onOrgNameChange: (v: string) => void;
   onCreateOrg: (e: FormEvent) => Promise<boolean>;
@@ -129,24 +172,14 @@ export function TeamWorkspaceSwitcher(props: {
             </div>
           ) : (
             <DropdownMenuEmptyState>
-              {props.canCreateTeam
-                ? "No workspaces yet. Create one to connect Webflow and manage Beacon presets."
-                : "No team workspaces yet. Accept an invite or upgrade to Team to create one."}
+              {workspaceEmptyStateMessage(props.canCreateTeam, props.billingEnabled)}
             </DropdownMenuEmptyState>
           )}
-          {props.canCreateTeam ? (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() => {
-                  setCreateOpen(true);
-                }}
-              >
-                <IconPlus className="size-4" />
-                New workspace
-              </DropdownMenuItem>
-            </>
-          ) : null}
+          <WorkspaceSwitcherCreateActions
+            canCreateTeam={props.canCreateTeam}
+            billingEnabled={props.billingEnabled}
+            onOpenCreate={() => setCreateOpen(true)}
+          />
         </DropdownMenuContent>
       </DropdownMenu>
 

@@ -6,6 +6,7 @@ import { TowerWorkspaceOnboardingShell } from "@/features/tower-ui/tower-workspa
 import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
+import { getTowerSessionOnboardingContext } from "@/server/tower-onboarding-context";
 
 export default async function TowerLayout({ children }: { children: React.ReactNode }) {
   const billingEnabled = isTowerBillingEnabled();
@@ -13,6 +14,7 @@ export default async function TowerLayout({ children }: { children: React.ReactN
   const session = await auth.api.getSession({ headers: requestHeaders });
   const userId = session?.user?.id;
   const activeOrg = userId ? await getActiveOrganizationIdForAuthHeaders(requestHeaders) : null;
+  const onboardingCtx = userId ? await getTowerSessionOnboardingContext() : null;
 
   const usageBanner = userId ? (
     <TowerUsageApproachingBanner userId={userId} activeOrganizationId={activeOrg} billingEnabled={billingEnabled} />
@@ -23,6 +25,7 @@ export default async function TowerLayout({ children }: { children: React.ReactN
     <TowerAppShell
       billingEnabled={billingEnabled}
       signedIn={Boolean(userId)}
+      canCreateWorkspace={onboardingCtx?.canCreateOrganization ?? false}
       usageBanner={usageBanner}
       workspaceOnboarding={workspaceOnboarding}
     >

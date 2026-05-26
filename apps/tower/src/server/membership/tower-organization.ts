@@ -9,7 +9,7 @@ import {
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { resolveMembershipSeatCapFromOrg } from "@/server/billing/team-billing-config";
 import { sendOrganizationInvitationEmail } from "@/server/email/organization-invitation-email";
-import { isTowerProductAdmin } from "@/server/membership/product-admin";
+import { resolveUserWorkspaceCreationEligibility } from "@/server/membership/user-workspace-creation-eligibility";
 import {
   assertWorkspaceSlugAvailableForUpdate,
   isWorkspaceSlugTaken,
@@ -35,14 +35,12 @@ export const towerOrganization = organization({
   /** All workspace deletes go through `deleteWorkspace` (Stripe cancel, session cleanup, slug confirm). */
   disableOrganizationDeletion: true,
   /**
-   * Team workspaces are a product tier: only SaaS operators (`product_admin`) or users with
-   * `canCreateOrganization` (billing upgrade, signup intent, etc.) may create organizations.
+   * Free accounts may admin one workspace; additional owned workspaces require individual Pro
+   * (or `canCreateOrganization` ops / team-billing override). Non-admin memberships do not count.
    */
   allowUserToCreateOrganization: async (user) => {
-    if (isTowerProductAdmin(user)) {
-      return true;
-    }
-    return Boolean(user.canCreateOrganization);
+    const eligibility = await resolveUserWorkspaceCreationEligibility(user.id);
+    return eligibility.canCreate;
   },
   membershipLimit: async (_user, org) => resolveMembershipSeatCapFromOrg(org as { seatLimit?: number | null }),
   invitationLimit: async ({ organization: org }) =>
@@ -51,7 +49,15 @@ export const towerOrganization = organization({
     await sendOrganizationInvitationEmail(data);
   },
   organizationHooks: {
-    beforeCreateOrganization: async ({ organization: orgInput }) => {
+    beforeCreateOrganization: async ({ organization: orgInput, user }) => {
+      const eligibility = await resolveUserWorkspaceCreationEligibility(user.id);
+      if (!eligibility.canCreate) {
+        throw new APIError("FORBIDDEN", {
+          message: "Upgrade to Pro to create another workspace.",
+          code: "workspace_creation_requires_pro",
+        });
+      }
+
       const parsed = resolveWorkspaceSlugForCreate(orgInput);
       if (!parsed.ok) {
         throw new APIError("BAD_REQUEST", {

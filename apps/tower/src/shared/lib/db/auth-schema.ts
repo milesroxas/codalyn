@@ -13,8 +13,8 @@ export const user = pgTable("user", {
   /** App-wide role from Better Auth admin plugin: `user` or `product_admin`. */
   role: text("role"),
   /**
-   * Eligible to create organizations (team workspaces). Set by signup intent, billing/upgrade webhooks, or ops.
-   * Server-enforced via `allowUserToCreateOrganization`; not set by public client input.
+   * Operator override to create owned workspaces beyond the free-tier cap without individual Pro.
+   * Does not affect the first free workspace. Set by ops, invites, or team checkout — not by default.
    */
   canCreateOrganization: boolean("can_create_organization").default(false).notNull(),
   banned: boolean("banned").default(false).notNull(),

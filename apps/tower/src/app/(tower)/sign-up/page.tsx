@@ -22,51 +22,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { Switch } from "@/shared/ui/switch";
-
-async function postEnableTeamCreation(): Promise<{ ok: true } | { ok: false; errorKey?: string }> {
-  const res = await fetch("/api/account/enable-team-creation", {
-    method: "POST",
-    credentials: "include",
-  });
-  if (res.ok) {
-    return { ok: true };
-  }
-  const body = (await res.json().catch(() => null)) as { error?: string } | null;
-  return { ok: false, errorKey: body?.error };
-}
-
-function messageForEnableTeamError(errorKey: string | undefined): string {
-  if (errorKey === "team_creation_requires_upgrade") {
-    return "Account created. Subscribe to Team on the Team page to create a workspace, or upgrade within 15 minutes of signup.";
-  }
-  if (errorKey === "already_in_organization") {
-    return "Account created. You already belong to a team.";
-  }
-  return "Account created, but team workspace could not be enabled yet. You can upgrade later.";
-}
 
 async function runAfterTowerSignUp(opts: {
   operatorInviteToken: string | null;
   beaconOrigin: string | null;
-  startWithTeamWorkspace: boolean;
 }): Promise<string | null> {
   if (opts.operatorInviteToken && !opts.beaconOrigin) {
     const redeemResult = await redeemOperatorInviteClient(opts.operatorInviteToken);
     if (redeemResult !== "ok") {
       return messageForRedeemFailure(redeemResult);
-    }
-  }
-  if (opts.startWithTeamWorkspace && !opts.beaconOrigin) {
-    const enable = await postEnableTeamCreation();
-    if (!enable.ok) {
-      return messageForEnableTeamError(enable.errorKey);
-    }
-  }
-  if (opts.beaconOrigin) {
-    const enable = await postEnableTeamCreation();
-    if (!enable.ok && enable.errorKey !== "already_in_organization") {
-      return messageForEnableTeamError(enable.errorKey);
     }
   }
   return null;
@@ -86,12 +50,11 @@ function SignUpForm() {
   const lastNameId = useId();
   const emailId = useId();
   const passwordId = useId();
-  const teamWorkspaceId = useId();
+  const workspaceHintId = useId();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [startWithTeamWorkspace, setStartWithTeamWorkspace] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [operatorInviteToken, setOperatorInviteToken] = useState<string | null>(null);
@@ -141,7 +104,6 @@ function SignUpForm() {
       const data = (await res.json().catch(() => null)) as { email?: string } | null;
       if (data?.email) {
         setEmail(data.email);
-        setStartWithTeamWorkspace(true);
         setOperatorInviteToken(operatorInviteParam);
         setInviteEmailLocked(true);
       }
@@ -197,7 +159,6 @@ function SignUpForm() {
     const postErr = await runAfterTowerSignUp({
       operatorInviteToken: inviteToken,
       beaconOrigin,
-      startWithTeamWorkspace,
     });
     if (postErr) {
       setError(postErr);
@@ -286,25 +247,12 @@ function SignUpForm() {
               <p className="text-xs text-muted-foreground">At least 8 characters.</p>
             </FormField>
             {!beaconOrigin ? (
-              <div className="flex items-start justify-between gap-4 rounded-xl border border-border/60 bg-muted/25 p-4 dark:bg-muted/15">
-                <div className="min-w-0 space-y-1">
-                  <Label htmlFor={teamWorkspaceId} className="text-sm font-medium">
-                    Team workspace
-                  </Label>
-                  <p id={`${teamWorkspaceId}-hint`} className="text-xs leading-relaxed text-muted-foreground">
-                    {operatorInviteToken
-                      ? "Your invite includes permission to create a team workspace."
-                      : "Required for Webflow, Beacon presets, and team billing. You can rename the workspace later."}
-                  </p>
-                </div>
-                <Switch
-                  id={teamWorkspaceId}
-                  checked={startWithTeamWorkspace}
-                  onCheckedChange={setStartWithTeamWorkspace}
-                  disabled={Boolean(operatorInviteToken)}
-                  className="mt-0.5 shrink-0"
-                  aria-describedby={`${teamWorkspaceId}-hint`}
-                />
+              <div className="rounded-xl border border-border/60 bg-muted/25 p-4 dark:bg-muted/15">
+                <p id={workspaceHintId} className="text-xs leading-relaxed text-muted-foreground">
+                  {operatorInviteToken
+                    ? "Your invite includes permission to create additional workspaces."
+                    : "Every account can create one workspace for free after sign-up."}
+                </p>
               </div>
             ) : null}
             {error ? (

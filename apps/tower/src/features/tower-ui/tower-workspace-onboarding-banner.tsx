@@ -77,12 +77,9 @@ function OnboardingAlertActions({
   if (blocker === "needs_workspace" && !summary.canCreateOrganization) {
     return (
       <>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/team">View team</Link>
-        </Button>
         {billingEnabled ? (
           <Button variant="default" size="sm" asChild>
-            <Link href="/billing">Upgrade to Team</Link>
+            <Link href="/billing">Upgrade to Pro</Link>
           </Button>
         ) : null}
       </>

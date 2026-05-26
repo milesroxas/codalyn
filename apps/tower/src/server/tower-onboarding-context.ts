@@ -2,7 +2,7 @@ import { count, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { cache } from "react";
 import { auth } from "@/server/auth";
-import { isTowerProductAdmin } from "@/server/membership/product-admin";
+import { resolveUserWorkspaceCreationEligibility } from "@/server/membership/user-workspace-creation-eligibility";
 import { resolveActiveOrganizationId } from "@/server/resolve-active-organization-id";
 import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
@@ -47,14 +47,12 @@ export const getTowerSessionOnboardingContext = cache(async (): Promise<TowerSes
 
   const rawSession = sessionData.session as { id?: string } | undefined;
   const activeOrganizationId = await resolveActiveOrganizationId(userId, rawSession?.id);
-  const canCreateOrganization =
-    isTowerProductAdmin(sessionData.user) ||
-    Boolean((sessionData.user as { canCreateOrganization?: boolean }).canCreateOrganization);
 
-  const [membershipRow, activeOrgTeamAdmin, webflowAccessToken] = await Promise.all([
+  const [membershipRow, activeOrgTeamAdmin, webflowAccessToken, workspaceCreationEligibility] = await Promise.all([
     db.select({ total: count() }).from(member).where(eq(member.userId, userId)),
     activeOrganizationId ? isTowerTeamAdminMemberOfOrg(userId, activeOrganizationId) : Promise.resolve(false),
     resolveWebflowBearerToken({ userId, requestHeaders }),
+    resolveUserWorkspaceCreationEligibility(userId),
   ]);
 
   return {
@@ -63,7 +61,7 @@ export const getTowerSessionOnboardingContext = cache(async (): Promise<TowerSes
     userEmail,
     activeOrganizationId,
     workspaceMembershipCount: membershipRow[0]?.total ?? 0,
-    canCreateOrganization,
+    canCreateOrganization: workspaceCreationEligibility.canCreate,
     activeOrgTeamAdmin: activeOrgTeamAdmin,
     webflowOAuthConnected: Boolean(webflowAccessToken),
     webflowAccessToken: webflowAccessToken ?? null,

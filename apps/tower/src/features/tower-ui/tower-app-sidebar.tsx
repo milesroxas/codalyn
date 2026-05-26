@@ -20,9 +20,10 @@ import {
 
 type TowerAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   billingEnabled: boolean;
+  canCreateWorkspace: boolean;
 };
 
-export function TowerAppSidebar({ billingEnabled, ...props }: TowerAppSidebarProps) {
+export function TowerAppSidebar({ billingEnabled, canCreateWorkspace, ...props }: TowerAppSidebarProps) {
   const pathname = usePathname();
   const navItems = buildTowerMainNav(billingEnabled).map(({ title, href, icon: Icon }) => ({
     title,
@@ -44,7 +45,7 @@ export function TowerAppSidebar({ billingEnabled, ...props }: TowerAppSidebarPro
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <TowerHeaderWorkspaceSwitcher />
+            <TowerHeaderWorkspaceSwitcher billingEnabled={billingEnabled} canCreateWorkspace={canCreateWorkspace} />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

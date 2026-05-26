@@ -50,44 +50,45 @@ describe("Tower ↔ Beacon settings JSON contract", () => {
   });
 
   it("parses and preserves preset storage from Tower payloads", () => {
-    const key = serializePresetTargetKey({
-      kind: "bare-image-instance",
+    const instanceTargetKey = {
+      kind: "bare-image-instance" as const,
       siteId: "site_1",
       pageId: "page_1",
       elementId: "img_1",
-    });
+    };
+    const instanceRow = {
+      id: "inst_1",
+      name: "Instance",
+      width: 1000,
+      height: 1000,
+      maxFileSizeBytes: 90_000,
+      targetKey: instanceTargetKey,
+    };
+    const siteDefault = {
+      id: "site_default",
+      name: "Site default",
+      width: 1400,
+      height: 900,
+      maxFileSizeBytes: 100_000,
+      targetKey: {
+        kind: "site-default" as const,
+        siteId: "site_1",
+      },
+    };
     const payload = {
       ...getDefaultBeaconAppSettings(),
       imagePresetStorage: {
-        siteDefault: {
-          id: "site_default",
-          name: "Site default",
-          width: 1400,
-          height: 900,
-          maxFileSizeBytes: 100_000,
-          targetKey: {
-            kind: "site-default" as const,
-            siteId: "site_1",
-          },
-        },
+        siteDefault,
         byTargetKey: {
-          [key]: {
-            id: "inst_1",
-            name: "Instance",
-            width: 1000,
-            height: 1000,
-            maxFileSizeBytes: 90_000,
-            targetKey: {
-              kind: "bare-image-instance" as const,
-              siteId: "site_1",
-              pageId: "page_1",
-              elementId: "img_1",
-            },
-          },
+          [serializePresetTargetKey(instanceTargetKey)]: instanceRow,
         },
       },
     };
-    expect(parseBeaconAppSettings(payload).imagePresetStorage).toEqual(payload.imagePresetStorage);
+    const parsed = parseBeaconAppSettings(payload);
+    expect(parsed.imagePresetStorage.siteDefault).toEqual(siteDefault);
+    expect(parsed.imagePresetStorage.byTargetKey[serializePresetTargetKey(instanceTargetKey)]).toEqual(instanceRow);
+    expect(parsed.imagePresetStorage.byTargetKey[serializePresetTargetKey(siteDefault.targetKey)]).toEqual(siteDefault);
+    expect(parseBeaconAppSettings(parsed)).toEqual(parsed);
   });
 
   it("does not accept invalid preset rows in the schema (parse falls back to defaults)", () => {

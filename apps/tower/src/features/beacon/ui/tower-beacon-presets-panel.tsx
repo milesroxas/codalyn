@@ -10,8 +10,7 @@ import {
   formatBeaconPresetStorageSummary,
 } from "@codalyn/webflow-kit";
 import { IconPlug } from "@tabler/icons-react";
-import { useEffect, useMemo, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
 import {
   draftToMaxBytes,
   type MaxSizeUnit,
@@ -21,10 +20,11 @@ import {
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { NativeSelect } from "@/shared/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
 export type TowerBeaconWebflowSite = {
   id: string;
@@ -280,6 +280,43 @@ function SiteDefaultPresetEditor(props: {
   );
 }
 
+function countSitePresets(group: BeaconPresetSiteGroup): number {
+  return group.scopedPresets.length + (group.siteDefault ? 1 : 0);
+}
+
+function BeaconSitePicker(props: {
+  siteGroups: BeaconPresetSiteGroup[];
+  selectedSiteId: string;
+  onSelectedSiteIdChange: Dispatch<SetStateAction<string>>;
+}) {
+  const { siteGroups, selectedSiteId, onSelectedSiteIdChange } = props;
+
+  if (siteGroups.length <= 1) {
+    return null;
+  }
+
+  return (
+    <Select value={selectedSiteId} onValueChange={onSelectedSiteIdChange}>
+      <SelectTrigger aria-label="Webflow site" className="w-56 max-w-full">
+        <SelectValue placeholder="Select site" />
+      </SelectTrigger>
+      <SelectContent>
+        {siteGroups.map((group) => {
+          const presetCount = countSitePresets(group);
+          const presetSuffix =
+            presetCount > 0 ? ` · ${presetCount} preset${presetCount === 1 ? "" : "s"}` : " · no presets";
+          return (
+            <SelectItem key={group.siteId} value={group.siteId}>
+              {group.displayName}
+              {presetSuffix}
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function ScopedPresetListItem(props: { entry: BeaconPresetStorageEntry; defaultExportFormat?: ImageExportFormat }) {
   const { entry, defaultExportFormat } = props;
   const { row, scope } = entry;
@@ -293,7 +330,7 @@ function ScopedPresetListItem(props: { entry: BeaconPresetStorageEntry; defaultE
   );
 }
 
-function SitePresetsGroupCard(props: {
+function SitePresetsDetail(props: {
   baseId: string;
   group: BeaconPresetSiteGroup;
   saving: boolean;
@@ -311,59 +348,54 @@ function SitePresetsGroupCard(props: {
     upsertSiteDefaultPresetAction,
     clearSiteDefaultPresetAction,
   } = props;
-  const presetCount = group.scopedPresets.length + (group.siteDefault ? 1 : 0);
+  const presetCount = countSitePresets(group);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{group.displayName}</CardTitle>
-        <CardDescription>
-          Site ID <span className="font-mono text-xs">{group.siteId}</span>
-          {presetCount > 0 ? ` · ${presetCount} preset${presetCount === 1 ? "" : "s"}` : " · no presets yet"}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-3">
-          <p className="text-sm font-medium">Site default</p>
-          {group.siteDefault ? (
-            <SiteDefaultPresetSummary
-              siteDefaultPreset={group.siteDefault}
-              defaultExportFormat={settings?.defaultExportFormat}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">No site default preset yet.</p>
-          )}
-          {canEditSiteDefault ? (
-            <SiteDefaultPresetEditor
-              baseId={baseId}
-              siteId={group.siteId}
-              saving={saving}
-              siteDefaultPreset={group.siteDefault}
-              defaultExportFormat={settings?.defaultExportFormat ?? "webp"}
-              upsertSiteDefaultPresetAction={upsertSiteDefaultPresetAction}
-              clearSiteDefaultPresetAction={clearSiteDefaultPresetAction}
-            />
-          ) : null}
-        </div>
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Scoped presets</p>
-          {group.scopedPresets.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Managed in the Beacon image editor.</p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {group.scopedPresets.map((entry) => (
-                <ScopedPresetListItem
-                  key={entry.row.id}
-                  entry={entry}
-                  defaultExportFormat={settings?.defaultExportFormat}
-                />
-              ))}
-            </ul>
-          )}
-        </div>
-      </CardContent>
-      {saving ? <CardFooter className="text-xs text-muted-foreground">Saving…</CardFooter> : null}
-    </Card>
+    <div className="space-y-4">
+      <p className="text-xs text-muted-foreground">
+        Site ID <span className="font-mono">{group.siteId}</span>
+        {presetCount > 0 ? ` · ${presetCount} preset${presetCount === 1 ? "" : "s"}` : " · no presets yet"}
+      </p>
+      <div className="space-y-3">
+        <p className="text-sm font-medium">Site default</p>
+        {group.siteDefault ? (
+          <SiteDefaultPresetSummary
+            siteDefaultPreset={group.siteDefault}
+            defaultExportFormat={settings?.defaultExportFormat}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">No site default preset yet.</p>
+        )}
+        {canEditSiteDefault ? (
+          <SiteDefaultPresetEditor
+            baseId={baseId}
+            siteId={group.siteId}
+            saving={saving}
+            siteDefaultPreset={group.siteDefault}
+            defaultExportFormat={settings?.defaultExportFormat ?? "webp"}
+            upsertSiteDefaultPresetAction={upsertSiteDefaultPresetAction}
+            clearSiteDefaultPresetAction={clearSiteDefaultPresetAction}
+          />
+        ) : null}
+      </div>
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Scoped presets</p>
+        {group.scopedPresets.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Managed in the Beacon image editor.</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {group.scopedPresets.map((entry) => (
+              <ScopedPresetListItem
+                key={entry.row.id}
+                entry={entry}
+                defaultExportFormat={settings?.defaultExportFormat}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+      {saving ? <p className="text-xs text-muted-foreground">Saving…</p> : null}
+    </div>
   );
 }
 
@@ -377,18 +409,53 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
     return buildBeaconPresetSiteGroups(settings.imagePresetStorage, webflowSites ?? []);
   }, [settings, webflowSites]);
 
+  const [selectedSiteId, setSelectedSiteId] = useState(() => siteGroups[0]?.siteId ?? "");
+
+  useEffect(() => {
+    if (siteGroups.length === 0) {
+      return;
+    }
+    const stillExists = siteGroups.some((group) => group.siteId === selectedSiteId);
+    if (!stillExists) {
+      setSelectedSiteId(siteGroups[0]?.siteId ?? "");
+    }
+  }, [selectedSiteId, siteGroups]);
+
+  const selectedGroup = siteGroups.find((group) => group.siteId === selectedSiteId) ?? siteGroups[0] ?? null;
+  const multipleSites = siteGroups.length > 1;
+
   return (
     <div className="mt-8 space-y-6">
       <TowerBeaconPanelStatus canManage={canManage} teamPresetsLocked={teamPresetsLocked} />
-      {siteGroups.map((group) => (
-        <SitePresetsGroupCard
-          key={group.siteId}
-          group={group}
-          settings={settings}
-          canEditSiteDefault={canEditSiteDefault}
-          {...siteDefaultActions}
-        />
-      ))}
+      {selectedGroup ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{multipleSites ? "Webflow sites" : selectedGroup.displayName}</CardTitle>
+            <CardDescription>
+              {multipleSites
+                ? `${siteGroups.length} sites linked to this workspace. Choose one to configure image presets.`
+                : "Configure the site default preset here. Scoped presets are managed in the Beacon image editor."}
+            </CardDescription>
+            {multipleSites ? (
+              <CardAction>
+                <BeaconSitePicker
+                  siteGroups={siteGroups}
+                  selectedSiteId={selectedSiteId}
+                  onSelectedSiteIdChange={setSelectedSiteId}
+                />
+              </CardAction>
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            <SitePresetsDetail
+              group={selectedGroup}
+              settings={settings}
+              canEditSiteDefault={canEditSiteDefault}
+              {...siteDefaultActions}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

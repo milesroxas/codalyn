@@ -8,8 +8,8 @@ import {
 } from "@/shared/lib/membership/tower-organization-access";
 
 function resolveAuthClientBaseUrl(): string {
-  // Prefer the live page origin so apex→www redirects (e.g. codalyn.app → www.codalyn.app) do not
-  // break Better Auth fetches when NEXT_PUBLIC_APP_URL still points at the apex host.
+  // Prefer the live page origin on the Tower app host so marketing/app subdomain splits do not
+  // break Better Auth fetches when NEXT_PUBLIC_APP_URL still points at a different host.
   if (typeof window !== "undefined") {
     return window.location.origin;
   }

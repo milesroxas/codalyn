@@ -2,6 +2,15 @@ import { getSessionCookie } from "better-auth/cookies";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { towerCorsHeadersFor } from "@/server/tower-cors";
+import {
+  buildMarketingUrl,
+  buildTowerAppUrl,
+  isAppHost,
+  isHostSplitEnabled,
+  isMarketingHost,
+  normalizeHostname,
+  sanitizeRelativePath,
+} from "@/server/tower-hosts";
 
 function needsCors(pathname: string): boolean {
   return (
@@ -43,16 +52,37 @@ function shouldSkipSessionGate(pathname: string): boolean {
   return pathname.startsWith("/_next") || pathname === "/favicon.ico" || pathname.startsWith("/api/");
 }
 
-function sanitizeCallbackTarget(pathname: string, search: string): string {
-  const pathWithQuery = `${pathname}${search}`;
-  if (!pathWithQuery.startsWith("/") || pathWithQuery.startsWith("//")) {
-    return "/";
+function applyHostSplitRouting(request: NextRequest, pathname: string): NextResponse | null {
+  if (!isHostSplitEnabled()) {
+    return null;
   }
-  return pathWithQuery;
+
+  const hostname = normalizeHostname(request.headers.get("host") ?? request.nextUrl.hostname);
+  const sessionCookie = getSessionCookie(request);
+
+  if (isMarketingHost(hostname)) {
+    if (pathname !== "/") {
+      return NextResponse.redirect(buildTowerAppUrl(pathname, request.nextUrl.search));
+    }
+    if (sessionCookie) {
+      return NextResponse.redirect(buildTowerAppUrl("/"));
+    }
+    return null;
+  }
+
+  if (isAppHost(hostname) && pathname === "/" && !sessionCookie) {
+    return NextResponse.redirect(buildMarketingUrl("/"));
+  }
+
+  return null;
 }
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  const hostSplitRedirect = applyHostSplitRouting(request, pathname);
+  if (hostSplitRedirect) {
+    return hostSplitRedirect;
+  }
 
   if (needsCors(pathname)) {
     const cors = towerCorsHeadersFor(request);
@@ -78,7 +108,7 @@ export function middleware(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/sign-in";
       url.search = "";
-      url.searchParams.set("callbackUrl", sanitizeCallbackTarget(pathname, request.nextUrl.search));
+      url.searchParams.set("callbackUrl", sanitizeRelativePath(pathname, request.nextUrl.search));
       return NextResponse.redirect(url);
     }
   }

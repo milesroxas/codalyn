@@ -20,6 +20,7 @@ import {
   toUserAccountDeletionApiError,
   UserAccountDeletionBlockedError,
 } from "@/server/membership/user-account-deletion";
+import { resolveTowerCookieDomain } from "@/server/tower-hosts";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { TOWER_STATIC_BEACON_RELATED_ORIGINS } from "@/server/tower-static-beacon-origins";
 import { db } from "@/shared/lib/db";
@@ -33,6 +34,21 @@ function resolveTrustedOrigins(): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
   return [...new Set([baseURL, ...TOWER_STATIC_BEACON_RELATED_ORIGINS, ...fromEnv])];
+}
+
+function resolveAdvancedAuthOptions(): {
+  crossSubDomainCookies?: { enabled: true; domain: string };
+} {
+  const cookieDomain = resolveTowerCookieDomain();
+  if (!cookieDomain) {
+    return {};
+  }
+  return {
+    crossSubDomainCookies: {
+      enabled: true,
+      domain: cookieDomain,
+    },
+  };
 }
 
 export const auth = betterAuth({
@@ -107,6 +123,7 @@ export const auth = betterAuth({
   secret: resolveAuthSecret(),
   baseURL,
   trustedOrigins: resolveTrustedOrigins(),
+  advanced: resolveAdvancedAuthOptions(),
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path === "/sign-up/email") {

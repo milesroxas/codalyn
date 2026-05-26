@@ -4,8 +4,17 @@ import { TowerLandingEntrance } from "@/features/tower-ui/tower-landing-entrance
 import { TowerLandingGraphic } from "@/features/tower-ui/tower-landing-graphic";
 import { Button } from "@/shared/ui/button";
 
-export function TowerLanding(props: { earlyAccessRequired?: boolean }) {
-  const { earlyAccessRequired = false } = props;
+export type TowerLandingAppLinks = {
+  signIn: string;
+  signUp: string;
+  requestAccess: string;
+};
+
+export function TowerLanding(props: { earlyAccessRequired?: boolean; appLinks?: TowerLandingAppLinks }) {
+  const { earlyAccessRequired = false, appLinks } = props;
+  const signInHref = appLinks?.signIn ?? "/sign-in";
+  const signUpHref = appLinks?.signUp ?? "/sign-up";
+  const requestAccessHref = appLinks?.requestAccess ?? "/request-access";
   return (
     <TowerLandingEntrance
       main={
@@ -25,7 +34,7 @@ export function TowerLanding(props: { earlyAccessRequired?: boolean }) {
               {earlyAccessRequired ? (
                 <>
                   <Button asChild size="lg" className="rounded-full px-8">
-                    <Link href="/request-access">Request early access</Link>
+                    <Link href={requestAccessHref}>Request early access</Link>
                   </Button>
                   <Button
                     asChild
@@ -33,13 +42,13 @@ export function TowerLanding(props: { earlyAccessRequired?: boolean }) {
                     size="lg"
                     className="rounded-full border-border/80 bg-background/60 backdrop-blur"
                   >
-                    <Link href="/sign-in">Sign in</Link>
+                    <Link href={signInHref}>Sign in</Link>
                   </Button>
                 </>
               ) : (
                 <>
                   <Button asChild size="lg" className="rounded-full px-8">
-                    <Link href="/sign-up">Create free account</Link>
+                    <Link href={signUpHref}>Create free account</Link>
                   </Button>
                   <Button
                     asChild
@@ -47,7 +56,7 @@ export function TowerLanding(props: { earlyAccessRequired?: boolean }) {
                     size="lg"
                     className="rounded-full border-border/80 bg-background/60 backdrop-blur"
                   >
-                    <Link href="/sign-in">Sign in</Link>
+                    <Link href={signInHref}>Sign in</Link>
                   </Button>
                 </>
               )}

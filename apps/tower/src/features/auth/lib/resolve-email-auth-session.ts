@@ -6,6 +6,7 @@ type EmailAuthUser = {
   email?: string | null;
   name?: string | null;
   image?: string | null;
+  role?: string | null;
 };
 
 /** Resolves user + session token after email sign-in/up, using at most one extra `getSession` call. */

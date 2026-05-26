@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applySiteDefaultPresetPatch,
   type BeaconPresetRow,
   type BeaconPresetSettingsSnapshot,
+  buildBeaconPresetSiteGroups,
   buildPresetTargetKeyForScope,
+  coalesceBeaconPresetStorage,
   createBeaconPresetResolver,
   createSiteDefaultPresetTargetKey,
   doesResolvedUploadTargetMatchPresetTargetKey,
@@ -13,6 +16,7 @@ import {
   isInstancePresetTargetKey,
   listBeaconPresetStorageEntries,
   type PresetTargetKey,
+  resolveSiteDefaultPresetRow,
   serializePresetTargetKey,
 } from "./beacon-image-preset-domain.js";
 
@@ -527,7 +531,8 @@ describe("preset storage listing helpers", () => {
       },
     });
     expect(entries).toHaveLength(2);
-    expect(entries[0]?.scope).toBe("site-default");
+    expect(entries.some((entry) => entry.scope === "site-default")).toBe(true);
+    expect(entries.some((entry) => entry.scope === "instance")).toBe(true);
     expect(formatBeaconPresetDisplayName(instance, "instance")).toBe(`${instance.name} (Instance)`);
   });
 });
@@ -601,5 +606,102 @@ describe("instance preset target helpers", () => {
         pageKind: "static",
       })
     ).toBe("Blog Posts Template");
+  });
+});
+
+describe("multi-site preset storage helpers", () => {
+  it("coalesces legacy siteDefault into byTargetKey", () => {
+    const siteDefault = makeRow({
+      id: "site_1_default",
+      targetKey: createSiteDefaultPresetTargetKey("site_1"),
+    });
+    const coalesced = coalesceBeaconPresetStorage({
+      siteDefault,
+      byTargetKey: {},
+    });
+    expect(coalesced.siteDefault).toEqual(siteDefault);
+    expect(coalesced.byTargetKey[serializePresetTargetKey(createSiteDefaultPresetTargetKey("site_1"))]?.id).toBe(
+      "site_1_default"
+    );
+  });
+
+  it("clears legacy siteDefault mirror when multiple site defaults exist", () => {
+    const siteOne = makeRow({
+      id: "site_1_default",
+      targetKey: createSiteDefaultPresetTargetKey("site_1"),
+    });
+    const siteTwo = makeRow({
+      id: "site_2_default",
+      targetKey: createSiteDefaultPresetTargetKey("site_2"),
+    });
+    const coalesced = coalesceBeaconPresetStorage({
+      siteDefault: siteOne,
+      byTargetKey: {
+        [serializePresetTargetKey(siteTwo.targetKey)]: siteTwo,
+      },
+    });
+    expect(coalesced.siteDefault).toBeNull();
+    expect(resolveSiteDefaultPresetRow(coalesced, "site_1")?.id).toBe("site_1_default");
+    expect(resolveSiteDefaultPresetRow(coalesced, "site_2")?.id).toBe("site_2_default");
+  });
+
+  it("applies site-default patches without overwriting other sites", () => {
+    const siteOne = makeRow({
+      id: "site_1_default",
+      targetKey: createSiteDefaultPresetTargetKey("site_1"),
+    });
+    const siteTwo = makeRow({
+      id: "site_2_default",
+      targetKey: createSiteDefaultPresetTargetKey("site_2"),
+    });
+    const base = coalesceBeaconPresetStorage({
+      siteDefault: siteOne,
+      byTargetKey: {
+        [serializePresetTargetKey(siteTwo.targetKey)]: siteTwo,
+      },
+    });
+    const updatedSiteTwo = {
+      ...siteTwo,
+      width: 1600,
+      height: 900,
+    };
+    const next = applySiteDefaultPresetPatch(base, "site_2", updatedSiteTwo);
+    expect(resolveSiteDefaultPresetRow(next, "site_1")?.id).toBe("site_1_default");
+    expect(resolveSiteDefaultPresetRow(next, "site_2")?.width).toBe(1600);
+  });
+
+  it("groups presets by site id and includes catalog-only sites", () => {
+    const siteDefault = makeRow({
+      id: "site_1_default",
+      targetKey: createSiteDefaultPresetTargetKey("site_1"),
+    });
+    const instance = makeRow({
+      id: "inst",
+      targetKey: {
+        kind: "bare-image-instance",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+      },
+    });
+    const groups = buildBeaconPresetSiteGroups(
+      {
+        siteDefault,
+        byTargetKey: {
+          [serializePresetTargetKey(instance.targetKey)]: instance,
+        },
+      },
+      [
+        { id: "site_1", displayName: "Marketing" },
+        { id: "site_2", displayName: "Docs" },
+      ]
+    );
+    expect(groups).toHaveLength(2);
+    expect(groups[0]?.displayName).toBe("Docs");
+    expect(groups[0]?.siteId).toBe("site_2");
+    expect(groups[0]?.scopedPresets).toHaveLength(0);
+    expect(groups[1]?.displayName).toBe("Marketing");
+    expect(groups[1]?.siteDefault?.id).toBe("site_1_default");
+    expect(groups[1]?.scopedPresets).toHaveLength(1);
   });
 });

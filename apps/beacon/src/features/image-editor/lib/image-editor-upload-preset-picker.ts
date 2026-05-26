@@ -6,6 +6,7 @@ import {
   type PresetConstraintSource,
   type ResolvedUploadTarget,
   type ResolverOutput,
+  resolveSiteDefaultPresetRow,
   serializePresetTargetKey,
 } from "@codalyn/webflow-kit";
 
@@ -140,8 +141,8 @@ function pushSiteDefaultFallbackOption(args: {
   readout: ResolverOutput | null;
 }) {
   const { options, settings, target, readout } = args;
-  const siteDefaultRow = settings.imagePresetStorage.siteDefault;
-  if (siteDefaultRow?.targetKey.siteId !== target.siteId) {
+  const siteDefaultRow = resolveSiteDefaultPresetRow(settings.imagePresetStorage, target.siteId);
+  if (siteDefaultRow == null) {
     return;
   }
   if (readout?.presetId === siteDefaultRow.id) {

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { TowerDashboard } from "@/features/tower-ui/tower-dashboard";
 import { TowerLanding } from "@/features/tower-ui/tower-landing";
+import { TowerLandingAuthSync } from "@/features/tower-ui/tower-landing-auth-sync";
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
 import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
@@ -8,30 +9,53 @@ import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { getTowerDashboardSummary } from "@/server/dashboard-summary";
 import { buildTowerLandingAppLinks, isMarketingHost, normalizeHostname } from "@/server/tower-hosts";
+import { hasWebflowOAuthCredentials } from "@/server/webflow-proxy-token";
 
 export default async function HomePage() {
   const host = normalizeHostname((await headers()).get("host") ?? "");
   const earlyAccessRequired = isTowerEarlyAccessGateEnabled();
 
   if (isMarketingHost(host)) {
-    return <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={buildTowerLandingAppLinks()} />;
+    return (
+      <>
+        <TowerLandingAuthSync serverSignedIn={false} />
+        <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={buildTowerLandingAppLinks()} />
+      </>
+    );
   }
 
-  const summary = await getTowerDashboardSummary();
+  const summary = await getTowerDashboardSummary({ includeWebflowSites: false });
 
   if (summary.signedIn) {
     const h = await headers();
     const session = await auth.api.getSession({ headers: h });
     const userId = session?.user?.id;
     if (!userId) {
-      return <TowerLanding earlyAccessRequired={earlyAccessRequired} />;
+      return (
+        <>
+          <TowerLandingAuthSync serverSignedIn={false} />
+          <TowerLanding earlyAccessRequired={earlyAccessRequired} />
+        </>
+      );
     }
 
     const activeOrg = await getActiveOrganizationIdForAuthHeaders(h);
     const usage = await fetchEndUserUsageStatus(userId, activeOrg);
 
-    return <TowerDashboard summary={summary} usage={usage} billingEnabled={isTowerBillingEnabled()} />;
+    return (
+      <TowerDashboard
+        summary={summary}
+        usage={usage}
+        billingEnabled={isTowerBillingEnabled()}
+        oauthConfigured={hasWebflowOAuthCredentials()}
+      />
+    );
   }
 
-  return <TowerLanding earlyAccessRequired={earlyAccessRequired} />;
+  return (
+    <>
+      <TowerLandingAuthSync serverSignedIn={false} />
+      <TowerLanding earlyAccessRequired={earlyAccessRequired} />
+    </>
+  );
 }

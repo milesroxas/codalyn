@@ -1,4 +1,7 @@
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
+import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
+
+export { sanitizeRelativePath };
 
 const DEFAULT_MARKETING_HOSTS = ["codalyn.app", "www.codalyn.app"] as const;
 const DEFAULT_APP_HOST = "tower.codalyn.app";
@@ -133,15 +136,6 @@ function getTowerHostConfig(): TowerHostConfig {
   cachedConfigKey = key;
   cachedConfig = buildTowerHostConfig();
   return cachedConfig;
-}
-
-/** Reject protocol-relative and other unsafe redirect targets. */
-export function sanitizeRelativePath(pathname: string, search = ""): string {
-  const pathWithQuery = `${pathname}${search}`;
-  if (!pathWithQuery.startsWith("/") || pathWithQuery.startsWith("//")) {
-    return "/";
-  }
-  return pathWithQuery;
 }
 
 function joinOriginPath(origin: string, pathname: string, search = ""): string {

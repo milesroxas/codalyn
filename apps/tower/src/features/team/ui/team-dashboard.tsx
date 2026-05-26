@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
+import { useRequireTowerSession } from "@/features/auth/model/use-require-tower-session";
 import {
   deleteTeamWorkspace,
   formatTeamWorkspaceDeleteError,
@@ -29,7 +29,7 @@ export function TeamDashboard(props: {
   activeOrganizationId?: string | null;
 }) {
   const { billingEnabled = false, workspaceBilling = null, activeOrganizationId = null } = props;
-  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const { session, sessionPending } = useRequireTowerSession("/team");
   const { refetch: refetchOrgs } = authClient.useListOrganizations();
   const {
     data: activeOrg,
@@ -244,27 +244,8 @@ export function TeamDashboard(props: {
     })) as InvitationRow[];
   }, [activeOrg?.invitations]);
 
-  if (sessionPending) {
+  if (sessionPending || !session?.user) {
     return <TeamDashboardSkeleton />;
-  }
-
-  if (!session?.user) {
-    return (
-      <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-6 px-4 py-12 sm:px-6">
-        <div className="max-w-md space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
-          <p className="text-sm text-muted-foreground">Sign in to manage workspaces, members, and invitations.</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Button asChild>
-            <Link href="/sign-in?callbackUrl=/team">Sign in</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/sign-up?callbackUrl=/team">Create account</Link>
-          </Button>
-        </div>
-      </main>
-    );
   }
 
   return (

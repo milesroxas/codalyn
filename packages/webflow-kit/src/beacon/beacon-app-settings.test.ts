@@ -43,6 +43,21 @@ describe("beacon app settings preset storage", () => {
   });
 
   it("round-trips preset storage without data loss", () => {
+    const instanceTargetKey = {
+      kind: "bare-image-instance" as const,
+      siteId: "site_1",
+      pageId: "page_1",
+      elementId: "img_1",
+    };
+    const instanceRow = {
+      id: "inst_1",
+      name: "Instance",
+      width: 1000,
+      height: 1000,
+      exportFormat: "webp" as const,
+      maxFileSizeBytes: 90_000,
+      targetKey: instanceTargetKey,
+    };
     const settings = {
       ...getDefaultBeaconAppSettings(),
       imagePresetStorage: {
@@ -59,30 +74,18 @@ describe("beacon app settings preset storage", () => {
           },
         },
         byTargetKey: {
-          [serializePresetTargetKey({
-            kind: "bare-image-instance",
-            siteId: "site_1",
-            pageId: "page_1",
-            elementId: "img_1",
-          })]: {
-            id: "inst_1",
-            name: "Instance",
-            width: 1000,
-            height: 1000,
-            exportFormat: "webp" as const,
-            maxFileSizeBytes: 90_000,
-            targetKey: {
-              kind: "bare-image-instance" as const,
-              siteId: "site_1",
-              pageId: "page_1",
-              elementId: "img_1",
-            },
-          },
+          [serializePresetTargetKey(instanceTargetKey)]: instanceRow,
         },
       },
     };
     const parsed = parseBeaconAppSettings(settings);
-    expect(parsed.imagePresetStorage).toEqual(settings.imagePresetStorage);
+    const siteDefault = settings.imagePresetStorage.siteDefault;
+    expect(parsed.imagePresetStorage.siteDefault).toEqual(siteDefault);
+    if (siteDefault == null) {
+      throw new Error("expected site default fixture");
+    }
+    expect(parsed.imagePresetStorage.byTargetKey[serializePresetTargetKey(siteDefault.targetKey)]).toEqual(siteDefault);
+    expect(parsed.imagePresetStorage.byTargetKey[serializePresetTargetKey(instanceTargetKey)]).toEqual(instanceRow);
   });
 
   it("rejects invalid target keys in patch validation", () => {

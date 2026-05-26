@@ -1,4 +1,5 @@
 import {
+  applySiteDefaultPresetPatch,
   BEACON_PRESET_DEFAULT_MAX_FILE_BYTES,
   formatBeaconPresetDisplayName,
   formatBeaconPresetInstanceLocationLabel,
@@ -7,6 +8,7 @@ import {
   type MaxSizeUnit,
   maxBytesToDraft,
   type PresetCrudScope,
+  readSiteIdFromPresetTargetKey,
 } from "@codalyn/webflow-kit";
 import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -221,6 +223,15 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     async (id: string) => {
       const entry = presetEntriesById.get(id) ?? null;
       const result = await updateSettings((prev) => {
+        if (entry?.scope === "site-default") {
+          return {
+            imagePresetStorage: applySiteDefaultPresetPatch(
+              prev.imagePresetStorage,
+              readSiteIdFromPresetTargetKey(entry.row.targetKey),
+              null
+            ),
+          };
+        }
         const nextByTargetKey = Object.fromEntries(
           Object.entries(prev.imagePresetStorage.byTargetKey).filter(([, row]) => row.id !== id)
         );

@@ -2,9 +2,9 @@
 
 import {
   type BeaconAppSettings,
+  buildBeaconPresetSiteGroups,
   formatBeaconPresetDisplayName,
   formatBeaconPresetStorageSummary,
-  listBeaconPresetStorageEntries,
 } from "@codalyn/webflow-kit";
 import { IconRefresh } from "@tabler/icons-react";
 import Link from "next/link";
@@ -18,6 +18,7 @@ type BeaconApiPayload = {
   settings: BeaconAppSettings;
   editorExperience?: boolean;
   canManageTeamBeaconSettings?: boolean;
+  webflowSites?: Array<{ id: string; displayName?: string }> | null;
 };
 
 function dedupePresetLabel(label: string): string {
@@ -27,13 +28,18 @@ function dedupePresetLabel(label: string): string {
 
 function WorkspacePresetsCardContent(props: {
   error: string | null;
-  presetRows: Array<{ id: string; label: string; summary: string }>;
+  siteGroups: ReturnType<typeof buildBeaconPresetSiteGroups>;
+  defaultExportFormat?: BeaconAppSettings["defaultExportFormat"];
 }) {
-  const { error, presetRows } = props;
+  const { error, siteGroups, defaultExportFormat } = props;
   if (error) {
     return <p className="text-xs text-destructive">{error}</p>;
   }
-  if (presetRows.length === 0) {
+  const presetCount = siteGroups.reduce(
+    (total, group) => total + group.scopedPresets.length + (group.siteDefault ? 1 : 0),
+    0
+  );
+  if (presetCount === 0) {
     return (
       <p className="text-xs text-muted-foreground">
         No export presets yet.{" "}
@@ -44,17 +50,37 @@ function WorkspacePresetsCardContent(props: {
     );
   }
   return (
-    <ul className="max-h-40 space-y-2 overflow-auto text-xs">
-      {presetRows.map((row) => (
-        <li
-          key={row.id}
-          className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 border-b border-border/60 pb-2 last:border-0 last:pb-0"
-        >
-          <span className="min-w-0 font-medium text-foreground">{row.label}</span>
-          <span className="shrink-0 font-mono text-muted-foreground">{row.summary}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="max-h-48 space-y-3 overflow-auto text-xs">
+      {siteGroups.map((group) => {
+        const rows = [
+          ...(group.siteDefault ? [{ row: group.siteDefault, scope: "site-default" as const }] : []),
+          ...group.scopedPresets,
+        ];
+        if (rows.length === 0) {
+          return null;
+        }
+        return (
+          <div key={group.siteId} className="space-y-2">
+            <p className="font-medium text-foreground">{group.displayName}</p>
+            <ul className="space-y-2">
+              {rows.map(({ row, scope }) => (
+                <li
+                  key={row.id}
+                  className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 border-b border-border/60 pb-2 last:border-0 last:pb-0"
+                >
+                  <span className="min-w-0 font-medium text-foreground">
+                    {dedupePresetLabel(formatBeaconPresetDisplayName(row, scope))}
+                  </span>
+                  <span className="shrink-0 font-mono text-muted-foreground">
+                    {formatBeaconPresetStorageSummary(row, defaultExportFormat)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -101,17 +127,17 @@ export function BeaconDashboardActivity() {
     };
   }, [refresh, session?.user]);
 
-  const presetRows = useMemo(() => {
+  const siteGroups = useMemo(() => {
     if (!payload?.settings) {
       return [];
     }
-    const defaultFormat = payload.settings.defaultExportFormat;
-    return listBeaconPresetStorageEntries(payload.settings.imagePresetStorage).map(({ row, scope }) => ({
-      id: row.id,
-      label: dedupePresetLabel(formatBeaconPresetDisplayName(row, scope)),
-      summary: formatBeaconPresetStorageSummary(row, defaultFormat),
-    }));
-  }, [payload?.settings]);
+    return buildBeaconPresetSiteGroups(payload.settings.imagePresetStorage, payload.webflowSites ?? []);
+  }, [payload?.settings, payload?.webflowSites]);
+
+  const presetCount = siteGroups.reduce(
+    (total, group) => total + group.scopedPresets.length + (group.siteDefault ? 1 : 0),
+    0
+  );
 
   if (sessionPending || !session?.user) {
     return null;
@@ -120,16 +146,17 @@ export function BeaconDashboardActivity() {
   const canManage = Boolean(payload?.canManageTeamBeaconSettings);
   const syncStatus = loading
     ? "Syncing…"
-    : presetRows.length === 0
+    : presetCount === 0
       ? "No presets synced"
-      : `${presetRows.length} preset${presetRows.length === 1 ? "" : "s"} · live sync`;
+      : `${presetCount} preset${presetCount === 1 ? "" : "s"} · live sync`;
 
   return (
     <Card className="h-full">
       <CardHeader>
         <CardTitle>Export presets</CardTitle>
         <CardDescription>
-          Synced from this workspace. The site default is editable in Tower; scoped presets are managed in Beacon.
+          Synced from this workspace, grouped by Webflow site. Site defaults are editable in Tower; scoped presets are
+          managed in Beacon.
         </CardDescription>
         <CardAction>
           <Button
@@ -151,7 +178,11 @@ export function BeaconDashboardActivity() {
           {canManage ? <Badge variant="outline">Editable in Tower</Badge> : null}
           <span className="text-xs text-muted-foreground">{syncStatus}</span>
         </div>
-        <WorkspacePresetsCardContent error={error} presetRows={presetRows} />
+        <WorkspacePresetsCardContent
+          error={error}
+          siteGroups={siteGroups}
+          defaultExportFormat={payload?.settings.defaultExportFormat}
+        />
         <div className="pt-1">
           <Button variant="outline" size="sm" asChild>
             <Link href="/beacon">Manage presets</Link>

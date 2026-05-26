@@ -1,20 +1,20 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { AccountDeleteSection } from "@/features/account/ui/account-delete-section";
 import { AccountSettingsSkeleton } from "@/features/account/ui/account-settings-skeleton";
 import { authClient } from "@/features/auth/model/auth-client";
+import { useRequireTowerSession } from "@/features/auth/model/use-require-tower-session";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Separator } from "@/shared/ui/separator";
+import { TowerPageMain } from "@/shared/ui/tower-page-shell";
 
 export function AccountSettingsScreen() {
-  const router = useRouter();
-  const { data: session, isPending: sessionPending, refetch: refetchSession } = authClient.useSession();
+  const { session, sessionPending, refetch: refetchSession } = useRequireTowerSession("/account");
 
   const firstNameId = useId();
   const lastNameId = useId();
@@ -40,15 +40,6 @@ export function AccountSettingsScreen() {
   const [passBusy, setPassBusy] = useState(false);
   const [passMsg, setPassMsg] = useState<string | null>(null);
   const [passErr, setPassErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (sessionPending) {
-      return;
-    }
-    if (!session?.user) {
-      router.replace(`/sign-in?callbackUrl=${encodeURIComponent("/account")}`);
-    }
-  }, [session?.user, sessionPending, router]);
 
   useEffect(() => {
     const u = session?.user as { firstName?: string | null; lastName?: string | null } | undefined;
@@ -166,7 +157,7 @@ export function AccountSettingsScreen() {
   const u = session.user;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8 sm:py-10">
+    <TowerPageMain width="narrow">
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Tower</p>
         <h1 className="text-2xl font-semibold tracking-tight">Account</h1>
@@ -333,6 +324,6 @@ export function AccountSettingsScreen() {
 
         <AccountDeleteSection sessionReady={Boolean(session?.user)} />
       </div>
-    </main>
+    </TowerPageMain>
   );
 }

@@ -1,4 +1,5 @@
 import {
+  applySiteDefaultPresetPatch,
   type BeaconPresetRow,
   type BeaconPresetStorageEntry,
   buildPresetTargetKeyForScope,
@@ -248,10 +249,7 @@ async function savePreset(args: {
     const byTargetKey = Object.fromEntries(filteredByTargetEntries);
     if (nextTargetKey.kind === "site-default") {
       return {
-        imagePresetStorage: {
-          siteDefault: nextRow,
-          byTargetKey,
-        },
+        imagePresetStorage: applySiteDefaultPresetPatch(prev.imagePresetStorage, siteId, nextRow),
       };
     }
     byTargetKey[serializePresetTargetKey(nextTargetKey)] = nextRow;

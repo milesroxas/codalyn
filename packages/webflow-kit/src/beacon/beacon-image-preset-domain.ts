@@ -259,6 +259,96 @@ function trimSiteId(siteId: string): string {
   return siteId.trim();
 }
 
+export function readSiteIdFromPresetTargetKey(key: PresetTargetKey): string {
+  return trimSiteId(key.siteId);
+}
+
+type PresetStorageRecord = {
+  siteDefault: BeaconPresetRow | null;
+  byTargetKey: Readonly<Record<string, BeaconPresetRow>>;
+};
+
+function iteratePresetStorageRows(byTargetKey: PresetStorageLookup["byTargetKey"]): Iterable<BeaconPresetRow> {
+  if (byTargetKey instanceof Map) {
+    return byTargetKey.values();
+  }
+  return Object.values(byTargetKey);
+}
+
+function listSiteDefaultPresetRows(storage: PresetStorageLookup): BeaconPresetRow[] {
+  const rows: BeaconPresetRow[] = [];
+  const seenIds = new Set<string>();
+  for (const row of iteratePresetStorageRows(storage.byTargetKey)) {
+    if (row.targetKey.kind !== "site-default" || seenIds.has(row.id)) {
+      continue;
+    }
+    seenIds.add(row.id);
+    rows.push(row);
+  }
+  if (storage.siteDefault !== null && !seenIds.has(storage.siteDefault.id)) {
+    rows.push(storage.siteDefault);
+  }
+  return rows;
+}
+
+/** Merges legacy `siteDefault` into `byTargetKey` and mirrors a single site default when unambiguous. */
+export function coalesceBeaconPresetStorage(storage: PresetStorageRecord): PresetStorageRecord {
+  const byTargetKey: Record<string, BeaconPresetRow> = { ...storage.byTargetKey };
+  if (storage.siteDefault !== null) {
+    const serialized = serializePresetTargetKey(storage.siteDefault.targetKey);
+    if (byTargetKey[serialized] === undefined) {
+      byTargetKey[serialized] = storage.siteDefault;
+    }
+  }
+  const siteDefaultRows = listSiteDefaultPresetRows({ siteDefault: null, byTargetKey });
+  return {
+    byTargetKey,
+    siteDefault: siteDefaultRows.length === 1 ? (siteDefaultRows[0] ?? null) : null,
+  };
+}
+
+export function resolveSiteDefaultPresetRow(storage: PresetStorageLookup, siteId: string): BeaconPresetRow | null {
+  const normalizedSiteId = trimSiteId(siteId);
+  const fromByTargetKey = findRowInByTargetKey(
+    storage.byTargetKey,
+    serializePresetTargetKey(createSiteDefaultPresetTargetKey(normalizedSiteId))
+  );
+  if (fromByTargetKey !== null) {
+    return fromByTargetKey;
+  }
+  const legacy = storage.siteDefault;
+  if (
+    legacy !== null &&
+    legacy.targetKey.kind === "site-default" &&
+    readSiteIdFromPresetTargetKey(legacy.targetKey) === normalizedSiteId
+  ) {
+    return legacy;
+  }
+  return null;
+}
+
+export function applySiteDefaultPresetPatch(
+  storage: PresetStorageRecord,
+  siteId: string,
+  row: BeaconPresetRow | null
+): PresetStorageRecord {
+  const coalesced = coalesceBeaconPresetStorage(storage);
+  const normalizedSiteId = trimSiteId(siteId);
+  const byTargetKey: Record<string, BeaconPresetRow> = { ...coalesced.byTargetKey };
+  for (const [serialized, existingRow] of Object.entries(byTargetKey)) {
+    if (
+      existingRow.targetKey.kind === "site-default" &&
+      readSiteIdFromPresetTargetKey(existingRow.targetKey) === normalizedSiteId
+    ) {
+      delete byTargetKey[serialized];
+    }
+  }
+  if (row !== null) {
+    byTargetKey[serializePresetTargetKey(row.targetKey)] = row;
+  }
+  return coalesceBeaconPresetStorage({ siteDefault: null, byTargetKey });
+}
+
 export function createSiteDefaultPresetTargetKey(siteId: string): SiteDefaultPresetTargetKey {
   return {
     kind: "site-default",
@@ -388,7 +478,10 @@ function selectPresetForUntypedTarget(input: ResolverInput): PresetSelection | n
         },
         "element"
       ) ??
-      (settings.siteDefault === null ? null : { preset: settings.siteDefault, source: "site-default" })
+      (() => {
+        const siteDefaultRow = resolveSiteDefaultPresetRow(settings, target.siteId);
+        return siteDefaultRow === null ? null : { preset: siteDefaultRow, source: "site-default" as const };
+      })()
     );
   }
   if (target.kind === "component-image") {
@@ -414,7 +507,10 @@ function selectPresetForUntypedTarget(input: ResolverInput): PresetSelection | n
         },
         "component"
       ) ??
-      (settings.siteDefault === null ? null : { preset: settings.siteDefault, source: "site-default" })
+      (() => {
+        const siteDefaultRow = resolveSiteDefaultPresetRow(settings, target.siteId);
+        return siteDefaultRow === null ? null : { preset: siteDefaultRow, source: "site-default" as const };
+      })()
     );
   }
   return null;
@@ -552,12 +648,7 @@ export function findBeaconPresetRowByTargetKey(
   key: PresetTargetKey
 ): BeaconPresetRow | null {
   if (key.kind === "site-default") {
-    if (storage.siteDefault === null) {
-      return null;
-    }
-    return serializePresetTargetKey(storage.siteDefault.targetKey) === serializePresetTargetKey(key)
-      ? storage.siteDefault
-      : null;
+    return resolveSiteDefaultPresetRow(storage, key.siteId);
   }
   return findRowInByTargetKey(storage.byTargetKey, serializePresetTargetKey(key));
 }
@@ -597,14 +688,67 @@ export function listBeaconPresetStorageEntries(storage: {
   siteDefault: BeaconPresetRow | null;
   byTargetKey: Readonly<Record<string, BeaconPresetRow>>;
 }): BeaconPresetStorageEntry[] {
+  const coalesced = coalesceBeaconPresetStorage(storage);
   const entries: BeaconPresetStorageEntry[] = [];
-  if (storage.siteDefault !== null) {
-    entries.push({ row: storage.siteDefault, scope: "site-default" });
-  }
-  for (const row of Object.values(storage.byTargetKey)) {
+  const seenIds = new Set<string>();
+  for (const row of Object.values(coalesced.byTargetKey)) {
+    if (seenIds.has(row.id)) {
+      continue;
+    }
+    seenIds.add(row.id);
     entries.push({ row, scope: inferPresetCrudScopeFromTargetKey(row) });
   }
   return entries;
+}
+
+export type BeaconPresetSiteCatalogEntry = {
+  id: string;
+  displayName?: string;
+};
+
+export type BeaconPresetSiteGroup = {
+  siteId: string;
+  displayName: string;
+  siteDefault: BeaconPresetRow | null;
+  scopedPresets: BeaconPresetStorageEntry[];
+};
+
+export function buildBeaconPresetSiteGroups(
+  storage: {
+    siteDefault: BeaconPresetRow | null;
+    byTargetKey: Readonly<Record<string, BeaconPresetRow>>;
+  },
+  catalog: ReadonlyArray<BeaconPresetSiteCatalogEntry> = []
+): BeaconPresetSiteGroup[] {
+  const coalesced = coalesceBeaconPresetStorage(storage);
+  const catalogById = new Map(catalog.map((site) => [trimSiteId(site.id), site.displayName?.trim() || undefined]));
+  const grouped = new Map<string, BeaconPresetStorageEntry[]>();
+
+  for (const entry of listBeaconPresetStorageEntries(coalesced)) {
+    const siteId = readSiteIdFromPresetTargetKey(entry.row.targetKey);
+    const existing = grouped.get(siteId) ?? [];
+    existing.push(entry);
+    grouped.set(siteId, existing);
+  }
+
+  for (const site of catalog) {
+    const siteId = trimSiteId(site.id);
+    if (!grouped.has(siteId)) {
+      grouped.set(siteId, []);
+    }
+  }
+
+  const groups: BeaconPresetSiteGroup[] = [];
+  for (const [siteId, entries] of grouped) {
+    groups.push({
+      siteId,
+      displayName: catalogById.get(siteId) ?? siteId,
+      siteDefault: resolveSiteDefaultPresetRow(coalesced, siteId),
+      scopedPresets: entries.filter((entry) => entry.scope !== "site-default"),
+    });
+  }
+
+  return groups.sort((left, right) => left.displayName.localeCompare(right.displayName));
 }
 
 export function formatBeaconPresetDisplayName(row: BeaconPresetRow, scope: PresetCrudScope): string {

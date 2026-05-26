@@ -69,12 +69,12 @@ export async function GET(request: Request) {
 
   const allowed = await canTowerUserManageWebflowOAuthViaDashboard(session.user.id, request.headers);
   if (!allowed) {
-    return NextResponse.redirect(`${appUrl}/?webflow=team_admin_required`);
+    return NextResponse.redirect(`${appUrl}/webflow?webflow=team_admin_required`);
   }
 
   const activeOrganizationId = await getActiveOrganizationIdForAuthHeaders(request.headers);
   if (!activeOrganizationId) {
-    return NextResponse.redirect(`${appUrl}/?webflow=no_active_workspace`);
+    return NextResponse.redirect(`${appUrl}/webflow?webflow=no_active_workspace`);
   }
 
   let url: string;

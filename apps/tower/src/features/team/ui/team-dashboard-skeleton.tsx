@@ -2,11 +2,12 @@ import { TeamWorkspacePanelSkeletonContent } from "@/features/team/ui/team-works
 import { PageHeaderSkeleton } from "@/shared/ui/page-header-skeleton";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { SkeletonStatus } from "@/shared/ui/skeleton-status";
+import { TowerPageMain } from "@/shared/ui/tower-page-shell";
 
 function TeamDashboardSkeleton() {
   return (
     <SkeletonStatus label="Loading team dashboard">
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
+      <TowerPageMain>
         <header className="mb-8 flex flex-col gap-6 border-b border-border pb-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <PageHeaderSkeleton descriptionLines={2} />
@@ -14,7 +15,7 @@ function TeamDashboardSkeleton() {
           </div>
         </header>
         <TeamWorkspacePanelSkeletonContent />
-      </main>
+      </TowerPageMain>
     </SkeletonStatus>
   );
 }

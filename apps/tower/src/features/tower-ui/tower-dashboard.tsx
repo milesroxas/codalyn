@@ -1,21 +1,27 @@
 import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
-import { IconGauge, IconPlug, IconRadar2, IconUsers } from "@tabler/icons-react";
+import { IconCreditCard, IconPlug, IconRadar2, IconUsers } from "@tabler/icons-react";
 import Link from "next/link";
-import { BeaconDashboardActivity } from "@/features/beacon/ui/beacon-dashboard-activity";
 import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
-import { formatTowerDashboardUsageSnapshot } from "@/features/tower-ui/tower-dashboard-usage-snapshot";
-import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
+import { formatWebflowIntegrationStatus } from "@/features/tower-ui/lib/tower-webflow-integration-status";
+import { TowerWorkspaceOnboardingBanner } from "@/features/tower-ui/tower-workspace-onboarding-banner";
 import type { TowerDashboardSummary } from "@/server/dashboard-summary";
+import { ActionTile, ActionTileGrid } from "@/shared/ui/action-tile";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { StatTile } from "@/shared/ui/stat-tile";
-import { TowerPageHeader, TowerPageMain, TowerPageSection } from "@/shared/ui/tower-page-shell";
+import {
+  TowerDashboardGrid,
+  TowerDashboardSignals,
+  TowerPageHeader,
+  TowerPageMain,
+  TowerPageSection,
+} from "@/shared/ui/tower-page-shell";
 import { UsageApproachingLimitAlert } from "@/shared/ui/usage-approaching-limit-alert";
 
 type TowerDashboardProps = {
   summary: TowerDashboardSummary;
   usage: TowerUsageStatusSnapshot;
   billingEnabled: boolean;
+  oauthConfigured: boolean;
 };
 
 function teamSnapshot(summary: TowerDashboardSummary) {
@@ -29,19 +35,6 @@ function teamSnapshot(summary: TowerDashboardSummary) {
   const hint = summary.activeOrgTeamAdmin && pending > 0 ? `${memberWord} · ${pending} pending` : memberWord;
 
   return { value: members, hint, tone: "default" as const };
-}
-
-function webflowSnapshot(summary: TowerDashboardSummary) {
-  if (!summary.webflowOAuthConnected) {
-    return { value: "Not connected", hint: "Data API proxy off", tone: "warn" as const };
-  }
-
-  const siteCount = summary.webflowSites?.length ?? 0;
-  return {
-    value: "Connected",
-    hint: siteCount === 0 ? "No sites returned" : `${siteCount} site${siteCount === 1 ? "" : "s"} available`,
-    tone: "positive" as const,
-  };
 }
 
 function beaconSnapshot(summary: TowerDashboardSummary) {
@@ -61,38 +54,45 @@ function buildQuickActions(summary: TowerDashboardSummary, billingEnabled: boole
   const actions: Array<{
     key: string;
     label: string;
-    href: string | null;
-    action: "link" | "webflow-oauth";
+    description: string;
+    href: string;
+    icon: typeof IconPlug;
+    variant?: "default" | "emphasis";
   }> = [];
 
-  if (summary.activeOrgTeamAdmin && !summary.webflowOAuthConnected) {
+  if (!summary.webflowOAuthConnected) {
     actions.push({
       key: "connect-webflow",
-      label: "Connect Webflow",
-      href: null,
-      action: "webflow-oauth",
+      label: summary.activeOrgTeamAdmin ? "Connect Webflow" : "Webflow settings",
+      description: "Authorize Webflow to enable the Data API proxy for your sites.",
+      href: "/webflow",
+      icon: IconPlug,
+      variant: "emphasis",
     });
   }
 
   actions.push({
     key: "team",
     label: summary.activeOrgTeamAdmin ? "Manage team" : "View team",
+    description: "Invite members, manage roles, and review pending invitations.",
     href: "/team",
-    action: "link",
+    icon: IconUsers,
   });
   actions.push({
     key: "beacon",
     label: "Beacon presets",
+    description: "Configure image export presets synced to the Beacon extension.",
     href: "/beacon",
-    action: "link",
+    icon: IconRadar2,
   });
 
   if (billingEnabled) {
     actions.push({
       key: "billing",
       label: "Billing",
+      description: "Review your plan, usage limits, and subscription details.",
       href: "/billing",
-      action: "link",
+      icon: IconCreditCard,
     });
   }
 
@@ -124,31 +124,21 @@ function DashboardHeaderMeta({ summary }: { summary: TowerDashboardSummary }) {
   );
 }
 
-function DashboardOverviewSection({
-  summary,
-  usage,
-  billingEnabled,
-}: {
-  summary: TowerDashboardSummary;
-  usage: TowerUsageStatusSnapshot;
-  billingEnabled: boolean;
-}) {
-  const usageSnapshot = formatTowerDashboardUsageSnapshot(usage);
-
+function DashboardSignalsColumn({ summary }: { summary: TowerDashboardSummary }) {
   return (
-    <TowerPageSection title="Overview" description="Key signals for the active workspace.">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile label="Webflow" {...webflowSnapshot(summary)} icon={IconPlug} />
-        <StatTile label="Team" {...teamSnapshot(summary)} icon={IconUsers} href="/team" />
-        <StatTile label="Beacon presets" {...beaconSnapshot(summary)} icon={IconRadar2} href="/beacon" />
-        <StatTile
-          label="Monthly usage"
-          {...usageSnapshot}
-          icon={IconGauge}
-          href={billingEnabled ? "/billing" : undefined}
-        />
-      </div>
-    </TowerPageSection>
+    <TowerDashboardSignals>
+      <StatTile
+        label="Webflow"
+        {...formatWebflowIntegrationStatus({
+          webflowOAuthConnected: summary.webflowOAuthConnected,
+          webflowSitesCount: summary.webflowSites ? summary.webflowSites.length : null,
+        })}
+        icon={IconPlug}
+        href="/webflow"
+      />
+      <StatTile label="Team" {...teamSnapshot(summary)} icon={IconUsers} href="/team" />
+      <StatTile label="Beacon presets" {...beaconSnapshot(summary)} icon={IconRadar2} href="/beacon" />
+    </TowerDashboardSignals>
   );
 }
 
@@ -163,76 +153,23 @@ function DashboardQuickActions({
 
   return (
     <TowerPageSection title="Quick actions" description="Common tasks based on your current setup.">
-      <div className="flex flex-wrap gap-2">
-        {quickActions.map((action) =>
-          action.action === "webflow-oauth" ? (
-            <TowerWebflowOAuthPopupButton key={action.key} variant="outline" size="sm">
-              {action.label}
-            </TowerWebflowOAuthPopupButton>
-          ) : (
-            <Button key={action.key} variant="outline" size="sm" asChild>
-              <Link href={action.href ?? "/"}>{action.label}</Link>
-            </Button>
-          )
-        )}
-      </div>
+      <ActionTileGrid>
+        {quickActions.map((action) => (
+          <ActionTile
+            key={action.key}
+            label={action.label}
+            description={action.description}
+            icon={action.icon}
+            href={action.href}
+            variant={action.variant}
+          />
+        ))}
+      </ActionTileGrid>
     </TowerPageSection>
   );
 }
 
-function DashboardDetailsSection({
-  usage,
-  billingEnabled,
-}: {
-  usage: TowerUsageStatusSnapshot;
-  billingEnabled: boolean;
-}) {
-  return (
-    <TowerPageSection title="Details" description="Usage limits and synced export presets for this workspace.">
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <TowerUsageSection
-          status={usage}
-          billingEnabled={billingEnabled}
-          showBillingLink
-          title="Usage this month"
-          description="Webflow proxy traffic, CMS writes, and AVIF image processing."
-        />
-        <BeaconDashboardActivity />
-      </div>
-    </TowerPageSection>
-  );
-}
-
-function DashboardWebflowSitesSection({ summary }: { summary: TowerDashboardSummary }) {
-  const sites = summary.webflowSites ?? [];
-  if (!summary.webflowOAuthConnected || sites.length === 0) {
-    return null;
-  }
-
-  return (
-    <TowerPageSection title="Webflow sites" description="Sites available to the Data API proxy for this account.">
-      <Card>
-        <CardHeader>
-          <CardTitle>Authorized sites</CardTitle>
-          <CardDescription>
-            {sites.length} site{sites.length === 1 ? "" : "s"} returned from Webflow.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ul className="max-h-40 space-y-1 overflow-auto text-xs">
-            {sites.slice(0, 12).map((site) => (
-              <li key={site.id} className="truncate font-mono text-muted-foreground">
-                {site.displayName ?? site.id}
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-    </TowerPageSection>
-  );
-}
-
-export function TowerDashboard({ summary, usage, billingEnabled }: TowerDashboardProps) {
+export function TowerDashboard({ summary, usage, billingEnabled, oauthConfigured }: TowerDashboardProps) {
   const approachingMeters = usage.approachingMeters.flatMap((meter) =>
     meter.limit === null ? [] : [{ kind: meter.kind, used: meter.used, limit: meter.limit }]
   );
@@ -243,10 +180,10 @@ export function TowerDashboard({ summary, usage, billingEnabled }: TowerDashboar
         title="Dashboard"
         description="At-a-glance status for your workspace, integrations, and monthly usage."
         actions={
-          summary.activeOrgTeamAdmin ? (
-            <TowerWebflowOAuthPopupButton variant="outline" size="sm">
-              {summary.webflowOAuthConnected ? "Relink Webflow" : "Connect Webflow"}
-            </TowerWebflowOAuthPopupButton>
+          summary.activeOrgTeamAdmin || !summary.webflowOAuthConnected ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/webflow">{summary.webflowOAuthConnected ? "Manage Webflow" : "Connect Webflow"}</Link>
+            </Button>
           ) : null
         }
         meta={<DashboardHeaderMeta summary={summary} />}
@@ -267,10 +204,25 @@ export function TowerDashboard({ summary, usage, billingEnabled }: TowerDashboar
         </div>
       ) : null}
 
-      <DashboardOverviewSection summary={summary} usage={usage} billingEnabled={billingEnabled} />
+      <TowerWorkspaceOnboardingBanner
+        summary={summary}
+        billingEnabled={billingEnabled}
+        oauthConfigured={oauthConfigured}
+        includeWebflowConnect
+      />
+
+      <TowerDashboardGrid>
+        <DashboardSignalsColumn summary={summary} />
+        <TowerUsageSection
+          status={usage}
+          billingEnabled={billingEnabled}
+          showBillingLink
+          title="Usage this month"
+          description="Webflow proxy traffic, CMS writes, and AVIF image processing."
+        />
+      </TowerDashboardGrid>
+
       <DashboardQuickActions summary={summary} billingEnabled={billingEnabled} />
-      <DashboardDetailsSection usage={usage} billingEnabled={billingEnabled} />
-      <DashboardWebflowSitesSection summary={summary} />
     </TowerPageMain>
   );
 }

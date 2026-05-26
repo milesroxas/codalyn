@@ -5,6 +5,7 @@ import { TowerHeader } from "@/features/tower-ui/tower-header";
 import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
+import { towerAppShellContentClassName } from "@/shared/ui/tower-page-shell";
 
 export default async function TowerLayout({ children }: { children: React.ReactNode }) {
   const billingEnabled = isTowerBillingEnabled();
@@ -17,7 +18,7 @@ export default async function TowerLayout({ children }: { children: React.ReactN
     <>
       <TowerHeader billingEnabled={billingEnabled} />
       {userId ? (
-        <div className="mx-auto max-w-4xl px-4 pt-4 sm:px-6">
+        <div className={towerAppShellContentClassName("default", "pt-4")}>
           <TowerUsageApproachingBanner
             userId={userId}
             activeOrganizationId={activeOrg}

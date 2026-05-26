@@ -2,14 +2,20 @@
 
 import type { BeaconAppSettings, BeaconPresetRow, ImageExportFormat } from "@codalyn/webflow-kit";
 import {
+  type BeaconPresetSiteGroup,
   type BeaconPresetStorageEntry,
+  buildBeaconPresetSiteGroups,
   formatBeaconPresetDisplayName,
   formatBeaconPresetMax,
   formatBeaconPresetStorageSummary,
-  listBeaconPresetStorageEntries,
 } from "@codalyn/webflow-kit";
-import { useMemo } from "react";
-import type { MaxSizeUnit } from "@/features/beacon/lib/preset-dimensions";
+import { useEffect, useMemo, useState } from "react";
+import {
+  draftToMaxBytes,
+  type MaxSizeUnit,
+  maxBytesToDraft,
+  parsePresetOutputDimension,
+} from "@/features/beacon/lib/preset-dimensions";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -17,27 +23,22 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { NativeSelect } from "@/shared/ui/native-select";
 
+export type TowerBeaconWebflowSite = {
+  id: string;
+  displayName?: string;
+};
+
 export type TowerBeaconPresetsPanelProps = {
   baseId: string;
   loading: boolean;
   saving: boolean;
   settings: BeaconAppSettings | undefined;
+  webflowSites: TowerBeaconWebflowSite[] | null;
   canManage: boolean;
   teamPresetsLocked: boolean;
   canEditSiteDefault: boolean;
-  draftW: string;
-  setDraftWAction: (v: string) => void;
-  draftH: string;
-  setDraftHAction: (v: string) => void;
-  draftFormat: ImageExportFormat;
-  setDraftFormatAction: (v: ImageExportFormat) => void;
-  draftMaxStr: string;
-  setDraftMaxStrAction: (v: string) => void;
-  draftMaxUnit: MaxSizeUnit;
-  setDraftMaxUnitAction: (v: MaxSizeUnit) => void;
-  siteDefaultPreset: BeaconPresetRow | null;
-  upsertSiteDefaultPresetAction: () => void;
-  clearSiteDefaultPresetAction: () => void;
+  upsertSiteDefaultPresetAction: (siteId: string, row: BeaconPresetRow) => void;
+  clearSiteDefaultPresetAction: (siteId: string) => void;
 };
 
 function TowerBeaconPanelStatus(props: { canManage: boolean; teamPresetsLocked: boolean }) {
@@ -83,74 +84,112 @@ function SiteDefaultPresetSummary(props: {
   );
 }
 
+type SiteDefaultDraft = {
+  draftW: string;
+  draftH: string;
+  draftFormat: ImageExportFormat;
+  draftMaxStr: string;
+  draftMaxUnit: MaxSizeUnit;
+};
+
+function createSiteDefaultDraft(
+  siteDefaultPreset: BeaconPresetRow | null,
+  defaultExportFormat: ImageExportFormat
+): SiteDefaultDraft {
+  if (siteDefaultPreset == null) {
+    return {
+      draftW: "1920",
+      draftH: "1080",
+      draftFormat: defaultExportFormat,
+      draftMaxStr: "100",
+      draftMaxUnit: "kb",
+    };
+  }
+  const maxDraft = maxBytesToDraft(siteDefaultPreset.maxFileSizeBytes);
+  return {
+    draftW: String(siteDefaultPreset.width),
+    draftH: String(siteDefaultPreset.height),
+    draftFormat: siteDefaultPreset.exportFormat ?? defaultExportFormat,
+    draftMaxStr: maxDraft.value,
+    draftMaxUnit: maxDraft.unit,
+  };
+}
+
 function SiteDefaultPresetEditor(props: {
   baseId: string;
+  siteId: string;
   saving: boolean;
   siteDefaultPreset: BeaconPresetRow | null;
-  draftW: string;
-  setDraftWAction: (v: string) => void;
-  draftH: string;
-  setDraftHAction: (v: string) => void;
-  draftFormat: ImageExportFormat;
-  setDraftFormatAction: (v: ImageExportFormat) => void;
-  draftMaxStr: string;
-  setDraftMaxStrAction: (v: string) => void;
-  draftMaxUnit: MaxSizeUnit;
-  setDraftMaxUnitAction: (v: MaxSizeUnit) => void;
-  upsertSiteDefaultPresetAction: () => void;
-  clearSiteDefaultPresetAction: () => void;
+  defaultExportFormat: ImageExportFormat;
+  upsertSiteDefaultPresetAction: (siteId: string, row: BeaconPresetRow) => void;
+  clearSiteDefaultPresetAction: (siteId: string) => void;
 }) {
   const {
     baseId,
+    siteId,
     saving,
     siteDefaultPreset,
-    draftW,
-    setDraftWAction,
-    draftH,
-    setDraftHAction,
-    draftFormat,
-    setDraftFormatAction,
-    draftMaxStr,
-    setDraftMaxStrAction,
-    draftMaxUnit,
-    setDraftMaxUnitAction,
+    defaultExportFormat,
     upsertSiteDefaultPresetAction,
     clearSiteDefaultPresetAction,
   } = props;
+  const [draft, setDraft] = useState<SiteDefaultDraft>(() =>
+    createSiteDefaultDraft(siteDefaultPreset, defaultExportFormat)
+  );
+
+  useEffect(() => {
+    setDraft(createSiteDefaultDraft(siteDefaultPreset, defaultExportFormat));
+  }, [siteDefaultPreset, defaultExportFormat]);
+
+  const save = () => {
+    const width = parsePresetOutputDimension(draft.draftW, 1920);
+    const height = parsePresetOutputDimension(draft.draftH, 1080);
+    upsertSiteDefaultPresetAction(siteId, {
+      id: siteDefaultPreset?.id ?? crypto.randomUUID(),
+      name: "Site default",
+      width,
+      height,
+      exportFormat: draft.draftFormat,
+      maxFileSizeBytes: draftToMaxBytes(draft.draftMaxStr, draft.draftMaxUnit),
+      targetKey: { kind: "site-default", siteId },
+    });
+  };
 
   return (
     <div className="space-y-3 rounded-lg border border-dashed border-border/80 bg-background/50 p-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor={`${baseId}-site-default-w`}>Width</Label>
+          <Label htmlFor={`${baseId}-${siteId}-site-default-w`}>Width</Label>
           <Input
-            id={`${baseId}-site-default-w`}
-            value={draftW}
+            id={`${baseId}-${siteId}-site-default-w`}
+            value={draft.draftW}
             disabled={saving}
-            onChange={(e) => setDraftWAction(e.target.value)}
+            onChange={(event) => setDraft((current) => ({ ...current, draftW: event.target.value }))}
             className="h-9 text-sm tabular-nums"
             inputMode="numeric"
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor={`${baseId}-site-default-h`}>Height</Label>
+          <Label htmlFor={`${baseId}-${siteId}-site-default-h`}>Height</Label>
           <Input
-            id={`${baseId}-site-default-h`}
-            value={draftH}
+            id={`${baseId}-${siteId}-site-default-h`}
+            value={draft.draftH}
             disabled={saving}
-            onChange={(e) => setDraftHAction(e.target.value)}
+            onChange={(event) => setDraft((current) => ({ ...current, draftH: event.target.value }))}
             className="h-9 text-sm tabular-nums"
             inputMode="numeric"
           />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor={`${baseId}-site-default-format`}>Format</Label>
+          <Label htmlFor={`${baseId}-${siteId}-site-default-format`}>Format</Label>
           <NativeSelect
-            id={`${baseId}-site-default-format`}
+            id={`${baseId}-${siteId}-site-default-format`}
             className="w-full"
-            value={draftFormat}
+            value={draft.draftFormat}
             disabled={saving}
-            onChange={(e) => setDraftFormatAction(e.target.value as ImageExportFormat)}
+            onChange={(event) =>
+              setDraft((current) => ({ ...current, draftFormat: event.target.value as ImageExportFormat }))
+            }
           >
             <option value="webp">WebP</option>
             <option value="avif">AVIF</option>
@@ -161,15 +200,17 @@ function SiteDefaultPresetEditor(props: {
           <div className="flex max-w-sm gap-2">
             <Input
               className="h-9 text-sm tabular-nums"
-              value={draftMaxStr}
+              value={draft.draftMaxStr}
               disabled={saving}
-              onChange={(e) => setDraftMaxStrAction(e.target.value)}
+              onChange={(event) => setDraft((current) => ({ ...current, draftMaxStr: event.target.value }))}
             />
             <NativeSelect
               className="w-18 shrink-0"
-              value={draftMaxUnit}
+              value={draft.draftMaxUnit}
               disabled={saving}
-              onChange={(e) => setDraftMaxUnitAction(e.target.value as MaxSizeUnit)}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, draftMaxUnit: event.target.value as MaxSizeUnit }))
+              }
             >
               <option value="kb">KB</option>
               <option value="mb">MB</option>
@@ -178,61 +219,22 @@ function SiteDefaultPresetEditor(props: {
         </div>
       </div>
       <div className="flex gap-2">
-        <Button type="button" size="sm" disabled={saving} onClick={upsertSiteDefaultPresetAction}>
+        <Button type="button" size="sm" disabled={saving} onClick={save}>
           {siteDefaultPreset ? "Update" : "Create"}
         </Button>
         {siteDefaultPreset ? (
-          <Button type="button" variant="outline" size="sm" disabled={saving} onClick={clearSiteDefaultPresetAction}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={saving}
+            onClick={() => clearSiteDefaultPresetAction(siteId)}
+          >
             Remove
           </Button>
         ) : null}
       </div>
     </div>
-  );
-}
-
-function SiteDefaultPresetCard(props: {
-  baseId: string;
-  saving: boolean;
-  settings: BeaconAppSettings | undefined;
-  canEditSiteDefault: boolean;
-  siteDefaultPreset: BeaconPresetRow | null;
-  draftW: string;
-  setDraftWAction: (v: string) => void;
-  draftH: string;
-  setDraftHAction: (v: string) => void;
-  draftFormat: ImageExportFormat;
-  setDraftFormatAction: (v: ImageExportFormat) => void;
-  draftMaxStr: string;
-  setDraftMaxStrAction: (v: string) => void;
-  draftMaxUnit: MaxSizeUnit;
-  setDraftMaxUnitAction: (v: MaxSizeUnit) => void;
-  upsertSiteDefaultPresetAction: () => void;
-  clearSiteDefaultPresetAction: () => void;
-}) {
-  const { saving, settings, canEditSiteDefault, siteDefaultPreset, ...editorProps } = props;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Site default preset</CardTitle>
-        <CardDescription>Fallback preset when no scoped target preset matches.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {siteDefaultPreset ? (
-          <SiteDefaultPresetSummary
-            siteDefaultPreset={siteDefaultPreset}
-            defaultExportFormat={settings?.defaultExportFormat}
-          />
-        ) : (
-          <p className="text-sm text-muted-foreground">No site default preset yet.</p>
-        )}
-        {canEditSiteDefault ? (
-          <SiteDefaultPresetEditor saving={saving} siteDefaultPreset={siteDefaultPreset} {...editorProps} />
-        ) : null}
-      </CardContent>
-      {saving ? <CardFooter className="text-xs text-muted-foreground">Saving…</CardFooter> : null}
-    </Card>
   );
 }
 
@@ -249,60 +251,117 @@ function ScopedPresetListItem(props: { entry: BeaconPresetStorageEntry; defaultE
   );
 }
 
-function ScopedPresetsCard(props: {
-  loading: boolean;
+function SitePresetsGroupCard(props: {
+  baseId: string;
+  group: BeaconPresetSiteGroup;
+  saving: boolean;
   settings: BeaconAppSettings | undefined;
-  scopedPresets: BeaconPresetStorageEntry[];
+  canEditSiteDefault: boolean;
+  upsertSiteDefaultPresetAction: (siteId: string, row: BeaconPresetRow) => void;
+  clearSiteDefaultPresetAction: (siteId: string) => void;
 }) {
-  const { loading, settings, scopedPresets } = props;
+  const {
+    baseId,
+    group,
+    saving,
+    settings,
+    canEditSiteDefault,
+    upsertSiteDefaultPresetAction,
+    clearSiteDefaultPresetAction,
+  } = props;
+  const presetCount = group.scopedPresets.length + (group.siteDefault ? 1 : 0);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Scoped presets</CardTitle>
+        <CardTitle>{group.displayName}</CardTitle>
         <CardDescription>
-          Element, component, and instance presets are managed in the Beacon image editor Configure flow.
+          Site ID <span className="font-mono text-xs">{group.siteId}</span>
+          {presetCount > 0 ? ` · ${presetCount} preset${presetCount === 1 ? "" : "s"}` : " · no presets yet"}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        {scopedPresets.length === 0 && !loading ? (
-          <p className="text-sm text-muted-foreground">No scoped presets yet.</p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {scopedPresets.map((entry) => (
-              <ScopedPresetListItem
-                key={entry.row.id}
-                entry={entry}
-                defaultExportFormat={settings?.defaultExportFormat}
-              />
-            ))}
-          </ul>
-        )}
+      <CardContent className="space-y-4">
+        <div className="space-y-3">
+          <p className="text-sm font-medium">Site default</p>
+          {group.siteDefault ? (
+            <SiteDefaultPresetSummary
+              siteDefaultPreset={group.siteDefault}
+              defaultExportFormat={settings?.defaultExportFormat}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">No site default preset yet.</p>
+          )}
+          {canEditSiteDefault ? (
+            <SiteDefaultPresetEditor
+              baseId={baseId}
+              siteId={group.siteId}
+              saving={saving}
+              siteDefaultPreset={group.siteDefault}
+              defaultExportFormat={settings?.defaultExportFormat ?? "webp"}
+              upsertSiteDefaultPresetAction={upsertSiteDefaultPresetAction}
+              clearSiteDefaultPresetAction={clearSiteDefaultPresetAction}
+            />
+          ) : null}
+        </div>
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Scoped presets</p>
+          {group.scopedPresets.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Element, component, and instance presets are managed in the Beacon image editor.
+            </p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {group.scopedPresets.map((entry) => (
+                <ScopedPresetListItem
+                  key={entry.row.id}
+                  entry={entry}
+                  defaultExportFormat={settings?.defaultExportFormat}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
       </CardContent>
+      {saving ? <CardFooter className="text-xs text-muted-foreground">Saving…</CardFooter> : null}
     </Card>
   );
 }
 
 export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
-  const { loading, settings, canManage, teamPresetsLocked, canEditSiteDefault, siteDefaultPreset, ...rest } = props;
+  const { loading, settings, webflowSites, canManage, teamPresetsLocked, canEditSiteDefault, ...siteDefaultActions } =
+    props;
 
-  const scopedPresets = useMemo(() => {
+  const siteGroups = useMemo(() => {
     if (!settings) {
       return [];
     }
-    return listBeaconPresetStorageEntries(settings.imagePresetStorage).filter(({ scope }) => scope !== "site-default");
-  }, [settings]);
+    return buildBeaconPresetSiteGroups(settings.imagePresetStorage, webflowSites ?? []);
+  }, [settings, webflowSites]);
 
   return (
     <div className="mt-8 space-y-6">
       <TowerBeaconPanelStatus canManage={canManage} teamPresetsLocked={teamPresetsLocked} />
-      <SiteDefaultPresetCard
-        canEditSiteDefault={canEditSiteDefault}
-        settings={settings}
-        siteDefaultPreset={siteDefaultPreset}
-        {...rest}
-      />
-      <ScopedPresetsCard loading={loading} scopedPresets={scopedPresets} settings={settings} />
+      {siteGroups.length === 0 && !loading ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No Webflow sites</CardTitle>
+            <CardDescription>
+              Connect Webflow OAuth for this workspace to list sites, or create presets in Beacon to populate site IDs
+              here.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        siteGroups.map((group) => (
+          <SitePresetsGroupCard
+            key={group.siteId}
+            group={group}
+            settings={settings}
+            canEditSiteDefault={canEditSiteDefault}
+            {...siteDefaultActions}
+          />
+        ))
+      )}
     </div>
   );
 }

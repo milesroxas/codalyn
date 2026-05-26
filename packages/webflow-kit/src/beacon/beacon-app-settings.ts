@@ -4,6 +4,7 @@ import { DEFAULT_IMAGE_EXPORT_FORMAT } from "../image/output-formats.js";
 import { BEACON_IMAGE_ERROR_CODES, type BeaconImageErrorCode } from "./beacon-image-errors.js";
 import {
   type BeaconPresetRow,
+  coalesceBeaconPresetStorage,
   isPresetTargetKey,
   type PresetTargetKeyString,
   serializePresetTargetKey,
@@ -130,7 +131,7 @@ function normalizeBeaconPresetStorageInternal(input: BeaconPresetStorage): Beaco
   };
 
   if (input.siteDefault !== null) {
-    const siteDefaultResult = addRow(input.siteDefault, false);
+    const siteDefaultResult = addRow(input.siteDefault, true);
     if (!siteDefaultResult.ok) {
       return siteDefaultResult;
     }
@@ -145,10 +146,10 @@ function normalizeBeaconPresetStorageInternal(input: BeaconPresetStorage): Beaco
 
   return {
     ok: true,
-    value: {
+    value: coalesceBeaconPresetStorage({
       siteDefault: input.siteDefault,
       byTargetKey,
-    },
+    }),
   };
 }
 

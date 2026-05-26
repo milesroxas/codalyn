@@ -4,11 +4,12 @@ import { PageHeaderSkeleton } from "@/shared/ui/page-header-skeleton";
 import { Separator } from "@/shared/ui/separator";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { SkeletonStatus } from "@/shared/ui/skeleton-status";
+import { TowerPageMain } from "@/shared/ui/tower-page-shell";
 
 function AccountSettingsSkeleton() {
   return (
     <SkeletonStatus label="Loading account settings">
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:py-10">
+      <TowerPageMain width="narrow">
         <PageHeaderSkeleton />
         <Separator className="my-8" />
         <div className="space-y-8">
@@ -17,7 +18,7 @@ function AccountSettingsSkeleton() {
           <SettingsCardSkeleton fields={3} />
           <SettingsCardSkeleton fields={2} destructive />
         </div>
-      </main>
+      </TowerPageMain>
     </SkeletonStatus>
   );
 }

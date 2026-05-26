@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
 import { EarlyAccessRequestForm } from "@/features/auth/ui/early-access-request-form";
 import { EarlyAccessRequestFormSkeletonPage } from "@/features/auth/ui/early-access-request-form-skeleton";
 import { EarlyAccessPageShell } from "@/features/tower-ui/early-access-page-shell";
@@ -10,6 +11,7 @@ import {
   EARLY_ACCESS_REQUEST_PAGE_SIGN_UP_CTA,
   EARLY_ACCESS_REQUEST_PAGE_UNAVAILABLE,
 } from "@/shared/lib/access/early-access-copy";
+import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 
 function RequestAccessLoading() {
   return <EarlyAccessRequestFormSkeletonPage />;
@@ -17,8 +19,12 @@ function RequestAccessLoading() {
 
 function RequestAccessContent() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  const callbackUrl = sanitizeRelativePath(searchParams.get("callbackUrl") ?? "/");
   const beaconOrigin = searchParams.get("beaconOrigin");
+  const { sessionPending, redirecting: redirectingSignedInUser } = useRedirectAuthenticatedFromAuthSurface({
+    callbackUrl,
+    beaconOrigin,
+  });
   const [available, setAvailable] = useState<boolean | null>(null);
 
   const signInHref = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`;
@@ -42,7 +48,7 @@ function RequestAccessContent() {
     };
   }, []);
 
-  if (available === null) {
+  if (sessionPending || redirectingSignedInUser || available === null) {
     return <EarlyAccessRequestFormSkeletonPage />;
   }
 

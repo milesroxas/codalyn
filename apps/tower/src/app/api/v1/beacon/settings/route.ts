@@ -21,6 +21,7 @@ import {
 } from "@/server/beacon-settings-context";
 import { persistTeamBeaconPatch, upsertUserBeaconPayload } from "@/server/beacon-settings-persist";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
+import { listWebflowSitesForUser } from "@/server/webflow-sites";
 import { db } from "@/shared/lib/db";
 import { beaconAppSettings as beaconAppSettingsTable, organization } from "@/shared/lib/db/auth-schema";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
@@ -82,10 +83,15 @@ function validateTeamMutationPermissions(opts: {
   return towerPutRejectionResponse(rejection);
 }
 
-async function loadEffectiveSettings(userId: string, ctx: Awaited<ReturnType<typeof resolveBeaconMembershipContext>>) {
-  const [rows, workspaces] = await Promise.all([
+async function loadEffectiveSettings(
+  userId: string,
+  ctx: Awaited<ReturnType<typeof resolveBeaconMembershipContext>>,
+  requestHeaders: Headers
+) {
+  const [rows, workspaces, webflowSites] = await Promise.all([
     db.select().from(beaconAppSettingsTable).where(eq(beaconAppSettingsTable.userId, userId)).limit(1),
     listBeaconWorkspacesForUser(userId),
+    listWebflowSitesForUser({ userId, requestHeaders }),
   ]);
 
   const row = rows[0];
@@ -123,6 +129,7 @@ async function loadEffectiveSettings(userId: string, ctx: Awaited<ReturnType<typ
     workspaces,
     activeOrganizationId: activeId,
     activeOrganizationName,
+    webflowSites,
   };
 }
 
@@ -140,7 +147,7 @@ export async function GET(req: Request) {
     return jsonError(401, "Session required");
   }
 
-  const payload = await loadEffectiveSettings(auth.userId, ctx);
+  const payload = await loadEffectiveSettings(auth.userId, ctx, req.headers);
 
   return Response.json(payload, { headers: { "Cache-Control": "no-store" } });
 }
@@ -216,7 +223,7 @@ export async function PUT(req: Request) {
     return jsonError(401, "Session required");
   }
 
-  const payload = await loadEffectiveSettings(auth.userId, nextCtx);
+  const payload = await loadEffectiveSettings(auth.userId, nextCtx, req.headers);
 
   return Response.json(payload, { headers: { "Cache-Control": "no-store" } });
 }

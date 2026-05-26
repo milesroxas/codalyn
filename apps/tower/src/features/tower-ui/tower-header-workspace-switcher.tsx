@@ -3,9 +3,9 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
+import { createWorkspaceOrganization } from "@/features/team/api/create-workspace-organization";
 import { TeamWorkspaceSwitcher } from "@/features/team/ui/team-workspace-switcher";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
-import { slugifyWorkspaceName } from "@/shared/lib/membership/workspace-slug";
 
 type SessionUserWithPreferred = {
   preferredOrganizationId?: string | null;
@@ -95,14 +95,10 @@ export function TowerHeaderWorkspaceSwitcher() {
       return false;
     }
     setBusy(true);
-    const slug = slugifyWorkspaceName(name);
-    const res = await authClient.organization.create({
-      name,
-      slug,
-    });
+    const result = await createWorkspaceOrganization(name);
     setBusy(false);
-    if (res.error) {
-      toast.error(res.error.message ?? "Could not create team");
+    if (!result.ok) {
+      toast.error(result.message);
       return false;
     }
     setOrgName("");

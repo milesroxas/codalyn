@@ -13,6 +13,7 @@ import { db } from "@/shared/lib/db";
 import { user } from "@/shared/lib/db/auth-schema";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { TowerPageMain } from "@/shared/ui/tower-page-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ export default async function BillingPage() {
   const showPortal = Boolean(row?.stripeCustomerId);
 
   return (
-    <main className="mx-auto max-w-2xl space-y-8 px-4 py-8 sm:px-6 sm:py-10">
+    <TowerPageMain width="narrow" className="space-y-8">
       <div>
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Tower</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Billing &amp; usage</h1>
@@ -93,6 +94,6 @@ export default async function BillingPage() {
           <code className="font-mono">stripe listen</code> for local webhooks.
         </p>
       ) : null}
-    </main>
+    </TowerPageMain>
   );
 }

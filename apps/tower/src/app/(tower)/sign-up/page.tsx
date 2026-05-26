@@ -9,11 +9,14 @@ import {
 } from "@/features/auth/lib/beacon-opener-auth";
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
+import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { authClient } from "@/features/auth/model/auth-client";
+import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
 import { EarlyAccessSignUpGate } from "@/features/auth/ui/early-access-sign-up-gate";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { TOWER_OPERATOR_INVITE_HEADER } from "@/shared/lib/access/operator-invite-header";
+import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
@@ -59,15 +62,25 @@ async function runAfterTowerSignUp(opts: {
       return messageForEnableTeamError(enable.errorKey);
     }
   }
+  if (opts.beaconOrigin) {
+    const enable = await postEnableTeamCreation();
+    if (!enable.ok && enable.errorKey !== "already_in_organization") {
+      return messageForEnableTeamError(enable.errorKey);
+    }
+  }
   return null;
 }
 
 function SignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  const callbackUrl = sanitizeRelativePath(searchParams.get("callbackUrl") ?? "/");
   const beaconOrigin = searchParams.get("beaconOrigin");
   const operatorInviteParam = searchParams.get("invite");
+  const { sessionPending, redirecting: redirectingSignedInUser } = useRedirectAuthenticatedFromAuthSurface({
+    callbackUrl,
+    beaconOrigin,
+  });
   const firstNameId = useId();
   const lastNameId = useId();
   const emailId = useId();
@@ -77,7 +90,7 @@ function SignUpForm() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [startWithTeamWorkspace, setStartWithTeamWorkspace] = useState(false);
+  const [startWithTeamWorkspace, setStartWithTeamWorkspace] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [operatorInviteToken, setOperatorInviteToken] = useState<string | null>(null);
@@ -150,7 +163,7 @@ function SignUpForm() {
     if (tryFinishBeaconTowerAuthPopup(beaconOrigin, u ? userToBeaconPayload(u) : undefined, token)) {
       return;
     }
-    router.push(callbackUrl);
+    router.push(resolvePostAuthRedirectTarget(u, callbackUrl));
     router.refresh();
   }
 
@@ -197,11 +210,11 @@ function SignUpForm() {
   const requestAccessHref = `/request-access?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`;
   const joiningViaTeamInvite = callbackUrl.includes("/invitations/accept");
 
-  if (earlyAccessRequired === null || !inviteValidated) {
+  if (sessionPending || redirectingSignedInUser || earlyAccessRequired === null || !inviteValidated) {
     return <AuthCardSkeleton variant="sign-up" />;
   }
 
-  if (earlyAccessRequired && inviteValidated && !operatorInviteToken && !operatorInviteParam && !joiningViaTeamInvite) {
+  if (earlyAccessRequired && !operatorInviteToken && !operatorInviteParam && !joiningViaTeamInvite) {
     return <EarlyAccessSignUpGate signInHref={signInHref} requestAccessHref={requestAccessHref} />;
   }
 
@@ -281,7 +294,7 @@ function SignUpForm() {
                   <p id={`${teamWorkspaceId}-hint`} className="text-xs leading-relaxed text-muted-foreground">
                     {operatorInviteToken
                       ? "Your invite includes permission to create a team workspace."
-                      : "Create a team workspace now (team plan / onboarding), or add it later from billing."}
+                      : "Required for Webflow, Beacon presets, and team billing. You can rename the workspace later."}
                   </p>
                 </div>
                 <Switch

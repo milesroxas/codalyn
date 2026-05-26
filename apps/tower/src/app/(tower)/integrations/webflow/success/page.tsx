@@ -11,11 +11,11 @@ function SuccessInner() {
 
   useEffect(() => {
     if (popup === "1" && window.opener) {
-      window.opener.postMessage({ type: "codalyn:webflow-oauth", status: "success" }, "*");
+      window.opener.postMessage({ type: "codalyn:webflow-oauth", status: "success" }, window.location.origin);
       window.close();
       return;
     }
-    router.replace("/?webflow=connected");
+    router.replace("/webflow?webflow=connected");
   }, [popup, router]);
 
   return (

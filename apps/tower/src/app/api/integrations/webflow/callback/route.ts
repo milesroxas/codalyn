@@ -171,5 +171,5 @@ export async function GET(request: Request) {
   if (isPopupFlow) {
     return NextResponse.redirect(`${appUrl}/integrations/webflow/success?popup=1`);
   }
-  return NextResponse.redirect(`${appUrl}/?webflow=connected`);
+  return NextResponse.redirect(`${appUrl}/webflow?webflow=connected`);
 }

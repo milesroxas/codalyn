@@ -2,17 +2,25 @@ import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
+const towerAppShellContentWidths = {
+  default: "max-w-4xl",
+  wide: "max-w-6xl",
+  narrow: "max-w-2xl",
+} as const;
+
+type TowerAppShellContentWidth = keyof typeof towerAppShellContentWidths;
+
+/** Shared horizontal bounds for Tower header chrome and page main content. */
+function towerAppShellContentClassName(width: TowerAppShellContentWidth = "default", className?: string) {
+  return cn("mx-auto w-full px-4 sm:px-6", towerAppShellContentWidths[width], className);
+}
+
 type TowerPageMainProps = React.ComponentProps<"main"> & {
-  width?: "default" | "narrow";
+  width?: TowerAppShellContentWidth;
 };
 
 function TowerPageMain({ className, width = "default", ...props }: TowerPageMainProps) {
-  return (
-    <main
-      className={cn("mx-auto px-4 py-8 sm:px-6 sm:py-10", width === "narrow" ? "max-w-2xl" : "max-w-4xl", className)}
-      {...props}
-    />
-  );
+  return <main className={towerAppShellContentClassName(width, cn("py-8 sm:py-10", className))} {...props} />;
 }
 
 type TowerPageHeaderProps = {
@@ -63,4 +71,24 @@ function TowerPageSection({ title, description, actions, children, className }: 
   );
 }
 
-export { TowerPageHeader, TowerPageMain, TowerPageSection };
+function TowerDashboardGrid({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      className={cn("mb-10 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]", className)}
+      {...props}
+    />
+  );
+}
+
+function TowerDashboardSignals({ className, ...props }: React.ComponentProps<"div">) {
+  return <div className={cn("flex flex-col gap-3", className)} {...props} />;
+}
+
+export {
+  TowerDashboardGrid,
+  TowerDashboardSignals,
+  TowerPageHeader,
+  TowerPageMain,
+  TowerPageSection,
+  towerAppShellContentClassName,
+};

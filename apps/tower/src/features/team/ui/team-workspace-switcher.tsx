@@ -9,8 +9,8 @@ import {
   IconStarFilled,
 } from "@tabler/icons-react";
 import { type FormEvent, useState } from "react";
+import { CreateWorkspaceDialog } from "@/features/team/ui/create-workspace-dialog";
 import { Button } from "@/shared/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,8 +19,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
-import { Input } from "@/shared/ui/input";
-import { Label } from "@/shared/ui/label";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 export type WorkspaceOrgRow = { id: string; name: string; slug: string };
@@ -122,8 +120,8 @@ export function TeamWorkspaceSwitcher(props: {
           ) : (
             <p className="px-2 py-2 text-xs text-muted-foreground">
               {props.canCreateTeam
-                ? "No workspaces yet. Use “New workspace” to create one."
-                : "No team workspaces yet."}
+                ? "No workspaces yet. Create one to connect Webflow and manage Beacon presets."
+                : "No team workspaces yet. Accept an invite or upgrade to Team to create one."}
             </p>
           )}
           {props.canCreateTeam ? (
@@ -143,44 +141,14 @@ export function TeamWorkspaceSwitcher(props: {
       </DropdownMenu>
 
       {props.canCreateTeam ? (
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>New workspace</DialogTitle>
-              <DialogDescription>Members, roles, and invitations are scoped to each workspace.</DialogDescription>
-            </DialogHeader>
-            <form
-              className="grid gap-4"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const ok = await props.onCreateOrg(e);
-                if (ok) {
-                  setCreateOpen(false);
-                }
-              }}
-            >
-              <div className="grid gap-2">
-                <Label htmlFor="tw-new-workspace-name">Workspace name</Label>
-                <Input
-                  id="tw-new-workspace-name"
-                  value={props.orgName}
-                  onChange={(ev) => props.onOrgNameChange(ev.target.value)}
-                  placeholder="Acme Studio"
-                  autoComplete="organization"
-                  autoFocus
-                />
-              </div>
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={disabled || !props.orgName.trim()}>
-                  Create workspace
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <CreateWorkspaceDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          orgName={props.orgName}
+          onOrgNameChange={props.onOrgNameChange}
+          busy={disabled}
+          onSubmit={props.onCreateOrg}
+        />
       ) : null}
     </>
   );

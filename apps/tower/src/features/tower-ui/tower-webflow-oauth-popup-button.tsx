@@ -2,29 +2,27 @@
 
 import type { VariantProps } from "class-variance-authority";
 import { type ReactNode, useState } from "react";
+import { useTowerWebflowOAuthPopup } from "@/features/tower-ui/use-tower-webflow-oauth-popup";
 import { Button, type buttonVariants } from "@/shared/ui/button";
-
-const WEBFLOW_OAUTH_POPUP_FEATURES = "popup=yes,width=480,height=700,scrollbars=yes,resizable=yes";
 
 type OAuthButtonProps = VariantProps<typeof buttonVariants> & {
   children: ReactNode;
+  onSuccess?: () => void;
 };
 
-export function TowerWebflowOAuthPopupButton({ children, variant = "outline", size = "sm" }: OAuthButtonProps) {
+export function TowerWebflowOAuthPopupButton({
+  children,
+  variant = "default",
+  size = "sm",
+  onSuccess,
+}: OAuthButtonProps) {
   const [busy, setBusy] = useState(false);
+  const { openPopup } = useTowerWebflowOAuthPopup(onSuccess);
 
   async function handleClick() {
     setBusy(true);
     try {
-      const res = await fetch("/api/integrations/webflow/authorize", {
-        method: "POST",
-        credentials: "include",
-      });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !data.url) {
-        return;
-      }
-      window.open(data.url, "tower-webflow-oauth", WEBFLOW_OAUTH_POPUP_FEATURES);
+      await openPopup();
     } finally {
       setBusy(false);
     }

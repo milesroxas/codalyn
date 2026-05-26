@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { Skeleton } from "@/shared/ui/skeleton";
+import { towerAppShellContentClassName } from "@/shared/ui/tower-page-shell";
 
 const publicLoggedOutSurfaces = new Set(["/", "/sign-in", "/sign-up", "/request-access"]);
 
@@ -67,8 +68,8 @@ export function TowerHeader({ billingEnabled = false }: { billingEnabled?: boole
   const isProductAdmin = isProductAdminAppRole(user?.role);
 
   return (
-    <header className="supports-backdrop-filter:bg-background/75 sticky top-0 z-50 border-b border-border bg-background/90 px-4 py-3 backdrop-blur sm:px-6">
-      <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
+    <header className="supports-backdrop-filter:bg-background/75 sticky top-0 z-50 border-b border-border bg-background/90 py-3 backdrop-blur">
+      <div className={towerAppShellContentClassName("default", "flex flex-wrap items-center justify-between gap-3")}>
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <Link href="/" className="shrink-0 font-semibold tracking-tight text-foreground">
             Tower

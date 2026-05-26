@@ -4,7 +4,7 @@ import type * as React from "react";
 import { cn } from "@/shared/lib/utils";
 
 const alertVariants = cva(
-  "relative grid w-full gap-1 rounded-lg border px-4 py-3 text-sm has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-3 *:[svg]:row-span-2 *:[svg:not([class*='size-'])]:size-4",
+  "group/alert relative grid w-full gap-1 rounded-lg border px-4 py-3 text-sm has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-3 *:[svg]:row-span-2 *:[svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -31,7 +31,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="alert-title"
       className={cn(
-        "font-medium leading-none tracking-tight has-[+_[data-slot=alert-description]]:mb-1 [&_a]:underline [&_a]:underline-offset-3",
+        "font-medium leading-none tracking-tight group-has-[>svg]/alert:col-start-2 has-[+_[data-slot=alert-description]]:mb-1 [&_a]:underline [&_a]:underline-offset-3",
         className
       )}
       {...props}
@@ -43,14 +43,23 @@ function AlertDescription({ className, ...props }: React.ComponentProps<"div">) 
   return (
     <div
       data-slot="alert-description"
-      className={cn("text-sm text-muted-foreground [&_p:not(:last-child)]:mb-2", className)}
+      className={cn(
+        "text-sm text-muted-foreground group-has-[>svg]/alert:col-start-2 [&_p:not(:last-child)]:mb-2",
+        className
+      )}
       {...props}
     />
   );
 }
 
 function AlertAction({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="alert-action" className={cn("mt-3 flex flex-wrap gap-2", className)} {...props} />;
+  return (
+    <div
+      data-slot="alert-action"
+      className={cn("mt-3 flex flex-wrap gap-2 group-has-[>svg]/alert:col-start-2", className)}
+      {...props}
+    />
+  );
 }
 
 export { Alert, AlertAction, AlertDescription, AlertTitle };

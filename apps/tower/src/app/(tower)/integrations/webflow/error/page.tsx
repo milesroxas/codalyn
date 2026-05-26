@@ -14,7 +14,7 @@ function ErrorInner() {
     if (popup === "1" && window.opener) {
       window.opener.postMessage(
         { type: "codalyn:webflow-oauth", status: "error", error: error ?? "unknown", detail },
-        "*"
+        window.location.origin
       );
       window.close();
     }

@@ -10,7 +10,7 @@ import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user?.id) {
-    return NextResponse.redirect(new URL("/sign-in", request.url));
+    return NextResponse.redirect(new URL("/sign-in?callbackUrl=%2Fintegrations%2Fbeacon-popup-next", request.url));
   }
 
   const token = await resolveWebflowBearerToken({ userId: session.user.id, requestHeaders: request.headers });

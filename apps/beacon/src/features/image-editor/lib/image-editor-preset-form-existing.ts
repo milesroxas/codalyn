@@ -7,6 +7,7 @@ import {
   formatBeaconPresetDisplayName,
   type PresetCrudScope,
   type ResolvedUploadTarget,
+  resolveSiteDefaultPresetRow,
 } from "@codalyn/webflow-kit";
 
 export type PresetFormExistingMatch = {
@@ -29,7 +30,10 @@ export function findExistingPresetForFormScope(input: {
 }): PresetFormExistingMatch | null {
   const { settings, scope, siteId, resolvedTarget } = input;
   if (scope === "site-default") {
-    const row = settings.imagePresetStorage.siteDefault;
+    if (siteId == null) {
+      return null;
+    }
+    const row = resolveSiteDefaultPresetRow(settings.imagePresetStorage, siteId);
     if (row == null) {
       return null;
     }

@@ -9,23 +9,18 @@ import {
 } from "@/features/auth/lib/beacon-opener-auth";
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
+import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { authClient } from "@/features/auth/model/auth-client";
+import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
-import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
+import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
 type SignInPostResult = { kind: "beacon_popup" } | { kind: "error"; message: string } | { kind: "done" };
-
-function resolvePostSignInTarget(user: { role?: string | null } | null | undefined, callbackUrl: string): string {
-  if (callbackUrl !== "/") {
-    return callbackUrl;
-  }
-  return isProductAdminAppRole(user?.role ?? null) ? "/console" : callbackUrl;
-}
 
 async function runAfterTowerSignIn(opts: {
   data: Parameters<typeof resolveUserAndTokenAfterEmailAuth>[0];
@@ -48,9 +43,13 @@ async function runAfterTowerSignIn(opts: {
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  const callbackUrl = sanitizeRelativePath(searchParams.get("callbackUrl") ?? "/");
   const beaconOrigin = searchParams.get("beaconOrigin");
   const operatorInviteParam = searchParams.get("invite");
+  const { sessionPending, redirecting: redirectingSignedInUser } = useRedirectAuthenticatedFromAuthSurface({
+    callbackUrl,
+    beaconOrigin,
+  });
   const emailId = useId();
   const passwordId = useId();
   const [email, setEmail] = useState("");
@@ -111,6 +110,10 @@ function SignInForm() {
     void syncExistingTowerSessionToBeaconIfPopup(beaconOrigin);
   }, [beaconOrigin]);
 
+  if (sessionPending || redirectingSignedInUser) {
+    return <AuthCardSkeleton variant="sign-in" />;
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -138,7 +141,7 @@ function SignInForm() {
       return;
     }
     if (data?.user) {
-      router.push(resolvePostSignInTarget(data.user, callbackUrl));
+      router.push(resolvePostAuthRedirectTarget(data.user, callbackUrl));
       router.refresh();
     }
   }

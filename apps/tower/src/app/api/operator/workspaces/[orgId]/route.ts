@@ -2,6 +2,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { buildOrganizationSeatSnapshot, countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
+import { resolveWorkspaceSlugPatch } from "@/server/membership/workspace-slug-update";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch } from "@/server/operator/types";
 import {
@@ -12,6 +13,7 @@ import {
 } from "@/server/operator/usage-limits";
 import { db } from "@/shared/lib/db";
 import { invitation, member, organization, user } from "@/shared/lib/db/auth-schema";
+import { parseWorkspaceSlug } from "@/shared/lib/membership/workspace-slug";
 
 export const dynamic = "force-dynamic";
 
@@ -155,10 +157,11 @@ function applySlugField(body: Record<string, unknown>, patch: OperatorWorkspaceP
   if (!("slug" in body)) {
     return null;
   }
-  if (typeof body.slug !== "string" || !/^[a-z0-9-]{1,80}$/.test(body.slug)) {
-    return "invalid_slug";
+  const parsed = parseWorkspaceSlug(body.slug);
+  if (!parsed.ok) {
+    return parsed.error;
   }
-  patch.slug = body.slug;
+  patch.slug = parsed.slug;
   return null;
 }
 
@@ -241,6 +244,19 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = { ...parsed };
   Object.assign(updates, usageLimitsPatchToDbUpdates(parsed));
+
+  if ("slug" in updates) {
+    const slugPatch = await resolveWorkspaceSlugPatch(orgId, updates.slug);
+    if (!slugPatch.ok) {
+      return NextResponse.json({ error: slugPatch.error }, { status: slugPatch.status });
+    }
+    if (!slugPatch.changed) {
+      delete updates.slug;
+    } else {
+      updates.slug = slugPatch.slug;
+    }
+  }
+
   if (Object.keys(updates).length > 0) {
     await db.update(organization).set(updates).where(eq(organization.id, orgId));
   }

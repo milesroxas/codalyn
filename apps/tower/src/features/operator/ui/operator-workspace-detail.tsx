@@ -27,6 +27,7 @@ import {
 } from "@/shared/ui/sheet";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { DangerZoneTypedDelete } from "@/shared/ui/typed-confirm-alert-dialog";
+import { WorkspaceSlugField } from "@/shared/ui/workspace-slug-field";
 
 export type OperatorWorkspaceDetailSheetProps = {
   workspaceId: string | null;
@@ -65,6 +66,7 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
   const [patchBusy, setPatchBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+  const [slugDraft, setSlugDraft] = useState("");
   const [seatLimitDraft, setSeatLimitDraft] = useState("");
   const [billingPlanDraft, setBillingPlanDraft] = useState("");
   const [subscriptionStatusDraft, setSubscriptionStatusDraft] = useState("");
@@ -77,6 +79,7 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
       const d = await operatorApi.getWorkspace(id);
       setDetail(d);
       setNameDraft(d.name);
+      setSlugDraft(d.slug);
       setSeatLimitDraft(d.seatLimit === null ? "" : String(d.seatLimit));
       setBillingPlanDraft(d.billingPlan ?? "");
       setSubscriptionStatusDraft(d.subscriptionStatus ?? "");
@@ -114,6 +117,7 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
         const next = await operatorApi.patchWorkspace(detail.id, update);
         setDetail(next);
         setNameDraft(next.name);
+        setSlugDraft(next.slug);
         setSeatLimitDraft(next.seatLimit === null ? "" : String(next.seatLimit));
         setBillingPlanDraft(next.billingPlan ?? "");
         setSubscriptionStatusDraft(next.subscriptionStatus ?? "");
@@ -155,6 +159,14 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
     }
     void patch({ name: v });
   }, [nameDraft, detail?.name, patch]);
+
+  const onSaveSlug = useCallback(() => {
+    const v = slugDraft.trim();
+    if (!v || v === detail?.slug) {
+      return;
+    }
+    void patch({ slug: v });
+  }, [slugDraft, detail?.slug, patch]);
 
   const onSaveSeatLimit = useCallback(() => {
     const raw = seatLimitDraft.trim();
@@ -257,9 +269,12 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
               <IdentitySection
                 detail={detail}
                 nameDraft={nameDraft}
+                slugDraft={slugDraft}
                 onNameDraftChange={setNameDraft}
+                onSlugDraftChange={setSlugDraft}
                 patchBusy={patchBusy}
-                onSave={onSaveName}
+                onSaveName={onSaveName}
+                onSaveSlug={onSaveSlug}
               />
               <SeatsSection
                 detail={detail}
@@ -351,17 +366,23 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
 function IdentitySection({
   detail,
   nameDraft,
+  slugDraft,
   onNameDraftChange,
+  onSlugDraftChange,
   patchBusy,
-  onSave,
+  onSaveName,
+  onSaveSlug,
 }: {
   detail: OperatorWorkspaceDetail;
   nameDraft: string;
+  slugDraft: string;
   onNameDraftChange: (next: string) => void;
+  onSlugDraftChange: (next: string) => void;
   patchBusy: boolean;
-  onSave: () => void;
+  onSaveName: () => void;
+  onSaveSlug: () => void;
 }) {
-  const disabled = patchBusy || nameDraft.trim() === "" || nameDraft.trim() === detail.name;
+  const nameDisabled = patchBusy || nameDraft.trim() === "" || nameDraft.trim() === detail.name;
   return (
     <section className="space-y-3">
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Identity</h3>
@@ -370,14 +391,21 @@ function IdentitySection({
           <Label htmlFor="workspace-name">Name</Label>
           <div className="flex items-center gap-2">
             <Input id="workspace-name" value={nameDraft} onChange={(event) => onNameDraftChange(event.target.value)} />
-            <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={onSave}>
+            <Button type="button" size="sm" variant="outline" disabled={nameDisabled} onClick={onSaveName}>
               Save
             </Button>
           </div>
         </div>
+        <WorkspaceSlugField
+          id="workspace-slug"
+          value={slugDraft}
+          currentSlug={detail.slug}
+          busy={patchBusy}
+          onChange={onSlugDraftChange}
+          onSave={onSaveSlug}
+        />
         <p className="text-xs text-muted-foreground">
-          Slug is <code className="rounded bg-muted px-1 py-0.5 font-mono">{detail.slug}</code> (immutable in this
-          view). Metadata: <span className="font-mono">{detail.metadata ?? "—"}</span>
+          Metadata: <span className="font-mono">{detail.metadata ?? "—"}</span>
         </p>
       </div>
     </section>

@@ -5,15 +5,7 @@ import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { TeamWorkspaceSwitcher } from "@/features/team/ui/team-workspace-switcher";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
-
-function slugify(name: string): string {
-  const s = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-  return s.length > 0 ? s : "team";
-}
+import { slugifyWorkspaceName } from "@/shared/lib/membership/workspace-slug";
 
 type SessionUserWithPreferred = {
   preferredOrganizationId?: string | null;
@@ -103,7 +95,7 @@ export function TowerHeaderWorkspaceSwitcher() {
       return false;
     }
     setBusy(true);
-    const slug = slugify(name);
+    const slug = slugifyWorkspaceName(name);
     const res = await authClient.organization.create({
       name,
       slug,

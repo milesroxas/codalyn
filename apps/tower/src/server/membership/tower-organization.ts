@@ -1,3 +1,4 @@
+import { APIError } from "better-auth/api";
 import { organization } from "better-auth/plugins";
 import { grantEarlyAccess } from "@/server/access/early-access";
 import {
@@ -10,9 +11,16 @@ import { resolveMembershipSeatCapFromOrg } from "@/server/billing/team-billing-c
 import { sendOrganizationInvitationEmail } from "@/server/email/organization-invitation-email";
 import { isTowerProductAdmin } from "@/server/membership/product-admin";
 import {
+  assertWorkspaceSlugAvailableForUpdate,
+  isWorkspaceSlugTaken,
+  resolveWorkspaceSlugForCreate,
+  resolveWorkspaceSlugInput,
+} from "@/server/membership/workspace-slug-update";
+import {
   towerOrganizationClientSchema,
   towerOrganizationRoles,
 } from "@/shared/lib/membership/tower-organization-access";
+import { workspaceSlugErrorMessage } from "@/shared/lib/membership/workspace-slug-messages";
 
 export {
   isTowerTeamAdminRole,
@@ -41,6 +49,46 @@ export const towerOrganization = organization({
     await sendOrganizationInvitationEmail(data);
   },
   organizationHooks: {
+    beforeCreateOrganization: async ({ organization: orgInput }) => {
+      const parsed = resolveWorkspaceSlugForCreate(orgInput);
+      if (!parsed.ok) {
+        throw new APIError("BAD_REQUEST", {
+          message: workspaceSlugErrorMessage(parsed.error),
+          code: parsed.error,
+        });
+      }
+      if (await isWorkspaceSlugTaken(parsed.slug)) {
+        throw new APIError("BAD_REQUEST", {
+          message: workspaceSlugErrorMessage("slug_taken"),
+          code: "slug_taken",
+        });
+      }
+      return {
+        data: {
+          ...orgInput,
+          slug: parsed.slug,
+        },
+      };
+    },
+    beforeUpdateOrganization: async ({ organization: orgInput, member }) => {
+      if (typeof orgInput.slug !== "string") {
+        return;
+      }
+      const parsed = resolveWorkspaceSlugInput(orgInput.slug);
+      if (!parsed.ok) {
+        throw new APIError("BAD_REQUEST", {
+          message: workspaceSlugErrorMessage(parsed.error),
+          code: parsed.error,
+        });
+      }
+      await assertWorkspaceSlugAvailableForUpdate(parsed.slug, member.organizationId);
+      return {
+        data: {
+          ...orgInput,
+          slug: parsed.slug,
+        },
+      };
+    },
     beforeCreateInvitation: async ({ organization: org }) => {
       await assertOrganizationSeatAvailable(org.id, org as { seatLimit?: number | null });
     },

@@ -26,6 +26,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { NativeSelect } from "@/shared/ui/native-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { WorkspaceSlugField } from "@/shared/ui/workspace-slug-field";
 
 type WorkspaceSeatState = {
   isAtSeatCap: boolean;
@@ -438,10 +439,22 @@ function WorkspaceSettingsTab(props: {
   activeOrg: { id: string; name: string; slug: string };
   busy: boolean;
   activeTeamNameEdit: string;
+  activeTeamSlugEdit: string;
   onActiveTeamNameEditChange: (v: string) => void;
+  onActiveTeamSlugEditChange: (v: string) => void;
   onUpdateActiveTeamName: (e: FormEvent) => void;
+  onUpdateActiveTeamSlug: () => void | Promise<void>;
 }) {
-  const { activeOrg, busy, activeTeamNameEdit, onActiveTeamNameEditChange, onUpdateActiveTeamName } = props;
+  const {
+    activeOrg,
+    busy,
+    activeTeamNameEdit,
+    activeTeamSlugEdit,
+    onActiveTeamNameEditChange,
+    onActiveTeamSlugEditChange,
+    onUpdateActiveTeamName,
+    onUpdateActiveTeamSlug,
+  } = props;
 
   return (
     <TabsContent value="settings" className="mt-6 space-y-6">
@@ -473,6 +486,34 @@ function WorkspaceSettingsTab(props: {
             >
               Save changes
             </Button>
+          </form>
+        </CardContent>
+      </Card>
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle className="text-base">Workspace slug</CardTitle>
+          <CardDescription>
+            A stable identifier used in support, integrations, and operator tools. Changing it does not affect member
+            access.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={(ev) => {
+              ev.preventDefault();
+              void onUpdateActiveTeamSlug();
+            }}
+          >
+            <WorkspaceSlugField
+              id="ws-slug"
+              value={activeTeamSlugEdit}
+              currentSlug={activeOrg.slug}
+              busy={busy}
+              onChange={onActiveTeamSlugEditChange}
+              onSave={() => {
+                void onUpdateActiveTeamSlug();
+              }}
+            />
           </form>
         </CardContent>
       </Card>
@@ -540,12 +581,15 @@ export function WorkspaceTabsShell(props: {
   inviteEmail: string;
   inviteRole: string;
   activeTeamNameEdit: string;
+  activeTeamSlugEdit: string;
   resendingInvitationId: string | null;
   onInviteEmailChange: (v: string) => void;
   onInviteRoleChange: (v: string) => void;
   onInvite: (e: FormEvent) => void;
   onUpdateActiveTeamName: (e: FormEvent) => void;
+  onUpdateActiveTeamSlug: () => void | Promise<void>;
   onActiveTeamNameEditChange: (v: string) => void;
+  onActiveTeamSlugEditChange: (v: string) => void;
   onUpdateMemberRole: (memberId: string, role: string) => void;
   onRemoveMember: (memberId: string) => void;
   onResendInvite: (inv: InvitationRow) => void;
@@ -565,12 +609,15 @@ export function WorkspaceTabsShell(props: {
     inviteEmail,
     inviteRole,
     activeTeamNameEdit,
+    activeTeamSlugEdit,
     resendingInvitationId,
     onInviteEmailChange,
     onInviteRoleChange,
     onInvite,
     onUpdateActiveTeamName,
+    onUpdateActiveTeamSlug,
     onActiveTeamNameEditChange,
+    onActiveTeamSlugEditChange,
     onUpdateMemberRole,
     onRemoveMember,
     onResendInvite,
@@ -661,8 +708,11 @@ export function WorkspaceTabsShell(props: {
               activeOrg={activeOrg}
               busy={busy}
               activeTeamNameEdit={activeTeamNameEdit}
+              activeTeamSlugEdit={activeTeamSlugEdit}
               onActiveTeamNameEditChange={onActiveTeamNameEditChange}
+              onActiveTeamSlugEditChange={onActiveTeamSlugEditChange}
               onUpdateActiveTeamName={onUpdateActiveTeamName}
+              onUpdateActiveTeamSlug={onUpdateActiveTeamSlug}
             />
 
             {workspaceBilling && billingOrganizationId ? (

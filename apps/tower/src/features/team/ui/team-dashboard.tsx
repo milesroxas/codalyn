@@ -14,6 +14,8 @@ import {
   TOWER_TEAM_ROLES,
   type TowerTeamRole,
 } from "@/shared/lib/membership/tower-organization-access";
+import { parseWorkspaceSlug } from "@/shared/lib/membership/workspace-slug";
+import { workspaceSlugErrorMessage } from "@/shared/lib/membership/workspace-slug-messages";
 import { Button } from "@/shared/ui/button";
 
 export function TeamDashboard(props: {
@@ -32,6 +34,7 @@ export function TeamDashboard(props: {
   const { data: activeMember, refetch: refetchActiveMember } = authClient.useActiveMember();
 
   const [activeTeamNameEdit, setActiveTeamNameEdit] = useState("");
+  const [activeTeamSlugEdit, setActiveTeamSlugEdit] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<string>(TOWER_TEAM_ROLES[1]);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +49,7 @@ export function TeamDashboard(props: {
   useEffect(() => {
     if (activeOrg) {
       setActiveTeamNameEdit(activeOrg.name);
+      setActiveTeamSlugEdit(activeOrg.slug);
     }
   }, [activeOrg]);
 
@@ -73,6 +77,37 @@ export function TeamDashboard(props: {
     }
     await refreshTeam();
     toast.success("Team name updated");
+  };
+
+  const onUpdateActiveTeamSlug = async () => {
+    if (!activeOrg) {
+      return;
+    }
+    const parsed = parseWorkspaceSlug(activeTeamSlugEdit);
+    if (!parsed.ok) {
+      const msg = workspaceSlugErrorMessage(parsed.error);
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+    if (parsed.slug === activeOrg.slug) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    const res = await authClient.organization.update({
+      organizationId: activeOrg.id,
+      data: { slug: parsed.slug },
+    });
+    setBusy(false);
+    if (res.error) {
+      const msg = workspaceSlugErrorMessage(res.error.message ?? "Could not update workspace slug");
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+    await refreshTeam();
+    toast.success("Workspace slug updated");
   };
 
   const onInvite = async (e: FormEvent) => {
@@ -264,8 +299,11 @@ export function TeamDashboard(props: {
         workspaceBilling={workspaceBilling}
         billingOrganizationId={activeOrganizationId ?? activeOrg?.id ?? null}
         activeTeamNameEdit={activeTeamNameEdit}
+        activeTeamSlugEdit={activeTeamSlugEdit}
         onActiveTeamNameEditChange={setActiveTeamNameEdit}
+        onActiveTeamSlugEditChange={setActiveTeamSlugEdit}
         onUpdateActiveTeamName={onUpdateActiveTeamName}
+        onUpdateActiveTeamSlug={onUpdateActiveTeamSlug}
         members={members}
         memberRoleOptions={memberRoleOptions}
         invitations={invitations}

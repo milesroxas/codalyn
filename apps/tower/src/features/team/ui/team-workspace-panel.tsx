@@ -15,8 +15,11 @@ export function TeamWorkspacePanel(props: {
   workspaceBilling: WorkspaceBillingView | null;
   billingOrganizationId: string | null;
   activeTeamNameEdit: string;
+  activeTeamSlugEdit: string;
   onActiveTeamNameEditChange: (v: string) => void;
+  onActiveTeamSlugEditChange: (v: string) => void;
   onUpdateActiveTeamName: (e: FormEvent) => void;
+  onUpdateActiveTeamSlug: () => void | Promise<void>;
   members: MemberRow[];
   memberRoleOptions: string[];
   invitations: InvitationRow[];
@@ -65,12 +68,15 @@ export function TeamWorkspacePanel(props: {
           inviteEmail={props.inviteEmail}
           inviteRole={props.inviteRole}
           activeTeamNameEdit={props.activeTeamNameEdit}
+          activeTeamSlugEdit={props.activeTeamSlugEdit}
           resendingInvitationId={props.resendingInvitationId}
           onInviteEmailChange={props.onInviteEmailChange}
           onInviteRoleChange={props.onInviteRoleChange}
           onInvite={props.onInvite}
           onUpdateActiveTeamName={props.onUpdateActiveTeamName}
+          onUpdateActiveTeamSlug={props.onUpdateActiveTeamSlug}
           onActiveTeamNameEditChange={props.onActiveTeamNameEditChange}
+          onActiveTeamSlugEditChange={props.onActiveTeamSlugEditChange}
           onUpdateMemberRole={props.onUpdateMemberRole}
           onRemoveMember={props.onRemoveMember}
           onResendInvite={props.onResendInvite}

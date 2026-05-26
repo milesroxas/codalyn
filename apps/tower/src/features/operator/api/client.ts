@@ -9,6 +9,17 @@ import type {
   OperatorWorkspaceListResponse,
   OperatorWorkspacePatch,
 } from "@/server/operator/types";
+import { workspaceSlugErrorMessage } from "@/shared/lib/membership/workspace-slug-messages";
+
+function formatOperatorApiError(body: { error?: string; message?: string } | null, status: number): string {
+  if (body?.message) {
+    return workspaceSlugErrorMessage(body.message);
+  }
+  if (body?.error) {
+    return workspaceSlugErrorMessage(body.error);
+  }
+  return `Request failed with ${status}`;
+}
 
 async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   const res = await fetch(input, {
@@ -20,14 +31,8 @@ async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
-    let message = `Request failed with ${res.status}`;
     const body = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
-    if (body?.message) {
-      message = body.message;
-    } else if (body?.error) {
-      message = body.error;
-    }
-    throw new OperatorApiError(message, res.status);
+    throw new OperatorApiError(formatOperatorApiError(body, res.status), res.status);
   }
   return (await res.json()) as T;
 }

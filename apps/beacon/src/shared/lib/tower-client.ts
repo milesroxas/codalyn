@@ -1,6 +1,7 @@
 import { readBeaconTowerSessionToken } from "@/features/auth/lib/webflow-designer-session";
+import { readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
 
-const towerOrigin = import.meta.env.VITE_TOWER_ORIGIN?.replace(/\/$/, "") ?? "";
+const towerOrigin = readBeaconTowerOrigin();
 const beaconApiKey = import.meta.env.VITE_BEACON_API_KEY ?? "";
 
 /** Base URL for Tower (e.g. `http://localhost:3100` when using Docker Compose). */

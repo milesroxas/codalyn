@@ -3,8 +3,9 @@ import {
   clearBeaconTowerSessionToken,
   readBeaconTowerSessionToken,
 } from "@/features/auth/lib/beacon-tower-session-token";
+import { isBeaconTowerOriginConfigured, readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
 
-const baseURL = import.meta.env.VITE_TOWER_ORIGIN?.replace(/\/$/, "") ?? "";
+const baseURL = readBeaconTowerOrigin();
 
 /** Valid URL required by the client; session hooks only run when Tower is configured in the UI. */
 export const towerAuthClient = createAuthClient({
@@ -30,7 +31,7 @@ export function getTowerAuthBaseUrl(): string {
 }
 
 export function isTowerConfigured(): boolean {
-  return Boolean(baseURL);
+  return isBeaconTowerOriginConfigured();
 }
 
 const TOWER_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";

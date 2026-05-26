@@ -5,6 +5,11 @@ import { type FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import {
+  postSupportRequest,
+  supportRequestSubmitErrorMessage,
+  validateSupportRequestForm,
+} from "@/features/tower-ui/lib/submit-tower-support-request";
+import {
   TOWER_SUPPORT_REQUEST_CONFIG,
   type TowerSupportRequestKind,
 } from "@/features/tower-ui/lib/tower-support-request";
@@ -60,42 +65,42 @@ export function TowerSupportRequestDialog({ kind, open, onOpenChange }: TowerSup
     const trimmedTopic = topic.trim();
     const trimmedDetails = details.trim();
     const trimmedEmail = email.trim();
-
-    if (!trimmedTopic) {
-      const message = `Choose a ${config.topicLabel.toLowerCase()}.`;
-      setError(message);
-      toast.error(message);
-      return;
-    }
-
-    if (!trimmedDetails) {
-      const message = `Enter your ${config.detailsLabel.toLowerCase()}.`;
-      setError(message);
-      toast.error(message);
-      return;
-    }
-
-    if (!trimmedEmail) {
-      const message = "Enter your email so we can reply.";
-      setError(message);
-      toast.error(message);
+    const validationError = validateSupportRequestForm(config, {
+      topic: trimmedTopic,
+      details: trimmedDetails,
+      email: trimmedEmail,
+    });
+    if (validationError) {
+      setError(validationError);
+      toast.error(validationError);
       return;
     }
 
     setBusy(true);
-    try {
-      captureSupportRequest(config.captureEvent, {
-        kind,
-        topic: trimmedTopic,
-        details: trimmedDetails,
-        email: trimmedEmail,
-      });
-      toast.success(config.kind === "feedback" ? "Thanks for the feedback." : "Help request sent.");
-      resetForm();
-      onOpenChange(false);
-    } finally {
-      setBusy(false);
+    const result = await postSupportRequest({
+      kind,
+      topic: trimmedTopic,
+      details: trimmedDetails,
+      email: trimmedEmail,
+    });
+    setBusy(false);
+
+    if (!result.ok) {
+      const message = supportRequestSubmitErrorMessage(config, result.error);
+      setError(message);
+      toast.error(message);
+      return;
     }
+
+    captureSupportRequest(config.captureEvent, {
+      kind,
+      topic: trimmedTopic,
+      details: trimmedDetails,
+      email: trimmedEmail,
+    });
+    toast.success(config.kind === "feedback" ? "Thanks for the feedback." : "Help request sent.");
+    resetForm();
+    onOpenChange(false);
   }
 
   return (

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { countPendingEarlyAccessRequests } from "@/server/access/early-access-request";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorMetrics } from "@/server/operator/types";
+import { countPendingSupportRequests } from "@/server/support/support-request";
 import { db } from "@/shared/lib/db";
 import {
   invitation,
@@ -46,6 +47,7 @@ export async function GET(): Promise<NextResponse<OperatorMetrics | { error: str
     [{ total: signups30 = 0 } = { total: 0 }],
     [{ total: workspaces30 = 0 } = { total: 0 }],
     pendingEarlyAccessRequests,
+    pendingSupportRequests,
     recentUsers,
     recentWorkspacesRaw,
   ] = await Promise.all([
@@ -61,6 +63,7 @@ export async function GET(): Promise<NextResponse<OperatorMetrics | { error: str
     db.select({ total: count() }).from(user).where(gt(user.createdAt, days30)),
     db.select({ total: count() }).from(organization).where(gt(organization.createdAt, days30)),
     countPendingEarlyAccessRequests(),
+    countPendingSupportRequests(),
     db
       .select({
         id: user.id,
@@ -97,6 +100,7 @@ export async function GET(): Promise<NextResponse<OperatorMetrics | { error: str
       workspaces: Number(totalWorkspaces),
       pendingInvitations: Number(totalInvitations),
       pendingEarlyAccessRequests: Number(pendingEarlyAccessRequests),
+      pendingSupportRequests: Number(pendingSupportRequests),
       webflowConnected: Number(totalWebflowConnected),
     },
     activity: {

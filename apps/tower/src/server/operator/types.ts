@@ -37,6 +37,7 @@ export type OperatorMetrics = {
     workspaces: number;
     pendingInvitations: number;
     pendingEarlyAccessRequests: number;
+    pendingSupportRequests: number;
     webflowConnected: number;
   };
   activity: {

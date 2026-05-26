@@ -238,6 +238,31 @@ export const invitation = pgTable(
   ]
 );
 
+/** Inbound feedback and help requests from Tower support FAB. */
+export const supportRequest = pgTable(
+  "support_request",
+  {
+    id: text("id").primaryKey(),
+    /** `feedback` · `help` */
+    kind: text("kind").notNull(),
+    topic: text("topic").notNull(),
+    details: text("details").notNull(),
+    email: text("email").notNull(),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    /** `pending` · `resolved` · `dismissed` */
+    status: text("status").notNull().default("pending"),
+    operatorNote: text("operator_note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at"),
+    resolvedByUserId: text("resolved_by_user_id").references(() => user.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    index("support_request_status_idx").on(table.status),
+    index("support_request_kind_idx").on(table.kind),
+    index("support_request_created_at_idx").on(table.createdAt),
+  ]
+);
+
 /** Inbound early-access interest queue. Approval uses `inviteCustomerForEarlyAccess`; access truth stays on `user`. */
 export const earlyAccessRequest = pgTable(
   "early_access_request",

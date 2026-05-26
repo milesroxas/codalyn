@@ -135,6 +135,43 @@ export const operatorApi = {
       method: "POST",
       body: JSON.stringify({ action }),
     }),
+  listSupportRequests: async (
+    query: { status?: "pending" | "resolved" | "dismissed" | "all"; kind?: "all" | "feedback" | "help" } = {}
+  ): Promise<{
+    rows: Array<{
+      id: string;
+      kind: "feedback" | "help";
+      topic: string;
+      details: string;
+      email: string;
+      userId: string | null;
+      status: "pending" | "resolved" | "dismissed";
+      operatorNote: string | null;
+      createdAt: string;
+      resolvedAt: string | null;
+      resolvedByUserId: string | null;
+    }>;
+  }> =>
+    requestJson(
+      `/api/operator/support-requests${toSearchParams({
+        status: query.status ?? "pending",
+        kind: query.kind ?? "all",
+      })}`
+    ),
+  resolveSupportRequest: async (
+    id: string,
+    action: "resolve" | "dismiss",
+    operatorNote?: string | null
+  ): Promise<{ ok: true }> =>
+    requestJson(`/api/operator/support-requests/${encodeURIComponent(id)}`, {
+      method: "POST",
+      body: JSON.stringify({ action, operatorNote: operatorNote ?? null }),
+    }),
+  patchSupportRequestNote: async (id: string, operatorNote: string | null): Promise<{ ok: true }> =>
+    requestJson(`/api/operator/support-requests/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ operatorNote }),
+    }),
   listWorkspaces: async (query: OperatorWorkspaceListQuery = {}): Promise<OperatorWorkspaceListResponse> =>
     requestJson<OperatorWorkspaceListResponse>(`/api/operator/workspaces${toSearchParams(query)}`),
   getWorkspace: async (orgId: string): Promise<OperatorWorkspaceDetail> =>

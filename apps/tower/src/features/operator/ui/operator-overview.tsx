@@ -7,6 +7,7 @@ import {
   IconCircleCheck,
   IconExternalLink,
   IconKey,
+  IconLifebuoy,
   IconRefresh,
   IconUserCheck,
   IconUsers,
@@ -168,9 +169,9 @@ function SecondaryStats({
   nf: Intl.NumberFormat;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {loading || !totals ? (
-        Array.from({ length: 3 }).map((_, i) => (
+        Array.from({ length: 4 }).map((_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: static skeletons
           <Card key={i} size="sm">
             <CardContent className="space-y-2 pt-4">
@@ -200,6 +201,13 @@ function SecondaryStats({
             hint="Review under Access requests"
             icon={IconKey}
             tone={totals.pendingEarlyAccessRequests > 0 ? "warn" : "default"}
+          />
+          <StatTile
+            label="Support requests"
+            value={nf.format(totals.pendingSupportRequests)}
+            hint="Review under Support requests"
+            icon={IconLifebuoy}
+            tone={totals.pendingSupportRequests > 0 ? "warn" : "default"}
           />
         </>
       )}

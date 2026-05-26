@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+import { db } from "@/shared/lib/db";
+import { user } from "@/shared/lib/db/auth-schema";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 
 /**
@@ -11,4 +14,10 @@ export function isTowerProductAdmin(user: unknown): boolean {
     return false;
   }
   return isProductAdminAppRole((user as { role?: string | null }).role);
+}
+
+/** Emails for users with the `product_admin` app role (support notifications, etc.). */
+export async function listProductAdminEmails(): Promise<string[]> {
+  const rows = await db.select({ email: user.email }).from(user).where(eq(user.role, "product_admin"));
+  return rows.map((row) => row.email);
 }

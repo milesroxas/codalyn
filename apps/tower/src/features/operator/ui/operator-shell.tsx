@@ -6,6 +6,7 @@ import {
   IconChevronDown,
   IconDashboard,
   IconKey,
+  IconLifebuoy,
   IconMenu2,
   IconMoon,
   IconPlug,
@@ -33,6 +34,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 const nav = [
   { href: "/console", label: "Overview", icon: IconDashboard },
   { href: "/console/access-requests", label: "Access requests", icon: IconKey },
+  { href: "/console/support-requests", label: "Support requests", icon: IconLifebuoy },
   { href: "/console/customers", label: "Customers", icon: IconUsers },
   { href: "/console/workspaces", label: "Workspaces", icon: IconBuilding },
   { href: "/console/platform", label: "Platform", icon: IconPlug },

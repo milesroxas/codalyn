@@ -63,7 +63,7 @@ function applyHostSplitRouting(request: NextRequest, pathname: string): NextResp
       return NextResponse.redirect(buildTowerAppUrl(pathname, request.nextUrl.search));
     }
     if (sessionCookie) {
-      return NextResponse.redirect(buildTowerAppUrl("/"));
+      return NextResponse.redirect(buildTowerAppUrl("/auth/continue", request.nextUrl.search));
     }
     return null;
   }

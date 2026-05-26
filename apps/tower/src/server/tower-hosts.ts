@@ -97,7 +97,8 @@ export function parentDomainForCookie(hostname: string): string | null {
 }
 
 function resolveCookieDomainFromEnv(appHost: string, splitEnabled: boolean): string | undefined {
-  if (!splitEnabled || process.env.VERCEL_ENV !== "production") {
+  const vercelEnv = process.env.VERCEL_ENV;
+  if (!splitEnabled || (vercelEnv !== "production" && vercelEnv !== "preview")) {
     return undefined;
   }
   const expectedParent = parentDomainForCookie(appHost);

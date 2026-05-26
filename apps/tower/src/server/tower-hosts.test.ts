@@ -92,11 +92,14 @@ describe("tower-hosts", () => {
     expect(parentDomainForCookie("localhost")).toBe(null);
   });
 
-  it("returns cookie domain only in production with a validated parent domain", () => {
+  it("returns cookie domain only in production and preview with a validated parent domain", () => {
     snapshotEnv();
     process.env.TOWER_HOST_SPLIT = "1";
     process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
     expect(resolveTowerCookieDomain()).toBeUndefined();
+
+    process.env.VERCEL_ENV = "preview";
+    expect(resolveTowerCookieDomain()).toBe("codalyn.app");
 
     process.env.VERCEL_ENV = "production";
     expect(resolveTowerCookieDomain()).toBe("codalyn.app");

@@ -1,3 +1,4 @@
+import { isHostSplitEnabled, resolveMarketingOrigin } from "@/server/tower-hosts";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { TOWER_STATIC_BEACON_RELATED_ORIGINS } from "@/server/tower-static-beacon-origins";
 
@@ -46,8 +47,23 @@ function resolvePreviewTrustedOrigins(): string[] {
   return origins;
 }
 
+function resolveHostSplitTrustedOrigins(): string[] {
+  if (!isHostSplitEnabled()) {
+    return [];
+  }
+  return [resolveMarketingOrigin()];
+}
+
 export function resolveTowerTrustedOrigins(): string[] {
   const baseURL = resolveTowerPublicBaseUrl();
   const fromEnv = parseCommaSeparatedOrigins(process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? process.env.TOWER_CORS_ORIGINS);
-  return [...new Set([baseURL, ...TOWER_STATIC_BEACON_RELATED_ORIGINS, ...fromEnv, ...resolvePreviewTrustedOrigins()])];
+  return [
+    ...new Set([
+      baseURL,
+      ...TOWER_STATIC_BEACON_RELATED_ORIGINS,
+      ...fromEnv,
+      ...resolveHostSplitTrustedOrigins(),
+      ...resolvePreviewTrustedOrigins(),
+    ]),
+  ];
 }

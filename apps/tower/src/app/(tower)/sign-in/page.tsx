@@ -21,7 +21,10 @@ import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
-type SignInPostResult = { kind: "beacon_popup" } | { kind: "error"; message: string } | { kind: "done" };
+type SignInPostResult =
+  | { kind: "beacon_popup" }
+  | { kind: "error"; message: string }
+  | { kind: "done"; user: Awaited<ReturnType<typeof resolveUserAndTokenAfterEmailAuth>>["user"] };
 
 async function runAfterTowerSignIn(opts: {
   data: Parameters<typeof resolveUserAndTokenAfterEmailAuth>[0];
@@ -38,7 +41,7 @@ async function runAfterTowerSignIn(opts: {
       return { kind: "error", message: messageForRedeemFailure(redeemResult) };
     }
   }
-  return { kind: "done" };
+  return { kind: "done", user: u };
 }
 
 function SignInForm() {
@@ -122,7 +125,6 @@ function SignInForm() {
     const { data, error: err } = await authClient.signIn.email({
       email,
       password,
-      ...(beaconOrigin ? {} : { callbackURL: callbackUrl }),
     });
     setPending(false);
     if (err) {
@@ -141,8 +143,8 @@ function SignInForm() {
       setError(post.message);
       return;
     }
-    if (data?.user) {
-      router.push(resolvePostAuthRedirectTarget(data.user, callbackUrl));
+    if (post.kind === "done" && post.user) {
+      router.push(resolvePostAuthRedirectTarget(post.user, callbackUrl));
       router.refresh();
     }
   }

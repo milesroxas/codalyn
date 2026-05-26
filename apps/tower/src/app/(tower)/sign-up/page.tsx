@@ -181,7 +181,6 @@ function SignUpForm() {
       name: displayName,
       firstName: firstName.trim() || undefined,
       lastName: lastName.trim() || undefined,
-      ...(beaconOrigin ? {} : { callbackURL: callbackUrl }),
       fetchOptions: inviteToken
         ? {
             headers: {

@@ -8,6 +8,8 @@ const ENV_KEYS = [
   "BETTER_AUTH_TRUSTED_ORIGINS",
   "TOWER_CORS_ORIGINS",
   "TOWER_PREVIEW_APP_ORIGIN",
+  "TOWER_HOST_SPLIT",
+  "TOWER_MARKETING_URL",
   "VERCEL_URL",
   "VERCEL_BRANCH_URL",
   "VERCEL_ENV",
@@ -22,24 +24,26 @@ afterEach(() => {
 });
 
 describe("resolveTowerTrustedOrigins", () => {
-  it("production includes only base URL and static origins — no wildcards or staging hosts", () => {
+  it("production includes base URL, marketing origin when host split is enabled, and static origins", () => {
     vi.stubEnv("BETTER_AUTH_URL", "https://tower.codalyn.app");
     vi.stubEnv("VERCEL_ENV", "production");
     const origins = resolveTowerTrustedOrigins();
     expect(origins).toContain("https://tower.codalyn.app");
+    expect(origins).toContain("https://codalyn.app");
     expect(origins).not.toContain("https://*.codalyn.app");
     expect(origins).not.toContain("https://*.vercel.app");
     expect(origins).not.toContain("https://tower-preview.codalyn.app");
-    expect(origins).not.toContain("https://codalyn.app");
   });
 
-  it("preview includes explicit staging origin and Vercel deployment hosts only", () => {
+  it("preview includes explicit staging origin, marketing origin, and Vercel deployment hosts only", () => {
     vi.stubEnv("BETTER_AUTH_URL", "https://tower.codalyn.app");
+    vi.stubEnv("TOWER_MARKETING_URL", "https://preview.codalyn.app");
     vi.stubEnv("VERCEL_ENV", "preview");
     vi.stubEnv("VERCEL_URL", "codalyn-tower-git-main-acme.vercel.app");
     vi.stubEnv("VERCEL_BRANCH_URL", "codalyn-tower-git-feature-acme.vercel.app");
     const origins = resolveTowerTrustedOrigins();
     expect(origins).toContain("https://tower-preview.codalyn.app");
+    expect(origins).toContain("https://preview.codalyn.app");
     expect(origins).toContain("https://codalyn-tower-git-main-acme.vercel.app");
     expect(origins).toContain("https://codalyn-tower-git-feature-acme.vercel.app");
     expect(origins).not.toContain("https://*.codalyn.app");

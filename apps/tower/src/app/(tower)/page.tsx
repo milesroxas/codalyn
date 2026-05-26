@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { TowerDashboard } from "@/features/tower-ui/tower-dashboard";
 import { TowerLanding } from "@/features/tower-ui/tower-landing";
 import { TowerLandingAuthSync } from "@/features/tower-ui/tower-landing-auth-sync";
@@ -8,6 +9,7 @@ import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { getTowerDashboardSummary } from "@/server/dashboard-summary";
+import { isTowerProductAdmin } from "@/server/membership/product-admin";
 import { buildTowerLandingAppLinks, isMarketingHost, normalizeHostname } from "@/server/tower-hosts";
 import { hasWebflowOAuthCredentials } from "@/server/webflow-proxy-token";
 
@@ -37,6 +39,10 @@ export default async function HomePage() {
           <TowerLanding earlyAccessRequired={earlyAccessRequired} />
         </>
       );
+    }
+
+    if (isTowerProductAdmin(session.user)) {
+      redirect("/console");
     }
 
     const activeOrg = await getActiveOrganizationIdForAuthHeaders(h);

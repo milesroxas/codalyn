@@ -7,11 +7,17 @@ import {
   syncExistingTowerSessionToBeaconIfPopup,
   tryFinishBeaconTowerAuthPopup,
 } from "@/features/auth/lib/beacon-opener-auth";
+import {
+  isEmailNotVerifiedAuthError,
+  resolveTowerAppCallbackUrl,
+  resolveTowerEmailVerificationCallbackUrl,
+} from "@/features/auth/lib/email-verification";
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { authClient } from "@/features/auth/model/auth-client";
 import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
+import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
@@ -61,6 +67,7 @@ function SignInForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [earlyAccessRequired, setEarlyAccessRequired] = useState(false);
+  const [awaitingVerificationEmail, setAwaitingVerificationEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,16 +125,36 @@ function SignInForm() {
     return <AuthCardSkeleton variant="sign-in" />;
   }
 
+  const signUpHref = `/sign-up?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}${operatorInviteParam ? `&invite=${encodeURIComponent(operatorInviteParam)}` : ""}`;
+
+  if (awaitingVerificationEmail) {
+    return (
+      <AuthShell>
+        <CheckEmailPrompt
+          email={awaitingVerificationEmail}
+          callbackPath={callbackUrl}
+          signInHref={`/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`}
+        />
+      </AuthShell>
+    );
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setPending(true);
+    const verificationCallback = resolveTowerAppCallbackUrl(resolveTowerEmailVerificationCallbackUrl(callbackUrl));
     const { data, error: err } = await authClient.signIn.email({
       email,
       password,
+      callbackURL: verificationCallback,
     });
     setPending(false);
     if (err) {
+      if (isEmailNotVerifiedAuthError(err)) {
+        setAwaitingVerificationEmail(email);
+        return;
+      }
       setError(err.message ?? "Sign in failed");
       return;
     }
@@ -212,10 +239,7 @@ function SignInForm() {
           ) : (
             <p className="text-left text-sm text-muted-foreground">
               No account?{" "}
-              <Link
-                href={`/sign-up?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}${operatorInviteParam ? `&invite=${encodeURIComponent(operatorInviteParam)}` : ""}`}
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-              >
+              <Link href={signUpHref} className="font-medium text-foreground underline-offset-4 hover:underline">
                 Create one
               </Link>
             </p>

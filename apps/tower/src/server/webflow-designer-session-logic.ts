@@ -42,6 +42,10 @@ export type DesignerSessionResult =
   | { ok: true; user: unknown; token: string }
   | { ok: false; status: number; message: string };
 
+async function markEmailVerifiedForWebflowDesigner(email: string): Promise<void> {
+  await db.update(user).set({ emailVerified: true }).where(eq(user.email, email));
+}
+
 async function signUpNewDesignerUser(
   request: Request,
   resolved: WebflowResolvedDesignerUser,
@@ -71,12 +75,24 @@ async function signUpNewDesignerUser(
         webflowAuthorizedUserId: resolved.id,
         firstName: resolved.firstName,
         lastName: resolved.lastName,
+        emailVerified: true,
       })
       .where(eq(user.email, resolved.email));
-    if (!signedUp.token) {
+    if (signedUp.token) {
+      return { ok: true, user: signedUp.user, token: signedUp.token };
+    }
+    const signedIn = await auth.api.signInEmail({
+      body: {
+        email: resolved.email,
+        password,
+        rememberMe: true,
+      },
+      headers: request.headers,
+    });
+    if (!signedIn.token) {
       return { ok: false, status: 500, message: "session_not_issued" };
     }
-    return { ok: true, user: signedUp.user, token: signedUp.token };
+    return { ok: true, user: signedIn.user, token: signedIn.token };
   } catch (e: unknown) {
     if (isAPIError(e)) {
       return { ok: false, status: 400, message: (e as Error).message ?? "sign_up_failed" };
@@ -95,6 +111,7 @@ async function signInExistingDesignerUser(
   } catch {
     return { ok: false, status: 403, message: "early_access_required" };
   }
+  await markEmailVerifiedForWebflowDesigner(resolved.email);
   try {
     const signedIn = await auth.api.signInEmail({
       body: {

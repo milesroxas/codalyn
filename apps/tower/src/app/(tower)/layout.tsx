@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import type * as React from "react";
+import { TowerEmailVerificationBanner } from "@/features/auth/ui/tower-email-verification-banner";
 import { TowerUsageApproachingBanner } from "@/features/billing/ui/tower-usage-approaching-banner";
 import { TowerAppShell } from "@/features/tower-ui/tower-app-shell";
 import { TowerWorkspaceOnboardingShell } from "@/features/tower-ui/tower-workspace-onboarding-shell";
@@ -19,6 +20,7 @@ export default async function TowerLayout({ children }: { children: React.ReactN
   const usageBanner = userId ? (
     <TowerUsageApproachingBanner userId={userId} activeOrganizationId={activeOrg} billingEnabled={billingEnabled} />
   ) : null;
+  const emailVerificationBanner = userId ? <TowerEmailVerificationBanner /> : null;
   const workspaceOnboarding = userId ? <TowerWorkspaceOnboardingShell /> : null;
 
   return (
@@ -27,6 +29,7 @@ export default async function TowerLayout({ children }: { children: React.ReactN
       signedIn={Boolean(userId)}
       canCreateWorkspace={onboardingCtx?.canCreateOrganization ?? false}
       usageBanner={usageBanner}
+      emailVerificationBanner={emailVerificationBanner}
       workspaceOnboarding={workspaceOnboarding}
     >
       {children}

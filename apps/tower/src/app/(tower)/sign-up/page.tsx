@@ -7,12 +7,17 @@ import {
   syncExistingTowerSessionToBeaconIfPopup,
   tryFinishBeaconTowerAuthPopup,
 } from "@/features/auth/lib/beacon-opener-auth";
+import {
+  resolveTowerAppCallbackUrl,
+  resolveTowerEmailVerificationCallbackUrl,
+} from "@/features/auth/lib/email-verification";
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { authClient } from "@/features/auth/model/auth-client";
 import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
 import { EarlyAccessSignUpGate } from "@/features/auth/ui/early-access-sign-up-gate";
+import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { TOWER_OPERATOR_INVITE_HEADER } from "@/shared/lib/access/operator-invite-header";
@@ -61,6 +66,7 @@ function SignUpForm() {
   const [inviteEmailLocked, setInviteEmailLocked] = useState(false);
   const [earlyAccessRequired, setEarlyAccessRequired] = useState<boolean | null>(null);
   const [inviteValidated, setInviteValidated] = useState(!operatorInviteParam && !beaconOrigin);
+  const [awaitingVerificationEmail, setAwaitingVerificationEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,12 +143,14 @@ function SignUpForm() {
     const displayName =
       [firstName.trim(), lastName.trim()].filter(Boolean).join(" ").trim() || email.split("@")[0] || "User";
     const inviteToken = operatorInviteToken ?? operatorInviteParam?.trim() ?? null;
+    const verificationCallback = resolveTowerAppCallbackUrl(resolveTowerEmailVerificationCallbackUrl(callbackUrl));
     const { data, error: err } = await authClient.signUp.email({
       email,
       password,
       name: displayName,
       firstName: firstName.trim() || undefined,
       lastName: lastName.trim() || undefined,
+      callbackURL: verificationCallback,
       fetchOptions: inviteToken
         ? {
             headers: {
@@ -154,6 +162,10 @@ function SignUpForm() {
     setPending(false);
     if (err) {
       setError(err.message ?? "Sign up failed");
+      return;
+    }
+    if (!data?.token) {
+      setAwaitingVerificationEmail(email);
       return;
     }
     const postErr = await runAfterTowerSignUp({
@@ -177,6 +189,14 @@ function SignUpForm() {
 
   if (earlyAccessRequired && !operatorInviteToken && !operatorInviteParam && !joiningViaTeamInvite) {
     return <EarlyAccessSignUpGate signInHref={signInHref} requestAccessHref={requestAccessHref} />;
+  }
+
+  if (awaitingVerificationEmail) {
+    return (
+      <AuthShell>
+        <CheckEmailPrompt email={awaitingVerificationEmail} callbackPath={callbackUrl} signInHref={signInHref} />
+      </AuthShell>
+    );
   }
 
   return (

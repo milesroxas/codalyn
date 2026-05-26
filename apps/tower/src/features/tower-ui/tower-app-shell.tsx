@@ -21,6 +21,7 @@ type TowerAppShellProps = {
   signedIn: boolean;
   canCreateWorkspace?: boolean;
   usageBanner?: React.ReactNode;
+  emailVerificationBanner?: React.ReactNode;
   workspaceOnboarding?: React.ReactNode;
   children: React.ReactNode;
 };
@@ -29,12 +30,14 @@ function TowerAuthenticatedShell({
   billingEnabled,
   canCreateWorkspace,
   usageBanner,
+  emailVerificationBanner,
   workspaceOnboarding,
   children,
 }: {
   billingEnabled: boolean;
   canCreateWorkspace: boolean;
   usageBanner?: React.ReactNode;
+  emailVerificationBanner?: React.ReactNode;
   workspaceOnboarding?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -47,9 +50,10 @@ function TowerAuthenticatedShell({
           <div className="@container/main flex min-h-0 flex-1 flex-col gap-2">
             <ScrollArea className="min-h-0 flex-1">
               <div className="flex flex-col gap-4 pt-2 pb-8 md:gap-6 md:pt-3 md:pb-10">
-                {usageBanner || workspaceOnboarding ? (
+                {usageBanner || emailVerificationBanner || workspaceOnboarding ? (
                   <div className="flex flex-col gap-3 px-4 lg:px-6">
                     {usageBanner}
+                    {emailVerificationBanner}
                     {workspaceOnboarding}
                   </div>
                 ) : null}
@@ -68,6 +72,7 @@ export function TowerAppShell({
   signedIn,
   canCreateWorkspace = false,
   usageBanner,
+  emailVerificationBanner,
   workspaceOnboarding,
   children,
 }: TowerAppShellProps) {
@@ -94,6 +99,7 @@ export function TowerAppShell({
       billingEnabled={billingEnabled}
       canCreateWorkspace={canCreateWorkspace}
       usageBanner={usageBanner}
+      emailVerificationBanner={emailVerificationBanner}
       workspaceOnboarding={workspaceOnboarding}
     >
       {children}

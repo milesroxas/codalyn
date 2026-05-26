@@ -4,7 +4,11 @@ import { type FormEvent, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { AccountDeleteSection } from "@/features/account/ui/account-delete-section";
 import { AccountSettingsSkeleton } from "@/features/account/ui/account-settings-skeleton";
-import { resolveTowerAppCallbackUrl } from "@/features/auth/lib/email-verification";
+import { TowerEmailChangeToast } from "@/features/account/ui/tower-email-change-toast";
+import {
+  CHANGE_EMAIL_ACCOUNT_COPY,
+  resolveTowerEmailChangePendingAppCallbackUrl,
+} from "@/features/auth/lib/change-email";
 import { authClient } from "@/features/auth/model/auth-client";
 import { useRequireTowerSession } from "@/features/auth/model/use-require-tower-session";
 import { Button } from "@/shared/ui/button";
@@ -92,7 +96,7 @@ export function AccountSettingsScreen() {
     setEmailBusy(true);
     const { error } = await authClient.changeEmail({
       newEmail: newEmail.trim(),
-      callbackURL: resolveTowerAppCallbackUrl("/account"),
+      callbackURL: resolveTowerEmailChangePendingAppCallbackUrl("/account"),
       fetchOptions: { credentials: "include" },
     });
     setEmailBusy(false);
@@ -102,7 +106,7 @@ export function AccountSettingsScreen() {
       toast.error(msg);
       return;
     }
-    const msg = "Check your email for a link to finish this change.";
+    const msg = CHANGE_EMAIL_ACCOUNT_COPY.submitSuccess;
     setEmailMsg(msg);
     toast.success(msg);
     setNewEmail("");
@@ -148,6 +152,7 @@ export function AccountSettingsScreen() {
 
   return (
     <TowerPageMain width="narrow">
+      <TowerEmailChangeToast />
       <TowerPageHeader title="Account" description={<>Email, password, and account deletion for {u.email}.</>} />
 
       <div className="space-y-8">
@@ -200,7 +205,7 @@ export function AccountSettingsScreen() {
         <Card className="border-border/80">
           <CardHeader>
             <CardTitle className="text-lg">Email</CardTitle>
-            <CardDescription>We email your current address to confirm.</CardDescription>
+            <CardDescription>{CHANGE_EMAIL_ACCOUNT_COPY.cardDescription}</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onChangeEmail} className="flex flex-col gap-4">

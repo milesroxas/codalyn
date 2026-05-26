@@ -14,11 +14,11 @@ export async function sendChangeEmailConfirmationEmail(data: {
   url: string;
 }): Promise<void> {
   const safeUrl = resolveTowerAbsoluteUrl(data.url);
-  const subject = "Confirm your Tower email change";
+  const subject = "Approve your Tower email change";
   const text = [
-    `You requested to change your Tower account email to ${data.newEmail}.`,
+    `You requested to change your Tower sign-in email to ${data.newEmail}.`,
     "",
-    "Approve this change by opening the link below:",
+    "Approve this request by opening the link below. We will then email your new address to confirm it:",
     safeUrl,
     "",
     "If you didn’t request this, secure your account and change your password.",
@@ -28,7 +28,8 @@ export async function sendChangeEmailConfirmationEmail(data: {
 <html>
 <body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #171717;">
   <p>You requested to change your Tower sign-in email to <strong>${escapeHtml(data.newEmail)}</strong>.</p>
-  <p><a href="${escapeHtml(safeUrl)}" style="color: #171717;">Confirm email change</a></p>
+  <p>Approve this request first. We will then email your new address to confirm it.</p>
+  <p><a href="${escapeHtml(safeUrl)}" style="color: #171717;">Approve email change</a></p>
   <p style="font-size: 12px; color: #737373;">If you didn’t request this, secure your account and change your password.</p>
 </body>
 </html>`;

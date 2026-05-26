@@ -11,8 +11,14 @@ import {
   readOperatorInviteTokenFromAuthContext,
 } from "@/server/access/early-access";
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
+import { resolveTowerEmailChangeCompleteAppCallbackUrl } from "@/server/auth/change-email-callback";
+import {
+  isChangeEmailVerificationRequest,
+  rewriteVerifyEmailCallbackUrl,
+} from "@/server/auth/email-verification-token";
 import { resolveAuthSecret } from "@/server/auth-secret";
 import { sendChangeEmailConfirmationEmail } from "@/server/email/change-email-confirmation-email";
+import { sendChangeEmailNewAddressVerificationEmail } from "@/server/email/change-email-new-address-email";
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
 import { sendPasswordResetEmail } from "@/server/email/password-reset-email";
 import { towerOrganization } from "@/server/membership/tower-organization";
@@ -65,8 +71,18 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, url }, request) => {
-      if (request?.headers.get(TOWER_SKIP_VERIFICATION_EMAIL_HEADER) === "1") {
+    sendVerificationEmail: async ({ user, url, token }, request) => {
+      const skipHeader = request?.headers.get(TOWER_SKIP_VERIFICATION_EMAIL_HEADER) === "1";
+      const changeEmailVerification = isChangeEmailVerificationRequest(token);
+      if (skipHeader && !changeEmailVerification) {
+        return;
+      }
+      if (changeEmailVerification) {
+        const verifyUrl = rewriteVerifyEmailCallbackUrl(url, resolveTowerEmailChangeCompleteAppCallbackUrl("/account"));
+        await sendChangeEmailNewAddressVerificationEmail({
+          user: { email: user.email, name: user.name },
+          url: verifyUrl,
+        });
         return;
       }
       await sendEmailVerificationEmail({
@@ -106,8 +122,9 @@ export const auth = betterAuth({
     },
     changeEmail: {
       enabled: true,
+      updateEmailWithoutVerification: false,
       sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
-        await sendChangeEmailConfirmationEmail({
+        void sendChangeEmailConfirmationEmail({
           user: { email: user.email, name: user.name },
           newEmail,
           url,

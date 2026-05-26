@@ -2,7 +2,7 @@ import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
 import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
 import type { TowerEntitlement } from "@/server/billing/entitlements";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { TowerPageHeader, TowerPageMain } from "@/shared/ui/tower-page-shell";
 
 type TowerBillingScreenProps = {
@@ -21,7 +21,6 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
 
   const tierLabel = entitlement.tier === "pro" ? "Pro" : "Free";
   const planDescription = [
-    `Source: ${entitlement.source}.`,
     `Tier: ${tierLabel}`,
     subscriptionStatus ? ` (${subscriptionStatus})` : null,
     subscriptionPlan && subscriptionPlan !== entitlement.tier ? ` · Plan: ${subscriptionPlan}` : null,
@@ -47,19 +46,21 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
         <CardHeader>
           <CardTitle>Current plan</CardTitle>
           <CardDescription>{planDescription}</CardDescription>
+          {checkoutAvailable && (entitlement.tier === "free" || showPortal) ? (
+            <CardAction className="flex flex-wrap gap-2 self-center">
+              {entitlement.tier === "free" ? (
+                <form action="/api/billing/checkout" method="post">
+                  <Button type="submit">Upgrade to Pro</Button>
+                </form>
+              ) : null}
+              {showPortal ? (
+                <Button asChild variant="outline">
+                  <a href="/api/billing/portal">Manage subscription</a>
+                </Button>
+              ) : null}
+            </CardAction>
+          ) : null}
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {checkoutAvailable && entitlement.tier === "free" ? (
-            <form action="/api/billing/checkout" method="post">
-              <Button type="submit">Upgrade to Pro</Button>
-            </form>
-          ) : null}
-          {checkoutAvailable && showPortal ? (
-            <Button asChild variant="outline">
-              <a href="/api/billing/portal">Manage subscription</a>
-            </Button>
-          ) : null}
-        </CardContent>
       </Card>
 
       <TowerUsageSection

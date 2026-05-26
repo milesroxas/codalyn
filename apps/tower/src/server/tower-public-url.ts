@@ -21,3 +21,13 @@ export function resolveTowerPublicBaseUrl(): string {
   }
   return "http://localhost:3100";
 }
+
+/** Absolute Tower URL for transactional email links (handles relative paths from Better Auth). */
+export function resolveTowerAbsoluteUrl(pathOrUrl: string): string {
+  const trimmed = pathOrUrl.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  const base = resolveTowerPublicBaseUrl();
+  return `${base}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
+}

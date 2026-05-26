@@ -41,7 +41,7 @@ export function OperatorAccessRequests() {
     setBusyId(id);
     try {
       const res = await operatorApi.resolveEarlyAccessRequest(id, "approve");
-      toast.success(res.inviteUrl ? "Approved — invite link ready" : "Approved — existing user notified");
+      toast.success(res.inviteUrl ? "Approved — invite email sent" : "Approved — sign-in email sent");
       if (res.inviteUrl) {
         await navigator.clipboard.writeText(res.inviteUrl);
         toast.message("Invite link copied");
@@ -73,8 +73,8 @@ export function OperatorAccessRequests() {
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Operator</p>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Early access requests</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Approve sends the same invite email/link as Invite customer. Access is stored on the user record when they
-          sign up or sign in.
+          Approve grants access and sends an approval email with a sign-up or sign-in link. Access is stored on the user
+          record when they sign up or sign in.
         </p>
       </div>
 

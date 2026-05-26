@@ -1,5 +1,5 @@
 import { sendTransactionalEmail } from "@/server/email/resend-send";
-import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
+import { resolveTowerAbsoluteUrl } from "@/server/tower-public-url";
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -13,21 +13,16 @@ export async function sendChangeEmailConfirmationEmail(data: {
   newEmail: string;
   url: string;
 }): Promise<void> {
-  const base = resolveTowerPublicBaseUrl();
+  const safeUrl = resolveTowerAbsoluteUrl(data.url);
   const subject = "Confirm your Tower email change";
   const text = [
     `You requested to change your Tower account email to ${data.newEmail}.`,
     "",
     "Approve this change by opening the link below:",
-    data.url,
+    safeUrl,
     "",
     "If you didn’t request this, secure your account and change your password.",
   ].join("\n");
-  const safeUrl = data.url.startsWith("http")
-    ? data.url
-    : base
-      ? `${base}${data.url.startsWith("/") ? "" : "/"}${data.url}`
-      : data.url;
   const html = `
 <!DOCTYPE html>
 <html>

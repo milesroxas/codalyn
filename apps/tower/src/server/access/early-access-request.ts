@@ -142,7 +142,7 @@ export async function approveEarlyAccessRequest(
     throw new Error("not_pending");
   }
 
-  const invite = await inviteCustomerForEarlyAccess(row.email, inviterLabel);
+  const invite = await inviteCustomerForEarlyAccess(row.email, inviterLabel, "early_access_request");
 
   await db
     .update(earlyAccessRequest)

@@ -33,11 +33,13 @@ type TowerPageHeaderProps = {
   title: string;
   description: React.ReactNode;
   actions?: React.ReactNode;
+  /** Prominent context below the title row (for example active workspace). */
+  context?: React.ReactNode;
   meta?: React.ReactNode;
   className?: string;
 };
 
-function TowerPageHeader({ title, description, actions, meta, className }: TowerPageHeaderProps) {
+function TowerPageHeader({ title, description, actions, context, meta, className }: TowerPageHeaderProps) {
   return (
     <header className={cn("mb-8 flex flex-col gap-6 border-b border-border pb-8", className)}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -47,10 +49,24 @@ function TowerPageHeader({ title, description, actions, meta, className }: Tower
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
+      {context ? <div>{context}</div> : null}
       {meta ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">{meta}</div>
       ) : null}
     </header>
+  );
+}
+
+function TowerCurrentWorkspaceMeta({ name, className }: { name: string | null | undefined; className?: string }) {
+  if (!name) {
+    return null;
+  }
+
+  return (
+    <p className={cn("max-w-full text-sm", className)}>
+      <span className="text-muted-foreground">Current workspace:</span>{" "}
+      <span className="font-semibold text-foreground">{name}</span>
+    </p>
   );
 }
 
@@ -91,6 +107,7 @@ function TowerDashboardSignals({ className, ...props }: React.ComponentProps<"di
 }
 
 export {
+  TowerCurrentWorkspaceMeta,
   TowerDashboardGrid,
   TowerDashboardSignals,
   TowerPageHeader,

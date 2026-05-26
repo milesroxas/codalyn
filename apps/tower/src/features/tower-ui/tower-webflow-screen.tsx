@@ -3,26 +3,36 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
+import { BeaconDesignerOpenLink } from "@/features/beacon/ui/beacon-designer-open-link";
 import {
   disconnectWebflowIntegration,
   WebflowIntegrationApiError,
 } from "@/features/tower-ui/api/disconnect-webflow-integration";
-import { formatWebflowIntegrationStatus } from "@/features/tower-ui/lib/tower-webflow-integration-status";
+import {
+  formatWebflowIntegrationStatus,
+  getWebflowConnectionCardCopy,
+} from "@/features/tower-ui/lib/tower-webflow-integration-status";
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
 import { TowerWebflowSetupAlerts } from "@/features/tower-ui/tower-workspace-onboarding-banner";
 import type { TowerDashboardSummary } from "@/server/dashboard-summary";
+import type { WebflowBeaconPublicConfig } from "@/server/webflow-beacon-public-config";
 import type { WebflowSiteSummary } from "@/server/webflow-sites";
 import { Badge } from "@/shared/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
-import { TowerPageHeader, TowerPageMain, TowerPageSection } from "@/shared/ui/tower-page-shell";
+import {
+  TowerCurrentWorkspaceMeta,
+  TowerPageHeader,
+  TowerPageMain,
+  TowerPageSection,
+} from "@/shared/ui/tower-page-shell";
 import { DangerZoneTypedDelete } from "@/shared/ui/typed-confirm-alert-dialog";
 
 type TowerWebflowScreenProps = {
   summary: TowerDashboardSummary;
   oauthConfigured: boolean;
   billingEnabled: boolean;
-};
+} & WebflowBeaconPublicConfig;
 
 type WebflowScreenContext = {
   summary: TowerDashboardSummary;
@@ -30,27 +40,50 @@ type WebflowScreenContext = {
   canManage: boolean;
   sites: WebflowSiteSummary[];
   onRefresh: () => void;
-};
+} & WebflowBeaconPublicConfig;
 
-function WebflowSitesTable({ sites }: { sites: WebflowSiteSummary[] }) {
+function WebflowSitesTable({
+  sites,
+  webflowAppClientId,
+  canManage,
+  oauthConfigured,
+  onRefresh,
+}: {
+  sites: WebflowSiteSummary[];
+  webflowAppClientId: string | null;
+  canManage: boolean;
+  oauthConfigured: boolean;
+  onRefresh: () => void;
+}) {
+  const relinkAction =
+    canManage && oauthConfigured ? (
+      <CardAction align="center">
+        <TowerWebflowOAuthPopupButton variant="default" onSuccess={onRefresh}>
+          Relink
+        </TowerWebflowOAuthPopupButton>
+      </CardAction>
+    ) : null;
+
   if (sites.length === 0) {
     return (
-      <Card>
+      <Card layout="table-section">
         <CardHeader>
           <CardTitle>No sites returned</CardTitle>
           <CardDescription>Connected, but no sites found. Relink if access changed recently.</CardDescription>
+          {relinkAction}
         </CardHeader>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card layout="table-section">
       <CardHeader>
         <CardTitle>Authorized sites</CardTitle>
         <CardDescription>
           {sites.length} site{sites.length === 1 ? "" : "s"} available through Tower.
         </CardDescription>
+        {relinkAction}
       </CardHeader>
       <CardContent>
         <Table>
@@ -58,6 +91,7 @@ function WebflowSitesTable({ sites }: { sites: WebflowSiteSummary[] }) {
             <TableRow>
               <TableHead>Site</TableHead>
               <TableHead>Site ID</TableHead>
+              <TableHead className="w-44">Designer</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -66,6 +100,9 @@ function WebflowSitesTable({ sites }: { sites: WebflowSiteSummary[] }) {
                 <TableCell>{site.displayName ?? "Untitled site"}</TableCell>
                 <TableCell>
                   <code>{site.id}</code>
+                </TableCell>
+                <TableCell>
+                  <BeaconDesignerOpenLink shortName={site.shortName} webflowAppClientId={webflowAppClientId} />
                 </TableCell>
               </TableRow>
             ))}
@@ -81,22 +118,22 @@ function WebflowConnectionSection({ summary, sites }: Pick<WebflowScreenContext,
     webflowOAuthConnected: summary.webflowOAuthConnected,
     webflowSitesCount: sites.length,
   });
+  const copy = getWebflowConnectionCardCopy({
+    webflowOAuthConnected: summary.webflowOAuthConnected,
+    sitesCount: sites.length,
+  });
 
   return (
-    <TowerPageSection title="Connection" description="OAuth status for the active workspace.">
+    <TowerPageSection title="Status">
       <Card>
         <CardHeader>
-          <CardTitle>Data API proxy</CardTitle>
-          <CardDescription>
-            {summary.webflowOAuthConnected
-              ? "This workspace can call the Webflow Data API through Tower."
-              : "Connect Webflow to enable the Data API proxy."}
-          </CardDescription>
+          <CardTitle>Webflow link</CardTitle>
+          {copy.description ? <CardDescription>{copy.description}</CardDescription> : null}
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant={summary.webflowOAuthConnected ? "default" : "secondary"}>{status.value}</Badge>
-            <span className="text-sm text-muted-foreground">{status.caption}</span>
+            <span className="text-sm text-muted-foreground">{copy.detail}</span>
           </div>
         </CardContent>
       </Card>
@@ -104,24 +141,27 @@ function WebflowConnectionSection({ summary, sites }: Pick<WebflowScreenContext,
   );
 }
 
-function WebflowSitesSection({ summary, oauthConfigured, canManage, sites, onRefresh }: WebflowScreenContext) {
+function WebflowSitesSection({
+  summary,
+  oauthConfigured,
+  canManage,
+  sites,
+  onRefresh,
+  webflowAppClientId,
+}: WebflowScreenContext) {
   if (!summary.webflowOAuthConnected) {
     return null;
   }
 
   return (
-    <TowerPageSection
-      title="Sites"
-      description="Webflow sites available to this workspace."
-      actions={
-        canManage && oauthConfigured ? (
-          <TowerWebflowOAuthPopupButton variant="ghost" size="sm" onSuccess={onRefresh}>
-            Relink
-          </TowerWebflowOAuthPopupButton>
-        ) : null
-      }
-    >
-      <WebflowSitesTable sites={sites} />
+    <TowerPageSection title="Sites" description="Webflow sites available to this workspace.">
+      <WebflowSitesTable
+        sites={sites}
+        webflowAppClientId={webflowAppClientId}
+        canManage={canManage}
+        oauthConfigured={oauthConfigured}
+        onRefresh={onRefresh}
+      />
     </TowerPageSection>
   );
 }
@@ -172,7 +212,12 @@ function WebflowDisconnectSection({
   );
 }
 
-export function TowerWebflowScreen({ summary, oauthConfigured, billingEnabled }: TowerWebflowScreenProps) {
+export function TowerWebflowScreen({
+  summary,
+  oauthConfigured,
+  billingEnabled,
+  webflowAppClientId,
+}: TowerWebflowScreenProps) {
   const router = useRouter();
   const sites = summary.webflowSites ?? [];
   const canManage = summary.activeOrgTeamAdmin;
@@ -187,6 +232,7 @@ export function TowerWebflowScreen({ summary, oauthConfigured, billingEnabled }:
     canManage,
     sites,
     onRefresh,
+    webflowAppClientId,
   };
 
   return (
@@ -204,13 +250,7 @@ export function TowerWebflowScreen({ summary, oauthConfigured, billingEnabled }:
             </TowerWebflowOAuthPopupButton>
           ) : null
         }
-        meta={
-          summary.activeOrganizationName ? (
-            <span>
-              Workspace <span className="font-medium text-foreground">{summary.activeOrganizationName}</span>
-            </span>
-          ) : null
-        }
+        context={<TowerCurrentWorkspaceMeta name={summary.activeOrganizationName} />}
       />
 
       <div className="mb-8">

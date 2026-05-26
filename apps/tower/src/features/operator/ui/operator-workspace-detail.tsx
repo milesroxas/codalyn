@@ -11,6 +11,10 @@ import {
   reloadWorkspaceUsageLimits,
 } from "@/features/operator/ui/operator-usage-limits-section";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch, OperatorWorkspaceRow } from "@/server/operator/types";
+import {
+  formatTowerInvitationStatusLabel,
+  towerInvitationBadgeVariant,
+} from "@/shared/lib/membership/tower-invitation-status";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -581,12 +585,6 @@ function MembersSection({
   );
 }
 
-function invitationBadgeVariant(status: string): "outline" | "secondary" | "destructive" {
-  if (status === "pending") return "outline";
-  if (status === "accepted") return "secondary";
-  return "destructive";
-}
-
 function InvitationsSection({ invitations }: { invitations: OperatorWorkspaceDetail["invitations"] }) {
   return (
     <section className="space-y-3">
@@ -609,8 +607,8 @@ function InvitationsSection({ invitations }: { invitations: OperatorWorkspaceDet
                     by {inv.inviterEmail ?? "—"} · exp {formatRelative(inv.expiresAt)}
                   </p>
                 </div>
-                <Badge variant={invitationBadgeVariant(inv.status)} className="shrink-0">
-                  {inv.status}
+                <Badge variant={towerInvitationBadgeVariant(inv.status)} className="shrink-0">
+                  {formatTowerInvitationStatusLabel(inv.status)}
                 </Badge>
                 {inv.role ? (
                   <Badge variant="outline" className="shrink-0">

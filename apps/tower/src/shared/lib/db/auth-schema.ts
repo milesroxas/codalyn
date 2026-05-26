@@ -204,9 +204,9 @@ export const member = pgTable(
     role: text("role").notNull(),
     /**
      * Team admins only: when true, Beacon hides designer features (team presets, manual controls, and related options).
-     * Default true: designer features off until explicitly enabled in Beacon settings.
+     * Default false: designer features on until explicitly restricted in Beacon settings.
      */
-    beaconRestrictToEditorExperience: boolean("beacon_restrict_to_editor_experience").default(true).notNull(),
+    beaconRestrictToEditorExperience: boolean("beacon_restrict_to_editor_experience").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

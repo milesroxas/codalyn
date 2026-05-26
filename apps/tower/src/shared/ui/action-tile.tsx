@@ -1,7 +1,7 @@
 import { IconArrowRight } from "@tabler/icons-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import Link from "next/link";
-import type * as React from "react";
+import { Children, type ComponentProps, type ComponentType } from "react";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -36,7 +36,7 @@ const actionTileIconVariants = cva("flex size-9 shrink-0 items-center justify-ce
 type ActionTileProps = {
   label: string;
   description: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   href: string;
 } & VariantProps<typeof actionTileVariants>;
 
@@ -60,8 +60,14 @@ function ActionTile({ label, description, icon: Icon, href, variant = "default" 
   );
 }
 
-function ActionTileGrid({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("grid gap-3 sm:grid-cols-2", className)} {...props} />;
+function ActionTileGrid({ className, children, ...props }: ComponentProps<"div">) {
+  const columns = Children.count(children) === 3 ? 3 : 2;
+
+  return (
+    <div className={cn("grid gap-3", columns === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2", className)} {...props}>
+      {children}
+    </div>
+  );
 }
 
 export { ActionTile, ActionTileGrid, actionTileIconVariants, actionTileVariants };

@@ -6,6 +6,13 @@ import { BeaconEditorExperienceSkeleton } from "@/features/beacon/ui/beacon-page
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Label } from "@/shared/ui/label";
 import { Switch } from "@/shared/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDetailNote,
+  TooltipDetailSummary,
+  TooltipHelpTrigger,
+} from "@/shared/ui/tooltip";
 
 type BeaconEditorExperienceSectionProps = {
   enabled?: boolean;
@@ -63,8 +70,22 @@ export function BeaconEditorExperienceSection({
       </CardHeader>
       <CardContent className="flex flex-row items-center justify-between gap-4">
         <div className="space-y-1">
-          <Label htmlFor="beacon-designer-features">Designer features</Label>
-          <p className="text-xs text-muted-foreground">Advanced controls in the Beacon panel.</p>
+          <div className="flex items-center gap-1">
+            <Label htmlFor="beacon-designer-features">Designer features</Label>
+            <Tooltip>
+              <TooltipHelpTrigger label="About designer features for admins" />
+              <TooltipContent side="top" variant="detail">
+                <TooltipDetailSummary>
+                  Turn off if you focus on content rather than site setup. You will see a simpler Beacon panel without
+                  configuration controls.
+                </TooltipDetailSummary>
+                <TooltipDetailNote>
+                  Applies only to your account. Team members with the designer role keep full configuration access.
+                </TooltipDetailNote>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <p className="text-xs text-muted-foreground">Show configuration options in my Beacon app extension.</p>
         </div>
         <Switch
           id="beacon-designer-features"

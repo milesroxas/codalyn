@@ -1,11 +1,7 @@
-import { webflowDataApiUrl } from "@codalyn/webflow-kit";
+import { parseWebflowSiteSummaries, type WebflowSiteSummary, webflowDataApiUrl } from "@codalyn/webflow-kit";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 
-export type WebflowSiteSummary = {
-  id: string;
-  displayName?: string;
-  shortName?: string;
-};
+export type { WebflowSiteSummary };
 
 export async function listWebflowSitesWithToken(accessToken: string): Promise<WebflowSiteSummary[]> {
   const token = accessToken.trim();
@@ -22,8 +18,8 @@ export async function listWebflowSitesWithToken(accessToken: string): Promise<We
     return [];
   }
 
-  const json = (await res.json()) as { sites?: WebflowSiteSummary[] };
-  return json.sites ?? [];
+  const json: unknown = await res.json();
+  return parseWebflowSiteSummaries(json);
 }
 
 export async function listWebflowSitesForUser(opts: {

@@ -5,6 +5,11 @@ import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { useRequireTowerSession } from "@/features/auth/model/use-require-tower-session";
 import {
+  deleteTeamInvitation,
+  formatTeamInvitationDeleteError,
+  TeamInvitationApiError,
+} from "@/features/team/api/delete-invitation";
+import {
   deleteTeamWorkspace,
   formatTeamWorkspaceDeleteError,
   TeamWorkspaceApiError,
@@ -206,6 +211,49 @@ export function TeamDashboard(props: {
     toast.success("Invitation revoked");
   };
 
+  const onDeleteInvite = async (invitationId: string) => {
+    if (!activeOrg) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await deleteTeamInvitation({ invitationId, organizationId: activeOrg.id });
+      await refreshTeam();
+      toast.success("Invitation deleted");
+    } catch (err) {
+      const msg =
+        err instanceof TeamInvitationApiError ? formatTeamInvitationDeleteError(err) : "Could not delete invitation";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onInviteAgain = async (inv: InvitationRow) => {
+    setError(null);
+    const role = parseTowerTeamRole(inv.role ?? TOWER_TEAM_ROLES[1]);
+    if (!role) {
+      toast.error("Invalid role");
+      return;
+    }
+    setBusy(true);
+    const res = await authClient.organization.inviteMember({
+      email: inv.email.toLowerCase(),
+      role,
+    });
+    setBusy(false);
+    if (res.error) {
+      const msg = res.error.message ?? "Could not send invite";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+    await refreshTeam();
+    toast.success("Invitation sent");
+  };
+
   const onUpdateMemberRole = async (memberId: string, role: string) => {
     setError(null);
     const parsedRole = parseOrganizationMemberRole(role);
@@ -299,6 +347,8 @@ export function TeamDashboard(props: {
         onRemoveMember={onRemoveMember}
         onResendInvite={(inv) => void onResendInvite(inv)}
         onCancelInvite={onCancelInvite}
+        onDeleteInvite={onDeleteInvite}
+        onInviteAgain={(inv) => void onInviteAgain(inv)}
         resendingInvitationId={resendingInvitationId}
         deleteBusy={deleteBusy}
         deleteConfirm={deleteConfirm}

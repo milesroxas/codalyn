@@ -33,6 +33,8 @@ export function TeamWorkspacePanel(props: {
   onRemoveMember: (memberId: string) => void;
   onResendInvite: (inv: InvitationRow) => void;
   onCancelInvite: (invitationId: string) => void | Promise<void>;
+  onDeleteInvite: (invitationId: string) => void | Promise<void>;
+  onInviteAgain: (inv: InvitationRow) => void;
   resendingInvitationId: string | null;
   deleteBusy: boolean;
   deleteConfirm: string;
@@ -83,6 +85,8 @@ export function TeamWorkspacePanel(props: {
           onRemoveMember={props.onRemoveMember}
           onResendInvite={props.onResendInvite}
           onCancelInvite={props.onCancelInvite}
+          onDeleteInvite={props.onDeleteInvite}
+          onInviteAgain={props.onInviteAgain}
           deleteBusy={props.deleteBusy}
           deleteConfirm={props.deleteConfirm}
           onDeleteConfirmChange={props.onDeleteConfirmChange}

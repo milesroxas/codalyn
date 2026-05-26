@@ -1,5 +1,5 @@
 import { auth } from "@/server/auth";
-import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
+import { pickAnyOrganizationWebflowAccessToken, resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 
 const RESOLVE_URL = "https://api.webflow.com/beta/token/resolve";
 
@@ -61,5 +61,11 @@ export async function pickBearerForWebflowIdTokenResolve(request: Request): Prom
       return t;
     }
   }
+
+  const orgToken = await pickAnyOrganizationWebflowAccessToken();
+  if (orgToken) {
+    return orgToken;
+  }
+
   return process.env.WEBFLOW_TOKEN_RESOLVE_BEARER?.trim() || process.env.WEBFLOW_API_TOKEN?.trim() || undefined;
 }

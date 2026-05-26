@@ -88,6 +88,30 @@ describe("beacon app settings preset storage", () => {
     expect(parsed.imagePresetStorage.byTargetKey[serializePresetTargetKey(instanceTargetKey)]).toEqual(instanceRow);
   });
 
+  it("re-parses coalesced site-default storage idempotently", () => {
+    const siteDefault = {
+      id: "site_default",
+      name: "Site default",
+      width: 1400,
+      height: 900,
+      maxFileSizeBytes: 120_000,
+      targetKey: {
+        kind: "site-default" as const,
+        siteId: "site_1",
+      },
+    };
+    const parsed = parseBeaconAppSettings({
+      ...getDefaultBeaconAppSettings(),
+      imagePresetStorage: {
+        siteDefault,
+        byTargetKey: {
+          [serializePresetTargetKey(siteDefault.targetKey)]: siteDefault,
+        },
+      },
+    });
+    expect(parseBeaconAppSettings(parsed)).toEqual(parsed);
+  });
+
   it("rejects invalid target keys in patch validation", () => {
     const result = validateBeaconPresetStoragePatch({
       imagePresetStorage: {

@@ -2,7 +2,6 @@
 
 import { IconAlertTriangle, IconTrash } from "@tabler/icons-react";
 import type * as React from "react";
-import { cn } from "@/shared/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +14,7 @@ import {
   AlertDialogTrigger,
 } from "@/shared/ui/alert-dialog";
 import { Button } from "@/shared/ui/button";
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -98,24 +98,31 @@ function TypedConfirmAlertDialog({
   );
 }
 
-const dangerZonePanelClass = "space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3";
-const dangerZoneHeadingClass = "text-xs font-medium uppercase tracking-[0.12em] text-destructive";
-const dangerZoneDescriptionClass = "text-xs text-destructive";
-
 type DangerZoneTypedDeleteProps = TypedConfirmAlertDialogProps & {
   panelDescription: React.ReactNode;
+  panelTitle?: string;
   className?: string;
 };
 
-function DangerZoneTypedDelete({ panelDescription, className, ...dialogProps }: DangerZoneTypedDeleteProps) {
+function DangerZoneTypedDelete({
+  panelDescription,
+  panelTitle,
+  className,
+  triggerLabel,
+  ...dialogProps
+}: DangerZoneTypedDeleteProps) {
+  const resolvedTitle = panelTitle ?? triggerLabel;
+
   return (
-    <section className={cn("space-y-3", className)}>
-      <h3 className={dangerZoneHeadingClass}>Danger zone</h3>
-      <div className={dangerZonePanelClass}>
-        <p className={dangerZoneDescriptionClass}>{panelDescription}</p>
-        <TypedConfirmAlertDialog {...dialogProps} />
-      </div>
-    </section>
+    <Card size="sm" tone="destructive" className={className}>
+      <CardHeader>
+        <CardTitle tone="destructive">{resolvedTitle}</CardTitle>
+        <CardDescription tone="destructive">{panelDescription}</CardDescription>
+        <CardAction align="center">
+          <TypedConfirmAlertDialog triggerLabel={triggerLabel} {...dialogProps} />
+        </CardAction>
+      </CardHeader>
+    </Card>
   );
 }
 

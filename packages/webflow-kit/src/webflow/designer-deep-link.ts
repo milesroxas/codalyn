@@ -14,6 +14,8 @@ export type WebflowDesignerOpenLinks = {
   openDesignerUrl: string | null;
 };
 
+const WEBFLOW_APP_CLIENT_ID_MAX_LENGTH = 128;
+
 export function normalizeWebflowSiteShortName(raw: string | null | undefined): string | null {
   if (typeof raw !== "string") {
     return null;
@@ -23,6 +25,20 @@ export function normalizeWebflowSiteShortName(raw: string | null | undefined): s
     return null;
   }
   if (!/^[a-z0-9-]+$/.test(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
+export function normalizeWebflowAppClientId(raw: string | null | undefined): string | null {
+  if (typeof raw !== "string") {
+    return null;
+  }
+  const trimmed = raw.trim();
+  if (trimmed.length === 0 || trimmed.length > WEBFLOW_APP_CLIENT_ID_MAX_LENGTH) {
+    return null;
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
     return null;
   }
   return trimmed;
@@ -41,14 +57,12 @@ export function buildWebflowDesignerCanvasUrl(shortName: string | null | undefin
  * @see https://developers.webflow.com/apps/deep-linking
  */
 export function buildWebflowDesignerAppDeepLink(input: WebflowDesignerDeepLinkInput): string | null {
-  const canvasUrl = buildWebflowDesignerCanvasUrl(input.shortName);
-  const clientId = input.appClientId?.trim();
-  if (canvasUrl == null || !clientId) {
+  const normalized = normalizeWebflowSiteShortName(input.shortName);
+  const clientId = normalizeWebflowAppClientId(input.appClientId);
+  if (normalized == null || clientId == null) {
     return null;
   }
-  const url = new URL(canvasUrl);
-  url.searchParams.set("app", clientId);
-  return url.toString();
+  return `https://${normalized}${WEBFLOW_DESIGNER_HOST_SUFFIX}?app=${encodeURIComponent(clientId)}`;
 }
 
 export function resolveWebflowDesignerOpenLinks(input: WebflowDesignerDeepLinkInput): WebflowDesignerOpenLinks {

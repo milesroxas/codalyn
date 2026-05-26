@@ -78,8 +78,12 @@ export function beaconAppSettingsPayloadNeedsMigration(raw: unknown): boolean {
   if (!isRecord(raw)) {
     return false;
   }
+  if (hasLegacyBeaconPresetStorageKeys(raw)) {
+    return true;
+  }
   const migrated = migrateBeaconAppSettingsPayload(raw);
-  return JSON.stringify(raw) !== JSON.stringify(migrated);
+  const canonical = serializeBeaconAppSettingsPayload(migrated);
+  return JSON.stringify(raw) !== JSON.stringify(canonical);
 }
 
 export function beaconOrgTeamSettingsPayloadNeedsMigration(raw: unknown): boolean {

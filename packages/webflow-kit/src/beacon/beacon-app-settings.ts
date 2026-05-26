@@ -110,10 +110,11 @@ export const beaconAppSettingsSchema = z.object({
 export type BeaconAppSettings = z.infer<typeof beaconAppSettingsSchema>;
 
 function normalizeBeaconPresetStorageInternal(input: BeaconPresetStorage): BeaconPresetStorageValidationResult {
+  const coalesced = coalesceBeaconPresetStorage(input);
   const byTargetKey: Record<PresetTargetKeyString, BeaconPresetRow> = {};
   const seen = new Set<string>();
 
-  const addRow = (row: BeaconPresetRow, includeInByTargetKey: boolean): BeaconPresetStorageValidationResult => {
+  for (const row of Object.values(coalesced.byTargetKey)) {
     let serialized: PresetTargetKeyString;
     try {
       serialized = serializePresetTargetKey(row.targetKey);
@@ -124,30 +125,13 @@ function normalizeBeaconPresetStorageInternal(input: BeaconPresetStorage): Beaco
       return { ok: false, errorCode: BEACON_IMAGE_ERROR_CODES.DUPLICATE_PRESET_TARGET };
     }
     seen.add(serialized);
-    if (includeInByTargetKey) {
-      byTargetKey[serialized] = row;
-    }
-    return { ok: true, value: { siteDefault: null, byTargetKey } };
-  };
-
-  if (input.siteDefault !== null) {
-    const siteDefaultResult = addRow(input.siteDefault, true);
-    if (!siteDefaultResult.ok) {
-      return siteDefaultResult;
-    }
-  }
-
-  for (const row of Object.values(input.byTargetKey)) {
-    const result = addRow(row, true);
-    if (!result.ok) {
-      return result;
-    }
+    byTargetKey[serialized] = row;
   }
 
   return {
     ok: true,
     value: coalesceBeaconPresetStorage({
-      siteDefault: input.siteDefault,
+      siteDefault: coalesced.siteDefault,
       byTargetKey,
     }),
   };

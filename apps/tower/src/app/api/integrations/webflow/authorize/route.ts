@@ -19,7 +19,7 @@ import { towerConnectionPathWithStatus } from "@/shared/lib/navigation/tower-app
 // cms:write: Data API PATCH collection items (Beacon CMS-bound image replace).
 // custom_code:*: Beacon page inline script (registered_scripts + page custom_code).
 const DEFAULT_SCOPES =
-  "sites:read pages:read cms:read cms:write assets:read assets:write custom_code:read custom_code:write";
+  "sites:read pages:read cms:read cms:write assets:read assets:write custom_code:read custom_code:write authorized_user:read";
 
 function buildWebflowAuthorizeUrl(state: string): string {
   const clientId = process.env.WEBFLOW_CLIENT_ID?.trim();

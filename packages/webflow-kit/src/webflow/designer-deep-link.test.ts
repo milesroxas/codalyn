@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildWebflowDesignerAppDeepLink,
   buildWebflowDesignerCanvasUrl,
+  normalizeWebflowAppClientId,
   normalizeWebflowSiteShortName,
   resolveWebflowDesignerOpenLinks,
 } from "./designer-deep-link.js";
@@ -32,12 +33,33 @@ describe("buildWebflowDesignerAppDeepLink", () => {
         shortName: "acme-site",
         appClientId: "client_123",
       })
-    ).toBe("https://acme-site.design.webflow.com/?app=client_123");
+    ).toBe("https://acme-site.design.webflow.com?app=client_123");
   });
 
   it("returns null when short name or client id is missing", () => {
     expect(buildWebflowDesignerAppDeepLink({ shortName: "acme", appClientId: "" })).toBeNull();
     expect(buildWebflowDesignerAppDeepLink({ shortName: "", appClientId: "client_123" })).toBeNull();
+  });
+
+  it("rejects client ids with unsafe characters", () => {
+    expect(
+      buildWebflowDesignerAppDeepLink({
+        shortName: "acme-site",
+        appClientId: "client&id=evil",
+      })
+    ).toBeNull();
+  });
+});
+
+describe("normalizeWebflowAppClientId", () => {
+  it("accepts canonical client ids", () => {
+    expect(normalizeWebflowAppClientId(" client_123-ABC ")).toBe("client_123-ABC");
+  });
+
+  it("rejects empty and invalid characters", () => {
+    expect(normalizeWebflowAppClientId("")).toBeNull();
+    expect(normalizeWebflowAppClientId("client&id")).toBeNull();
+    expect(normalizeWebflowAppClientId("client id")).toBeNull();
   });
 });
 
@@ -50,7 +72,7 @@ describe("resolveWebflowDesignerOpenLinks", () => {
       })
     ).toEqual({
       shortName: "acme-site",
-      openWithAppUrl: "https://acme-site.design.webflow.com/?app=client_123",
+      openWithAppUrl: "https://acme-site.design.webflow.com?app=client_123",
       openDesignerUrl: "https://acme-site.design.webflow.com",
     });
   });

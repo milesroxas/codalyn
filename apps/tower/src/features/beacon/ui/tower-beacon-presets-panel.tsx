@@ -1,14 +1,7 @@
 "use client";
 
 import type { BeaconAppSettings, BeaconPresetRow, ImageExportFormat } from "@codalyn/webflow-kit";
-import {
-  type BeaconPresetSiteGroup,
-  type BeaconPresetStorageEntry,
-  buildBeaconPresetSiteGroups,
-  formatBeaconPresetDisplayName,
-  formatBeaconPresetMax,
-  formatBeaconPresetStorageSummary,
-} from "@codalyn/webflow-kit";
+import { type BeaconPresetSiteGroup, buildBeaconPresetSiteGroups, formatBeaconPresetMax } from "@codalyn/webflow-kit";
 import { IconPlug } from "@tabler/icons-react";
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
 import {
@@ -22,7 +15,7 @@ import { BeaconSiteDefaultPresetFields } from "@/features/beacon/ui/beacon-prese
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { FormFieldInset } from "@/shared/ui/form-field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
@@ -78,7 +71,6 @@ export type TowerBeaconPresetsPanelProps = {
   settings: BeaconAppSettings | undefined;
   webflowSites: TowerBeaconWebflowSite[] | null;
   webflowAppClientId: string | null;
-  webflowBeaconMarketplaceUrl?: string | null;
   canManage: boolean;
   teamPresetsLocked: boolean;
   canEditSiteDefault: boolean;
@@ -271,7 +263,7 @@ function SiteDefaultPresetEditor(props: {
 }
 
 function countSitePresets(group: BeaconPresetSiteGroup): number {
-  return group.scopedPresets.length + (group.siteDefault ? 1 : 0);
+  return group.siteDefault ? 1 : 0;
 }
 
 function BeaconSitePicker(props: {
@@ -306,19 +298,6 @@ function BeaconSitePicker(props: {
   );
 }
 
-function ScopedPresetListItem(props: { entry: BeaconPresetStorageEntry; defaultExportFormat?: ImageExportFormat }) {
-  const { entry, defaultExportFormat } = props;
-  const { row, scope } = entry;
-  return (
-    <li className="flex flex-wrap items-baseline justify-between gap-2 rounded-md border border-border/50 px-3 py-2">
-      <span className="font-medium text-foreground">{formatBeaconPresetDisplayName(row, scope)}</span>
-      <span className="font-mono text-xs text-muted-foreground">
-        {formatBeaconPresetStorageSummary(row, defaultExportFormat)}
-      </span>
-    </li>
-  );
-}
-
 function SitePresetsDetail(props: {
   baseId: string;
   group: BeaconPresetSiteGroup;
@@ -328,8 +307,6 @@ function SitePresetsDetail(props: {
   saving: boolean;
   settings: BeaconAppSettings | undefined;
   canEditSiteDefault: boolean;
-  webflowAppClientId: string | null;
-  webflowBeaconMarketplaceUrl?: string | null;
   upsertSiteDefaultPresetAction: (siteId: string, row: BeaconPresetRow) => void;
   clearSiteDefaultPresetAction: (siteId: string) => void;
 }) {
@@ -342,8 +319,6 @@ function SitePresetsDetail(props: {
     saving,
     settings,
     canEditSiteDefault,
-    webflowAppClientId,
-    webflowBeaconMarketplaceUrl,
     upsertSiteDefaultPresetAction,
     clearSiteDefaultPresetAction,
   } = props;
@@ -352,19 +327,13 @@ function SitePresetsDetail(props: {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {siteGroups.length > 1 ? (
         <BeaconSitePicker
           siteGroups={siteGroups}
           selectedSiteId={selectedSiteId}
           onSelectedSiteIdChange={onSelectedSiteIdChange}
         />
-        <BeaconDesignerOpenLink
-          siteDisplayName={group.displayName}
-          shortName={group.shortName}
-          webflowAppClientId={webflowAppClientId}
-          webflowBeaconMarketplaceUrl={webflowBeaconMarketplaceUrl}
-        />
-      </div>
+      ) : null}
       <div className="space-y-3">
         <div className="space-y-1">
           <p className="text-sm font-medium">Site default preset</p>
@@ -403,22 +372,6 @@ function SitePresetsDetail(props: {
           />
         ) : null}
       </div>
-      <div className="space-y-2">
-        <p className="text-sm font-medium">Scoped presets</p>
-        {group.scopedPresets.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Managed in the Beacon image editor.</p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {group.scopedPresets.map((entry) => (
-              <ScopedPresetListItem
-                key={entry.row.id}
-                entry={entry}
-                defaultExportFormat={settings?.defaultExportFormat}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
       {saving ? <p className="text-xs text-muted-foreground">Saving…</p> : null}
     </div>
   );
@@ -429,7 +382,6 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
     settings,
     webflowSites,
     webflowAppClientId,
-    webflowBeaconMarketplaceUrl,
     canManage,
     teamPresetsLocked,
     canEditSiteDefault,
@@ -470,6 +422,9 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
                 ? "Choose a site to manage its image export presets."
                 : "Manage image export presets for this site."}
             </CardDescription>
+            <CardAction align="center">
+              <BeaconDesignerOpenLink shortName={selectedGroup.shortName} webflowAppClientId={webflowAppClientId} />
+            </CardAction>
           </CardHeader>
           <CardContent>
             <SitePresetsDetail
@@ -480,8 +435,6 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
               onSelectedSiteIdChange={setSelectedSiteId}
               settings={settings}
               canEditSiteDefault={canEditSiteDefault}
-              webflowAppClientId={webflowAppClientId}
-              webflowBeaconMarketplaceUrl={webflowBeaconMarketplaceUrl}
               {...siteDefaultActions}
             />
           </CardContent>

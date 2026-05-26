@@ -40,7 +40,7 @@ function TowerAuthenticatedShell({
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="@container/main flex min-h-0 flex-1 flex-col gap-2">
             <ScrollArea className="min-h-0 flex-1">
-              <div className="flex flex-col gap-4 py-4 pb-8 md:gap-6 md:py-6 md:pb-10">
+              <div className="flex flex-col gap-4 pt-2 pb-8 md:gap-6 md:pt-3 md:pb-10">
                 {usageBanner ? <div className="px-4 lg:px-6">{usageBanner}</div> : null}
                 <div className="flex w-full flex-col px-4 lg:px-6">{children}</div>
               </div>

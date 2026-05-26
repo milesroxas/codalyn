@@ -1,11 +1,16 @@
 "use client";
 
-import { IconClockHour4, IconMailForward, IconTrash, IconUserPlus } from "@tabler/icons-react";
+import { IconClockHour4, IconMailForward, IconUserPlus } from "@tabler/icons-react";
 import type { FormEvent } from "react";
 import { formatInvitationExpiry } from "@/features/team/lib/workspace-invitation-utils";
 import { getInviteSeatUiState, type WorkspaceSeatState } from "@/features/team/lib/workspace-seat-state";
 import type { InvitationRow } from "@/features/team/model/workspace-types";
+import { InvitationRowActions } from "@/features/team/ui/invitation-row-actions";
 import { WorkspaceInvitesUpsellState } from "@/features/team/ui/workspace-invites-upsell";
+import {
+  formatTowerInvitationStatusLabel,
+  TOWER_INVITATION_STATUS,
+} from "@/shared/lib/membership/tower-invitation-status";
 import { TOWER_TEAM_ROLES } from "@/shared/lib/membership/tower-organization-access";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -60,6 +65,8 @@ export function WorkspaceInvitesTab(props: {
   onInvite: (e: FormEvent) => void;
   onResendInvite: (inv: InvitationRow) => void;
   onRequestRevoke: (inv: InvitationRow) => void;
+  onRequestDelete: (inv: InvitationRow) => void;
+  onInviteAgain: (inv: InvitationRow) => void;
 }) {
   const {
     busy,
@@ -75,6 +82,8 @@ export function WorkspaceInvitesTab(props: {
     onInvite,
     onResendInvite,
     onRequestRevoke,
+    onRequestDelete,
+    onInviteAgain,
   } = props;
 
   const { showInvitesUpsellState, inviteBlocked, showTeamUpgradeHint } = getInviteSeatUiState(
@@ -158,7 +167,10 @@ export function WorkspaceInvitesTab(props: {
       <Card size="sm" layout="table-section">
         <CardHeader>
           <CardTitle>Invitations</CardTitle>
-          <CardDescription>Resend or revoke pending invitations before they&apos;re accepted.</CardDescription>
+          <CardDescription>
+            Manage pending invites or clean up past invitations. Pending invites can be resent or revoked; ended invites
+            can be deleted or re-sent.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {invitations.length === 0 ? (
@@ -182,7 +194,7 @@ export function WorkspaceInvitesTab(props: {
               </TableHeader>
               <TableBody>
                 {invitations.map((inv) => {
-                  const isPending = inv.status === "pending";
+                  const isAccountDeleted = inv.status === TOWER_INVITATION_STATUS.accountDeleted;
                   const expiresLabel = formatInvitationExpiry(inv.expiresAt);
                   const resending = resendingInvitationId === inv.id;
                   return (
@@ -193,7 +205,9 @@ export function WorkspaceInvitesTab(props: {
                           {inv.role ?? "—"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="capitalize">{inv.status}</TableCell>
+                      <TableCell className={isAccountDeleted ? "text-destructive" : undefined}>
+                        {formatTowerInvitationStatusLabel(inv.status)}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {expiresLabel ? (
                           <span className="inline-flex items-center gap-1 text-xs">
@@ -205,32 +219,15 @@ export function WorkspaceInvitesTab(props: {
                         )}
                       </TableCell>
                       <TableCell className="text-end">
-                        {isPending ? (
-                          <div className="flex flex-wrap justify-end gap-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={busy || resending}
-                              onClick={() => onResendInvite(inv)}
-                            >
-                              <IconMailForward className="size-3.5" aria-hidden />
-                              Resend
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              disabled={busy}
-                              onClick={() => onRequestRevoke(inv)}
-                            >
-                              <IconTrash className="size-3.5" aria-hidden />
-                              Revoke
-                            </Button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
+                        <InvitationRowActions
+                          invitation={inv}
+                          busy={busy}
+                          resending={resending}
+                          onResendInvite={onResendInvite}
+                          onRequestRevoke={onRequestRevoke}
+                          onRequestDelete={onRequestDelete}
+                          onInviteAgain={onInviteAgain}
+                        />
                       </TableCell>
                     </TableRow>
                   );

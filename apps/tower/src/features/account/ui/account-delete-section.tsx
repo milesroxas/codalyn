@@ -20,7 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/shared/ui/alert-dialog";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -129,13 +129,84 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
   const deleteBlockedMessage = deleteBlocked ? formatSoleAdminWorkspacesMessage(deleteBlockers) : null;
 
   return (
-    <Card className="border-destructive/30">
+    <Card tone="destructive">
       <CardHeader>
-        <CardTitle className="text-lg text-destructive">Delete account</CardTitle>
+        <CardTitle size="lg" tone="destructive">
+          Delete account
+        </CardTitle>
         <CardDescription>
           Permanently removes your account and personal data. Promote another admin first if you are the only admin in a
           workspace with other members.
         </CardDescription>
+        <CardAction align="center">
+          <AlertDialog open={deleteDialogOpen} onOpenChange={onDeleteDialogOpenChange}>
+            <AlertDialogTrigger asChild>
+              <Button
+                type="button"
+                variant="destructive"
+                width="fit"
+                disabled={deleteEligibilityPending || deleteBlocked}
+              >
+                Delete my account…
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <form onSubmit={onDeleteAccount} className="flex flex-col gap-4">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this account?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently deletes your user and cannot be undone. Enter your password and type DELETE to
+                    confirm.
+                    {!deleteBlocked && soleMemberWorkspaceCount > 0
+                      ? " Any workspace where you are the only member will be deleted with your account."
+                      : null}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                {deleteBlockedMessage ? (
+                  <p className="text-sm text-destructive" role="alert">
+                    {deleteBlockedMessage}
+                  </p>
+                ) : null}
+                <FormField>
+                  <Label htmlFor={deletePassId}>Password</Label>
+                  <Input
+                    id={deletePassId}
+                    type="password"
+                    autoComplete="current-password"
+                    value={deletePassword}
+                    onChange={(ev) => setDeletePassword(ev.target.value)}
+                    required
+                    autoFocus
+                  />
+                </FormField>
+                <FormField>
+                  <Label htmlFor={deleteConfirmPhraseId}>Type DELETE to confirm</Label>
+                  <Input
+                    id={deleteConfirmPhraseId}
+                    type="text"
+                    autoComplete="off"
+                    value={deleteConfirm}
+                    onChange={(ev) => setDeleteConfirm(ev.target.value)}
+                    required
+                  />
+                </FormField>
+                {deleteErr ? (
+                  <p className="text-sm text-destructive" role="alert">
+                    {deleteErr}
+                  </p>
+                ) : null}
+                <AlertDialogFooter>
+                  <AlertDialogCancel type="button" disabled={deleteBusy}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction type="submit" variant="destructive" disabled={deleteBusy || deleteBlocked}>
+                    {deleteBusy ? "Deleting…" : "Delete account"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </form>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardAction>
       </CardHeader>
       <CardContent className="space-y-4">
         {deleteEligibilityPending ? (
@@ -156,73 +227,6 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
               : `${soleMemberWorkspaceCount} workspaces where you are the only member will also be deleted.`}
           </p>
         ) : null}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={onDeleteDialogOpenChange}>
-          <AlertDialogTrigger asChild>
-            <Button
-              type="button"
-              variant="destructive"
-              width="fit"
-              disabled={deleteEligibilityPending || deleteBlocked}
-            >
-              Delete my account…
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <form onSubmit={onDeleteAccount} className="flex flex-col gap-4">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete this account?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This permanently deletes your user and cannot be undone. Enter your password and type DELETE to
-                  confirm.
-                  {!deleteBlocked && soleMemberWorkspaceCount > 0
-                    ? " Any workspace where you are the only member will be deleted with your account."
-                    : null}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              {deleteBlockedMessage ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {deleteBlockedMessage}
-                </p>
-              ) : null}
-              <FormField>
-                <Label htmlFor={deletePassId}>Password</Label>
-                <Input
-                  id={deletePassId}
-                  type="password"
-                  autoComplete="current-password"
-                  value={deletePassword}
-                  onChange={(ev) => setDeletePassword(ev.target.value)}
-                  required
-                  autoFocus
-                />
-              </FormField>
-              <FormField>
-                <Label htmlFor={deleteConfirmPhraseId}>Type DELETE to confirm</Label>
-                <Input
-                  id={deleteConfirmPhraseId}
-                  type="text"
-                  autoComplete="off"
-                  value={deleteConfirm}
-                  onChange={(ev) => setDeleteConfirm(ev.target.value)}
-                  required
-                />
-              </FormField>
-              {deleteErr ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {deleteErr}
-                </p>
-              ) : null}
-              <AlertDialogFooter>
-                <AlertDialogCancel type="button" disabled={deleteBusy}>
-                  Cancel
-                </AlertDialogCancel>
-                <AlertDialogAction type="submit" variant="destructive" disabled={deleteBusy || deleteBlocked}>
-                  {deleteBusy ? "Deleting…" : "Delete account"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </form>
-          </AlertDialogContent>
-        </AlertDialog>
       </CardContent>
       <CardFooter className="border-t border-border/60 text-xs text-muted-foreground">
         This cannot be undone. If you use Beacon or integrations, you will need a new account to sign in again.

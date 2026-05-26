@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { resolveWorkspaceSeatState } from "@/features/team/lib/workspace-seat-state";
 import type { InvitationRow, MemberRow, WorkspaceOrgSummary } from "@/features/team/model/workspace-types";
+import { DeleteInvitationDialog } from "@/features/team/ui/delete-invitation-dialog";
 import { RevokeInvitationDialog } from "@/features/team/ui/revoke-invitation-dialog";
 import { WorkspaceBillingSection } from "@/features/team/ui/workspace-billing-section";
 import { WorkspaceIdentityCard } from "@/features/team/ui/workspace-identity-card";
@@ -46,6 +47,8 @@ export function WorkspaceTabsShell(props: {
   onRemoveMember: (memberId: string) => void;
   onResendInvite: (inv: InvitationRow) => void;
   onCancelInvite: (invitationId: string) => void;
+  onDeleteInvite: (invitationId: string) => void;
+  onInviteAgain: (inv: InvitationRow) => void;
 }) {
   const {
     activeOrg,
@@ -78,9 +81,12 @@ export function WorkspaceTabsShell(props: {
     onRemoveMember,
     onResendInvite,
     onCancelInvite,
+    onDeleteInvite,
+    onInviteAgain,
   } = props;
 
   const [revokeTarget, setRevokeTarget] = useState<InvitationRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<InvitationRow | null>(null);
 
   const seatState = resolveWorkspaceSeatState({
     workspaceBilling,
@@ -151,6 +157,8 @@ export function WorkspaceTabsShell(props: {
               onInvite={onInvite}
               onResendInvite={onResendInvite}
               onRequestRevoke={(inv) => setRevokeTarget(inv)}
+              onRequestDelete={(inv) => setDeleteTarget(inv)}
+              onInviteAgain={onInviteAgain}
             />
 
             <WorkspaceSettingsTab
@@ -188,6 +196,20 @@ export function WorkspaceTabsShell(props: {
             onConfirmRevoke={(invitationId) => {
               void onCancelInvite(invitationId);
               setRevokeTarget(null);
+            }}
+          />
+
+          <DeleteInvitationDialog
+            deleteTarget={deleteTarget}
+            busy={busy}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDeleteTarget(null);
+              }
+            }}
+            onConfirmDelete={(invitationId) => {
+              void onDeleteInvite(invitationId);
+              setDeleteTarget(null);
             }}
           />
         </>

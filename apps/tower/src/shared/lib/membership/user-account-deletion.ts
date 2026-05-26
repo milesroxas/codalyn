@@ -53,6 +53,16 @@ export function computeUserAccountDeletionPlan(userId: string, orgs: OrgMemberSn
   return { blockers, soleMemberOrganizationIds };
 }
 
+/** Shared workspaces where membership should be released before the user row is deleted. */
+export function resolveSharedMembershipOrganizationIds(
+  memberships: readonly { organizationId: string }[],
+  soleMemberOrganizationIds: readonly string[]
+): string[] {
+  const excluded = new Set(soleMemberOrganizationIds);
+  const orgIds = memberships.map((row) => row.organizationId).filter((id) => !excluded.has(id));
+  return [...new Set(orgIds)];
+}
+
 export function formatSoleAdminWorkspacesMessage(blockers: WorkspaceDeletionBlocker[]): string {
   if (blockers.length === 0) {
     return "Promote another member to admin before deleting this account.";

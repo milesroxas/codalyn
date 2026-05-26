@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       request,
       {
         error: "webflow_resolve_bearer_missing",
-        hint: "Set WEBFLOW_TOKEN_RESOLVE_BEARER or WEBFLOW_API_TOKEN (scope authorized_user:read), or sign in on Tower and connect Webflow so a per-user token is stored.",
+        hint: "Set WEBFLOW_TOKEN_RESOLVE_BEARER or WEBFLOW_API_TOKEN (scope authorized_user:read), connect Webflow on the Connection page, or sign in on Tower so a stored workspace token can resolve the Designer ID token.",
       },
       { status: 503 }
     );

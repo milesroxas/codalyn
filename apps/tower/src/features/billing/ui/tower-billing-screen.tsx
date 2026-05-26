@@ -47,7 +47,7 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
           <CardTitle>Current plan</CardTitle>
           <CardDescription>{planDescription}</CardDescription>
           {checkoutAvailable && (entitlement.tier === "free" || showPortal) ? (
-            <CardAction className="flex flex-wrap gap-2 self-center">
+            <CardAction align="center" group>
               {entitlement.tier === "free" ? (
                 <form action="/api/billing/checkout" method="post">
                   <Button type="submit">Upgrade to Pro</Button>

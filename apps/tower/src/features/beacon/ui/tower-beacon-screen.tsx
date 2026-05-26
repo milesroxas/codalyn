@@ -30,7 +30,6 @@ type BeaconApiPayload = {
   appUserRole: string | null;
   webflowSites: TowerBeaconWebflowSite[] | null;
   webflowAppClientId: string | null;
-  webflowBeaconMarketplaceUrl?: string | null;
 };
 
 function canEditSiteDefaultPreset(payload: BeaconApiPayload | null, canEditPresets: boolean): boolean {
@@ -216,7 +215,6 @@ export function TowerBeaconScreen(props: { oauthConfigured?: boolean }) {
           settings={settings}
           webflowSites={payload.webflowSites}
           webflowAppClientId={payload.webflowAppClientId}
-          webflowBeaconMarketplaceUrl={payload.webflowBeaconMarketplaceUrl}
           canManage={canManage}
           teamPresetsLocked={teamPresetsLocked}
           canEditSiteDefault={canEditSiteDefault}

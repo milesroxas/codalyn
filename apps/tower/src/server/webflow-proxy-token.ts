@@ -52,6 +52,15 @@ export async function resolveWebflowBearerToken(
   return stored || undefined;
 }
 
+/** Any workspace OAuth token (for Designer ID-token resolve when the extension has no Tower session cookie). */
+export async function pickAnyOrganizationWebflowAccessToken(): Promise<string | undefined> {
+  const rows = await db
+    .select({ accessToken: organizationWebflowOAuthToken.accessToken })
+    .from(organizationWebflowOAuthToken)
+    .limit(1);
+  return rows[0]?.accessToken?.trim() || undefined;
+}
+
 /** OAuth app credentials (authorization code flow); used to obtain an OAuth access token, not as the Data API Bearer. */
 export function hasWebflowOAuthCredentials(): boolean {
   return Boolean(process.env.WEBFLOW_CLIENT_ID?.trim() && process.env.WEBFLOW_CLIENT_SECRET?.trim());

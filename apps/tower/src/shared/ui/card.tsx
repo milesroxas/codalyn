@@ -1,24 +1,92 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
 type CardLayout = "default" | "fill" | "table-section";
 
+const cardVariants = cva(
+  "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[layout=fill]:h-full data-[layout=table-section]:gap-0 data-[layout=table-section]:py-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 data-[size=sm]:data-[layout=table-section]:gap-0 data-[size=sm]:data-[layout=table-section]:py-0 data-[layout=table-section]:[&_[data-slot=table-header]]:bg-muted/20 data-[layout=table-section]:[&_[data-slot=table-header]_tr]:border-border data-[layout=table-section]:[&_[data-slot=table-header]_tr]:hover:bg-transparent data-[layout=table-section]:[&_[data-slot=table-head]:first-child]:pl-4 data-[layout=table-section]:[&_[data-slot=table-head]:last-child]:pr-4 data-[layout=table-section]:[&_[data-slot=table-head]]:py-3 data-[layout=table-section]:[&_[data-slot=table-head]]:uppercase data-[layout=table-section]:[&_[data-slot=table-head]]:tracking-wide data-[layout=table-section]:[&_[data-slot=table-cell]:first-child]:pl-4 data-[layout=table-section]:[&_[data-slot=table-cell]:last-child]:pr-4 data-[layout=table-section]:[&_[data-slot=table-cell]]:py-3 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+  {
+    variants: {
+      tone: {
+        default: "",
+        destructive: "bg-destructive/5 ring-destructive/30",
+      },
+    },
+    defaultVariants: {
+      tone: "default",
+    },
+  }
+);
+
+const cardTitleVariants = cva(
+  "leading-snug font-medium group-data-[size=sm]/card:text-sm group-data-[layout=table-section]/card:text-base",
+  {
+    variants: {
+      size: {
+        default: "text-base",
+        lg: "text-lg",
+      },
+      tone: {
+        default: "",
+        destructive: "text-destructive",
+      },
+    },
+    defaultVariants: {
+      size: "default",
+      tone: "default",
+    },
+  }
+);
+
+const cardDescriptionVariants = cva("text-sm text-muted-foreground", {
+  variants: {
+    tone: {
+      default: "",
+      destructive: "text-xs leading-relaxed text-destructive",
+    },
+  },
+  defaultVariants: {
+    tone: "default",
+  },
+});
+
+const cardActionVariants = cva("col-start-2 row-span-2 row-start-1 justify-self-end", {
+  variants: {
+    align: {
+      start: "self-start",
+      center: "self-center",
+    },
+    group: {
+      false: "",
+      true: "flex flex-wrap gap-2",
+    },
+  },
+  defaultVariants: {
+    align: "start",
+    group: false,
+  },
+});
+
 function Card({
   className,
   size = "default",
   layout = "default",
+  tone = "default",
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm"; layout?: CardLayout }) {
+}: React.ComponentProps<"div"> & {
+  size?: "default" | "sm";
+  layout?: CardLayout;
+  tone?: VariantProps<typeof cardVariants>["tone"];
+}) {
   return (
     <div
       data-slot="card"
       data-size={size}
       data-layout={layout}
-      className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[layout=fill]:h-full data-[layout=table-section]:gap-0 data-[layout=table-section]:py-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 data-[size=sm]:data-[layout=table-section]:gap-0 data-[size=sm]:data-[layout=table-section]:py-0 data-[layout=table-section]:[&_[data-slot=table-header]]:bg-muted/20 data-[layout=table-section]:[&_[data-slot=table-header]_tr]:border-border data-[layout=table-section]:[&_[data-slot=table-header]_tr]:hover:bg-transparent data-[layout=table-section]:[&_[data-slot=table-head]:first-child]:pl-4 data-[layout=table-section]:[&_[data-slot=table-head]:last-child]:pr-4 data-[layout=table-section]:[&_[data-slot=table-head]]:py-3 data-[layout=table-section]:[&_[data-slot=table-head]]:uppercase data-[layout=table-section]:[&_[data-slot=table-head]]:tracking-wide data-[layout=table-section]:[&_[data-slot=table-cell]:first-child]:pl-4 data-[layout=table-section]:[&_[data-slot=table-cell]:last-child]:pr-4 data-[layout=table-section]:[&_[data-slot=table-cell]]:py-3 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
-        className
-      )}
+      data-tone={tone}
+      className={cn(cardVariants({ tone }), className)}
       {...props}
     />
   );
@@ -37,31 +105,30 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-title"
-      className={cn(
-        "text-base leading-snug font-medium group-data-[size=sm]/card:text-sm group-data-[layout=table-section]/card:text-base",
-        className
-      )}
-      {...props}
-    />
-  );
+function CardTitle({
+  className,
+  size = "default",
+  tone = "default",
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof cardTitleVariants>) {
+  return <div data-slot="card-title" className={cn(cardTitleVariants({ size, tone }), className)} {...props} />;
 }
 
-function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="card-description" className={cn("text-sm text-muted-foreground", className)} {...props} />;
+function CardDescription({
+  className,
+  tone = "default",
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof cardDescriptionVariants>) {
+  return <div data-slot="card-description" className={cn(cardDescriptionVariants({ tone }), className)} {...props} />;
 }
 
-function CardAction({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-action"
-      className={cn("col-start-2 row-span-2 row-start-1 self-start justify-self-end", className)}
-      {...props}
-    />
-  );
+function CardAction({
+  className,
+  align = "start",
+  group = false,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof cardActionVariants>) {
+  return <div data-slot="card-action" className={cn(cardActionVariants({ align, group }), className)} {...props} />;
 }
 
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {

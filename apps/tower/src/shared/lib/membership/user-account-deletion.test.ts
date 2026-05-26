@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeUserAccountDeletionPlan,
   formatSoleAdminWorkspacesMessage,
+  resolveSharedMembershipOrganizationIds,
 } from "@/shared/lib/membership/user-account-deletion";
 
 const userId = "user-1";
@@ -75,6 +76,20 @@ describe("computeUserAccountDeletionPlan", () => {
     ]);
 
     expect(plan).toEqual({ blockers: [], soleMemberOrganizationIds: [] });
+  });
+});
+
+describe("resolveSharedMembershipOrganizationIds", () => {
+  it("excludes sole-member workspaces scheduled for deletion", () => {
+    expect(
+      resolveSharedMembershipOrganizationIds([{ organizationId: "solo" }, { organizationId: "shared" }], ["solo"])
+    ).toEqual(["shared"]);
+  });
+
+  it("deduplicates organization ids", () => {
+    expect(
+      resolveSharedMembershipOrganizationIds([{ organizationId: "shared" }, { organizationId: "shared" }], [])
+    ).toEqual(["shared"]);
   });
 });
 

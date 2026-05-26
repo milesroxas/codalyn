@@ -100,11 +100,15 @@ export function useBeaconTowerSession(): {
       return;
     }
     let cancelled = false;
-    void exchangeWebflowDesignerSession().then((r) => {
-      if (!cancelled && r.ok) {
-        void refetch();
-      }
-    });
+    void exchangeWebflowDesignerSession()
+      .then((r) => {
+        if (!cancelled && r.ok) {
+          void refetch();
+        }
+      })
+      .catch(() => {
+        /* network errors are handled inside exchangeWebflowDesignerSession */
+      });
     return () => {
       cancelled = true;
     };

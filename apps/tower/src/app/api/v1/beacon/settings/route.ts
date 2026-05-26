@@ -21,6 +21,7 @@ import {
 } from "@/server/beacon-settings-context";
 import { persistTeamBeaconPatch, upsertUserBeaconPayload } from "@/server/beacon-settings-persist";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
+import { resolveWebflowBeaconPublicConfig } from "@/server/webflow-beacon-public-config";
 import { listWebflowSitesForUser } from "@/server/webflow-sites";
 import { db } from "@/shared/lib/db";
 import { beaconAppSettings as beaconAppSettingsTable, organization } from "@/shared/lib/db/auth-schema";
@@ -81,16 +82,6 @@ function validateTeamMutationPermissions(opts: {
     return null;
   }
   return towerPutRejectionResponse(rejection);
-}
-
-function resolveWebflowBeaconPublicConfig(): {
-  webflowAppClientId: string | null;
-  webflowBeaconMarketplaceUrl: string | null;
-} {
-  return {
-    webflowAppClientId: process.env.WEBFLOW_CLIENT_ID?.trim() || null,
-    webflowBeaconMarketplaceUrl: process.env.WEBFLOW_BEACON_MARKETPLACE_URL?.trim() || null,
-  };
 }
 
 async function loadEffectiveSettings(

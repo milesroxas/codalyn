@@ -4,7 +4,7 @@ import type * as React from "react";
 import { cn } from "@/shared/lib/utils";
 
 const alertVariants = cva(
-  "group/alert relative grid w-full gap-1 rounded-lg border px-4 py-3 text-sm has-data-[slot=alert-action]:pr-28 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-3 *:[svg]:row-span-2 *:[svg:not([class*='size-'])]:size-4",
+  "group/alert grid w-full gap-1 rounded-lg border px-4 py-3 text-sm has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-3 has-data-[slot=alert-action]:md:grid-cols-[1fr_auto] has-[>svg]:has-data-[slot=alert-action]:md:grid-cols-[auto_1fr_auto] has-data-[slot=alert-action]:md:items-center has-data-[slot=alert-action]:md:gap-x-4 *:[svg]:row-span-2 *:[svg]:self-start *:[svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -31,7 +31,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="alert-title"
       className={cn(
-        "font-medium leading-none tracking-tight group-has-[>svg]/alert:col-start-2 has-[+_[data-slot=alert-description]]:mb-1 [&_a]:underline [&_a]:underline-offset-3",
+        "min-w-0 font-medium leading-none tracking-tight group-has-[>svg]/alert:col-start-2 has-[+_[data-slot=alert-description]]:mb-1 [&_a]:underline [&_a]:underline-offset-3",
         className
       )}
       {...props}
@@ -44,7 +44,7 @@ function AlertDescription({ className, ...props }: React.ComponentProps<"div">) 
     <div
       data-slot="alert-description"
       className={cn(
-        "text-sm text-muted-foreground group-has-[>svg]/alert:col-start-2 [&_p:not(:last-child)]:mb-2",
+        "min-w-0 text-sm text-muted-foreground group-has-[>svg]/alert:col-start-2 [&_p:not(:last-child)]:mb-2",
         className
       )}
       {...props}
@@ -56,7 +56,10 @@ function AlertAction({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="alert-action"
-      className={cn("absolute inset-y-0 right-4 flex items-center gap-2", className)}
+      className={cn(
+        "mt-2 flex w-fit shrink-0 flex-wrap items-center gap-2 group-has-[>svg]/alert:col-start-2 md:col-start-2 md:row-start-1 md:row-span-2 md:mt-0 md:self-center group-has-[>svg]/alert:md:col-start-3",
+        className
+      )}
       {...props}
     />
   );

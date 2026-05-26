@@ -61,6 +61,7 @@ function detailToRow(d: OperatorWorkspaceDetail): OperatorWorkspaceRow {
     slug: d.slug,
     logo: d.logo,
     seatLimit: d.seatLimit,
+    effectiveSeatLimit: d.effectiveSeatLimit,
     billingPlan: d.billingPlan,
     subscriptionStatus: d.subscriptionStatus,
     stripeCustomerId: d.stripeCustomerId,
@@ -415,7 +416,7 @@ function SeatsSection({
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Seats</h3>
       <div className="space-y-3 rounded-lg border border-border bg-card p-3">
         <div className="space-y-1.5">
-          <Label htmlFor="workspace-seat-limit">Seat limit (blank = unlimited / free tier default)</Label>
+          <Label htmlFor="workspace-seat-limit">Seat limit (blank = unpaid solo cap)</Label>
           <div className="flex items-center gap-2">
             <Input
               id="workspace-seat-limit"
@@ -431,14 +432,15 @@ function SeatsSection({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Current usage: <span className="text-foreground">{detail.memberCount}</span>{" "}
-          {detail.seatLimit !== null ? (
+          Current usage: <span className="text-foreground">{detail.memberCount + detail.pendingInvitations}</span> of{" "}
+          <span className="text-foreground">{detail.effectiveSeatLimit}</span> seats
+          {detail.pendingInvitations > 0 ? (
             <>
-              of <span className="text-foreground">{detail.seatLimit}</span> members
+              {" "}
+              (<span className="text-foreground">{detail.pendingInvitations}</span> pending invite
+              {detail.pendingInvitations === 1 ? "" : "s"})
             </>
-          ) : (
-            "members"
-          )}
+          ) : null}
           .
         </p>
       </div>

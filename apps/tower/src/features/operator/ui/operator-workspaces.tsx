@@ -352,7 +352,7 @@ function WorkspaceRow({
         </div>
       </TableCell>
       <TableCell className="text-right text-sm tabular-nums text-foreground">
-        {workspace.seatLimit === null ? "∞" : workspace.seatLimit}
+        {workspace.seatLimit ?? workspace.effectiveSeatLimit}
       </TableCell>
       <TableCell>
         <OperatorUsageLimitsTableCell usage={workspace.usage} />

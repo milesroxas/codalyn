@@ -21,8 +21,10 @@ async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     let message = `Request failed with ${res.status}`;
-    const body = (await res.json().catch(() => null)) as { error?: string } | null;
-    if (body?.error) {
+    const body = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
+    if (body?.message) {
+      message = body.message;
+    } else if (body?.error) {
       message = body.error;
     }
     throw new OperatorApiError(message, res.status);

@@ -143,6 +143,7 @@ export type OperatorWorkspaceRow = {
   slug: string;
   logo: string | null;
   seatLimit: number | null;
+  effectiveSeatLimit: number;
   billingPlan: string | null;
   subscriptionStatus: string | null;
   stripeCustomerId: string | null;

@@ -1,5 +1,6 @@
 import { organization } from "better-auth/plugins";
 import { grantEarlyAccess } from "@/server/access/early-access";
+import { assertOrganizationSeatAvailable } from "@/server/billing/organization-seat-count";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { resolveMembershipSeatCapFromOrg } from "@/server/billing/team-billing-config";
 import { sendOrganizationInvitationEmail } from "@/server/email/organization-invitation-email";
@@ -34,6 +35,15 @@ export const towerOrganization = organization({
     await sendOrganizationInvitationEmail(data);
   },
   organizationHooks: {
+    beforeCreateInvitation: async ({ organization: org }) => {
+      await assertOrganizationSeatAvailable(org.id, org as { seatLimit?: number | null });
+    },
+    afterCreateInvitation: async ({ organization: org }) => {
+      await syncOrganizationSeatQuantityWithStripe(org.id);
+    },
+    beforeAddMember: async ({ member: m, organization: org }) => {
+      await assertOrganizationSeatAvailable(m.organizationId, org as { seatLimit?: number | null });
+    },
     afterAcceptInvitation: async ({ user, organization: org }) => {
       await grantEarlyAccess(user.id);
       await syncOrganizationSeatQuantityWithStripe(org.id);

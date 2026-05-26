@@ -1,5 +1,6 @@
 import { and, count, desc, eq, ilike, or, type SQL, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { buildOrganizationSeatSnapshot } from "@/server/billing/organization-seat-count";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorWorkspaceListResponse, OperatorWorkspaceRow } from "@/server/operator/types";
 import { defaultOperatorWorkspaceUsageLimits, fetchOperatorWorkspaceUsageLimits } from "@/server/operator/usage-limits";
@@ -82,21 +83,29 @@ export async function GET(req: Request): Promise<NextResponse<OperatorWorkspaceL
   );
 
   const mapped: OperatorWorkspaceRow[] = await Promise.all(
-    rows.map(async (r) => ({
-      id: r.id,
-      name: r.name,
-      slug: r.slug,
-      logo: r.logo ?? null,
-      seatLimit: r.seatLimit ?? null,
-      billingPlan: r.billingPlan ?? null,
-      subscriptionStatus: r.subscriptionStatus ?? null,
-      stripeCustomerId: r.stripeCustomerId ?? null,
-      stripeSubscriptionId: r.stripeSubscriptionId ?? null,
-      memberCount: Number(r.memberCount ?? 0),
-      pendingInvitations: Number(r.pendingInvitations ?? 0),
-      usage: usageByOrgId.get(r.id) ?? (await defaultOperatorWorkspaceUsageLimits()),
-      createdAt: toIso(r.createdAt),
-    }))
+    rows.map(async (r) => {
+      const memberCount = Number(r.memberCount ?? 0);
+      const pendingInvitations = Number(r.pendingInvitations ?? 0);
+      const seatSnapshot = buildOrganizationSeatSnapshot(memberCount + pendingInvitations, {
+        seatLimit: r.seatLimit ?? null,
+      });
+      return {
+        id: r.id,
+        name: r.name,
+        slug: r.slug,
+        logo: r.logo ?? null,
+        seatLimit: r.seatLimit ?? null,
+        effectiveSeatLimit: seatSnapshot.effectiveSeatLimit,
+        billingPlan: r.billingPlan ?? null,
+        subscriptionStatus: r.subscriptionStatus ?? null,
+        stripeCustomerId: r.stripeCustomerId ?? null,
+        stripeSubscriptionId: r.stripeSubscriptionId ?? null,
+        memberCount,
+        pendingInvitations,
+        usage: usageByOrgId.get(r.id) ?? (await defaultOperatorWorkspaceUsageLimits()),
+        createdAt: toIso(r.createdAt),
+      };
+    })
   );
 
   return NextResponse.json({ rows: mapped, total, limit, offset });

@@ -139,7 +139,7 @@ export const organization = pgTable(
     logo: text("logo"),
     metadata: text("metadata"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    /** Nullable cap on members; null means use a high default (free tier). Wired to Stripe seat count later. */
+    /** Nullable cap on members; null means unpaid solo workspace (see `TEAM_UNPAID_SEAT_CAP`). Set from Stripe team billing. */
     seatLimit: integer("seat_limit"),
     /** When false, members bypass monthly usage metering while this workspace is active (operator override). */
     meteringEnabled: boolean("metering_enabled").default(true).notNull(),

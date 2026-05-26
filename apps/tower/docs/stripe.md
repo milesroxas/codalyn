@@ -103,6 +103,7 @@ Independent of **Stripe** but part of the same “billing” story: the **free**
 
 ## Team seats
 
+- Unpaid workspaces (`seat_limit` null) allow **1 member** (`TEAM_UNPAID_SEAT_CAP`) — solo only; invites require Team billing.
 - Checkout quantity = `max(TOWER_TEAM_MIN_SEATS, members + pending invitations)`.
 - Webhooks set `organization.seat_limit` from Stripe subscription quantity.
 - Member/invitation hooks call `syncOrganizationSeatQuantityWithStripe` to keep Stripe and `seat_limit` aligned.

@@ -10,10 +10,7 @@ export function WorkspaceBillingSection(props: { organizationId: string; billing
     return null;
   }
 
-  const seatLabel =
-    billing.seatLimit != null
-      ? `${billing.seatsUsed} of ${billing.seatLimit} seats used`
-      : `${billing.seatsUsed} member${billing.seatsUsed === 1 ? "" : "s"}`;
+  const seatLabel = `${billing.seatsUsed} of ${billing.effectiveSeatLimit} seat${billing.effectiveSeatLimit === 1 ? "" : "s"} used`;
 
   return (
     <Card size="sm">
@@ -23,7 +20,8 @@ export function WorkspaceBillingSection(props: { organizationId: string; billing
           <CardTitle className="text-base">Team billing</CardTitle>
         </div>
         <CardDescription>
-          Per-seat workspace plan — Pro limits for every member, shared Webflow connection, and team presets.
+          Per-seat workspace plan — Pro limits for every member, shared Webflow connection, and team presets. Unpaid
+          workspaces are solo (1 seat); subscribe to invite collaborators.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

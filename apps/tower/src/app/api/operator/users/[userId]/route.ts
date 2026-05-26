@@ -2,6 +2,7 @@ import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
+import { prepareUserAccountDeletion, UserAccountDeletionBlockedError } from "@/server/membership/user-account-deletion";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorUserDetail, OperatorUserPatch } from "@/server/operator/types";
 import {
@@ -279,11 +280,22 @@ export async function DELETE(
   }
 
   try {
+    await prepareUserAccountDeletion(userId);
     await auth.api.removeUser({
       body: { userId },
       headers: await headers(),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof UserAccountDeletionBlockedError) {
+      return NextResponse.json(
+        {
+          error: error.code,
+          message: error.message,
+          blockers: error.blockers,
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: "delete_failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });

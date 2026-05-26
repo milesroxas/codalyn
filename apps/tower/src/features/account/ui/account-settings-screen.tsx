@@ -3,20 +3,11 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
+import { AccountDeleteSection } from "@/features/account/ui/account-delete-section";
 import { AccountSettingsSkeleton } from "@/features/account/ui/account-settings-skeleton";
 import { authClient } from "@/features/auth/model/auth-client";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/shared/ui/alert-dialog";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Separator } from "@/shared/ui/separator";
@@ -31,8 +22,6 @@ export function AccountSettingsScreen() {
   const curPassId = useId();
   const newPassId = useId();
   const confirmPassId = useId();
-  const deletePassId = useId();
-  const deleteConfirmPhraseId = useId();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -51,12 +40,6 @@ export function AccountSettingsScreen() {
   const [passBusy, setPassBusy] = useState(false);
   const [passMsg, setPassMsg] = useState<string | null>(null);
   const [passErr, setPassErr] = useState<string | null>(null);
-
-  const [deletePassword, setDeletePassword] = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState("");
-  const [deleteBusy, setDeleteBusy] = useState(false);
-  const [deleteErr, setDeleteErr] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (sessionPending) {
@@ -174,41 +157,6 @@ export function AccountSettingsScreen() {
     setNewPassword("");
     setConfirmPassword("");
     void refetchSession();
-  }
-
-  async function onDeleteAccount(e: FormEvent) {
-    e.preventDefault();
-    setDeleteErr(null);
-    if (deleteConfirm.trim().toUpperCase() !== "DELETE") {
-      setDeleteErr("Type DELETE to confirm.");
-      return;
-    }
-    setDeleteBusy(true);
-    const { error } = await authClient.deleteUser({
-      password: deletePassword,
-      callbackURL: appCallbackUrl("/"),
-      fetchOptions: { credentials: "include" },
-    });
-    setDeleteBusy(false);
-    if (error) {
-      const msg = error.message ?? "Could not delete account";
-      setDeleteErr(msg);
-      toast.error(msg);
-      return;
-    }
-    toast.success("Account deleted");
-    setDeleteDialogOpen(false);
-    router.push("/");
-    router.refresh();
-  }
-
-  function onDeleteDialogOpenChange(open: boolean) {
-    setDeleteDialogOpen(open);
-    if (!open) {
-      setDeletePassword("");
-      setDeleteConfirm("");
-      setDeleteErr(null);
-    }
   }
 
   if (sessionPending || !session?.user) {
@@ -383,78 +331,7 @@ export function AccountSettingsScreen() {
           </CardContent>
         </Card>
 
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <CardTitle className="text-lg text-destructive">Delete account</CardTitle>
-            <CardDescription>
-              Permanently removes your Tower user, sessions, and personal data tied to this account. Team workspaces you
-              own may need to be transferred first.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AlertDialog open={deleteDialogOpen} onOpenChange={onDeleteDialogOpenChange}>
-              <AlertDialogTrigger asChild>
-                <Button type="button" variant="destructive" className="h-10 font-medium">
-                  Delete my account…
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <form onSubmit={onDeleteAccount} className="flex flex-col gap-4">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this account?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This permanently deletes your user and cannot be undone. Enter your password and type DELETE to
-                      confirm.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor={deletePassId}>Password</Label>
-                    <Input
-                      id={deletePassId}
-                      type="password"
-                      autoComplete="current-password"
-                      value={deletePassword}
-                      onChange={(ev) => setDeletePassword(ev.target.value)}
-                      fieldSize="lg"
-                      surface="elevated"
-                      required
-                      autoFocus
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor={deleteConfirmPhraseId}>Type DELETE to confirm</Label>
-                    <Input
-                      id={deleteConfirmPhraseId}
-                      type="text"
-                      autoComplete="off"
-                      value={deleteConfirm}
-                      onChange={(ev) => setDeleteConfirm(ev.target.value)}
-                      fieldSize="lg"
-                      surface="elevated"
-                      required
-                    />
-                  </div>
-                  {deleteErr ? (
-                    <p className="text-sm text-destructive" role="alert">
-                      {deleteErr}
-                    </p>
-                  ) : null}
-                  <AlertDialogFooter>
-                    <AlertDialogCancel type="button" disabled={deleteBusy}>
-                      Cancel
-                    </AlertDialogCancel>
-                    <Button type="submit" variant="destructive" disabled={deleteBusy} className="font-medium">
-                      {deleteBusy ? "Deleting…" : "Delete account"}
-                    </Button>
-                  </AlertDialogFooter>
-                </form>
-              </AlertDialogContent>
-            </AlertDialog>
-          </CardContent>
-          <CardFooter className="border-t border-border/60 text-xs text-muted-foreground">
-            This cannot be undone. If you use Beacon or integrations, you will need a new account to sign in again.
-          </CardFooter>
-        </Card>
+        <AccountDeleteSection sessionReady={Boolean(session?.user)} />
       </div>
     </main>
   );

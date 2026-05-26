@@ -1,0 +1,239 @@
+"use client";
+
+import Link from "next/link";
+import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
+import { toast } from "sonner";
+import { authClient } from "@/features/auth/model/auth-client";
+import {
+  formatSoleAdminWorkspacesMessage,
+  type WorkspaceDeletionBlocker,
+} from "@/shared/lib/membership/user-account-deletion";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/shared/ui/alert-dialog";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+
+type DeleteEligibility = {
+  blockers: WorkspaceDeletionBlocker[];
+  soleMemberWorkspaceCount: number;
+};
+
+function resolveAppCallbackUrl(path: string): string {
+  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
+  if (base) {
+    return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}${path.startsWith("/") ? path : `/${path}`}`;
+  }
+  return path;
+}
+
+async function fetchDeleteEligibility(): Promise<DeleteEligibility> {
+  const res = await fetch("/api/account/delete-eligibility", { credentials: "include" });
+  if (!res.ok) {
+    return { blockers: [], soleMemberWorkspaceCount: 0 };
+  }
+  const body = (await res.json()) as {
+    blockers?: WorkspaceDeletionBlocker[];
+    soleMemberWorkspaceCount?: number;
+  };
+  return {
+    blockers: body.blockers ?? [],
+    soleMemberWorkspaceCount: body.soleMemberWorkspaceCount ?? 0,
+  };
+}
+
+export function AccountDeleteSection(props: { sessionReady: boolean }) {
+  const { sessionReady } = props;
+  const deletePassId = useId();
+  const deleteConfirmPhraseId = useId();
+
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteBlockers, setDeleteBlockers] = useState<WorkspaceDeletionBlocker[]>([]);
+  const [soleMemberWorkspaceCount, setSoleMemberWorkspaceCount] = useState(0);
+  const [deleteEligibilityPending, setDeleteEligibilityPending] = useState(true);
+
+  const refreshDeleteEligibility = useCallback(async () => {
+    setDeleteEligibilityPending(true);
+    try {
+      const eligibility = await fetchDeleteEligibility();
+      setDeleteBlockers(eligibility.blockers);
+      setSoleMemberWorkspaceCount(eligibility.soleMemberWorkspaceCount);
+    } finally {
+      setDeleteEligibilityPending(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!sessionReady) {
+      return;
+    }
+    void refreshDeleteEligibility();
+  }, [sessionReady, refreshDeleteEligibility]);
+
+  async function onDeleteAccount(e: FormEvent) {
+    e.preventDefault();
+    setDeleteErr(null);
+    if (deleteConfirm.trim().toUpperCase() !== "DELETE") {
+      setDeleteErr("Type DELETE to confirm.");
+      return;
+    }
+    setDeleteBusy(true);
+    const { error } = await authClient.deleteUser({
+      password: deletePassword,
+      callbackURL: resolveAppCallbackUrl("/"),
+      fetchOptions: { credentials: "include" },
+    });
+    setDeleteBusy(false);
+    if (error) {
+      const msg = error.message ?? "Could not delete account";
+      setDeleteErr(msg);
+      toast.error(msg);
+      return;
+    }
+    toast.success("Account deleted");
+    setDeleteDialogOpen(false);
+    window.location.assign("/");
+  }
+
+  function onDeleteDialogOpenChange(open: boolean) {
+    setDeleteDialogOpen(open);
+    if (open) {
+      void refreshDeleteEligibility();
+    }
+    if (!open) {
+      setDeletePassword("");
+      setDeleteConfirm("");
+      setDeleteErr(null);
+    }
+  }
+
+  const deleteBlocked = deleteBlockers.length > 0;
+  const deleteBlockedMessage = deleteBlocked ? formatSoleAdminWorkspacesMessage(deleteBlockers) : null;
+
+  return (
+    <Card className="border-destructive/30">
+      <CardHeader>
+        <CardTitle className="text-lg text-destructive">Delete account</CardTitle>
+        <CardDescription>
+          Permanently removes your Tower user, sessions, and personal data. Workspaces where you are the only admin with
+          other members must have another admin promoted first.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {deleteEligibilityPending ? (
+          <p className="text-sm text-muted-foreground">Checking workspace admin responsibilities…</p>
+        ) : null}
+        {!deleteEligibilityPending && deleteBlockedMessage ? (
+          <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm text-destructive">{deleteBlockedMessage}</p>
+            <Button asChild variant="outline" size="sm" className="h-9 w-fit">
+              <Link href="/team">Open Team settings</Link>
+            </Button>
+          </div>
+        ) : null}
+        {!deleteEligibilityPending && !deleteBlocked && soleMemberWorkspaceCount > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {soleMemberWorkspaceCount === 1
+              ? "Your personal workspace with no other members will also be deleted."
+              : `${soleMemberWorkspaceCount} workspaces where you are the only member will also be deleted.`}
+          </p>
+        ) : null}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={onDeleteDialogOpenChange}>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="destructive"
+              className="h-10 font-medium"
+              disabled={deleteEligibilityPending || deleteBlocked}
+            >
+              Delete my account…
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <form onSubmit={onDeleteAccount} className="flex flex-col gap-4">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this account?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently deletes your user and cannot be undone. Enter your password and type DELETE to
+                  confirm.
+                  {!deleteBlocked && soleMemberWorkspaceCount > 0
+                    ? " Any workspace where you are the only member will be deleted with your account."
+                    : null}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              {deleteBlockedMessage ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {deleteBlockedMessage}
+                </p>
+              ) : null}
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={deletePassId}>Password</Label>
+                <Input
+                  id={deletePassId}
+                  type="password"
+                  autoComplete="current-password"
+                  value={deletePassword}
+                  onChange={(ev) => setDeletePassword(ev.target.value)}
+                  fieldSize="lg"
+                  surface="elevated"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={deleteConfirmPhraseId}>Type DELETE to confirm</Label>
+                <Input
+                  id={deleteConfirmPhraseId}
+                  type="text"
+                  autoComplete="off"
+                  value={deleteConfirm}
+                  onChange={(ev) => setDeleteConfirm(ev.target.value)}
+                  fieldSize="lg"
+                  surface="elevated"
+                  required
+                />
+              </div>
+              {deleteErr ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {deleteErr}
+                </p>
+              ) : null}
+              <AlertDialogFooter>
+                <AlertDialogCancel type="button" disabled={deleteBusy}>
+                  Cancel
+                </AlertDialogCancel>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  disabled={deleteBusy || deleteBlocked}
+                  className="font-medium"
+                >
+                  {deleteBusy ? "Deleting…" : "Delete account"}
+                </Button>
+              </AlertDialogFooter>
+            </form>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+      <CardFooter className="border-t border-border/60 text-xs text-muted-foreground">
+        This cannot be undone. If you use Beacon or integrations, you will need a new account to sign in again.
+      </CardFooter>
+    </Card>
+  );
+}

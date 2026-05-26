@@ -76,7 +76,7 @@ export const towerOrganizationRoles = {
 export const towerOrganizationClientSchema = {
   organization: {
     additionalFields: {
-      seatLimit: { type: "number", required: false, input: true },
+      seatLimit: { type: "number", required: false, input: false },
       stripeCustomerId: { type: "string", required: false, input: false },
       stripeSubscriptionId: { type: "string", required: false, input: false },
       subscriptionStatus: { type: "string", required: false, input: false },

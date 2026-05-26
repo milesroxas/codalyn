@@ -17,6 +17,6 @@ describe("resolveMembershipSeatCapFromOrg", () => {
   });
 
   it("falls back to unpaid cap when seatLimit is null", () => {
-    expect(resolveMembershipSeatCapFromOrg({ seatLimit: null })).toBe(10_000);
+    expect(resolveMembershipSeatCapFromOrg({ seatLimit: null })).toBe(1);
   });
 });

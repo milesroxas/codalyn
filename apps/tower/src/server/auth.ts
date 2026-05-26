@@ -15,6 +15,11 @@ import { resolveAuthSecret } from "@/server/auth-secret";
 import { sendChangeEmailConfirmationEmail } from "@/server/email/change-email-confirmation-email";
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
 import { towerOrganization } from "@/server/membership/tower-organization";
+import {
+  prepareUserAccountDeletion,
+  toUserAccountDeletionApiError,
+  UserAccountDeletionBlockedError,
+} from "@/server/membership/user-account-deletion";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { TOWER_STATIC_BEACON_RELATED_ORIGINS } from "@/server/tower-static-beacon-origins";
 import { db } from "@/shared/lib/db";
@@ -87,6 +92,16 @@ export const auth = betterAuth({
     },
     deleteUser: {
       enabled: true,
+      beforeDelete: async (user) => {
+        try {
+          await prepareUserAccountDeletion(user.id);
+        } catch (error) {
+          if (error instanceof UserAccountDeletionBlockedError) {
+            throw toUserAccountDeletionApiError(error);
+          }
+          throw error;
+        }
+      },
     },
   },
   secret: resolveAuthSecret(),

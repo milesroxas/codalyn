@@ -1,5 +1,6 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { buildOrganizationSeatSnapshot } from "@/server/billing/organization-seat-count";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch } from "@/server/operator/types";
 import {
@@ -76,6 +77,12 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
       .orderBy(desc(invitation.createdAt)),
   ]);
 
+  const memberCount = Number(row.memberCount ?? 0);
+  const pendingInvitations = Number(row.pendingInvitations ?? 0);
+  const seatSnapshot = buildOrganizationSeatSnapshot(memberCount + pendingInvitations, {
+    seatLimit: row.seatLimit ?? null,
+  });
+
   return {
     id: row.id,
     name: row.name,
@@ -83,12 +90,13 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
     logo: row.logo ?? null,
     metadata: row.metadata ?? null,
     seatLimit: row.seatLimit ?? null,
+    effectiveSeatLimit: seatSnapshot.effectiveSeatLimit,
     billingPlan: row.billingPlan ?? null,
     subscriptionStatus: row.subscriptionStatus ?? null,
     stripeCustomerId: row.stripeCustomerId ?? null,
     stripeSubscriptionId: row.stripeSubscriptionId ?? null,
-    memberCount: Number(row.memberCount ?? 0),
-    pendingInvitations: Number(row.pendingInvitations ?? 0),
+    memberCount,
+    pendingInvitations,
     usage: (await fetchOperatorWorkspaceUsageLimits(orgId)) ?? (await defaultOperatorWorkspaceUsageLimits()),
     createdAt: toIso(row.createdAt),
     members: memberRows.map((m) => ({

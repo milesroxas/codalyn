@@ -633,7 +633,8 @@ function DangerZoneSection({
       <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
         <p className="text-xs text-destructive">
           Permanently delete this customer, their sessions, OAuth tokens, and Beacon preferences. Workspace memberships
-          are removed; any workspaces they own remain.
+          are removed. Deletion is blocked while they are the only admin of a workspace with other members; promote
+          another admin or delete the workspace first.
         </p>
         <AlertDialog>
           <AlertDialogTrigger asChild>

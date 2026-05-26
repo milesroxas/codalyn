@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { isOrganizationProEntitled, organizationBillingPlanLabel } from "@/server/billing/organization-billing";
-import { countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
+import { buildOrganizationSeatSnapshot, countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
 import { isTeamBillingCheckoutConfigured } from "@/server/billing/team-billing-config";
 import { db } from "@/shared/lib/db";
 import { member, organization } from "@/shared/lib/db/auth-schema";
@@ -16,6 +16,8 @@ export type WorkspaceBillingView = {
   subscriptionStatus: string | null;
   seatLimit: number | null;
   seatsUsed: number;
+  effectiveSeatLimit: number;
+  isAtSeatCap: boolean;
   hasStripeCustomer: boolean;
 };
 
@@ -55,6 +57,7 @@ export async function fetchWorkspaceBillingView(
     stripeSubscriptionId: org.stripeSubscriptionId,
   };
   const seatsUsed = await countOrganizationSeatsUsed(organizationId);
+  const seatSnapshot = buildOrganizationSeatSnapshot(seatsUsed, org);
 
   return {
     billingEnabled: isTowerBillingEnabled(),
@@ -65,6 +68,8 @@ export async function fetchWorkspaceBillingView(
     subscriptionStatus: org.subscriptionStatus,
     seatLimit: org.seatLimit,
     seatsUsed,
+    effectiveSeatLimit: seatSnapshot.effectiveSeatLimit,
+    isAtSeatCap: seatSnapshot.isAtSeatCap,
     hasStripeCustomer: Boolean(org.stripeCustomerId),
   };
 }

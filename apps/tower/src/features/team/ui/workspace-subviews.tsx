@@ -191,6 +191,7 @@ function WorkspaceInvitesTab(props: {
   inviteRole: string;
   invitations: InvitationRow[];
   resendingInvitationId: string | null;
+  workspaceBilling: WorkspaceBillingView | null;
   onInviteEmailChange: (v: string) => void;
   onInviteRoleChange: (v: string) => void;
   onInvite: (e: FormEvent) => void;
@@ -203,12 +204,21 @@ function WorkspaceInvitesTab(props: {
     inviteRole,
     invitations,
     resendingInvitationId,
+    workspaceBilling,
     onInviteEmailChange,
     onInviteRoleChange,
     onInvite,
     onResendInvite,
     onRequestRevoke,
   } = props;
+
+  const inviteBlocked = workspaceBilling?.isAtSeatCap ?? false;
+  const showTeamUpgradeHint =
+    inviteBlocked &&
+    workspaceBilling != null &&
+    !workspaceBilling.isPaid &&
+    workspaceBilling.billingEnabled &&
+    workspaceBilling.teamCheckoutConfigured;
 
   return (
     <TabsContent value="invites" className="mt-6 space-y-6">
@@ -224,7 +234,19 @@ function WorkspaceInvitesTab(props: {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {showTeamUpgradeHint ? (
+            <p className="text-sm text-muted-foreground">
+              Free workspaces include one member. Open the Billing tab and subscribe to Team (per seat) to invite
+              collaborators.
+            </p>
+          ) : null}
+          {inviteBlocked && !showTeamUpgradeHint ? (
+            <p className="text-sm text-muted-foreground">
+              This workspace is at its seat limit ({workspaceBilling?.effectiveSeatLimit ?? "—"}). Remove a member,
+              revoke a pending invite, or add seats via billing before sending new invites.
+            </p>
+          ) : null}
           <form
             className="flex flex-col gap-4 lg:flex-row lg:items-start"
             onSubmit={(ev) => {
@@ -242,6 +264,7 @@ function WorkspaceInvitesTab(props: {
                   value={inviteEmail}
                   onChange={(ev) => onInviteEmailChange(ev.target.value)}
                   required
+                  disabled={inviteBlocked}
                 />
               </div>
               <div className="space-y-2">
@@ -250,6 +273,7 @@ function WorkspaceInvitesTab(props: {
                   id="ws-invite-role"
                   value={inviteRole}
                   onChange={(ev) => onInviteRoleChange(ev.target.value)}
+                  disabled={inviteBlocked}
                 >
                   {TOWER_TEAM_ROLES.map((r) => (
                     <option key={r} value={r}>
@@ -263,7 +287,7 @@ function WorkspaceInvitesTab(props: {
               <span className="hidden text-sm font-medium leading-none select-none lg:block lg:invisible" aria-hidden>
                 &nbsp;
               </span>
-              <Button type="submit" disabled={busy} className="w-full shrink-0 lg:w-auto">
+              <Button type="submit" disabled={busy || inviteBlocked} className="w-full shrink-0 lg:w-auto">
                 Send invite
               </Button>
             </div>
@@ -573,6 +597,7 @@ export function WorkspaceTabsShell(props: {
               inviteRole={inviteRole}
               invitations={invitations}
               resendingInvitationId={resendingInvitationId}
+              workspaceBilling={workspaceBilling}
               onInviteEmailChange={onInviteEmailChange}
               onInviteRoleChange={onInviteRoleChange}
               onInvite={onInvite}

@@ -1,8 +1,8 @@
 /** Canonical `organization.billing_plan` value for self-serve Stripe team subscriptions. */
 export const TEAM_BILLING_PLAN = "team" as const;
 
-/** Default member cap when `organization.seat_limit` is null (unpaid / legacy workspaces). */
-export const TEAM_UNPAID_SEAT_CAP = 10_000;
+/** Solo workspace cap when `organization.seat_limit` is null (unpaid). Team billing raises the limit via Stripe. */
+export const TEAM_UNPAID_SEAT_CAP = 1;
 
 const envInt = (name: string, fallback: number): number => {
   const raw = process.env[name]?.trim();

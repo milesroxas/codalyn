@@ -85,7 +85,7 @@ Subscribe to at least:
 | Webhook application | `src/server/billing/stripe-webhook-apply.ts` |
 | User sync | `src/server/billing/stripe-app.ts` |
 | Org sync + seat quantity | `src/server/billing/stripe-org-app.ts`, `stripe-org-seat-sync.ts` |
-| Seat counting | `src/server/billing/organization-seat-count.ts` |
+| Seat counting | `src/server/billing/organization-seat-count.ts`, `src/shared/lib/billing/organization-seat-cap.ts` |
 | Workspace billing UI data | `src/server/billing/workspace-billing-view.ts` |
 
 Individual checkout embeds `towerUserId` and `towerBillingScope: user`. Team checkout embeds `towerOrgId`, `towerUserId`, and `towerBillingScope: organization` so webhooks route to the correct table.
@@ -104,6 +104,10 @@ Independent of **Stripe** but part of the same “billing” story: the **free**
 ## Team seats
 
 - Unpaid workspaces (`seat_limit` null) allow **1 member** (`TEAM_UNPAID_SEAT_CAP`) — solo only; invites require Team billing.
+- Seat enforcement uses members **plus** pending invitations (shared helpers under `src/shared/lib/billing/organization-seat-cap.ts`).
+- Better Auth hooks: `beforeCreateInvitation`, `beforeAcceptInvitation`, `beforeAddMember`, plus dynamic `invitationLimit`.
+- `seat_limit` is not client-writable; Stripe webhooks and operator API (non-Stripe orgs only) update it.
+- Over-cap workspaces (e.g. after subscription cancel) keep existing members but block new invites/accepts until resolved.
 - Checkout quantity = `max(TOWER_TEAM_MIN_SEATS, members + pending invitations)`.
 - Webhooks set `organization.seat_limit` from Stripe subscription quantity.
 - Member/invitation hooks call `syncOrganizationSeatQuantityWithStripe` to keep Stripe and `seat_limit` aligned.

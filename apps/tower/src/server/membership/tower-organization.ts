@@ -1,6 +1,10 @@
 import { organization } from "better-auth/plugins";
 import { grantEarlyAccess } from "@/server/access/early-access";
-import { assertOrganizationSeatAvailable } from "@/server/billing/organization-seat-count";
+import {
+  assertOrganizationNotOverSeatCap,
+  assertOrganizationSeatAvailable,
+  resolveOrganizationInvitationLimitForOrg,
+} from "@/server/billing/organization-seat-count";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { resolveMembershipSeatCapFromOrg } from "@/server/billing/team-billing-config";
 import { sendOrganizationInvitationEmail } from "@/server/email/organization-invitation-email";
@@ -31,6 +35,8 @@ export const towerOrganization = organization({
     return Boolean(user.canCreateOrganization);
   },
   membershipLimit: async (_user, org) => resolveMembershipSeatCapFromOrg(org as { seatLimit?: number | null }),
+  invitationLimit: async ({ organization: org }) =>
+    resolveOrganizationInvitationLimitForOrg(org.id, org as { seatLimit?: number | null }),
   sendInvitationEmail: async (data) => {
     await sendOrganizationInvitationEmail(data);
   },
@@ -40,6 +46,9 @@ export const towerOrganization = organization({
     },
     afterCreateInvitation: async ({ organization: org }) => {
       await syncOrganizationSeatQuantityWithStripe(org.id);
+    },
+    beforeAcceptInvitation: async ({ organization: org }) => {
+      await assertOrganizationNotOverSeatCap(org.id, org as { seatLimit?: number | null });
     },
     beforeAddMember: async ({ member: m, organization: org }) => {
       await assertOrganizationSeatAvailable(m.organizationId, org as { seatLimit?: number | null });

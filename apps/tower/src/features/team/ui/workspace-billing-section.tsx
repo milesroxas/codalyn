@@ -3,13 +3,44 @@ import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-vi
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 
-export function WorkspaceBillingSection(props: { organizationId: string; billing: WorkspaceBillingView }) {
+function WorkspaceBillingActions(props: { organizationId: string; billing: WorkspaceBillingView }) {
   const { organizationId, billing } = props;
 
-  if (!billing.billingEnabled) {
+  if (!billing.billingEnabled || !billing.canManageBilling) {
+    if (billing.billingEnabled) {
+      return <p className="text-xs text-muted-foreground">Only workspace admins can manage billing.</p>;
+    }
     return null;
   }
 
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {!billing.isPaid && billing.teamCheckoutConfigured && !billing.isOverSeatCap ? (
+          <form action="/api/billing/workspace/checkout" method="post">
+            <input type="hidden" name="organizationId" value={organizationId} />
+            <Button type="submit">Subscribe to Team</Button>
+          </form>
+        ) : null}
+        {billing.hasStripeCustomer ? (
+          <Button asChild variant="outline">
+            <a href={`/api/billing/workspace/portal?organizationId=${encodeURIComponent(organizationId)}`}>
+              Manage subscription
+            </a>
+          </Button>
+        ) : null}
+      </div>
+      {!billing.teamCheckoutConfigured && !billing.isPaid ? (
+        <p className="text-xs text-muted-foreground">
+          Team checkout is disabled until <code className="font-mono">STRIPE_PRICE_TEAM_SEAT</code> is configured.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export function WorkspaceBillingSection(props: { organizationId: string; billing: WorkspaceBillingView }) {
+  const { organizationId, billing } = props;
   const seatLabel = `${billing.seatsUsed} of ${billing.effectiveSeatLimit} seat${billing.effectiveSeatLimit === 1 ? "" : "s"} used`;
 
   return (
@@ -17,52 +48,39 @@ export function WorkspaceBillingSection(props: { organizationId: string; billing
       <CardHeader>
         <div className="flex items-center gap-2">
           <IconCreditCard className="size-4 text-muted-foreground" aria-hidden />
-          <CardTitle className="text-base">Team billing</CardTitle>
+          <CardTitle className="text-base">Workspace seats</CardTitle>
         </div>
         <CardDescription>
-          Per-seat workspace plan — Pro limits for every member, shared Webflow connection, and team presets. Unpaid
-          workspaces are solo (1 seat); subscribe to invite collaborators.
+          Unpaid workspaces are solo (1 seat). Team billing is per seat — Pro limits for every member, shared Webflow
+          connection, and team presets.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          <span>
-            Plan:{" "}
-            <span className="font-medium capitalize">{billing.isPaid ? (billing.billingPlan ?? "team") : "free"}</span>
-          </span>
+          {billing.billingEnabled ? (
+            <span>
+              Plan:{" "}
+              <span className="font-medium capitalize">
+                {billing.isPaid ? (billing.billingPlan ?? "team") : "free"}
+              </span>
+            </span>
+          ) : null}
           <span className="text-muted-foreground">{seatLabel}</span>
-          {billing.subscriptionStatus ? (
+          {billing.billingEnabled && billing.subscriptionStatus ? (
             <span className="text-muted-foreground">
               Status: <span className="font-mono text-xs">{billing.subscriptionStatus}</span>
             </span>
           ) : null}
         </div>
 
-        {billing.canManageBilling ? (
-          <div className="flex flex-wrap gap-2">
-            {!billing.isPaid && billing.teamCheckoutConfigured ? (
-              <form action="/api/billing/workspace/checkout" method="post">
-                <input type="hidden" name="organizationId" value={organizationId} />
-                <Button type="submit">Subscribe to Team</Button>
-              </form>
-            ) : null}
-            {billing.hasStripeCustomer ? (
-              <Button asChild variant="outline">
-                <a href={`/api/billing/workspace/portal?organizationId=${encodeURIComponent(organizationId)}`}>
-                  Manage subscription
-                </a>
-              </Button>
-            ) : null}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">Only workspace admins can manage billing.</p>
-        )}
-
-        {!billing.teamCheckoutConfigured && billing.canManageBilling && !billing.isPaid ? (
-          <p className="text-xs text-muted-foreground">
-            Team checkout is disabled until <code className="font-mono">STRIPE_PRICE_TEAM_SEAT</code> is configured.
+        {billing.isOverSeatCap ? (
+          <p className="text-sm text-destructive">
+            This workspace exceeds its seat limit ({billing.seatsUsed} used, limit {billing.effectiveSeatLimit}). Remove
+            members or resubscribe to Team billing. New invitations cannot be accepted until resolved.
           </p>
         ) : null}
+
+        <WorkspaceBillingActions organizationId={organizationId} billing={billing} />
       </CardContent>
     </Card>
   );

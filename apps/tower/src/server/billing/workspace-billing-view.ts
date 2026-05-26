@@ -18,6 +18,8 @@ export type WorkspaceBillingView = {
   seatsUsed: number;
   effectiveSeatLimit: number;
   isAtSeatCap: boolean;
+  isOverSeatCap: boolean;
+  seatsRemaining: number;
   hasStripeCustomer: boolean;
 };
 
@@ -25,29 +27,27 @@ export async function fetchWorkspaceBillingView(
   userId: string,
   organizationId: string
 ): Promise<WorkspaceBillingView | null> {
-  const [memberRow] = await db
-    .select({ role: member.role })
-    .from(member)
-    .where(and(eq(member.userId, userId), eq(member.organizationId, organizationId)))
-    .limit(1);
+  const [[memberRow], [org], seatsUsed] = await Promise.all([
+    db
+      .select({ role: member.role })
+      .from(member)
+      .where(and(eq(member.userId, userId), eq(member.organizationId, organizationId)))
+      .limit(1),
+    db
+      .select({
+        subscriptionStatus: organization.subscriptionStatus,
+        billingPlan: organization.billingPlan,
+        stripeSubscriptionId: organization.stripeSubscriptionId,
+        stripeCustomerId: organization.stripeCustomerId,
+        seatLimit: organization.seatLimit,
+      })
+      .from(organization)
+      .where(eq(organization.id, organizationId))
+      .limit(1),
+    countOrganizationSeatsUsed(organizationId),
+  ]);
 
-  if (!memberRow) {
-    return null;
-  }
-
-  const [org] = await db
-    .select({
-      subscriptionStatus: organization.subscriptionStatus,
-      billingPlan: organization.billingPlan,
-      stripeSubscriptionId: organization.stripeSubscriptionId,
-      stripeCustomerId: organization.stripeCustomerId,
-      seatLimit: organization.seatLimit,
-    })
-    .from(organization)
-    .where(eq(organization.id, organizationId))
-    .limit(1);
-
-  if (!org) {
+  if (!memberRow || !org) {
     return null;
   }
 
@@ -56,7 +56,6 @@ export async function fetchWorkspaceBillingView(
     billingPlan: org.billingPlan,
     stripeSubscriptionId: org.stripeSubscriptionId,
   };
-  const seatsUsed = await countOrganizationSeatsUsed(organizationId);
   const seatSnapshot = buildOrganizationSeatSnapshot(seatsUsed, org);
 
   return {
@@ -70,6 +69,8 @@ export async function fetchWorkspaceBillingView(
     seatsUsed,
     effectiveSeatLimit: seatSnapshot.effectiveSeatLimit,
     isAtSeatCap: seatSnapshot.isAtSeatCap,
+    isOverSeatCap: seatSnapshot.isOverSeatCap,
+    seatsRemaining: seatSnapshot.seatsRemaining,
     hasStripeCustomer: Boolean(org.stripeCustomerId),
   };
 }

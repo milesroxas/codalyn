@@ -16,6 +16,7 @@ import { WorkspaceBillingSection } from "@/features/team/ui/workspace-billing-se
 import { formatInvitationExpiry } from "@/features/team/ui/workspace-invitation-utils";
 import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
+import { buildOrganizationSeatSnapshot } from "@/shared/lib/billing/organization-seat-cap";
 import { TOWER_TEAM_ROLES } from "@/shared/lib/membership/tower-organization-access";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -25,6 +26,45 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { NativeSelect } from "@/shared/ui/native-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+
+type WorkspaceSeatState = {
+  isAtSeatCap: boolean;
+  isOverSeatCap: boolean;
+  effectiveSeatLimit: number;
+  isPaid: boolean;
+  billingEnabled: boolean;
+  teamCheckoutConfigured: boolean;
+};
+
+function resolveWorkspaceSeatState(input: {
+  workspaceBilling: WorkspaceBillingView | null;
+  membersCount: number;
+  pendingInviteCount: number;
+  orgSeatLimit?: number | null;
+}): WorkspaceSeatState {
+  const { workspaceBilling, membersCount, pendingInviteCount, orgSeatLimit } = input;
+  if (workspaceBilling) {
+    return {
+      isAtSeatCap: workspaceBilling.isAtSeatCap,
+      isOverSeatCap: workspaceBilling.isOverSeatCap,
+      effectiveSeatLimit: workspaceBilling.effectiveSeatLimit,
+      isPaid: workspaceBilling.isPaid,
+      billingEnabled: workspaceBilling.billingEnabled,
+      teamCheckoutConfigured: workspaceBilling.teamCheckoutConfigured,
+    };
+  }
+  const snapshot = buildOrganizationSeatSnapshot(membersCount + pendingInviteCount, {
+    seatLimit: orgSeatLimit ?? null,
+  });
+  return {
+    isAtSeatCap: snapshot.isAtSeatCap,
+    isOverSeatCap: snapshot.isOverSeatCap,
+    effectiveSeatLimit: snapshot.effectiveSeatLimit,
+    isPaid: false,
+    billingEnabled: false,
+    teamCheckoutConfigured: false,
+  };
+}
 
 function MemberInitial(props: { name: string; email: string }) {
   const letter = (props.name?.trim()[0] ?? props.email?.trim()[0] ?? "?").toUpperCase();
@@ -191,7 +231,7 @@ function WorkspaceInvitesTab(props: {
   inviteRole: string;
   invitations: InvitationRow[];
   resendingInvitationId: string | null;
-  workspaceBilling: WorkspaceBillingView | null;
+  seatState: WorkspaceSeatState;
   onInviteEmailChange: (v: string) => void;
   onInviteRoleChange: (v: string) => void;
   onInvite: (e: FormEvent) => void;
@@ -204,7 +244,7 @@ function WorkspaceInvitesTab(props: {
     inviteRole,
     invitations,
     resendingInvitationId,
-    workspaceBilling,
+    seatState,
     onInviteEmailChange,
     onInviteRoleChange,
     onInvite,
@@ -212,13 +252,13 @@ function WorkspaceInvitesTab(props: {
     onRequestRevoke,
   } = props;
 
-  const inviteBlocked = workspaceBilling?.isAtSeatCap ?? false;
+  const inviteBlocked = seatState.isAtSeatCap || seatState.isOverSeatCap;
   const showTeamUpgradeHint =
     inviteBlocked &&
-    workspaceBilling != null &&
-    !workspaceBilling.isPaid &&
-    workspaceBilling.billingEnabled &&
-    workspaceBilling.teamCheckoutConfigured;
+    !seatState.isPaid &&
+    seatState.billingEnabled &&
+    seatState.teamCheckoutConfigured &&
+    !seatState.isOverSeatCap;
 
   return (
     <TabsContent value="invites" className="mt-6 space-y-6">
@@ -235,16 +275,22 @@ function WorkspaceInvitesTab(props: {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {seatState.isOverSeatCap ? (
+            <p className="text-sm text-destructive">
+              This workspace exceeds its seat limit. Remove members or resubscribe to Team billing before inviting
+              anyone new.
+            </p>
+          ) : null}
           {showTeamUpgradeHint ? (
             <p className="text-sm text-muted-foreground">
               Free workspaces include one member. Open the Billing tab and subscribe to Team (per seat) to invite
               collaborators.
             </p>
           ) : null}
-          {inviteBlocked && !showTeamUpgradeHint ? (
+          {inviteBlocked && !showTeamUpgradeHint && !seatState.isOverSeatCap ? (
             <p className="text-sm text-muted-foreground">
-              This workspace is at its seat limit ({workspaceBilling?.effectiveSeatLimit ?? "—"}). Remove a member,
-              revoke a pending invite, or add seats via billing before sending new invites.
+              This workspace is at its seat limit ({seatState.effectiveSeatLimit}). Remove a member, revoke a pending
+              invite, or add seats via billing before sending new invites.
             </p>
           ) : null}
           <form
@@ -480,7 +526,7 @@ function RevokeInvitationDialog(props: {
 }
 
 export function WorkspaceTabsShell(props: {
-  activeOrg: { id: string; name: string; slug: string };
+  activeOrg: { id: string; name: string; slug: string; seatLimit?: number | null };
   members: MemberRow[];
   pendingInviteCount: number;
   memberRoleOptions: string[];
@@ -512,7 +558,6 @@ export function WorkspaceTabsShell(props: {
     memberRoleOptions,
     invitations,
     canManageTeam,
-    billingEnabled,
     workspaceBilling,
     billingOrganizationId,
     busy,
@@ -533,6 +578,13 @@ export function WorkspaceTabsShell(props: {
   } = props;
 
   const [revokeTarget, setRevokeTarget] = useState<InvitationRow | null>(null);
+
+  const seatState = resolveWorkspaceSeatState({
+    workspaceBilling,
+    membersCount: members.length,
+    pendingInviteCount,
+    orgSeatLimit: activeOrg.seatLimit,
+  });
 
   const memberDirectory = (
     <WorkspaceMemberDirectoryCard
@@ -578,7 +630,7 @@ export function WorkspaceTabsShell(props: {
                 <TabsTrigger value="settings" className="gap-2 px-3 py-2 sm:flex-1">
                   Settings
                 </TabsTrigger>
-                {billingEnabled ? (
+                {workspaceBilling ? (
                   <TabsTrigger value="billing" className="gap-2 px-3 py-2 sm:flex-1">
                     <IconCreditCard className="size-4 opacity-70" aria-hidden />
                     Billing
@@ -597,7 +649,7 @@ export function WorkspaceTabsShell(props: {
               inviteRole={inviteRole}
               invitations={invitations}
               resendingInvitationId={resendingInvitationId}
-              workspaceBilling={workspaceBilling}
+              seatState={seatState}
               onInviteEmailChange={onInviteEmailChange}
               onInviteRoleChange={onInviteRoleChange}
               onInvite={onInvite}
@@ -613,7 +665,7 @@ export function WorkspaceTabsShell(props: {
               onUpdateActiveTeamName={onUpdateActiveTeamName}
             />
 
-            {billingEnabled && workspaceBilling && billingOrganizationId ? (
+            {workspaceBilling && billingOrganizationId ? (
               <TabsContent value="billing" className="mt-6 space-y-6">
                 <WorkspaceBillingSection organizationId={billingOrganizationId} billing={workspaceBilling} />
               </TabsContent>

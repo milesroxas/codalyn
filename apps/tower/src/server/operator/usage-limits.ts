@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import {
   EMPTY_METERING_OVERRIDES,
@@ -126,6 +126,95 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
     memberCmsWriteCount: Number(memberUsage?.cmsWriteCount ?? 0),
     memberImageOptimizeCount: Number(memberUsage?.imageOptimizeCount ?? 0),
   });
+}
+
+/** Batch workspace usage for operator lists (one org query + one aggregated usage query). */
+export async function fetchOperatorWorkspaceUsageLimitsBatch(
+  orgIds: string[]
+): Promise<Map<string, OperatorUsageLimitsView>> {
+  const result = new Map<string, OperatorUsageLimitsView>();
+  if (orgIds.length === 0) {
+    return result;
+  }
+
+  const ym = utcYearMonth();
+  const [orgRows, memberUsageRows] = await Promise.all([
+    db
+      .select({
+        id: organization.id,
+        meteringEnabled: organization.meteringEnabled,
+        webflowProxyLimitOverride: organization.webflowProxyLimitOverride,
+        cmsWriteLimitOverride: organization.cmsWriteLimitOverride,
+        imageOptimizeLimitOverride: organization.imageOptimizeLimitOverride,
+      })
+      .from(organization)
+      .where(inArray(organization.id, orgIds)),
+    db
+      .select({
+        organizationId: member.organizationId,
+        webflowProxyRequestCount: sql<number>`COALESCE(SUM(${towerUsageMonth.webflowProxyRequestCount}), 0)`,
+        cmsWriteCount: sql<number>`COALESCE(SUM(${towerUsageMonth.cmsWriteCount}), 0)`,
+        imageOptimizeCount: sql<number>`COALESCE(SUM(${towerUsageMonth.imageOptimizeCount}), 0)`,
+      })
+      .from(member)
+      .leftJoin(towerUsageMonth, and(eq(towerUsageMonth.userId, member.userId), eq(towerUsageMonth.yearMonth, ym)))
+      .where(inArray(member.organizationId, orgIds))
+      .groupBy(member.organizationId),
+  ]);
+
+  const usageByOrgId = new Map(
+    memberUsageRows.map((row) => [
+      row.organizationId,
+      {
+        webflowProxyRequestCount: Number(row.webflowProxyRequestCount ?? 0),
+        cmsWriteCount: Number(row.cmsWriteCount ?? 0),
+        imageOptimizeCount: Number(row.imageOptimizeCount ?? 0),
+      },
+    ])
+  );
+
+  const limits = await getTowerLimitsSnapshot();
+
+  for (const row of orgRows) {
+    const orgFields = {
+      meteringEnabled: Boolean(row.meteringEnabled),
+      webflowProxyLimitOverride: row.webflowProxyLimitOverride ?? null,
+      cmsWriteLimitOverride: row.cmsWriteLimitOverride ?? null,
+      imageOptimizeLimitOverride: row.imageOptimizeLimitOverride ?? null,
+    };
+    const policy = resolveMeteringPolicy({
+      tier: "free",
+      user: EMPTY_METERING_OVERRIDES,
+      organization: orgFields,
+      limits,
+    });
+    const memberUsage = usageByOrgId.get(row.id);
+
+    result.set(
+      row.id,
+      mapUsageLimitsView({
+        scope: "workspace",
+        tier: "free",
+        meteringEnabled: orgFields.meteringEnabled,
+        globalMeteringDisabled: policy.globalMeteringDisabled,
+        webflowProxyLimitOverride: orgFields.webflowProxyLimitOverride,
+        cmsWriteLimitOverride: orgFields.cmsWriteLimitOverride,
+        imageOptimizeLimitOverride: orgFields.imageOptimizeLimitOverride,
+        yearMonth: ym,
+        webflowProxyRequestCount: 0,
+        cmsWriteCount: 0,
+        imageOptimizeCount: 0,
+        effectiveWebflowProxyLimit: policy.webflowProxyCap,
+        effectiveCmsWriteLimit: policy.cmsWriteCap,
+        effectiveImageLimit: policy.imageCap,
+        memberWebflowProxyRequestCount: memberUsage?.webflowProxyRequestCount ?? 0,
+        memberCmsWriteCount: memberUsage?.cmsWriteCount ?? 0,
+        memberImageOptimizeCount: memberUsage?.imageOptimizeCount ?? 0,
+      })
+    );
+  }
+
+  return result;
 }
 
 export function sanitizeUsageLimitsPatch(raw: unknown): OperatorUsageLimitsPatch | { error: string } {

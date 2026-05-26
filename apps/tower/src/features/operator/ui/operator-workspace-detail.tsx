@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  IconAlertTriangle,
-  IconBuilding,
-  IconCreditCard,
-  IconMail,
-  IconTrash,
-  IconUserPlus,
-  IconUsers,
-} from "@tabler/icons-react";
+import { IconBuilding, IconCreditCard, IconMail, IconUserPlus, IconUsers } from "@tabler/icons-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -19,17 +11,6 @@ import {
   reloadWorkspaceUsageLimits,
 } from "@/features/operator/ui/operator-usage-limits-section";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch, OperatorWorkspaceRow } from "@/server/operator/types";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/shared/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -45,6 +26,7 @@ import {
   SheetTitle,
 } from "@/shared/ui/sheet";
 import { Skeleton } from "@/shared/ui/skeleton";
+import { DangerZoneTypedDelete } from "@/shared/ui/typed-confirm-alert-dialog";
 
 export type OperatorWorkspaceDetailSheetProps = {
   workspaceId: string | null;
@@ -62,6 +44,8 @@ function detailToRow(d: OperatorWorkspaceDetail): OperatorWorkspaceRow {
     logo: d.logo,
     seatLimit: d.seatLimit,
     effectiveSeatLimit: d.effectiveSeatLimit,
+    isAtSeatCap: d.isAtSeatCap,
+    isOverSeatCap: d.isOverSeatCap,
     billingPlan: d.billingPlan,
     subscriptionStatus: d.subscriptionStatus,
     stripeCustomerId: d.stripeCustomerId,
@@ -339,12 +323,22 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
                 </dl>
               </section>
 
-              <DangerZoneSection
-                slug={detail.slug}
-                confirm={deleteConfirm}
-                onConfirmChange={setDeleteConfirm}
-                deleteBusy={deleteBusy}
-                onDelete={() => void onDelete()}
+              <DangerZoneTypedDelete
+                panelDescription={
+                  <>
+                    Permanently delete this workspace, its memberships, and invitations. Users keep their accounts and
+                    Webflow tokens.
+                  </>
+                }
+                triggerLabel="Delete workspace"
+                title="Delete workspace?"
+                confirmFieldLabel="Slug"
+                confirmFieldId="confirm-slug"
+                expectedValue={detail.slug}
+                confirmValue={deleteConfirm}
+                onConfirmValueChange={setDeleteConfirm}
+                busy={deleteBusy}
+                onConfirm={() => void onDelete()}
               />
             </SheetBody>
 
@@ -416,7 +410,10 @@ function SeatsSection({
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Seats</h3>
       <div className="space-y-3 rounded-lg border border-border bg-card p-3">
         <div className="space-y-1.5">
-          <Label htmlFor="workspace-seat-limit">Seat limit (blank = unpaid solo cap)</Label>
+          <Label htmlFor="workspace-seat-limit">
+            Seat limit (blank = unpaid solo cap)
+            {detail.stripeSubscriptionId ? " — managed by Stripe when billing is on" : null}
+          </Label>
           <div className="flex items-center gap-2">
             <Input
               id="workspace-seat-limit"
@@ -424,9 +421,16 @@ function SeatsSection({
               min={1}
               step={1}
               value={seatLimitDraft}
+              disabled={Boolean(detail.stripeSubscriptionId)}
               onChange={(event) => onSeatLimitDraftChange(event.target.value)}
             />
-            <Button type="button" size="sm" variant="outline" disabled={patchBusy || !dirty} onClick={onSave}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={patchBusy || !dirty || Boolean(detail.stripeSubscriptionId)}
+              onClick={onSave}
+            >
               Save
             </Button>
           </div>
@@ -442,6 +446,12 @@ function SeatsSection({
             </>
           ) : null}
           .
+          {detail.isOverSeatCap ? (
+            <>
+              {" "}
+              <span className="text-destructive">Over seat limit — remove members or restore Team billing.</span>
+            </>
+          ) : null}
         </p>
       </div>
     </section>
@@ -593,71 +603,6 @@ function InvitationsSection({ invitations }: { invitations: OperatorWorkspaceDet
             ))}
           </ul>
         )}
-      </div>
-    </section>
-  );
-}
-
-function DangerZoneSection({
-  slug,
-  confirm,
-  onConfirmChange,
-  deleteBusy,
-  onDelete,
-}: {
-  slug: string;
-  confirm: string;
-  onConfirmChange: (next: string) => void;
-  deleteBusy: boolean;
-  onDelete: () => void;
-}) {
-  const matches = confirm.trim().toLowerCase() === slug.toLowerCase();
-  return (
-    <section className="space-y-3">
-      <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-destructive">Danger zone</h3>
-      <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-        <p className="text-xs text-destructive">
-          Permanently delete this workspace, its memberships, and invitations. Users keep their accounts and Webflow
-          tokens.
-        </p>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button type="button" variant="destructive" size="sm" className="gap-1.5">
-              <IconTrash className="size-4" />
-              Delete workspace
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="inline-flex items-center gap-1.5">
-                <IconAlertTriangle className="size-4 text-destructive" />
-                Delete workspace?
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                This cannot be undone. Type the slug{" "}
-                <code className="rounded bg-muted px-1 font-mono text-xs">{slug}</code> to confirm.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="space-y-2 py-2">
-              <Label htmlFor="confirm-slug">Slug</Label>
-              <Input
-                id="confirm-slug"
-                value={confirm}
-                onChange={(event) => onConfirmChange(event.target.value)}
-                placeholder={slug}
-                autoComplete="off"
-              />
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction asChild>
-                <Button variant="destructive" disabled={deleteBusy || !matches} onClick={onDelete}>
-                  {deleteBusy ? "Deleting…" : "Delete permanently"}
-                </Button>
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     </section>
   );

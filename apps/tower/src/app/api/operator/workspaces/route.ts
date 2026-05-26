@@ -1,9 +1,15 @@
 import { and, count, desc, eq, ilike, or, type SQL, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { buildOrganizationSeatSnapshot } from "@/server/billing/organization-seat-count";
+import {
+  buildOrganizationSeatSnapshot,
+  countOrganizationSeatsUsedBatch,
+} from "@/server/billing/organization-seat-count";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorWorkspaceListResponse, OperatorWorkspaceRow } from "@/server/operator/types";
-import { defaultOperatorWorkspaceUsageLimits, fetchOperatorWorkspaceUsageLimits } from "@/server/operator/usage-limits";
+import {
+  defaultOperatorWorkspaceUsageLimits,
+  fetchOperatorWorkspaceUsageLimitsBatch,
+} from "@/server/operator/usage-limits";
 import { db } from "@/shared/lib/db";
 import { invitation, member, organization } from "@/shared/lib/db/auth-schema";
 
@@ -71,42 +77,37 @@ export async function GET(req: Request): Promise<NextResponse<OperatorWorkspaceL
   ]);
 
   const total = Number(totalRows[0]?.total ?? 0);
-  const usageByOrgId = new Map(
-    (
-      await Promise.all(
-        rows.map(async (r) => {
-          const usage = await fetchOperatorWorkspaceUsageLimits(r.id);
-          return [r.id, usage] as const;
-        })
-      )
-    ).filter((entry): entry is readonly [string, NonNullable<(typeof entry)[1]>] => entry[1] !== null)
-  );
+  const orgIds = rows.map((r) => r.id);
+  const [seatsUsedByOrgId, usageByOrgId, defaultUsage] = await Promise.all([
+    countOrganizationSeatsUsedBatch(orgIds),
+    fetchOperatorWorkspaceUsageLimitsBatch(orgIds),
+    defaultOperatorWorkspaceUsageLimits(),
+  ]);
 
-  const mapped: OperatorWorkspaceRow[] = await Promise.all(
-    rows.map(async (r) => {
-      const memberCount = Number(r.memberCount ?? 0);
-      const pendingInvitations = Number(r.pendingInvitations ?? 0);
-      const seatSnapshot = buildOrganizationSeatSnapshot(memberCount + pendingInvitations, {
-        seatLimit: r.seatLimit ?? null,
-      });
-      return {
-        id: r.id,
-        name: r.name,
-        slug: r.slug,
-        logo: r.logo ?? null,
-        seatLimit: r.seatLimit ?? null,
-        effectiveSeatLimit: seatSnapshot.effectiveSeatLimit,
-        billingPlan: r.billingPlan ?? null,
-        subscriptionStatus: r.subscriptionStatus ?? null,
-        stripeCustomerId: r.stripeCustomerId ?? null,
-        stripeSubscriptionId: r.stripeSubscriptionId ?? null,
-        memberCount,
-        pendingInvitations,
-        usage: usageByOrgId.get(r.id) ?? (await defaultOperatorWorkspaceUsageLimits()),
-        createdAt: toIso(r.createdAt),
-      };
-    })
-  );
+  const mapped: OperatorWorkspaceRow[] = rows.map((r) => {
+    const memberCount = Number(r.memberCount ?? 0);
+    const pendingInvitations = Number(r.pendingInvitations ?? 0);
+    const seatsUsed = seatsUsedByOrgId.get(r.id) ?? memberCount + pendingInvitations;
+    const seatSnapshot = buildOrganizationSeatSnapshot(seatsUsed, { seatLimit: r.seatLimit ?? null });
+    return {
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      logo: r.logo ?? null,
+      seatLimit: r.seatLimit ?? null,
+      effectiveSeatLimit: seatSnapshot.effectiveSeatLimit,
+      isAtSeatCap: seatSnapshot.isAtSeatCap,
+      isOverSeatCap: seatSnapshot.isOverSeatCap,
+      billingPlan: r.billingPlan ?? null,
+      subscriptionStatus: r.subscriptionStatus ?? null,
+      stripeCustomerId: r.stripeCustomerId ?? null,
+      stripeSubscriptionId: r.stripeSubscriptionId ?? null,
+      memberCount,
+      pendingInvitations,
+      usage: usageByOrgId.get(r.id) ?? defaultUsage,
+      createdAt: toIso(r.createdAt),
+    };
+  });
 
   return NextResponse.json({ rows: mapped, total, limit, offset });
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  IconAlertTriangle,
   IconBan,
   IconBuilding,
   IconCheck,
@@ -9,7 +8,6 @@ import {
   IconMail,
   IconShieldCheck,
   IconShieldOff,
-  IconTrash,
   IconUserCheck,
 } from "@tabler/icons-react";
 import Link from "next/link";
@@ -28,17 +26,6 @@ import {
   reloadUserUsageLimits,
 } from "@/features/operator/ui/operator-usage-limits-section";
 import type { OperatorUserDetail, OperatorUserPatch, OperatorUserRow } from "@/server/operator/types";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/shared/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -56,6 +43,7 @@ import {
 } from "@/shared/ui/sheet";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Switch } from "@/shared/ui/switch";
+import { DangerZoneTypedDelete } from "@/shared/ui/typed-confirm-alert-dialog";
 
 export type OperatorCustomerDetailProps = {
   userId: string | null;
@@ -321,13 +309,24 @@ export function OperatorCustomerDetail(props: OperatorCustomerDetailProps) {
               <WorkspacesSection detail={state.detail} onCloseSheet={() => onOpenChange(false)} />
               <SessionsSection detail={state.detail} />
               <MetadataSection detail={state.detail} />
-              <DangerZoneSection
-                email={state.detail.email}
-                isSelf={isSelf}
-                confirm={state.deleteConfirm}
-                onConfirmChange={(v) => setState((s) => ({ ...s, deleteConfirm: v }))}
-                deleteBusy={state.deleteBusy}
-                onDelete={() => void onDelete()}
+              <DangerZoneTypedDelete
+                panelDescription={
+                  <>
+                    Permanently delete this customer, their sessions, OAuth tokens, and Beacon preferences. Workspace
+                    memberships are removed. Deletion is blocked while they are the only admin of a workspace with other
+                    members; promote another admin or delete the workspace first.
+                  </>
+                }
+                triggerLabel="Delete customer"
+                triggerDisabled={isSelf}
+                title="Delete customer?"
+                confirmFieldLabel="Email"
+                confirmFieldId="confirm-email"
+                expectedValue={state.detail.email}
+                confirmValue={state.deleteConfirm}
+                onConfirmValueChange={(v) => setState((s) => ({ ...s, deleteConfirm: v }))}
+                busy={state.deleteBusy}
+                onConfirm={() => void onDelete()}
               />
             </SheetBody>
 
@@ -607,74 +606,6 @@ function MetadataSection({ detail }: { detail: OperatorUserDetail }) {
           </dd>
         </div>
       </dl>
-    </section>
-  );
-}
-
-function DangerZoneSection({
-  email,
-  isSelf,
-  confirm,
-  onConfirmChange,
-  deleteBusy,
-  onDelete,
-}: {
-  email: string;
-  isSelf: boolean;
-  confirm: string;
-  onConfirmChange: (next: string) => void;
-  deleteBusy: boolean;
-  onDelete: () => void;
-}) {
-  const matches = confirm.trim().toLowerCase() === email.toLowerCase();
-  return (
-    <section className="space-y-3">
-      <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-destructive">Danger zone</h3>
-      <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-        <p className="text-xs text-destructive">
-          Permanently delete this customer, their sessions, OAuth tokens, and Beacon preferences. Workspace memberships
-          are removed. Deletion is blocked while they are the only admin of a workspace with other members; promote
-          another admin or delete the workspace first.
-        </p>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button type="button" variant="destructive" size="sm" className="gap-1.5" disabled={isSelf}>
-              <IconTrash className="size-4" />
-              Delete customer
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="inline-flex items-center gap-1.5">
-                <IconAlertTriangle className="size-4 text-destructive" />
-                Delete customer?
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                This cannot be undone. Type the email{" "}
-                <code className="rounded bg-muted px-1 font-mono text-xs">{email}</code> to confirm.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="space-y-2 py-2">
-              <Label htmlFor="confirm-email">Email</Label>
-              <Input
-                id="confirm-email"
-                value={confirm}
-                onChange={(event) => onConfirmChange(event.target.value)}
-                placeholder={email}
-                autoComplete="off"
-              />
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction asChild>
-                <Button variant="destructive" disabled={deleteBusy || !matches} onClick={onDelete}>
-                  {deleteBusy ? "Deleting…" : "Delete permanently"}
-                </Button>
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
     </section>
   );
 }

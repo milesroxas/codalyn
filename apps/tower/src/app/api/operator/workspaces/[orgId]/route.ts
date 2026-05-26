@@ -1,6 +1,7 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { buildOrganizationSeatSnapshot } from "@/server/billing/organization-seat-count";
+import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
+import { buildOrganizationSeatSnapshot, countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch } from "@/server/operator/types";
 import {
@@ -79,7 +80,8 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
 
   const memberCount = Number(row.memberCount ?? 0);
   const pendingInvitations = Number(row.pendingInvitations ?? 0);
-  const seatSnapshot = buildOrganizationSeatSnapshot(memberCount + pendingInvitations, {
+  const seatsUsed = await countOrganizationSeatsUsed(orgId);
+  const seatSnapshot = buildOrganizationSeatSnapshot(seatsUsed, {
     seatLimit: row.seatLimit ?? null,
   });
 
@@ -91,6 +93,8 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
     metadata: row.metadata ?? null,
     seatLimit: row.seatLimit ?? null,
     effectiveSeatLimit: seatSnapshot.effectiveSeatLimit,
+    isAtSeatCap: seatSnapshot.isAtSeatCap,
+    isOverSeatCap: seatSnapshot.isOverSeatCap,
     billingPlan: row.billingPlan ?? null,
     subscriptionStatus: row.subscriptionStatus ?? null,
     stripeCustomerId: row.stripeCustomerId ?? null,
@@ -223,6 +227,18 @@ export async function PATCH(
   if ("error" in parsed) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
+
+  if ("seatLimit" in parsed && isTowerBillingEnabled()) {
+    const [billingRow] = await db
+      .select({ stripeSubscriptionId: organization.stripeSubscriptionId })
+      .from(organization)
+      .where(eq(organization.id, orgId))
+      .limit(1);
+    if (billingRow?.stripeSubscriptionId) {
+      return NextResponse.json({ error: "seat_limit_managed_by_stripe" }, { status: 409 });
+    }
+  }
+
   const updates: Record<string, unknown> = { ...parsed };
   Object.assign(updates, usageLimitsPatchToDbUpdates(parsed));
   if (Object.keys(updates).length > 0) {

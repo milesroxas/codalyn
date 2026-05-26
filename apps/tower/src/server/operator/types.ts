@@ -144,6 +144,8 @@ export type OperatorWorkspaceRow = {
   logo: string | null;
   seatLimit: number | null;
   effectiveSeatLimit: number;
+  isAtSeatCap: boolean;
+  isOverSeatCap: boolean;
   billingPlan: string | null;
   subscriptionStatus: string | null;
   stripeCustomerId: string | null;

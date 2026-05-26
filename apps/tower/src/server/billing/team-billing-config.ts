@@ -1,8 +1,10 @@
 /** Canonical `organization.billing_plan` value for self-serve Stripe team subscriptions. */
 export const TEAM_BILLING_PLAN = "team" as const;
 
-/** Solo workspace cap when `organization.seat_limit` is null (unpaid). Team billing raises the limit via Stripe. */
-export const TEAM_UNPAID_SEAT_CAP = 1;
+export {
+  resolveMembershipSeatCapFromOrg,
+  TEAM_UNPAID_SEAT_CAP,
+} from "@/shared/lib/billing/organization-seat-cap";
 
 const envInt = (name: string, fallback: number): number => {
   const raw = process.env[name]?.trim();
@@ -29,12 +31,4 @@ export function getTeamMinSeats(): number {
 
 export function isTeamBillingCheckoutConfigured(): boolean {
   return Boolean(getStripePriceTeamSeat());
-}
-
-export function resolveMembershipSeatCapFromOrg(org: { seatLimit?: number | null }): number {
-  const raw = org.seatLimit;
-  if (raw != null && typeof raw === "number" && !Number.isNaN(raw)) {
-    return Math.max(1, raw);
-  }
-  return TEAM_UNPAID_SEAT_CAP;
 }

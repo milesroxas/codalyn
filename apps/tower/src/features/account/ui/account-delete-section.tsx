@@ -10,6 +10,7 @@ import {
 } from "@/shared/lib/membership/user-account-deletion";
 import {
   AlertDialog,
+  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -218,14 +219,9 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
                 <AlertDialogCancel type="button" disabled={deleteBusy}>
                   Cancel
                 </AlertDialogCancel>
-                <Button
-                  type="submit"
-                  variant="destructive"
-                  disabled={deleteBusy || deleteBlocked}
-                  className="font-medium"
-                >
+                <AlertDialogAction type="submit" variant="destructive" disabled={deleteBusy || deleteBlocked}>
                   {deleteBusy ? "Deleting…" : "Delete account"}
-                </Button>
+                </AlertDialogAction>
               </AlertDialogFooter>
             </form>
           </AlertDialogContent>

@@ -6,7 +6,7 @@ import {
   formatBeaconPresetStorageSummary,
   listBeaconPresetStorageEntries,
 } from "@codalyn/webflow-kit";
-import { IconRadar2, IconRefresh } from "@tabler/icons-react";
+import { IconRefresh } from "@tabler/icons-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
@@ -19,6 +19,11 @@ type BeaconApiPayload = {
   editorExperience?: boolean;
   canManageTeamBeaconSettings?: boolean;
 };
+
+function dedupePresetLabel(label: string): string {
+  const match = label.match(/^(.+) \((.+)\)$/);
+  return match && match[1] === match[2] ? match[1] : label;
+}
 
 function WorkspacePresetsCardContent(props: {
   error: string | null;
@@ -103,7 +108,7 @@ export function BeaconDashboardActivity() {
     const defaultFormat = payload.settings.defaultExportFormat;
     return listBeaconPresetStorageEntries(payload.settings.imagePresetStorage).map(({ row, scope }) => ({
       id: row.id,
-      label: formatBeaconPresetDisplayName(row, scope),
+      label: dedupePresetLabel(formatBeaconPresetDisplayName(row, scope)),
       summary: formatBeaconPresetStorageSummary(row, defaultFormat),
     }));
   }, [payload?.settings]);
@@ -113,39 +118,38 @@ export function BeaconDashboardActivity() {
   }
 
   const canManage = Boolean(payload?.canManageTeamBeaconSettings);
+  const syncStatus = loading
+    ? "Syncing…"
+    : presetRows.length === 0
+      ? "No presets synced"
+      : `${presetRows.length} preset${presetRows.length === 1 ? "" : "s"} · live sync`;
 
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle>Beacon export presets</CardTitle>
+        <CardTitle>Export presets</CardTitle>
         <CardDescription>
-          Synced scoped presets for this workspace. Site default is editable in Tower; scoped presets are managed in
-          Beacon.
+          Synced from this workspace. The site default is editable in Tower; scoped presets are managed in Beacon.
         </CardDescription>
         <CardAction>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">Beacon</Badge>
-            {canManage ? <Badge variant="outline">Editable in Tower</Badge> : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              disabled={loading}
-              onClick={() => void refresh()}
-            >
-              <IconRefresh aria-hidden className="size-3.5" stroke={1.5} />
-              {loading ? "Updating…" : "Refresh"}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={loading}
+            onClick={() => void refresh()}
+          >
+            <IconRefresh aria-hidden className="size-3.5" stroke={1.5} />
+            {loading ? "Updating…" : "Refresh"}
+          </Button>
         </CardAction>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-muted text-foreground">
-            <IconRadar2 aria-hidden className="size-4" stroke={1.5} />
-          </span>
-          <span className="text-xs">{loading ? "Loading presets…" : "Live workspace sync"}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">Beacon</Badge>
+          {canManage ? <Badge variant="outline">Editable in Tower</Badge> : null}
+          <span className="text-xs text-muted-foreground">{syncStatus}</span>
         </div>
         <WorkspacePresetsCardContent error={error} presetRows={presetRows} />
         <div className="pt-1">

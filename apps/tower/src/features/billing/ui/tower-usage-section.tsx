@@ -42,8 +42,7 @@ export function TowerUsageSection(props: TowerUsageSectionProps) {
       <CardContent className="space-y-4">
         {!status.metered || status.meters.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Monthly usage limits are not enforced for your account on the {status.tier === "pro" ? "Pro" : "current"}{" "}
-            plan.
+            {status.tier === "pro" ? "No usage limits on the Pro plan." : "No usage limits on the Free plan."}
           </p>
         ) : (
           status.meters.map((meter) => <UsageMeterRow key={meter.kind} meter={meter} />)

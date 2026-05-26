@@ -188,14 +188,14 @@ function DashboardDetailsSection({
   billingEnabled: boolean;
 }) {
   return (
-    <TowerPageSection title="Details" description="Deeper views when you need more than the snapshot.">
-      <div className="grid gap-4 lg:grid-cols-2">
+    <TowerPageSection title="Details" description="Usage limits and synced export presets for this workspace.">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         <TowerUsageSection
           status={usage}
           billingEnabled={billingEnabled}
           showBillingLink
-          title="This month"
-          description="Monthly allowances for Webflow proxy traffic, CMS writes, and AVIF image processing."
+          title="Usage this month"
+          description="Webflow proxy traffic, CMS writes, and AVIF image processing."
         />
         <BeaconDashboardActivity />
       </div>

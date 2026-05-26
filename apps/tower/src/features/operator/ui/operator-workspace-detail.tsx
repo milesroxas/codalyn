@@ -292,14 +292,8 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
                 onReset={async () => {
                   await operatorApi.resetWorkspaceUsage(detail.id);
                   const usage = await reloadWorkspaceUsageLimits(detail.id);
-                  setDetail((current) => {
-                    if (!current) {
-                      return current;
-                    }
-                    const next = { ...current, usage };
-                    onUpdated?.(detailToRow(next));
-                    return next;
-                  });
+                  setDetail((current) => (current ? { ...current, usage } : current));
+                  onUpdated?.(detailToRow({ ...detail, usage }));
                   return usage;
                 }}
               />

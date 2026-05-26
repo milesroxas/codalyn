@@ -41,7 +41,7 @@ const publicLoggedOutSurfaces = new Set(["/", "/sign-in", "/sign-up", "/request-
 export function TowerHeader({ billingEnabled = false }: { billingEnabled?: boolean }) {
   const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
-  const { setTheme, resolvedTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const effectiveResolved: "light" | "dark" = resolvedTheme === "dark" ? "dark" : "light";
   const [mounted, setMounted] = useState(false);
   const { signOut: onSignOut, signingOut } = useTowerWebSignOut();
@@ -51,14 +51,12 @@ export function TowerHeader({ billingEnabled = false }: { billingEnabled?: boole
   }, []);
 
   const cycleTheme = useCallback(() => {
-    setTheme((current) => {
-      const next = toggledLightDarkTheme(current, effectiveResolved);
-      if (session?.user) {
-        persistBeaconThemePreference(next);
-      }
-      return next;
-    });
-  }, [setTheme, session?.user, effectiveResolved]);
+    const next = toggledLightDarkTheme(theme, effectiveResolved);
+    setTheme(next);
+    if (session?.user) {
+      persistBeaconThemePreference(next);
+    }
+  }, [theme, setTheme, session?.user, effectiveResolved]);
 
   const hideAppChrome = !session?.user && publicLoggedOutSurfaces.has(pathname);
   if (hideAppChrome) {

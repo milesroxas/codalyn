@@ -293,16 +293,12 @@ export function OperatorCustomerDetail(props: OperatorCustomerDetailProps) {
                   if (!state.detail) {
                     throw new Error("missing_detail");
                   }
-                  await operatorApi.resetUserUsage(state.detail.id);
-                  const usage = await reloadUserUsageLimits(state.detail.id);
-                  setState((s) => {
-                    if (!s.detail) {
-                      return s;
-                    }
-                    const nextDetail = { ...s.detail, usage };
-                    onUpdated?.(detailToRow(nextDetail));
-                    return { ...s, detail: nextDetail };
-                  });
+                  const { detail } = state;
+                  await operatorApi.resetUserUsage(detail.id);
+                  const usage = await reloadUserUsageLimits(detail.id);
+                  const nextDetail = { ...detail, usage };
+                  setState((s) => (s.detail ? { ...s, detail: nextDetail } : s));
+                  onUpdated?.(detailToRow(nextDetail));
                   return usage;
                 }}
               />

@@ -363,10 +363,12 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
           isNoOp = true;
           return prev;
         }
-        const next = mergeBeaconAppSettings(prev, toMerge);
-        writeLocal(next);
-        return next;
+        return mergeBeaconAppSettings(prev, toMerge);
       });
+
+      if (!isNoOp && previous !== undefined && resolved !== undefined && !isEmptySettingsPatch(resolved)) {
+        writeLocal(mergeBeaconAppSettings(previous, resolved));
+      }
 
       if (isNoOp || resolved === undefined || isEmptySettingsPatch(resolved)) {
         return { ok: true };

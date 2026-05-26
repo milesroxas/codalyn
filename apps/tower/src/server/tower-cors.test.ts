@@ -34,6 +34,15 @@ describe("towerCorsHeadersFor", () => {
     expect(h["Access-Control-Allow-Private-Network"]).toBe("true");
   });
 
+  it("reflects Webflow extension bundle Origin (*.webflow-ext.com)", () => {
+    const req = new Request("https://tower.example/api/auth/get-session", {
+      headers: { Origin: "https://69e3aaad66cf6f468fd8ecb8.webflow-ext.com" },
+    });
+    const h = towerCorsHeadersFor(req);
+    expect(h["Access-Control-Allow-Origin"]).toBe("https://69e3aaad66cf6f468fd8ecb8.webflow-ext.com");
+    expect(h["Access-Control-Allow-Credentials"]).toBe("true");
+  });
+
   it("includes extra origins from TOWER_CORS_ORIGINS", () => {
     process.env.TOWER_CORS_ORIGINS = "https://custom.test";
     const req = new Request("https://tower.example/api", {

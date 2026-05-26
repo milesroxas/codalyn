@@ -1,19 +1,6 @@
 import type { NextRequest } from "next/server";
 import { TOWER_STATIC_BEACON_RELATED_ORIGINS } from "@/server/tower-static-beacon-origins";
-
-/** Webflow Designer extension origins are matched dynamically below; static dev hosts live in `TOWER_STATIC_BEACON_RELATED_ORIGINS`. */
-function isWebflowDesignerExtensionOrigin(origin: string): boolean {
-  try {
-    const { hostname } = new URL(origin);
-    return (
-      hostname === "design.webflow.com" ||
-      hostname.endsWith(".design.webflow.com") ||
-      hostname.endsWith(".webflow-ext.com")
-    );
-  } catch {
-    return false;
-  }
-}
+import { isWebflowDesignerExtensionOrigin } from "@/server/tower-webflow-designer-origins";
 
 export function towerCorsHeadersFor(request: Request | NextRequest): Record<string, string> {
   const origin = request.headers.get("Origin");

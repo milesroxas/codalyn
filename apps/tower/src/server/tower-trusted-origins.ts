@@ -1,6 +1,7 @@
 import { isHostSplitEnabled, resolveMarketingOrigin } from "@/server/tower-hosts";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { TOWER_STATIC_BEACON_RELATED_ORIGINS } from "@/server/tower-static-beacon-origins";
+import { TOWER_WEBFLOW_DESIGNER_TRUSTED_ORIGIN_PATTERNS } from "@/server/tower-webflow-designer-origins";
 
 /** Canonical Tower staging origin (Preview env only). Override with TOWER_PREVIEW_APP_ORIGIN. */
 const DEFAULT_PREVIEW_APP_ORIGIN = "https://tower-preview.codalyn.app";
@@ -61,6 +62,7 @@ export function resolveTowerTrustedOrigins(): string[] {
     ...new Set([
       baseURL,
       ...TOWER_STATIC_BEACON_RELATED_ORIGINS,
+      ...TOWER_WEBFLOW_DESIGNER_TRUSTED_ORIGIN_PATTERNS,
       ...fromEnv,
       ...resolveHostSplitTrustedOrigins(),
       ...resolvePreviewTrustedOrigins(),

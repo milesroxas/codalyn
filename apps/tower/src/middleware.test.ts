@@ -44,4 +44,22 @@ describe("middleware host split", () => {
     const response = middleware(makeRequest("tower.codalyn.app", "/"));
     expect(response?.status).not.toBe(307);
   });
+
+  it("returns CORS headers for OPTIONS /api/auth from Webflow extension origins", () => {
+    const url = new URL("/api/auth/get-session", "https://tower.codalyn.app");
+    const request = new NextRequest(url, {
+      method: "OPTIONS",
+      headers: {
+        host: "tower.codalyn.app",
+        Origin: "https://69e3aaad66cf6f468fd8ecb8.webflow-ext.com",
+        "Access-Control-Request-Method": "GET",
+      },
+    });
+    const response = middleware(request);
+    expect(response?.status).toBe(204);
+    expect(response?.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://69e3aaad66cf6f468fd8ecb8.webflow-ext.com"
+    );
+    expect(response?.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+  });
 });

@@ -18,6 +18,10 @@ export function formatTowerReachabilityError(error: unknown): string {
     return `Could not reach Tower at ${origin}. From the Webflow Designer, local HTTP Tower is often blocked — use an HTTPS tunnel or the production Tower URL in VITE_TOWER_ORIGIN, and confirm Tower is running.`;
   }
 
+  if (origin.includes("tower-preview.") || origin.includes("-preview.codalyn.app")) {
+    return `Could not reach Tower at ${origin}. Preview Tower is usually behind Vercel Deployment Protection, which blocks Beacon API calls from the Webflow Designer (browser CORS errors on /api/auth/*). Add a Deployment Protection Exception for the preview domain in Vercel, or point VITE_TOWER_ORIGIN at https://tower.codalyn.app for production auth.`;
+  }
+
   return origin
     ? `Could not reach Tower at ${origin}. Check your network connection and try again.`
     : "Could not reach Tower. Check VITE_TOWER_ORIGIN and your network connection.";

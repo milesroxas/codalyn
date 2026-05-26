@@ -30,6 +30,7 @@ describe("resolveTowerTrustedOrigins", () => {
     const origins = resolveTowerTrustedOrigins();
     expect(origins).toContain("https://tower.codalyn.app");
     expect(origins).toContain("https://codalyn.app");
+    expect(origins).toContain("https://*.webflow-ext.com");
     expect(origins).not.toContain("https://*.codalyn.app");
     expect(origins).not.toContain("https://*.vercel.app");
     expect(origins).not.toContain("https://tower-preview.codalyn.app");

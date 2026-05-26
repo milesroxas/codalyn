@@ -12,6 +12,7 @@ import {
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { BeaconEditorExperienceSection } from "@/features/team/ui/beacon-editor-experience-section";
 import { WorkspaceBillingSection } from "@/features/team/ui/workspace-billing-section";
 import { formatInvitationExpiry } from "@/features/team/ui/workspace-invitation-utils";
 import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
@@ -25,6 +26,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { NativeSelect } from "@/shared/ui/native-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { DangerZoneTypedDelete } from "@/shared/ui/typed-confirm-alert-dialog";
 import { WorkspaceSlugField } from "@/shared/ui/workspace-slug-field";
@@ -138,84 +140,79 @@ function WorkspaceMemberDirectoryCard(props: {
   const { members, memberRoleOptions, canManageTeam, busy, currentUserId, onUpdateMemberRole, onRemoveMember } = props;
 
   return (
-    <Card size="sm" className="overflow-hidden py-0">
-      <CardHeader className="border-b bg-muted/30 py-4">
-        <CardTitle className="text-base">Directory</CardTitle>
+    <Card size="sm" layout="table-section">
+      <CardHeader>
+        <CardTitle>Directory</CardTitle>
         <CardDescription>People in this workspace and their access level.</CardDescription>
       </CardHeader>
-      <CardContent className="px-0 py-0">
+      <CardContent>
         {members.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">No members yet.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[32.5rem] text-left text-sm">
-              <thead>
-                <tr className="border-b bg-muted/20 text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Member</th>
-                  <th className="px-4 py-3 font-medium">Role</th>
-                  {canManageTeam ? <th className="w-36 px-4 py-3 text-end font-medium">Actions</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((m) => (
-                  <tr
-                    key={m.id}
-                    className="border-b border-border/80 last:border-0 hover:bg-muted/10 [.border-b]:transition-colors"
-                  >
-                    <td className="px-4 py-3 align-middle">
-                      <div className="flex items-start gap-3">
-                        <MemberInitial name={m.user.name} email={m.user.email} />
-                        <div className="min-w-0">
-                          <div className="font-medium">{m.user.name || "—"}</div>
-                          <div className="truncate text-xs text-muted-foreground">{m.user.email}</div>
-                        </div>
+          <Table className="min-w-[32.5rem]">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Member</TableHead>
+                <TableHead>Role</TableHead>
+                {canManageTeam ? <TableHead className="w-36 text-end">Actions</TableHead> : null}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {members.map((m) => (
+                <TableRow key={m.id}>
+                  <TableCell>
+                    <div className="flex items-start gap-3">
+                      <MemberInitial name={m.user.name} email={m.user.email} />
+                      <div className="min-w-0">
+                        <div className="font-medium">{m.user.name || "—"}</div>
+                        <div className="truncate text-xs text-muted-foreground">{m.user.email}</div>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      {canManageTeam ? (
-                        <NativeSelect
-                          fieldSize="sm"
-                          className="min-w-28"
-                          value={m.role}
-                          disabled={busy || m.userId === currentUserId}
-                          aria-label={`Role for ${m.user.email}`}
-                          onChange={(ev) => {
-                            void onUpdateMemberRole(m.id, ev.target.value);
-                          }}
-                        >
-                          {memberRoleOptions.map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </NativeSelect>
-                      ) : (
-                        <Badge variant="secondary" className="font-mono text-xs">
-                          {m.role}
-                        </Badge>
-                      )}
-                    </td>
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     {canManageTeam ? (
-                      <td className="px-4 py-3 text-end align-middle">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          disabled={busy || m.userId === currentUserId}
-                          onClick={() => {
-                            void onRemoveMember(m.id);
-                          }}
-                        >
-                          Remove
-                        </Button>
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      <NativeSelect
+                        fieldSize="sm"
+                        className="min-w-28"
+                        value={m.role}
+                        disabled={busy || m.userId === currentUserId}
+                        aria-label={`Role for ${m.user.email}`}
+                        onChange={(ev) => {
+                          void onUpdateMemberRole(m.id, ev.target.value);
+                        }}
+                      >
+                        {memberRoleOptions.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    ) : (
+                      <Badge variant="secondary" className="font-mono text-xs">
+                        {m.role}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  {canManageTeam ? (
+                    <TableCell className="text-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        disabled={busy || m.userId === currentUserId}
+                        onClick={() => {
+                          void onRemoveMember(m.id);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </TableCell>
+                  ) : null}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </CardContent>
       {!canManageTeam ? (
@@ -263,7 +260,7 @@ function WorkspaceInvitesTab(props: {
     !seatState.isOverSeatCap;
 
   return (
-    <TabsContent value="invites" className="mt-6 space-y-6">
+    <TabsContent value="invites" className="space-y-6">
       <Card size="sm" className="border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
@@ -343,14 +340,14 @@ function WorkspaceInvitesTab(props: {
         </CardContent>
       </Card>
 
-      <Card size="sm" className="overflow-hidden py-0">
-        <CardHeader className="border-b bg-muted/30 py-4">
-          <CardTitle className="text-base">Invitations</CardTitle>
+      <Card size="sm" layout="table-section">
+        <CardHeader>
+          <CardTitle>Invitations</CardTitle>
           <CardDescription>
             Track sent invitations. Pending rows can be resent or revoked before they are accepted.
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-0 py-0">
+        <CardContent>
           {invitations.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
               <IconMailForward className="size-10 text-muted-foreground/40" aria-hidden />
@@ -360,75 +357,73 @@ function WorkspaceInvitesTab(props: {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[35rem] text-left text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/20 text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Role</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="min-w-36 px-4 py-3 font-medium">Expires</th>
-                    <th className="w-52 px-4 py-3 text-end font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invitations.map((inv) => {
-                    const isPending = inv.status === "pending";
-                    const expiresLabel = formatInvitationExpiry(inv.expiresAt);
-                    const resending = resendingInvitationId === inv.id;
-                    return (
-                      <tr key={inv.id} className="border-b border-border/80 last:border-0 hover:bg-muted/10">
-                        <td className="px-4 py-3 align-middle font-medium">{inv.email}</td>
-                        <td className="px-4 py-3 align-middle">
-                          <Badge variant="outline" className="font-mono text-xs">
-                            {inv.role ?? "—"}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 align-middle capitalize">{inv.status}</td>
-                        <td className="px-4 py-3 align-middle text-muted-foreground">
-                          {expiresLabel ? (
-                            <span className="inline-flex items-center gap-1 text-xs">
-                              <IconClockHour4 className="size-3.5 opacity-60" aria-hidden />
-                              {expiresLabel}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-end align-middle">
-                          {isPending ? (
-                            <div className="flex flex-wrap justify-end gap-1">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={busy || resending}
-                                onClick={() => onResendInvite(inv)}
-                              >
-                                <IconMailForward className="size-3.5" aria-hidden />
-                                Resend
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="sm"
-                                disabled={busy}
-                                onClick={() => onRequestRevoke(inv)}
-                              >
-                                <IconTrash className="size-3.5" aria-hidden />
-                                Revoke
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <Table className="min-w-[35rem]">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="min-w-36">Expires</TableHead>
+                  <TableHead className="w-52 text-end">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invitations.map((inv) => {
+                  const isPending = inv.status === "pending";
+                  const expiresLabel = formatInvitationExpiry(inv.expiresAt);
+                  const resending = resendingInvitationId === inv.id;
+                  return (
+                    <TableRow key={inv.id}>
+                      <TableCell className="font-medium">{inv.email}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {inv.role ?? "—"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="capitalize">{inv.status}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {expiresLabel ? (
+                          <span className="inline-flex items-center gap-1 text-xs">
+                            <IconClockHour4 className="size-3.5 opacity-60" aria-hidden />
+                            {expiresLabel}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-end">
+                        {isPending ? (
+                          <div className="flex flex-wrap justify-end gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={busy || resending}
+                              onClick={() => onResendInvite(inv)}
+                            >
+                              <IconMailForward className="size-3.5" aria-hidden />
+                              Resend
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => onRequestRevoke(inv)}
+                            >
+                              <IconTrash className="size-3.5" aria-hidden />
+                              Revoke
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
@@ -473,7 +468,7 @@ function WorkspaceSettingsTab(props: {
   const inviteLabel = pendingInviteCount === 1 ? "pending invitation" : "pending invitations";
 
   return (
-    <TabsContent value="settings" className="mt-6 space-y-6">
+    <TabsContent value="settings" className="space-y-6">
       <Card size="sm">
         <CardHeader>
           <CardTitle className="text-base">Workspace profile</CardTitle>
@@ -533,6 +528,7 @@ function WorkspaceSettingsTab(props: {
           </form>
         </CardContent>
       </Card>
+      <BeaconEditorExperienceSection />
       <DangerZoneTypedDelete
         panelDescription={
           <>
@@ -691,46 +687,36 @@ export function WorkspaceTabsShell(props: {
 
   return (
     <>
-      <WorkspaceIdentityCard
-        key={activeOrg.id}
-        activeOrg={activeOrg}
-        membersCount={members.length}
-        pendingInviteCount={pendingInviteCount}
-        showPendingInvitesSummary={canManageTeam}
-      />
-
       {canManageTeam ? (
         <>
-          <Tabs defaultValue="people" className="gap-0">
-            <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
-              <TabsList className="h-auto w-full gap-0.5 p-1 sm:max-w-md">
-                <TabsTrigger value="people" className="gap-2 px-3 py-2 sm:flex-1">
-                  <IconUsers className="size-4 opacity-70" aria-hidden />
-                  People
-                  <Badge variant="outline" className="h-5 min-w-6 px-1.5 font-mono text-xs">
-                    {members.length}
-                  </Badge>
+          <Tabs defaultValue="people" className="gap-4">
+            <TabsList className="h-auto w-full gap-0.5 p-1 sm:max-w-lg">
+              <TabsTrigger value="people" className="gap-2 px-3 py-2 sm:flex-1">
+                <IconUsers className="size-4 opacity-70" aria-hidden />
+                People
+                <Badge variant="outline" className="h-5 min-w-6 px-1.5 font-mono text-xs">
+                  {members.length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="invites" className="gap-2 px-3 py-2 sm:flex-1">
+                <IconMailForward className="size-4 opacity-70" aria-hidden />
+                Invitations
+                <Badge variant="outline" className="h-5 min-w-6 px-1.5 font-mono text-xs">
+                  {pendingInviteCount}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="gap-2 px-3 py-2 sm:flex-1">
+                Settings
+              </TabsTrigger>
+              {workspaceBilling ? (
+                <TabsTrigger value="billing" className="gap-2 px-3 py-2 sm:flex-1">
+                  <IconCreditCard className="size-4 opacity-70" aria-hidden />
+                  Billing
                 </TabsTrigger>
-                <TabsTrigger value="invites" className="gap-2 px-3 py-2 sm:flex-1">
-                  <IconMailForward className="size-4 opacity-70" aria-hidden />
-                  Invitations
-                  <Badge variant="outline" className="h-5 min-w-6 px-1.5 font-mono text-xs">
-                    {pendingInviteCount}
-                  </Badge>
-                </TabsTrigger>
-                <TabsTrigger value="settings" className="gap-2 px-3 py-2 sm:flex-1">
-                  Settings
-                </TabsTrigger>
-                {workspaceBilling ? (
-                  <TabsTrigger value="billing" className="gap-2 px-3 py-2 sm:flex-1">
-                    <IconCreditCard className="size-4 opacity-70" aria-hidden />
-                    Billing
-                  </TabsTrigger>
-                ) : null}
-              </TabsList>
-            </div>
+              ) : null}
+            </TabsList>
 
-            <TabsContent value="people" className="mt-6 space-y-4">
+            <TabsContent value="people" className="space-y-4">
               {memberDirectory}
             </TabsContent>
 
@@ -766,7 +752,7 @@ export function WorkspaceTabsShell(props: {
             />
 
             {workspaceBilling && billingOrganizationId ? (
-              <TabsContent value="billing" className="mt-6 space-y-6">
+              <TabsContent value="billing" className="space-y-6">
                 <WorkspaceBillingSection organizationId={billingOrganizationId} billing={workspaceBilling} />
               </TabsContent>
             ) : null}
@@ -787,7 +773,16 @@ export function WorkspaceTabsShell(props: {
           />
         </>
       ) : (
-        <div className="mt-6">{memberDirectory}</div>
+        <div className="space-y-6">
+          <WorkspaceIdentityCard
+            key={activeOrg.id}
+            activeOrg={activeOrg}
+            membersCount={members.length}
+            pendingInviteCount={pendingInviteCount}
+            showPendingInvitesSummary={false}
+          />
+          {memberDirectory}
+        </div>
       )}
     </>
   );

@@ -7,22 +7,22 @@ import type { TowerDashboardSummary } from "@/server/dashboard-summary";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
-import { Separator } from "@/shared/ui/separator";
+import { TowerPageHeader, TowerPageMain, TowerPageSection } from "@/shared/ui/tower-page-shell";
 
 export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) {
   const shortcutCards = [
     {
       title: "Team",
-      description: "Workspaces, invitations, and member roles for your organization.",
+      description: "Teams, invitations, and member roles for your organization.",
       href: "/team",
       external: false,
       icon: IconUsers,
       action: summary.activeOrgTeamAdmin ? "Manage team" : "View team",
-      badge: "Workspace",
+      badge: "Team",
     },
     {
       title: "Beacon",
-      description: "Workspace image presets for the Beacon Webflow app, synced from Tower.",
+      description: "Image export presets for the Beacon Webflow app, synced from Tower.",
       href: "/beacon",
       external: false,
       icon: IconRadar2,
@@ -30,24 +30,41 @@ export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) 
       badge: "Beacon",
     },
   ] as const;
-  return (
-    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Tower</p>
-        <h1 className="text-2xl font-semibold tracking-tight">Workspace</h1>
-        <p className="max-w-2xl text-muted-foreground">
-          Connect Webflow, manage your team, and keep Beacon export presets in sync with your workspace.
-        </p>
-      </div>
 
-      <Separator className="my-8" />
+  return (
+    <TowerPageMain>
+      <TowerPageHeader
+        title="Dashboard"
+        description="Connect Webflow, manage your team, and keep Beacon export presets in sync."
+        meta={
+          <>
+            {summary.userEmail ? <span className="font-medium text-foreground">{summary.userEmail}</span> : null}
+            {summary.activeOrganizationName ? (
+              <>
+                <span className="hidden sm:inline" aria-hidden>
+                  ·
+                </span>
+                <span>
+                  Active team <span className="font-medium text-foreground">{summary.activeOrganizationName}</span>
+                </span>
+              </>
+            ) : summary.activeOrganizationId ? (
+              <>
+                <span className="hidden sm:inline" aria-hidden>
+                  ·
+                </span>
+                <span>No active team selected</span>
+              </>
+            ) : null}
+          </>
+        }
+      />
 
       <BeaconDashboardActivity />
 
       <TowerDashboardUsageSection />
 
-      <section className="mb-10 space-y-3">
-        <h2 className="text-sm font-medium text-foreground">Your connection</h2>
+      <TowerPageSection title="Your connection">
         <Card>
           <CardHeader className="space-y-3">
             <div className="flex items-start justify-between gap-2">
@@ -64,15 +81,6 @@ export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) 
             </div>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
-              <span>
-                <span className="font-medium text-foreground">Account</span> {summary.userEmail ?? "—"}
-              </span>
-              <span>
-                <span className="font-medium text-foreground">Active org</span>{" "}
-                {summary.activeOrganizationName ?? (summary.activeOrganizationId ? "—" : "None active")}
-              </span>
-            </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-muted-foreground">OAuth</span>
               {summary.webflowOAuthConnected ? (
@@ -104,10 +112,9 @@ export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) 
             ) : null}
           </CardContent>
         </Card>
-      </section>
+      </TowerPageSection>
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-foreground">Shortcuts</h2>
+      <TowerPageSection title="Shortcuts">
         <div className="grid gap-4 sm:grid-cols-2">
           {shortcutCards.map(({ title, description, href, icon: Icon, action, badge, external }) => (
             <Card key={title} className="flex h-full flex-col">
@@ -137,7 +144,7 @@ export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) 
             </Card>
           ))}
         </div>
-      </section>
-    </main>
+      </TowerPageSection>
+    </TowerPageMain>
   );
 }

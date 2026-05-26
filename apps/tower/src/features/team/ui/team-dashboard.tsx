@@ -9,7 +9,6 @@ import {
   formatTeamWorkspaceDeleteError,
   TeamWorkspaceApiError,
 } from "@/features/team/api/delete-workspace";
-import { BeaconEditorExperienceSection } from "@/features/team/ui/beacon-editor-experience-section";
 import { TeamDashboardSkeleton } from "@/features/team/ui/team-dashboard-skeleton";
 import { TeamWorkspacePanel } from "@/features/team/ui/team-workspace-panel";
 import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
@@ -22,6 +21,7 @@ import {
 import { parseWorkspaceSlug } from "@/shared/lib/membership/workspace-slug";
 import { workspaceSlugErrorMessage } from "@/shared/lib/membership/workspace-slug-messages";
 import { Button } from "@/shared/ui/button";
+import { TowerPageHeader, TowerPageMain } from "@/shared/ui/tower-page-shell";
 
 export function TeamDashboard(props: {
   billingEnabled?: boolean;
@@ -268,55 +268,22 @@ export function TeamDashboard(props: {
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
-      <header className="mb-8 flex flex-col gap-6 border-b border-border pb-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
-            <p className="text-sm text-muted-foreground">
-              Workspaces group people and permissions. Switch workspace anytime — invites and roles are scoped per
-              workspace.
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void refreshTeam()}>
-              Sync
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{session.user.email}</span>
-          {session.user.role ? (
-            <>
-              <span className="hidden sm:inline" aria-hidden>
-                ·
-              </span>
-              <span>
-                App <span className="font-mono">{session.user.role}</span>
-              </span>
-            </>
-          ) : null}
-          {activeMember?.role ? (
-            <>
-              <span className="hidden sm:inline" aria-hidden>
-                ·
-              </span>
-              <span>
-                Workspace role <span className="font-mono">{activeMember.role}</span>
-              </span>
-            </>
-          ) : null}
-        </div>
-      </header>
+    <TowerPageMain>
+      <TowerPageHeader
+        title="Team"
+        description="Workspaces group people and permissions. Switch workspace anytime — invites and roles are scoped per workspace."
+        actions={
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void refreshTeam()}>
+            Sync
+          </Button>
+        }
+      />
 
       {error ? (
         <div className="mb-6 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       ) : null}
-
-      <BeaconEditorExperienceSection enabled={canManageTeam && Boolean(activeOrg)} />
 
       <TeamWorkspacePanel
         activeOrgPending={activeOrgPending}
@@ -351,6 +318,6 @@ export function TeamDashboard(props: {
         onDeleteConfirmChange={setDeleteConfirm}
         onDeleteWorkspace={onDeleteWorkspace}
       />
-    </main>
+    </TowerPageMain>
   );
 }

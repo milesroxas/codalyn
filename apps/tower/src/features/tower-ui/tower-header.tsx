@@ -77,7 +77,7 @@ export function TowerHeader({ billingEnabled = false }: { billingEnabled?: boole
             <Button variant="ghost" size="sm" asChild>
               <Link href="/" className="inline-flex items-center gap-1.5">
                 <IconHome aria-hidden className="size-4 shrink-0" stroke={1.5} />
-                Workspace
+                Dashboard
               </Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>

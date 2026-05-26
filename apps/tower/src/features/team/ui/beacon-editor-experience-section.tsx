@@ -8,10 +8,10 @@ import { Label } from "@/shared/ui/label";
 import { Switch } from "@/shared/ui/switch";
 
 type BeaconEditorExperienceSectionProps = {
-  enabled: boolean;
+  enabled?: boolean;
 };
 
-export function BeaconEditorExperienceSection({ enabled }: BeaconEditorExperienceSectionProps) {
+export function BeaconEditorExperienceSection({ enabled = true }: BeaconEditorExperienceSectionProps) {
   const [designerFeaturesOn, setDesignerFeaturesOn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -70,37 +70,31 @@ export function BeaconEditorExperienceSection({ enabled }: BeaconEditorExperienc
   }
 
   if (loading) {
-    return (
-      <div className="mb-8">
-        <BeaconEditorExperienceSkeleton />
-      </div>
-    );
+    return <BeaconEditorExperienceSkeleton />;
   }
 
   return (
-    <div className="mb-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Beacon in the Designer</CardTitle>
-          <CardDescription>
-            Preset configuration, manual changes, and related controls. Off by default; turn the switch on to use them
-            in Beacon in Webflow.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-row items-center justify-between gap-4">
-          <div className="space-y-1">
-            <Label htmlFor="beacon-designer-features">Designer features</Label>
-            <p className="text-xs text-muted-foreground">Full Beacon controls in the Webflow panel.</p>
-          </div>
-          <Switch
-            id="beacon-designer-features"
-            checked={designerFeaturesOn}
-            disabled={loading || saving}
-            onCheckedChange={(v) => void onToggle(v)}
-          />
-        </CardContent>
-        {loadError ? <p className="px-6 pb-4 text-sm text-destructive">{loadError}</p> : null}
-      </Card>
-    </div>
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle className="text-base">Beacon in the Designer</CardTitle>
+        <CardDescription>
+          Preset configuration, manual changes, and related controls. Off by default; turn the switch on to use them in
+          Beacon in Webflow.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-row items-center justify-between gap-4">
+        <div className="space-y-1">
+          <Label htmlFor="beacon-designer-features">Designer features</Label>
+          <p className="text-xs text-muted-foreground">Full Beacon controls in the Webflow panel.</p>
+        </div>
+        <Switch
+          id="beacon-designer-features"
+          checked={designerFeaturesOn}
+          disabled={loading || saving}
+          onCheckedChange={(v) => void onToggle(v)}
+        />
+      </CardContent>
+      {loadError ? <p className="px-4 pb-4 text-sm text-destructive">{loadError}</p> : null}
+    </Card>
   );
 }

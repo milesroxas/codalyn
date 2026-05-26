@@ -4,6 +4,7 @@ import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
+import { TowerPageSection } from "@/shared/ui/tower-page-shell";
 
 export async function TowerDashboardUsageSection() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -17,8 +18,7 @@ export async function TowerDashboardUsageSection() {
   const status = await fetchEndUserUsageStatus(userId, activeOrg);
 
   return (
-    <section className="mb-10 space-y-3">
-      <h2 className="text-sm font-medium text-foreground">Usage</h2>
+    <TowerPageSection title="Usage">
       <TowerUsageSection
         status={status}
         billingEnabled={isTowerBillingEnabled()}
@@ -26,6 +26,6 @@ export async function TowerDashboardUsageSection() {
         title="This month"
         description="Monthly allowances for Webflow proxy traffic, CMS writes, and AVIF image processing."
       />
-    </section>
+    </TowerPageSection>
   );
 }

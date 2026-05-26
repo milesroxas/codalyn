@@ -12,7 +12,10 @@
  * Usage (from repo root):
  *   pnpm app tower db:beacon-preset-storage-migrate:local [--dry-run]
  *   pnpm app tower db:beacon-preset-storage-migrate:dev [--dry-run] [--vercel]
- *   pnpm app tower db:beacon-preset-storage-migrate:prod [--dry-run] [--vercel]
+ *   pnpm app tower db:beacon-preset-storage-migrate:preview [--dry-run] [--vercel]
+ *   pnpm app tower db:beacon-preset-storage-migrate:prod [--dry-run] [--vercel] [--confirm]
+ *
+ * `--vercel` ignores local TOWER_* overrides. `prod` requires `--confirm` (or TOWER_DB_MIGRATE_CONFIRM=1).
  */
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
@@ -25,7 +28,7 @@ import {
   serializeBeaconOrgTeamSettingsPayload,
 } from "@codalyn/webflow-kit";
 import pg from "pg";
-import { resolveDatabaseUrl, towerRoot } from "./db-env.mjs";
+import { describeDatabaseHost, parseDbScriptArgs, resolveDatabaseUrl, towerRoot } from "./db-env.mjs";
 
 function ensureWebflowKitBuilt() {
   const r = spawnSync("pnpm", ["exec", "turbo", "run", "build", "--filter=@codalyn/webflow-kit"], {
@@ -35,15 +38,6 @@ function ensureWebflowKitBuilt() {
   if (r.status !== 0) {
     process.exit(r.status ?? 1);
   }
-}
-
-function parseArgs(argv) {
-  const args = argv.slice(2).filter((a) => a !== "--");
-  const dryRun = args.includes("--dry-run");
-  const useVercel = args.includes("--vercel");
-  const positional = args.filter((a) => a !== "--dry-run" && a !== "--vercel");
-  const target = (positional[0] || "local").toLowerCase();
-  return { target, dryRun, useVercel };
 }
 
 async function migrateUserSettings(client, dryRun) {
@@ -106,10 +100,10 @@ async function migrateOrgTeamSettings(client, dryRun) {
 async function main() {
   ensureWebflowKitBuilt();
 
-  const { target, dryRun, useVercel } = parseArgs(process.argv);
+  const { target, dryRun, useVercel, confirmed } = parseDbScriptArgs(process.argv);
   let databaseUrl;
   try {
-    databaseUrl = resolveDatabaseUrl(target, { useVercel });
+    databaseUrl = resolveDatabaseUrl(target, { useVercel, confirmed });
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
@@ -124,10 +118,11 @@ async function main() {
   await client.connect();
 
   try {
+    const host = describeDatabaseHost(databaseUrl);
     console.log(
       dryRun
-        ? `Dry run: scanning Beacon preset storage in ${target} database…`
-        : `Migrating Beacon preset storage in ${target} database…`
+        ? `Dry run: scanning Beacon preset storage in ${target} database at ${host}…`
+        : `Migrating Beacon preset storage in ${target} database at ${host}…`
     );
     const users = await migrateUserSettings(client, dryRun);
     const orgs = await migrateOrgTeamSettings(client, dryRun);

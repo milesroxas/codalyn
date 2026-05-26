@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 export const towerRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pullPath = resolve(towerRoot, ".env.migrate.pull");
 
+const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "postgres"]);
+const NEON_BRANCH_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*(@[a-zA-Z0-9.+:-]+)?$/;
+
 function applyEnvLine(line, target) {
   const trimmed = line.trim();
   if (!trimmed || trimmed.startsWith("#")) return;
@@ -46,6 +49,99 @@ function parseDatabaseUrlFromEnvText(text) {
   return null;
 }
 
+/** @param {string} branch */
+export function assertValidNeonBranchName(branch) {
+  const trimmed = branch.trim();
+  if (!trimmed || !NEON_BRANCH_NAME_PATTERN.test(trimmed)) {
+    throw new Error(
+      `Invalid Neon branch name "${branch}". Use names like "preview", "development", or branch@timestamp.`
+    );
+  }
+  return trimmed;
+}
+
+/** @param {string} databaseUrl */
+export function parsePostgresDatabaseUrl(databaseUrl) {
+  let parsed;
+  try {
+    parsed = new URL(databaseUrl);
+  } catch {
+    throw new Error("Invalid DATABASE_URL: not a valid URL.");
+  }
+  if (parsed.protocol !== "postgresql:" && parsed.protocol !== "postgres:") {
+    throw new Error(`Invalid DATABASE_URL protocol: ${parsed.protocol}`);
+  }
+  return parsed;
+}
+
+/**
+ * @param {"local" | "dev" | "preview" | "prod" | "production"} target
+ * @param {string} databaseUrl
+ */
+export function assertSafeRemoteDatabaseUrl(target, databaseUrl) {
+  const normalized = target.toLowerCase();
+  if (normalized === "local") {
+    return parsePostgresDatabaseUrl(databaseUrl);
+  }
+
+  const parsed = parsePostgresDatabaseUrl(databaseUrl);
+  const host = parsed.hostname.toLowerCase();
+
+  if (LOCAL_DB_HOSTS.has(host)) {
+    throw new Error(`Refusing ${normalized} target: DATABASE_URL host "${host}" looks local.`);
+  }
+
+  if (normalized === "prod" || normalized === "production") {
+    const allowNonNeon = process.env.TOWER_DB_ALLOW_NON_NEON === "1";
+    if (!allowNonNeon && !host.endsWith(".neon.tech")) {
+      throw new Error(
+        `Refusing prod target: host "${host}" is not a Neon host. Set TOWER_DB_ALLOW_NON_NEON=1 to override.`
+      );
+    }
+  }
+
+  return parsed;
+}
+
+/** @param {string} databaseUrl */
+export function describeDatabaseHost(databaseUrl) {
+  return parsePostgresDatabaseUrl(databaseUrl).hostname;
+}
+
+/**
+ * @param {"local" | "dev" | "preview" | "prod" | "production"} target
+ * @param {string} databaseUrl
+ * @param {{ confirmed?: boolean }} opts
+ */
+export function requireProdMigrationConfirm(target, databaseUrl, opts = {}) {
+  const normalized = target.toLowerCase();
+  if (normalized !== "prod" && normalized !== "production") {
+    return;
+  }
+  if (opts.confirmed || process.env.TOWER_DB_MIGRATE_CONFIRM === "1") {
+    return;
+  }
+
+  const host = describeDatabaseHost(databaseUrl);
+  throw new Error(
+    `Refusing prod migration to ${host} without --confirm. Re-run with --confirm or set TOWER_DB_MIGRATE_CONFIRM=1 for CI.`
+  );
+}
+
+/**
+ * @param {string[]} argv
+ * @returns {{ target: string; useVercel: boolean; confirmed: boolean; dryRun: boolean }}
+ */
+export function parseDbScriptArgs(argv) {
+  const args = argv.slice(2).filter((a) => a !== "--");
+  return {
+    target: (args.find((a) => !a.startsWith("--")) || "local").toLowerCase(),
+    useVercel: args.includes("--vercel"),
+    confirmed: args.includes("--confirm"),
+    dryRun: args.includes("--dry-run"),
+  };
+}
+
 function neonConnectionString(branch) {
   const fileEnv = readTowerEnvFiles();
   const projectId = (
@@ -61,23 +157,28 @@ function neonConnectionString(branch) {
   if (projectId) {
     args.push("--project-id", projectId);
   }
-  if (apiKey) {
-    args.push("--api-key", apiKey);
-  }
   if (branch?.trim()) {
-    args.push(branch.trim());
+    args.push(assertValidNeonBranchName(branch));
+  }
+
+  const spawnEnv = { ...process.env };
+  if (apiKey) {
+    spawnEnv.NEON_API_KEY = apiKey;
   }
 
   const r = spawnSync("npx", args, {
     encoding: "utf8",
     cwd: towerRoot,
+    env: spawnEnv,
     maxBuffer: 10 * 1024 * 1024,
   });
   if (r.error) {
     throw new Error(r.error.message);
   }
   if (r.status !== 0) {
-    throw new Error(r.stderr || r.stdout || "neonctl connection-string failed");
+    throw new Error(
+      "neonctl connection-string failed. Verify NEON_PROJECT_ID, NEON_API_KEY (or neonctl auth), and branch name."
+    );
   }
   const out = (r.stdout || "").trim();
   try {
@@ -93,7 +194,7 @@ function neonConnectionString(branch) {
   if (line) {
     return line.trim();
   }
-  throw new Error(`Could not parse neonctl JSON output. First 300 chars: ${out.slice(0, 300)}`);
+  throw new Error("Could not parse neonctl connection-string output. Verify branch name and Neon credentials.");
 }
 
 function databaseUrlFromVercel(environment) {
@@ -118,32 +219,44 @@ function databaseUrlFromVercel(environment) {
 }
 
 function databaseUrlForDev(fileEnv, useVercel) {
+  if (useVercel) {
+    return databaseUrlFromVercel("preview");
+  }
   const fromFile = (process.env.TOWER_DATABASE_URL_DEV || fileEnv.TOWER_DATABASE_URL_DEV || "").trim();
   if (fromFile) {
     return fromFile;
-  }
-  if (useVercel) {
-    return databaseUrlFromVercel("preview");
   }
   const branch = (process.env.TOWER_NEON_BRANCH_DEV || fileEnv.TOWER_NEON_BRANCH_DEV || "development").trim();
   return neonConnectionString(branch);
 }
 
-function databaseUrlForProd(fileEnv, useVercel) {
-  const fromFile = (process.env.TOWER_DATABASE_URL_PROD || fileEnv.TOWER_DATABASE_URL_PROD || "").trim();
+function databaseUrlForPreview(fileEnv, useVercel) {
+  if (useVercel) {
+    return databaseUrlFromVercel("preview");
+  }
+  const fromFile = (process.env.TOWER_DATABASE_URL_PREVIEW || fileEnv.TOWER_DATABASE_URL_PREVIEW || "").trim();
   if (fromFile) {
     return fromFile;
   }
+  const branch = (process.env.TOWER_NEON_BRANCH_PREVIEW || fileEnv.TOWER_NEON_BRANCH_PREVIEW || "preview").trim();
+  return neonConnectionString(branch);
+}
+
+function databaseUrlForProd(fileEnv, useVercel) {
   if (useVercel) {
     return databaseUrlFromVercel("production");
+  }
+  const fromFile = (process.env.TOWER_DATABASE_URL_PROD || fileEnv.TOWER_DATABASE_URL_PROD || "").trim();
+  if (fromFile) {
+    return fromFile;
   }
   const branch = (process.env.TOWER_NEON_BRANCH_PROD || fileEnv.TOWER_NEON_BRANCH_PROD || "").trim();
   return neonConnectionString(branch || undefined);
 }
 
 /**
- * @param {"local" | "dev" | "prod" | "production"} target
- * @param {{ useVercel?: boolean }} opts
+ * @param {"local" | "dev" | "preview" | "prod" | "production"} target
+ * @param {{ useVercel?: boolean; confirmed?: boolean }} opts
  * @returns {string | undefined} undefined for local (uses shell / .env DATABASE_URL)
  */
 export function resolveDatabaseUrl(target, opts = {}) {
@@ -154,11 +267,18 @@ export function resolveDatabaseUrl(target, opts = {}) {
     return (process.env.DATABASE_URL || fileEnv.DATABASE_URL || "").trim() || undefined;
   }
   const fileEnv = readTowerEnvFiles();
+  let databaseUrl;
   if (normalized === "dev") {
-    return databaseUrlForDev(fileEnv, useVercel);
+    databaseUrl = databaseUrlForDev(fileEnv, useVercel);
+  } else if (normalized === "preview") {
+    databaseUrl = databaseUrlForPreview(fileEnv, useVercel);
+  } else if (normalized === "prod" || normalized === "production") {
+    databaseUrl = databaseUrlForProd(fileEnv, useVercel);
+  } else {
+    throw new Error(`Unknown target "${target}". Use: local | dev | preview | prod`);
   }
-  if (normalized === "prod" || normalized === "production") {
-    return databaseUrlForProd(fileEnv, useVercel);
-  }
-  throw new Error(`Unknown target "${target}". Use: local | dev | prod`);
+
+  assertSafeRemoteDatabaseUrl(normalized, databaseUrl);
+  requireProdMigrationConfirm(normalized, databaseUrl, { confirmed: opts.confirmed });
+  return databaseUrl;
 }

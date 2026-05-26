@@ -27,10 +27,12 @@ pnpm app tower db:push      # Drizzle → Neon (needs DATABASE_URL)
 
 # Migrations (see drizzle/README.md)
 pnpm app tower db:migrate:local   # .env + .env.local only (ignores DATABASE_URL in shell)
-pnpm app tower db:migrate:dev     # TOWER_DATABASE_URL_DEV or Neon branch TOWER_NEON_BRANCH_DEV
-pnpm app tower db:migrate:prod    # TOWER_DATABASE_URL_PROD or Neon default branch / TOWER_NEON_BRANCH_PROD
-pnpm app tower db:migrate:dev:vercel   # preview env from Vercel (linked project)
-pnpm app tower db:migrate:prod:vercel  # production env from Vercel
+pnpm app tower db:migrate:dev     # TOWER_NEON_BRANCH_DEV + NEON_* (or TOWER_DATABASE_URL_DEV)
+pnpm app tower db:migrate:preview # TOWER_NEON_BRANCH_PREVIEW + NEON_* (or TOWER_DATABASE_URL_PREVIEW)
+pnpm app tower db:migrate:prod    # TOWER_NEON_BRANCH_PROD + NEON_*; requires `-- --confirm`
+pnpm app tower db:migrate:dev:vercel     # Vercel Preview DATABASE_URL only (ignores TOWER_*)
+pnpm app tower db:migrate:preview:vercel # same as dev:vercel
+pnpm app tower db:migrate:prod:vercel    # Vercel Production DATABASE_URL; requires `-- --confirm`
 ```
 
 Copy `.env.example` to `.env.local` and fill values before `pnpm build` or `db:push`.

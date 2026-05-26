@@ -22,19 +22,11 @@ import {
 } from "@/server/membership/user-account-deletion";
 import { resolveTowerCookieDomain } from "@/server/tower-hosts";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
-import { TOWER_STATIC_BEACON_RELATED_ORIGINS } from "@/server/tower-static-beacon-origins";
+import { resolveTowerTrustedOrigins } from "@/server/tower-trusted-origins";
 import { db } from "@/shared/lib/db";
 import * as schema from "@/shared/lib/db/auth-schema";
 
 const baseURL = resolveTowerPublicBaseUrl();
-
-function resolveTrustedOrigins(): string[] {
-  const fromEnv = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? process.env.TOWER_CORS_ORIGINS ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return [...new Set([baseURL, ...TOWER_STATIC_BEACON_RELATED_ORIGINS, ...fromEnv])];
-}
 
 function resolveAdvancedAuthOptions(): {
   crossSubDomainCookies?: { enabled: true; domain: string };
@@ -122,7 +114,7 @@ export const auth = betterAuth({
   },
   secret: resolveAuthSecret(),
   baseURL,
-  trustedOrigins: resolveTrustedOrigins(),
+  trustedOrigins: resolveTowerTrustedOrigins(),
   advanced: resolveAdvancedAuthOptions(),
   hooks: {
     before: createAuthMiddleware(async (ctx) => {

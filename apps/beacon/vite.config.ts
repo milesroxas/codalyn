@@ -6,28 +6,17 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import pkg from "./package.json";
+import { resolveBeaconTowerOriginForBuild } from "./src/shared/lib/resolve-beacon-tower-origin-for-build";
 
 const beaconRoot = __dirname;
 const towerRoot = path.join(beaconRoot, "../tower");
-
-/** Default Tower for `vite build --mode production` when `VITE_TOWER_ORIGIN` is unset. Override via env or `.env.production`. */
-const DEFAULT_PRODUCTION_TOWER_ORIGIN = "https://tower.codalyn.app";
-
-function isLocalTowerUrl(origin: string): boolean {
-  try {
-    const u = new URL(origin);
-    return u.hostname === "localhost" || u.hostname === "127.0.0.1";
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Tower base URL baked into the bundle.
  * - Dev / `vite build --mode development`: default `http://TOWER_DEV_HOST:TOWER_PORT` when unset.
  * - Production (`vite build --mode production`): defaults to tower.codalyn.app when unset.
- *   Override with `VITE_TOWER_ORIGIN`. `http://localhost` from env is rejected (mixed content); use
- *   `BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION=1` for rare local Tower tests.
+ *   Override with `VITE_TOWER_ORIGIN`. Marketing hosts and `http://localhost` are rejected in production;
+ *   use `BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION=1` for rare local Tower tests.
  */
 function resolveTowerOrigin(mode: string): string {
   const beaconEnv = loadEnv(mode, beaconRoot, "");
@@ -37,22 +26,13 @@ function resolveTowerOrigin(mode: string): string {
     beaconEnv.BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION === "1" ||
     process.env.BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION === "1";
 
-  if (explicit) {
-    const origin = explicit.replace(/\/$/, "");
-    if (mode === "production" && isLocalTowerUrl(origin) && !allowLocalInProd) {
-      // `.env.local` often points at local Tower; never bake that into a Webflow prod bundle.
-      return DEFAULT_PRODUCTION_TOWER_ORIGIN.replace(/\/$/, "");
-    }
-    return origin;
-  }
-
-  if (mode === "production") {
-    return DEFAULT_PRODUCTION_TOWER_ORIGIN.replace(/\/$/, "");
-  }
-
-  const port = beaconEnv.TOWER_PORT || towerEnv.PORT || towerEnv.TOWER_PORT || "3100";
-  const host = beaconEnv.TOWER_DEV_HOST || "localhost";
-  return `http://${host}:${port}`;
+  return resolveBeaconTowerOriginForBuild({
+    mode,
+    explicitOrigin: explicit,
+    allowLocalInProduction: allowLocalInProd,
+    towerPort: beaconEnv.TOWER_PORT || towerEnv.PORT || towerEnv.TOWER_PORT || "3100",
+    towerDevHost: beaconEnv.TOWER_DEV_HOST || "localhost",
+  });
 }
 
 /** CORS for `/__webflow` when the Designer is HTTPS and the dev server is http://localhost (Chrome PNA). */

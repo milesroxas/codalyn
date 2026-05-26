@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { isTowerConfigured, openTowerAppPath, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
+import { isTowerConfigured, openTowerAppHome, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
@@ -289,7 +289,7 @@ function BeaconAppMenu({
   const [towerActionsOpen, setTowerActionsOpen] = useState(false);
 
   const openTowerApp = useCallback(() => {
-    openTowerAppPath("/");
+    openTowerAppHome();
   }, []);
 
   return (

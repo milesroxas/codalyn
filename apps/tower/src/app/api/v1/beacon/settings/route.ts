@@ -83,6 +83,16 @@ function validateTeamMutationPermissions(opts: {
   return towerPutRejectionResponse(rejection);
 }
 
+function resolveWebflowBeaconPublicConfig(): {
+  webflowAppClientId: string | null;
+  webflowBeaconMarketplaceUrl: string | null;
+} {
+  return {
+    webflowAppClientId: process.env.WEBFLOW_CLIENT_ID?.trim() || null,
+    webflowBeaconMarketplaceUrl: process.env.WEBFLOW_BEACON_MARKETPLACE_URL?.trim() || null,
+  };
+}
+
 async function loadEffectiveSettings(
   userId: string,
   ctx: Awaited<ReturnType<typeof resolveBeaconMembershipContext>>,
@@ -130,6 +140,7 @@ async function loadEffectiveSettings(
     activeOrganizationId: activeId,
     activeOrganizationName,
     webflowSites,
+    ...resolveWebflowBeaconPublicConfig(),
   };
 }
 

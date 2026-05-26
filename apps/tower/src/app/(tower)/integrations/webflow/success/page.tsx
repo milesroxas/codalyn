@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
+import { towerConnectionPathWithStatus } from "@/shared/lib/navigation/tower-app-paths";
 import { CompactRedirectSkeleton } from "@/shared/ui/page-loading-skeletons";
 
 function SuccessInner() {
@@ -15,7 +16,7 @@ function SuccessInner() {
       window.close();
       return;
     }
-    router.replace("/webflow?webflow=connected");
+    router.replace(towerConnectionPathWithStatus("connected"));
   }, [popup, router]);
 
   return (

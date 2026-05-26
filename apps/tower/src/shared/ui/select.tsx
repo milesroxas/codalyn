@@ -1,8 +1,31 @@
 import { IconCheck, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { cva, type VariantProps } from "class-variance-authority";
 import { Select as SelectPrimitive } from "radix-ui";
 import type * as React from "react";
 import { cn } from "@/shared/lib/utils";
 import { formFieldFocusClass, formFieldInvalidClass } from "@/shared/ui/form-field-styles";
+
+const selectTriggerVariants = cva(
+  "flex items-center justify-between gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 dark:border-input dark:bg-input/30 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&>span]:line-clamp-1",
+  {
+    variants: {
+      size: {
+        default: "h-8",
+        sm: "h-7 text-[0.8rem]",
+      },
+      width: {
+        full: "w-full",
+        compact: "w-20 shrink-0",
+        menu: "w-56 max-w-full",
+        fit: "w-fit",
+      },
+    },
+    defaultVariants: {
+      size: "default",
+      width: "full",
+    },
+  }
+);
 
 function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   return <SelectPrimitive.Root data-slot="select" {...props} />;
@@ -19,19 +42,15 @@ function SelectValue({ ...props }: React.ComponentProps<typeof SelectPrimitive.V
 function SelectTrigger({
   className,
   size = "default",
+  width,
   children,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Trigger> & { size?: "default" | "sm" }) {
+}: React.ComponentProps<typeof SelectPrimitive.Trigger> & VariantProps<typeof selectTriggerVariants>) {
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       data-size={size}
-      className={cn(
-        "flex w-full items-center justify-between gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-8 data-[size=sm]:h-7 data-[size=sm]:text-[0.8rem] dark:border-input dark:bg-input/30 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&>span]:line-clamp-1",
-        formFieldFocusClass,
-        formFieldInvalidClass,
-        className
-      )}
+      className={cn(selectTriggerVariants({ size, width }), formFieldFocusClass, formFieldInvalidClass, className)}
       {...props}
     >
       {children}
@@ -155,4 +174,5 @@ export {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
+  selectTriggerVariants,
 };

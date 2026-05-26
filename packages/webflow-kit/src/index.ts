@@ -10,3 +10,4 @@ export * from "./image/output-formats.js";
 export * from "./tower/tower-usage-metering.js";
 export * from "./tower/tower-usage-metering-copy.js";
 export * from "./webflow/constants.js";
+export * from "./webflow/designer-deep-link.js";

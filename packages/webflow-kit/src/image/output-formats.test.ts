@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_IMAGE_EXPORT_FORMAT,
   fileExtensionForFormat,
+  IMAGE_EXPORT_FORMAT_OPTIONS,
+  IMAGE_EXPORT_FORMATS,
   isImageExportFormat,
   mimeTypeForFormat,
 } from "./output-formats.js";
@@ -15,6 +17,10 @@ describe("output-formats", () => {
     expect(isImageExportFormat("webp")).toBe(true);
     expect(isImageExportFormat("avif")).toBe(true);
     expect(isImageExportFormat("png")).toBe(false);
+  });
+
+  it("lists export format options aligned with supported formats", () => {
+    expect(IMAGE_EXPORT_FORMAT_OPTIONS.map((option) => option.value)).toEqual([...IMAGE_EXPORT_FORMATS]);
   });
 
   it("maps mime and extension", () => {

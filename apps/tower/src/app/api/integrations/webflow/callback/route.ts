@@ -12,6 +12,7 @@ import {
 import { exchangeWebflowAuthorizationCode, type WebflowOAuthTokenResponse } from "@/server/webflow-oauth-exchange";
 import { db } from "@/shared/lib/db";
 import { organizationWebflowOAuthToken, webflowOauthAuthorizeState } from "@/shared/lib/db/auth-schema";
+import { towerConnectionPathWithStatus } from "@/shared/lib/navigation/tower-app-paths";
 
 type CookieStore = Awaited<ReturnType<typeof cookies>>;
 
@@ -171,5 +172,5 @@ export async function GET(request: Request) {
   if (isPopupFlow) {
     return NextResponse.redirect(`${appUrl}/integrations/webflow/success?popup=1`);
   }
-  return NextResponse.redirect(`${appUrl}/webflow?webflow=connected`);
+  return NextResponse.redirect(`${appUrl}${towerConnectionPathWithStatus("connected")}`);
 }

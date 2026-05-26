@@ -1,4 +1,10 @@
 import type { ImageExportFormat, MaxSizeUnit, PresetCrudScope } from "@codalyn/webflow-kit";
+import {
+  IMAGE_EXPORT_FORMAT_OPTIONS,
+  isImageExportFormat,
+  isMaxSizeUnit,
+  MAX_SIZE_UNIT_OPTIONS,
+} from "@codalyn/webflow-kit";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { ImagePageTargetSurfaceSummary } from "@/features/image-editor/ui/image-editor-page-target-surface-summary";
 import { FormFieldsCard } from "@/shared/ui/card";
@@ -49,13 +55,16 @@ function PresetFormEncodingFields(props: {
             className="min-w-0 tabular-nums"
             disabled={savePending}
           />
-          <Select value={maxSizeUnit} onValueChange={(v) => (v === "kb" || v === "mb") && setMaxSizeUnit(v)}>
+          <Select value={maxSizeUnit} onValueChange={(v) => isMaxSizeUnit(v) && setMaxSizeUnit(v)}>
             <SelectTrigger className="w-20 shrink-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent position="popper">
-              <SelectItem value="kb">KB</SelectItem>
-              <SelectItem value="mb">MB</SelectItem>
+              {MAX_SIZE_UNIT_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -71,13 +80,16 @@ function PresetFormEncodingFields(props: {
           <Label htmlFor={formatToggleId}>Set preset export format</Label>
         </div>
         {formatEnabled ? (
-          <Select value={formatDraft} onValueChange={(v) => (v === "webp" || v === "avif") && setFormatDraft(v)}>
-            <SelectTrigger className="w-full">
+          <Select value={formatDraft} onValueChange={(v) => isImageExportFormat(v) && setFormatDraft(v)}>
+            <SelectTrigger size="full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent position="popper">
-              <SelectItem value="webp">WebP</SelectItem>
-              <SelectItem value="avif">AVIF</SelectItem>
+              {IMAGE_EXPORT_FORMAT_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         ) : (

@@ -6,12 +6,10 @@ import {
   IconChevronDown,
   IconDashboard,
   IconKey,
-  IconLogout,
   IconMenu2,
   IconMoon,
   IconPlug,
   IconSearch,
-  IconSettings,
   IconShieldCheck,
   IconSun,
   IconUsers,
@@ -26,19 +24,10 @@ import { useTowerWebSignOut } from "@/features/auth/model/use-tower-web-sign-out
 import { persistBeaconThemePreference, toggledLightDarkTheme } from "@/features/beacon/lib/beacon-theme-preference";
 import { initialsFor } from "@/features/operator/model/format";
 import { OperatorCommandPalette } from "@/features/operator/ui/operator-command-palette";
+import { TowerAccountMenu } from "@/features/tower-ui/tower-account-menu";
 import { cn } from "@/shared/lib/utils";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/shared/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 const nav = [
@@ -208,59 +197,23 @@ export function OperatorShell({ userEmail, userName, children }: OperatorShellPr
             </Tooltip>
           ) : null}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" size="sm" className="gap-2 pl-1.5 pr-1.5" aria-label="Account menu">
+          <TowerAccountMenu
+            displayName={userName || userEmail}
+            email={userEmail}
+            showOperatorBadge
+            links={[{ href: "/", label: "Switch to tenant", icon: IconArrowLeft }]}
+            signingOut={signingOut}
+            onSignOut={onSignOut}
+            trigger={
+              <Button type="button" variant="ghost" size="account-toolbar" aria-label="Account menu">
                 <Avatar className="size-6">
                   <AvatarFallback>{initialsFor(userName || userEmail)}</AvatarFallback>
                 </Avatar>
                 <span className="hidden max-w-40 truncate text-sm md:inline">{userEmail}</span>
                 <IconChevronDown className="size-3.5 opacity-60" aria-hidden />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel className="normal-case">
-                <div className="flex flex-col gap-0.5">
-                  <span className="truncate text-sm font-medium text-foreground">{userName || userEmail}</span>
-                  <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
-                  <span className="mt-1">
-                    <Badge variant="secondary" className="gap-1">
-                      <IconShieldCheck className="size-3" />
-                      Operator
-                    </Badge>
-                  </span>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem asChild>
-                  <Link href="/account" className="gap-2">
-                    <IconSettings className="size-4" />
-                    Account settings
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/" className="gap-2">
-                    <IconArrowLeft className="size-4" />
-                    Switch to tenant
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                disabled={signingOut}
-                onSelect={(event) => {
-                  event.preventDefault();
-                  void onSignOut();
-                }}
-                className="gap-2"
-              >
-                <IconLogout className="size-4" />
-                {signingOut ? "Signing out…" : "Sign out"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+          />
         </div>
       </header>
 

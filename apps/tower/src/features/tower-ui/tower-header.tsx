@@ -3,10 +3,9 @@
 import {
   IconCreditCard,
   IconHome,
-  IconLogout,
   IconMoon,
+  IconPlug,
   IconRadar2,
-  IconSettings,
   IconShieldCheck,
   IconSun,
   IconUserPlus,
@@ -20,20 +19,13 @@ import { authClient } from "@/features/auth/model/auth-client";
 import { useTowerWebSignOut } from "@/features/auth/model/use-tower-web-sign-out";
 import { persistBeaconThemePreference, toggledLightDarkTheme } from "@/features/beacon/lib/beacon-theme-preference";
 import { avatarLetterFromUser } from "@/features/operator/model/format";
+import { TowerAccountMenu } from "@/features/tower-ui/tower-account-menu";
 import { TowerHeaderWorkspaceSwitcher } from "@/features/tower-ui/tower-header-workspace-switcher";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
+import { TOWER_CONNECTION_PATH } from "@/shared/lib/navigation/tower-app-paths";
+import { userDisplayName } from "@/shared/lib/user-display-name";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/shared/ui/dropdown-menu";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { towerAppShellContentClassName } from "@/shared/ui/tower-page-shell";
 
@@ -93,6 +85,12 @@ export function TowerHeader({ billingEnabled = false }: { billingEnabled?: boole
                 Beacon
               </Link>
             </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={TOWER_CONNECTION_PATH} className="inline-flex items-center gap-1.5">
+                <IconPlug aria-hidden className="size-4 shrink-0" stroke={1.5} />
+                Connection
+              </Link>
+            </Button>
             {billingEnabled ? (
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/billing" className="inline-flex items-center gap-1.5">
@@ -137,14 +135,6 @@ type AuthUser = {
   lastName?: string | null;
 };
 
-function displayNameForMenu(user: AuthUser): string {
-  const parts = [user.firstName?.trim(), user.lastName?.trim()].filter(Boolean);
-  if (parts.length > 0) {
-    return parts.join(" ");
-  }
-  return user.name?.trim() || user.email;
-}
-
 function AuthSection({
   billingEnabled,
   isPending,
@@ -185,10 +175,21 @@ function AuthSection({
       </>
     );
   }
+  const accountLinks = [
+    ...(billingEnabled ? [{ href: "/billing", label: "Billing", icon: IconCreditCard }] : []),
+    ...(isProductAdmin ? [{ href: "/console", label: "Switch to operator", icon: IconShieldCheck }] : []),
+  ];
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="icon-sm" className="rounded-full" aria-label="Account menu">
+    <TowerAccountMenu
+      displayName={userDisplayName(user)}
+      email={user.email}
+      showOperatorBadge={isProductAdmin}
+      links={accountLinks}
+      signingOut={signingOut}
+      onSignOut={onSignOut}
+      trigger={
+        <Button type="button" variant="ghost" size="icon-avatar" aria-label="Account menu">
           <Avatar className="size-8">
             <AvatarFallback className="text-xs font-medium">
               {avatarLetterFromUser({
@@ -199,61 +200,7 @@ function AuthSection({
             </AvatarFallback>
           </Avatar>
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel className="normal-case">
-          <div className="flex flex-col gap-0.5">
-            <span className="truncate text-sm font-medium text-foreground">{displayNameForMenu(user)}</span>
-            <span className="truncate text-xs text-muted-foreground">{user.email}</span>
-            {isProductAdmin ? (
-              <span className="mt-1">
-                <Badge variant="secondary" className="gap-1">
-                  <IconShieldCheck className="size-3" />
-                  Operator
-                </Badge>
-              </span>
-            ) : null}
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link href="/account" className="gap-2">
-              <IconSettings className="size-4" />
-              Account settings
-            </Link>
-          </DropdownMenuItem>
-          {billingEnabled ? (
-            <DropdownMenuItem asChild>
-              <Link href="/billing" className="gap-2">
-                <IconCreditCard className="size-4" />
-                Billing
-              </Link>
-            </DropdownMenuItem>
-          ) : null}
-          {isProductAdmin ? (
-            <DropdownMenuItem asChild>
-              <Link href="/console" className="gap-2">
-                <IconShieldCheck className="size-4" />
-                Switch to operator
-              </Link>
-            </DropdownMenuItem>
-          ) : null}
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          disabled={signingOut}
-          onSelect={(event) => {
-            event.preventDefault();
-            void onSignOut();
-          }}
-          className="gap-2"
-        >
-          <IconLogout className="size-4" />
-          {signingOut ? "Signing out…" : "Sign out"}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      }
+    />
   );
 }

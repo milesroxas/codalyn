@@ -17,18 +17,19 @@ import {
   maxBytesToDraft,
   parsePresetOutputDimension,
 } from "@/features/beacon/lib/preset-dimensions";
+import { BeaconDesignerOpenLink } from "@/features/beacon/ui/beacon-designer-open-link";
+import { BeaconSiteDefaultPresetFields } from "@/features/beacon/ui/beacon-preset-form-fields";
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { Input } from "@/shared/ui/input";
-import { Label } from "@/shared/ui/label";
-import { NativeSelect } from "@/shared/ui/native-select";
+import { FormFieldInset } from "@/shared/ui/form-field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
 export type TowerBeaconWebflowSite = {
   id: string;
   displayName?: string;
+  shortName?: string;
 };
 
 export function TowerBeaconConnectEmptyState(props: {
@@ -76,6 +77,8 @@ export type TowerBeaconPresetsPanelProps = {
   saving: boolean;
   settings: BeaconAppSettings | undefined;
   webflowSites: TowerBeaconWebflowSite[] | null;
+  webflowAppClientId: string | null;
+  webflowBeaconMarketplaceUrl?: string | null;
   canManage: boolean;
   teamPresetsLocked: boolean;
   canEditSiteDefault: boolean;
@@ -157,6 +160,28 @@ function createSiteDefaultDraft(
   };
 }
 
+function SiteDefaultPresetEmptyState(props: { canEdit: boolean; onSet?: () => void }) {
+  const { canEdit, onSet } = props;
+
+  return (
+    <Card size="sm">
+      <CardContent className="flex flex-col gap-4 px-4 py-6">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-foreground">No site default preset has been set</p>
+          <p className="text-sm text-muted-foreground">
+            Set a default format, size, and file limit for images exported from this site.
+          </p>
+        </div>
+        {canEdit ? (
+          <Button type="button" onClick={onSet}>
+            Set site default preset
+          </Button>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
 function SiteDefaultPresetEditor(props: {
   baseId: string;
   siteId: string;
@@ -165,6 +190,8 @@ function SiteDefaultPresetEditor(props: {
   defaultExportFormat: ImageExportFormat;
   upsertSiteDefaultPresetAction: (siteId: string, row: BeaconPresetRow) => void;
   clearSiteDefaultPresetAction: (siteId: string) => void;
+  onCancel: () => void;
+  onSaved: () => void;
 }) {
   const {
     baseId,
@@ -174,6 +201,8 @@ function SiteDefaultPresetEditor(props: {
     defaultExportFormat,
     upsertSiteDefaultPresetAction,
     clearSiteDefaultPresetAction,
+    onCancel,
+    onSaved,
   } = props;
   const [draft, setDraft] = useState<SiteDefaultDraft>(() =>
     createSiteDefaultDraft(siteDefaultPreset, defaultExportFormat)
@@ -195,72 +224,26 @@ function SiteDefaultPresetEditor(props: {
       maxFileSizeBytes: draftToMaxBytes(draft.draftMaxStr, draft.draftMaxUnit),
       targetKey: { kind: "site-default", siteId },
     });
+    onSaved();
   };
 
   return (
-    <div className="space-y-3 rounded-lg border border-dashed border-border/80 bg-background/50 p-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor={`${baseId}-${siteId}-site-default-w`}>Width</Label>
-          <Input
-            id={`${baseId}-${siteId}-site-default-w`}
-            value={draft.draftW}
-            disabled={saving}
-            onChange={(event) => setDraft((current) => ({ ...current, draftW: event.target.value }))}
-            className="h-9 text-sm tabular-nums"
-            inputMode="numeric"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={`${baseId}-${siteId}-site-default-h`}>Height</Label>
-          <Input
-            id={`${baseId}-${siteId}-site-default-h`}
-            value={draft.draftH}
-            disabled={saving}
-            onChange={(event) => setDraft((current) => ({ ...current, draftH: event.target.value }))}
-            className="h-9 text-sm tabular-nums"
-            inputMode="numeric"
-          />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor={`${baseId}-${siteId}-site-default-format`}>Format</Label>
-          <NativeSelect
-            id={`${baseId}-${siteId}-site-default-format`}
-            className="w-full"
-            value={draft.draftFormat}
-            disabled={saving}
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, draftFormat: event.target.value as ImageExportFormat }))
-            }
-          >
-            <option value="webp">WebP</option>
-            <option value="avif">AVIF</option>
-          </NativeSelect>
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label className="text-xs text-muted-foreground">Max encoded size</Label>
-          <div className="flex max-w-sm gap-2">
-            <Input
-              className="h-9 text-sm tabular-nums"
-              value={draft.draftMaxStr}
-              disabled={saving}
-              onChange={(event) => setDraft((current) => ({ ...current, draftMaxStr: event.target.value }))}
-            />
-            <NativeSelect
-              className="w-18 shrink-0"
-              value={draft.draftMaxUnit}
-              disabled={saving}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, draftMaxUnit: event.target.value as MaxSizeUnit }))
-              }
-            >
-              <option value="kb">KB</option>
-              <option value="mb">MB</option>
-            </NativeSelect>
-          </div>
-        </div>
-      </div>
-      <div className="flex gap-2">
+    <FormFieldInset>
+      <BeaconSiteDefaultPresetFields
+        baseId={`${baseId}-${siteId}`}
+        disabled={saving}
+        width={draft.draftW}
+        height={draft.draftH}
+        exportFormat={draft.draftFormat}
+        maxStr={draft.draftMaxStr}
+        maxUnit={draft.draftMaxUnit}
+        onWidthChange={(value) => setDraft((current) => ({ ...current, draftW: value }))}
+        onHeightChange={(value) => setDraft((current) => ({ ...current, draftH: value }))}
+        onExportFormatChange={(value) => setDraft((current) => ({ ...current, draftFormat: value }))}
+        onMaxStrChange={(value) => setDraft((current) => ({ ...current, draftMaxStr: value }))}
+        onMaxUnitChange={(value) => setDraft((current) => ({ ...current, draftMaxUnit: value }))}
+      />
+      <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" disabled={saving} onClick={save}>
           {siteDefaultPreset ? "Update" : "Create"}
         </Button>
@@ -270,13 +253,19 @@ function SiteDefaultPresetEditor(props: {
             variant="outline"
             size="sm"
             disabled={saving}
-            onClick={() => clearSiteDefaultPresetAction(siteId)}
+            onClick={() => {
+              clearSiteDefaultPresetAction(siteId);
+              onCancel();
+            }}
           >
             Remove
           </Button>
         ) : null}
+        <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onCancel}>
+          Cancel
+        </Button>
       </div>
-    </div>
+    </FormFieldInset>
   );
 }
 
@@ -297,14 +286,13 @@ function BeaconSitePicker(props: {
 
   return (
     <Select value={selectedSiteId} onValueChange={onSelectedSiteIdChange}>
-      <SelectTrigger aria-label="Webflow site" className="w-56 max-w-full">
+      <SelectTrigger aria-label="Webflow site" width="menu">
         <SelectValue placeholder="Select site" />
       </SelectTrigger>
       <SelectContent>
         {siteGroups.map((group) => {
           const presetCount = countSitePresets(group);
-          const presetSuffix =
-            presetCount > 0 ? ` · ${presetCount} preset${presetCount === 1 ? "" : "s"}` : " · no presets";
+          const presetSuffix = presetCount > 0 ? ` · ${presetCount} preset${presetCount === 1 ? "" : "s"}` : "";
           return (
             <SelectItem key={group.siteId} value={group.siteId}>
               {group.displayName}
@@ -336,6 +324,8 @@ function SitePresetsDetail(props: {
   saving: boolean;
   settings: BeaconAppSettings | undefined;
   canEditSiteDefault: boolean;
+  webflowAppClientId: string | null;
+  webflowBeaconMarketplaceUrl?: string | null;
   upsertSiteDefaultPresetAction: (siteId: string, row: BeaconPresetRow) => void;
   clearSiteDefaultPresetAction: (siteId: string) => void;
 }) {
@@ -345,36 +335,63 @@ function SitePresetsDetail(props: {
     saving,
     settings,
     canEditSiteDefault,
+    webflowAppClientId,
+    webflowBeaconMarketplaceUrl,
     upsertSiteDefaultPresetAction,
     clearSiteDefaultPresetAction,
   } = props;
   const presetCount = countSitePresets(group);
+  const [siteDefaultFormOpen, setSiteDefaultFormOpen] = useState(false);
+  const siteDefaultPreset = group.siteDefault;
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">
-        Site ID <span className="font-mono">{group.siteId}</span>
-        {presetCount > 0 ? ` · ${presetCount} preset${presetCount === 1 ? "" : "s"}` : " · no presets yet"}
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          {presetCount > 0 ? `${presetCount} preset${presetCount === 1 ? "" : "s"}` : "No presets yet"}
+        </p>
+        <BeaconDesignerOpenLink
+          siteDisplayName={group.displayName}
+          shortName={group.shortName}
+          webflowAppClientId={webflowAppClientId}
+          webflowBeaconMarketplaceUrl={webflowBeaconMarketplaceUrl}
+        />
+      </div>
       <div className="space-y-3">
-        <p className="text-sm font-medium">Site default</p>
-        {group.siteDefault ? (
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Site default preset</p>
+          <p className="text-sm text-muted-foreground">
+            Used when Beacon exports images without a more specific preset.
+          </p>
+        </div>
+        {siteDefaultPreset ? (
           <SiteDefaultPresetSummary
-            siteDefaultPreset={group.siteDefault}
+            siteDefaultPreset={siteDefaultPreset}
             defaultExportFormat={settings?.defaultExportFormat}
           />
-        ) : (
-          <p className="text-sm text-muted-foreground">No site default preset yet.</p>
-        )}
-        {canEditSiteDefault ? (
+        ) : null}
+        {!siteDefaultPreset && !siteDefaultFormOpen ? (
+          <SiteDefaultPresetEmptyState
+            canEdit={canEditSiteDefault}
+            onSet={canEditSiteDefault ? () => setSiteDefaultFormOpen(true) : undefined}
+          />
+        ) : null}
+        {canEditSiteDefault && siteDefaultPreset && !siteDefaultFormOpen ? (
+          <Button type="button" variant="outline" size="sm" onClick={() => setSiteDefaultFormOpen(true)}>
+            Edit site default preset
+          </Button>
+        ) : null}
+        {canEditSiteDefault && siteDefaultFormOpen ? (
           <SiteDefaultPresetEditor
             baseId={baseId}
             siteId={group.siteId}
             saving={saving}
-            siteDefaultPreset={group.siteDefault}
+            siteDefaultPreset={siteDefaultPreset}
             defaultExportFormat={settings?.defaultExportFormat ?? "webp"}
             upsertSiteDefaultPresetAction={upsertSiteDefaultPresetAction}
             clearSiteDefaultPresetAction={clearSiteDefaultPresetAction}
+            onCancel={() => setSiteDefaultFormOpen(false)}
+            onSaved={() => setSiteDefaultFormOpen(false)}
           />
         ) : null}
       </div>
@@ -400,7 +417,16 @@ function SitePresetsDetail(props: {
 }
 
 export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
-  const { settings, webflowSites, canManage, teamPresetsLocked, canEditSiteDefault, ...siteDefaultActions } = props;
+  const {
+    settings,
+    webflowSites,
+    webflowAppClientId,
+    webflowBeaconMarketplaceUrl,
+    canManage,
+    teamPresetsLocked,
+    canEditSiteDefault,
+    ...siteDefaultActions
+  } = props;
 
   const siteGroups = useMemo(() => {
     if (!settings) {
@@ -433,8 +459,8 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
             <CardTitle>{multipleSites ? "Webflow sites" : selectedGroup.displayName}</CardTitle>
             <CardDescription>
               {multipleSites
-                ? `${siteGroups.length} sites linked to this workspace. Choose one to configure image presets.`
-                : "Configure the site default preset here. Scoped presets are managed in the Beacon image editor."}
+                ? "Choose a site to manage its image export presets."
+                : "Manage image export presets for this site."}
             </CardDescription>
             {multipleSites ? (
               <CardAction>
@@ -448,9 +474,12 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
           </CardHeader>
           <CardContent>
             <SitePresetsDetail
+              key={selectedGroup.siteId}
               group={selectedGroup}
               settings={settings}
               canEditSiteDefault={canEditSiteDefault}
+              webflowAppClientId={webflowAppClientId}
+              webflowBeaconMarketplaceUrl={webflowBeaconMarketplaceUrl}
               {...siteDefaultActions}
             />
           </CardContent>

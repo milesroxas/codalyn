@@ -14,7 +14,9 @@ import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuEmptyState,
   DropdownMenuItem,
+  DropdownMenuItemIconSlot,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -54,12 +56,7 @@ export function TeamWorkspaceSwitcher(props: {
             type="button"
             variant="outline"
             disabled={disabled}
-            size={props.compact ? "sm" : "lg"}
-            className={
-              props.compact
-                ? "h-8 min-w-32 max-w-[11rem] justify-between gap-1.5 px-2 text-xs font-normal sm:min-w-36 sm:max-w-[14rem]"
-                : "min-w-48 max-w-[min(18rem,100%)] justify-between gap-2 px-3 font-normal"
-            }
+            size={props.compact ? "workspace-compact" : "workspace"}
             aria-label="Workspace menu"
           >
             <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
@@ -73,7 +70,7 @@ export function TeamWorkspaceSwitcher(props: {
             <IconChevronDown className="size-4 shrink-0 opacity-50" aria-hidden />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuContent align="end" size="panel">
           <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
           {list.length > 0 ? (
             <div className="flex flex-col">
@@ -83,18 +80,19 @@ export function TeamWorkspaceSwitcher(props: {
                 return (
                   <DropdownMenuItem
                     key={o.id}
-                    className="flex cursor-pointer items-center gap-2 pr-1.5"
+                    layout="workspace"
                     onSelect={() => {
                       props.onSetActive(o.id);
                     }}
                   >
-                    <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
-                      {isActive ? <IconCheck className="size-4 text-foreground" aria-hidden /> : null}
-                    </span>
+                    <DropdownMenuItemIconSlot>
+                      {isActive ? <IconCheck className="text-foreground" aria-hidden /> : null}
+                    </DropdownMenuItemIconSlot>
                     <span className="min-w-0 flex-1 truncate">{o.name}</span>
-                    <button
+                    <Button
                       type="button"
-                      className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                      variant="ghost"
+                      size="icon"
                       aria-label={
                         isPreferred ? "Remove as default workspace for Team" : "Set as default workspace for Team"
                       }
@@ -108,21 +106,21 @@ export function TeamWorkspaceSwitcher(props: {
                       }}
                     >
                       {isPreferred ? (
-                        <IconStarFilled className="size-4 text-amber-600 dark:text-amber-400" aria-hidden />
+                        <IconStarFilled className="text-amber-600 dark:text-amber-400" aria-hidden />
                       ) : (
-                        <IconStar className="size-4 opacity-70" aria-hidden />
+                        <IconStar className="opacity-70" aria-hidden />
                       )}
-                    </button>
+                    </Button>
                   </DropdownMenuItem>
                 );
               })}
             </div>
           ) : (
-            <p className="px-2 py-2 text-xs text-muted-foreground">
+            <DropdownMenuEmptyState>
               {props.canCreateTeam
                 ? "No workspaces yet. Create one to connect Webflow and manage Beacon presets."
                 : "No team workspaces yet. Accept an invite or upgrade to Team to create one."}
-            </p>
+            </DropdownMenuEmptyState>
           )}
           {props.canCreateTeam ? (
             <>

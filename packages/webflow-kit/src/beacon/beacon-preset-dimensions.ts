@@ -27,6 +27,18 @@ export function parsePresetOutputDimension(input: string, fallback: number): num
 
 export type MaxSizeUnit = "kb" | "mb";
 
+export const MAX_SIZE_UNIT_OPTIONS: ReadonlyArray<{
+  value: MaxSizeUnit;
+  label: string;
+}> = [
+  { value: "kb", label: "KB" },
+  { value: "mb", label: "MB" },
+];
+
+export function isMaxSizeUnit(value: string): value is MaxSizeUnit {
+  return value === "kb" || value === "mb";
+}
+
 export function draftToMaxBytes(value: string, unit: MaxSizeUnit): number {
   const n = Number.parseFloat(value.replace(",", "."));
   if (!Number.isFinite(n) || n <= 0) {

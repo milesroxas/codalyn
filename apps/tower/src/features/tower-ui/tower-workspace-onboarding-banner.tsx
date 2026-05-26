@@ -18,6 +18,7 @@ import {
 } from "@/features/tower-ui/lib/tower-workspace-onboarding";
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
 import type { TowerDashboardSummary } from "@/server/dashboard-summary";
+import { TOWER_CONNECTION_PATH, TOWER_CONNECTION_STATUS_QUERY } from "@/shared/lib/navigation/tower-app-paths";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 
@@ -25,7 +26,7 @@ type TowerWorkspaceOnboardingBannerProps = {
   summary: TowerDashboardSummary;
   billingEnabled: boolean;
   oauthConfigured?: boolean;
-  /** Dashboard only: nudge admins who still need to connect. Omit on `/webflow` (page has connect actions). */
+  /** Dashboard only: nudge admins who still need to connect. Omit on `/connection` (page has connect actions). */
   includeWebflowConnect?: boolean;
   /** When nested inside another alert stack, omit outer bottom margin. */
   embedded?: boolean;
@@ -84,7 +85,7 @@ function OnboardingAlertActions({
   if (blocker === "webflow_admin_only") {
     return (
       <Button variant="outline" size="sm" asChild>
-        <Link href="/webflow">View Webflow status</Link>
+        <Link href={TOWER_CONNECTION_PATH}>View Webflow status</Link>
       </Button>
     );
   }
@@ -246,13 +247,16 @@ type TowerWebflowQueryBannerProps = {
 function TowerWebflowQueryBannerInner({ webflowOAuthConnected }: TowerWebflowQueryBannerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [status] = useState(() => parseTowerWebflowQueryStatus(searchParams.get("webflow")));
+  const [status] = useState(() =>
+    parseTowerWebflowQueryStatus(searchParams.get(TOWER_CONNECTION_STATUS_QUERY) ?? searchParams.get("webflow"))
+  );
 
   useEffect(() => {
-    if (!status || !searchParams.has("webflow")) {
+    if (!status || (!searchParams.has(TOWER_CONNECTION_STATUS_QUERY) && !searchParams.has("webflow"))) {
       return;
     }
     const url = new URL(window.location.href);
+    url.searchParams.delete(TOWER_CONNECTION_STATUS_QUERY);
     url.searchParams.delete("webflow");
     router.replace(`${url.pathname}${url.search}`, { scroll: false });
   }, [status, router, searchParams]);
@@ -302,7 +306,9 @@ type TowerWebflowSetupAlertsProps = {
 
 function TowerWebflowSetupAlertsInner({ summary, billingEnabled, oauthConfigured }: TowerWebflowSetupAlertsProps) {
   const searchParams = useSearchParams();
-  const queryStatus = parseTowerWebflowQueryStatus(searchParams.get("webflow"));
+  const queryStatus = parseTowerWebflowQueryStatus(
+    searchParams.get(TOWER_CONNECTION_STATUS_QUERY) ?? searchParams.get("webflow")
+  );
   const blocker = resolveTowerWorkspaceOnboardingBlocker(summary);
   const suppressOnboarding = shouldSuppressOnboardingForQuery(queryStatus, blocker);
 

@@ -6,6 +6,8 @@ import {
   formatBeaconPresetExportSummary,
   formatBeaconPresetMax,
   formatBeaconPresetStorageSummary,
+  isMaxSizeUnit,
+  MAX_SIZE_UNIT_OPTIONS,
   maxBytesToDraft,
   parsePresetOutputDimension,
 } from "./beacon-preset-dimensions.js";
@@ -19,6 +21,18 @@ describe("parsePresetOutputDimension", () => {
   it("clamps valid numeric input", () => {
     expect(parsePresetOutputDimension("100", 1)).toBe(100);
     expect(parsePresetOutputDimension("999999", 1)).toBe(8192);
+  });
+});
+
+describe("isMaxSizeUnit", () => {
+  it("accepts kb and mb only", () => {
+    expect(isMaxSizeUnit("kb")).toBe(true);
+    expect(isMaxSizeUnit("mb")).toBe(true);
+    expect(isMaxSizeUnit("gb")).toBe(false);
+  });
+
+  it("lists max size unit options", () => {
+    expect(MAX_SIZE_UNIT_OPTIONS.map((option) => option.value)).toEqual(["kb", "mb"]);
   });
 });
 

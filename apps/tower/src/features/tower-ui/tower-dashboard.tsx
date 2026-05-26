@@ -5,6 +5,7 @@ import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
 import { formatWebflowIntegrationStatus } from "@/features/tower-ui/lib/tower-webflow-integration-status";
 import { TowerWorkspaceOnboardingBanner } from "@/features/tower-ui/tower-workspace-onboarding-banner";
 import type { TowerDashboardSummary } from "@/server/dashboard-summary";
+import { TOWER_CONNECTION_PATH } from "@/shared/lib/navigation/tower-app-paths";
 import { ActionTile, ActionTileGrid } from "@/shared/ui/action-tile";
 import { Button } from "@/shared/ui/button";
 import { StatTile } from "@/shared/ui/stat-tile";
@@ -65,7 +66,7 @@ function buildQuickActions(summary: TowerDashboardSummary, billingEnabled: boole
       key: "connect-webflow",
       label: summary.activeOrgTeamAdmin ? "Connect Webflow" : "Webflow settings",
       description: "Connect Webflow to enable the Data API proxy.",
-      href: "/webflow",
+      href: TOWER_CONNECTION_PATH,
       icon: IconPlug,
       variant: "emphasis",
     });
@@ -134,7 +135,7 @@ function DashboardSignalsColumn({ summary }: { summary: TowerDashboardSummary })
           webflowSitesCount: summary.webflowSites ? summary.webflowSites.length : null,
         })}
         icon={IconPlug}
-        href="/webflow"
+        href={TOWER_CONNECTION_PATH}
       />
       <StatTile label="Team" {...teamSnapshot(summary)} icon={IconUsers} href="/team" />
       <StatTile label="Beacon presets" {...beaconSnapshot(summary)} icon={IconRadar2} href="/beacon" />
@@ -182,7 +183,9 @@ export function TowerDashboard({ summary, usage, billingEnabled, oauthConfigured
         actions={
           summary.activeOrgTeamAdmin || !summary.webflowOAuthConnected ? (
             <Button variant="outline" size="sm" asChild>
-              <Link href="/webflow">{summary.webflowOAuthConnected ? "Manage Webflow" : "Connect Webflow"}</Link>
+              <Link href={TOWER_CONNECTION_PATH}>
+                {summary.webflowOAuthConnected ? "Manage Webflow" : "Connect Webflow"}
+              </Link>
             </Button>
           ) : null
         }

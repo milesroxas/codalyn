@@ -1,22 +1,21 @@
 import { redirect } from "next/navigation";
-import { TowerWebflowScreen } from "@/features/tower-ui/tower-webflow-screen";
-import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
-import { getTowerDashboardSummary } from "@/server/dashboard-summary";
-import { hasWebflowOAuthCredentials } from "@/server/webflow-proxy-token";
+import { TOWER_CONNECTION_PATH, TOWER_CONNECTION_STATUS_QUERY } from "@/shared/lib/navigation/tower-app-paths";
 
-export const dynamic = "force-dynamic";
+type WebflowRouteRedirectProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
-export default async function WebflowPage() {
-  const summary = await getTowerDashboardSummary({ includeWebflowSites: true });
-  if (!summary.signedIn) {
-    redirect("/sign-in?callbackUrl=/webflow");
+/** Legacy `/webflow` URL — forwards to `/connection` and maps the old status query param. */
+export default async function WebflowRouteRedirect({ searchParams }: WebflowRouteRedirectProps) {
+  const params = await searchParams;
+  const legacyStatus = params.webflow;
+  const status =
+    typeof legacyStatus === "string" ? legacyStatus : Array.isArray(legacyStatus) ? legacyStatus[0] : undefined;
+
+  if (status) {
+    const next = new URLSearchParams({ [TOWER_CONNECTION_STATUS_QUERY]: status });
+    redirect(`${TOWER_CONNECTION_PATH}?${next.toString()}`);
   }
 
-  return (
-    <TowerWebflowScreen
-      summary={summary}
-      oauthConfigured={hasWebflowOAuthCredentials()}
-      billingEnabled={isTowerBillingEnabled()}
-    />
-  );
+  redirect(TOWER_CONNECTION_PATH);
 }

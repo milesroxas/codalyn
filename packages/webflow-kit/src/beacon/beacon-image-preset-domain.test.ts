@@ -692,15 +692,17 @@ describe("multi-site preset storage helpers", () => {
         },
       },
       [
-        { id: "site_1", displayName: "Marketing" },
-        { id: "site_2", displayName: "Docs" },
+        { id: "site_1", displayName: "Marketing", shortName: "marketing-site" },
+        { id: "site_2", displayName: "Docs", shortName: "docs-site" },
       ]
     );
     expect(groups).toHaveLength(2);
     expect(groups[0]?.displayName).toBe("Docs");
     expect(groups[0]?.siteId).toBe("site_2");
+    expect(groups[0]?.shortName).toBe("docs-site");
     expect(groups[0]?.scopedPresets).toHaveLength(0);
     expect(groups[1]?.displayName).toBe("Marketing");
+    expect(groups[1]?.shortName).toBe("marketing-site");
     expect(groups[1]?.siteDefault?.id).toBe("site_1_default");
     expect(groups[1]?.scopedPresets).toHaveLength(1);
   });

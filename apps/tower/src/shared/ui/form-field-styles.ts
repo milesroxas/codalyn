@@ -39,10 +39,15 @@ export const formFieldVariants = cva(formFieldSharedClass, {
       default: formFieldSurfaceClass.default,
       elevated: formFieldSurfaceClass.elevated,
     },
+    numeric: {
+      true: "tabular-nums",
+      false: "",
+    },
   },
   defaultVariants: {
     fieldSize: "default",
     surface: "default",
+    numeric: false,
   },
 });
 

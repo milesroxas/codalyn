@@ -9,6 +9,14 @@ export const IMAGE_EXPORT_FORMATS = ["webp", "avif"] as const;
 
 export type ImageExportFormat = (typeof IMAGE_EXPORT_FORMATS)[number];
 
+export const IMAGE_EXPORT_FORMAT_OPTIONS: ReadonlyArray<{
+  value: ImageExportFormat;
+  label: string;
+}> = [
+  { value: "webp", label: "WebP" },
+  { value: "avif", label: "AVIF" },
+];
+
 export function isImageExportFormat(value: string): value is ImageExportFormat {
   return (IMAGE_EXPORT_FORMATS as readonly string[]).includes(value);
 }

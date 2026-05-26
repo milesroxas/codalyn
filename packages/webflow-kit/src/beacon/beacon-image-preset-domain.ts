@@ -1,3 +1,4 @@
+import { normalizeWebflowSiteShortName } from "../webflow/designer-deep-link.js";
 import { BEACON_IMAGE_ERROR_CODES } from "./beacon-image-errors.js";
 
 const TAGGED_EXPORT_MAX_EDGE = 2560;
@@ -704,11 +705,13 @@ export function listBeaconPresetStorageEntries(storage: {
 export type BeaconPresetSiteCatalogEntry = {
   id: string;
   displayName?: string;
+  shortName?: string;
 };
 
 export type BeaconPresetSiteGroup = {
   siteId: string;
   displayName: string;
+  shortName: string | null;
   siteDefault: BeaconPresetRow | null;
   scopedPresets: BeaconPresetStorageEntry[];
 };
@@ -721,7 +724,15 @@ export function buildBeaconPresetSiteGroups(
   catalog: ReadonlyArray<BeaconPresetSiteCatalogEntry> = []
 ): BeaconPresetSiteGroup[] {
   const coalesced = coalesceBeaconPresetStorage(storage);
-  const catalogById = new Map(catalog.map((site) => [trimSiteId(site.id), site.displayName?.trim() || undefined]));
+  const catalogById = new Map(
+    catalog.map((site) => [
+      trimSiteId(site.id),
+      {
+        displayName: site.displayName?.trim() || undefined,
+        shortName: normalizeWebflowSiteShortName(site.shortName),
+      },
+    ])
+  );
   const grouped = new Map<string, BeaconPresetStorageEntry[]>();
 
   for (const entry of listBeaconPresetStorageEntries(coalesced)) {
@@ -740,9 +751,11 @@ export function buildBeaconPresetSiteGroups(
 
   const groups: BeaconPresetSiteGroup[] = [];
   for (const [siteId, entries] of grouped) {
+    const catalogEntry = catalogById.get(siteId);
     groups.push({
       siteId,
-      displayName: catalogById.get(siteId) ?? siteId,
+      displayName: catalogEntry?.displayName ?? siteId,
+      shortName: catalogEntry?.shortName ?? null,
       siteDefault: resolveSiteDefaultPresetRow(coalesced, siteId),
       scopedPresets: entries.filter((entry) => entry.scope !== "site-default"),
     });

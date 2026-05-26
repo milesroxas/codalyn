@@ -12,13 +12,14 @@ function Input({
   type,
   fieldSize,
   surface,
+  numeric,
   ...props
 }: Omit<React.ComponentProps<"input">, "size"> & VariantProps<typeof formFieldVariants>) {
   return (
     <input
       type={type}
       data-slot="input"
-      className={cn(formFieldVariants({ fieldSize, surface }), inputSpecificClass, className)}
+      className={cn(formFieldVariants({ fieldSize, surface, numeric }), inputSpecificClass, className)}
       {...props}
     />
   );

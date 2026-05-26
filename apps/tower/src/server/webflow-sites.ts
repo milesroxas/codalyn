@@ -4,6 +4,7 @@ import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 export type WebflowSiteSummary = {
   id: string;
   displayName?: string;
+  shortName?: string;
 };
 
 export async function listWebflowSitesWithToken(accessToken: string): Promise<WebflowSiteSummary[]> {

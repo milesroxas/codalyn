@@ -1,18 +1,27 @@
-import { webflowDataApiUrl } from "@codalyn/webflow-kit";
-import { eq } from "drizzle-orm";
+import {
+  getDefaultBeaconAppSettings,
+  listBeaconPresetStorageEntries,
+  mergeOrgTeamSettingsIntoUser,
+  parseBeaconAppSettings,
+  webflowDataApiUrl,
+} from "@codalyn/webflow-kit";
+import { and, count, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { auth } from "@/server/auth";
 import { resolveActiveOrganizationId } from "@/server/resolve-active-organization-id";
 import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 import { db } from "@/shared/lib/db";
-import { organization } from "@/shared/lib/db/auth-schema";
+import { beaconAppSettings, invitation, member, organization } from "@/shared/lib/db/auth-schema";
 
 export type TowerDashboardSummary = {
   signedIn: boolean;
   userEmail: string | null;
   activeOrganizationId: string | null;
   activeOrganizationName: string | null;
+  workspaceMemberCount: number | null;
+  workspacePendingInviteCount: number | null;
+  beaconPresetCount: number | null;
   webflowOAuthConnected: boolean;
   webflowSites: { id: string; displayName?: string }[] | null;
   /**
@@ -21,6 +30,49 @@ export type TowerDashboardSummary = {
    */
   activeOrgTeamAdmin: boolean;
 };
+
+async function resolveBeaconPresetCount(userId: string, activeOrganizationId: string | null): Promise<number | null> {
+  if (!activeOrganizationId) {
+    return null;
+  }
+
+  const [settingsRows, orgRows] = await Promise.all([
+    db
+      .select({ payload: beaconAppSettings.payload })
+      .from(beaconAppSettings)
+      .where(eq(beaconAppSettings.userId, userId))
+      .limit(1),
+    db
+      .select({ beaconTeamSettings: organization.beaconTeamSettings })
+      .from(organization)
+      .where(eq(organization.id, activeOrganizationId))
+      .limit(1),
+  ]);
+
+  const userSettings = settingsRows[0]?.payload
+    ? parseBeaconAppSettings(settingsRows[0].payload)
+    : getDefaultBeaconAppSettings();
+  const merged = mergeOrgTeamSettingsIntoUser(userSettings, orgRows[0]?.beaconTeamSettings ?? null);
+  return listBeaconPresetStorageEntries(merged.imagePresetStorage).length;
+}
+
+async function resolveWorkspaceCounts(activeOrganizationId: string): Promise<{
+  memberCount: number;
+  pendingInviteCount: number;
+}> {
+  const [[memberRow], [inviteRow]] = await Promise.all([
+    db.select({ total: count() }).from(member).where(eq(member.organizationId, activeOrganizationId)),
+    db
+      .select({ total: count() })
+      .from(invitation)
+      .where(and(eq(invitation.organizationId, activeOrganizationId), eq(invitation.status, "pending"))),
+  ]);
+
+  return {
+    memberCount: memberRow?.total ?? 0,
+    pendingInviteCount: inviteRow?.total ?? 0,
+  };
+}
 
 export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary> {
   const sessionData = await auth.api.getSession({ headers: await headers() });
@@ -33,6 +85,9 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
       userEmail: null,
       activeOrganizationId: null,
       activeOrganizationName: null,
+      workspaceMemberCount: null,
+      workspacePendingInviteCount: null,
+      beaconPresetCount: null,
       webflowOAuthConnected: false,
       webflowSites: null,
       activeOrgTeamAdmin: false,
@@ -43,13 +98,24 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
   const activeOrganizationId = await resolveActiveOrganizationId(userId, rawSession?.id);
 
   let activeOrganizationName: string | null = null;
+  let workspaceMemberCount: number | null = null;
+  let workspacePendingInviteCount: number | null = null;
+  let beaconPresetCount: number | null = null;
+
   if (activeOrganizationId) {
-    const orgRows = await db
-      .select({ name: organization.name })
-      .from(organization)
-      .where(eq(organization.id, activeOrganizationId))
-      .limit(1);
+    const [orgRows, workspaceCounts, presetCount] = await Promise.all([
+      db
+        .select({ name: organization.name })
+        .from(organization)
+        .where(eq(organization.id, activeOrganizationId))
+        .limit(1),
+      resolveWorkspaceCounts(activeOrganizationId),
+      resolveBeaconPresetCount(userId, activeOrganizationId),
+    ]);
     activeOrganizationName = orgRows[0]?.name ?? null;
+    workspaceMemberCount = workspaceCounts.memberCount;
+    workspacePendingInviteCount = workspaceCounts.pendingInviteCount;
+    beaconPresetCount = presetCount;
   }
 
   const activeOrgTeamAdmin = activeOrganizationId
@@ -79,6 +145,9 @@ export async function getTowerDashboardSummary(): Promise<TowerDashboardSummary>
     userEmail,
     activeOrganizationId,
     activeOrganizationName,
+    workspaceMemberCount,
+    workspacePendingInviteCount,
+    beaconPresetCount,
     webflowOAuthConnected,
     webflowSites,
     activeOrgTeamAdmin,

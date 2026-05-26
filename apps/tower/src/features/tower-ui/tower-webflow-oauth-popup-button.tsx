@@ -1,11 +1,16 @@
 "use client";
 
+import type { VariantProps } from "class-variance-authority";
 import { type ReactNode, useState } from "react";
-import { Button } from "@/shared/ui/button";
+import { Button, type buttonVariants } from "@/shared/ui/button";
 
 const WEBFLOW_OAUTH_POPUP_FEATURES = "popup=yes,width=480,height=700,scrollbars=yes,resizable=yes";
 
-export function TowerWebflowOAuthPopupButton({ children }: { children: ReactNode }) {
+type OAuthButtonProps = VariantProps<typeof buttonVariants> & {
+  children: ReactNode;
+};
+
+export function TowerWebflowOAuthPopupButton({ children, variant = "outline", size = "sm" }: OAuthButtonProps) {
   const [busy, setBusy] = useState(false);
 
   async function handleClick() {
@@ -26,7 +31,7 @@ export function TowerWebflowOAuthPopupButton({ children }: { children: ReactNode
   }
 
   return (
-    <Button size="sm" variant="outline" disabled={busy} type="button" onClick={() => void handleClick()}>
+    <Button size={size} variant={variant} disabled={busy} type="button" onClick={() => void handleClick()}>
       {children}
     </Button>
   );

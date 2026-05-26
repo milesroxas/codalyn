@@ -21,38 +21,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
-
-function StatTile(props: {
-  label: string;
-  value: string | number;
-  hint?: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tone?: "default" | "warn" | "positive";
-}) {
-  const { label, value, hint, icon: Icon, tone = "default" } = props;
-  return (
-    <Card size="sm">
-      <CardHeader className="flex-row items-start justify-between gap-2">
-        <CardDescription className="text-xs text-muted-foreground">{label}</CardDescription>
-        <span
-          className={
-            tone === "warn"
-              ? "flex size-7 items-center justify-center rounded-md bg-destructive/10 text-destructive"
-              : tone === "positive"
-                ? "flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary"
-                : "flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground"
-          }
-        >
-          <Icon className="size-4" />
-        </span>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-0.5">
-        <span className="text-2xl font-semibold tracking-tight tabular-nums text-foreground">{value}</span>
-        {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
-      </CardContent>
-    </Card>
-  );
-}
+import { StatTile } from "@/shared/ui/stat-tile";
 
 export function OperatorOverview() {
   const [metrics, setMetrics] = useState<OperatorMetrics | null>(null);

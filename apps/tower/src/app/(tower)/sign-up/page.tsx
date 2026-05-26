@@ -34,7 +34,7 @@ async function postEnableTeamCreation(): Promise<{ ok: true } | { ok: false; err
 
 function messageForEnableTeamError(errorKey: string | undefined): string {
   if (errorKey === "team_creation_requires_upgrade") {
-    return "Account created. Team workspace creation needs a team-eligible plan—use billing when available.";
+    return "Account created. Subscribe to Team on the Team page to create a workspace, or upgrade within 15 minutes of signup.";
   }
   if (errorKey === "already_in_organization") {
     return "Account created. You already belong to a team.";

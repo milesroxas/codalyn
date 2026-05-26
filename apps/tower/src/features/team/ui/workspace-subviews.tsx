@@ -1,11 +1,21 @@
 "use client";
 
-import { IconClockHour4, IconCopy, IconMailForward, IconTrash, IconUserPlus, IconUsers } from "@tabler/icons-react";
+import {
+  IconClockHour4,
+  IconCopy,
+  IconCreditCard,
+  IconMailForward,
+  IconTrash,
+  IconUserPlus,
+  IconUsers,
+} from "@tabler/icons-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { WorkspaceBillingSection } from "@/features/team/ui/workspace-billing-section";
 import { formatInvitationExpiry } from "@/features/team/ui/workspace-invitation-utils";
 import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
+import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import { TOWER_TEAM_ROLES } from "@/shared/lib/membership/tower-organization-access";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -452,6 +462,9 @@ export function WorkspaceTabsShell(props: {
   memberRoleOptions: string[];
   invitations: InvitationRow[];
   canManageTeam: boolean;
+  billingEnabled: boolean;
+  workspaceBilling: WorkspaceBillingView | null;
+  billingOrganizationId: string | null;
   busy: boolean;
   currentUserId: string;
   inviteEmail: string;
@@ -475,6 +488,9 @@ export function WorkspaceTabsShell(props: {
     memberRoleOptions,
     invitations,
     canManageTeam,
+    billingEnabled,
+    workspaceBilling,
+    billingOrganizationId,
     busy,
     currentUserId,
     inviteEmail,
@@ -538,6 +554,12 @@ export function WorkspaceTabsShell(props: {
                 <TabsTrigger value="settings" className="gap-2 px-3 py-2 sm:flex-1">
                   Settings
                 </TabsTrigger>
+                {billingEnabled ? (
+                  <TabsTrigger value="billing" className="gap-2 px-3 py-2 sm:flex-1">
+                    <IconCreditCard className="size-4 opacity-70" aria-hidden />
+                    Billing
+                  </TabsTrigger>
+                ) : null}
               </TabsList>
             </div>
 
@@ -565,6 +587,12 @@ export function WorkspaceTabsShell(props: {
               onActiveTeamNameEditChange={onActiveTeamNameEditChange}
               onUpdateActiveTeamName={onUpdateActiveTeamName}
             />
+
+            {billingEnabled && workspaceBilling && billingOrganizationId ? (
+              <TabsContent value="billing" className="mt-6 space-y-6">
+                <WorkspaceBillingSection organizationId={billingOrganizationId} billing={workspaceBilling} />
+              </TabsContent>
+            ) : null}
           </Tabs>
 
           <RevokeInvitationDialog

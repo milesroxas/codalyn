@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { isOrganizationProEntitled } from "@/server/billing/organization-billing";
 import {
   isStripeSubscriptionProEntitled,
+  orgRowHasStripeTeam,
   subscriptionPlanForStatus,
   userRowHasStripePro,
 } from "@/server/billing/stripe-subscription-status";
+import { TEAM_BILLING_PLAN } from "@/server/billing/team-billing-config";
 
 describe("subscriptionPlanForStatus", () => {
   it("maps entitled statuses to pro", () => {
@@ -52,6 +55,60 @@ describe("userRowHasStripePro", () => {
         subscriptionPlan: "free",
         subscriptionStatus: "active",
         stripeSubscriptionId: "sub_1",
+      })
+    ).toBe(false);
+  });
+});
+
+describe("orgRowHasStripeTeam", () => {
+  it("requires team plan, subscription id, and entitled status", () => {
+    expect(
+      orgRowHasStripeTeam({
+        billingPlan: TEAM_BILLING_PLAN,
+        subscriptionStatus: "active",
+        stripeSubscriptionId: "sub_team_1",
+      })
+    ).toBe(true);
+  });
+
+  it("rejects individual pro plan on organization row", () => {
+    expect(
+      orgRowHasStripeTeam({
+        billingPlan: "pro",
+        subscriptionStatus: "active",
+        stripeSubscriptionId: "sub_team_1",
+      })
+    ).toBe(false);
+  });
+});
+
+describe("isOrganizationProEntitled", () => {
+  it("grants pro for stripe team subscription", () => {
+    expect(
+      isOrganizationProEntitled({
+        billingPlan: TEAM_BILLING_PLAN,
+        subscriptionStatus: "active",
+        stripeSubscriptionId: "sub_team_1",
+      })
+    ).toBe(true);
+  });
+
+  it("grants pro for legacy operator plan without stripe id", () => {
+    expect(
+      isOrganizationProEntitled({
+        billingPlan: "pro team",
+        subscriptionStatus: "active",
+        stripeSubscriptionId: null,
+      })
+    ).toBe(true);
+  });
+
+  it("rejects canceled subscription", () => {
+    expect(
+      isOrganizationProEntitled({
+        billingPlan: TEAM_BILLING_PLAN,
+        subscriptionStatus: "canceled",
+        stripeSubscriptionId: "sub_team_1",
       })
     ).toBe(false);
   });

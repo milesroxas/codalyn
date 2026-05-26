@@ -8,6 +8,7 @@ import { BeaconEditorExperienceSection } from "@/features/team/ui/beacon-editor-
 import { TeamDashboardSkeleton } from "@/features/team/ui/team-dashboard-skeleton";
 import { TeamWorkspacePanel } from "@/features/team/ui/team-workspace-panel";
 import type { InvitationRow, MemberRow } from "@/features/team/ui/workspace-types";
+import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import {
   isTowerTeamAdminRole,
   TOWER_TEAM_ROLES,
@@ -15,7 +16,12 @@ import {
 } from "@/shared/lib/membership/tower-organization-access";
 import { Button } from "@/shared/ui/button";
 
-export function TeamDashboard() {
+export function TeamDashboard(props: {
+  billingEnabled?: boolean;
+  workspaceBilling?: WorkspaceBillingView | null;
+  activeOrganizationId?: string | null;
+}) {
+  const { billingEnabled = false, workspaceBilling = null, activeOrganizationId = null } = props;
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const { refetch: refetchOrgs } = authClient.useListOrganizations();
   const {
@@ -254,6 +260,9 @@ export function TeamDashboard() {
         activeOrgPending={activeOrgPending}
         activeOrg={activeOrg}
         canManageTeam={canManageTeam}
+        billingEnabled={billingEnabled}
+        workspaceBilling={workspaceBilling}
+        billingOrganizationId={activeOrganizationId ?? activeOrg?.id ?? null}
         activeTeamNameEdit={activeTeamNameEdit}
         onActiveTeamNameEditChange={setActiveTeamNameEdit}
         onUpdateActiveTeamName={onUpdateActiveTeamName}

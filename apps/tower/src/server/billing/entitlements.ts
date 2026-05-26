@@ -1,27 +1,9 @@
 import { eq, inArray } from "drizzle-orm";
-import type Stripe from "stripe";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
-import { isStripeSubscriptionProEntitled, userRowHasStripePro } from "@/server/billing/stripe-subscription-status";
+import { isOrganizationProEntitled } from "@/server/billing/organization-billing";
+import { userRowHasStripePro } from "@/server/billing/stripe-subscription-status";
 import { db } from "@/shared/lib/db";
 import { member, organization, user } from "@/shared/lib/db/auth-schema";
-
-function orgLooksPaid(row: {
-  subscriptionStatus: string | null;
-  billingPlan: string | null;
-  stripeSubscriptionId: string | null;
-}): boolean {
-  if (
-    !row.subscriptionStatus ||
-    !isStripeSubscriptionProEntitled(row.subscriptionStatus as Stripe.Subscription.Status)
-  ) {
-    return false;
-  }
-  if (row.stripeSubscriptionId) {
-    return true;
-  }
-  const plan = row.billingPlan?.trim().toLowerCase() ?? "";
-  return plan === "pro" || plan === "pro+" || plan === "pro team" || plan === "team pro";
-}
 
 export type TowerTier = "free" | "pro";
 
@@ -63,7 +45,7 @@ export async function resolveTowerEntitlement(
       .from(organization)
       .where(eq(organization.id, activeOrganizationId))
       .limit(1);
-    if (o && orgLooksPaid(o)) {
+    if (o && isOrganizationProEntitled(o)) {
       return { tier: "pro", source: "organization" };
     }
   }
@@ -89,7 +71,7 @@ export async function resolveTowerEntitlement(
     .where(inArray(organization.id, orgIds));
 
   for (const o of orgs) {
-    if (orgLooksPaid(o)) {
+    if (isOrganizationProEntitled(o)) {
       return { tier: "pro", source: "organization" };
     }
   }

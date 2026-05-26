@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getStripePricePro, requireStripeBillingSession } from "@/server/billing/stripe-billing-routes";
 import { ensureStripeCustomerForUser } from "@/server/billing/stripe-customer";
+import { STRIPE_BILLING_SCOPE_USER } from "@/server/billing/stripe-metadata";
 import { userRowHasStripePro } from "@/server/billing/stripe-subscription-status";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { db } from "@/shared/lib/db";
@@ -60,9 +61,9 @@ export async function POST(request: Request) {
     success_url: `${base}/billing?checkout=success`,
     cancel_url: `${base}/billing?checkout=canceled`,
     client_reference_id: u.id,
-    metadata: { towerUserId: u.id },
+    metadata: { towerUserId: u.id, towerBillingScope: STRIPE_BILLING_SCOPE_USER },
     subscription_data: {
-      metadata: { towerUserId: u.id },
+      metadata: { towerUserId: u.id, towerBillingScope: STRIPE_BILLING_SCOPE_USER },
     },
   });
 

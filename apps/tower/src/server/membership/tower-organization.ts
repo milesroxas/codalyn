@@ -1,5 +1,7 @@
 import { organization } from "better-auth/plugins";
 import { grantEarlyAccess } from "@/server/access/early-access";
+import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
+import { resolveMembershipSeatCapFromOrg } from "@/server/billing/team-billing-config";
 import { sendOrganizationInvitationEmail } from "@/server/email/organization-invitation-email";
 import { isTowerProductAdmin } from "@/server/membership/product-admin";
 import {
@@ -12,14 +14,6 @@ export {
   TOWER_TEAM_ROLES,
   type TowerTeamRole,
 } from "@/shared/lib/membership/tower-organization-access";
-
-function resolveMembershipSeatCap(organization: Record<string, unknown>) {
-  const raw = organization.seatLimit;
-  if (raw != null && typeof raw === "number" && !Number.isNaN(raw)) {
-    return Math.max(1, raw);
-  }
-  return 10_000;
-}
 
 export const towerOrganization = organization({
   creatorRole: "admin",
@@ -35,16 +29,24 @@ export const towerOrganization = organization({
     }
     return Boolean(user.canCreateOrganization);
   },
-  membershipLimit: async (_user, org) => resolveMembershipSeatCap(org as Record<string, unknown>),
+  membershipLimit: async (_user, org) => resolveMembershipSeatCapFromOrg(org as { seatLimit?: number | null }),
   sendInvitationEmail: async (data) => {
     await sendOrganizationInvitationEmail(data);
   },
   organizationHooks: {
-    afterAcceptInvitation: async ({ user }) => {
+    afterAcceptInvitation: async ({ user, organization: org }) => {
       await grantEarlyAccess(user.id);
+      await syncOrganizationSeatQuantityWithStripe(org.id);
     },
-    afterAddMember: async ({ user }) => {
+    afterAddMember: async ({ user, organization: org }) => {
       await grantEarlyAccess(user.id);
+      await syncOrganizationSeatQuantityWithStripe(org.id);
+    },
+    afterRemoveMember: async ({ organization: org }) => {
+      await syncOrganizationSeatQuantityWithStripe(org.id);
+    },
+    afterCancelInvitation: async ({ organization: org }) => {
+      await syncOrganizationSeatQuantityWithStripe(org.id);
     },
   },
 });

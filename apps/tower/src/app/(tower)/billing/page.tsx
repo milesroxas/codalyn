@@ -2,13 +2,13 @@ import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
 import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { isStripeCheckoutConfigured } from "@/server/billing/stripe-billing-routes";
-import { getTowerLimitsSnapshot, tierLimitsFromSnapshot } from "@/server/billing/tower-limits-config";
-import { getUsageSnapshot } from "@/server/billing/usage-gate";
+import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { db } from "@/shared/lib/db";
 import { user } from "@/shared/lib/db/auth-schema";
 import { Button } from "@/shared/ui/button";
@@ -29,9 +29,7 @@ export default async function BillingPage() {
   const h = await headers();
   const activeOrg = await getActiveOrganizationIdForAuthHeaders(h);
   const ent = await resolveTowerEntitlement(userId, activeOrg);
-  const usage = await getUsageSnapshot(userId);
-  const limitsSnapshot = await getTowerLimitsSnapshot();
-  const limits = tierLimitsFromSnapshot(limitsSnapshot, ent.tier);
+  const usageStatus = await fetchEndUserUsageStatus(userId, activeOrg);
   const [row] = await db
     .select({
       email: user.email,
@@ -82,35 +80,11 @@ export default async function BillingPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>This month (UTC)</CardTitle>
-          <CardDescription>Period {usage.yearMonth}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p>
-            <span className="text-muted-foreground">Webflow proxy units</span>{" "}
-            <span className="font-mono">
-              {usage.webflowProxyRequestCount} / {limits.webflowProxyRequestsPerMonth}
-            </span>
-          </p>
-          <p>
-            <span className="text-muted-foreground">CMS write units</span>{" "}
-            <span className="font-mono">
-              {usage.cmsWriteCount} / {limits.cmsWritesPerMonth}
-            </span>
-          </p>
-          <p>
-            <span className="text-muted-foreground">Image optimize (AVIF)</span>{" "}
-            <span className="font-mono">
-              {usage.imageOptimizeCount} / {limits.imageOptimizesPerMonth}
-            </span>
-          </p>
-          {ent.tier === "pro" ? (
-            <p className="text-xs text-muted-foreground">Pro usage is not incremented in Tower for these counters.</p>
-          ) : null}
-        </CardContent>
-      </Card>
+      <TowerUsageSection
+        status={usageStatus}
+        title="This month (UTC)"
+        description="Usage for your signed-in account against plan limits."
+      />
 
       {!checkoutAvailable ? (
         <p className="text-xs text-muted-foreground">

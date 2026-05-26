@@ -1,6 +1,7 @@
 import { IconPlug, IconRadar2, IconUsers } from "@tabler/icons-react";
 import Link from "next/link";
 import { BeaconDashboardActivity } from "@/features/beacon/ui/beacon-dashboard-activity";
+import { TowerDashboardUsageSection } from "@/features/billing/ui/tower-dashboard-usage-section";
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
 import type { TowerDashboardSummary } from "@/server/dashboard-summary";
 import { Badge } from "@/shared/ui/badge";
@@ -42,6 +43,8 @@ export function TowerDashboard({ summary }: { summary: TowerDashboardSummary }) 
       <Separator className="my-8" />
 
       <BeaconDashboardActivity />
+
+      <TowerDashboardUsageSection />
 
       <section className="mb-10 space-y-3">
         <h2 className="text-sm font-medium text-foreground">Your connection</h2>

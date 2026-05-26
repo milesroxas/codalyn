@@ -25,6 +25,8 @@ const PUBLIC_PREFIXES = [
   "/",
   "/sign-in",
   "/sign-up",
+  "/forgot-password",
+  "/reset-password",
   "/request-access",
   "/invitations/accept",
   "/integrations/webflow/success",

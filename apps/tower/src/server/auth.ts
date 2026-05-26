@@ -14,6 +14,7 @@ import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feat
 import { resolveAuthSecret } from "@/server/auth-secret";
 import { sendChangeEmailConfirmationEmail } from "@/server/email/change-email-confirmation-email";
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
+import { sendPasswordResetEmail } from "@/server/email/password-reset-email";
 import { towerOrganization } from "@/server/membership/tower-organization";
 import {
   prepareUserAccountDeletion,
@@ -51,6 +52,13 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: async ({ user, url }) => {
+      void sendPasswordResetEmail({
+        user: { email: user.email, name: user.name },
+        url,
+      });
+    },
   },
   emailVerification: {
     sendOnSignUp: true,

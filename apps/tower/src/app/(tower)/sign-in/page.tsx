@@ -2,17 +2,24 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, Suspense, useEffect, useId, useState } from "react";
+import { type FormEvent, Suspense, useEffect, useId, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   syncExistingTowerSessionToBeaconIfPopup,
   tryFinishBeaconTowerAuthPopup,
 } from "@/features/auth/lib/beacon-opener-auth";
+import { buildTowerAuthSurfaceHref } from "@/features/auth/lib/build-tower-auth-surface-href";
 import {
   isEmailNotVerifiedAuthError,
   resolveTowerAppCallbackUrl,
   resolveTowerEmailVerificationCallbackUrl,
 } from "@/features/auth/lib/email-verification";
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
+import {
+  PASSWORD_RESET_QUERY,
+  RESET_PASSWORD_COPY,
+  readPasswordResetSuccess,
+} from "@/features/auth/lib/password-reset";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { authClient } from "@/features/auth/model/auth-client";
@@ -68,6 +75,26 @@ function SignInForm() {
   const [pending, setPending] = useState(false);
   const [earlyAccessRequired, setEarlyAccessRequired] = useState(false);
   const [awaitingVerificationEmail, setAwaitingVerificationEmail] = useState<string | null>(null);
+  const passwordResetNotifiedRef = useRef(false);
+
+  const authSearchParams = {
+    beaconOrigin,
+    invite: operatorInviteParam,
+  };
+  const signUpHref = buildTowerAuthSurfaceHref("/sign-up", callbackUrl, authSearchParams);
+  const forgotPasswordHref = buildTowerAuthSurfaceHref("/forgot-password", callbackUrl, authSearchParams);
+  const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl, authSearchParams);
+
+  useEffect(() => {
+    if (passwordResetNotifiedRef.current || !readPasswordResetSuccess(searchParams)) {
+      return;
+    }
+    passwordResetNotifiedRef.current = true;
+    toast.success(RESET_PASSWORD_COPY.successMessage);
+    const url = new URL(window.location.href);
+    url.searchParams.delete(PASSWORD_RESET_QUERY);
+    router.replace(`${url.pathname}${url.search}`, { scroll: false });
+  }, [router, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,16 +152,10 @@ function SignInForm() {
     return <AuthCardSkeleton variant="sign-in" />;
   }
 
-  const signUpHref = `/sign-up?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}${operatorInviteParam ? `&invite=${encodeURIComponent(operatorInviteParam)}` : ""}`;
-
   if (awaitingVerificationEmail) {
     return (
       <AuthShell>
-        <CheckEmailPrompt
-          email={awaitingVerificationEmail}
-          callbackPath={callbackUrl}
-          signInHref={`/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`}
-        />
+        <CheckEmailPrompt email={awaitingVerificationEmail} callbackPath={callbackUrl} signInHref={signInHref} />
       </AuthShell>
     );
   }
@@ -215,6 +236,14 @@ function SignInForm() {
                 required
               />
             </FormField>
+            <p className="-mt-2 text-right text-sm">
+              <Link
+                href={forgotPasswordHref}
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </p>
             {error ? (
               <p className="text-sm text-destructive" role="alert">
                 {error}

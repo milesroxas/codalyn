@@ -14,6 +14,37 @@ export function towerUsageMeterLabel(kind: TowerUsageMeterKind): string {
   }
 }
 
+/** User-facing Beacon actions that increment each meter (one API call = one unit unless noted). */
+export const TOWER_USAGE_METER_CONTRIBUTING_ACTIONS: Record<TowerUsageMeterKind, readonly string[]> = {
+  webflowProxy: [
+    "CMS Slots — install or sync the page script",
+    "CMS Slots — create a list target or link it to a CMS field",
+    "CMS Slots — open or save a layout in Composer on a collection template",
+    "Image Upload — publish an image to a CMS collection field",
+  ],
+  cmsWrite: ["CMS Slots — save a block-based layout composition through Tower's layout API"],
+  image: [
+    "Image Upload — export an image as AVIF",
+    "Image Upload — AVIF size estimates while adjusting crop, size, or quality",
+  ],
+};
+
+function formatContributingActions(actions: readonly string[]): string {
+  return actions.map((action) => `• ${action}`).join("\n");
+}
+
+export function towerUsageMeterTooltip(kind: TowerUsageMeterKind): string {
+  const actions = formatContributingActions(TOWER_USAGE_METER_CONTRIBUTING_ACTIONS[kind]);
+  switch (kind) {
+    case "webflowProxy":
+      return `Each Webflow Data API request through Tower counts as one. A single action may use several requests.\n\nCounts when you:\n${actions}\n\nComposer saves to a CMS text field and CMS field uploads use this meter. AVIF exports and layout API saves are counted separately.`;
+    case "cmsWrite":
+      return `Each layout save through Tower's CMS layout API counts as one.\n\nCounts when you:\n${actions}\n\nSaving slot order in Composer to a CMS text field counts toward Webflow proxy instead. Loading layouts does not count.`;
+    case "image":
+      return `Each AVIF optimize request through Tower counts as one.\n\nCounts when you:\n${actions}\n\nWebP exports in the Designer do not count toward this limit.`;
+  }
+}
+
 export function towerUsageApproachingAlertDescription(
   meters: ReadonlyArray<{ kind: TowerUsageMeterKind; used: number; limit: number }>
 ): string {
@@ -42,17 +73,16 @@ export function towerUsageLimitDialogTitle(kind: TowerUsageMeterKind): string {
 
 export function towerUsageLimitDialogDescription(kind: TowerUsageMeterKind): string {
   if (kind === "image") {
-    return TOWER_AVIF_LIMIT_FALLBACK_DESCRIPTION;
+    return `${TOWER_AVIF_LIMIT_FALLBACK_DESCRIPTION} Counts AVIF exports and size estimates in Image Upload.`;
   }
   if (kind === "cmsWrite") {
-    return "You've used your free plan allowance for CMS layout writes through Tower this month.";
+    return "You've used your free plan allowance for CMS layout saves through Tower this month. Counts block-based layout saves in CMS Slots, not Composer text-field saves.";
   }
-  return "You've used your free plan allowance for Webflow Data API proxy traffic through Tower this month.";
+  return "You've used your free plan allowance for Webflow Data API traffic through Tower this month. Counts CMS Slots sync and CMS actions plus Image Upload CMS field publishes.";
 }
 
 export function towerUsageLimitDialogUsageLine(used: number, limit: number, kind: TowerUsageMeterKind): string {
-  const label =
-    kind === "image" ? "AVIF optimizes" : kind === "cmsWrite" ? "CMS writes" : "Webflow proxy requests";
+  const label = kind === "image" ? "AVIF optimizes" : kind === "cmsWrite" ? "CMS writes" : "Webflow proxy requests";
   return `${used.toLocaleString()} / ${limit.toLocaleString()} ${label} used this month (UTC).`;
 }
 

@@ -12,6 +12,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Switch } from "@/shared/ui/switch";
+import { UsageMeterLabel } from "@/shared/ui/usage-meter-label";
 
 type OperatorUsageLimitsSectionProps = {
   scope: OperatorUsageLimitsView["scope"];
@@ -114,19 +115,25 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
         {scope === "user" ? (
           <dl className="grid gap-2 text-xs sm:grid-cols-3">
             <div>
-              <dt className="text-muted-foreground">Webflow proxy</dt>
+              <dt className="text-muted-foreground">
+                <UsageMeterLabel kind="webflowProxy" />
+              </dt>
               <dd className="font-mono text-foreground">
                 {formatUsageRatio(usage.webflowProxyRequestCount, usage.effectiveWebflowProxyLimit)}
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">CMS writes</dt>
+              <dt className="text-muted-foreground">
+                <UsageMeterLabel kind="cmsWrite" />
+              </dt>
               <dd className="font-mono text-foreground">
                 {formatUsageRatio(usage.cmsWriteCount, usage.effectiveCmsWriteLimit)}
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Image optimize (AVIF)</dt>
+              <dt className="text-muted-foreground">
+                <UsageMeterLabel kind="image" />
+              </dt>
               <dd className="font-mono text-foreground">
                 {formatUsageRatio(usage.imageOptimizeCount, usage.effectiveImageLimit)}
               </dd>
@@ -135,19 +142,25 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
         ) : (
           <dl className="grid gap-2 text-xs sm:grid-cols-3">
             <div>
-              <dt className="text-muted-foreground">Member Webflow proxy (sum)</dt>
+              <dt className="text-muted-foreground">
+                <UsageMeterLabel kind="webflowProxy" label="Member Webflow proxy (sum)" />
+              </dt>
               <dd className="font-mono text-foreground">
                 {formatUsageRatio(usage.memberWebflowProxyRequestCount ?? 0, usage.effectiveWebflowProxyLimit)}
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Member CMS writes (sum)</dt>
+              <dt className="text-muted-foreground">
+                <UsageMeterLabel kind="cmsWrite" label="Member CMS writes (sum)" />
+              </dt>
               <dd className="font-mono text-foreground">
                 {formatUsageRatio(usage.memberCmsWriteCount ?? 0, usage.effectiveCmsWriteLimit)}
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Member image usage (sum)</dt>
+              <dt className="text-muted-foreground">
+                <UsageMeterLabel kind="image" label="Member image usage (sum)" />
+              </dt>
               <dd className="font-mono text-foreground">
                 {formatUsageRatio(usage.memberImageOptimizeCount ?? 0, usage.effectiveImageLimit)}
               </dd>
@@ -175,7 +188,9 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
-            <Label htmlFor={`${scope}-webflow-proxy-limit`}>Webflow proxy cap override</Label>
+            <Label htmlFor={`${scope}-webflow-proxy-limit`}>
+              <UsageMeterLabel kind="webflowProxy" label="Webflow proxy cap override" />
+            </Label>
             <Input
               id={`${scope}-webflow-proxy-limit`}
               type="number"
@@ -188,7 +203,9 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor={`${scope}-cms-write-limit`}>CMS write cap override</Label>
+            <Label htmlFor={`${scope}-cms-write-limit`}>
+              <UsageMeterLabel kind="cmsWrite" label="CMS write cap override" />
+            </Label>
             <Input
               id={`${scope}-cms-write-limit`}
               type="number"
@@ -201,7 +218,9 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor={`${scope}-image-limit`}>Image cap override</Label>
+            <Label htmlFor={`${scope}-image-limit`}>
+              <UsageMeterLabel kind="image" label="Image cap override" />
+            </Label>
             <Input
               id={`${scope}-image-limit`}
               type="number"

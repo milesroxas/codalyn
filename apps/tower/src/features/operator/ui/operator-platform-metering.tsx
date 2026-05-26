@@ -14,6 +14,7 @@ import { Label } from "@/shared/ui/label";
 import { Separator } from "@/shared/ui/separator";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Switch } from "@/shared/ui/switch";
+import { UsageMeterLabel } from "@/shared/ui/usage-meter-label";
 
 type DraftState = {
   globalMeteringEnabled: boolean;
@@ -67,7 +68,9 @@ function TierLimitFields({
       <p className="text-sm font-medium text-foreground">{tierLabel}</p>
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1.5">
-          <Label htmlFor={webflowProxyId}>Webflow proxy / month</Label>
+          <Label htmlFor={webflowProxyId}>
+            <UsageMeterLabel kind="webflowProxy" label="Webflow proxy / month" />
+          </Label>
           <Input
             id={webflowProxyId}
             type="number"
@@ -79,7 +82,9 @@ function TierLimitFields({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor={cmsWritesId}>CMS writes / month</Label>
+          <Label htmlFor={cmsWritesId}>
+            <UsageMeterLabel kind="cmsWrite" label="CMS writes / month" />
+          </Label>
           <Input
             id={cmsWritesId}
             type="number"
@@ -91,7 +96,9 @@ function TierLimitFields({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor={imageId}>Image optimize (AVIF) / month</Label>
+          <Label htmlFor={imageId}>
+            <UsageMeterLabel kind="image" label="Image optimize (AVIF) / month" />
+          </Label>
           <Input
             id={imageId}
             type="number"

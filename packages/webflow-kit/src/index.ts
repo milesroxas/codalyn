@@ -1,5 +1,3 @@
-export * from "./tower/tower-usage-metering-copy.js";
-export * from "./tower/tower-usage-metering.js";
 export * from "./beacon/beacon-app-settings.js";
 export * from "./beacon/beacon-composition.js";
 export * from "./beacon/beacon-image-errors.js";
@@ -9,4 +7,6 @@ export * from "./beacon/beacon-preset-dimensions.js";
 export * from "./beacon/beacon-preset-storage-migration.js";
 export * from "./beacon/beacon-settings-tower-put.js";
 export * from "./image/output-formats.js";
+export * from "./tower/tower-usage-metering.js";
+export * from "./tower/tower-usage-metering-copy.js";
 export * from "./webflow/constants.js";

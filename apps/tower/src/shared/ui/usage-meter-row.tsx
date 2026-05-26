@@ -2,6 +2,7 @@ import { formatTowerUsageRatio, type TowerUsageMeterSnapshot, towerUsageMeterLab
 import { usageMeterLevelLabel, usageMeterProgressValue } from "@/shared/lib/usage-meter-ui";
 import { Badge } from "@/shared/ui/badge";
 import { Progress, type ProgressIndicatorLevel } from "@/shared/ui/progress";
+import { UsageMeterLabel } from "@/shared/ui/usage-meter-label";
 
 function progressLevelForMeter(level: TowerUsageMeterSnapshot["level"]): ProgressIndicatorLevel {
   switch (level) {
@@ -24,7 +25,9 @@ export function UsageMeterRow({ meter }: { meter: TowerUsageMeterSnapshot }) {
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">{towerUsageMeterLabel(meter.kind)}</span>
+          <span className="text-sm text-muted-foreground">
+            <UsageMeterLabel kind={meter.kind} />
+          </span>
           {statusLabel ? (
             <Badge variant={meter.level === "exceeded" ? "destructive" : "secondary"}>{statusLabel}</Badge>
           ) : null}

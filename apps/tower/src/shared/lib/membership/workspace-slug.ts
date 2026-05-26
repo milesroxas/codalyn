@@ -34,10 +34,21 @@ export function normalizeWorkspaceSlugInput(raw: string): string {
 
 export function slugifyWorkspaceName(name: string): string {
   const normalized = normalizeWorkspaceSlugInput(name);
-  if (!normalized) {
-    return "team";
+  const candidate = (normalized || "workspace").slice(0, WORKSPACE_SLUG_MAX_LENGTH);
+  const parsed = parseWorkspaceSlug(candidate);
+  if (parsed.ok) {
+    return parsed.slug;
   }
-  return normalized.slice(0, WORKSPACE_SLUG_MAX_LENGTH);
+  if (parsed.error === "slug_reserved") {
+    const suffix = "-ws";
+    const base =
+      (normalized || "workspace").slice(0, WORKSPACE_SLUG_MAX_LENGTH - suffix.length).replace(/-+$/, "") || "workspace";
+    const disambiguated = parseWorkspaceSlug(`${base}${suffix}`);
+    if (disambiguated.ok) {
+      return disambiguated.slug;
+    }
+  }
+  return "workspace-ws";
 }
 
 export function isValidWorkspaceSlugFormat(slug: string): boolean {

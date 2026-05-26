@@ -26,7 +26,11 @@ describe("slugifyWorkspaceName", () => {
   });
 
   it("falls back when the name has no slug characters", () => {
-    expect(slugifyWorkspaceName("***")).toBe("team");
+    expect(slugifyWorkspaceName("***")).toBe("workspace");
+  });
+
+  it("disambiguates when the name slugifies to a reserved slug", () => {
+    expect(slugifyWorkspaceName("Team")).toBe("team-ws");
   });
 
   it("truncates to the max length", () => {

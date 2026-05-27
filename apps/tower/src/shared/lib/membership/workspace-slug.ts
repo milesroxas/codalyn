@@ -18,6 +18,7 @@ export const RESERVED_WORKSPACE_SLUGS = new Set([
   "request-access",
   "sign-in",
   "sign-up",
+  "verify-email",
   "team",
 ]);
 

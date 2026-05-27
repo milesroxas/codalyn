@@ -28,6 +28,13 @@ export const EMAIL_VERIFICATION_FAILED_TOAST = {
   description: "This link is invalid or expired. Resend a verification email below.",
 } as const;
 
+export const VERIFY_EMAIL_PAGE_COPY = {
+  pendingTitle: "Verifying your email",
+  pendingDescription: "Hang tight while we confirm your address.",
+  invalidTokenMessage: "This verification link is invalid or expired.",
+  signInLabel: "Back to sign in",
+} as const;
+
 export function resolveTowerEmailVerificationCallbackUrl(path = "/"): string {
   const safePath = sanitizeRelativePath(path);
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
@@ -85,4 +92,46 @@ export function readSessionEmailVerified(user: { emailVerified?: boolean | null 
 export function readEmailVerificationRedirectError(searchParams: URLSearchParams): string | null {
   const error = searchParams.get("error")?.trim();
   return error || null;
+}
+
+export function readEmailVerificationToken(searchParams: URLSearchParams): string | null {
+  const token = searchParams.get("token")?.trim();
+  return token || null;
+}
+
+/** Same-origin post-verify destination from the verification page query string. */
+export function readEmailVerificationCallbackUrl(searchParams: URLSearchParams): string {
+  const raw = searchParams.get("callbackURL")?.trim();
+  if (!raw) {
+    return resolveTowerEmailVerificationCallbackUrl("/");
+  }
+
+  try {
+    const decoded = decodeURIComponent(raw);
+    if (decoded.startsWith("/")) {
+      const queryIndex = decoded.indexOf("?");
+      if (queryIndex === -1) {
+        return resolveTowerEmailVerificationCallbackUrl(decoded);
+      }
+      const path = decoded.slice(0, queryIndex);
+      const merged = new URL(resolveTowerEmailVerificationCallbackUrl(path), "http://localhost");
+      for (const [key, value] of new URLSearchParams(decoded.slice(queryIndex + 1))) {
+        merged.searchParams.set(key, value);
+      }
+      return `${merged.pathname}${merged.search}`;
+    }
+
+    const target = new URL(decoded);
+    if (typeof window !== "undefined" && target.origin === window.location.origin) {
+      return `${target.pathname}${target.search}`;
+    }
+    const appBase = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
+    if (appBase && target.origin === new URL(appBase).origin) {
+      return `${target.pathname}${target.search}`;
+    }
+  } catch {
+    // fall through
+  }
+
+  return resolveTowerEmailVerificationCallbackUrl("/");
 }

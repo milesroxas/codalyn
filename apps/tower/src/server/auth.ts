@@ -14,6 +14,7 @@ import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feat
 import { resolveTowerEmailChangeCompleteAppCallbackUrl } from "@/server/auth/change-email-callback";
 import {
   isChangeEmailVerificationRequest,
+  rewriteBetterAuthVerifyEmailUrlToAppPage,
   rewriteVerifyEmailCallbackUrl,
 } from "@/server/auth/email-verification-token";
 import { resolveAuthSecret } from "@/server/auth-secret";
@@ -87,7 +88,7 @@ export const auth = betterAuth({
       }
       await sendEmailVerificationEmail({
         user: { email: user.email, name: user.name },
-        url,
+        url: rewriteBetterAuthVerifyEmailUrlToAppPage(url),
       });
     },
   },

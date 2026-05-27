@@ -45,6 +45,20 @@ describe("middleware host split", () => {
     expect(response?.status).not.toBe(307);
   });
 
+  it("redirects legacy Better Auth verify links to the first-party page", () => {
+    process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
+    const response = middleware(
+      makeRequest(
+        "tower.codalyn.app",
+        "/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F%3FemailVerified%3D1"
+      )
+    );
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get("location")).toBe(
+      "https://tower.codalyn.app/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F%3FemailVerified%3D1"
+    );
+  });
+
   it("returns CORS headers for OPTIONS /api/auth from Webflow extension origins", () => {
     const url = new URL("/api/auth/get-session", "https://tower.codalyn.app");
     const request = new NextRequest(url, {

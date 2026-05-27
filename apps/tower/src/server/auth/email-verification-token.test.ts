@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTowerEmailVerificationPageUrl,
   isChangeEmailVerificationRequest,
   readEmailVerificationTokenPayload,
+  rewriteBetterAuthVerifyEmailUrlToAppPage,
   rewriteVerifyEmailCallbackUrl,
 } from "@/server/auth/email-verification-token";
 
@@ -47,14 +49,40 @@ describe("isChangeEmailVerificationRequest", () => {
   });
 });
 
+describe("buildTowerEmailVerificationPageUrl", () => {
+  it("builds a first-party verification page URL", () => {
+    const prev = process.env.BETTER_AUTH_URL;
+    process.env.BETTER_AUTH_URL = "https://tower.example.com";
+    expect(buildTowerEmailVerificationPageUrl("abc", "https://tower.example.com/?emailVerified=1")).toBe(
+      "https://tower.example.com/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.example.com%2F%3FemailVerified%3D1"
+    );
+    process.env.BETTER_AUTH_URL = prev;
+  });
+});
+
+describe("rewriteBetterAuthVerifyEmailUrlToAppPage", () => {
+  it("rewrites Better Auth verify links to the Tower verification page", () => {
+    const prev = process.env.BETTER_AUTH_URL;
+    process.env.BETTER_AUTH_URL = "https://tower.example.com";
+    const next = rewriteBetterAuthVerifyEmailUrlToAppPage(
+      "https://tower.example.com/api/auth/verify-email?token=abc&callbackURL=%2Faccount"
+    );
+    expect(next).toBe("https://tower.example.com/verify-email?token=abc&callbackURL=%2Faccount");
+    process.env.BETTER_AUTH_URL = prev;
+  });
+});
+
 describe("rewriteVerifyEmailCallbackUrl", () => {
-  it("replaces callbackURL query param", () => {
+  it("rewrites callbackURL onto the first-party verification page", () => {
+    const prev = process.env.BETTER_AUTH_URL;
+    process.env.BETTER_AUTH_URL = "https://tower.example.com";
     const next = rewriteVerifyEmailCallbackUrl(
       "https://tower.example.com/api/auth/verify-email?token=abc&callbackURL=%2Faccount",
       "https://tower.example.com/account?emailChanged=1"
     );
     expect(next).toBe(
-      "https://tower.example.com/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.example.com%2Faccount%3FemailChanged%3D1"
+      "https://tower.example.com/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.example.com%2Faccount%3FemailChanged%3D1"
     );
+    process.env.BETTER_AUTH_URL = prev;
   });
 });

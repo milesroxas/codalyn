@@ -55,6 +55,7 @@ const surfaceSummaryCardPanelVariants = cva("flex min-w-0 flex-col overflow-hidd
   variants: {
     tone: {
       default: "border-border/80 bg-card",
+      callout: "border-dashed border-border/70 bg-muted/15 shadow-sm",
     },
   },
   defaultVariants: {
@@ -142,6 +143,23 @@ const surfaceSummaryCardSelectRowListClass = "flex min-w-0 flex-col gap-2";
 const surfaceSummaryCardSurfaceSummaryClass = "flex min-w-0 flex-col gap-2";
 
 const surfaceSummaryCardFormFieldsClass = "flex min-w-0 flex-col gap-4";
+
+const surfaceSummaryCardActionGroupVariants = cva(
+  "flex min-w-0 w-full items-stretch gap-2 [&_[data-slot=button]]:min-w-0 [&_[data-slot=button]]:flex-1",
+  {
+    variants: {
+      layout: {
+        row: "flex-row",
+        stack: "flex-col [&_[data-slot=button]]:w-full [&_[data-slot=button]]:flex-none",
+      },
+    },
+    defaultVariants: {
+      layout: "row",
+    },
+  }
+);
+
+const surfaceSummaryCardIconActionGroupClass = "flex shrink-0 items-center gap-1";
 
 const surfaceSummaryCardScanListSectionClass = "flex w-full min-w-0 flex-col gap-2";
 const surfaceSummaryCardScanListSectionHeaderClass = "flex min-w-0 shrink-0 items-center justify-between gap-2";
@@ -310,12 +328,22 @@ function SurfaceSummaryCardPanel({
 function SurfaceSummaryCardPanelSection({
   className,
   showDivider = true,
+  density = "default",
   ...props
-}: React.ComponentProps<"section"> & { showDivider?: boolean }) {
+}: React.ComponentProps<"section"> & {
+  showDivider?: boolean;
+  density?: "default" | "compact";
+}) {
   return (
     <section
       data-slot="surface-summary-card-panel-section"
-      className={cn("flex min-w-0 flex-col gap-2 px-3 py-3", showDivider && "border-b border-border/60", className)}
+      data-density={density}
+      className={cn(
+        "flex min-w-0 flex-col px-3",
+        density === "compact" ? "gap-1.5 py-2" : "gap-2 py-3",
+        showDivider && "border-b border-border/60",
+        className
+      )}
       {...props}
     />
   );
@@ -425,6 +453,31 @@ function SurfaceSummaryCardOptionRows({ className, ...props }: React.ComponentPr
     <div
       data-slot="surface-summary-card-option-rows"
       className={cn("flex min-w-0 w-full flex-col gap-2", className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardActionGroup({
+  className,
+  layout,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardActionGroupVariants>) {
+  return (
+    <div
+      data-slot="surface-summary-card-action-group"
+      className={cn(surfaceSummaryCardActionGroupVariants({ layout }), className)}
+      {...props}
+    />
+  );
+}
+
+/** Compact icon-only controls aligned to the leading edge of a summary icon row. */
+function SurfaceSummaryCardIconActionGroup({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-icon-action-group"
+      className={cn(surfaceSummaryCardIconActionGroupClass, className)}
       {...props}
     />
   );
@@ -630,11 +683,13 @@ function SurfaceSummaryCardSurfaceActionsMenu(props: SurfaceSummaryCardSurfaceAc
 export {
   SurfaceSummaryCard,
   SurfaceSummaryCardActionCopy,
+  SurfaceSummaryCardActionGroup,
   SurfaceSummaryCardActionRow,
   SurfaceSummaryCardBody,
   SurfaceSummaryCardCanvasActionRow,
   SurfaceSummaryCardEmpty,
   SurfaceSummaryCardFormFields,
+  SurfaceSummaryCardIconActionGroup,
   SurfaceSummaryCardIconBox,
   SurfaceSummaryCardIconRow,
   SurfaceSummaryCardIconRowCopy,

@@ -57,6 +57,8 @@ const buttonVariants = cva(
         "icon-lg": "size-9",
         /** CMS Slots Engine / Composer / Sync dock */
         dockNav: "h-9 min-h-9 gap-2 px-3 py-2 text-[0.8125rem]",
+        /** Full-width dock back row (icon + label centered). */
+        dockNavFull: "h-9 min-h-9 w-full gap-2 px-3 py-2 text-[0.8125rem]",
         /** Route step breadcrumb labels and links in the pinned subheader strip. */
         stepNav: "h-7 min-w-0 gap-0 px-1.5 text-[11px]",
         /** Paired with `variant="actionCard"` */

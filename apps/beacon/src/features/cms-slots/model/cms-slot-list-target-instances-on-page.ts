@@ -15,6 +15,37 @@ export type ListCmsSlotListTargetInstancesOnPageOptions = {
   preferredDefinitionId?: string | null;
 };
 
+async function instanceMatchesRegisteredCmsSlotListTargetIdentity(
+  inst: ComponentElement,
+  expectedName: string,
+  expectedGroup: string
+): Promise<boolean> {
+  if (expectedGroup !== CMS_SLOT_UTILITIES_COMPONENT_GROUP) {
+    return false;
+  }
+  const c = await inst.getComponent();
+  if ((await c.getName()) !== expectedName) {
+    return false;
+  }
+  if ((await c.getSettings()).group !== expectedGroup) {
+    return false;
+  }
+  return true;
+}
+
+async function instanceMatchesRegisteredCmsSlotListTarget(
+  inst: ComponentElement,
+  expectedName: string,
+  expectedGroup: string,
+  dataList: string,
+  listContainer: BlockElement
+): Promise<boolean> {
+  if (!(await instanceMatchesRegisteredCmsSlotListTargetIdentity(inst, expectedName, expectedGroup))) {
+    return false;
+  }
+  return instanceMatchesCmsSlotListTargetSurface(inst, dataList, listContainer);
+}
+
 /**
  * Resolves the current list-renderer’s registered name + group, then finds every **Component** instance on the
  * **current** page where `getComponent()` matches that name and group. Uses name/group (the stable identity in the
@@ -44,14 +75,7 @@ export async function listCmsSlotListTargetInstancesOnPage(
       continue;
     }
     const inst = el as ComponentElement;
-    const c = await inst.getComponent();
-    if ((await c.getName()) !== expectedName) {
-      continue;
-    }
-    if ((await c.getSettings()).group !== expectedGroup) {
-      continue;
-    }
-    if (await instanceMatchesCmsSlotListTargetSurface(inst, dataList, listContainer)) {
+    if (await instanceMatchesRegisteredCmsSlotListTarget(inst, expectedName, expectedGroup, dataList, listContainer)) {
       out.push(inst);
       if (cap != null && out.length >= cap) {
         break;
@@ -59,6 +83,26 @@ export async function listCmsSlotListTargetInstancesOnPage(
     }
   }
   return out;
+}
+
+/** True when the Designer’s current selection is a list-target instance for this beacon list. */
+export async function isCmsSlotListTargetInstanceSelected(
+  dataList: string,
+  listContainer: BlockElement,
+  options?: ListCmsSlotListTargetInstancesOnPageOptions
+): Promise<boolean> {
+  const selected = await webflow.getSelectedElement();
+  if (selected == null || selected.type !== "ComponentInstance") {
+    return false;
+  }
+  const listTarget = await getCmsSlotListTargetComponentOrNull(dataList, listContainer, options?.preferredDefinitionId);
+  if (listTarget == null) {
+    return false;
+  }
+  const expectedName = await listTarget.getName();
+  const expectedGroup = (await listTarget.getSettings()).group;
+  // Name/group only — do not enter/exit the component on every selection event (causes Designer flicker).
+  return instanceMatchesRegisteredCmsSlotListTargetIdentity(selected as ComponentElement, expectedName, expectedGroup);
 }
 
 /**

@@ -48,6 +48,7 @@ import {
 } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import { clearAllCmsSlotListTargetDesignerPreviewsOnPage } from "@/features/cms-slots/model/cms-slot-list-target-designer-preview";
 import {
+  isCmsSlotListTargetInstanceSelected,
   listCmsSlotListTargetInstancesOnPage,
   removeAllCmsSlotListTargetInstancesOnPage,
 } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
@@ -469,6 +470,68 @@ function useListTargetReconcileWhenPicking(
     listTargetResolveGen,
     listTargetDefinitionIdRef,
   ]);
+}
+
+function useListTargetSelectedOnCanvas(
+  picking: boolean,
+  listTargetPhase: CmsSlotListTargetPhase,
+  listTargetOnCanvasCount: number,
+  listTargetOnCanvasCountResolved: boolean,
+  activeDataList: string | null,
+  targetRef: MutableRefObject<BlockElement | null>,
+  listTargetDefinitionIdRef: MutableRefObject<string | null>
+) {
+  const [listTargetSelectedOnCanvas, setListTargetSelectedOnCanvas] = useState(false);
+
+  const refreshListTargetSelectedOnCanvas = useCallback(async () => {
+    if (
+      !picking ||
+      listTargetPhase !== "synced" ||
+      !listTargetOnCanvasCountResolved ||
+      listTargetOnCanvasCount === 0 ||
+      activeDataList == null
+    ) {
+      setListTargetSelectedOnCanvas(false);
+      return;
+    }
+    const listContainer = targetRef.current;
+    if (listContainer == null) {
+      setListTargetSelectedOnCanvas(false);
+      return;
+    }
+    try {
+      const selected = await isCmsSlotListTargetInstanceSelected(activeDataList, listContainer, {
+        preferredDefinitionId: listTargetDefinitionIdRef.current,
+      });
+      setListTargetSelectedOnCanvas(selected);
+    } catch {
+      setListTargetSelectedOnCanvas(false);
+    }
+  }, [
+    picking,
+    listTargetPhase,
+    listTargetOnCanvasCountResolved,
+    listTargetOnCanvasCount,
+    activeDataList,
+    targetRef,
+    listTargetDefinitionIdRef,
+  ]);
+
+  useEffect(() => {
+    void refreshListTargetSelectedOnCanvas();
+  }, [refreshListTargetSelectedOnCanvas]);
+
+  useEffect(() => {
+    if (!picking || listTargetPhase !== "synced" || listTargetOnCanvasCount === 0) {
+      return;
+    }
+    const unsub = webflow.subscribe("selectedelement", () => {
+      void refreshListTargetSelectedOnCanvas();
+    });
+    return unsub;
+  }, [picking, listTargetPhase, listTargetOnCanvasCount, refreshListTargetSelectedOnCanvas]);
+
+  return listTargetSelectedOnCanvas;
 }
 
 function useListTargetOnCanvasCountWhenSynced(
@@ -1056,6 +1119,15 @@ export function CmsSlotsScreen() {
     listTargetDefinitionIdRef,
     setListTargetOnCanvasCount,
     setListTargetOnCanvasCountResolved
+  );
+  const listTargetSelectedOnCanvas = useListTargetSelectedOnCanvas(
+    picking,
+    listTargetPhase,
+    listTargetOnCanvasCount,
+    listTargetOnCanvasCountResolved,
+    activeDataList,
+    targetRef,
+    listTargetDefinitionIdRef
   );
 
   const handleOpenBeacon = async (beacon: CmsSlotListOnPage) => {
@@ -1730,6 +1802,13 @@ export function CmsSlotsScreen() {
     const dataList = activeDataList;
     const listContainer = targetRef.current;
     if (!listContainer) return;
+    if (
+      await isCmsSlotListTargetInstanceSelected(dataList, listContainer, {
+        preferredDefinitionId: listTargetDefinitionIdRef.current,
+      })
+    ) {
+      return;
+    }
     setListTargetFocusOnCanvasPending(true);
     setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS);
     try {
@@ -1949,6 +2028,7 @@ export function CmsSlotsScreen() {
       listTargetRemovePending={listTargetRemovePending}
       listTargetFocusOnCanvasPending={listTargetFocusOnCanvasPending}
       listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
+      listTargetSelectedOnCanvas={listTargetSelectedOnCanvas}
       engineListSlotFile={engineListSlotFile}
       onSetEngineSlotExposed={handleSetEngineSlotExposed}
       onResyncEngineSlotAttrs={handleResyncEngineSlotAttrs}

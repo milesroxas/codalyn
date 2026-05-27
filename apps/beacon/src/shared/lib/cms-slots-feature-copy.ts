@@ -138,18 +138,21 @@ export const CMS_SLOTS_COMPOSER_MAIN_TITLE = "Composer";
 
 export const CMS_SLOTS_COMPOSER_MAIN_DESCRIPTION = "Pick a list to order parts and set content.";
 
-export const CMS_SLOTS_ENGINE_EDITING_TITLE = "Editing list";
+export const CMS_SLOTS_ENGINE_EDITING_TITLE = "Configure Slot Settings";
 
 export const CMS_SLOTS_ENGINE_EDITING_DESCRIPTION = "Add components and expose props for this slot list.";
 
-export const CMS_SLOTS_ENGINE_CURRENT_LIST_LABEL = "Current list";
+export const CMS_SLOTS_ENGINE_STEP_NAV_ARIA_LABEL = `${CMS_SLOTS_FEATURE_NAME} engine steps`;
+
+export const CMS_SLOTS_ENGINE_SLOT_COMPONENT_LABEL = "Slot component";
+
+export const CMS_SLOTS_ENGINE_LIST_TARGET_ON_CANVAS_TITLE = "On canvas";
 
 export const CMS_SLOTS_ENGINE_COMPONENTS_LABEL = "Components";
 
 export const CMS_SLOTS_ENGINE_COMPONENTS_EMPTY_TITLE = "No components yet";
 
-export const CMS_SLOTS_ENGINE_COMPONENTS_EMPTY_DESCRIPTION =
-  "Open the component library to add components to this list.";
+export const CMS_SLOTS_ENGINE_COMPONENTS_EMPTY_DESCRIPTION = "Click the Add button to add components to this slot.";
 
 export const CMS_SLOTS_ENGINE_ADD_COMPONENT_LABEL = "Add component";
 
@@ -165,15 +168,37 @@ export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LIST_ARIA_LABEL = "Components";
 
 export const CMS_SLOTS_ENGINE_SELECTED_COMPONENTS_ARIA_LABEL = "Selected components";
 
-export const CMS_SLOTS_ENGINE_LIST_TARGET_META = "List target";
-
 export const CMS_SLOTS_ENGINE_FOCUS_ON_CANVAS_HINT = "Jump to the list target on the canvas.";
 
 export const CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_HINT = "Place the list target on the canvas.";
 
+export const CMS_SLOTS_ENGINE_SLOT_COMPONENT_PLACE_TITLE = "Not on canvas";
+
+export const CMS_SLOTS_ENGINE_SLOT_COMPONENT_PLACE_GUIDE = "Place the slot on the page to continue setup.";
+
+export const CMS_SLOTS_ENGINE_SLOT_COMPONENT_ON_CANVAS_GUIDE = "Select and use navigator to position it on the page.";
+
+export const CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_LABEL = "Select";
+
+export const CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_SELECTED_LABEL = "Selected";
+
+export const CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_PENDING_LABEL = "Selecting…";
+
 export const CMS_SLOTS_ENGINE_CREATE_TARGET_HINT = "Add the hidden list target block to this page.";
 
-export const CMS_SLOTS_ENGINE_LIST_TARGET_STATUS_HINT = "Checking list target on this page.";
+export const CMS_SLOTS_ENGINE_LIST_TARGET_ABSENT_TITLE = "Not set up";
+
+export const CMS_SLOTS_ENGINE_LIST_TARGET_ABSENT_DESCRIPTION =
+  "This list needs a slot component before it can render on the page.";
+
+export const CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_TITLE = "Checking status";
+
+export const CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_DESCRIPTION =
+  "Verifying whether the slot component is on this page.";
+
+export const CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_TITLE = "Updating";
+
+export const CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_DESCRIPTION = "Syncing slot component changes on this page.";
 
 export const CMS_SLOTS_ENGINE_FOCUS_ON_CANVAS_LABEL = "Focus on canvas";
 
@@ -183,7 +208,7 @@ export const CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_LABEL = "Place on canvas";
 
 export const CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_PENDING_LABEL = "Placing…";
 
-export const CMS_SLOTS_ENGINE_CREATE_TARGET_LABEL = "Create target";
+export const CMS_SLOTS_ENGINE_CREATE_TARGET_LABEL = "Create";
 
 export const CMS_SLOTS_ENGINE_CREATE_TARGET_PENDING_LABEL = "Creating…";
 
@@ -192,9 +217,5 @@ export const CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_LABEL = "Checking…";
 export const CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_LABEL = "Updating…";
 
 export const CMS_SLOTS_ENGINE_REMOVE_TARGET_LABEL = "Remove target…";
-
-export function cmsSlotsEngineListTargetActionsAriaLabel(listName: string): string {
-  return `List target actions for ${listName}`;
-}
 
 export const CMS_SLOTS_ENGINE_BACK_TO_LIST_LABEL = "Back to list";

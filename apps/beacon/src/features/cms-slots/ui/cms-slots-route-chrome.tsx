@@ -9,6 +9,7 @@ import {
   BeaconFeatureRouteFooter,
   BeaconFeatureRouteHeader,
   BeaconFeatureRouteScrollBody,
+  BeaconFeatureRouteSubheader,
 } from "@/app/ui/beacon-feature-route-chrome";
 import { BeaconRouteContentTransition } from "@/app/ui/beacon-route-content-transition";
 import { BeaconRouteLoadingOverlay } from "@/app/ui/beacon-route-loading-overlay";
@@ -30,12 +31,16 @@ import { CmsSlotComposerListPanel } from "@/features/cms-slots/ui/cms-slot-compo
 import { CmsSlotComposerPanel } from "@/features/cms-slots/ui/cms-slot-composer-panel";
 import { ComposerPaletteSection } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-palette-section";
 import { CmsSlotCompositionPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel";
+import { CmsSlotEngineBackToListDock } from "@/features/cms-slots/ui/cms-slot-composition-panel/cms-slot-engine-back-to-list-dock";
 import { CmsSlotHomePanel } from "@/features/cms-slots/ui/cms-slot-home-panel";
 import { CmsSlotsCmsFieldLinkDialog } from "@/features/cms-slots/ui/cms-slots-cms-field-link-dialog";
 import { CmsSlotsPageRuntimeSyncButton } from "@/features/cms-slots/ui/cms-slots-page-runtime-sync-button";
 import {
   CMS_SLOTS_AREA_NAV_LABEL,
   CMS_SLOTS_DELETE_DIALOG_TITLE,
+  CMS_SLOTS_ENGINE_EDITING_TITLE,
+  CMS_SLOTS_ENGINE_MAIN_TITLE,
+  CMS_SLOTS_ENGINE_STEP_NAV_ARIA_LABEL,
   CMS_SLOTS_FEATURE_NAME,
   CMS_SLOTS_OPENING_ARIA_LABEL,
   CMS_SLOTS_OPENING_MESSAGE,
@@ -55,6 +60,7 @@ import {
 import { Button, buttonVariants } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Label } from "@/shared/ui/label";
+import { StepNav } from "@/shared/ui/step-nav";
 
 export type CmsSlotsRouteChromeProps = {
   navigate: NavigateFunction;
@@ -113,6 +119,7 @@ export type CmsSlotsRouteChromeProps = {
   listTargetRemovePending: boolean;
   listTargetFocusOnCanvasPending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
+  listTargetSelectedOnCanvas: boolean;
   engineListSlotFile: CmsSlotEngineSlotPropsFile | null;
   onSetEngineSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void | Promise<void>;
   onResyncEngineSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
@@ -184,8 +191,6 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps & { routeInteractio
         <CmsSlotCompositionPanel
           searchFieldId={p.searchFieldId}
           activeDataList={p.activeDataList}
-          activeListLabel={p.activeListLabel}
-          onBackToList={p.exitToList}
           componentQuery={p.componentQuery}
           setComponentQuery={p.setComponentQuery}
           catalogLoading={p.catalogLoading}
@@ -208,6 +213,7 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps & { routeInteractio
           listTargetRemovePending={p.listTargetRemovePending}
           listTargetFocusOnCanvasPending={p.listTargetFocusOnCanvasPending}
           listTargetPlaceOnCanvasPending={p.listTargetPlaceOnCanvasPending}
+          listTargetSelectedOnCanvas={p.listTargetSelectedOnCanvas}
           engineSlotProps={p.engineListSlotFile ?? { v: 1, slots: [] }}
           onSetSlotExposed={p.onSetEngineSlotExposed}
           onResyncEngineSlotAttrs={p.onResyncEngineSlotAttrs}
@@ -564,13 +570,39 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
   );
 }
 
+type CmsSlotsEngineStepId = "engine-home" | "configure";
+
 /** Route shell/header, scroll region, dialogs, footer — splits cognitive complexity off `CmsSlotsScreen`. */
 export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
   const composerPaletteDocked = p.isComposer && p.activeComposer != null;
+  const engineBackToListDocked = p.isEngine && p.picking;
+  const engineStepNav =
+    p.isEngine && p.picking ? (
+      <StepNav<CmsSlotsEngineStepId>
+        aria-label={CMS_SLOTS_ENGINE_STEP_NAV_ARIA_LABEL}
+        current="configure"
+        onStepSelect={(step) => {
+          if (step === "engine-home") {
+            p.exitToList();
+          }
+        }}
+        steps={[
+          { id: "engine-home", label: CMS_SLOTS_ENGINE_MAIN_TITLE },
+          { id: "configure", label: p.activeListLabel ?? CMS_SLOTS_ENGINE_EDITING_TITLE },
+        ]}
+      />
+    ) : null;
 
   return (
     <BeaconFeatureRouteChrome
       header={<BeaconFeatureRouteHeader title={CMS_SLOTS_FEATURE_NAME} dataSlot="cms_slots_route_header" />}
+      subheader={
+        engineStepNav ? (
+          <BeaconFeatureRouteSubheader dataSlot="cms_slots_engine_step_nav">
+            {engineStepNav}
+          </BeaconFeatureRouteSubheader>
+        ) : null
+      }
       overlays={
         <>
           <CmsSlotsBeaconDeleteDialog {...p} />
@@ -586,6 +618,7 @@ export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
       }
       footer={
         <>
+          {engineBackToListDocked ? <CmsSlotEngineBackToListDock onBackToList={p.exitToList} /> : null}
           {composerPaletteDocked ? (
             <ComposerPaletteSection
               variant="docked"

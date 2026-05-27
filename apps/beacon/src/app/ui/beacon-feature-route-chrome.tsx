@@ -140,6 +140,17 @@ export function BeaconFeatureRouteDockButton(props: BeaconFeatureRouteDockButton
   );
 }
 
+/** Full-width dock back control with a leading chevron and centered label. */
+export function BeaconFeatureRouteDockBackButton(props: BeaconFeatureRouteDockButtonProps) {
+  const { children, emphasized = false, size = "dockNavFull", ...rest } = props;
+  return (
+    <BeaconFeatureRouteDockButton emphasized={emphasized} size={size} {...rest}>
+      <ChevronLeft aria-hidden className="size-4" strokeWidth={2.25} />
+      {children}
+    </BeaconFeatureRouteDockButton>
+  );
+}
+
 export type BeaconRouteSubheaderProps = {
   children: ReactNode;
 };

@@ -123,12 +123,7 @@ const surfaceSummaryCardSelectRowVariants = cva(
   }
 );
 
-const surfaceSummaryCardSurfaceDisplayClass = "flex min-w-0 w-full items-center gap-3 text-left";
-const surfaceSummaryCardSurfaceActionsClass = "shrink-0";
-
-const surfaceSummaryCardSelectRowListClass = "flex min-w-0 flex-col gap-2";
-
-const surfaceSummaryCardSurfaceSummaryVariants = cva("flex min-w-0 flex-col gap-2", {
+const surfaceSummaryCardSurfaceDisplayVariants = cva("flex min-w-0 w-full items-center gap-3 text-left", {
   variants: {
     contained: {
       true: "overflow-hidden rounded-md border border-border/80 bg-card px-3 py-2.5 text-card-foreground shadow-sm",
@@ -139,6 +134,12 @@ const surfaceSummaryCardSurfaceSummaryVariants = cva("flex min-w-0 flex-col gap-
     contained: false,
   },
 });
+
+const surfaceSummaryCardSurfaceActionsClass = "shrink-0";
+
+const surfaceSummaryCardSelectRowListClass = "flex min-w-0 flex-col gap-2";
+
+const surfaceSummaryCardSurfaceSummaryClass = "flex min-w-0 flex-col gap-2";
 
 const surfaceSummaryCardFormFieldsClass = "flex min-w-0 flex-col gap-4";
 
@@ -472,11 +473,16 @@ function SurfaceSummaryCardSelectRow({
   );
 }
 
-function SurfaceSummaryCardSurfaceDisplay({ className, ...props }: React.ComponentProps<"div">) {
+function SurfaceSummaryCardSurfaceDisplay({
+  className,
+  contained,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardSurfaceDisplayVariants>) {
   return (
     <div
       data-slot="surface-summary-card-surface-display"
-      className={cn(surfaceSummaryCardSurfaceDisplayClass, className)}
+      data-contained={contained ? "true" : "false"}
+      className={cn(surfaceSummaryCardSurfaceDisplayVariants({ contained }), className)}
       {...props}
     />
   );
@@ -492,16 +498,11 @@ function SurfaceSummaryCardSelectRowList({ className, ...props }: React.Componen
   );
 }
 
-function SurfaceSummaryCardSurfaceSummary({
-  className,
-  contained,
-  ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardSurfaceSummaryVariants>) {
+function SurfaceSummaryCardSurfaceSummary({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="surface-summary-card-surface-summary"
-      data-contained={contained ? "true" : "false"}
-      className={cn(surfaceSummaryCardSurfaceSummaryVariants({ contained }), className)}
+      className={cn(surfaceSummaryCardSurfaceSummaryClass, className)}
       {...props}
     />
   );

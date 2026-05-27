@@ -27,6 +27,8 @@ export type CmsSlotCompositionPanelProps = {
   listTargetPhase: CmsSlotListTargetPhase;
   /** How many list-render target instances for this list exist on the current page. */
   listTargetOnCanvasCount: number;
+  /** False until the on-page list target instance count has been resolved for the current list. */
+  listTargetOnCanvasCountResolved: boolean;
   onCreateListTarget: () => void;
   onRequestRemoveListTarget: () => void;
   onFocusListTargetOnCanvas: () => void;
@@ -77,6 +79,7 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     listTargetFocusOnCanvasPending,
     listTargetPlaceOnCanvasPending,
     listTargetOnCanvasCount,
+    listTargetOnCanvasCountResolved,
     engineSlotProps,
     onSetSlotExposed,
     onResyncEngineSlotAttrs,
@@ -95,7 +98,8 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     listTargetFocusOnCanvasPending ||
     listTargetPlaceOnCanvasPending ||
     listTargetPhase === "loading" ||
-    listTargetPhase === "updating";
+    listTargetPhase === "updating" ||
+    (listTargetPhase === "synced" && !listTargetOnCanvasCountResolved);
 
   const { composableByKey, composableLoading } = useCompositionComposableMeta(selected);
 
@@ -107,6 +111,7 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
         listTargetActionBusy={listTargetActionBusy}
         listTargetCreatePending={listTargetCreatePending}
         listTargetOnCanvasCount={listTargetOnCanvasCount}
+        listTargetOnCanvasCountResolved={listTargetOnCanvasCountResolved}
         listTargetPhase={listTargetPhase}
         listTargetFocusOnCanvasPending={listTargetFocusOnCanvasPending}
         listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}

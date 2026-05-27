@@ -32,6 +32,7 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
   setListTargetPhase: (p: CmsSlotListTargetPhase) => void;
   setListTargetRegisteredName: (n: string | null) => void;
   setListTargetOnCanvasCount: (n: number) => void;
+  setListTargetOnCanvasCountResolved: (resolved: boolean) => void;
   onProgress?: (message: string) => void;
 }): Promise<CmsSlotListCmsTextFieldEnsureResult | null> {
   const {
@@ -43,6 +44,7 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
     setListTargetPhase,
     setListTargetRegisteredName,
     setListTargetOnCanvasCount,
+    setListTargetOnCanvasCountResolved,
     onProgress,
   } = options;
   try {
@@ -80,6 +82,8 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
       setListTargetOnCanvasCount(list.length);
     } catch {
       setListTargetOnCanvasCount(0);
+    } finally {
+      setListTargetOnCanvasCountResolved(true);
     }
     return cmsEnsure;
   } catch (e) {

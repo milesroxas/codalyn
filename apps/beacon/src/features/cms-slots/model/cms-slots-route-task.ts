@@ -39,6 +39,7 @@ export type CmsSlotsRouteTaskInput = {
   listTargetPlaceOnCanvasPending: boolean;
   listTargetRemovePending: boolean;
   listTargetPhase: CmsSlotListTargetPhase;
+  listTargetOnCanvasCountResolved: boolean;
   slotPropsWritePending: boolean;
   embedSyncPending: boolean;
   composerSavePending: boolean;
@@ -116,6 +117,9 @@ const CMS_SLOTS_ROUTE_TASK_RULES: RouteTaskRule[] = [
       }
       if (input.listTargetPhase === "updating") {
         return task(CMS_SLOTS_ROUTE_TASK_UPDATING_LIST_TARGET);
+      }
+      if (input.listTargetPhase === "synced" && !input.listTargetOnCanvasCountResolved) {
+        return task(CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET);
       }
       return null;
     },

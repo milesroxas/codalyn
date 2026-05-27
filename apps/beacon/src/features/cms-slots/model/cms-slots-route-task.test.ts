@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveCmsSlotsRouteTask } from "@/features/cms-slots/model/cms-slots-route-task";
 import {
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
+  CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET,
   CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_SAVING_EXPOSED_PROPS,
   CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES,
@@ -22,6 +23,7 @@ const idleInput = {
   listTargetPlaceOnCanvasPending: false,
   listTargetRemovePending: false,
   listTargetPhase: "synced" as const,
+  listTargetOnCanvasCountResolved: true,
   slotPropsWritePending: false,
   embedSyncPending: false,
   composerSavePending: false,
@@ -66,6 +68,17 @@ describe("resolveCmsSlotsRouteTask", () => {
     expect(resolveCmsSlotsRouteTask({ ...idleInput, listTargetFocusOnCanvasPending: true })?.message).toBe(
       CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS
     );
+  });
+
+  it("returns checking list target while synced canvas count is unresolved", () => {
+    expect(
+      resolveCmsSlotsRouteTask({
+        ...idleInput,
+        picking: true,
+        listTargetPhase: "synced",
+        listTargetOnCanvasCountResolved: false,
+      })?.message
+    ).toBe(CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET);
   });
 
   it("returns null when idle", () => {

@@ -49,6 +49,7 @@ type CmsSlotEngineListContextSectionProps = {
   listTargetFocusOnCanvasPending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
   listTargetOnCanvasCount: number;
+  listTargetOnCanvasCountResolved: boolean;
   onBackToList: () => void;
   onCreateListTarget: () => void;
   onRequestRemoveListTarget: () => void;
@@ -114,9 +115,9 @@ function CmsSlotEngineCurrentListSummary(props: CmsSlotEngineCurrentListSummaryP
   const { activeListLabel, actionsMenuAriaLabel, actionsMenuDisabled = false, actionsMenuItems = [] } = props;
 
   return (
-    <SurfaceSummaryCardSurfaceSummary contained>
+    <SurfaceSummaryCardSurfaceSummary>
       <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_ENGINE_CURRENT_LIST_LABEL}</SurfaceSummaryCardPanelSectionLabel>
-      <SurfaceSummaryCardSurfaceDisplay>
+      <SurfaceSummaryCardSurfaceDisplay contained>
         <SurfaceSummaryCardIconBox>
           <List aria-hidden strokeWidth={1.5} />
         </SurfaceSummaryCardIconBox>
@@ -226,6 +227,7 @@ export function CmsSlotEngineListContextSection(props: CmsSlotEngineListContextS
     listTargetFocusOnCanvasPending,
     listTargetPlaceOnCanvasPending,
     listTargetOnCanvasCount,
+    listTargetOnCanvasCountResolved,
     onBackToList,
     onCreateListTarget,
     onRequestRemoveListTarget,
@@ -235,6 +237,10 @@ export function CmsSlotEngineListContextSection(props: CmsSlotEngineListContextS
 
   const ctaDisabled = listTargetActionBusy || removingKey !== null || activeDataList == null;
   const canvasActionHint = resolveCanvasActionHint(listTargetPhase, listTargetOnCanvasCount);
+  const listTargetCanvasStatusPending =
+    listTargetPhase === "loading" ||
+    listTargetPhase === "updating" ||
+    (listTargetPhase === "synced" && !listTargetOnCanvasCountResolved);
   const syncedMenuItems =
     listTargetPhase === "synced"
       ? buildSyncedListTargetMenuItems({
@@ -263,7 +269,7 @@ export function CmsSlotEngineListContextSection(props: CmsSlotEngineListContextS
         />
       ) : null}
 
-      {listTargetPhase === "synced" && listTargetOnCanvasCount === 0 ? (
+      {listTargetPhase === "synced" && listTargetOnCanvasCountResolved && listTargetOnCanvasCount === 0 ? (
         <CmsSlotEnginePlaceOnCanvasAction
           canvasActionHint={canvasActionHint}
           ctaDisabled={ctaDisabled}
@@ -282,10 +288,10 @@ export function CmsSlotEngineListContextSection(props: CmsSlotEngineListContextS
         />
       ) : null}
 
-      {listTargetPhase === "loading" || listTargetPhase === "updating" ? (
+      {listTargetCanvasStatusPending ? (
         <CmsSlotEnginePendingActions
           canvasActionHint={canvasActionHint}
-          listTargetPhase={listTargetPhase}
+          listTargetPhase={listTargetPhase === "updating" ? "updating" : "loading"}
           onBackToList={onBackToList}
         />
       ) : null}

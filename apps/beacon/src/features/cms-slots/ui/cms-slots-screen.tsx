@@ -268,6 +268,7 @@ type BeaconsPageChangeReset = {
   setListTargetPhase: (v: CmsSlotListTargetPhase) => void;
   setListTargetRegisteredName: (v: string | null) => void;
   setListTargetOnCanvasCount: (v: number) => void;
+  setListTargetOnCanvasCountResolved: (v: boolean) => void;
   setRemoveListTargetDialogOpen: (v: boolean) => void;
   setActiveBeaconKey: (v: string | null) => void;
   setEngineListCompositionStale: (v: boolean) => void;
@@ -337,6 +338,7 @@ function useBeaconsPageChangeReset(
         reset.setListTargetPhase("loading");
         reset.setListTargetRegisteredName(null);
         reset.setListTargetOnCanvasCount(0);
+        reset.setListTargetOnCanvasCountResolved(false);
         reset.setRemoveListTargetDialogOpen(false);
         reset.setActiveBeaconKey(null);
         reset.listTargetResolveGen.current += 1;
@@ -476,19 +478,23 @@ function useListTargetOnCanvasCountWhenSynced(
   activeBeaconKey: string | null,
   targetRef: MutableRefObject<BlockElement | null>,
   listTargetDefinitionIdRef: MutableRefObject<string | null>,
-  setListTargetOnCanvasCount: (n: number) => void
+  setListTargetOnCanvasCount: (n: number) => void,
+  setListTargetOnCanvasCountResolved: (resolved: boolean) => void
 ) {
   useEffect(() => {
     if (!picking || listTargetPhase !== "synced" || activeDataList == null || activeBeaconKey == null) {
       setListTargetOnCanvasCount(0);
+      setListTargetOnCanvasCountResolved(false);
       return;
     }
     const listContainer = targetRef.current;
     if (listContainer == null) {
       setListTargetOnCanvasCount(0);
+      setListTargetOnCanvasCountResolved(false);
       return;
     }
     let cancelled = false;
+    setListTargetOnCanvasCountResolved(false);
     void (async () => {
       try {
         const list = await listCmsSlotListTargetInstancesOnPage(activeDataList, listContainer, {
@@ -496,10 +502,12 @@ function useListTargetOnCanvasCountWhenSynced(
         });
         if (!cancelled) {
           setListTargetOnCanvasCount(list.length);
+          setListTargetOnCanvasCountResolved(true);
         }
       } catch {
         if (!cancelled) {
           setListTargetOnCanvasCount(0);
+          setListTargetOnCanvasCountResolved(true);
         }
       }
     })();
@@ -514,6 +522,7 @@ function useListTargetOnCanvasCountWhenSynced(
     targetRef,
     listTargetDefinitionIdRef,
     setListTargetOnCanvasCount,
+    setListTargetOnCanvasCountResolved,
   ]);
 }
 
@@ -523,6 +532,7 @@ function isListTargetCanvasActionBlocked(
   listTargetCreatePending: boolean,
   listTargetRemovePending: boolean,
   listTargetPhase: CmsSlotListTargetPhase,
+  listTargetOnCanvasCountResolved: boolean,
   activeDataList: string | null
 ): boolean {
   return (
@@ -531,6 +541,7 @@ function isListTargetCanvasActionBlocked(
     listTargetCreatePending ||
     listTargetRemovePending ||
     listTargetPhase !== "synced" ||
+    !listTargetOnCanvasCountResolved ||
     activeDataList == null
   );
 }
@@ -539,7 +550,8 @@ async function refreshListTargetOnCanvasCount(
   dataList: string,
   listContainer: BlockElement,
   preferredDefinitionId: string | null,
-  setListTargetOnCanvasCount: (n: number) => void
+  setListTargetOnCanvasCount: (n: number) => void,
+  setListTargetOnCanvasCountResolved: (resolved: boolean) => void
 ): Promise<void> {
   try {
     const list = await listCmsSlotListTargetInstancesOnPage(dataList, listContainer, {
@@ -548,6 +560,8 @@ async function refreshListTargetOnCanvasCount(
     setListTargetOnCanvasCount(list.length);
   } catch {
     setListTargetOnCanvasCount(0);
+  } finally {
+    setListTargetOnCanvasCountResolved(true);
   }
 }
 
@@ -574,6 +588,7 @@ async function finishListTargetCanvasPlacement(params: {
   preferredDefinitionId: string | null;
   openCmsFieldLinkPrompt: (binding: { collectionId: string; fieldId: string }) => void;
   setListTargetOnCanvasCount: (n: number) => void;
+  setListTargetOnCanvasCountResolved: (resolved: boolean) => void;
 }): Promise<void> {
   if (params.cmsFieldWasCreated) {
     const collectionId = await resolveCmsSlotListTargetCmsCollectionIdForCleanup(params.listContainer);
@@ -594,7 +609,8 @@ async function finishListTargetCanvasPlacement(params: {
     params.activeDataList,
     params.listContainer,
     params.preferredDefinitionId,
-    params.setListTargetOnCanvasCount
+    params.setListTargetOnCanvasCount,
+    params.setListTargetOnCanvasCountResolved
   );
   void webflow.notify({
     type: "Success",
@@ -659,6 +675,7 @@ export function CmsSlotsScreen() {
   const [listTargetPhase, setListTargetPhase] = useState<CmsSlotListTargetPhase>("loading");
   const [, setListTargetRegisteredName] = useState<string | null>(null);
   const [listTargetOnCanvasCount, setListTargetOnCanvasCount] = useState(0);
+  const [listTargetOnCanvasCountResolved, setListTargetOnCanvasCountResolved] = useState(false);
   const [removeListTargetDialogOpen, setRemoveListTargetDialogOpen] = useState(false);
   const [cmsFieldLinkPromptOpen, setCmsFieldLinkPromptOpen] = useState(false);
   const [cmsFieldLinkDetectEpoch, setCmsFieldLinkDetectEpoch] = useState(0);
@@ -961,6 +978,7 @@ export function CmsSlotsScreen() {
     setListTargetPhase,
     setListTargetRegisteredName,
     setListTargetOnCanvasCount,
+    setListTargetOnCanvasCountResolved,
     setRemoveListTargetDialogOpen,
     setActiveBeaconKey,
     setEngineListCompositionStale,
@@ -1018,6 +1036,7 @@ export function CmsSlotsScreen() {
     setListTargetPhase("loading");
     setListTargetRegisteredName(null);
     setListTargetOnCanvasCount(0);
+    setListTargetOnCanvasCountResolved(false);
     setRemoveListTargetDialogOpen(false);
     setActiveBeaconKey(null);
     setEngineListSlotFile(null);
@@ -1035,7 +1054,8 @@ export function CmsSlotsScreen() {
     activeBeaconKey,
     targetRef,
     listTargetDefinitionIdRef,
-    setListTargetOnCanvasCount
+    setListTargetOnCanvasCount,
+    setListTargetOnCanvasCountResolved
   );
 
   const handleOpenBeacon = async (beacon: CmsSlotListOnPage) => {
@@ -1142,6 +1162,7 @@ export function CmsSlotsScreen() {
       setPicking(true);
       setCreateFormOpen(false);
       setListTargetOnCanvasCount(listTargetOnPage.length);
+      setListTargetOnCanvasCountResolved(true);
       listTargetReconcileCacheRef.current = {
         beaconKey,
         dataList,
@@ -1470,6 +1491,7 @@ export function CmsSlotsScreen() {
           setListTargetPhase,
           setListTargetRegisteredName,
           setListTargetOnCanvasCount,
+          setListTargetOnCanvasCountResolved,
           onProgress: setRouteTaskPhase,
         });
         promptCmsFieldLinkIfCreated(cmsEnsure);
@@ -1697,6 +1719,7 @@ export function CmsSlotsScreen() {
         listTargetCreatePending,
         listTargetRemovePending,
         listTargetPhase,
+        listTargetOnCanvasCountResolved,
         activeDataList
       ) ||
       activeDataList == null ||
@@ -1713,6 +1736,7 @@ export function CmsSlotsScreen() {
       const instance = await focusCmsSlotListTargetOnCanvas(dataList, listContainer, listTargetDefinitionIdRef.current);
       if (instance == null) {
         setListTargetOnCanvasCount(0);
+        setListTargetOnCanvasCountResolved(true);
         void webflow.notify({ type: "Warning", message: CMS_SLOTS_TOAST_LIST_TARGET_NOT_ON_CANVAS });
         return;
       }
@@ -1734,6 +1758,7 @@ export function CmsSlotsScreen() {
         listTargetCreatePending,
         listTargetRemovePending,
         listTargetPhase,
+        listTargetOnCanvasCountResolved,
         activeDataList
       ) ||
       activeDataList == null
@@ -1761,6 +1786,7 @@ export function CmsSlotsScreen() {
         preferredDefinitionId: listTargetDefinitionIdRef.current,
         openCmsFieldLinkPrompt,
         setListTargetOnCanvasCount,
+        setListTargetOnCanvasCountResolved,
       });
     } catch (err) {
       const message = formatWebflowDesignerError(err);
@@ -1807,6 +1833,8 @@ export function CmsSlotsScreen() {
         setListTargetOnCanvasCount(list.length);
       } catch {
         setListTargetOnCanvasCount(0);
+      } finally {
+        setListTargetOnCanvasCountResolved(true);
       }
       void refreshPageBeacons();
     } catch (err) {
@@ -1912,6 +1940,7 @@ export function CmsSlotsScreen() {
       removingKey={removingKey}
       listTargetPhase={listTargetPhase}
       listTargetOnCanvasCount={listTargetOnCanvasCount}
+      listTargetOnCanvasCountResolved={listTargetOnCanvasCountResolved}
       onCreateListTarget={handleCreateListTarget}
       onRequestRemoveListTarget={handleRequestRemoveListTarget}
       onFocusListTargetOnCanvas={handleFocusListTargetOnCanvas}

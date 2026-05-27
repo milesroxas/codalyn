@@ -104,6 +104,7 @@ export type CmsSlotsRouteChromeProps = {
   removingKey: string | null;
   listTargetPhase: CmsSlotListTargetPhase;
   listTargetOnCanvasCount: number;
+  listTargetOnCanvasCountResolved: boolean;
   onCreateListTarget: () => void | Promise<void>;
   onRequestRemoveListTarget: () => void;
   onFocusListTargetOnCanvas: () => void | Promise<void>;
@@ -198,6 +199,7 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps & { routeInteractio
           removingKey={p.removingKey}
           listTargetPhase={p.listTargetPhase}
           listTargetOnCanvasCount={p.listTargetOnCanvasCount}
+          listTargetOnCanvasCountResolved={p.listTargetOnCanvasCountResolved}
           onCreateListTarget={p.onCreateListTarget}
           onRequestRemoveListTarget={p.onRequestRemoveListTarget}
           onFocusListTargetOnCanvas={p.onFocusListTargetOnCanvas}
@@ -338,6 +340,7 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
     listTargetPlaceOnCanvasPending: p.listTargetPlaceOnCanvasPending,
     listTargetRemovePending: p.listTargetRemovePending,
     listTargetPhase: p.listTargetPhase,
+    listTargetOnCanvasCountResolved: p.listTargetOnCanvasCountResolved,
     slotPropsWritePending: p.slotPropsWritePending,
     embedSyncPending: p.embedSyncPending,
     composerSavePending: p.composerSavePending,

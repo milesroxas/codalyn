@@ -85,12 +85,6 @@ function applyHostSplitRouting(request: NextRequest, pathname: string): NextResp
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  if (pathname === "/api/auth/verify-email" && request.method === "GET" && request.nextUrl.searchParams.has("token")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/verify-email";
-    return NextResponse.redirect(url, 307);
-  }
-
   const hostSplitRedirect = applyHostSplitRouting(request, pathname);
   if (hostSplitRedirect) {
     return hostSplitRedirect;

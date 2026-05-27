@@ -18,7 +18,53 @@ export const CMS_SLOTS_PAGE_LIST_ARIA_LABEL = "CMS slot lists on this page";
 
 export const CMS_SLOTS_SCAN_ARIA_LABEL = "Scanning page for CMS slot lists";
 
+export const CMS_SLOTS_SCAN_MESSAGE = "Scanning page for slot lists…";
+
 export const CMS_SLOTS_OPENING_ARIA_LABEL = "Opening CMS slot";
+
+export const CMS_SLOTS_OPENING_MESSAGE = "Opening slot list…";
+
+export const CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT = "Adding component…";
+
+export const CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG = "Saving slot config…";
+
+export const CMS_SLOTS_ROUTE_TASK_CHECKING_CMS_FIELD = "Checking CMS field…";
+
+export const CMS_SLOTS_ROUTE_TASK_UPDATING_LIST_TARGET = "Syncing list target…";
+
+export const CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES = "Tagging attributes…";
+
+export const CMS_SLOTS_ROUTE_TASK_ENTERING_COMPONENT = "Opening component…";
+
+export const CMS_SLOTS_ROUTE_TASK_TAGGING_ELEMENTS = "Tagging elements…";
+
+export const CMS_SLOTS_ROUTE_TASK_SAVING_EXPOSED_PROPS = "Saving props…";
+
+export const CMS_SLOTS_ROUTE_TASK_CREATING_LIST_TARGET = "Creating list target…";
+
+export const CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS = "Placing on canvas…";
+
+export const CMS_SLOTS_ROUTE_TASK_OPENING_LIST_TARGET = "Opening list target…";
+
+export const CMS_SLOTS_ROUTE_TASK_FINISHING = "Finishing up…";
+
+export const CMS_SLOTS_ROUTE_TASK_REMOVING_LIST_TARGET = "Removing list target…";
+
+export const CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET = "Checking list target…";
+
+export const CMS_SLOTS_ROUTE_TASK_REMOVING_COMPONENT = "Removing component…";
+
+export const CMS_SLOTS_ROUTE_TASK_CREATING_LIST = "Creating slot list…";
+
+export const CMS_SLOTS_ROUTE_TASK_DELETING_LIST = "Deleting slot list…";
+
+export const CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT = "Syncing page script…";
+
+export const CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION = "Saving composition…";
+
+export const CMS_SLOTS_ROUTE_TASK_LOADING_COMPOSER_LISTS = "Loading lists…";
+
+export const CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD = "Linking CMS field…";
 
 import { BEACON_BACK_TO_HOME_ARIA_LABEL } from "@/shared/lib/beacon-feature-route-copy";
 

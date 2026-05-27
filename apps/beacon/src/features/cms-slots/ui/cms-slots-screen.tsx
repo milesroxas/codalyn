@@ -100,6 +100,10 @@ import {
   CMS_SLOTS_CMS_FIELD_LINK_TOAST_SUCCESS,
   CMS_SLOTS_CMS_FIELD_NOT_VISIBLE_NOTIFY,
   CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON,
+  CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
+  CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS,
+  CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG,
+  CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES,
   CMS_SLOTS_TOAST_LIST_CREATED,
   CMS_SLOTS_TOAST_LIST_REMOVED,
   CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED,
@@ -621,6 +625,9 @@ export function CmsSlotsScreen() {
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [addPending, setAddPending] = useState(false);
+  /** Fine-grained copy for multi-step Designer operations shown in the route overlay. */
+  const [routeTaskPhase, setRouteTaskPhase] = useState<string | null>(null);
+  const [slotPropsWritePending, setSlotPropsWritePending] = useState(false);
   /** Opens the expose/tag drawer on the row with this `key` once after add-from-catalog. */
   const [autoOpenExposeDrawerRowKey, setAutoOpenExposeDrawerRowKey] = useState<string | null>(null);
   const [selected, setSelected] = useState<HydratedCmsSlotRow[]>([]);
@@ -707,9 +714,11 @@ export function CmsSlotsScreen() {
     });
     slotPropsWriteTailRef.current = gate;
     await prev;
+    setSlotPropsWritePending(true);
     try {
       return await fn();
     } finally {
+      setSlotPropsWritePending(false);
       release();
     }
   }, []);
@@ -1267,18 +1276,24 @@ export function CmsSlotsScreen() {
   const handleResyncEngineSlotAttrs = useCallback(
     async (slotIndex: number) => {
       await awaitSlotPropsWritesIdle();
-      const ok = await resyncEngineSlotPropAttributesForSlotIndex({
-        slotIndex,
-        selected,
-        container: targetRef.current,
-        setResyncingEngineSlotKey,
-        setSelected,
-      });
-      if (ok) {
-        setEngineListCompositionStale(false);
-        void refreshPageBeacons();
+      setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES);
+      try {
+        const ok = await resyncEngineSlotPropAttributesForSlotIndex({
+          slotIndex,
+          selected,
+          container: targetRef.current,
+          setResyncingEngineSlotKey,
+          setSelected,
+          onProgress: setRouteTaskPhase,
+        });
+        if (ok) {
+          setEngineListCompositionStale(false);
+          void refreshPageBeacons();
+        }
+        return ok;
+      } finally {
+        setRouteTaskPhase(null);
       }
-      return ok;
     },
     [selected, awaitSlotPropsWritesIdle, refreshPageBeacons]
   );
@@ -1394,12 +1409,13 @@ export function CmsSlotsScreen() {
     const container = targetRef.current;
     if (!container || addPending) return;
     setAddPending(true);
+    setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT);
     try {
       const instance = await appendComponentToSlotListContainer(container, c.id);
       const rowKey = crypto.randomUUID();
       const nextSelected = [...selected, { key: rowKey, componentId: c.id, name: c.name, instance }];
       setSelected(nextSelected);
-      setAutoOpenExposeDrawerRowKey(rowKey);
+      setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG);
       await writeCmsSlotEngineConfiguredComponentIds(
         container,
         nextSelected.map((row) => row.componentId)
@@ -1421,14 +1437,17 @@ export function CmsSlotsScreen() {
           setListTargetPhase,
           setListTargetRegisteredName,
           setListTargetOnCanvasCount,
+          onProgress: setRouteTaskPhase,
         });
         promptCmsFieldLinkIfCreated(cmsEnsure);
       }
+      setAutoOpenExposeDrawerRowKey(rowKey);
     } catch (err) {
       const message = formatWebflowDesignerError(err);
       void webflow.notify({ type: "Error", message });
     } finally {
       setAddPending(false);
+      setRouteTaskPhase(null);
     }
   };
 
@@ -1604,11 +1623,13 @@ export function CmsSlotsScreen() {
     const listContainer = targetRef.current;
     if (!listContainer) return;
     setListTargetPlaceOnCanvasPending(true);
+    setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS);
     try {
       const { instance, alreadyExisted, cmsFieldWasCreated } = await placeCmsSlotListTargetOnCanvas(
         dataList,
         listContainer,
-        listTargetDefinitionIdRef.current
+        listTargetDefinitionIdRef.current,
+        { onProgress: setRouteTaskPhase }
       );
       await finishListTargetCanvasPlacement({
         instance,
@@ -1625,6 +1646,7 @@ export function CmsSlotsScreen() {
       void webflow.notify({ type: "Error", message });
     } finally {
       setListTargetPlaceOnCanvasPending(false);
+      setRouteTaskPhase(null);
     }
   };
 
@@ -1739,6 +1761,8 @@ export function CmsSlotsScreen() {
       pageBeacons={pageBeacons}
       pageScanLoading={pageScanLoading}
       pageBootBlocking={pageBootBlocking}
+      routeTaskPhase={routeTaskPhase}
+      slotPropsWritePending={slotPropsWritePending}
       routeStateKnown={routeStateKnown}
       beaconName={beaconName}
       setBeaconName={setBeaconName}

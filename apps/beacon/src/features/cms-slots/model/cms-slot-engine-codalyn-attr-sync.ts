@@ -12,6 +12,10 @@ import {
   nestedPublishSeedPairKey,
 } from "@/features/cms-slots/model/cms-slot-nested-prop-alias";
 import {
+  CMS_SLOTS_ROUTE_TASK_ENTERING_COMPONENT,
+  CMS_SLOTS_ROUTE_TASK_TAGGING_ELEMENTS,
+} from "@/shared/lib/cms-slots-feature-copy";
+import {
   exitUntilPageForComponentEnter,
   MAX_DESIGNER_COMPONENT_NESTING,
 } from "@/shared/lib/component-definition-scope";
@@ -281,14 +285,17 @@ async function enterComponentDefinitionsAndWalk(
   comp: Component,
   exposed: readonly ComposableInstancePropMeta[],
   out: EngineCodalynAttrSyncResult,
-  gate: TagSyncEnteredGate
+  gate: TagSyncEnteredGate,
+  onProgress?: (message: string) => void
 ): Promise<EngineTagWalkResult> {
   const exposedIds = new Set(exposed.map((e) => e.propId));
   const taggedPropIds = new Set<string>();
   const nestedPublishSeedPairKeys = new Set<string>();
   await exitUntilPageForComponentEnter();
+  onProgress?.(CMS_SLOTS_ROUTE_TASK_ENTERING_COMPONENT);
   await webflow.enterComponent(instance);
   gate.entered = true;
+  onProgress?.(CMS_SLOTS_ROUTE_TASK_TAGGING_ELEMENTS);
 
   const root = await comp.getRootElement();
   if (root) {
@@ -305,7 +312,8 @@ async function enterComponentDefinitionsAndWalk(
  */
 export function syncEngineCodalynSlotPropAttributes(
   instance: ComponentElement,
-  exposed: readonly ComposableInstancePropMeta[]
+  exposed: readonly ComposableInstancePropMeta[],
+  onProgress?: (message: string) => void
 ): Promise<EngineCodalynAttrSyncResult> {
   return runExclusiveDesignerOp(async () => {
     const out: EngineCodalynAttrSyncResult = {
@@ -325,7 +333,8 @@ export function syncEngineCodalynSlotPropAttributes(
         comp,
         exposed,
         out,
-        gate
+        gate,
+        onProgress
       ));
     } finally {
       if (gate.entered) {

@@ -93,9 +93,12 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     if (autoOpenExposeDrawerRowKey !== row.key) {
       return;
     }
+    if (composableLoading) {
+      return;
+    }
     openExposeDrawer();
     onAutoOpenExposeDrawerConsumed?.();
-  }, [autoOpenExposeDrawerRowKey, onAutoOpenExposeDrawerConsumed, openExposeDrawer, row.key]);
+  }, [autoOpenExposeDrawerRowKey, composableLoading, onAutoOpenExposeDrawerConsumed, openExposeDrawer, row.key]);
 
   const handlePropsDrawerOpenChange = useCallback(
     (nextOpen: boolean) => {

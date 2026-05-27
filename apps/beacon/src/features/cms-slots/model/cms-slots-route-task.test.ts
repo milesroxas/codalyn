@@ -1,0 +1,72 @@
+import { describe, expect, it } from "vitest";
+import { resolveCmsSlotsRouteTask } from "@/features/cms-slots/model/cms-slots-route-task";
+import {
+  CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
+  CMS_SLOTS_ROUTE_TASK_SAVING_EXPOSED_PROPS,
+  CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES,
+  CMS_SLOTS_SCAN_MESSAGE,
+} from "@/shared/lib/cms-slots-feature-copy";
+
+const idleInput = {
+  pageBootBlocking: false,
+  routeTaskPhase: null,
+  isComposer: false,
+  picking: false,
+  activeComposer: null,
+  composerEligibleLoading: false,
+  addPending: false,
+  resyncingEngineSlotKey: null,
+  listTargetCreatePending: false,
+  listTargetPlaceOnCanvasPending: false,
+  listTargetRemovePending: false,
+  listTargetPhase: "synced" as const,
+  slotPropsWritePending: false,
+  embedSyncPending: false,
+  composerSavePending: false,
+  removingKey: null,
+  deletePendingKey: null,
+  createPending: false,
+  cmsFieldLinkRetryPending: false,
+};
+
+describe("resolveCmsSlotsRouteTask", () => {
+  it("returns scan message during page boot", () => {
+    expect(resolveCmsSlotsRouteTask({ ...idleInput, pageBootBlocking: true })?.message).toBe(CMS_SLOTS_SCAN_MESSAGE);
+  });
+
+  it("prefers explicit route task phase over pending flags", () => {
+    expect(
+      resolveCmsSlotsRouteTask({
+        ...idleInput,
+        routeTaskPhase: "Saving slot config…",
+        addPending: true,
+      })?.message
+    ).toBe("Saving slot config…");
+  });
+
+  it("prioritizes resync over add pending", () => {
+    expect(
+      resolveCmsSlotsRouteTask({
+        ...idleInput,
+        resyncingEngineSlotKey: "row-1",
+        addPending: true,
+      })?.message
+    ).toBe(CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES);
+  });
+
+  it("returns add pending when no higher-priority task is active", () => {
+    expect(resolveCmsSlotsRouteTask({ ...idleInput, addPending: true })?.message).toBe(
+      CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT
+    );
+  });
+
+  it("returns null when idle", () => {
+    expect(resolveCmsSlotsRouteTask(idleInput)).toBeNull();
+  });
+
+  it("returns saving exposed props when slot props write is pending", () => {
+    expect(resolveCmsSlotsRouteTask({ ...idleInput, slotPropsWritePending: true })?.message).toBe(
+      CMS_SLOTS_ROUTE_TASK_SAVING_EXPOSED_PROPS
+    );
+  });
+});

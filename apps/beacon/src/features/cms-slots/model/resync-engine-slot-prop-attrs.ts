@@ -50,8 +50,9 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
   container: BlockElement | null;
   setResyncingEngineSlotKey: (key: string | null) => void;
   setSelected: Dispatch<SetStateAction<HydratedCmsSlotRow[]>>;
+  onProgress?: (message: string) => void;
 }): Promise<boolean> {
-  const { slotIndex, selected, container, setResyncingEngineSlotKey, setSelected } = input;
+  const { slotIndex, selected, container, setResyncingEngineSlotKey, setSelected, onProgress } = input;
   const labelRow = selected[slotIndex];
   if (labelRow == null) {
     return false;
@@ -78,7 +79,7 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
     const f = await readCmsSlotEngineSlotPropsFile(container, scoped.length);
     const exposed = f.slots[slotIndex]?.exposed ?? [];
 
-    const r = await syncEngineCodalynSlotPropAttributes(row.instance, exposed);
+    const r = await syncEngineCodalynSlotPropAttributes(row.instance, exposed, onProgress);
 
     setSelected((prev) => mergeScopedIntoSelected(prev, scoped));
     notifyResyncOutcome(r, exposed);

@@ -1,5 +1,5 @@
-import { Loader2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import {
   BEACON_ROUTE_CONTENT_ENTER_TRANSITION_MS,
   beaconRouteContentTransitionMotionClass,
@@ -10,6 +10,7 @@ import { cn } from "@/shared/lib/utils";
 type BeaconRouteLoadingOverlayProps = {
   visible: boolean;
   ariaLabel: string;
+  message?: string;
   className?: string;
 };
 
@@ -17,7 +18,7 @@ type BeaconRouteLoadingOverlayProps = {
  * Full-bleed loader over a `relative` route scroll region. Appears opaque immediately; fades out when hidden.
  */
 export function BeaconRouteLoadingOverlay(props: BeaconRouteLoadingOverlayProps) {
-  const { visible, ariaLabel, className } = props;
+  const { visible, ariaLabel, message, className } = props;
   const [mounted, setMounted] = useState(visible);
   /** Opaque immediately when shown — fade-out only, so content never flashes through first. */
   const [shown, setShown] = useState(visible);
@@ -70,6 +71,7 @@ export function BeaconRouteLoadingOverlay(props: BeaconRouteLoadingOverlayProps)
       role="status"
       aria-live="polite"
       aria-busy="true"
+      aria-label={ariaLabel}
       data-slot="beacon_route_loading_overlay"
       onTransitionEnd={(e) => {
         if (e.target !== e.currentTarget || e.propertyName !== "opacity" || shown) {
@@ -82,8 +84,7 @@ export function BeaconRouteLoadingOverlay(props: BeaconRouteLoadingOverlayProps)
         setMounted(false);
       }}
     >
-      <Loader2 aria-hidden className="size-6 shrink-0 animate-spin text-muted-foreground" />
-      <span className="sr-only">{ariaLabel}</span>
+      <BeaconRouteLoadingStatus ariaLabel={ariaLabel} message={message} />
     </div>
   );
 }

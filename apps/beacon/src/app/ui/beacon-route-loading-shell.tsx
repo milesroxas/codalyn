@@ -1,15 +1,16 @@
-import { Loader2 } from "lucide-react";
+import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import { cn } from "@/shared/lib/utils";
 
 type BeaconRouteLoadingShellProps = {
   ariaLabel: string;
+  message?: string;
   className?: string;
   dataSlot?: string;
 };
 
 /** Centered loader body for route scroll regions (pair with overlay or content transition). */
 export function BeaconRouteLoadingShell(props: BeaconRouteLoadingShellProps) {
-  const { ariaLabel, className, dataSlot = "beacon_route_loading_shell" } = props;
+  const { ariaLabel, message, className, dataSlot = "beacon_route_loading_shell" } = props;
 
   return (
     <div
@@ -17,10 +18,10 @@ export function BeaconRouteLoadingShell(props: BeaconRouteLoadingShellProps) {
       role="status"
       aria-live="polite"
       aria-busy="true"
+      aria-label={ariaLabel}
       data-slot={dataSlot}
     >
-      <Loader2 aria-hidden className="size-6 shrink-0 animate-spin text-muted-foreground" />
-      <span className="sr-only">{ariaLabel}</span>
+      <BeaconRouteLoadingStatus ariaLabel={ariaLabel} message={message} />
     </div>
   );
 }

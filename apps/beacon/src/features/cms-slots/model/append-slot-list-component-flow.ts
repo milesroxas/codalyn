@@ -10,6 +10,11 @@ import {
   getCmsSlotListTargetComponentOrNull,
 } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { placeCmsSlotListTargetOnCanvas } from "@/features/cms-slots/model/place-cms-slot-list-target-on-canvas";
+import {
+  CMS_SLOTS_ROUTE_TASK_CHECKING_CMS_FIELD,
+  CMS_SLOTS_ROUTE_TASK_CREATING_LIST_TARGET,
+  CMS_SLOTS_ROUTE_TASK_FINISHING,
+} from "@/shared/lib/cms-slots-feature-copy";
 
 type ListTargetCache = {
   beaconKey: string;
@@ -27,6 +32,7 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
   setListTargetPhase: (p: CmsSlotListTargetPhase) => void;
   setListTargetRegisteredName: (n: string | null) => void;
   setListTargetOnCanvasCount: (n: number) => void;
+  onProgress?: (message: string) => void;
 }): Promise<CmsSlotListCmsTextFieldEnsureResult | null> {
   const {
     dataList,
@@ -37,11 +43,14 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
     setListTargetPhase,
     setListTargetRegisteredName,
     setListTargetOnCanvasCount,
+    onProgress,
   } = options;
   try {
+    onProgress?.(CMS_SLOTS_ROUTE_TASK_CHECKING_CMS_FIELD);
     const cmsEnsure = await ensureCmsSlotListCmsTextFieldOnList(container, dataList);
     const comp = await getCmsSlotListTargetComponentOrNull(dataList, container, listTargetDefinitionIdRef.current);
     if (comp == null) {
+      onProgress?.(CMS_SLOTS_ROUTE_TASK_CREATING_LIST_TARGET);
       const { component: created, definitionId } = await createCmsSlotListTargetComponent({
         dataList,
         listContainer: container,
@@ -61,7 +70,9 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
     }
     await placeCmsSlotListTargetOnCanvas(dataList, container, listTargetDefinitionIdRef.current, {
       resolvedCmsEnsure: cmsEnsure,
+      onProgress,
     });
+    onProgress?.(CMS_SLOTS_ROUTE_TASK_FINISHING);
     try {
       const list = await listCmsSlotListTargetInstancesOnPage(dataList, container, {
         preferredDefinitionId: listTargetDefinitionIdRef.current,

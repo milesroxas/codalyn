@@ -9,6 +9,13 @@ import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model
 import { ensureCmsSlotListTargetTextProp } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { findCmsSlotsWrapperOnPage } from "@/features/cms-slots/model/install-cms-slots-wrapper";
+import {
+  CMS_SLOTS_ROUTE_TASK_CHECKING_CMS_FIELD,
+  CMS_SLOTS_ROUTE_TASK_FINISHING,
+  CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD,
+  CMS_SLOTS_ROUTE_TASK_OPENING_LIST_TARGET,
+  CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS,
+} from "@/shared/lib/cms-slots-feature-copy";
 import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
 
 const MAX_EXIT_COMPONENT_STEPS = 4;
@@ -180,6 +187,7 @@ export type PlaceCmsSlotListTargetOnCanvasResult = {
 export type PlaceCmsSlotListTargetOnCanvasOptions = {
   /** When the caller already ran {@link ensureCmsSlotListCmsTextFieldOnList}, pass the result to skip a second ensure. */
   resolvedCmsEnsure?: CmsSlotListCmsTextFieldEnsureResult | null;
+  onProgress?: (message: string) => void;
 };
 
 /**
@@ -328,8 +336,12 @@ export async function placeCmsSlotListTargetOnCanvas(
   preferredDefinitionId?: string | null,
   options?: PlaceCmsSlotListTargetOnCanvasOptions
 ): Promise<PlaceCmsSlotListTargetOnCanvasResult> {
+  const report = options?.onProgress;
   await exitToPageCanvas();
 
+  if (options?.resolvedCmsEnsure === undefined) {
+    report?.(CMS_SLOTS_ROUTE_TASK_CHECKING_CMS_FIELD);
+  }
   const cmsEnsure = await resolveCmsEnsureForPlacement(listContainer, dataList, options);
   const cmsBinding: CmsSlotListCmsBinding | null = cmsEnsure?.binding ?? null;
   const cmsFieldWasCreated = cmsEnsure?.fieldWasCreated ?? false;
@@ -340,6 +352,7 @@ export async function placeCmsSlotListTargetOnCanvas(
     preferredDefinitionId
   );
 
+  report?.(CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS);
   const existing = await listCmsSlotListTargetInstancesOnPage(dataList, listContainer, { preferredDefinitionId });
   const firstExisting = existing[0];
   const instance = firstExisting ?? (await tryPlaceNewListTargetInstance(placementDef));
@@ -349,10 +362,14 @@ export async function placeCmsSlotListTargetOnCanvas(
 
   await ensureTextPropOnDefs(resolvedDef, placementDef);
   if (firstExisting == null) {
+    report?.(CMS_SLOTS_ROUTE_TASK_OPENING_LIST_TARGET);
     await forceOpenAndCloseListTargetEditor(instance);
   }
   await exitToPageCanvas();
 
+  if (cmsBinding != null) {
+    report?.(CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD);
+  }
   const cmsBindSucceeded =
     cmsBinding == null
       ? true
@@ -368,6 +385,7 @@ export async function placeCmsSlotListTargetOnCanvas(
           cmsFieldWasCreated,
         });
 
+  report?.(CMS_SLOTS_ROUTE_TASK_FINISHING);
   try {
     await applyCmsSlotListTargetDesignerPlaceholderForList(dataList, listContainer, preferredDefinitionId);
   } catch (err) {

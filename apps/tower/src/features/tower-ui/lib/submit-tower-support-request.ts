@@ -3,7 +3,6 @@ import type { TowerSupportRequestConfig, TowerSupportRequestKind } from "@/share
 type SupportRequestFormValues = {
   topic: string;
   details: string;
-  email: string;
 };
 
 export function validateSupportRequestForm(
@@ -16,9 +15,6 @@ export function validateSupportRequestForm(
   if (!values.details.trim()) {
     return `Enter your ${config.detailsLabel.toLowerCase()}.`;
   }
-  if (!values.email.trim()) {
-    return "Enter your email so we can reply.";
-  }
   return null;
 }
 
@@ -26,8 +22,8 @@ export function supportRequestSubmitErrorMessage(
   config: TowerSupportRequestConfig,
   errorCode: string | undefined
 ): string {
-  if (errorCode === "invalid_email") {
-    return "Enter a valid email address.";
+  if (errorCode === "unauthorized") {
+    return "Sign in to continue.";
   }
   if (errorCode === "invalid_details") {
     return `Enter your ${config.detailsLabel.toLowerCase()}.`;
@@ -42,7 +38,6 @@ export async function postSupportRequest(input: {
   kind: TowerSupportRequestKind;
   topic: string;
   details: string;
-  email: string;
 }): Promise<{ ok: true } | { ok: false; error?: string }> {
   try {
     const res = await fetch("/api/account/support-request", {

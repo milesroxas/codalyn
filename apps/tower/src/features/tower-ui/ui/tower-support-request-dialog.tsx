@@ -1,7 +1,7 @@
 "use client";
 
 import posthog from "posthog-js";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import {
@@ -16,7 +16,6 @@ import {
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { FormField } from "@/shared/ui/form-field";
-import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
@@ -42,19 +41,12 @@ export function TowerSupportRequestDialog({ kind, open, onOpenChange }: TowerSup
 
   const [topic, setTopic] = useState("");
   const [details, setDetails] = useState("");
-  const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setEmail(sessionEmail);
-  }, [open, sessionEmail]);
 
   function resetForm() {
     setTopic("");
     setDetails("");
-    setEmail(sessionEmail);
     setError(null);
   }
 
@@ -64,12 +56,16 @@ export function TowerSupportRequestDialog({ kind, open, onOpenChange }: TowerSup
 
     const trimmedTopic = topic.trim();
     const trimmedDetails = details.trim();
-    const trimmedEmail = email.trim();
     const validationError = validateSupportRequestForm(config, {
       topic: trimmedTopic,
       details: trimmedDetails,
-      email: trimmedEmail,
     });
+    if (!sessionEmail) {
+      const message = "Sign in to continue.";
+      setError(message);
+      toast.error(message);
+      return;
+    }
     if (validationError) {
       setError(validationError);
       toast.error(validationError);
@@ -81,7 +77,6 @@ export function TowerSupportRequestDialog({ kind, open, onOpenChange }: TowerSup
       kind,
       topic: trimmedTopic,
       details: trimmedDetails,
-      email: trimmedEmail,
     });
     setBusy(false);
 
@@ -96,7 +91,7 @@ export function TowerSupportRequestDialog({ kind, open, onOpenChange }: TowerSup
       kind,
       topic: trimmedTopic,
       details: trimmedDetails,
-      email: trimmedEmail,
+      email: sessionEmail,
     });
     toast.success(config.kind === "feedback" ? "Thanks for the feedback." : "Help request sent.");
     resetForm();
@@ -147,18 +142,6 @@ export function TowerSupportRequestDialog({ kind, open, onOpenChange }: TowerSup
               placeholder={config.detailsPlaceholder}
               value={details}
               onChange={(event) => setDetails(event.target.value)}
-              required
-            />
-          </FormField>
-          <FormField>
-            <Label htmlFor={`tower-support-email-${kind}`}>Email</Label>
-            <Input
-              id={`tower-support-email-${kind}`}
-              type="email"
-              autoComplete="email"
-              placeholder="you@company.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
               required
             />
           </FormField>

@@ -1,6 +1,7 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { List, PanelsTopLeft } from "lucide-react";
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { type NavigateFunction, NavLink } from "react-router-dom";
 import {
   BeaconFeatureRouteChrome,
@@ -154,7 +155,7 @@ export type CmsSlotsRouteChromeProps = {
   onRetryCmsFieldLink: () => void | Promise<void>;
 };
 
-function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps) {
+function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps & { routeInteractionIdle?: boolean }) {
   const showOpeningLoader = useDeferredLoadingIndicator(p.openingBeaconKey != null);
   const contentKey = cmsSlotsEngineRouteContentKey({
     picking: p.picking,
@@ -205,6 +206,7 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps) {
           renamingPublishedSlotKey={p.renamingPublishedSlotKey}
           autoOpenExposeDrawerRowKey={p.autoOpenExposeDrawerRowKey}
           onAutoOpenExposeDrawerConsumed={p.onAutoOpenExposeDrawerConsumed}
+          routeInteractionIdle={p.routeInteractionIdle ?? true}
         />
       </div>
     );
@@ -334,20 +336,31 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
   });
   const routeBlocking = routeTask != null;
   const showRouteBlocking = useDeferredLoadingIndicator(routeBlocking);
+  const [overlayOccupied, setOverlayOccupied] = useState(false);
+  const suppressRouteContent = showRouteBlocking || overlayOccupied;
+  const routeInteractionIdle = !suppressRouteContent;
 
   return (
-    <BeaconFeatureRouteScrollBody>
-      <BeaconRouteLoadingOverlay
-        visible={routeBlocking}
-        deferredVisible={showRouteBlocking}
-        ariaLabel={routeTask?.ariaLabel ?? CMS_SLOTS_SCAN_ARIA_LABEL}
-        message={routeTask?.message}
-      />
+    <BeaconFeatureRouteScrollBody
+      overlay={
+        <BeaconRouteLoadingOverlay
+          visible={routeBlocking}
+          deferredVisible={showRouteBlocking}
+          onOccupancyChange={setOverlayOccupied}
+          ariaLabel={routeTask?.ariaLabel ?? CMS_SLOTS_SCAN_ARIA_LABEL}
+          message={routeTask?.message}
+        />
+      }
+    >
       <div
-        className={cn("flex min-h-0 min-w-0 flex-1 flex-col", showRouteBlocking && "pointer-events-none invisible")}
-        aria-hidden={showRouteBlocking}
+        className={cn("flex min-h-0 min-w-0 flex-1 flex-col", suppressRouteContent && "pointer-events-none invisible")}
+        aria-hidden={suppressRouteContent}
       >
-        {p.isEngine ? <CmsSlotsEngineRouteBody {...p} /> : p.isComposer ? <CmsSlotsComposerRouteBody {...p} /> : null}
+        {p.isEngine ? (
+          <CmsSlotsEngineRouteBody {...p} routeInteractionIdle={routeInteractionIdle} />
+        ) : p.isComposer ? (
+          <CmsSlotsComposerRouteBody {...p} />
+        ) : null}
       </div>
     </BeaconFeatureRouteScrollBody>
   );

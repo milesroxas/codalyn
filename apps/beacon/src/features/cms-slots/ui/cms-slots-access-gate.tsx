@@ -1,8 +1,8 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
-import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { BeaconFeatureRouteHeader } from "@/app/ui/beacon-feature-route-chrome";
+import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { BeaconTowerNotConfiguredNotice } from "@/features/auth/ui/beacon-tower-not-configured-notice";
@@ -13,6 +13,7 @@ import { beaconAppRouteSurfaceClass } from "@/shared/lib/beacon-app-route-surfac
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 import { Button } from "@/shared/ui/button";
+import { RouteLoadingSurface } from "@/shared/ui/route-loading";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
 function AccessGateLoadingStatus(props: { busy: boolean; message: string }) {
@@ -21,14 +22,9 @@ function AccessGateLoadingStatus(props: { busy: boolean; message: string }) {
     return null;
   }
   return (
-    <div
-      className={`${beaconAppRouteSurfaceClass} items-center justify-center gap-3 p-6`}
-      role="status"
-      aria-live="polite"
-    >
-      <Loader2 aria-hidden className="size-6 shrink-0 animate-spin text-muted-foreground" />
-      <p className="text-muted-foreground text-sm">{props.message}</p>
-    </div>
+    <RouteLoadingSurface layout="route" role="status" aria-live="polite" data-slot="beacon_access_gate_loading">
+      <BeaconRouteLoadingStatus ariaLabel={props.message} message={props.message} />
+    </RouteLoadingSurface>
   );
 }
 

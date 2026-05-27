@@ -43,6 +43,8 @@ export type CmsSlotCompositionPanelProps = {
   renamingPublishedSlotKey: string | null;
   autoOpenExposeDrawerRowKey?: string | null;
   onAutoOpenExposeDrawerConsumed?: () => void;
+  /** False while route loading overlay is visible or exiting — defer auto-open until idle. */
+  routeInteractionIdle?: boolean;
 };
 
 export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
@@ -78,6 +80,7 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     renamingPublishedSlotKey,
     autoOpenExposeDrawerRowKey = null,
     onAutoOpenExposeDrawerConsumed,
+    routeInteractionIdle = true,
   } = props;
 
   const listTargetActionBusy =
@@ -149,6 +152,7 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
                   onResyncEngineSlotAttrs={onResyncEngineSlotAttrs}
                   autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
                   onAutoOpenExposeDrawerConsumed={onAutoOpenExposeDrawerConsumed}
+                  routeInteractionIdle={routeInteractionIdle}
                 />
               ))}
             </ul>

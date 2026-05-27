@@ -7,11 +7,14 @@ import {
   beaconRouteContentVisibleClass,
 } from "@/shared/lib/beacon-route-content-transition";
 import { cn } from "@/shared/lib/utils";
+import { RouteLoadingSurface } from "@/shared/ui/route-loading";
 
 type BeaconRouteLoadingOverlayProps = {
   visible: boolean;
   /** When set, skips an internal deferred-loading timer (pass from a parent that already deferred the same signal). */
   deferredVisible?: boolean;
+  /** Fires when the overlay mounts or fully unmounts after its exit transition. */
+  onOccupancyChange?: (occupied: boolean) => void;
   ariaLabel: string;
   message?: string;
   className?: string;
@@ -38,11 +41,15 @@ type BeaconRouteLoadingOverlayShellProps = BeaconRouteLoadingOverlayProps & {
 };
 
 function BeaconRouteLoadingOverlayShell(props: BeaconRouteLoadingOverlayShellProps) {
-  const { showVisible, ariaLabel, message, className } = props;
+  const { showVisible, onOccupancyChange, ariaLabel, message, className } = props;
   const [mounted, setMounted] = useState(showVisible);
   /** Opaque immediately when shown — fade-out only, so content never flashes through first. */
   const [shown, setShown] = useState(showVisible);
   const exitFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    onOccupancyChange?.(mounted);
+  }, [mounted, onOccupancyChange]);
 
   useLayoutEffect(() => {
     if (showVisible) {
@@ -81,13 +88,9 @@ function BeaconRouteLoadingOverlayShell(props: BeaconRouteLoadingOverlayShellPro
   }
 
   return (
-    <div
-      className={cn(
-        "absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/85 backdrop-blur-[1px]",
-        beaconRouteContentTransitionMotionClass,
-        beaconRouteContentVisibleClass(shown),
-        className
-      )}
+    <RouteLoadingSurface
+      layout="overlay"
+      className={cn(beaconRouteContentTransitionMotionClass, beaconRouteContentVisibleClass(shown), className)}
       role="status"
       aria-live="polite"
       aria-busy="true"
@@ -105,6 +108,6 @@ function BeaconRouteLoadingOverlayShell(props: BeaconRouteLoadingOverlayShellPro
       }}
     >
       <BeaconRouteLoadingStatus ariaLabel={ariaLabel} message={message} />
-    </div>
+    </RouteLoadingSurface>
   );
 }

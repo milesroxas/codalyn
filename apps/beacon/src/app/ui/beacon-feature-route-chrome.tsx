@@ -79,8 +79,11 @@ export function BeaconFeatureRouteScrollBody(props: BeaconFeatureRouteScrollBody
 
   return (
     <div className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", className)}>
+      {overlay}
       <ScrollArea className="h-full min-h-0 min-w-0 flex-1" viewportRef={viewportRef}>
-        <div className={cn(beaconRouteScrollContentClass, contentClassName)}>{children}</div>
+        <div className={cn(beaconRouteScrollContentClass, beaconRouteScrollViewportFillClass, contentClassName)}>
+          {children}
+        </div>
       </ScrollArea>
     </div>
   );

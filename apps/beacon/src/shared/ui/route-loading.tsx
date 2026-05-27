@@ -20,12 +20,15 @@ export const routeLoadingSurfaceVariants = cva("flex flex-col items-center justi
   },
 });
 
-export type RouteLoadingSurfaceProps = React.ComponentProps<"div"> &
-  VariantProps<typeof routeLoadingSurfaceVariants>;
+export type RouteLoadingSurfaceProps = React.ComponentProps<"div"> & VariantProps<typeof routeLoadingSurfaceVariants>;
 
 export function RouteLoadingSurface(props: RouteLoadingSurfaceProps) {
   const { layout, className, ...rest } = props;
   return (
-    <div data-slot="route_loading_surface" className={cn(routeLoadingSurfaceVariants({ layout }), className)} {...rest} />
+    <div
+      data-slot="route_loading_surface"
+      className={cn(routeLoadingSurfaceVariants({ layout }), className)}
+      {...rest}
+    />
   );
 }

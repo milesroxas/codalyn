@@ -58,6 +58,7 @@ type CmsSlotEngineSelectedRowProps = {
   /** When set to this row’s `key`, opens the expose/tag drawer once (e.g. right after adding the component). */
   autoOpenExposeDrawerRowKey?: string | null;
   onAutoOpenExposeDrawerConsumed?: () => void;
+  routeInteractionIdle?: boolean;
 };
 
 export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
@@ -80,6 +81,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     onResyncEngineSlotAttrs,
     autoOpenExposeDrawerRowKey = null,
     onAutoOpenExposeDrawerConsumed,
+    routeInteractionIdle = true,
   } = props;
   const showComposableLoading = useDeferredLoadingIndicator(composableLoading);
 
@@ -99,11 +101,16 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     if (autoOpenExposeDrawerRowKey !== row.key) {
       return;
     }
-    if (addPending || listTargetActionBusy || composableLoading || !composableMetaReady) {
+    if (addPending || listTargetActionBusy || composableLoading || !composableMetaReady || !routeInteractionIdle) {
       return;
     }
-    openExposeDrawer();
-    onAutoOpenExposeDrawerConsumed?.();
+    const frame = requestAnimationFrame(() => {
+      openExposeDrawer();
+      onAutoOpenExposeDrawerConsumed?.();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
   }, [
     addPending,
     autoOpenExposeDrawerRowKey,
@@ -112,6 +119,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     listTargetActionBusy,
     onAutoOpenExposeDrawerConsumed,
     openExposeDrawer,
+    routeInteractionIdle,
     row.key,
   ]);
 

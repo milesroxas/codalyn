@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTowerVerifyEmailApiUrl,
   isEmailNotVerifiedAuthError,
   readEmailVerificationCallbackUrl,
   resolveTowerAppCallbackUrl,
@@ -63,6 +64,17 @@ describe("readEmailVerificationCallbackUrl", () => {
     } else {
       process.env.NEXT_PUBLIC_APP_URL = prev;
     }
+  });
+});
+
+describe("buildTowerVerifyEmailApiUrl", () => {
+  it("builds a same-origin API url with an absolute callback for Better Auth originCheck", () => {
+    const prev = process.env.NEXT_PUBLIC_APP_URL;
+    process.env.NEXT_PUBLIC_APP_URL = "https://app.example.com";
+    expect(buildTowerVerifyEmailApiUrl("tok", "/dashboard?emailVerified=1", "https://app.example.com")).toBe(
+      "https://app.example.com/api/auth/verify-email?token=tok&callbackURL=https%3A%2F%2Fapp.example.com%2Fdashboard%3FemailVerified%3D1"
+    );
+    process.env.NEXT_PUBLIC_APP_URL = prev;
   });
 });
 

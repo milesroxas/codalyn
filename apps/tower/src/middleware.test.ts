@@ -56,6 +56,44 @@ describe("middleware host split", () => {
     expect(response?.status).not.toBe(307);
   });
 
+  it("allows logged-out access to the first-party verify-email page", () => {
+    process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
+    const response = middleware(
+      makeRequest("tower.codalyn.app", "/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F")
+    );
+    expect(response?.status).not.toBe(307);
+  });
+
+  it("redirects marketing host verify-email links to the app host with query preserved", () => {
+    process.env.TOWER_HOST_SPLIT = "1";
+    process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
+    const response = middleware(makeRequest("codalyn.app", "/verify-email?token=abc&callbackURL=%2F"));
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get("location")).toBe("https://tower.codalyn.app/verify-email?token=abc&callbackURL=%2F");
+  });
+
+  it("redirects marketing host verify API links to the app host with query preserved", () => {
+    process.env.TOWER_HOST_SPLIT = "1";
+    process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
+    const response = middleware(
+      makeRequest(
+        "codalyn.app",
+        "/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F%3FemailVerified%3D1"
+      )
+    );
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get("location")).toBe(
+      "https://tower.codalyn.app/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F%3FemailVerified%3D1"
+    );
+  });
+
+  it("still redirects protected routes to sign-in when logged out", () => {
+    process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
+    const response = middleware(makeRequest("tower.codalyn.app", "/account"));
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get("location")).toBe("https://tower.codalyn.app/sign-in?callbackUrl=%2Faccount");
+  });
+
   it("returns CORS headers for OPTIONS /api/auth from Webflow extension origins", () => {
     const url = new URL("/api/auth/get-session", "https://tower.codalyn.app");
     const request = new NextRequest(url, {

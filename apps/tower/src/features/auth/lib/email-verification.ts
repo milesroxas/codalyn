@@ -99,6 +99,14 @@ export function readEmailVerificationToken(searchParams: URLSearchParams): strin
   return token || null;
 }
 
+/** Better Auth GET endpoint — verifies token, sets session, redirects to callbackURL. */
+export function buildTowerVerifyEmailApiUrl(token: string, callbackPath: string, origin = "http://localhost"): string {
+  const apiUrl = new URL("/api/auth/verify-email", origin);
+  apiUrl.searchParams.set("token", token);
+  apiUrl.searchParams.set("callbackURL", resolveTowerAppCallbackUrl(callbackPath));
+  return apiUrl.toString();
+}
+
 /** Same-origin post-verify destination from the verification page query string. */
 export function readEmailVerificationCallbackUrl(searchParams: URLSearchParams): string {
   const raw = searchParams.get("callbackURL")?.trim();

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef } from "react";
 import {
+  buildTowerVerifyEmailApiUrl,
   readEmailVerificationCallbackUrl,
   readEmailVerificationToken,
-  resolveTowerAppCallbackUrl,
   VERIFY_EMAIL_PAGE_COPY,
 } from "@/features/auth/lib/email-verification";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
@@ -25,10 +25,7 @@ function VerifyEmailForm() {
     }
     verifyStartedRef.current = true;
 
-    const verifyApi = new URL("/api/auth/verify-email", window.location.origin);
-    verifyApi.searchParams.set("token", token);
-    verifyApi.searchParams.set("callbackURL", resolveTowerAppCallbackUrl(callbackUrl));
-    window.location.replace(verifyApi.toString());
+    window.location.replace(buildTowerVerifyEmailApiUrl(token, callbackUrl, window.location.origin));
   }, [callbackUrl, token]);
 
   if (!token) {

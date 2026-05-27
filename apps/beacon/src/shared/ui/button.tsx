@@ -16,9 +16,6 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
-        /** Icon back control on route headers over muted strips. */
-        routeHeaderBack:
-          "text-foreground hover:bg-muted/60 hover:text-foreground aria-expanded:bg-muted/60 dark:hover:bg-muted/50",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
@@ -66,7 +63,9 @@ const buttonVariants = cva(
           "!h-auto min-h-11 w-full shrink-0 justify-center gap-2 rounded-md px-4 py-3.5 font-medium whitespace-normal",
         /** Paired with `variant="composerPaletteTile"` */
         composerPaletteTile:
-          "!h-auto min-h-[4.25rem] w-full max-w-none shrink-0 justify-center gap-0 rounded-md px-2 py-2.5 text-[0.8125rem] font-medium leading-tight whitespace-normal",
+          "!h-auto min-h-10 w-full max-w-none shrink-0 justify-center gap-1 rounded-md px-2 py-1.5 text-[0.8125rem] font-medium leading-tight whitespace-normal has-data-[icon=inline-start]:pl-1.5 [&_[data-icon=inline-start]_svg]:size-3.5",
+        /** Full-width primary action in drawer footers. */
+        drawerAction: "h-9 w-full gap-1.5 px-3",
       },
     },
     defaultVariants: {

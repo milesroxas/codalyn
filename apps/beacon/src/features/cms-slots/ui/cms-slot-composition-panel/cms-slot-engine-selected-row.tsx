@@ -1,10 +1,21 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
-import { Loader2, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import { ComposerSlotNameDrawer } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-slot-name-drawer";
+import { CmsSlotEngineExposePropsPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel/cms-slot-engine-expose-props-panel";
+import {
+  CMS_SLOTS_ENGINE_EXPOSE_PROPS_DESCRIPTION,
+  CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL,
+  CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION,
+  CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL,
+  CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE,
+  CMS_SLOTS_ENGINE_EXPOSE_PROPS_OPEN_LABEL,
+  CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL,
+  CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL,
+} from "@/shared/lib/cms-slots-feature-copy";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,8 +27,15 @@ import {
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
 import { Button } from "@/shared/ui/button";
-import { Checkbox } from "@/shared/ui/checkbox";
-import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/shared/ui/drawer";
+import {
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/shared/ui/drawer";
 
 function sameExposedPropSelection(a: ComposableInstancePropMeta[], b: ComposableInstancePropMeta[]): boolean {
   if (a.length !== b.length) {
@@ -210,67 +228,32 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
           disabled={removingKey !== null || listTargetActionBusy}
           onClick={openExposeDrawer}
         >
-          Open
+          {CMS_SLOTS_ENGINE_EXPOSE_PROPS_OPEN_LABEL}
         </Button>
       </div>
 
       <Drawer open={propsDrawerOpen} dismissible={!tagAttrsBusy} onOpenChange={handlePropsDrawerOpenChange}>
-        <DrawerContent stickyFooter className="border-border bg-popover text-popover-foreground ring-foreground/10">
-          <DrawerHeader className="text-left">
-            <DrawerTitle className="text-foreground">{publishedDisplayName}</DrawerTitle>
-            <DrawerDescription>Choose which props to include for this slot.</DrawerDescription>
+        <DrawerContent stickyFooter>
+          <DrawerHeader align="start">
+            <DrawerTitle>{publishedDisplayName}</DrawerTitle>
+            <DrawerDescription>{CMS_SLOTS_ENGINE_EXPOSE_PROPS_DESCRIPTION}</DrawerDescription>
           </DrawerHeader>
-          <div className="space-y-3" data-slot="beacon_engine_exposed_props">
-            {showComposableLoading && available.length === 0 ? (
-              <p className="text-sm text-muted-foreground" role="status">
-                <Loader2 className="mr-1 inline size-4 animate-spin align-middle" aria-hidden />
-                Loading…
-              </p>
-            ) : available.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No composable props found for this component.</p>
-            ) : (
-              <ul className="m-0 list-none space-y-2.5 p-0 pb-2" aria-label="Composer props">
-                {available.map((p) => {
-                  const on = slotExposed.some((e) => e.propId === p.propId);
-                  return (
-                    <li key={p.propId} className="flex items-start gap-2.5 text-sm">
-                      <Checkbox
-                        id={`cms-slot-expose-${row.key}-${p.propId}`}
-                        checked={on}
-                        disabled={removingKey !== null || listTargetActionBusy || tagAttrsBusy}
-                        onCheckedChange={(v) => {
-                          if (v === "indeterminate") {
-                            return;
-                          }
-                          const want = v === true;
-                          const byId = new Map(slotExposed.map((e) => [e.propId, e]));
-                          if (want) {
-                            byId.set(p.propId, p);
-                          } else {
-                            byId.delete(p.propId);
-                          }
-                          onSetSlotExposed(slotIndex, [...byId.values()]);
-                        }}
-                      />
-                      <label
-                        className="min-w-0 flex-1 cursor-pointer leading-snug text-foreground"
-                        htmlFor={`cms-slot-expose-${row.key}-${p.propId}`}
-                      >
-                        {p.label}
-                        <span className="ml-1 font-mono text-xs text-muted-foreground">{p.valueType}</span>
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-          <DrawerFooter className="mt-0 border-border border-t bg-popover pt-4 pb-0">
+          <DrawerBody data-slot="beacon_engine_exposed_props">
+            <CmsSlotEngineExposePropsPanel
+              rowKey={row.key}
+              slotIndex={slotIndex}
+              available={available}
+              slotExposed={slotExposed}
+              showComposableLoading={showComposableLoading}
+              disabled={removingKey !== null || listTargetActionBusy || tagAttrsBusy}
+              onSetSlotExposed={onSetSlotExposed}
+            />
+          </DrawerBody>
+          <DrawerFooter layout="sticky">
             <Button
               type="button"
               variant="secondary"
-              size="sm"
-              className="h-9 w-full"
+              size="drawerAction"
               disabled={
                 removingKey !== null ||
                 listTargetActionBusy ||
@@ -281,7 +264,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
               aria-busy={tagAttrsBusy}
               onClick={() => void applyTagAttrsAndCloseDrawer()}
             >
-              {tagAttrsBusy ? "Tagging…" : "Tag data attributes"}
+              {tagAttrsBusy ? CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL : CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL}
             </Button>
           </DrawerFooter>
         </DrawerContent>
@@ -297,15 +280,12 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Tag data attributes first?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You picked new props—close after tagging so the canvas gets matching data attributes, or discard changes
-              to restore the props you entered with.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE}</AlertDialogTitle>
+            <AlertDialogDescription>{CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button" disabled={tagAttrsBusy}>
-              Continue editing
+              {CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL}
             </AlertDialogCancel>
             <AlertDialogCancel
               type="button"
@@ -314,7 +294,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
               disabled={tagAttrsBusy}
               onClick={handleDiscardExposeChangesClose}
             >
-              Discard prop changes
+              {CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL}
             </AlertDialogCancel>
             <AlertDialogAction
               type="button"
@@ -324,7 +304,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
                 void applyTagAttrsAndCloseDrawer();
               }}
             >
-              Tag data attributes
+              {CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

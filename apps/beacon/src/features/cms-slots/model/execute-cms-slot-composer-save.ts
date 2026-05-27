@@ -39,6 +39,17 @@ import {
   type CmsSlotCompositionDraftRow,
   type CmsSlotPaletteEntry,
 } from "@/features/cms-slots/model/site-components";
+import {
+  CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION,
+  CMS_SLOTS_ROUTE_TASK_CHECKING_CMS_FIELD,
+  CMS_SLOTS_ROUTE_TASK_FINISHING,
+  CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD,
+  CMS_SLOTS_ROUTE_TASK_SAVING_CMS_LAYOUT,
+  CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION,
+  CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG,
+  CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT,
+  CMS_SLOTS_ROUTE_TASK_UPDATING_LIST_TARGET,
+} from "@/shared/lib/cms-slots-feature-copy";
 import { getTowerOrigin } from "@/shared/lib/tower-client";
 
 type ActiveComposerState = {
@@ -99,6 +110,7 @@ async function applyComposerSaveCmsTemplatePath(args: {
   slotLabels: string[];
   draftToApply: CmsSlotCompositionDraftRow[];
   setters: ComposerSaveSetters;
+  onProgress?: (message: string) => void;
 }): Promise<boolean> {
   const {
     beacon,
@@ -109,6 +121,7 @@ async function applyComposerSaveCmsTemplatePath(args: {
     slotLabels,
     draftToApply,
     setters,
+    onProgress,
   } = args;
   if (!getTowerOrigin().trim() || currentCmsItemId == null) {
     void webflow.notify({
@@ -118,6 +131,7 @@ async function applyComposerSaveCmsTemplatePath(args: {
     });
     return false;
   }
+  onProgress?.(CMS_SLOTS_ROUTE_TASK_CHECKING_CMS_FIELD);
   const cmsEnsure = await ensureCmsSlotListCmsTextFieldOnList(beacon.container, beacon.dataList);
   if (cmsEnsure == null) {
     void webflow.notify({
@@ -133,6 +147,7 @@ async function applyComposerSaveCmsTemplatePath(args: {
     listTargetDefinitionIdRef.current
   );
   if (listTargetDef != null) {
+    onProgress?.(CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD);
     const listTargetOnPage = await listCmsSlotListTargetInstancesOnPage(beacon.dataList, beacon.container, {
       preferredDefinitionId: listTargetDefinitionIdRef.current,
     });
@@ -146,6 +161,7 @@ async function applyComposerSaveCmsTemplatePath(args: {
   }
   let cmsLayoutSaveFailed = false;
   try {
+    onProgress?.(CMS_SLOTS_ROUTE_TASK_SAVING_CMS_LAYOUT);
     await saveCmsSlotListRuntimePayloadToCmsItem({
       collectionId: binding.collectionId,
       fieldId: binding.fieldId,
@@ -158,7 +174,9 @@ async function applyComposerSaveCmsTemplatePath(args: {
     cmsLayoutSaveFailed = true;
     console.warn("[cms-slots] CMS list text save", e);
   }
+  onProgress?.(CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT);
   await syncCmsSlotPageInlineScript();
+  onProgress?.(CMS_SLOTS_ROUTE_TASK_FINISHING);
   setters.setComposerDraft(draftToApply);
   setters.setActiveComposer((prev) =>
     prev ? { ...prev, initialSignature: cmsSlotCompositionSignature(draftToApply) } : null
@@ -185,19 +203,24 @@ async function applyComposerSaveStaticPagePath(args: {
   draftToApply: CmsSlotCompositionDraftRow[];
   runtimeText: string;
   setters: ComposerSaveSetters;
+  onProgress?: (message: string) => void;
 }): Promise<void> {
-  const { beacon, listTargetDefinitionIdRef, engineScopedRows, draftToApply, runtimeText, setters } = args;
+  const { beacon, listTargetDefinitionIdRef, engineScopedRows, draftToApply, runtimeText, setters, onProgress } = args;
   const beforePoolIds = engineScopedRows.map((r) => r.componentId);
   const oldFile = await readCmsSlotEngineSlotPropsFile(beacon.container, engineScopedRows.length);
+  onProgress?.(CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION);
   await applyCmsSlotCompositionDraft(beacon.container, draftToApply);
   const newFile = mergeSlotFileAfterListRebuild(beforePoolIds, oldFile, draftToApply);
+  onProgress?.(CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG);
   await writeCmsSlotEngineSlotPropsFile(beacon.container, newFile);
+  onProgress?.(CMS_SLOTS_ROUTE_TASK_UPDATING_LIST_TARGET);
   await setCmsSlotListTargetInstancesStaticRuntimeText({
     dataList: beacon.dataList,
     listContainer: beacon.container,
     preferredDefinitionId: listTargetDefinitionIdRef.current,
     text: runtimeText,
   });
+  onProgress?.(CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT);
   await syncCmsSlotPageInlineScript();
   const normalizedDraft = draftToApply.map((d) => ({
     key: d.key,
@@ -214,6 +237,7 @@ async function applyComposerSaveStaticPagePath(args: {
         }
       : null
   );
+  onProgress?.(CMS_SLOTS_ROUTE_TASK_FINISHING);
   await finalizeStaticComposerReload(beacon, setters);
   void webflow.notify({
     type: "Success",
@@ -230,7 +254,8 @@ export async function executeCmsSlotComposerSave(input: {
   listTargetDefinitionIdRef: MutableRefObject<string | null>;
   setters: ComposerSaveSetters;
   onCompleteSideEffects: () => void;
-}): Promise<void> {
+  onProgress?: (message: string) => void;
+}): Promise<boolean> {
   const {
     beacon,
     composerDraft,
@@ -240,7 +265,10 @@ export async function executeCmsSlotComposerSave(input: {
     listTargetDefinitionIdRef,
     setters,
     onCompleteSideEffects,
+    onProgress,
   } = input;
+
+  onProgress?.(CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION);
 
   const allowedComponentIdSet = new Set(composerAllowedPalette.map((entry) => entry.id));
   const draftToApply = composerDraft.filter((row) => allowedComponentIdSet.has(row.componentId));
@@ -249,7 +277,7 @@ export async function executeCmsSlotComposerSave(input: {
       type: "Error",
       message: "This list only allows component types configured in Engine.",
     });
-    return;
+    return false;
   }
 
   const rows = await listInstancesInSlotListContainer(beacon.container);
@@ -262,7 +290,7 @@ export async function executeCmsSlotComposerSave(input: {
       message:
         "Your order uses component types that are not available in the Engine list (or not enough instances). Add them in Engine, then try again.",
     });
-    return;
+    return false;
   }
 
   const slotF = await readCmsSlotEngineSlotPropsFile(beacon.container, engineScopedRows.length);
@@ -289,8 +317,11 @@ export async function executeCmsSlotComposerSave(input: {
       slotLabels,
       draftToApply,
       setters,
+      onProgress,
     });
-    if (!completed) return;
+    if (!completed) {
+      return false;
+    }
   } else {
     await applyComposerSaveStaticPagePath({
       beacon,
@@ -299,7 +330,9 @@ export async function executeCmsSlotComposerSave(input: {
       draftToApply,
       runtimeText,
       setters,
+      onProgress,
     });
   }
   onCompleteSideEffects();
+  return true;
 }

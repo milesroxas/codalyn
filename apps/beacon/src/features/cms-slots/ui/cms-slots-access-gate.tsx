@@ -1,6 +1,5 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
 import { BeaconFeatureRouteHeader } from "@/app/ui/beacon-feature-route-chrome";
 import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
@@ -29,11 +28,9 @@ function AccessGateLoadingStatus(props: { busy: boolean; message: string }) {
 }
 
 function CmsSlotsCollectionTemplateBlocked() {
-  const navigate = useNavigate();
-
   return (
     <div className={beaconAppRouteSurfaceClass}>
-      <BeaconFeatureRouteHeader title={CMS_SLOTS_FEATURE_NAME} onBack={() => navigate("/home")} />
+      <BeaconFeatureRouteHeader title={CMS_SLOTS_FEATURE_NAME} />
       <ScrollArea className="min-h-0 min-w-0 flex-1">
         <div className="flex min-h-full min-w-0 flex-col items-center justify-center px-4 py-8">
           <CmsSlotsCollectionTemplateGatePrompt />

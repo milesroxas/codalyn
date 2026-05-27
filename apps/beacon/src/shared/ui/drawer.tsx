@@ -148,8 +148,40 @@ function DrawerHeader({
   return <div data-slot="drawer-header" className={cn(drawerHeaderVariants({ align }), className)} {...props} />;
 }
 
-function DrawerFooter({ className, ...props }: ComponentProps<"div">) {
-  return <div data-slot="drawer-footer" className={cn("mt-6 flex shrink-0 flex-col gap-2", className)} {...props} />;
+const drawerFooterVariants = cva("flex shrink-0 flex-col gap-2", {
+  variants: {
+    layout: {
+      default: "mt-6",
+      sticky: "mt-0 border-t border-border bg-popover pt-4 pb-0",
+    },
+  },
+  defaultVariants: {
+    layout: "default",
+  },
+});
+
+function DrawerFooter({
+  className,
+  layout,
+  ...props
+}: ComponentProps<"div"> & VariantProps<typeof drawerFooterVariants>) {
+  return <div data-slot="drawer-footer" className={cn(drawerFooterVariants({ layout }), className)} {...props} />;
+}
+
+const drawerBodyVariants = cva("", {
+  variants: {
+    spacing: {
+      default: "space-y-3 pb-2",
+      form: "space-y-4 pb-2",
+    },
+  },
+  defaultVariants: {
+    spacing: "default",
+  },
+});
+
+function DrawerBody({ className, spacing, ...props }: ComponentProps<"div"> & VariantProps<typeof drawerBodyVariants>) {
+  return <div data-slot="drawer-body" className={cn(drawerBodyVariants({ spacing }), className)} {...props} />;
 }
 
 function DrawerTitle({ className, ...props }: ComponentProps<typeof VaulDrawer.Title>) {
@@ -177,6 +209,7 @@ function DrawerDescription({ className, ...props }: ComponentProps<typeof VaulDr
 
 export {
   Drawer,
+  DrawerBody,
   DrawerClose,
   DrawerContent,
   DrawerDescription,

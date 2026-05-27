@@ -1,11 +1,19 @@
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { useMemo } from "react";
+import { ListOrdered } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
+import { composerDraftRowHasContent } from "@/features/cms-slots/model/composer-draft-row-has-content";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
+import { CmsSlotsPanelEmptyState } from "@/features/cms-slots/ui/cms-slots-panel-empty-state";
+import {
+  CMS_SLOTS_COMPOSER_ORDER_EMPTY_DESCRIPTION,
+  CMS_SLOTS_COMPOSER_ORDER_EMPTY_TITLE,
+} from "@/shared/lib/cms-slots-feature-copy";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import { ComposerCollapsedDragPreview } from "./composer-collapsed-drag-preview";
 import { ComposerOrderSortableRow } from "./composer-order-sortable-row";
+import { ComposerRemoveDraftDialog } from "./composer-remove-draft-dialog";
 import { useComposerOrderSortable } from "./use-composer-order-sortable";
 
 const DROP_ANIMATION_MS = 200;
@@ -37,6 +45,31 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
     onRemove,
   } = props;
 
+  const [removeConfirmKey, setRemoveConfirmKey] = useState<string | null>(null);
+  const removeConfirmRow = draft.find((row) => row.key === removeConfirmKey) ?? null;
+
+  const handleRequestRemove = useCallback(
+    (key: string) => {
+      const row = draft.find((entry) => entry.key === key);
+      if (row == null) {
+        return;
+      }
+      if (!composerDraftRowHasContent(row)) {
+        onRemove(key);
+        return;
+      }
+      setRemoveConfirmKey(key);
+    },
+    [draft, onRemove]
+  );
+
+  const handleConfirmRemove = useCallback(() => {
+    if (removeConfirmKey != null) {
+      onRemove(removeConfirmKey);
+    }
+    setRemoveConfirmKey(null);
+  }, [onRemove, removeConfirmKey]);
+
   const { collisionDetection, sensors, onDragStart, onDragEnd, onDragCancel, dragOverlay } = useComposerOrderSortable({
     draft,
     busy,
@@ -48,7 +81,12 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
   return (
     <section className="space-y-2" data-slot="beacon_composer_order">
       {draft.length === 0 ? (
-        <div className="min-h-24 rounded-sm border border-dashed border-border bg-muted/10" aria-hidden />
+        <CmsSlotsPanelEmptyState
+          data-slot="cms_slots_composer_order_empty"
+          icon={ListOrdered}
+          title={CMS_SLOTS_COMPOSER_ORDER_EMPTY_TITLE}
+          description={CMS_SLOTS_COMPOSER_ORDER_EMPTY_DESCRIPTION}
+        />
       ) : (
         <DndContext
           sensors={sensors}
@@ -72,7 +110,7 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
                       onChangePropValue={onChangePropValue}
                       onRenameSlot={onRenameSlot}
                       onPersistComposerSlot={onPersistComposerSlot}
-                      onRemove={onRemove}
+                      onRemove={handleRequestRemove}
                     />
                   );
                 })}
@@ -89,6 +127,17 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
           </DragOverlay>
         </DndContext>
       )}
+      <ComposerRemoveDraftDialog
+        open={removeConfirmKey != null}
+        componentName={removeConfirmRow?.name ?? null}
+        busy={busy}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemoveConfirmKey(null);
+          }
+        }}
+        onConfirm={handleConfirmRemove}
+      />
     </section>
   );
 }

@@ -3,11 +3,14 @@ import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-const emptyVariants = cva("flex min-w-0 flex-1 flex-col gap-4 text-balance", {
+const emptyVariants = cva("flex min-w-0 flex-1 flex-col text-balance", {
   variants: {
     tone: {
-      default: "items-center justify-center rounded-sm border border-dashed p-6 text-center",
-      plain: "w-full items-stretch border-0 bg-transparent p-0 text-left",
+      default: "items-center justify-center gap-4 rounded-sm border border-dashed p-6 text-center",
+      plain: "w-full items-stretch gap-4 border-0 bg-transparent p-0 text-left",
+      /** Inset panel empty state (CMS Slots Engine / Composer sections). */
+      insetPanel:
+        "items-center justify-center gap-3 rounded-[10px] border border-border bg-muted/10 py-8 text-center min-h-28",
     },
   },
   defaultVariants: {
@@ -79,17 +82,27 @@ function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
-  return (
-    <div
-      data-slot="empty-description"
-      className={cn(
-        "text-sm/relaxed text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary [&>strong]:font-medium [&>strong]:text-primary",
-        className
-      )}
-      {...props}
-    />
-  );
+const emptyDescriptionVariants = cva(
+  "text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary [&>strong]:font-medium [&>strong]:text-primary",
+  {
+    variants: {
+      size: {
+        default: "text-sm/relaxed",
+        compact: "max-w-56 text-xs leading-relaxed",
+      },
+    },
+    defaultVariants: {
+      size: "default",
+    },
+  }
+);
+
+function EmptyDescription({
+  className,
+  size,
+  ...props
+}: React.ComponentProps<"p"> & VariantProps<typeof emptyDescriptionVariants>) {
+  return <div data-slot="empty-description" className={cn(emptyDescriptionVariants({ size }), className)} {...props} />;
 }
 
 const emptyContentVariants = cva("flex w-full min-w-0 flex-col text-sm text-balance", {

@@ -244,21 +244,15 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Save your edits?</AlertDialogTitle>
+            <AlertDialogTitle>Save changes?</AlertDialogTitle>
             <AlertDialogDescription>
-              You changed this slot&apos;s content—save the slot name before closing, or discard to restore how it was
-              when you opened this drawer.
+              Save your changes before closing, or discard them to keep the previous content.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Continue editing</AlertDialogCancel>
-            <AlertDialogCancel
-              type="button"
-              variant="outline"
-              className="mt-2 sm:mt-0"
-              onClick={handleDiscardComposerEditsClose}
-            >
-              Discard edits
+            <AlertDialogCancel type="button" variant="destructive" onClick={handleDiscardComposerEditsClose}>
+              Discard changes
             </AlertDialogCancel>
             <AlertDialogAction
               type="button"
@@ -267,7 +261,7 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
                 void applySaveClose();
               }}
             >
-              Save
+              Save changes
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

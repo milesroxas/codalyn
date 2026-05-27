@@ -3,7 +3,6 @@ import { ChevronLeft } from "lucide-react";
 import type * as React from "react";
 import type { ReactNode } from "react";
 import { useLayoutEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   beaconAppRouteSurfaceClass,
   beaconPanelContainClass,
@@ -11,7 +10,6 @@ import {
   beaconRouteScrollContentClass,
   beaconRouteScrollViewportFillClass,
 } from "@/shared/lib/beacon-app-route-surface";
-import { BEACON_BACK_TO_HOME_ARIA_LABEL } from "@/shared/lib/beacon-feature-route-copy";
 import { cn } from "@/shared/lib/utils";
 import { Button, type buttonVariants } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
@@ -19,34 +17,18 @@ import { hasBeaconRouteSubheaderContent } from "@/shared/ui/step-nav";
 
 export type BeaconFeatureRouteHeaderProps = {
   title: string;
-  onBack?: () => void;
-  backAriaLabel?: string;
   dataSlot?: string;
 };
 
 export function BeaconFeatureRouteHeader(props: BeaconFeatureRouteHeaderProps) {
-  const navigate = useNavigate();
-  const {
-    title,
-    onBack,
-    backAriaLabel = BEACON_BACK_TO_HOME_ARIA_LABEL,
-    dataSlot = "beacon_feature_route_header",
-  } = props;
+  const { title, dataSlot = "beacon_feature_route_header" } = props;
 
   return (
-    <div className="shrink-0 border-b border-border/50 bg-muted/20 dark:bg-muted/15" data-slot={dataSlot}>
-      <div className={cn(beaconPanelContainClass, "flex h-8 items-center gap-2 px-3")}>
-        <Button
-          type="button"
-          variant="routeHeaderBack"
-          size="icon-sm"
-          className="-ml-1 shrink-0"
-          aria-label={backAriaLabel}
-          onClick={() => void (onBack ? onBack() : navigate("/home"))}
-        >
-          <ChevronLeft aria-hidden className="size-4" strokeWidth={2.25} />
-        </Button>
-        <h2 className="min-w-0 truncate text-sm font-medium leading-none tracking-tight text-foreground">{title}</h2>
+    <div className="shrink-0 border-b border-border/65 bg-background" data-slot={dataSlot}>
+      <div className={cn(beaconPanelContainClass, "flex h-8 items-center justify-center px-3")}>
+        <h2 className="min-w-0 w-full truncate text-center text-sm font-medium leading-none tracking-tight text-foreground">
+          {title}
+        </h2>
       </div>
     </div>
   );

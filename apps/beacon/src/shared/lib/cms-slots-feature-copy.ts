@@ -72,13 +72,13 @@ export const CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT = "Syncing page script…"
 
 export const CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION = "Saving composition…";
 
+export const CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION = "Applying composition…";
+
+export const CMS_SLOTS_ROUTE_TASK_SAVING_CMS_LAYOUT = "Saving layout to CMS…";
+
 export const CMS_SLOTS_ROUTE_TASK_LOADING_COMPOSER_LISTS = "Loading lists…";
 
 export const CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD = "Linking CMS field…";
-
-import { BEACON_BACK_TO_HOME_ARIA_LABEL } from "@/shared/lib/beacon-feature-route-copy";
-
-export const CMS_SLOTS_BACK_BUTTON_ARIA_LABEL = BEACON_BACK_TO_HOME_ARIA_LABEL;
 
 export const CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP = `Install ${CMS_SLOTS_FEATURE_NAME} on this page first.`;
 
@@ -134,9 +134,9 @@ export const CMS_SLOTS_ENGINE_MAIN_TITLE = "Engine";
 
 export const CMS_SLOTS_ENGINE_MAIN_DESCRIPTION = "Set up slots, components, and fields for this collection.";
 
-export const CMS_SLOTS_COMPOSER_MAIN_TITLE = "Composer";
+export const CMS_SLOTS_COMPOSER_MAIN_TITLE = "Compose";
 
-export const CMS_SLOTS_COMPOSER_MAIN_DESCRIPTION = "Pick a list to order parts and set content.";
+export const CMS_SLOTS_COMPOSER_MAIN_DESCRIPTION = "Manage CMS Slot content for collection entries.";
 
 export const CMS_SLOTS_ENGINE_EDITING_TITLE = "Configure Slot Settings";
 
@@ -219,3 +219,55 @@ export const CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_LABEL = "Updating…";
 export const CMS_SLOTS_ENGINE_REMOVE_TARGET_LABEL = "Remove target…";
 
 export const CMS_SLOTS_ENGINE_BACK_TO_LIST_LABEL = "Back to list";
+
+export const CMS_SLOTS_COMPOSER_ORDER_EMPTY_TITLE = "No components yet";
+
+export const CMS_SLOTS_COMPOSER_ORDER_EMPTY_DESCRIPTION = "Pick component types below to add them to this composition.";
+
+export const CMS_SLOTS_COMPOSER_PALETTE_EMPTY_TITLE = "No component types available";
+
+export const CMS_SLOTS_COMPOSER_PALETTE_EMPTY_DESCRIPTION =
+  "Configure and expose components in Engine before adding them here.";
+
+export const CMS_SLOTS_COMPOSER_REMOVE_COMPONENT_DIALOG_TITLE = "Remove this component?";
+
+export const CMS_SLOTS_COMPOSER_REMOVE_COMPONENT_DIALOG_DESCRIPTION =
+  "This removes the component and its content from the composition.";
+
+export const CMS_SLOTS_COMPOSER_REMOVE_COMPONENT_DIALOG_CANCEL = "Keep component";
+
+export const CMS_SLOTS_COMPOSER_REMOVE_COMPONENT_DIALOG_CONFIRM = "Remove from composition";
+
+export const CMS_SLOTS_COMPOSER_LEAVE_UNSAVED_DIALOG_TITLE = "Save changes?";
+
+export const CMS_SLOTS_COMPOSER_LEAVE_UNSAVED_DIALOG_DESCRIPTION =
+  "Save your changes before leaving, or discard them to keep the previous composition.";
+
+export const CMS_SLOTS_COMPOSER_LEAVE_UNSAVED_DIALOG_CONTINUE = "Continue editing";
+
+export const CMS_SLOTS_COMPOSER_LEAVE_UNSAVED_DIALOG_DISCARD = "Discard changes";
+
+export const CMS_SLOTS_COMPOSER_LEAVE_UNSAVED_DIALOG_SAVE = "Save changes";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DESCRIPTION = "Choose which props to include for this slot.";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_LOADING = "Loading…";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_EMPTY = "No composable props found for this component.";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL = "Composer props";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_OPEN_LABEL = "Open";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL = "Tag data attributes";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL = "Tagging…";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE = "Tag data attributes first?";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION =
+  "You picked new props—close after tagging so the canvas gets matching data attributes, or discard changes to restore the props you entered with.";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL = "Continue editing";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL = "Discard prop changes";

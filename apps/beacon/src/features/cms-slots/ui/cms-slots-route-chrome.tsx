@@ -24,12 +24,13 @@ import {
   cmsSlotsComposerRouteContentKey,
   cmsSlotsEngineRouteContentKey,
 } from "@/features/cms-slots/model/cms-slots-panel-content-key";
-import { resolveCmsSlotsRouteTask } from "@/features/cms-slots/model/cms-slots-route-task";
+import { type CmsSlotsRouteTaskInput, resolveCmsSlotsRouteTask } from "@/features/cms-slots/model/cms-slots-route-task";
 import type { CmsSlotCompositionDraftRow, CmsSlotPaletteEntry } from "@/features/cms-slots/model/site-components";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotComposerListPanel } from "@/features/cms-slots/ui/cms-slot-composer-list-panel";
 import { CmsSlotComposerPanel } from "@/features/cms-slots/ui/cms-slot-composer-panel";
 import { ComposerPaletteSection } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-palette-section";
+import { ComposerUnsavedChangesDialog } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-unsaved-changes-dialog";
 import { CmsSlotCompositionPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel";
 import { CmsSlotEngineBackToListDock } from "@/features/cms-slots/ui/cms-slot-composition-panel/cms-slot-engine-back-to-list-dock";
 import { CmsSlotHomePanel } from "@/features/cms-slots/ui/cms-slot-home-panel";
@@ -44,6 +45,7 @@ import {
   CMS_SLOTS_FEATURE_NAME,
   CMS_SLOTS_OPENING_ARIA_LABEL,
   CMS_SLOTS_OPENING_MESSAGE,
+  CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION,
   CMS_SLOTS_SCAN_ARIA_LABEL,
   CMS_SLOTS_UNINSTALL_PAGE_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
@@ -144,8 +146,12 @@ export type CmsSlotsRouteChromeProps = {
   onComposerReorderDraft: (fromIndex: number, toIndex: number) => void;
   onComposerRemoveDraft: (key: string) => void;
   onComposerBack: () => void;
-  onComposerSave: (draftOverride?: CmsSlotCompositionDraftRow[]) => void | Promise<void>;
+  onComposerSave: (draftOverride?: CmsSlotCompositionDraftRow[]) => Promise<boolean>;
   composerSavePending: boolean;
+  composerLeaveDialogOpen: boolean;
+  setComposerLeaveDialogOpen: (open: boolean) => void;
+  onComposerLeaveDiscard: () => void;
+  onComposerLeaveSave: () => void | Promise<void>;
   onSyncInstallEmbed: () => void | Promise<void>;
   embedSyncPending: boolean;
   composerRowMeta: CmsSlotComposerRowMeta[];
@@ -168,6 +174,32 @@ export type CmsSlotsRouteChromeProps = {
   setCmsFieldLinkPromptOpen: (v: boolean) => void;
   onRetryCmsFieldLink: () => void | Promise<void>;
 };
+
+function cmsSlotsRouteTaskInputFromChromeProps(p: CmsSlotsRouteChromeProps): CmsSlotsRouteTaskInput {
+  return {
+    pageBootBlocking: p.pageBootBlocking,
+    routeTaskPhase: p.routeTaskPhase,
+    isComposer: p.isComposer,
+    picking: p.picking,
+    activeComposer: p.activeComposer,
+    composerEligibleLoading: p.composerEligibleLoading,
+    addPending: p.addPending,
+    resyncingEngineSlotKey: p.resyncingEngineSlotKey,
+    listTargetCreatePending: p.listTargetCreatePending,
+    listTargetFocusOnCanvasPending: p.listTargetFocusOnCanvasPending,
+    listTargetPlaceOnCanvasPending: p.listTargetPlaceOnCanvasPending,
+    listTargetRemovePending: p.listTargetRemovePending,
+    listTargetPhase: p.listTargetPhase,
+    listTargetOnCanvasCountResolved: p.listTargetOnCanvasCountResolved,
+    slotPropsWritePending: p.slotPropsWritePending,
+    embedSyncPending: p.embedSyncPending,
+    composerSavePending: p.composerSavePending,
+    removingKey: p.removingKey,
+    deletePendingKey: p.deletePendingKey,
+    createPending: p.createPending,
+    cmsFieldLinkRetryPending: p.cmsFieldLinkRetryPending,
+  };
+}
 
 function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps & { routeInteractionIdle?: boolean }) {
   const showOpeningLoader = useDeferredLoadingIndicator(p.openingBeaconKey != null);
@@ -332,29 +364,7 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
 }
 
 function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
-  const routeTask = resolveCmsSlotsRouteTask({
-    pageBootBlocking: p.pageBootBlocking,
-    routeTaskPhase: p.routeTaskPhase,
-    isComposer: p.isComposer,
-    picking: p.picking,
-    activeComposer: p.activeComposer,
-    composerEligibleLoading: p.composerEligibleLoading,
-    addPending: p.addPending,
-    resyncingEngineSlotKey: p.resyncingEngineSlotKey,
-    listTargetCreatePending: p.listTargetCreatePending,
-    listTargetFocusOnCanvasPending: p.listTargetFocusOnCanvasPending,
-    listTargetPlaceOnCanvasPending: p.listTargetPlaceOnCanvasPending,
-    listTargetRemovePending: p.listTargetRemovePending,
-    listTargetPhase: p.listTargetPhase,
-    listTargetOnCanvasCountResolved: p.listTargetOnCanvasCountResolved,
-    slotPropsWritePending: p.slotPropsWritePending,
-    embedSyncPending: p.embedSyncPending,
-    composerSavePending: p.composerSavePending,
-    removingKey: p.removingKey,
-    deletePendingKey: p.deletePendingKey,
-    createPending: p.createPending,
-    cmsFieldLinkRetryPending: p.cmsFieldLinkRetryPending,
-  });
+  const routeTask = resolveCmsSlotsRouteTask(cmsSlotsRouteTaskInputFromChromeProps(p));
   const routeBlocking = routeTask != null;
   const showRouteBlocking = useDeferredLoadingIndicator(routeBlocking);
   const [overlayOccupied, setOverlayOccupied] = useState(false);
@@ -482,6 +492,13 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
   const { composerOnly } = useCmsSlotsAccess();
 
   const composerSavePending = p.composerSavePending || p.embedSyncPending;
+  const routeTask = resolveCmsSlotsRouteTask(cmsSlotsRouteTaskInputFromChromeProps(p));
+  const composerSaveLabel =
+    composerSavePending && routeTask != null
+      ? routeTask.message
+      : composerSavePending
+        ? CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION
+        : "Save";
 
   const syncButton = (
     <CmsSlotsPageRuntimeSyncButton
@@ -506,7 +523,7 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
         aria-busy={p.composerSavePending}
         onClick={() => void p.onComposerSave()}
       >
-        {composerSavePending ? "Saving…" : "Save"}
+        {composerSaveLabel}
       </BeaconFeatureRouteDockButton>
     ) : null;
 
@@ -535,8 +552,9 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
               "min-w-0 flex-1 shrink"
             )
           }
-          onClick={() => {
+          onClick={(event) => {
             if (p.activeComposer != null) {
+              event.preventDefault();
               p.onComposerBack();
             }
           }}
@@ -613,6 +631,13 @@ export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
             retryPending={p.cmsFieldLinkRetryPending}
             onOpenChange={p.setCmsFieldLinkPromptOpen}
             onRetryLink={p.onRetryCmsFieldLink}
+          />
+          <ComposerUnsavedChangesDialog
+            open={p.composerLeaveDialogOpen}
+            busy={p.composerSavePending}
+            onOpenChange={p.setComposerLeaveDialogOpen}
+            onDiscard={p.onComposerLeaveDiscard}
+            onSave={() => void p.onComposerLeaveSave()}
           />
         </>
       }

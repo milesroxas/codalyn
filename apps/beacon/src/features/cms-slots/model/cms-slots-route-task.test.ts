@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import { resolveCmsSlotsRouteTask } from "@/features/cms-slots/model/cms-slots-route-task";
 import {
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
+  CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION,
   CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET,
   CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS,
+  CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION,
   CMS_SLOTS_ROUTE_TASK_SAVING_EXPOSED_PROPS,
+  CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT,
   CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES,
   CMS_SLOTS_SCAN_MESSAGE,
 } from "@/shared/lib/cms-slots-feature-copy";
@@ -89,5 +92,33 @@ describe("resolveCmsSlotsRouteTask", () => {
     expect(resolveCmsSlotsRouteTask({ ...idleInput, slotPropsWritePending: true })?.message).toBe(
       CMS_SLOTS_ROUTE_TASK_SAVING_EXPOSED_PROPS
     );
+  });
+
+  it("prefers composer save phase over generic saving composition flag", () => {
+    expect(
+      resolveCmsSlotsRouteTask({
+        ...idleInput,
+        routeTaskPhase: CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION,
+        composerSavePending: true,
+      })?.message
+    ).toBe(CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION);
+  });
+
+  it("returns syncing page script when embed sync is pending without an explicit phase", () => {
+    expect(
+      resolveCmsSlotsRouteTask({
+        ...idleInput,
+        embedSyncPending: true,
+      })?.message
+    ).toBe(CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT);
+  });
+
+  it("returns saving composition when composer save is pending without an explicit phase", () => {
+    expect(
+      resolveCmsSlotsRouteTask({
+        ...idleInput,
+        composerSavePending: true,
+      })?.message
+    ).toBe(CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION);
   });
 });

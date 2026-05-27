@@ -1,3 +1,4 @@
+import { writeCmsSlotListDisplayName } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 import { findCmsSlotsWrapperOnPage } from "@/features/cms-slots/model/install-cms-slots-wrapper";
 
@@ -64,6 +65,7 @@ export async function createCmsSlotListOnPage(name: string): Promise<{ container
 
   await el.setCustomAttribute("data-target", "beacons");
   await el.setCustomAttribute("data-list", dataList);
+  await writeCmsSlotListDisplayName(el, name);
 
   return { container: el, dataList };
 }

@@ -1,5 +1,5 @@
 import type { ComposerEligibleList } from "@/features/cms-slots/model/cms-slot-composer-eligible";
-import { displayLabelForDataList } from "@/features/cms-slots/model/cms-slot-data-list-display";
+import { displayLabelForCmsSlotList } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import {
   shouldShowCmsSlotsEditorNoSlotsEmpty,
   shouldShowCmsSlotsPreInstall,
@@ -88,7 +88,7 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
           {eligible.map((b) => (
             <CmsSlotListTile
               key={b.key}
-              label={displayLabelForDataList(b.dataList)}
+              label={displayLabelForCmsSlotList(b)}
               disabled={openingKey !== null}
               busy={openingKey === b.key}
               onOpen={() => void onOpenList(b)}

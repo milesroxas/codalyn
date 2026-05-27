@@ -11,6 +11,7 @@ import { useCompositionComposableMeta } from "./use-composition-composable-meta"
 export type CmsSlotCompositionPanelProps = {
   searchFieldId: string;
   activeDataList: string | null;
+  activeListLabel: string | null;
   onBackToList: () => void;
   componentQuery: string;
   setComponentQuery: (q: string) => void;
@@ -53,6 +54,7 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
   const {
     searchFieldId,
     activeDataList,
+    activeListLabel,
     onBackToList,
     componentQuery,
     setComponentQuery,
@@ -101,6 +103,7 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     <>
       <CmsSlotEngineListContextSection
         activeDataList={activeDataList}
+        activeListLabel={activeListLabel}
         listTargetActionBusy={listTargetActionBusy}
         listTargetCreatePending={listTargetCreatePending}
         listTargetOnCanvasCount={listTargetOnCanvasCount}

@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renameCmsSlotListOnPage } from "./rename-cms-slot-list-on-page";
 
 describe("renameCmsSlotListOnPage", () => {
-  const container = { id: { component: "c1", element: "e1" } } as BlockElement;
+  const container = {
+    id: { component: "c1", element: "e1" },
+    setCustomAttribute: vi.fn(async () => {}),
+  } as unknown as BlockElement;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -36,5 +39,6 @@ describe("renameCmsSlotListOnPage", () => {
       otherDataListsOnPage: new Set(),
     });
     expect(result).toEqual({ ok: true, dataList: "beacon-hero" });
+    expect(container.setCustomAttribute).toHaveBeenCalledWith("data-beacon-display-name", "Hero");
   });
 });

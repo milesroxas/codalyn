@@ -15,6 +15,7 @@ import { BeaconRouteLoadingOverlay } from "@/app/ui/beacon-route-loading-overlay
 import { BeaconRouteLoadingShell } from "@/app/ui/beacon-route-loading-shell";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
+import { displayLabelForCmsSlotList } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import type { CmsSlotListOnPage, HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
@@ -68,6 +69,7 @@ export type CmsSlotsRouteChromeProps = {
   isComposer: boolean;
   picking: boolean;
   activeDataList: string | null;
+  activeListLabel: string | null;
   beaconsWrapperInstalled: boolean;
   installPending: boolean;
   pageBeacons: CmsSlotListOnPage[];
@@ -181,6 +183,7 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps & { routeInteractio
         <CmsSlotCompositionPanel
           searchFieldId={p.searchFieldId}
           activeDataList={p.activeDataList}
+          activeListLabel={p.activeListLabel}
           onBackToList={p.exitToList}
           componentQuery={p.componentQuery}
           setComponentQuery={p.setComponentQuery}
@@ -273,7 +276,7 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
     panel = (
       <div className="space-y-4" data-route="cms-slots-composer-editor">
         <CmsSlotComposerPanel
-          activeDataList={activeComposer.beacon.dataList}
+          activeListLabel={displayLabelForCmsSlotList(activeComposer.beacon)}
           draft={p.composerDraft}
           dirty={p.composerDirty}
           allowedPalette={p.composerAllowedPalette}

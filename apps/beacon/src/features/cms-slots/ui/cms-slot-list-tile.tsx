@@ -1,5 +1,5 @@
 import { MoreVertical } from "lucide-react";
-import { displayLabelForDataList } from "@/features/cms-slots/model/cms-slot-data-list-display";
+import { displayLabelForCmsSlotList } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import { CMS_SLOTS_RENAME_SLOT_MENU_LABEL } from "@/shared/lib/cms-slots-feature-copy";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
 import { TileBottomPinnedLabel, TileButton, TileGridListItem, TileOverlayButton, TileSurface } from "@/shared/ui/tile";
@@ -74,6 +74,7 @@ export function CmsSlotListTile(props: CmsSlotListTileProps) {
 
 type CmsSlotPublishedSlotTileProps = {
   dataList: string;
+  displayName?: string | null;
   disabled: boolean;
   opening: boolean;
   deleting: boolean;
@@ -84,8 +85,9 @@ type CmsSlotPublishedSlotTileProps = {
 };
 
 export function CmsSlotPublishedSlotTile(props: CmsSlotPublishedSlotTileProps) {
-  const { dataList, disabled, opening, deleting, renaming, onOpen, onRequestDelete, onRequestRename } = props;
-  const label = displayLabelForDataList(dataList);
+  const { dataList, displayName, disabled, opening, deleting, renaming, onOpen, onRequestDelete, onRequestRename } =
+    props;
+  const label = displayLabelForCmsSlotList({ dataList, displayName });
 
   return (
     <CmsSlotListTile

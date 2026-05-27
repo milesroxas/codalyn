@@ -1,7 +1,7 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Plus } from "lucide-react";
 import { useId, useState } from "react";
-import { displayLabelForDataList } from "@/features/cms-slots/model/cms-slot-data-list-display";
+import { displayLabelForCmsSlotList } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { CmsSlotDisplayNameDrawer } from "@/features/cms-slots/ui/cms-slot-display-name-drawer";
 import { CmsSlotPublishedSlotTile } from "@/features/cms-slots/ui/cms-slot-list-tile";
@@ -56,7 +56,7 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
   const [renameDraft, setRenameDraft] = useState("");
 
   const hasBeacons = pageBeacons.length > 0;
-  const renameBaseline = renameTarget != null ? displayLabelForDataList(renameTarget.dataList).trim() : "";
+  const renameBaseline = renameTarget != null ? displayLabelForCmsSlotList(renameTarget).trim() : "";
   const renameDraftTrimmed = renameDraft.trim();
   const renameSaveDisabled =
     renameDraftTrimmed === "" ||
@@ -64,7 +64,7 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
 
   const openRenameDrawer = (beacon: CmsSlotListOnPage) => {
     setRenameTarget(beacon);
-    setRenameDraft(displayLabelForDataList(beacon.dataList));
+    setRenameDraft(displayLabelForCmsSlotList(beacon));
   };
 
   const closeRenameDrawer = () => {
@@ -142,6 +142,7 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
               <CmsSlotPublishedSlotTile
                 key={b.key}
                 dataList={b.dataList}
+                displayName={b.displayName}
                 disabled={openingBeaconKey !== null || deletePendingKey !== null || renamePendingKey !== null}
                 opening={openingBeaconKey === b.key}
                 deleting={deletePendingKey === b.key}

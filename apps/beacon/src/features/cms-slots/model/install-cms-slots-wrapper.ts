@@ -1,3 +1,4 @@
+import { readCmsSlotListDisplayName } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import {
   removeCmsSlotPageRuntimeFromPage,
   syncCmsSlotPageInlineScript,
@@ -181,7 +182,8 @@ export async function listCmsSlotListsOrphanedOnBody(): Promise<CmsSlotListOnPag
     const list = await block.getCustomAttribute("data-list");
     if (target === "beacons" && list != null && list.startsWith("beacon-")) {
       const key = `${block.id.component}:${block.id.element}`;
-      out.push({ dataList: list, container: block, key });
+      const displayName = await readCmsSlotListDisplayName(block);
+      out.push({ dataList: list, displayName, container: block, key });
     }
   }
   return out;

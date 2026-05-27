@@ -5,7 +5,7 @@ import { ComposerOrderSection } from "./composer-order-section";
 import { ComposerPaletteSection } from "./composer-palette-section";
 
 export type CmsSlotComposerPanelProps = {
-  activeDataList: string;
+  activeListLabel: string;
   draft: CmsSlotCompositionDraftRow[];
   dirty: boolean;
   /** Component types present in the Engine-defined beacon list; Composer can only add from this set. */
@@ -28,7 +28,7 @@ export type CmsSlotComposerPanelProps = {
 
 export function CmsSlotComposerPanel(props: CmsSlotComposerPanelProps) {
   const {
-    activeDataList,
+    activeListLabel,
     draft,
     dirty,
     allowedPalette,
@@ -52,8 +52,8 @@ export function CmsSlotComposerPanel(props: CmsSlotComposerPanelProps) {
     <div className="space-y-3" data-slot="beacon_composer">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-medium">Composer</p>
-          <code className="mt-0.5 block truncate font-mono text-[0.7rem] text-muted-foreground">{activeDataList}</code>
+          <p className="text-sm font-medium">{activeListLabel}</p>
+          <p className="mt-0.5 truncate text-[0.7rem] text-muted-foreground">Composer</p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onBack()}>

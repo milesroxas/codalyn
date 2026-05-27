@@ -23,6 +23,10 @@ import {
 } from "@/features/cms-slots/model/cms-slot-composer-cms-draft";
 import { listComposerEligibleLists } from "@/features/cms-slots/model/cms-slot-composer-eligible";
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
+import {
+  displayLabelForCmsSlotList,
+  displayLabelForDataList,
+} from "@/features/cms-slots/model/cms-slot-data-list-display";
 import { renamePublishedSlotDisplayNameAtPoolIndex } from "@/features/cms-slots/model/cms-slot-engine-rename-published-slot";
 import {
   type CmsSlotEngineSlotPropsFile,
@@ -845,6 +849,21 @@ export function CmsSlotsScreen() {
     if (beaconToDelete == null) return false;
     return pageBeacons.length === 1 && pageBeacons[0]?.key === beaconToDelete.key;
   }, [beaconToDelete, pageBeacons]);
+
+  const activeListLabel = useMemo(() => {
+    if (activeDataList == null) {
+      return null;
+    }
+    const pageBeacon = pageBeacons.find((entry) => entry.dataList === activeDataList);
+    if (pageBeacon != null) {
+      return displayLabelForCmsSlotList(pageBeacon);
+    }
+    const composerBeacon = activeComposer?.beacon;
+    if (composerBeacon != null && composerBeacon.dataList === activeDataList) {
+      return displayLabelForCmsSlotList(composerBeacon);
+    }
+    return displayLabelForDataList(activeDataList);
+  }, [activeDataList, activeComposer, pageBeacons]);
 
   useEffect(() => {
     void refreshPageBeacons();
@@ -1858,6 +1877,7 @@ export function CmsSlotsScreen() {
       isComposer={isComposer}
       picking={picking}
       activeDataList={activeDataList}
+      activeListLabel={activeListLabel}
       beaconsWrapperInstalled={beaconsWrapperInstalled}
       installPending={installPending}
       pageBeacons={pageBeacons}

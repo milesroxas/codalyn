@@ -40,6 +40,7 @@ import {
 
 type CmsSlotEngineListContextSectionProps = {
   activeDataList: string | null;
+  activeListLabel: string | null;
   removingKey: string | null;
   listTargetPhase: CmsSlotListTargetPhase;
   listTargetActionBusy: boolean;
@@ -103,24 +104,24 @@ function buildSyncedListTargetMenuItems(props: {
 }
 
 type CmsSlotEngineCurrentListSummaryProps = {
-  activeDataList: string;
+  activeListLabel: string;
   actionsMenuAriaLabel?: string;
   actionsMenuDisabled?: boolean;
   actionsMenuItems?: SurfaceSummaryCardSurfaceActionsMenuItem[];
 };
 
 function CmsSlotEngineCurrentListSummary(props: CmsSlotEngineCurrentListSummaryProps) {
-  const { activeDataList, actionsMenuAriaLabel, actionsMenuDisabled = false, actionsMenuItems = [] } = props;
+  const { activeListLabel, actionsMenuAriaLabel, actionsMenuDisabled = false, actionsMenuItems = [] } = props;
 
   return (
-    <SurfaceSummaryCardSurfaceSummary>
+    <SurfaceSummaryCardSurfaceSummary contained>
       <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_ENGINE_CURRENT_LIST_LABEL}</SurfaceSummaryCardPanelSectionLabel>
       <SurfaceSummaryCardSurfaceDisplay>
         <SurfaceSummaryCardIconBox>
           <List aria-hidden strokeWidth={1.5} />
         </SurfaceSummaryCardIconBox>
         <SurfaceSummaryCardIconRowCopy>
-          <SurfaceSummaryCardTitle>{activeDataList}</SurfaceSummaryCardTitle>
+          <SurfaceSummaryCardTitle>{activeListLabel}</SurfaceSummaryCardTitle>
           <SurfaceSummaryCardMeta>{CMS_SLOTS_ENGINE_LIST_TARGET_META}</SurfaceSummaryCardMeta>
         </SurfaceSummaryCardIconRowCopy>
         {actionsMenuAriaLabel != null ? (
@@ -216,6 +217,7 @@ function CmsSlotEnginePendingActions(props: {
 export function CmsSlotEngineListContextSection(props: CmsSlotEngineListContextSectionProps) {
   const {
     activeDataList,
+    activeListLabel,
     removingKey,
     listTargetPhase,
     listTargetActionBusy,
@@ -250,11 +252,11 @@ export function CmsSlotEngineListContextSection(props: CmsSlotEngineListContextS
         title={CMS_SLOTS_ENGINE_EDITING_TITLE}
       />
 
-      {activeDataList != null ? (
+      {activeDataList != null && activeListLabel != null ? (
         <CmsSlotEngineCurrentListSummary
-          activeDataList={activeDataList}
+          activeListLabel={activeListLabel}
           actionsMenuAriaLabel={
-            listTargetPhase === "synced" ? cmsSlotsEngineListTargetActionsAriaLabel(activeDataList) : undefined
+            listTargetPhase === "synced" ? cmsSlotsEngineListTargetActionsAriaLabel(activeListLabel) : undefined
           }
           actionsMenuDisabled={ctaDisabled || listTargetRemovePending}
           actionsMenuItems={syncedMenuItems}

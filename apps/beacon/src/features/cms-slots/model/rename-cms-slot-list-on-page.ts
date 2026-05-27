@@ -1,3 +1,4 @@
+import { writeCmsSlotListDisplayName } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import { syncCmsSlotPageInlineScript } from "@/features/cms-slots/model/cms-slot-page-inline-script";
 import {
   applyCmsSlotListTargetSync,
@@ -24,6 +25,7 @@ export async function renameCmsSlotListOnPage(input: {
   }
 
   if (toDataList === fromDataList) {
+    await writeCmsSlotListDisplayName(container, nextDisplayName);
     return { ok: true, dataList: toDataList };
   }
 
@@ -34,6 +36,7 @@ export async function renameCmsSlotListOnPage(input: {
   const listTarget = await getCmsSlotListTargetComponentOrNull(fromDataList, container, preferredDefinitionId);
 
   await container.setCustomAttribute("data-list", toDataList);
+  await writeCmsSlotListDisplayName(container, nextDisplayName);
 
   if (listTarget != null) {
     await runExclusiveDesignerStyleOp(async () => {

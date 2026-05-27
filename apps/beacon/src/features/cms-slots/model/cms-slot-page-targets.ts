@@ -1,3 +1,5 @@
+import { readCmsSlotListDisplayName } from "@/features/cms-slots/model/cms-slot-data-list-display";
+
 type ElementWithChildren = AnyElement & {
   getChildren: () => Promise<AnyElement[]>;
 };
@@ -47,6 +49,8 @@ export function cmsSlotListKey(container: BlockElement): string {
 export type CmsSlotListOnPage = {
   /** Value of `data-list`, e.g. `beacon-hero-cta` */
   dataList: string;
+  /** User-facing rename label from `data-beacon-display-name`, when set. */
+  displayName: string | null;
   container: BlockElement;
   /** Stable key for React / maps */
   key: string;
@@ -70,7 +74,8 @@ export async function findCmsSlotListsOnPage(): Promise<CmsSlotListOnPage[]> {
       const target = await block.getCustomAttribute("data-target");
       const list = await block.getCustomAttribute("data-list");
       if (target === "beacons" && list != null && list.startsWith("beacon-")) {
-        out.push({ dataList: list, container: block, key: cmsSlotListKey(block) });
+        const displayName = await readCmsSlotListDisplayName(block);
+        out.push({ dataList: list, displayName, container: block, key: cmsSlotListKey(block) });
       }
     }
     if (!hasGetChildren(el)) return;

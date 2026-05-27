@@ -1,5 +1,7 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
+
 import {
   IconBuildingCommunity,
   IconCheck,
@@ -91,6 +93,7 @@ export function TeamWorkspaceSwitcher(props: {
 
   const list = props.orgs ?? [];
   const disabled = props.busy || props.orgsPending;
+  const showOrgsPending = useDeferredLoadingIndicator(props.orgsPending);
 
   return (
     <>
@@ -104,7 +107,7 @@ export function TeamWorkspaceSwitcher(props: {
               aria-label="Workspace menu"
             >
               <IconBuildingCommunity className="opacity-60" aria-hidden />
-              {props.orgsPending ? (
+              {showOrgsPending ? (
                 <Skeleton className="h-3 w-24" aria-hidden />
               ) : (
                 <span className="min-w-0 flex-1 truncate">{props.triggerLabel}</span>
@@ -115,7 +118,7 @@ export function TeamWorkspaceSwitcher(props: {
             <Button type="button" variant="outline" disabled={disabled} size="workspace" aria-label="Workspace menu">
               <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
                 <IconBuildingCommunity className="size-4 shrink-0 opacity-60" aria-hidden />
-                {props.orgsPending ? (
+                {showOrgsPending ? (
                   <Skeleton className="h-3 w-24" aria-hidden />
                 ) : (
                   <span className="truncate">{props.triggerLabel}</span>

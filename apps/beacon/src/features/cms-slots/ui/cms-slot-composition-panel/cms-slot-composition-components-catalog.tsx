@@ -1,3 +1,4 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Loader2, Plus, Search } from "lucide-react";
 import { Input } from "@/shared/ui/input";
 
@@ -25,6 +26,7 @@ export function CmsSlotCompositionComponentsCatalog(props: CmsSlotCompositionCom
     addPending,
     onAddComponent,
   } = props;
+  const showCatalogLoading = useDeferredLoadingIndicator(catalogLoading);
 
   return (
     <div
@@ -43,7 +45,7 @@ export function CmsSlotCompositionComponentsCatalog(props: CmsSlotCompositionCom
           value={componentQuery}
           onChange={(e) => setComponentQuery(e.target.value)}
           autoComplete="off"
-          aria-busy={catalogLoading}
+          aria-busy={showCatalogLoading}
           placeholder="Search components"
           className="h-9 pl-9"
         />
@@ -56,7 +58,7 @@ export function CmsSlotCompositionComponentsCatalog(props: CmsSlotCompositionCom
       ) : null}
 
       <div className="relative -mx-1 h-40 shrink-0 overflow-hidden rounded-md">
-        {catalogLoading ? (
+        {showCatalogLoading ? (
           <div
             className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-card/75 backdrop-blur-[1px]"
             data-slot="beacon_list_loader"
@@ -69,9 +71,9 @@ export function CmsSlotCompositionComponentsCatalog(props: CmsSlotCompositionCom
         ) : null}
         <div
           className="scrollbar-themed h-40 overflow-y-scroll rounded-md"
-          data-state={catalogLoading ? "loading" : "idle"}
+          data-state={showCatalogLoading ? "loading" : "idle"}
         >
-          {componentCatalog.length === 0 && !catalogLoading ? (
+          {componentCatalog.length === 0 && !showCatalogLoading ? (
             <div className="h-full min-h-28" aria-hidden />
           ) : (
             <ul className="px-1" aria-label="Components">

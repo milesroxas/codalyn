@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
+import { TowerDeferredLoadingFallback } from "@/shared/ui/deferred-loading";
 import { CompactRedirectSkeleton } from "@/shared/ui/page-loading-skeletons";
 
 function ErrorInner() {
@@ -27,7 +28,13 @@ function ErrorInner() {
 
 export default function WebflowOAuthErrorPage() {
   return (
-    <Suspense fallback={<CompactRedirectSkeleton />}>
+    <Suspense
+      fallback={
+        <TowerDeferredLoadingFallback>
+          <CompactRedirectSkeleton />
+        </TowerDeferredLoadingFallback>
+      }
+    >
       <ErrorInner />
     </Suspense>
   );

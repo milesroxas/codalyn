@@ -1410,6 +1410,7 @@ export function CmsSlotsScreen() {
     if (!container || addPending) return;
     setAddPending(true);
     setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT);
+    let rowKeyToAutoOpen: string | null = null;
     try {
       const instance = await appendComponentToSlotListContainer(container, c.id);
       const rowKey = crypto.randomUUID();
@@ -1441,13 +1442,16 @@ export function CmsSlotsScreen() {
         });
         promptCmsFieldLinkIfCreated(cmsEnsure);
       }
-      setAutoOpenExposeDrawerRowKey(rowKey);
+      rowKeyToAutoOpen = rowKey;
     } catch (err) {
       const message = formatWebflowDesignerError(err);
       void webflow.notify({ type: "Error", message });
     } finally {
       setAddPending(false);
       setRouteTaskPhase(null);
+    }
+    if (rowKeyToAutoOpen != null) {
+      setAutoOpenExposeDrawerRowKey(rowKeyToAutoOpen);
     }
   };
 

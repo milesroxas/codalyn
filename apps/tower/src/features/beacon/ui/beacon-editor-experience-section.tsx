@@ -1,5 +1,6 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { BeaconEditorExperienceSkeleton } from "@/features/beacon/ui/beacon-page-skeleton";
@@ -30,6 +31,7 @@ export function BeaconEditorExperienceSection({
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const designerFeaturesOn = !restrictToEditorExperience;
+  const showLoading = useDeferredLoadingIndicator(loading);
 
   const onToggle = async (nextDesignerOn: boolean) => {
     setSaving(true);
@@ -58,7 +60,7 @@ export function BeaconEditorExperienceSection({
     return null;
   }
 
-  if (loading) {
+  if (showLoading) {
     return <BeaconEditorExperienceSkeleton />;
   }
 

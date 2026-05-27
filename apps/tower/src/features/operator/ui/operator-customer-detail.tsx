@@ -1,5 +1,6 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import {
   IconBan,
   IconBuilding,
@@ -11,7 +12,7 @@ import {
   IconUserCheck,
 } from "@tabler/icons-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import {
@@ -21,6 +22,7 @@ import {
   initialsFor,
   userAgentSummary,
 } from "@/features/operator/model/format";
+import { OperatorDetailSheetSkeleton } from "@/features/operator/ui/operator-detail-sheet-skeleton";
 import {
   OperatorUsageLimitsSection,
   reloadUserUsageLimits,
@@ -42,7 +44,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/shared/ui/sheet";
-import { Skeleton } from "@/shared/ui/skeleton";
 import { Switch } from "@/shared/ui/switch";
 import { DangerZoneTypedDelete } from "@/shared/ui/typed-confirm-alert-dialog";
 
@@ -201,141 +202,196 @@ export function OperatorCustomerDetail(props: OperatorCustomerDetailProps) {
     }
   }, [state.detail, state.deleteConfirm, onDeleted, onOpenChange]);
 
+  const showPlaceholder = useDeferredLoadingIndicator(state.loading);
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col p-0 sm:max-w-xl">
-        {state.loading || !state.detail ? (
-          <>
-            <SheetHeader>
-              <SheetTitle className="sr-only">Customer details</SheetTitle>
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-3 w-24" />
-            </SheetHeader>
-            <SheetBody className="space-y-3">
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </SheetBody>
-          </>
-        ) : (
-          <>
-            <SheetHeader>
-              <div className="flex items-start gap-3">
-                <Avatar className="size-10">
-                  <AvatarFallback>{initialsFor(state.detail.name || state.detail.email)}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <SheetTitle className="truncate">{state.detail.name || state.detail.email}</SheetTitle>
-                  <SheetDescription className="truncate">{state.detail.email}</SheetDescription>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    <Badge variant={state.detail.role === "product_admin" ? "secondary" : "outline"}>
-                      <IconShieldCheck className="size-3" />
-                      {appRoleLabel(state.detail.role)}
-                    </Badge>
-                    {state.detail.emailVerified ? (
-                      <Badge variant="outline">
-                        <IconMail className="size-3" />
-                        Verified
-                      </Badge>
-                    ) : null}
-                    {state.detail.canCreateOrganization ? (
-                      <Badge variant="outline">
-                        <IconCheck className="size-3" />
-                        Eligible
-                      </Badge>
-                    ) : null}
-                    {state.detail.banned ? (
-                      <Badge variant="destructive">
-                        <IconBan className="size-3" />
-                        Banned
-                      </Badge>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            </SheetHeader>
-
-            <SheetBody className="space-y-6">
-              {state.error ? (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                  {state.error}
-                </div>
-              ) : null}
-
-              <AccessSection
-                detail={state.detail}
-                patchBusy={state.patchBusy}
-                isSelf={isSelf}
-                onToggleRole={onToggleRole}
-                onToggleEligibility={onToggleEligibility}
-              />
-              <ModerationSection
-                detail={state.detail}
-                banReasonDraft={state.banReasonDraft}
-                onBanReasonDraftChange={(v) => setState((s) => ({ ...s, banReasonDraft: v }))}
-                patchBusy={state.patchBusy}
-                isSelf={isSelf}
-                onBan={onBan}
-                onUnban={onUnban}
-              />
-              <OperatorUsageLimitsSection
-                scope="user"
-                usage={state.detail.usage}
-                busy={state.patchBusy}
-                onSave={async (update) => {
-                  if (!state.detail) {
-                    throw new Error("missing_detail");
-                  }
-                  const next = await operatorApi.patchUser(state.detail.id, update);
-                  setState((s) => ({ ...s, detail: next }));
-                  onUpdated?.(detailToRow(next));
-                  return next.usage;
-                }}
-                onReset={async () => {
-                  if (!state.detail) {
-                    throw new Error("missing_detail");
-                  }
-                  const { detail } = state;
-                  await operatorApi.resetUserUsage(detail.id);
-                  const usage = await reloadUserUsageLimits(detail.id);
-                  const nextDetail = { ...detail, usage };
-                  setState((s) => (s.detail ? { ...s, detail: nextDetail } : s));
-                  onUpdated?.(detailToRow(nextDetail));
-                  return usage;
-                }}
-              />
-              <WorkspacesSection detail={state.detail} onCloseSheet={() => onOpenChange(false)} />
-              <SessionsSection detail={state.detail} />
-              <MetadataSection detail={state.detail} />
-              <DangerZoneTypedDelete
-                panelDescription={
-                  <>
-                    Permanently delete this customer, their sessions, OAuth tokens, and Beacon preferences. Workspace
-                    memberships are removed. Deletion is blocked while they are the only admin of a workspace with other
-                    members; promote another admin or delete the workspace first.
-                  </>
-                }
-                triggerLabel="Delete customer"
-                triggerDisabled={isSelf}
-                title="Delete customer?"
-                confirmFieldLabel="Email"
-                confirmFieldId="confirm-email"
-                expectedValue={state.detail.email}
-                confirmValue={state.deleteConfirm}
-                onConfirmValueChange={(v) => setState((s) => ({ ...s, deleteConfirm: v }))}
-                busy={state.deleteBusy}
-                onConfirm={() => void onDelete()}
-              />
-            </SheetBody>
-
-            <SheetFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Close
-              </Button>
-            </SheetFooter>
-          </>
-        )}
+        <OperatorCustomerDetailSheetBody
+          showPlaceholder={showPlaceholder}
+          state={state}
+          isSelf={isSelf}
+          onOpenChange={onOpenChange}
+          onToggleRole={onToggleRole}
+          onToggleEligibility={onToggleEligibility}
+          onBan={onBan}
+          onUnban={onUnban}
+          onDelete={onDelete}
+          onUpdated={onUpdated}
+          setState={setState}
+        />
       </SheetContent>
     </Sheet>
+  );
+}
+
+type OperatorCustomerDetailSheetBodyProps = {
+  showPlaceholder: boolean;
+  state: LocalState;
+  isSelf: boolean;
+  onOpenChange: (open: boolean) => void;
+  onToggleRole: (next: string) => void;
+  onToggleEligibility: (next: boolean) => void;
+  onBan: () => void;
+  onUnban: () => void;
+  onDelete: () => void | Promise<void>;
+  onUpdated?: (row: OperatorUserRow) => void;
+  setState: Dispatch<SetStateAction<LocalState>>;
+};
+
+function OperatorCustomerDetailSheetBody(props: OperatorCustomerDetailSheetBodyProps) {
+  const {
+    showPlaceholder,
+    state,
+    isSelf,
+    onOpenChange,
+    onToggleRole,
+    onToggleEligibility,
+    onBan,
+    onUnban,
+    onDelete,
+    onUpdated,
+    setState,
+  } = props;
+
+  if (showPlaceholder) {
+    return <OperatorDetailSheetSkeleton title="Customer details" />;
+  }
+  if (!state.detail) {
+    if (state.error) {
+      return (
+        <>
+          <SheetHeader>
+            <SheetTitle>Customer details</SheetTitle>
+          </SheetHeader>
+          <SheetBody>
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {state.error}
+            </div>
+          </SheetBody>
+          <SheetFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </SheetFooter>
+        </>
+      );
+    }
+    return null;
+  }
+
+  const detail = state.detail;
+
+  return (
+    <>
+      <SheetHeader>
+        <div className="flex items-start gap-3">
+          <Avatar className="size-10">
+            <AvatarFallback>{initialsFor(detail.name || detail.email)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <SheetTitle className="truncate">{detail.name || detail.email}</SheetTitle>
+            <SheetDescription className="truncate">{detail.email}</SheetDescription>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Badge variant={detail.role === "product_admin" ? "secondary" : "outline"}>
+                <IconShieldCheck className="size-3" />
+                {appRoleLabel(detail.role)}
+              </Badge>
+              {detail.emailVerified ? (
+                <Badge variant="outline">
+                  <IconMail className="size-3" />
+                  Verified
+                </Badge>
+              ) : null}
+              {detail.canCreateOrganization ? (
+                <Badge variant="outline">
+                  <IconCheck className="size-3" />
+                  Eligible
+                </Badge>
+              ) : null}
+              {detail.banned ? (
+                <Badge variant="destructive">
+                  <IconBan className="size-3" />
+                  Banned
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </SheetHeader>
+
+      <SheetBody className="space-y-6">
+        {state.error ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            {state.error}
+          </div>
+        ) : null}
+
+        <AccessSection
+          detail={detail}
+          patchBusy={state.patchBusy}
+          isSelf={isSelf}
+          onToggleRole={onToggleRole}
+          onToggleEligibility={onToggleEligibility}
+        />
+        <ModerationSection
+          detail={detail}
+          banReasonDraft={state.banReasonDraft}
+          onBanReasonDraftChange={(v) => setState((s) => ({ ...s, banReasonDraft: v }))}
+          patchBusy={state.patchBusy}
+          isSelf={isSelf}
+          onBan={onBan}
+          onUnban={onUnban}
+        />
+        <OperatorUsageLimitsSection
+          scope="user"
+          usage={detail.usage}
+          busy={state.patchBusy}
+          onSave={async (update) => {
+            const next = await operatorApi.patchUser(detail.id, update);
+            setState((s) => ({ ...s, detail: next }));
+            onUpdated?.(detailToRow(next));
+            return next.usage;
+          }}
+          onReset={async () => {
+            await operatorApi.resetUserUsage(detail.id);
+            const usage = await reloadUserUsageLimits(detail.id);
+            const nextDetail = { ...detail, usage };
+            setState((s) => (s.detail ? { ...s, detail: nextDetail } : s));
+            onUpdated?.(detailToRow(nextDetail));
+            return usage;
+          }}
+        />
+        <WorkspacesSection detail={detail} onCloseSheet={() => onOpenChange(false)} />
+        <SessionsSection detail={detail} />
+        <MetadataSection detail={detail} />
+        <DangerZoneTypedDelete
+          panelDescription={
+            <>
+              Permanently delete this customer, their sessions, OAuth tokens, and Beacon preferences. Workspace
+              memberships are removed. Deletion is blocked while they are the only admin of a workspace with other
+              members; promote another admin or delete the workspace first.
+            </>
+          }
+          triggerLabel="Delete customer"
+          triggerDisabled={isSelf}
+          title="Delete customer?"
+          confirmFieldLabel="Email"
+          confirmFieldId="confirm-email"
+          expectedValue={detail.email}
+          confirmValue={state.deleteConfirm}
+          onConfirmValueChange={(v) => setState((s) => ({ ...s, deleteConfirm: v }))}
+          busy={state.deleteBusy}
+          onConfirm={() => void onDelete()}
+        />
+      </SheetBody>
+
+      <SheetFooter>
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          Close
+        </Button>
+      </SheetFooter>
+    </>
   );
 }
 

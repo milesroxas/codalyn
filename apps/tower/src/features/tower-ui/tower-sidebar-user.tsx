@@ -1,5 +1,6 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { CircleUserRoundIcon, CreditCardIcon, EllipsisVerticalIcon, LogOutIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { authClient } from "@/features/auth/model/auth-client";
@@ -28,8 +29,9 @@ export function TowerSidebarUser({ billingEnabled }: TowerSidebarUserProps) {
   const { isMobile } = useSidebar();
   const { data: session, isPending } = authClient.useSession();
   const { signOut: onSignOut, signingOut } = useTowerWebSignOut();
+  const showSidebarSkeleton = useDeferredLoadingIndicator(isPending);
 
-  if (isPending) {
+  if (showSidebarSkeleton) {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
@@ -37,6 +39,9 @@ export function TowerSidebarUser({ billingEnabled }: TowerSidebarUserProps) {
         </SidebarMenuItem>
       </SidebarMenu>
     );
+  }
+  if (isPending) {
+    return null;
   }
 
   const user = session?.user;

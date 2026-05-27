@@ -1,5 +1,6 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import {
   IconAlertTriangle,
   IconArrowRight,
@@ -113,9 +114,11 @@ function PrimaryStats({
   loading: boolean;
   nf: Intl.NumberFormat;
 }) {
+  const showPlaceholder = useDeferredLoadingIndicator(loading);
+
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {loading || !totals ? (
+      {showPlaceholder ? (
         Array.from({ length: 4 }).map((_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: static skeletons
           <Card key={i} size="sm">
@@ -126,7 +129,7 @@ function PrimaryStats({
             </CardContent>
           </Card>
         ))
-      ) : (
+      ) : totals ? (
         <>
           <StatTile
             label="Customers"
@@ -154,8 +157,42 @@ function PrimaryStats({
             icon={IconUserCheck}
           />
         </>
-      )}
+      ) : null}
     </div>
+  );
+}
+
+function SecondaryStatTiles({ totals, nf }: { totals: OperatorMetrics["totals"]; nf: Intl.NumberFormat }) {
+  return (
+    <>
+      <StatTile
+        label="Eligible to create workspace"
+        value={nf.format(totals.eligibleForWorkspace)}
+        hint="canCreateOrganization = true"
+        icon={IconCircleCheck}
+      />
+      <StatTile
+        label="Banned accounts"
+        value={nf.format(totals.banned)}
+        hint={totals.banned === 0 ? "Nothing to review" : "Review under Customers"}
+        icon={IconAlertTriangle}
+        tone={totals.banned > 0 ? "warn" : "default"}
+      />
+      <StatTile
+        label="Early access requests"
+        value={nf.format(totals.pendingEarlyAccessRequests)}
+        hint="Review under Access requests"
+        icon={IconKey}
+        tone={totals.pendingEarlyAccessRequests > 0 ? "warn" : "default"}
+      />
+      <StatTile
+        label="Support requests"
+        value={nf.format(totals.pendingSupportRequests)}
+        hint="Review under Support requests"
+        icon={IconLifebuoy}
+        tone={totals.pendingSupportRequests > 0 ? "warn" : "default"}
+      />
+    </>
   );
 }
 
@@ -168,9 +205,11 @@ function SecondaryStats({
   loading: boolean;
   nf: Intl.NumberFormat;
 }) {
+  const showPlaceholder = useDeferredLoadingIndicator(loading);
+
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {loading || !totals ? (
+      {showPlaceholder ? (
         Array.from({ length: 4 }).map((_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: static skeletons
           <Card key={i} size="sm">
@@ -180,37 +219,9 @@ function SecondaryStats({
             </CardContent>
           </Card>
         ))
-      ) : (
-        <>
-          <StatTile
-            label="Eligible to create workspace"
-            value={nf.format(totals.eligibleForWorkspace)}
-            hint="canCreateOrganization = true"
-            icon={IconCircleCheck}
-          />
-          <StatTile
-            label="Banned accounts"
-            value={nf.format(totals.banned)}
-            hint={totals.banned === 0 ? "Nothing to review" : "Review under Customers"}
-            icon={IconAlertTriangle}
-            tone={totals.banned > 0 ? "warn" : "default"}
-          />
-          <StatTile
-            label="Early access requests"
-            value={nf.format(totals.pendingEarlyAccessRequests)}
-            hint="Review under Access requests"
-            icon={IconKey}
-            tone={totals.pendingEarlyAccessRequests > 0 ? "warn" : "default"}
-          />
-          <StatTile
-            label="Support requests"
-            value={nf.format(totals.pendingSupportRequests)}
-            hint="Review under Support requests"
-            icon={IconLifebuoy}
-            tone={totals.pendingSupportRequests > 0 ? "warn" : "default"}
-          />
-        </>
-      )}
+      ) : totals ? (
+        <SecondaryStatTiles totals={totals} nf={nf} />
+      ) : null}
     </div>
   );
 }
@@ -240,7 +251,8 @@ function RecentCustomers({ users, loading }: { users: OperatorMetrics["recentUse
 }
 
 function RecentCustomersBody({ users, loading }: { users: OperatorMetrics["recentUsers"]; loading: boolean }) {
-  if (loading) {
+  const showPlaceholder = useDeferredLoadingIndicator(loading);
+  if (showPlaceholder) {
     return (
       <>
         {Array.from({ length: 4 }).map((_, i) => (
@@ -325,7 +337,8 @@ function RecentWorkspacesBody({
   workspaces: OperatorMetrics["recentWorkspaces"];
   loading: boolean;
 }) {
-  if (loading) {
+  const showPlaceholder = useDeferredLoadingIndicator(loading);
+  if (showPlaceholder) {
     return (
       <>
         {Array.from({ length: 4 }).map((_, i) => (

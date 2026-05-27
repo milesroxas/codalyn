@@ -7,6 +7,7 @@ import {
   type BeaconPresetRow,
   buildBeaconPresetSiteGroups,
 } from "@codalyn/webflow-kit";
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useRequireTowerSession } from "@/features/auth/model/use-require-tower-session";
@@ -42,8 +43,25 @@ function canEditSiteDefaultPreset(payload: BeaconApiPayload | null, canEditPrese
 
 export function TowerBeaconScreen(props: { oauthConfigured?: boolean }) {
   const { oauthConfigured = false } = props;
-  const baseId = useId();
   const { session, sessionPending } = useRequireTowerSession("/beacon");
+  const showSessionSkeleton = useDeferredLoadingIndicator(sessionPending);
+
+  if (showSessionSkeleton) {
+    return <BeaconPageSkeleton />;
+  }
+  if (sessionPending || !session?.user) {
+    return null;
+  }
+
+  return <TowerBeaconScreenLoaded oauthConfigured={oauthConfigured} session={session} />;
+}
+
+function TowerBeaconScreenLoaded(props: {
+  oauthConfigured: boolean;
+  session: NonNullable<ReturnType<typeof useRequireTowerSession>["session"]>;
+}) {
+  const { oauthConfigured, session } = props;
+  const baseId = useId();
 
   const [payload, setPayload] = useState<BeaconApiPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -170,9 +188,7 @@ export function TowerBeaconScreen(props: { oauthConfigured?: boolean }) {
     [applyPatch, canEditSiteDefault, settings]
   );
 
-  if (sessionPending || !session?.user) {
-    return <BeaconPageSkeleton />;
-  }
+  const showPayloadSkeleton = useDeferredLoadingIndicator(loading && !payload);
 
   return (
     <TowerPageMain>
@@ -184,7 +200,7 @@ export function TowerBeaconScreen(props: { oauthConfigured?: boolean }) {
         </div>
       ) : null}
 
-      {loading && !payload ? <Skeleton className="mb-6 h-48 w-full rounded-xl" aria-hidden /> : null}
+      {showPayloadSkeleton ? <Skeleton className="mb-6 h-48 w-full rounded-xl" aria-hidden /> : null}
 
       {showBeaconConnectState ? (
         <TowerBeaconConnectEmptyState

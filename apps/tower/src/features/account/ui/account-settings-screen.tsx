@@ -1,5 +1,6 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { type FormEvent, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { AccountDeleteSection } from "@/features/account/ui/account-delete-section";
@@ -144,8 +145,12 @@ export function AccountSettingsScreen() {
     void refetchSession();
   }
 
-  if (sessionPending || !session?.user) {
+  const showSettingsSkeleton = useDeferredLoadingIndicator(sessionPending);
+  if (showSettingsSkeleton) {
     return <AccountSettingsSkeleton />;
+  }
+  if (sessionPending || !session?.user) {
+    return null;
   }
 
   const u = session.user;

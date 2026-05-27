@@ -12,6 +12,7 @@ import {
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { TowerDeferredLoadingFallback } from "@/shared/ui/deferred-loading";
 
 function VerifyEmailForm() {
   const searchParams = useSearchParams();
@@ -68,7 +69,13 @@ function VerifyEmailForm() {
 
 export default function VerifyEmailPage() {
   return (
-    <Suspense fallback={<AuthCardSkeleton variant="sign-in" />}>
+    <Suspense
+      fallback={
+        <TowerDeferredLoadingFallback>
+          <AuthCardSkeleton variant="sign-in" />
+        </TowerDeferredLoadingFallback>
+      }
+    >
       <VerifyEmailForm />
     </Suspense>
   );

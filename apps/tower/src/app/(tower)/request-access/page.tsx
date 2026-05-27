@@ -1,5 +1,6 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -12,6 +13,7 @@ import {
   EARLY_ACCESS_REQUEST_PAGE_UNAVAILABLE,
 } from "@/shared/lib/access/early-access-copy";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
+import { TowerDeferredLoadingFallback } from "@/shared/ui/deferred-loading";
 
 function RequestAccessLoading() {
   return <EarlyAccessRequestFormSkeletonPage />;
@@ -48,8 +50,13 @@ function RequestAccessContent() {
     };
   }, []);
 
-  if (sessionPending || redirectingSignedInUser || available === null) {
+  const authBusy = sessionPending || redirectingSignedInUser || available === null;
+  const showAuthSkeleton = useDeferredLoadingIndicator(authBusy);
+  if (showAuthSkeleton) {
     return <EarlyAccessRequestFormSkeletonPage />;
+  }
+  if (authBusy) {
+    return null;
   }
 
   if (!available) {
@@ -74,7 +81,13 @@ function RequestAccessContent() {
 
 export default function RequestAccessPage() {
   return (
-    <Suspense fallback={<RequestAccessLoading />}>
+    <Suspense
+      fallback={
+        <TowerDeferredLoadingFallback>
+          <RequestAccessLoading />
+        </TowerDeferredLoadingFallback>
+      }
+    >
       <RequestAccessContent />
     </Suspense>
   );

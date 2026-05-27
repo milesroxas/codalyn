@@ -1,3 +1,4 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Plus } from "lucide-react";
 import { CMS_SLOT_ROW_NAME_MAX } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
@@ -53,6 +54,7 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
     openingBeaconKey,
     deletePendingKey,
   } = props;
+  const showPageScanLoading = useDeferredLoadingIndicator(pageScanLoading);
 
   const hasBeacons = pageBeacons.length > 0;
   const nameLen = beaconName.length > CMS_SLOT_ROW_NAME_MAX ? CMS_SLOT_ROW_NAME_MAX : beaconName.length;
@@ -66,7 +68,7 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
             variant="actionCard"
             size="actionCard"
             disabled={pageScanLoading}
-            aria-busy={pageScanLoading}
+            aria-busy={showPageScanLoading}
             aria-expanded={createFormOpen}
             aria-haspopup="dialog"
           >

@@ -1,5 +1,6 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { IconUserPlus } from "@tabler/icons-react";
 import Link from "next/link";
 import { authClient } from "@/features/auth/model/auth-client";
@@ -9,6 +10,7 @@ import { towerAppShellContentClassName } from "@/shared/ui/tower-page-shell";
 
 export function TowerLoggedOutHeader() {
   const { isPending } = authClient.useSession();
+  const showHeaderSkeleton = useDeferredLoadingIndicator(isPending);
 
   return (
     <header className="supports-backdrop-filter:bg-background/75 shrink-0 border-b border-border bg-background/90 py-3 backdrop-blur">
@@ -17,12 +19,12 @@ export function TowerLoggedOutHeader() {
           Tower
         </Link>
         <div className="flex shrink-0 items-center gap-2">
-          {isPending ? (
+          {showHeaderSkeleton ? (
             <>
               <Skeleton className="h-8 w-16 rounded-md" aria-hidden />
               <Skeleton className="h-8 w-20 rounded-md" aria-hidden />
             </>
-          ) : (
+          ) : isPending ? null : (
             <>
               <Button variant="outline" size="sm" asChild>
                 <Link href="/sign-in">Sign in</Link>

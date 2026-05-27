@@ -1,6 +1,6 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { type KeyboardEvent, type PointerEvent, useCallback, useRef, useState } from "react";
-
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 
@@ -17,6 +17,7 @@ export function QualityComparePreview(p: QualityComparePreviewProps) {
   const { originalSrc, compressedSrc, pending, exportWidth, exportHeight, onOpenQualityPopout } = p;
   const previewRef = useRef<HTMLDivElement>(null);
   const [scrubPct, setScrubPct] = useState(50);
+  const showPending = useDeferredLoadingIndicator(pending);
 
   const ready = originalSrc !== null && compressedSrc !== null && !pending;
   const aspectRatio = exportWidth > 0 && exportHeight > 0 ? exportWidth / exportHeight : 1;
@@ -110,11 +111,11 @@ export function QualityComparePreview(p: QualityComparePreviewProps) {
         ref={previewRef}
         className={cn(
           "relative max-h-52 w-full overflow-hidden rounded-sm border border-border/50 bg-muted/25 shadow-inner",
-          pending && "min-h-[128px]"
+          showPending && "min-h-[128px]"
         )}
         style={{ aspectRatio }}
       >
-        {pending && !compressedSrc ? (
+        {showPending && !compressedSrc ? (
           <div className="absolute inset-0 flex items-center justify-center bg-muted/40">
             <Loader2 aria-hidden className="text-muted-foreground size-6 animate-spin" />
           </div>

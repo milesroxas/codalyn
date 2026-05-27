@@ -1,3 +1,4 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Loader2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
@@ -46,6 +47,8 @@ type CmsSlotEngineSelectedRowProps = {
   available: ComposableInstancePropMeta[];
   slotExposed: ComposableInstancePropMeta[];
   composableLoading: boolean;
+  composableMetaReady: boolean;
+  addPending: boolean;
   removingKey: string | null;
   listTargetActionBusy: boolean;
   resyncingEngineSlotKey: string | null;
@@ -67,6 +70,8 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     available,
     slotExposed,
     composableLoading,
+    composableMetaReady,
+    addPending,
     removingKey,
     listTargetActionBusy,
     resyncingEngineSlotKey,
@@ -76,6 +81,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     autoOpenExposeDrawerRowKey = null,
     onAutoOpenExposeDrawerConsumed,
   } = props;
+  const showComposableLoading = useDeferredLoadingIndicator(composableLoading);
 
   const [propsDrawerOpen, setPropsDrawerOpen] = useState(false);
   const [closeBeforeTagDialogOpen, setCloseBeforeTagDialogOpen] = useState(false);
@@ -93,12 +99,21 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     if (autoOpenExposeDrawerRowKey !== row.key) {
       return;
     }
-    if (composableLoading) {
+    if (addPending || listTargetActionBusy || composableLoading || !composableMetaReady) {
       return;
     }
     openExposeDrawer();
     onAutoOpenExposeDrawerConsumed?.();
-  }, [autoOpenExposeDrawerRowKey, composableLoading, onAutoOpenExposeDrawerConsumed, openExposeDrawer, row.key]);
+  }, [
+    addPending,
+    autoOpenExposeDrawerRowKey,
+    composableLoading,
+    composableMetaReady,
+    listTargetActionBusy,
+    onAutoOpenExposeDrawerConsumed,
+    openExposeDrawer,
+    row.key,
+  ]);
 
   const handlePropsDrawerOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -189,7 +204,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
             <DrawerDescription>Choose which props to include for this slot.</DrawerDescription>
           </DrawerHeader>
           <div className="space-y-3" data-slot="beacon_engine_exposed_props">
-            {composableLoading && available.length === 0 ? (
+            {showComposableLoading && available.length === 0 ? (
               <p className="text-sm text-muted-foreground" role="status">
                 <Loader2 className="mr-1 inline size-4 animate-spin align-middle" aria-hidden />
                 Loading…

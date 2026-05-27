@@ -5,6 +5,7 @@ import type { Area, MediaSize } from "react-easy-crop";
 import Cropper from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
 import {
   parseOutputDimension,
@@ -1159,6 +1160,7 @@ function AssetFolderToolbar(p: AssetFolderToolbarProps) {
     setSelectedAssetFolderId,
     onCreateAssetFolder,
   } = p;
+  const showFoldersLoading = useDeferredLoadingIndicator(foldersLoading);
 
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -1340,7 +1342,7 @@ function AssetFolderToolbar(p: AssetFolderToolbarProps) {
           </DialogContent>
         </Dialog>
       </div>
-      {foldersLoading ? (
+      {showFoldersLoading ? (
         <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
           <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
           Loading folders…

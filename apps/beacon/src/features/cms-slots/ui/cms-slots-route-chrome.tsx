@@ -1,3 +1,4 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { List, PanelsTopLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { type NavigateFunction, NavLink } from "react-router-dom";
@@ -154,9 +155,10 @@ export type CmsSlotsRouteChromeProps = {
 };
 
 function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps) {
+  const showOpeningLoader = useDeferredLoadingIndicator(p.openingBeaconKey != null);
   const contentKey = cmsSlotsEngineRouteContentKey({
     picking: p.picking,
-    openingBeaconKey: p.openingBeaconKey,
+    openingBeaconKey: showOpeningLoader ? p.openingBeaconKey : null,
   });
 
   let panel: ReactNode;
@@ -241,9 +243,10 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps) {
 
 function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
   const { composerOnly } = useCmsSlotsAccess();
+  const showOpeningLoader = useDeferredLoadingIndicator(p.composerOpeningKey != null);
   const contentKey = cmsSlotsComposerRouteContentKey({
     activeComposer: p.activeComposer,
-    composerOpeningKey: p.composerOpeningKey,
+    composerOpeningKey: showOpeningLoader ? p.composerOpeningKey : null,
   });
 
   let panel: ReactNode;
@@ -330,17 +333,19 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
     cmsFieldLinkRetryPending: p.cmsFieldLinkRetryPending,
   });
   const routeBlocking = routeTask != null;
+  const showRouteBlocking = useDeferredLoadingIndicator(routeBlocking);
 
   return (
     <BeaconFeatureRouteScrollBody>
       <BeaconRouteLoadingOverlay
         visible={routeBlocking}
+        deferredVisible={showRouteBlocking}
         ariaLabel={routeTask?.ariaLabel ?? CMS_SLOTS_SCAN_ARIA_LABEL}
         message={routeTask?.message}
       />
       <div
-        className={cn("flex min-h-0 min-w-0 flex-1 flex-col", routeBlocking && "pointer-events-none invisible")}
-        aria-hidden={routeBlocking}
+        className={cn("flex min-h-0 min-w-0 flex-1 flex-col", showRouteBlocking && "pointer-events-none invisible")}
+        aria-hidden={showRouteBlocking}
       >
         {p.isEngine ? <CmsSlotsEngineRouteBody {...p} /> : p.isComposer ? <CmsSlotsComposerRouteBody {...p} /> : null}
       </div>

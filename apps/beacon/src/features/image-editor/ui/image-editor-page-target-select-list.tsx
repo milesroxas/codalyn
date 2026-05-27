@@ -1,6 +1,6 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { IconChevronRight } from "@tabler/icons-react";
 import { Loader2, RefreshCw } from "lucide-react";
-
 import { imagePageTargetTablerIcon } from "@/features/image-editor/lib/image-editor-page-target-icon";
 import {
   IMAGE_TARGET_STEP_EMPTY,
@@ -115,11 +115,12 @@ function ImagePageTargetScanListMessages(props: {
   targetCount: number;
 }) {
   const { scanError, scanPending, pageScanned, targetCount } = props;
+  const showScanLoading = useDeferredLoadingIndicator(scanPending && targetCount === 0);
 
   return (
     <>
       {scanError ? <SurfaceSummaryCardScanListError>{scanError}</SurfaceSummaryCardScanListError> : null}
-      {scanPending && targetCount === 0 ? (
+      {showScanLoading ? (
         <SurfaceSummaryCardScanListStatus>
           <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
           {IMAGE_TARGET_STEP_SCAN_PENDING}

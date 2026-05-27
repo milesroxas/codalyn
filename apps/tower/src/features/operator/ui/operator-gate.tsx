@@ -1,5 +1,6 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { IconShieldLock } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -16,8 +17,12 @@ export function OperatorGate({ children }: { children: ReactNode }) {
   const isProductAdmin = isProductAdminAppRole(session?.user?.role);
   const operatorSignInHref = `/sign-in?callbackUrl=${encodeURIComponent(pathname || "/console")}`;
 
-  if (isPending) {
+  const showGateLoading = useDeferredLoadingIndicator(isPending);
+  if (showGateLoading) {
     return <OperatorGateSkeleton />;
+  }
+  if (isPending) {
+    return null;
   }
 
   if (!session?.user) {

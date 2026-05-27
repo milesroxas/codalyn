@@ -1,5 +1,7 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
+
 import {
   IconBan,
   IconChevronLeft,
@@ -130,6 +132,7 @@ export function OperatorCustomers() {
   const pageIndex = Math.floor(offset / DEFAULT_LIMIT);
   const hasPrev = pageIndex > 0;
   const hasNext = pageIndex < pageCount - 1;
+  const showPaginationSkeleton = useDeferredLoadingIndicator(loading);
 
   const nf = useMemo(() => new Intl.NumberFormat(), []);
 
@@ -237,7 +240,7 @@ export function OperatorCustomers() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
         <div>
-          {loading ? (
+          {showPaginationSkeleton ? (
             <TablePaginationSummarySkeleton />
           ) : (
             `Showing ${rows.length === 0 ? 0 : offset + 1}–${offset + rows.length} of ${nf.format(total)}`
@@ -299,7 +302,8 @@ function CustomersTableBody({
   selectedId: string | null;
   onOpen: (id: string) => void;
 }) {
-  if (loading && rows.length === 0) {
+  const showPlaceholder = useDeferredLoadingIndicator(loading && rows.length === 0);
+  if (showPlaceholder) {
     return (
       <>
         {Array.from({ length: 6 }).map((_, i) => (

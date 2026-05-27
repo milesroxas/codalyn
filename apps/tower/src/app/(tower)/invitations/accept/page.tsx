@@ -1,10 +1,12 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
+import { TowerDeferredLoadingFallback } from "@/shared/ui/deferred-loading";
 import { AcceptInvitationSkeleton, CompactRedirectSkeleton } from "@/shared/ui/page-loading-skeletons";
 
 function AcceptInvitationContent() {
@@ -12,6 +14,7 @@ function AcceptInvitationContent() {
   const searchParams = useSearchParams();
   const invitationId = searchParams.get("invitationId");
   const { data: session, isPending: sessionPending } = authClient.useSession();
+  const showInvitationSkeleton = useDeferredLoadingIndicator(sessionPending);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const attempted = useRef(false);
@@ -60,8 +63,11 @@ function AcceptInvitationContent() {
     );
   }
 
-  if (sessionPending) {
+  if (showInvitationSkeleton) {
     return <AcceptInvitationSkeleton />;
+  }
+  if (sessionPending) {
+    return null;
   }
 
   if (!session?.user) {
@@ -111,7 +117,13 @@ function AcceptInvitationContent() {
 
 export default function AcceptInvitationPage() {
   return (
-    <Suspense fallback={<CompactRedirectSkeleton />}>
+    <Suspense
+      fallback={
+        <TowerDeferredLoadingFallback>
+          <CompactRedirectSkeleton />
+        </TowerDeferredLoadingFallback>
+      }
+    >
       <AcceptInvitationContent />
     </Suspense>
   );

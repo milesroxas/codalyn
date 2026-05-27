@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import { towerConnectionPathWithStatus } from "@/shared/lib/navigation/tower-app-paths";
+import { TowerDeferredLoadingFallback } from "@/shared/ui/deferred-loading";
 import { CompactRedirectSkeleton } from "@/shared/ui/page-loading-skeletons";
 
 function SuccessInner() {
@@ -28,7 +29,13 @@ function SuccessInner() {
 
 export default function WebflowOAuthSuccessPage() {
   return (
-    <Suspense fallback={<CompactRedirectSkeleton />}>
+    <Suspense
+      fallback={
+        <TowerDeferredLoadingFallback>
+          <CompactRedirectSkeleton />
+        </TowerDeferredLoadingFallback>
+      }
+    >
       <SuccessInner />
     </Suspense>
   );

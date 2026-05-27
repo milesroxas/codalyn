@@ -139,6 +139,8 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
                   available={composableByKey[row.key] ?? []}
                   slotExposed={engineSlotProps.slots[slotIndex]?.exposed ?? []}
                   composableLoading={composableLoading}
+                  composableMetaReady={!composableLoading && row.key in composableByKey}
+                  addPending={addPending}
                   removingKey={removingKey}
                   listTargetActionBusy={listTargetActionBusy}
                   resyncingEngineSlotKey={resyncingEngineSlotKey}

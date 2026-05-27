@@ -1,5 +1,7 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
+
 import { IconActivity, IconExternalLink, IconPlug, IconRefresh } from "@tabler/icons-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -141,7 +143,8 @@ function HealthCard({ health, loading }: { health: HealthState; loading: boolean
 }
 
 function HealthBody({ loading, raw }: { loading: boolean; raw: string | null }) {
-  if (loading) {
+  const showPlaceholder = useDeferredLoadingIndicator(loading);
+  if (showPlaceholder) {
     return <Skeleton className="h-24 w-full" />;
   }
   if (raw) {
@@ -221,13 +224,14 @@ function IntegrationRow({
   suffix: string;
   loading: boolean;
 }) {
+  const showPlaceholder = useDeferredLoadingIndicator(loading);
   return (
     <div className="flex items-baseline justify-between rounded-lg border border-border bg-card px-3 py-2.5">
       <div>
         <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">{label}</dt>
         <dd className="text-xs text-muted-foreground">{suffix}</dd>
       </div>
-      {loading ? (
+      {showPlaceholder ? (
         <Skeleton className="h-6 w-12" />
       ) : (
         <span className="font-heading text-2xl font-semibold tabular-nums text-foreground">{value ?? "—"}</span>

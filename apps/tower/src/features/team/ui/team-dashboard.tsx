@@ -1,5 +1,7 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
+
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
@@ -299,8 +301,12 @@ export function TeamDashboard(props: {
   }, [members]);
   const invitations = useMemo(() => normalizeInvitationRows(activeOrg?.invitations), [activeOrg?.invitations]);
 
-  if (sessionPending || !session?.user) {
+  const showDashboardSkeleton = useDeferredLoadingIndicator(sessionPending);
+  if (showDashboardSkeleton) {
     return <TeamDashboardSkeleton />;
+  }
+  if (sessionPending || !session?.user) {
+    return null;
   }
 
   return (

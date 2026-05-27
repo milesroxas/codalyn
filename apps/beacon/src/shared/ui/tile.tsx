@@ -1,7 +1,7 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Loader2 } from "lucide-react";
 import type * as React from "react";
-
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 
@@ -79,6 +79,7 @@ function TilePanel(props: TilePanelProps) {
 
 function TileButton(props: TileButtonProps) {
   const { tileVariant, busy = false, className, disabled, children, ...rest } = props;
+  const showBusy = useDeferredLoadingIndicator(busy);
 
   return (
     <button
@@ -90,11 +91,11 @@ function TileButton(props: TileButtonProps) {
         className
       )}
       disabled={disabled}
-      aria-busy={busy}
+      aria-busy={showBusy}
       {...rest}
     >
       {children}
-      {busy ? <TileBusyOverlay /> : null}
+      {showBusy ? <TileBusyOverlay /> : null}
     </button>
   );
 }

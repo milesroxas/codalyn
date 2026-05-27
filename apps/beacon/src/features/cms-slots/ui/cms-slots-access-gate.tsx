@@ -1,3 +1,4 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -14,7 +15,11 @@ import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-te
 import { Button } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
-function AccessGateLoadingStatus(props: { message: string }) {
+function AccessGateLoadingStatus(props: { busy: boolean; message: string }) {
+  const show = useDeferredLoadingIndicator(props.busy);
+  if (!show) {
+    return null;
+  }
   return (
     <div
       className={`${beaconAppRouteSurfaceClass} items-center justify-center gap-3 p-6`}
@@ -50,7 +55,7 @@ export function CmsSlotsAccessGate(props: { children: ReactNode }) {
   const base = getTowerAuthBaseUrl();
 
   if (!pageKindReady) {
-    return <AccessGateLoadingStatus message="Checking Designer page…" />;
+    return <AccessGateLoadingStatus busy message="Checking Designer page…" />;
   }
 
   if (!isCmsCollectionTemplatePage) {
@@ -58,7 +63,7 @@ export function CmsSlotsAccessGate(props: { children: ReactNode }) {
   }
 
   if (sessionPending) {
-    return <AccessGateLoadingStatus message="Checking access…" />;
+    return <AccessGateLoadingStatus busy message="Checking access…" />;
   }
 
   if (!base.trim()) {
@@ -85,7 +90,7 @@ export function CmsSlotsAccessGate(props: { children: ReactNode }) {
   }
 
   if (settingsPullPending) {
-    return <AccessGateLoadingStatus message="Checking workspace access…" />;
+    return <AccessGateLoadingStatus busy message="Checking workspace access…" />;
   }
 
   if (syncState === "error") {

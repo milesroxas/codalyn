@@ -1,5 +1,6 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useId, useState } from "react";
@@ -17,6 +18,7 @@ import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { TowerDeferredLoadingFallback } from "@/shared/ui/deferred-loading";
 import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -48,8 +50,13 @@ function ResetPasswordForm() {
   });
   const forgotPasswordHref = buildTowerAuthSurfaceHref("/forgot-password", callbackUrl, authSearchParams);
 
-  if (sessionPending || redirectingSignedInUser) {
+  const authBusy = sessionPending || redirectingSignedInUser;
+  const showAuthSkeleton = useDeferredLoadingIndicator(authBusy);
+  if (showAuthSkeleton) {
     return <AuthCardSkeleton variant="sign-in" />;
+  }
+  if (authBusy) {
+    return null;
   }
 
   if (invalidToken || !token) {
@@ -162,7 +169,13 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<AuthCardSkeleton variant="sign-in" />}>
+    <Suspense
+      fallback={
+        <TowerDeferredLoadingFallback>
+          <AuthCardSkeleton variant="sign-in" />
+        </TowerDeferredLoadingFallback>
+      }
+    >
       <ResetPasswordForm />
     </Suspense>
   );

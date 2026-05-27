@@ -13,5 +13,8 @@ export const beaconPanelContainClass = "min-w-0 w-full max-w-full";
 /** Padded, scrollable route body content (horizontal inset matches route chrome padding). */
 export const beaconRouteScrollContentClass = "box-border min-w-0 w-full max-w-full space-y-4 overflow-x-clip px-3 py-3";
 
+/** Stretch scroll content to the viewport so flex-1 route loaders fill available height. */
+export const beaconRouteScrollViewportFillClass = "flex min-h-full min-w-0 flex-col";
+
 /** Full-bleed strip inside padded scroll content (e.g. loaded-image filename bar). */
 export const beaconRouteBleedXClass = "-mx-3 px-3";

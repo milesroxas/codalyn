@@ -1,5 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
+import { BeaconDeferredLoadingFallback } from "@/app/ui/beacon-deferred-loading-fallback";
 import { HeaderLogo } from "@/app/ui/Header";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { GuestSettingsUpsell } from "@/features/settings/ui/guest-settings-upsell";
@@ -24,7 +25,13 @@ const LazyAccount = lazy(() =>
 function SettingsSectionBody({ section }: { section: SettingsSectionId }) {
   const Comp = section === "preferences" ? LazyPreferences : LazyAccount;
   return (
-    <Suspense fallback={<SettingsPanelSkeleton />}>
+    <Suspense
+      fallback={
+        <BeaconDeferredLoadingFallback>
+          <SettingsPanelSkeleton />
+        </BeaconDeferredLoadingFallback>
+      }
+    >
       <Comp />
     </Suspense>
   );

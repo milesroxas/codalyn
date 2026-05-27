@@ -1,8 +1,8 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Info, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useId } from "react";
 import type { Area } from "react-easy-crop";
-
 import { formatFileSize, formatSizeDeltaPercent } from "@/features/image-editor/lib/format-file-size";
 import { cn } from "@/shared/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
@@ -100,12 +100,13 @@ export function ExportEncodeSizeFootnote({
   showQualityCommitHint = false,
 }: ExportEncodeSizeFootnoteProps) {
   const detailsId = useId();
+  const showEstimatePending = useDeferredLoadingIndicator(estimatePending);
   const originalLabel = originalBytes !== null ? formatFileSize(originalBytes) : "Unknown";
 
   let estDisplay: ReactNode;
   if (!completedCrop) {
     estDisplay = <span className="text-muted-foreground">Crop first</span>;
-  } else if (estimatePending) {
+  } else if (showEstimatePending) {
     estDisplay = (
       <span className="text-muted-foreground inline-flex items-center gap-1">
         <Loader2 aria-hidden className="size-3 shrink-0 animate-spin" />…
@@ -118,17 +119,17 @@ export function ExportEncodeSizeFootnote({
   }
 
   const delta =
-    originalBytes !== null && estimatedBytes !== null && !estimatePending && completedCrop
+    originalBytes !== null && estimatedBytes !== null && !showEstimatePending && completedCrop
       ? formatSizeDeltaPercent(originalBytes, estimatedBytes)
       : null;
 
   const unknownOriginalNote =
-    originalBytes === null && estimatedBytes !== null && !estimatePending && completedCrop
+    originalBytes === null && estimatedBytes !== null && !showEstimatePending && completedCrop
       ? "Original size unavailable."
       : null;
 
   const tooltipLines: string[] = [];
-  if (showQualityCommitHint && !estimatePending && completedCrop) {
+  if (showQualityCommitHint && !showEstimatePending && completedCrop) {
     tooltipLines.push("Release the slider to refresh the estimate.");
   }
   if (delta) {
@@ -139,7 +140,7 @@ export function ExportEncodeSizeFootnote({
   }
 
   return (
-    <div aria-busy={estimatePending} aria-live="polite" className="flex flex-col gap-2">
+    <div aria-busy={showEstimatePending} aria-live="polite" className="flex flex-col gap-2">
       <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] leading-tight tabular-nums">
         <p className="min-w-0">
           <span className="text-muted-foreground/85">Original </span>

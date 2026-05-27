@@ -1,5 +1,5 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Loader2 } from "lucide-react";
-
 import { imagePageTargetTablerIcon } from "@/features/image-editor/lib/image-editor-page-target-icon";
 import {
   IMAGE_TARGET_STEP_DISCOVERY_PENDING,
@@ -30,6 +30,7 @@ type ImagePageTargetSurfaceSummaryProps = {
 
 export function ImagePageTargetSurfaceSummary(props: ImagePageTargetSurfaceSummaryProps) {
   const { target, discoveryPending = false } = props;
+  const showDiscoveryPending = useDeferredLoadingIndicator(discoveryPending);
   const SurfaceIcon = target ? imagePageTargetTablerIcon(target.kind) : imagePageTargetTablerIcon("image");
 
   return (
@@ -37,7 +38,7 @@ export function ImagePageTargetSurfaceSummary(props: ImagePageTargetSurfaceSumma
       <SurfaceSummaryCardPanelSectionLabel>
         {IMAGE_TARGET_STEP_SELECTED_SURFACE_LABEL}
       </SurfaceSummaryCardPanelSectionLabel>
-      {discoveryPending ? (
+      {showDiscoveryPending ? (
         <SurfaceSummaryCardPending>
           <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
           {IMAGE_TARGET_STEP_DISCOVERY_PENDING}

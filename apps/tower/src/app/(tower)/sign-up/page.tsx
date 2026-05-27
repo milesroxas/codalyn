@@ -1,5 +1,6 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useId, useState } from "react";
@@ -22,6 +23,7 @@ import { TOWER_OPERATOR_INVITE_HEADER } from "@/shared/lib/access/operator-invit
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { TowerDeferredLoadingFallback } from "@/shared/ui/deferred-loading";
 import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -185,8 +187,13 @@ function SignUpForm() {
   const requestAccessHref = buildTowerAuthSurfaceHref("/request-access", callbackUrl, authSearchParams);
   const joiningViaTeamInvite = callbackUrl.includes("/invitations/accept");
 
-  if (sessionPending || redirectingSignedInUser || earlyAccessRequired === null || !inviteValidated) {
+  const authBusy = sessionPending || redirectingSignedInUser || earlyAccessRequired === null || !inviteValidated;
+  const showAuthSkeleton = useDeferredLoadingIndicator(authBusy);
+  if (showAuthSkeleton) {
     return <AuthCardSkeleton variant="sign-up" />;
+  }
+  if (authBusy) {
+    return null;
   }
 
   if (earlyAccessRequired && !operatorInviteToken && !operatorInviteParam && !joiningViaTeamInvite) {
@@ -302,7 +309,13 @@ function SignUpForm() {
 
 export default function SignUpPage() {
   return (
-    <Suspense fallback={<AuthCardSkeleton variant="sign-up" />}>
+    <Suspense
+      fallback={
+        <TowerDeferredLoadingFallback>
+          <AuthCardSkeleton variant="sign-up" />
+        </TowerDeferredLoadingFallback>
+      }
+    >
       <SignUpForm />
     </Suspense>
   );

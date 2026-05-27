@@ -1,5 +1,7 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
+
 import { IconCheck, IconKey, IconMail, IconX } from "@tabler/icons-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -72,6 +74,7 @@ export function OperatorAccessRequests() {
   }
 
   const pendingCount = metrics?.totals.pendingEarlyAccessRequests ?? rows.length;
+  const showTablePlaceholder = useDeferredLoadingIndicator(loading);
 
   return (
     <div className="space-y-6">
@@ -110,7 +113,7 @@ export function OperatorAccessRequests() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading
+            {showTablePlaceholder
               ? ACCESS_REQUEST_SKELETON_ROWS.map((rowKey) => (
                   <TableRow key={`sk-row-${rowKey}`}>
                     {ACCESS_REQUEST_SKELETON_COLS.map((colKey) => (

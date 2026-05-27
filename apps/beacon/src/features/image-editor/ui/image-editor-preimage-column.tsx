@@ -1,3 +1,4 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Loader2 } from "lucide-react";
 import type { DragEvent, ReactNode, TransitionEvent } from "react";
 import type { ImageEditorFlowStep } from "@/features/image-editor/lib/image-editor-flow-step";
@@ -79,10 +80,11 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
 
   const showDesignerStart = roleReady && isWorkspaceDesigner && flowStep === "entry";
   const entered = useImageEditorStepEnter(flowStep);
+  const showRoleLoading = useDeferredLoadingIndicator(!roleReady && isTowerUser);
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      {!roleReady && isTowerUser ? (
+      {showRoleLoading ? (
         <p className="text-muted-foreground flex items-center justify-center gap-2 py-8 text-xs" role="status">
           <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
           Loading…

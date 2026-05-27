@@ -9,6 +9,7 @@ import {
   beaconPanelContainClass,
   beaconRouteBleedXClass,
   beaconRouteScrollContentClass,
+  beaconRouteScrollViewportFillClass,
 } from "@/shared/lib/beacon-app-route-surface";
 import { BEACON_BACK_TO_HOME_ARIA_LABEL } from "@/shared/lib/beacon-feature-route-copy";
 import { cn } from "@/shared/lib/utils";
@@ -53,6 +54,8 @@ export function BeaconFeatureRouteHeader(props: BeaconFeatureRouteHeaderProps) {
 
 export type BeaconFeatureRouteScrollBodyProps = {
   children: ReactNode;
+  /** Full-bleed loader rendered over the scroll viewport (not inside scroll content). */
+  overlay?: ReactNode;
   className?: string;
   contentClassName?: string;
   /** When this value changes, the scroll viewport resets to the top (e.g. image editor flow step). */
@@ -60,7 +63,7 @@ export type BeaconFeatureRouteScrollBodyProps = {
 };
 
 export function BeaconFeatureRouteScrollBody(props: BeaconFeatureRouteScrollBodyProps) {
-  const { children, className, contentClassName, scrollResetKey } = props;
+  const { children, overlay, className, contentClassName, scrollResetKey } = props;
   const viewportRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {

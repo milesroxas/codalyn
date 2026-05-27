@@ -1,5 +1,7 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
+
 import { IconGauge } from "@tabler/icons-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -327,6 +329,7 @@ export function OperatorPlatformMeteringCard() {
   }, [draft]);
 
   const disabled = loading || saving || !draft;
+  const showPlaceholder = useDeferredLoadingIndicator(loading);
 
   return (
     <Card>
@@ -341,7 +344,7 @@ export function OperatorPlatformMeteringCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {loading ? (
+        {showPlaceholder ? (
           <div className="space-y-3">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-24 w-full" />

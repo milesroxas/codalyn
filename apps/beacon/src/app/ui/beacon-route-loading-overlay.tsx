@@ -1,3 +1,4 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import {
@@ -9,6 +10,8 @@ import { cn } from "@/shared/lib/utils";
 
 type BeaconRouteLoadingOverlayProps = {
   visible: boolean;
+  /** When set, skips an internal deferred-loading timer (pass from a parent that already deferred the same signal). */
+  deferredVisible?: boolean;
   ariaLabel: string;
   message?: string;
   className?: string;
@@ -16,16 +19,33 @@ type BeaconRouteLoadingOverlayProps = {
 
 /**
  * Full-bleed loader over a `relative` route scroll region. Appears opaque immediately; fades out when hidden.
+ * Loading chrome is deferred until busy has lasted at least the standard loading-indicator delay.
  */
 export function BeaconRouteLoadingOverlay(props: BeaconRouteLoadingOverlayProps) {
-  const { visible, ariaLabel, message, className } = props;
-  const [mounted, setMounted] = useState(visible);
+  if (props.deferredVisible !== undefined) {
+    return <BeaconRouteLoadingOverlayShell {...props} showVisible={props.deferredVisible} />;
+  }
+  return <BeaconRouteLoadingOverlayDeferred {...props} />;
+}
+
+function BeaconRouteLoadingOverlayDeferred(props: BeaconRouteLoadingOverlayProps) {
+  const showVisible = useDeferredLoadingIndicator(props.visible);
+  return <BeaconRouteLoadingOverlayShell {...props} showVisible={showVisible} />;
+}
+
+type BeaconRouteLoadingOverlayShellProps = BeaconRouteLoadingOverlayProps & {
+  showVisible: boolean;
+};
+
+function BeaconRouteLoadingOverlayShell(props: BeaconRouteLoadingOverlayShellProps) {
+  const { showVisible, ariaLabel, message, className } = props;
+  const [mounted, setMounted] = useState(showVisible);
   /** Opaque immediately when shown — fade-out only, so content never flashes through first. */
-  const [shown, setShown] = useState(visible);
+  const [shown, setShown] = useState(showVisible);
   const exitFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useLayoutEffect(() => {
-    if (visible) {
+    if (showVisible) {
       setMounted(true);
       setShown(true);
       return undefined;
@@ -34,10 +54,10 @@ export function BeaconRouteLoadingOverlay(props: BeaconRouteLoadingOverlayProps)
       setShown(false);
     }
     return undefined;
-  }, [visible, mounted]);
+  }, [showVisible, mounted]);
 
   useEffect(() => {
-    if (visible || !mounted) {
+    if (showVisible || !mounted) {
       if (exitFallbackRef.current != null) {
         clearTimeout(exitFallbackRef.current);
         exitFallbackRef.current = null;
@@ -54,7 +74,7 @@ export function BeaconRouteLoadingOverlay(props: BeaconRouteLoadingOverlayProps)
         exitFallbackRef.current = null;
       }
     };
-  }, [visible, mounted]);
+  }, [showVisible, mounted]);
 
   if (!mounted) {
     return null;

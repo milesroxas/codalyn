@@ -1,3 +1,4 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -209,11 +210,12 @@ function BeaconMenuAccountGroup(props: {
   onOpenTowerActions: () => void;
 }) {
   const { user, sessionPending, onOpenTowerEmailPopup, onOpenTowerActions } = props;
+  const showSessionPending = useDeferredLoadingIndicator(sessionPending);
 
   return (
     <DropdownMenuGroup>
       {sessionPending || !user ? <BeaconMenuSectionLabel>Account</BeaconMenuSectionLabel> : null}
-      {sessionPending ? (
+      {showSessionPending ? (
         <div
           className="flex items-center gap-2 px-2 py-2 text-muted-foreground text-sm"
           aria-live="polite"

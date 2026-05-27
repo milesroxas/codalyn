@@ -1,5 +1,7 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
+
 import { IconCheck, IconLifebuoy, IconMail, IconMessageCircle, IconX } from "@tabler/icons-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -92,6 +94,8 @@ export function OperatorSupportRequests() {
     }
   }
 
+  const showTablePlaceholder = useDeferredLoadingIndicator(loading);
+
   return (
     <div className="space-y-6">
       <div className="space-y-1.5">
@@ -146,7 +150,7 @@ export function OperatorSupportRequests() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading
+            {showTablePlaceholder
               ? SUPPORT_REQUEST_SKELETON_ROWS.map((rowKey) => (
                   <TableRow key={`sk-row-${rowKey}`}>
                     {SUPPORT_REQUEST_SKELETON_COLS.map((colKey) => (

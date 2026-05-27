@@ -1,11 +1,13 @@
 "use client";
 
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { IconBuilding, IconCreditCard, IconMail, IconUserPlus, IconUsers } from "@tabler/icons-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { formatOperatorWorkspaceDeleteError, OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { formatDateTime, formatRelative, initialsFor } from "@/features/operator/model/format";
+import { OperatorDetailSheetSkeleton } from "@/features/operator/ui/operator-detail-sheet-skeleton";
 import {
   OperatorUsageLimitsSection,
   reloadWorkspaceUsageLimits,
@@ -30,7 +32,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/shared/ui/sheet";
-import { Skeleton } from "@/shared/ui/skeleton";
 import { DangerZoneTypedDelete } from "@/shared/ui/typed-confirm-alert-dialog";
 import { WorkspaceSlugField } from "@/shared/ui/workspace-slug-field";
 
@@ -216,150 +217,258 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
     }
   }, [detail, deleteConfirm, onDeleted, onOpenChange]);
 
+  const showPlaceholder = useDeferredLoadingIndicator(loading);
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col p-0 sm:max-w-xl">
-        {loading || !detail ? (
-          <>
-            <SheetHeader>
-              <SheetTitle className="sr-only">Workspace details</SheetTitle>
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-3 w-24" />
-            </SheetHeader>
-            <SheetBody className="space-y-3">
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </SheetBody>
-          </>
-        ) : (
-          <>
-            <SheetHeader>
-              <div className="flex items-start gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                  <IconBuilding className="size-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <SheetTitle className="truncate">{detail.name}</SheetTitle>
-                  <SheetDescription className="truncate font-mono">{detail.slug}</SheetDescription>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    <Badge variant="outline">
-                      <IconUsers className="size-3" />
-                      {detail.memberCount} members
-                    </Badge>
-                    {detail.pendingInvitations > 0 ? (
-                      <Badge variant="outline">
-                        <IconMail className="size-3" />
-                        {detail.pendingInvitations} pending
-                      </Badge>
-                    ) : null}
-                    {detail.billingPlan ? <Badge variant="secondary">{detail.billingPlan}</Badge> : null}
-                    {detail.subscriptionStatus ? <Badge variant="outline">{detail.subscriptionStatus}</Badge> : null}
-                  </div>
-                </div>
-              </div>
-            </SheetHeader>
-
-            <SheetBody className="space-y-6">
-              {error ? (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                  {error}
-                </div>
-              ) : null}
-
-              <IdentitySection
-                detail={detail}
-                nameDraft={nameDraft}
-                slugDraft={slugDraft}
-                onNameDraftChange={setNameDraft}
-                onSlugDraftChange={setSlugDraft}
-                patchBusy={patchBusy}
-                onSaveName={onSaveName}
-                onSaveSlug={onSaveSlug}
-              />
-              <SeatsSection
-                detail={detail}
-                seatLimitDraft={seatLimitDraft}
-                onSeatLimitDraftChange={setSeatLimitDraft}
-                dirty={seatLimitDirty}
-                patchBusy={patchBusy}
-                onSave={onSaveSeatLimit}
-              />
-              <BillingSection
-                detail={detail}
-                billingPlanDraft={billingPlanDraft}
-                onBillingPlanDraftChange={setBillingPlanDraft}
-                subscriptionStatusDraft={subscriptionStatusDraft}
-                onSubscriptionStatusDraftChange={setSubscriptionStatusDraft}
-                dirty={billingDirty}
-                patchBusy={patchBusy}
-                onSave={onSaveBilling}
-              />
-              <OperatorUsageLimitsSection
-                scope="workspace"
-                usage={detail.usage}
-                busy={patchBusy}
-                onSave={async (update) => {
-                  const next = await operatorApi.patchWorkspace(detail.id, update);
-                  setDetail(next);
-                  onUpdated?.(detailToRow(next));
-                  return next.usage;
-                }}
-                onReset={async () => {
-                  await operatorApi.resetWorkspaceUsage(detail.id);
-                  const usage = await reloadWorkspaceUsageLimits(detail.id);
-                  setDetail((current) => (current ? { ...current, usage } : current));
-                  onUpdated?.(detailToRow({ ...detail, usage }));
-                  return usage;
-                }}
-              />
-
-              <MembersSection members={detail.members} onCloseSheet={() => onOpenChange(false)} />
-              <InvitationsSection invitations={detail.invitations} />
-
-              <section className="space-y-3">
-                <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Metadata</h3>
-                <dl className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-3 text-xs">
-                  <div>
-                    <dt className="text-muted-foreground">Workspace ID</dt>
-                    <dd className="truncate font-mono text-foreground" title={detail.id}>
-                      {detail.id}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Created</dt>
-                    <dd className="text-foreground">{formatDateTime(detail.createdAt)}</dd>
-                  </div>
-                </dl>
-              </section>
-
-              <DangerZoneTypedDelete
-                panelDescription={
-                  <>
-                    Permanently delete this workspace, its memberships, and invitations. Users keep their accounts and
-                    Webflow tokens.
-                  </>
-                }
-                triggerLabel="Delete workspace"
-                title="Delete workspace?"
-                confirmFieldLabel="Slug"
-                confirmFieldId="confirm-slug"
-                expectedValue={detail.slug}
-                confirmValue={deleteConfirm}
-                onConfirmValueChange={setDeleteConfirm}
-                busy={deleteBusy}
-                onConfirm={() => void onDelete()}
-              />
-            </SheetBody>
-
-            <SheetFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Close
-              </Button>
-            </SheetFooter>
-          </>
-        )}
+        <OperatorWorkspaceDetailSheetBody
+          showPlaceholder={showPlaceholder}
+          detail={detail}
+          error={error}
+          nameDraft={nameDraft}
+          slugDraft={slugDraft}
+          seatLimitDraft={seatLimitDraft}
+          billingPlanDraft={billingPlanDraft}
+          subscriptionStatusDraft={subscriptionStatusDraft}
+          deleteConfirm={deleteConfirm}
+          patchBusy={patchBusy}
+          deleteBusy={deleteBusy}
+          seatLimitDirty={seatLimitDirty}
+          billingDirty={billingDirty}
+          onNameDraftChange={setNameDraft}
+          onSlugDraftChange={setSlugDraft}
+          onSeatLimitDraftChange={setSeatLimitDraft}
+          onBillingPlanDraftChange={setBillingPlanDraft}
+          onSubscriptionStatusDraftChange={setSubscriptionStatusDraft}
+          onDeleteConfirmChange={setDeleteConfirm}
+          onOpenChange={onOpenChange}
+          onSaveName={onSaveName}
+          onSaveSlug={onSaveSlug}
+          onSaveSeatLimit={onSaveSeatLimit}
+          onSaveBilling={onSaveBilling}
+          onDelete={onDelete}
+          onUpdated={onUpdated}
+          setDetail={setDetail}
+        />
       </SheetContent>
     </Sheet>
+  );
+}
+
+type OperatorWorkspaceDetailSheetBodyProps = {
+  showPlaceholder: boolean;
+  detail: OperatorWorkspaceDetail | null;
+  error: string | null;
+  nameDraft: string;
+  slugDraft: string;
+  seatLimitDraft: string;
+  billingPlanDraft: string;
+  subscriptionStatusDraft: string;
+  deleteConfirm: string;
+  patchBusy: boolean;
+  deleteBusy: boolean;
+  seatLimitDirty: boolean;
+  billingDirty: boolean;
+  onNameDraftChange: (next: string) => void;
+  onSlugDraftChange: (next: string) => void;
+  onSeatLimitDraftChange: (next: string) => void;
+  onBillingPlanDraftChange: (next: string) => void;
+  onSubscriptionStatusDraftChange: (next: string) => void;
+  onDeleteConfirmChange: (next: string) => void;
+  onOpenChange: (open: boolean) => void;
+  onSaveName: () => void;
+  onSaveSlug: () => void;
+  onSaveSeatLimit: () => void;
+  onSaveBilling: () => void;
+  onDelete: () => void | Promise<void>;
+  onUpdated?: (row: OperatorWorkspaceRow) => void;
+  setDetail: Dispatch<SetStateAction<OperatorWorkspaceDetail | null>>;
+};
+
+function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBodyProps) {
+  const {
+    showPlaceholder,
+    detail,
+    error,
+    nameDraft,
+    slugDraft,
+    seatLimitDraft,
+    billingPlanDraft,
+    subscriptionStatusDraft,
+    deleteConfirm,
+    patchBusy,
+    deleteBusy,
+    seatLimitDirty,
+    billingDirty,
+    onNameDraftChange,
+    onSlugDraftChange,
+    onSeatLimitDraftChange,
+    onBillingPlanDraftChange,
+    onSubscriptionStatusDraftChange,
+    onDeleteConfirmChange,
+    onOpenChange,
+    onSaveName,
+    onSaveSlug,
+    onSaveSeatLimit,
+    onSaveBilling,
+    onDelete,
+    onUpdated,
+    setDetail,
+  } = props;
+
+  if (showPlaceholder) {
+    return <OperatorDetailSheetSkeleton title="Workspace details" />;
+  }
+  if (!detail) {
+    if (error) {
+      return (
+        <>
+          <SheetHeader>
+            <SheetTitle>Workspace details</SheetTitle>
+          </SheetHeader>
+          <SheetBody>
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {error}
+            </div>
+          </SheetBody>
+          <SheetFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </SheetFooter>
+        </>
+      );
+    }
+    return null;
+  }
+
+  return (
+    <>
+      <SheetHeader>
+        <div className="flex items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <IconBuilding className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <SheetTitle className="truncate">{detail.name}</SheetTitle>
+            <SheetDescription className="truncate font-mono">{detail.slug}</SheetDescription>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Badge variant="outline">
+                <IconUsers className="size-3" />
+                {detail.memberCount} members
+              </Badge>
+              {detail.pendingInvitations > 0 ? (
+                <Badge variant="outline">
+                  <IconMail className="size-3" />
+                  {detail.pendingInvitations} pending
+                </Badge>
+              ) : null}
+              {detail.billingPlan ? <Badge variant="secondary">{detail.billingPlan}</Badge> : null}
+              {detail.subscriptionStatus ? <Badge variant="outline">{detail.subscriptionStatus}</Badge> : null}
+            </div>
+          </div>
+        </div>
+      </SheetHeader>
+
+      <SheetBody className="space-y-6">
+        {error ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            {error}
+          </div>
+        ) : null}
+
+        <IdentitySection
+          detail={detail}
+          nameDraft={nameDraft}
+          slugDraft={slugDraft}
+          onNameDraftChange={onNameDraftChange}
+          onSlugDraftChange={onSlugDraftChange}
+          patchBusy={patchBusy}
+          onSaveName={onSaveName}
+          onSaveSlug={onSaveSlug}
+        />
+        <SeatsSection
+          detail={detail}
+          seatLimitDraft={seatLimitDraft}
+          onSeatLimitDraftChange={onSeatLimitDraftChange}
+          dirty={seatLimitDirty}
+          patchBusy={patchBusy}
+          onSave={onSaveSeatLimit}
+        />
+        <BillingSection
+          detail={detail}
+          billingPlanDraft={billingPlanDraft}
+          onBillingPlanDraftChange={onBillingPlanDraftChange}
+          subscriptionStatusDraft={subscriptionStatusDraft}
+          onSubscriptionStatusDraftChange={onSubscriptionStatusDraftChange}
+          dirty={billingDirty}
+          patchBusy={patchBusy}
+          onSave={onSaveBilling}
+        />
+        <OperatorUsageLimitsSection
+          scope="workspace"
+          usage={detail.usage}
+          busy={patchBusy}
+          onSave={async (update) => {
+            const next = await operatorApi.patchWorkspace(detail.id, update);
+            setDetail(next);
+            onUpdated?.(detailToRow(next));
+            return next.usage;
+          }}
+          onReset={async () => {
+            await operatorApi.resetWorkspaceUsage(detail.id);
+            const usage = await reloadWorkspaceUsageLimits(detail.id);
+            setDetail((current) => (current ? { ...current, usage } : current));
+            onUpdated?.(detailToRow({ ...detail, usage }));
+            return usage;
+          }}
+        />
+
+        <MembersSection members={detail.members} onCloseSheet={() => onOpenChange(false)} />
+        <InvitationsSection invitations={detail.invitations} />
+
+        <section className="space-y-3">
+          <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Metadata</h3>
+          <dl className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-3 text-xs">
+            <div>
+              <dt className="text-muted-foreground">Workspace ID</dt>
+              <dd className="truncate font-mono text-foreground" title={detail.id}>
+                {detail.id}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Created</dt>
+              <dd className="text-foreground">{formatDateTime(detail.createdAt)}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <DangerZoneTypedDelete
+          panelDescription={
+            <>
+              Permanently delete this workspace, its memberships, and invitations. Users keep their accounts and Webflow
+              tokens.
+            </>
+          }
+          triggerLabel="Delete workspace"
+          title="Delete workspace?"
+          confirmFieldLabel="Slug"
+          confirmFieldId="confirm-slug"
+          expectedValue={detail.slug}
+          confirmValue={deleteConfirm}
+          onConfirmValueChange={onDeleteConfirmChange}
+          busy={deleteBusy}
+          onConfirm={() => void onDelete()}
+        />
+      </SheetBody>
+
+      <SheetFooter>
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          Close
+        </Button>
+      </SheetFooter>
+    </>
   );
 }
 

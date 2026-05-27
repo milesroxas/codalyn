@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
 import { submitEarlyAccessRequest } from "@/server/access/early-access-request";
-import { parseAccessEmailInput, parseTeamMemberEmailsInput } from "@/shared/lib/access/email-input";
+import { parseAccessEmailInput } from "@/shared/lib/access/email-input";
+import { parseEarlyAccessReferralRequestInput } from "@/shared/lib/access/referral-source";
 
 export async function POST(req: Request) {
   if (!isTowerEarlyAccessGateEnabled()) {
@@ -11,8 +12,8 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as {
     email?: unknown;
     name?: unknown;
-    note?: unknown;
-    teamMemberEmails?: unknown;
+    referralSource?: unknown;
+    referralOther?: unknown;
   } | null;
 
   const email = parseAccessEmailInput(body?.email);
@@ -20,16 +21,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_email" }, { status: 400 });
   }
 
-  const teamMemberEmails = parseTeamMemberEmailsInput(body?.teamMemberEmails, { excludeEmail: email });
-  if (teamMemberEmails === null) {
-    return NextResponse.json({ error: "invalid_team_email" }, { status: 400 });
+  const referral = parseEarlyAccessReferralRequestInput({
+    referralSource: body?.referralSource,
+    referralOther: body?.referralOther,
+  });
+  if ("error" in referral) {
+    return NextResponse.json({ error: referral.error }, { status: 400 });
   }
 
   const name = typeof body?.name === "string" ? body.name : undefined;
-  const note = typeof body?.note === "string" ? body.note : undefined;
 
   try {
-    const outcome = await submitEarlyAccessRequest({ email, name, note, teamMemberEmails });
+    const outcome = await submitEarlyAccessRequest({ email, name, note: referral.note });
     return NextResponse.json({ ok: true, outcome });
   } catch (error) {
     if (error instanceof Error && error.message === "gate_disabled") {

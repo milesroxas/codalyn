@@ -11,7 +11,7 @@ import { Skeleton } from "@/shared/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 
 const ACCESS_REQUEST_SKELETON_ROWS = ["one", "two", "three"] as const;
-const ACCESS_REQUEST_SKELETON_COLS = ["email", "name", "team", "note", "requested", "actions"] as const;
+const ACCESS_REQUEST_SKELETON_COLS = ["email", "name", "referral", "requested", "actions"] as const;
 
 export function OperatorAccessRequests() {
   const [rows, setRows] = useState<Awaited<ReturnType<typeof operatorApi.listEarlyAccessRequests>>["rows"]>([]);
@@ -90,8 +90,7 @@ export function OperatorAccessRequests() {
             <TableRow>
               <TableHead>Email</TableHead>
               <TableHead>Name</TableHead>
-              <TableHead>Team</TableHead>
-              <TableHead>Note</TableHead>
+              <TableHead>Referral</TableHead>
               <TableHead>Requested</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -110,7 +109,7 @@ export function OperatorAccessRequests() {
               : null}
             {!loading && rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
                   No pending requests.
                 </TableCell>
               </TableRow>
@@ -125,13 +124,6 @@ export function OperatorAccessRequests() {
                       </div>
                     </TableCell>
                     <TableCell>{row.name ?? "—"}</TableCell>
-                    <TableCell className="max-w-[12rem] text-muted-foreground">
-                      {row.teamMemberEmails?.length ? (
-                        <span className="line-clamp-2">{row.teamMemberEmails.join(", ")}</span>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
                     <TableCell className="max-w-xs truncate text-muted-foreground">{row.note ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{formatRelative(row.createdAt)}</Badge>

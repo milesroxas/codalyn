@@ -1,34 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { type FormEvent, useCallback, useId, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 import {
   EARLY_ACCESS_ALREADY_APPROVED_PROMPT,
   EARLY_ACCESS_REQUEST_ALREADY_HAS_ACCESS_MESSAGE,
   EARLY_ACCESS_REQUEST_ALREADY_PENDING_MESSAGE,
   EARLY_ACCESS_REQUEST_EMAIL_LABEL,
   EARLY_ACCESS_REQUEST_INVALID_EMAIL,
-  EARLY_ACCESS_REQUEST_INVALID_TEAM_EMAIL,
+  EARLY_ACCESS_REQUEST_INVALID_REFERRAL,
+  EARLY_ACCESS_REQUEST_INVALID_REFERRAL_OTHER,
   EARLY_ACCESS_REQUEST_NAME_LABEL,
-  EARLY_ACCESS_REQUEST_NOTE_LABEL,
-  EARLY_ACCESS_REQUEST_NOTE_PLACEHOLDER,
   EARLY_ACCESS_REQUEST_PAGE_DESCRIPTION,
   EARLY_ACCESS_REQUEST_PAGE_TITLE,
+  EARLY_ACCESS_REQUEST_REFERRAL_LABEL,
+  EARLY_ACCESS_REQUEST_REFERRAL_OTHER_LABEL,
+  EARLY_ACCESS_REQUEST_REFERRAL_OTHER_PLACEHOLDER,
+  EARLY_ACCESS_REQUEST_REFERRAL_PLACEHOLDER,
   EARLY_ACCESS_REQUEST_SIGN_IN_LABEL,
   EARLY_ACCESS_REQUEST_SUBMIT_ERROR,
   EARLY_ACCESS_REQUEST_SUBMIT_LABEL,
   EARLY_ACCESS_REQUEST_SUBMIT_PENDING,
   EARLY_ACCESS_REQUEST_SUCCESS_MESSAGE,
-  EARLY_ACCESS_REQUEST_TEAM_EMAILS_HINT,
-  EARLY_ACCESS_REQUEST_TEAM_EMAILS_LABEL,
-  EARLY_ACCESS_REQUEST_TEAM_EMAILS_PLACEHOLDER,
 } from "@/shared/lib/access/early-access-copy";
-import { normalizeAccessEmail, parseAccessEmailInput } from "@/shared/lib/access/email-input";
+import { normalizeAccessEmail } from "@/shared/lib/access/email-input";
+import {
+  EARLY_ACCESS_REFERRAL_SOURCE_OPTIONS,
+  type EarlyAccessReferralSource,
+} from "@/shared/lib/access/referral-source";
 import { Button } from "@/shared/ui/button";
 import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { TagsInput } from "@/shared/ui/tags-input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
 
 type RequestOutcome = "created" | "already_pending" | "already_has_access";
@@ -43,44 +47,58 @@ function messageForOutcome(outcome: RequestOutcome): string {
   return EARLY_ACCESS_REQUEST_SUCCESS_MESSAGE;
 }
 
+function submitErrorMessage(errorCode: string | undefined): string {
+  if (errorCode === "invalid_email") {
+    return EARLY_ACCESS_REQUEST_INVALID_EMAIL;
+  }
+  if (errorCode === "invalid_referral") {
+    return EARLY_ACCESS_REQUEST_INVALID_REFERRAL;
+  }
+  if (errorCode === "invalid_referral_other") {
+    return EARLY_ACCESS_REQUEST_INVALID_REFERRAL_OTHER;
+  }
+  return EARLY_ACCESS_REQUEST_SUBMIT_ERROR;
+}
+
+function validateReferralInput(referralSource: EarlyAccessReferralSource | "", referralOther: string): string | null {
+  if (!referralSource) {
+    return EARLY_ACCESS_REQUEST_INVALID_REFERRAL;
+  }
+  if (referralSource === "other" && !referralOther.trim()) {
+    return EARLY_ACCESS_REQUEST_INVALID_REFERRAL_OTHER;
+  }
+  return null;
+}
+
 export type EarlyAccessRequestFormProps = {
   signInHref?: string;
 };
 
 export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
   const { signInHref = "/sign-in" } = props;
-  const emailId = useId();
   const nameId = useId();
-  const teamEmailsId = useId();
-  const teamEmailsHintId = useId();
-  const noteId = useId();
-  const [email, setEmail] = useState("");
+  const emailId = useId();
+  const referralId = useId();
+  const referralOtherId = useId();
   const [name, setName] = useState("");
-  const [teamMemberEmails, setTeamMemberEmails] = useState<string[]>([]);
-  const [note, setNote] = useState("");
+  const [email, setEmail] = useState("");
+  const [referralSource, setReferralSource] = useState<EarlyAccessReferralSource | "">("");
+  const [referralOther, setReferralOther] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  const normalizeTeamEmail = useCallback(
-    (raw: string) => {
-      const parsed = parseAccessEmailInput(raw);
-      if (!parsed) {
-        return null;
-      }
-      const primary = parseAccessEmailInput(email);
-      if (primary && parsed === primary) {
-        return null;
-      }
-      return parsed;
-    },
-    [email]
-  );
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setSuccess(null);
+
+    const validationError = validateReferralInput(referralSource, referralOther);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setPending(true);
     try {
       const res = await fetch("/api/account/request-early-access", {
@@ -88,21 +106,15 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: normalizeAccessEmail(email),
           name,
-          note,
-          teamMemberEmails,
+          email: normalizeAccessEmail(email),
+          referralSource,
+          referralOther: referralSource === "other" ? referralOther : undefined,
         }),
       });
       const body = (await res.json().catch(() => null)) as { outcome?: RequestOutcome; error?: string } | null;
       if (!res.ok) {
-        if (body?.error === "invalid_email") {
-          setError(EARLY_ACCESS_REQUEST_INVALID_EMAIL);
-        } else if (body?.error === "invalid_team_email") {
-          setError(EARLY_ACCESS_REQUEST_INVALID_TEAM_EMAIL);
-        } else {
-          setError(EARLY_ACCESS_REQUEST_SUBMIT_ERROR);
-        }
+        setError(submitErrorMessage(body?.error));
         return;
       }
       const outcome = body?.outcome ?? "created";
@@ -110,8 +122,8 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
       if (outcome === "already_has_access") {
         return;
       }
-      setNote("");
-      setTeamMemberEmails([]);
+      setReferralSource("");
+      setReferralOther("");
     } catch {
       setError(EARLY_ACCESS_REQUEST_SUBMIT_ERROR);
     } finally {
@@ -134,6 +146,18 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
         ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
             <FormField>
+              <Label htmlFor={nameId}>{EARLY_ACCESS_REQUEST_NAME_LABEL}</Label>
+              <Input
+                id={nameId}
+                type="text"
+                autoComplete="name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                fieldSize="lg"
+                surface="elevated"
+              />
+            </FormField>
+            <FormField>
               <Label htmlFor={emailId}>{EARLY_ACCESS_REQUEST_EMAIL_LABEL}</Label>
               <Input
                 id={emailId}
@@ -147,46 +171,39 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
               />
             </FormField>
             <FormField>
-              <Label htmlFor={nameId}>{EARLY_ACCESS_REQUEST_NAME_LABEL}</Label>
-              <Input
-                id={nameId}
-                type="text"
-                autoComplete="name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                fieldSize="lg"
-                surface="elevated"
-              />
-            </FormField>
-            <FormField>
-              <Label id={`${teamEmailsId}-label`} htmlFor={teamEmailsId}>
-                {EARLY_ACCESS_REQUEST_TEAM_EMAILS_LABEL}
-              </Label>
-              <TagsInput
-                id={teamEmailsId}
-                value={teamMemberEmails}
-                onChange={setTeamMemberEmails}
-                placeholder={EARLY_ACCESS_REQUEST_TEAM_EMAILS_PLACEHOLDER}
-                normalizeTag={normalizeTeamEmail}
+              <Label htmlFor={referralId}>{EARLY_ACCESS_REQUEST_REFERRAL_LABEL}</Label>
+              <Select
+                value={referralSource || undefined}
+                onValueChange={(value) => setReferralSource(value as EarlyAccessReferralSource)}
                 disabled={pending}
-                aria-describedby={teamEmailsHintId}
-              />
-              <p id={teamEmailsHintId} className="text-xs leading-relaxed text-muted-foreground">
-                {EARLY_ACCESS_REQUEST_TEAM_EMAILS_HINT}
-              </p>
+              >
+                <SelectTrigger id={referralId} aria-label={EARLY_ACCESS_REQUEST_REFERRAL_LABEL}>
+                  <SelectValue placeholder={EARLY_ACCESS_REQUEST_REFERRAL_PLACEHOLDER} />
+                </SelectTrigger>
+                <SelectContent>
+                  {EARLY_ACCESS_REFERRAL_SOURCE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FormField>
-            <FormField>
-              <Label htmlFor={noteId}>{EARLY_ACCESS_REQUEST_NOTE_LABEL}</Label>
-              <Textarea
-                id={noteId}
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                rows={3}
-                placeholder={EARLY_ACCESS_REQUEST_NOTE_PLACEHOLDER}
-                fieldSize="lg"
-                surface="elevated"
-              />
-            </FormField>
+            {referralSource === "other" ? (
+              <FormField>
+                <Label htmlFor={referralOtherId}>{EARLY_ACCESS_REQUEST_REFERRAL_OTHER_LABEL}</Label>
+                <Textarea
+                  id={referralOtherId}
+                  value={referralOther}
+                  onChange={(event) => setReferralOther(event.target.value)}
+                  rows={3}
+                  placeholder={EARLY_ACCESS_REQUEST_REFERRAL_OTHER_PLACEHOLDER}
+                  fieldSize="lg"
+                  surface="elevated"
+                  required
+                />
+              </FormField>
+            ) : null}
             {error ? (
               <p className="text-sm text-destructive" role="alert">
                 {error}

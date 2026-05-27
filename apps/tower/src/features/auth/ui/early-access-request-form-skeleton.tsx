@@ -16,8 +16,7 @@ function EarlyAccessRequestFormSkeleton() {
         <div className="flex flex-col gap-5">
           <FormFieldSkeleton fieldSize="lg" />
           <FormFieldSkeleton fieldSize="lg" />
-          <FormFieldSkeleton fieldSize="lg" hint labelWidth="w-28" />
-          <FormFieldSkeleton fieldSize="lg" multiline />
+          <FormFieldSkeleton fieldSize="lg" />
           <Skeleton className="h-10 w-full rounded-lg" />
         </div>
       </div>

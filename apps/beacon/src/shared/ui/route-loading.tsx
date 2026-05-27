@@ -9,8 +9,8 @@ export const routeLoadingSurfaceVariants = cva("flex flex-col items-center justi
     layout: {
       /** In-scroll loader that grows to fill the route viewport. */
       shell: "min-h-0 min-w-0 flex-1 py-4",
-      /** Full-bleed loader over a `relative` route scroll region. */
-      overlay: "absolute inset-0 z-20 bg-background/85 backdrop-blur-[1px]",
+      /** Full-bleed loader portaled over the extension viewport (above drawers/dialogs). */
+      overlay: "fixed inset-0 z-[60] bg-background/85 backdrop-blur-[1px]",
       /** Full-height route surface (e.g. access gates without route chrome). */
       route: cn(beaconAppRouteSurfaceClass, "gap-3 p-6"),
     },

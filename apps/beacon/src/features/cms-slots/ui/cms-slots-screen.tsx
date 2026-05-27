@@ -87,6 +87,7 @@ import {
   focusCmsSlotListTargetOnCanvas,
   placeCmsSlotListTargetOnCanvas,
 } from "@/features/cms-slots/model/place-cms-slot-list-target-on-canvas";
+import { renameCmsSlotListOnPage } from "@/features/cms-slots/model/rename-cms-slot-list-on-page";
 import { resyncEngineSlotPropAttributesForSlotIndex } from "@/features/cms-slots/model/resync-engine-slot-prop-attrs";
 import { retryCmsSlotListTargetCmsFieldLink } from "@/features/cms-slots/model/retry-cms-slot-list-target-cms-field-link";
 import {
@@ -106,11 +107,13 @@ import {
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
   CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS,
+  CMS_SLOTS_ROUTE_TASK_RENAMING_LIST,
   CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG,
   CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES,
   CMS_SLOTS_TOAST_LIST_CREATED,
   CMS_SLOTS_TOAST_LIST_REMOVED,
   CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED,
+  CMS_SLOTS_TOAST_LIST_RENAMED,
   CMS_SLOTS_TOAST_LIST_TARGET_FOCUSED,
   CMS_SLOTS_TOAST_LIST_TARGET_NOT_ON_CANVAS,
 } from "@/shared/lib/cms-slots-feature-copy";
@@ -666,6 +669,7 @@ export function CmsSlotsScreen() {
   const [beaconToDelete, setBeaconToDelete] = useState<CmsSlotListOnPage | null>(null);
   const [uninstallWithLastBeaconDelete, setUninstallWithLastBeaconDelete] = useState(false);
   const [deletePendingKey, setDeletePendingKey] = useState<string | null>(null);
+  const [renamePendingKey, setRenamePendingKey] = useState<string | null>(null);
   const [embedSyncPending, setEmbedSyncPending] = useState(false);
   const [pageRuntimeStatusLoading, setPageRuntimeStatusLoading] = useState(true);
   const [pageRuntimeSynced, setPageRuntimeSynced] = useState(false);
@@ -1297,7 +1301,7 @@ export function CmsSlotsScreen() {
         });
         if (ok) {
           setEngineListCompositionStale(false);
-          void refreshPageBeacons();
+          await refreshPageBeacons();
         }
         return ok;
       } finally {
@@ -1512,6 +1516,53 @@ export function CmsSlotsScreen() {
       setInstallPending(false);
     }
   };
+
+  const handleRenameBeacon = useCallback(
+    async (beacon: CmsSlotListOnPage, nextDisplayName: string): Promise<boolean> => {
+      if (renamePendingKey != null) {
+        return false;
+      }
+      setRenamePendingKey(beacon.key);
+      setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_RENAMING_LIST);
+      try {
+        const otherDataListsOnPage = new Set(
+          pageBeacons.filter((entry) => entry.key !== beacon.key).map((entry) => entry.dataList)
+        );
+        const preferredDefinitionId =
+          listTargetReconcileCacheRef.current?.beaconKey === beacon.key ? listTargetDefinitionIdRef.current : null;
+        const result = await renameCmsSlotListOnPage({
+          container: beacon.container,
+          fromDataList: beacon.dataList,
+          nextDisplayName,
+          otherDataListsOnPage,
+          preferredDefinitionId,
+        });
+        if (!result.ok) {
+          void webflow.notify({ type: "Error", message: result.reason });
+          return false;
+        }
+        if (activeBeaconKey === beacon.key) {
+          setActiveDataList(result.dataList);
+          const cached = listTargetReconcileCacheRef.current;
+          if (cached?.beaconKey === beacon.key) {
+            listTargetReconcileCacheRef.current = { ...cached, dataList: result.dataList };
+          }
+        }
+        void webflow.notify({ type: "Success", message: CMS_SLOTS_TOAST_LIST_RENAMED });
+        setEngineListCompositionStale(true);
+        void refreshPageBeacons();
+        return true;
+      } catch (err) {
+        const message = formatWebflowDesignerError(err);
+        void webflow.notify({ type: "Error", message });
+        return false;
+      } finally {
+        setRenamePendingKey(null);
+        setRouteTaskPhase(null);
+      }
+    },
+    [activeBeaconKey, pageBeacons, refreshPageBeacons, renamePendingKey]
+  );
 
   const handleConfirmDeleteBeacon = async () => {
     if (deletePendingKey != null) return;
@@ -1822,7 +1873,9 @@ export function CmsSlotsScreen() {
       setCreateFormOpen={setCreateFormOpen}
       openingBeaconKey={openingBeaconKey}
       deletePendingKey={deletePendingKey}
+      renamePendingKey={renamePendingKey}
       setBeaconToDelete={setBeaconToDelete}
+      onRenameBeacon={handleRenameBeacon}
       onCreate={handleCreate}
       onOpenBeacon={handleOpenBeacon}
       onInstallWrapper={handleInstallWrapper}

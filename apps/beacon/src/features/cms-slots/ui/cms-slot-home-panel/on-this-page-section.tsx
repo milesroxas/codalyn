@@ -1,25 +1,17 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Plus } from "lucide-react";
-import { CMS_SLOT_ROW_NAME_MAX } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
+import { useId, useState } from "react";
+import { displayLabelForDataList } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
+import { CmsSlotDisplayNameDrawer } from "@/features/cms-slots/ui/cms-slot-display-name-drawer";
 import { CmsSlotPublishedSlotTile } from "@/features/cms-slots/ui/cms-slot-list-tile";
 import {
   CMS_SLOTS_ADD_SLOT_LABEL,
   CMS_SLOTS_PAGE_LIST_ARIA_LABEL,
   CMS_SLOTS_PUBLISHED_SECTION_LABEL,
+  CMS_SLOTS_RENAME_SLOT_DRAWER_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/shared/ui/drawer";
-import { Input } from "@/shared/ui/input";
-import { Label } from "@/shared/ui/label";
 import { SectionLabelDivider } from "@/shared/ui/section-label-divider";
 
 type OnThisPageSectionProps = {
@@ -34,8 +26,10 @@ type OnThisPageSectionProps = {
   onCreate: () => void;
   onOpenBeacon: (b: CmsSlotListOnPage) => void;
   onRequestDelete: (b: CmsSlotListOnPage) => void;
+  onRenameBeacon: (b: CmsSlotListOnPage, nextDisplayName: string) => boolean | Promise<boolean>;
   openingBeaconKey: string | null;
   deletePendingKey: string | null;
+  renamePendingKey: string | null;
 };
 
 export function OnThisPageSection(props: OnThisPageSectionProps) {
@@ -51,18 +45,50 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
     onCreate,
     onOpenBeacon,
     onRequestDelete,
+    onRenameBeacon,
     openingBeaconKey,
     deletePendingKey,
+    renamePendingKey,
   } = props;
   const showPageScanLoading = useDeferredLoadingIndicator(pageScanLoading);
+  const renameFieldId = useId();
+  const [renameTarget, setRenameTarget] = useState<CmsSlotListOnPage | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
 
   const hasBeacons = pageBeacons.length > 0;
-  const nameLen = beaconName.length > CMS_SLOT_ROW_NAME_MAX ? CMS_SLOT_ROW_NAME_MAX : beaconName.length;
+  const renameBaseline = renameTarget != null ? displayLabelForDataList(renameTarget.dataList).trim() : "";
+  const renameDraftTrimmed = renameDraft.trim();
+  const renameSaveDisabled =
+    renameDraftTrimmed === "" ||
+    (renameBaseline !== "" && renameDraftTrimmed.toLowerCase() === renameBaseline.toLowerCase());
+
+  const openRenameDrawer = (beacon: CmsSlotListOnPage) => {
+    setRenameTarget(beacon);
+    setRenameDraft(displayLabelForDataList(beacon.dataList));
+  };
+
+  const closeRenameDrawer = () => {
+    setRenameTarget(null);
+    setRenameDraft("");
+  };
 
   return (
     <div className="space-y-3" data-slot="cms_slots_on_page">
-      <Drawer open={createFormOpen} onOpenChange={setCreateFormOpen} dismissible>
-        <DrawerTrigger asChild>
+      <CmsSlotDisplayNameDrawer
+        open={createFormOpen}
+        onOpenChange={setCreateFormOpen}
+        title={CMS_SLOTS_ADD_SLOT_LABEL}
+        fieldId={nameFieldId}
+        value={beaconName}
+        onValueChange={setBeaconName}
+        primaryLabel="Create"
+        primaryPending={createPending}
+        primaryDisabled={!beaconName.trim()}
+        onPrimary={() => void onCreate()}
+        secondaryLabel="Cancel"
+        secondaryDisabled={createPending}
+        onSecondary={() => setCreateFormOpen(false)}
+        trigger={
           <Button
             type="button"
             variant="actionCard"
@@ -75,52 +101,38 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
             <Plus data-icon="inline-start" aria-hidden strokeWidth={2.25} />
             <span>{CMS_SLOTS_ADD_SLOT_LABEL}</span>
           </Button>
-        </DrawerTrigger>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>{CMS_SLOTS_ADD_SLOT_LABEL}</DrawerTitle>
-            <DrawerDescription className="sr-only">Choose a display name for the new CMS slot.</DrawerDescription>
-          </DrawerHeader>
-          <div className="space-y-2 pb-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor={nameFieldId} className="text-xs text-muted-foreground">
-                Slot name
-              </Label>
-              <span className="text-xs tabular-nums text-muted-foreground">
-                {nameLen}/{CMS_SLOT_ROW_NAME_MAX}
-              </span>
-            </div>
-            <Input
-              id={nameFieldId}
-              value={beaconName}
-              maxLength={CMS_SLOT_ROW_NAME_MAX}
-              onChange={(e) => setBeaconName(e.target.value)}
-              autoComplete="off"
-              name="beacon-slot-name"
-              onPointerDown={(e) => e.stopPropagation()}
-            />
-          </div>
-          <DrawerFooter className="gap-2">
-            <Button
-              type="button"
-              className="w-full"
-              disabled={createPending || !beaconName.trim()}
-              onClick={() => void onCreate()}
-            >
-              {createPending ? "Creating…" : "Create"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              disabled={createPending}
-              onClick={() => setCreateFormOpen(false)}
-            >
-              Cancel
-            </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+        }
+      />
+
+      <CmsSlotDisplayNameDrawer
+        open={renameTarget != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeRenameDrawer();
+          }
+        }}
+        title={CMS_SLOTS_RENAME_SLOT_DRAWER_TITLE}
+        fieldId={renameFieldId}
+        value={renameDraft}
+        onValueChange={setRenameDraft}
+        primaryLabel="Save"
+        primaryPending={renamePendingKey != null}
+        primaryDisabled={renameSaveDisabled}
+        onPrimary={() => {
+          if (renameTarget == null) {
+            return;
+          }
+          void (async () => {
+            const ok = await onRenameBeacon(renameTarget, renameDraft);
+            if (ok) {
+              closeRenameDrawer();
+            }
+          })();
+        }}
+        secondaryLabel="Cancel"
+        secondaryDisabled={renamePendingKey != null}
+        onSecondary={closeRenameDrawer}
+      />
 
       {hasBeacons ? (
         <div className="space-y-3">
@@ -130,11 +142,13 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
               <CmsSlotPublishedSlotTile
                 key={b.key}
                 dataList={b.dataList}
-                disabled={openingBeaconKey !== null || deletePendingKey !== null}
+                disabled={openingBeaconKey !== null || deletePendingKey !== null || renamePendingKey !== null}
                 opening={openingBeaconKey === b.key}
                 deleting={deletePendingKey === b.key}
+                renaming={renamePendingKey === b.key}
                 onOpen={() => void onOpenBeacon(b)}
                 onRequestDelete={() => onRequestDelete(b)}
+                onRequestRename={() => openRenameDrawer(b)}
               />
             ))}
           </ul>

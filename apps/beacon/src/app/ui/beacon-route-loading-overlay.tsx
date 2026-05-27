@@ -1,5 +1,6 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import {
   BEACON_ROUTE_CONTENT_ENTER_TRANSITION_MS,
@@ -21,7 +22,7 @@ type BeaconRouteLoadingOverlayProps = {
 };
 
 /**
- * Full-bleed loader over a `relative` route scroll region. Appears opaque immediately; fades out when hidden.
+ * Full-bleed loader portaled above route drawers and dialogs. Appears opaque immediately; fades out when hidden.
  * Loading chrome is deferred until busy has lasted at least the standard loading-indicator delay.
  */
 export function BeaconRouteLoadingOverlay(props: BeaconRouteLoadingOverlayProps) {
@@ -87,7 +88,7 @@ function BeaconRouteLoadingOverlayShell(props: BeaconRouteLoadingOverlayShellPro
     return null;
   }
 
-  return (
+  return createPortal(
     <RouteLoadingSurface
       layout="overlay"
       className={cn(beaconRouteContentTransitionMotionClass, beaconRouteContentVisibleClass(shown), className)}
@@ -108,6 +109,7 @@ function BeaconRouteLoadingOverlayShell(props: BeaconRouteLoadingOverlayShellPro
       }}
     >
       <BeaconRouteLoadingStatus ariaLabel={ariaLabel} message={message} />
-    </RouteLoadingSurface>
+    </RouteLoadingSurface>,
+    document.body
   );
 }

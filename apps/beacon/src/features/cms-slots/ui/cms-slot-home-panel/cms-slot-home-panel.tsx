@@ -20,8 +20,10 @@ type CmsSlotHomePanelProps = {
   onCreate: () => void;
   onOpenBeacon: (b: CmsSlotListOnPage) => void;
   onRequestDelete: (b: CmsSlotListOnPage) => void;
+  onRenameBeacon: (b: CmsSlotListOnPage, nextDisplayName: string) => boolean | Promise<boolean>;
   openingBeaconKey: string | null;
   deletePendingKey: string | null;
+  renamePendingKey: string | null;
 };
 
 export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
@@ -41,8 +43,10 @@ export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
     onCreate,
     onOpenBeacon,
     onRequestDelete,
+    onRenameBeacon,
     openingBeaconKey,
     deletePendingKey,
+    renamePendingKey,
   } = props;
 
   if (!routeStateKnown) {
@@ -76,8 +80,10 @@ export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
         onCreate={onCreate}
         onOpenBeacon={onOpenBeacon}
         onRequestDelete={onRequestDelete}
+        onRenameBeacon={onRenameBeacon}
         openingBeaconKey={openingBeaconKey}
         deletePendingKey={deletePendingKey}
+        renamePendingKey={renamePendingKey}
       />
     </div>
   );

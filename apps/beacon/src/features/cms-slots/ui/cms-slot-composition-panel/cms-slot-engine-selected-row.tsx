@@ -87,8 +87,12 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
 
   const [propsDrawerOpen, setPropsDrawerOpen] = useState(false);
   const [closeBeforeTagDialogOpen, setCloseBeforeTagDialogOpen] = useState(false);
+  const [tagAttrsPending, setTagAttrsPending] = useState(false);
+  const tagAttrsPendingRef = useRef(false);
   const exposeBaselineRef = useRef<ComposableInstancePropMeta[]>([]);
   const exposedCount = slotExposed.length;
+
+  const tagAttrsBusy = tagAttrsPending || resyncingEngineSlotKey === row.key;
 
   const hasNewExposeSelections = propsDrawerOpen && !sameExposedPropSelection(slotExposed, exposeBaselineRef.current);
 
@@ -129,13 +133,16 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
         setPropsDrawerOpen(true);
         return;
       }
+      if (tagAttrsPendingRef.current || resyncingEngineSlotKey === row.key) {
+        return;
+      }
       if (sameExposedPropSelection(slotExposed, exposeBaselineRef.current)) {
         setPropsDrawerOpen(false);
         return;
       }
       setCloseBeforeTagDialogOpen(true);
     },
-    [slotExposed]
+    [resyncingEngineSlotKey, row.key, slotExposed]
   );
 
   const handleDiscardExposeChangesClose = useCallback(() => {
@@ -144,22 +151,24 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     setPropsDrawerOpen(false);
   }, [onSetSlotExposed, slotIndex]);
 
-  const handleTagAttrsFromDismissDialog = useCallback(async () => {
-    const ok = await onResyncEngineSlotAttrs(slotIndex);
-    if (ok !== true) {
+  const applyTagAttrsAndCloseDrawer = useCallback(async () => {
+    if (tagAttrsPendingRef.current) {
       return;
     }
-    exposeBaselineRef.current = snapshotExposed(slotExposed);
-    setCloseBeforeTagDialogOpen(false);
-    setPropsDrawerOpen(false);
-  }, [onResyncEngineSlotAttrs, slotIndex, slotExposed]);
-
-  const handleTagAttrsFromFooter = useCallback(async () => {
-    const ok = await onResyncEngineSlotAttrs(slotIndex);
-    if (ok !== true) {
-      return;
+    tagAttrsPendingRef.current = true;
+    setTagAttrsPending(true);
+    try {
+      const ok = await onResyncEngineSlotAttrs(slotIndex);
+      if (ok !== true) {
+        return;
+      }
+      exposeBaselineRef.current = snapshotExposed(slotExposed);
+      setCloseBeforeTagDialogOpen(false);
+      setPropsDrawerOpen(false);
+    } finally {
+      tagAttrsPendingRef.current = false;
+      setTagAttrsPending(false);
     }
-    exposeBaselineRef.current = snapshotExposed(slotExposed);
   }, [onResyncEngineSlotAttrs, slotIndex, slotExposed]);
   const drawerRow: CmsSlotCompositionDraftRow = {
     key: row.key,
@@ -205,7 +214,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
         </Button>
       </div>
 
-      <Drawer open={propsDrawerOpen} onOpenChange={handlePropsDrawerOpenChange}>
+      <Drawer open={propsDrawerOpen} dismissible={!tagAttrsBusy} onOpenChange={handlePropsDrawerOpenChange}>
         <DrawerContent stickyFooter className="border-border bg-popover text-popover-foreground ring-foreground/10">
           <DrawerHeader className="text-left">
             <DrawerTitle className="text-foreground">{publishedDisplayName}</DrawerTitle>
@@ -228,7 +237,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
                       <Checkbox
                         id={`cms-slot-expose-${row.key}-${p.propId}`}
                         checked={on}
-                        disabled={removingKey !== null || listTargetActionBusy || resyncingEngineSlotKey !== null}
+                        disabled={removingKey !== null || listTargetActionBusy || tagAttrsBusy}
                         onCheckedChange={(v) => {
                           if (v === "indeterminate") {
                             return;
@@ -265,14 +274,14 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
               disabled={
                 removingKey !== null ||
                 listTargetActionBusy ||
-                resyncingEngineSlotKey !== null ||
+                tagAttrsBusy ||
                 composableLoading ||
                 !hasNewExposeSelections
               }
-              aria-busy={resyncingEngineSlotKey === row.key}
-              onClick={() => void handleTagAttrsFromFooter()}
+              aria-busy={tagAttrsBusy}
+              onClick={() => void applyTagAttrsAndCloseDrawer()}
             >
-              {resyncingEngineSlotKey === row.key ? "Tagging…" : "Tag data attributes"}
+              {tagAttrsBusy ? "Tagging…" : "Tag data attributes"}
             </Button>
           </DrawerFooter>
         </DrawerContent>
@@ -295,20 +304,24 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel type="button">Continue editing</AlertDialogCancel>
+            <AlertDialogCancel type="button" disabled={tagAttrsBusy}>
+              Continue editing
+            </AlertDialogCancel>
             <AlertDialogCancel
               type="button"
               variant="outline"
               className="mt-2 sm:mt-0"
+              disabled={tagAttrsBusy}
               onClick={handleDiscardExposeChangesClose}
             >
               Discard prop changes
             </AlertDialogCancel>
             <AlertDialogAction
               type="button"
+              disabled={tagAttrsBusy}
               onClick={(ev) => {
                 ev.preventDefault();
-                void handleTagAttrsFromDismissDialog();
+                void applyTagAttrsAndCloseDrawer();
               }}
             >
               Tag data attributes

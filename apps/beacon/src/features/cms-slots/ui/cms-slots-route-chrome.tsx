@@ -83,7 +83,9 @@ export type CmsSlotsRouteChromeProps = {
   setCreateFormOpen: (v: boolean) => void;
   openingBeaconKey: string | null;
   deletePendingKey: string | null;
+  renamePendingKey: string | null;
   setBeaconToDelete: (v: CmsSlotListOnPage | null) => void;
+  onRenameBeacon: (b: CmsSlotListOnPage, nextDisplayName: string) => boolean | Promise<boolean>;
   onCreate: () => void | Promise<void>;
   onOpenBeacon: (b: CmsSlotListOnPage) => void;
   onInstallWrapper: () => void | Promise<void>;
@@ -234,7 +236,9 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps & { routeInteractio
           onOpenBeacon={p.onOpenBeacon}
           openingBeaconKey={p.openingBeaconKey}
           onRequestDelete={(b) => p.setBeaconToDelete(b)}
+          onRenameBeacon={p.onRenameBeacon}
           deletePendingKey={p.deletePendingKey}
+          renamePendingKey={p.renamePendingKey}
         />
       </div>
     );

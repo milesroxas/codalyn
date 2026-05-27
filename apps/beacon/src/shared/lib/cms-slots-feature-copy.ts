@@ -9,6 +9,12 @@ export const CMS_SLOTS_AREA_NAV_LABEL = `${CMS_SLOTS_FEATURE_NAME} area`;
 
 export const CMS_SLOTS_ADD_SLOT_LABEL = "Add Slot";
 
+export const CMS_SLOTS_RENAME_SLOT_MENU_LABEL = "Rename";
+
+export const CMS_SLOTS_RENAME_SLOT_DRAWER_TITLE = "Rename slot";
+
+export const CMS_SLOTS_TOAST_LIST_RENAMED = "CMS slot renamed.";
+
 /** Section heading for CMS slot lists already on the page (home grid). */
 export const CMS_SLOTS_PUBLISHED_SECTION_LABEL = "Published Slots";
 
@@ -57,6 +63,8 @@ export const CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET = "Checking list target�
 export const CMS_SLOTS_ROUTE_TASK_REMOVING_COMPONENT = "Removing component…";
 
 export const CMS_SLOTS_ROUTE_TASK_CREATING_LIST = "Creating slot list…";
+
+export const CMS_SLOTS_ROUTE_TASK_RENAMING_LIST = "Renaming slot list…";
 
 export const CMS_SLOTS_ROUTE_TASK_DELETING_LIST = "Deleting slot list…";
 

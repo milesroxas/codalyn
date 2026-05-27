@@ -54,7 +54,7 @@ export function BeaconFeatureRouteHeader(props: BeaconFeatureRouteHeaderProps) {
 
 export type BeaconFeatureRouteScrollBodyProps = {
   children: ReactNode;
-  /** Full-bleed loader rendered over the scroll viewport (not inside scroll content). */
+  /** Full-bleed loader rendered above route drawers/dialogs (portaled; not inside scroll content). */
   overlay?: ReactNode;
   className?: string;
   contentClassName?: string;

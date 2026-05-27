@@ -2,10 +2,15 @@ import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-
 import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
-import { SectionLabelDivider } from "@/shared/ui/section-label-divider";
-import { CmsSlotCompositionComponentsCatalog } from "./cms-slot-composition-components-catalog";
+import { CMS_SLOTS_ENGINE_COMPONENTS_LABEL } from "@/shared/lib/cms-slots-feature-copy";
+import {
+  SurfaceSummaryCardPanelSectionLabel,
+  SurfaceSummaryCardSurfaceSummary,
+} from "@/shared/ui/surface-summary-card";
+import { CmsSlotCompositionComponentsCatalogSheet } from "./cms-slot-composition-components-catalog-sheet";
+import { CmsSlotEngineComponentsEmptyState } from "./cms-slot-engine-components-empty-state";
 import { CmsSlotEngineListContextSection } from "./cms-slot-engine-list-context-section";
-import { CmsSlotEngineSelectedRow } from "./cms-slot-engine-selected-row";
+import { CmsSlotEngineSelectedComponentsList } from "./cms-slot-engine-selected-components-list";
 import { useCompositionComposableMeta } from "./use-composition-composable-meta";
 
 export type CmsSlotCompositionPanelProps = {
@@ -124,56 +129,43 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
         removingKey={removingKey}
       />
 
-      <CmsSlotCompositionComponentsCatalog
-        searchFieldId={searchFieldId}
-        componentQuery={componentQuery}
-        setComponentQuery={setComponentQuery}
-        catalogLoading={catalogLoading}
-        catalogError={catalogError}
-        componentCatalog={componentCatalog}
-        selectedComponentIdSet={selectedComponentIdSet}
-        addPending={addPending}
-        onAddComponent={onAddComponent}
-      />
-
-      <div className="space-y-2">
-        <SectionLabelDivider label="Components" variant="plain" lineTone="default" />
+      <SurfaceSummaryCardSurfaceSummary>
+        <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_ENGINE_COMPONENTS_LABEL}</SurfaceSummaryCardPanelSectionLabel>
         {selected.length === 0 ? (
-          <div className="min-h-16 rounded-[10px] border border-dashed border-border bg-muted/10" aria-hidden />
+          <CmsSlotEngineComponentsEmptyState />
         ) : (
-          <div className="overflow-hidden rounded-[10px] border border-border/70 bg-card text-card-foreground shadow-sm">
-            <ul
-              className="scrollbar-themed max-h-60 divide-y divide-border/80 overflow-y-scroll"
-              aria-label="Selected components"
-            >
-              {selected.map((row, slotIndex) => (
-                <CmsSlotEngineSelectedRow
-                  key={row.key}
-                  row={row}
-                  slotIndex={slotIndex}
-                  publishedDisplayName={enginePublishedDisplayNames?.[slotIndex] ?? row.name}
-                  onRenamePublishedDisplayName={onRenamePublishedDisplayName}
-                  renamingPublishedSlotKey={renamingPublishedSlotKey}
-                  available={composableByKey[row.key] ?? []}
-                  slotExposed={engineSlotProps.slots[slotIndex]?.exposed ?? []}
-                  composableLoading={composableLoading}
-                  composableMetaReady={!composableLoading && row.key in composableByKey}
-                  addPending={addPending}
-                  removingKey={removingKey}
-                  listTargetActionBusy={listTargetActionBusy}
-                  resyncingEngineSlotKey={resyncingEngineSlotKey}
-                  onRemove={onRemove}
-                  onSetSlotExposed={onSetSlotExposed}
-                  onResyncEngineSlotAttrs={onResyncEngineSlotAttrs}
-                  autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
-                  onAutoOpenExposeDrawerConsumed={onAutoOpenExposeDrawerConsumed}
-                  routeInteractionIdle={routeInteractionIdle}
-                />
-              ))}
-            </ul>
-          </div>
+          <CmsSlotEngineSelectedComponentsList
+            selected={selected}
+            composableByKey={composableByKey}
+            composableLoading={composableLoading}
+            engineSlotProps={engineSlotProps}
+            enginePublishedDisplayNames={enginePublishedDisplayNames}
+            onRenamePublishedDisplayName={onRenamePublishedDisplayName}
+            renamingPublishedSlotKey={renamingPublishedSlotKey}
+            addPending={addPending}
+            removingKey={removingKey}
+            listTargetActionBusy={listTargetActionBusy}
+            resyncingEngineSlotKey={resyncingEngineSlotKey}
+            onRemove={onRemove}
+            onSetSlotExposed={onSetSlotExposed}
+            onResyncEngineSlotAttrs={onResyncEngineSlotAttrs}
+            autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
+            onAutoOpenExposeDrawerConsumed={onAutoOpenExposeDrawerConsumed}
+            routeInteractionIdle={routeInteractionIdle}
+          />
         )}
-      </div>
+        <CmsSlotCompositionComponentsCatalogSheet
+          searchFieldId={searchFieldId}
+          componentQuery={componentQuery}
+          setComponentQuery={setComponentQuery}
+          catalogLoading={catalogLoading}
+          catalogError={catalogError}
+          componentCatalog={componentCatalog}
+          selectedComponentIdSet={selectedComponentIdSet}
+          addPending={addPending}
+          onAddComponent={onAddComponent}
+        />
+      </SurfaceSummaryCardSurfaceSummary>
     </>
   );
 }

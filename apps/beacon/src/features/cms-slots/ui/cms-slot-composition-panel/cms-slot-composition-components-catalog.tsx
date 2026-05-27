@@ -1,8 +1,15 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
-import { Loader2, Plus, Search } from "lucide-react";
-import { Input } from "@/shared/ui/input";
+import { cva } from "class-variance-authority";
+import { Loader2, Plus } from "lucide-react";
+import {
+  CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LIST_ARIA_LABEL,
+  CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LOADING_ARIA_LABEL,
+  CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_SEARCH_PLACEHOLDER,
+} from "@/shared/lib/cms-slots-feature-copy";
+import { ScrollArea } from "@/shared/ui/scroll-area";
+import { SearchInput } from "@/shared/ui/search-input";
 
-type CmsSlotCompositionComponentsCatalogProps = {
+export type CmsSlotCompositionComponentsCatalogProps = {
   searchFieldId: string;
   componentQuery: string;
   setComponentQuery: (q: string) => void;
@@ -14,108 +21,156 @@ type CmsSlotCompositionComponentsCatalogProps = {
   onAddComponent: (c: ComponentSearchResult) => void;
 };
 
-export function CmsSlotCompositionComponentsCatalog(props: CmsSlotCompositionComponentsCatalogProps) {
-  const {
-    searchFieldId,
-    componentQuery,
-    setComponentQuery,
-    catalogLoading,
-    catalogError,
-    componentCatalog,
-    selectedComponentIdSet,
-    addPending,
-    onAddComponent,
-  } = props;
+const compositionComponentCatalogListRootClass = "flex min-w-0 flex-col gap-2";
+const compositionComponentCatalogListShellClass = "relative min-h-48 min-w-0 flex-1";
+const compositionComponentCatalogListLoaderClass =
+  "absolute inset-0 z-10 flex items-center justify-center rounded-md bg-popover/75 backdrop-blur-[1px]";
+const compositionComponentCatalogListScrollAreaClass = "min-h-48 min-w-0 flex-1 rounded-md";
+const compositionComponentCatalogListClass = "m-0 list-none px-1";
+const compositionComponentCatalogListItemClass = "mx-2 border-b border-border/80 last:border-b-0";
+const compositionComponentCatalogErrorClass = "text-sm text-destructive";
+
+const compositionComponentCatalogListItemButtonVariants = cva(
+  "flex w-full min-w-0 items-center justify-between gap-3 py-2.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none"
+);
+
+const compositionComponentCatalogListItemNameVariants = cva("min-w-0 truncate text-sm", {
+  variants: {
+    added: {
+      true: "text-muted-foreground",
+      false: "font-normal text-foreground",
+    },
+  },
+  defaultVariants: {
+    added: false,
+  },
+});
+
+const compositionComponentCatalogListItemAddBadgeVariants = cva(
+  "flex size-5 shrink-0 items-center justify-center rounded-full border",
+  {
+    variants: {
+      added: {
+        true: "border-border/60 text-muted-foreground",
+        false: "border-border text-foreground",
+      },
+    },
+    defaultVariants: {
+      added: false,
+    },
+  }
+);
+
+type CompositionComponentCatalogListItemProps = {
+  component: ComponentSearchResult;
+  added: boolean;
+  disabled: boolean;
+  onAdd: () => void;
+};
+
+function CompositionComponentCatalogListItem(props: CompositionComponentCatalogListItemProps) {
+  const { component, added, disabled, onAdd } = props;
+
+  return (
+    <li className={compositionComponentCatalogListItemClass}>
+      <button
+        type="button"
+        className={compositionComponentCatalogListItemButtonVariants()}
+        onClick={() => void onAdd()}
+        disabled={disabled}
+        aria-disabled={added}
+        aria-label={added ? `${component.name} already added` : `Add ${component.name}`}
+      >
+        <span className={compositionComponentCatalogListItemNameVariants({ added })}>{component.name}</span>
+        <span className={compositionComponentCatalogListItemAddBadgeVariants({ added })} aria-hidden>
+          <Plus className="size-2.5 stroke-[1.5]" />
+        </span>
+      </button>
+    </li>
+  );
+}
+
+type CompositionComponentCatalogSearchProps = {
+  searchFieldId: string;
+  componentQuery: string;
+  setComponentQuery: (q: string) => void;
+  catalogLoading: boolean;
+};
+
+export function CompositionComponentCatalogSearch(props: CompositionComponentCatalogSearchProps) {
+  const { searchFieldId, componentQuery, setComponentQuery, catalogLoading } = props;
   const showCatalogLoading = useDeferredLoadingIndicator(catalogLoading);
 
   return (
-    <div
-      className="space-y-4 overflow-hidden rounded-[10px] border border-border/70 bg-card p-4 text-card-foreground shadow-sm"
-      data-slot="beacon_list"
-    >
-      <p className="text-xs leading-relaxed text-muted-foreground">Add a list of components for this slot</p>
+    <SearchInput
+      id={searchFieldId}
+      value={componentQuery}
+      onChange={(event) => setComponentQuery(event.target.value)}
+      autoComplete="off"
+      aria-busy={showCatalogLoading}
+      placeholder={CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_SEARCH_PLACEHOLDER}
+      onPointerDown={(event) => event.stopPropagation()}
+    />
+  );
+}
 
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden
-        />
-        <Input
-          id={searchFieldId}
-          value={componentQuery}
-          onChange={(e) => setComponentQuery(e.target.value)}
-          autoComplete="off"
-          aria-busy={showCatalogLoading}
-          placeholder="Search components"
-          className="h-9 pl-9"
-        />
-      </div>
+export function CmsSlotCompositionComponentsCatalogList(
+  props: Pick<
+    CmsSlotCompositionComponentsCatalogProps,
+    "catalogLoading" | "catalogError" | "componentCatalog" | "selectedComponentIdSet" | "addPending" | "onAddComponent"
+  >
+) {
+  const { catalogLoading, catalogError, componentCatalog, selectedComponentIdSet, addPending, onAddComponent } = props;
+  const showCatalogLoading = useDeferredLoadingIndicator(catalogLoading);
 
+  return (
+    <div className={compositionComponentCatalogListRootClass} data-slot="cms_slots_component_catalog_list">
       {catalogError ? (
-        <p className="text-sm text-destructive" role="alert">
+        <p className={compositionComponentCatalogErrorClass} role="alert">
           {catalogError}
         </p>
       ) : null}
 
-      <div className="relative -mx-1 h-40 shrink-0 overflow-hidden rounded-md">
+      <div className={compositionComponentCatalogListShellClass}>
         {showCatalogLoading ? (
           <div
-            className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-card/75 backdrop-blur-[1px]"
-            data-slot="beacon_list_loader"
+            className={compositionComponentCatalogListLoaderClass}
+            data-slot="cms_slots_component_catalog_loader"
             role="status"
             aria-live="polite"
-            aria-label="Loading components"
+            aria-label={CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LOADING_ARIA_LABEL}
           >
             <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
           </div>
         ) : null}
-        <div
-          className="scrollbar-themed h-40 overflow-y-scroll rounded-md"
+        <ScrollArea
+          className={compositionComponentCatalogListScrollAreaClass}
           data-state={showCatalogLoading ? "loading" : "idle"}
         >
           {componentCatalog.length === 0 && !showCatalogLoading ? (
-            <div className="h-full min-h-28" aria-hidden />
+            <div className="min-h-28" aria-hidden />
           ) : (
-            <ul className="px-1" aria-label="Components">
-              {componentCatalog.map((c) => {
-                const isAlreadyAdded = selectedComponentIdSet.has(c.id);
+            <ul
+              className={compositionComponentCatalogListClass}
+              aria-label={CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LIST_ARIA_LABEL}
+            >
+              {componentCatalog.map((component) => {
+                const isAlreadyAdded = selectedComponentIdSet.has(component.id);
                 const disabled = addPending || catalogLoading || isAlreadyAdded;
+
                 return (
-                  <li key={c.id} className="mx-2 border-b border-border/80 last:border-b-0">
-                    <button
-                      type="button"
-                      className="flex w-full min-w-0 items-center justify-between gap-3 py-2.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none"
-                      onClick={() => void onAddComponent(c)}
-                      disabled={disabled}
-                      aria-disabled={isAlreadyAdded}
-                      aria-label={isAlreadyAdded ? `${c.name} already added` : `Add ${c.name}`}
-                    >
-                      <span
-                        className={
-                          isAlreadyAdded
-                            ? "min-w-0 truncate text-sm text-muted-foreground"
-                            : "min-w-0 truncate text-sm font-normal text-foreground"
-                        }
-                      >
-                        {c.name}
-                      </span>
-                      <span
-                        className={
-                          isAlreadyAdded
-                            ? "flex size-5 shrink-0 items-center justify-center rounded-full border border-border/60 text-muted-foreground"
-                            : "flex size-5 shrink-0 items-center justify-center rounded-full border border-border text-foreground"
-                        }
-                        aria-hidden
-                      >
-                        <Plus className="size-2.5 stroke-[1.5]" />
-                      </span>
-                    </button>
-                  </li>
+                  <CompositionComponentCatalogListItem
+                    key={component.id}
+                    component={component}
+                    added={isAlreadyAdded}
+                    disabled={disabled}
+                    onAdd={() => void onAddComponent(component)}
+                  />
                 );
               })}
             </ul>
           )}
-        </div>
+        </ScrollArea>
       </div>
     </div>
   );

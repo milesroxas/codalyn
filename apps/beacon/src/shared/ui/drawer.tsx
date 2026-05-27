@@ -1,3 +1,4 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import { XIcon } from "lucide-react";
 import { Children, type ComponentProps, isValidElement, type ReactNode } from "react";
 import { Drawer as VaulDrawer } from "vaul";
@@ -127,14 +128,24 @@ function DrawerContent({
   );
 }
 
-function DrawerHeader({ className, ...props }: ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="drawer-header"
-      className={cn("relative flex shrink-0 flex-col gap-1.5 pb-4 text-center", className)}
-      {...props}
-    />
-  );
+const drawerHeaderVariants = cva("relative flex shrink-0 flex-col gap-1.5 pb-4", {
+  variants: {
+    align: {
+      center: "text-center",
+      start: "text-left",
+    },
+  },
+  defaultVariants: {
+    align: "center",
+  },
+});
+
+function DrawerHeader({
+  className,
+  align,
+  ...props
+}: ComponentProps<"div"> & VariantProps<typeof drawerHeaderVariants>) {
+  return <div data-slot="drawer-header" className={cn(drawerHeaderVariants({ align }), className)} {...props} />;
 }
 
 function DrawerFooter({ className, ...props }: ComponentProps<"div">) {

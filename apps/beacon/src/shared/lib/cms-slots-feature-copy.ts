@@ -144,6 +144,27 @@ export const CMS_SLOTS_ENGINE_EDITING_DESCRIPTION = "Add components and expose p
 
 export const CMS_SLOTS_ENGINE_CURRENT_LIST_LABEL = "Current list";
 
+export const CMS_SLOTS_ENGINE_COMPONENTS_LABEL = "Components";
+
+export const CMS_SLOTS_ENGINE_COMPONENTS_EMPTY_TITLE = "No components yet";
+
+export const CMS_SLOTS_ENGINE_COMPONENTS_EMPTY_DESCRIPTION =
+  "Open the component library to add components to this list.";
+
+export const CMS_SLOTS_ENGINE_ADD_COMPONENT_LABEL = "Add component";
+
+export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_TITLE = "Component library";
+
+export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_DESCRIPTION = "Search site components to add to this list.";
+
+export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_SEARCH_PLACEHOLDER = "Search components";
+
+export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LOADING_ARIA_LABEL = "Loading components";
+
+export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LIST_ARIA_LABEL = "Components";
+
+export const CMS_SLOTS_ENGINE_SELECTED_COMPONENTS_ARIA_LABEL = "Selected components";
+
 export const CMS_SLOTS_ENGINE_LIST_TARGET_META = "List target";
 
 export const CMS_SLOTS_ENGINE_FOCUS_ON_CANVAS_HINT = "Jump to the list target on the canvas.";

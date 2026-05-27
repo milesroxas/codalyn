@@ -45,11 +45,13 @@ type CmsSlotEngineListContextSectionProps = {
   listTargetActionBusy: boolean;
   listTargetCreatePending: boolean;
   listTargetRemovePending: boolean;
+  listTargetFocusOnCanvasPending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
   listTargetOnCanvasCount: number;
   onBackToList: () => void;
   onCreateListTarget: () => void;
   onRequestRemoveListTarget: () => void;
+  onFocusListTargetOnCanvas: () => void;
   onPlaceListTargetOnCanvas: () => void;
 };
 
@@ -68,14 +70,14 @@ function resolveCanvasActionHint(listTargetPhase: CmsSlotListTargetPhase, listTa
 
 function buildSyncedListTargetMenuItems(props: {
   listTargetOnCanvasCount: number;
-  listTargetPlaceOnCanvasPending: boolean;
-  onPlaceListTargetOnCanvas: () => void;
+  listTargetFocusOnCanvasPending: boolean;
+  onFocusListTargetOnCanvas: () => void;
   onRequestRemoveListTarget: () => void;
 }): SurfaceSummaryCardSurfaceActionsMenuItem[] {
   const {
     listTargetOnCanvasCount,
-    listTargetPlaceOnCanvasPending,
-    onPlaceListTargetOnCanvas,
+    listTargetFocusOnCanvasPending,
+    onFocusListTargetOnCanvas,
     onRequestRemoveListTarget,
   } = props;
   const items: SurfaceSummaryCardSurfaceActionsMenuItem[] = [];
@@ -85,8 +87,8 @@ function buildSyncedListTargetMenuItems(props: {
       id: "focus-on-canvas",
       label: CMS_SLOTS_ENGINE_FOCUS_ON_CANVAS_LABEL,
       pendingLabel: CMS_SLOTS_ENGINE_FOCUS_ON_CANVAS_PENDING_LABEL,
-      pending: listTargetPlaceOnCanvasPending,
-      onSelect: () => void onPlaceListTargetOnCanvas(),
+      pending: listTargetFocusOnCanvasPending,
+      onSelect: () => void onFocusListTargetOnCanvas(),
     });
   }
 
@@ -219,11 +221,13 @@ export function CmsSlotEngineListContextSection(props: CmsSlotEngineListContextS
     listTargetActionBusy,
     listTargetCreatePending,
     listTargetRemovePending,
+    listTargetFocusOnCanvasPending,
     listTargetPlaceOnCanvasPending,
     listTargetOnCanvasCount,
     onBackToList,
     onCreateListTarget,
     onRequestRemoveListTarget,
+    onFocusListTargetOnCanvas,
     onPlaceListTargetOnCanvas,
   } = props;
 
@@ -233,8 +237,8 @@ export function CmsSlotEngineListContextSection(props: CmsSlotEngineListContextS
     listTargetPhase === "synced"
       ? buildSyncedListTargetMenuItems({
           listTargetOnCanvasCount,
-          listTargetPlaceOnCanvasPending,
-          onPlaceListTargetOnCanvas,
+          listTargetFocusOnCanvasPending,
+          onFocusListTargetOnCanvas,
           onRequestRemoveListTarget,
         })
       : [];

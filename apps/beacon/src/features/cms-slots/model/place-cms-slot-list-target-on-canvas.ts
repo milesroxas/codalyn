@@ -394,3 +394,25 @@ export async function placeCmsSlotListTargetOnCanvas(
 
   return { instance, alreadyExisted: firstExisting != null, cmsFieldWasCreated, cmsBindSucceeded };
 }
+
+/** Selects the first list-target instance on the current page (does not create or bind). */
+export async function focusCmsSlotListTargetOnCanvas(
+  dataList: string,
+  listContainer: BlockElement,
+  preferredDefinitionId?: string | null
+): Promise<ComponentElement | null> {
+  await exitToPageCanvas();
+  const instances = await listCmsSlotListTargetInstancesOnPage(dataList, listContainer, { preferredDefinitionId });
+  const instance = instances[0] ?? null;
+  if (instance == null) {
+    return null;
+  }
+  if (typeof webflow.setSelectedElement === "function") {
+    try {
+      await webflow.setSelectedElement(instance);
+    } catch {
+      /* selection is optional */
+    }
+  }
+  return instance;
+}

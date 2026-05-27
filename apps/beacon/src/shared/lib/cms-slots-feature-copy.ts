@@ -44,6 +44,8 @@ export const CMS_SLOTS_ROUTE_TASK_CREATING_LIST_TARGET = "Creating list target�
 
 export const CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS = "Placing on canvas…";
 
+export const CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS = "Focusing on canvas…";
+
 export const CMS_SLOTS_ROUTE_TASK_OPENING_LIST_TARGET = "Opening list target…";
 
 export const CMS_SLOTS_ROUTE_TASK_FINISHING = "Finishing up…";
@@ -73,6 +75,11 @@ export const CMS_SLOTS_BACK_BUTTON_ARIA_LABEL = BEACON_BACK_TO_HOME_ARIA_LABEL;
 export const CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP = `Install ${CMS_SLOTS_FEATURE_NAME} on this page first.`;
 
 export const CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON = "CMS slot list changed in Engine — sync page script.";
+
+export const CMS_SLOTS_TOAST_LIST_TARGET_FOCUSED = "Selected the list target on the canvas.";
+
+export const CMS_SLOTS_TOAST_LIST_TARGET_NOT_ON_CANVAS =
+  "No list target found on this page. Place it on the canvas first.";
 
 export const CMS_SLOTS_TOAST_LIST_CREATED = "CMS slot list created.";
 

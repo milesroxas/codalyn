@@ -102,9 +102,11 @@ export type CmsSlotsRouteChromeProps = {
   listTargetOnCanvasCount: number;
   onCreateListTarget: () => void | Promise<void>;
   onRequestRemoveListTarget: () => void;
+  onFocusListTargetOnCanvas: () => void | Promise<void>;
   onPlaceListTargetOnCanvas: () => void | Promise<void>;
   listTargetCreatePending: boolean;
   listTargetRemovePending: boolean;
+  listTargetFocusOnCanvasPending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
   engineListSlotFile: CmsSlotEngineSlotPropsFile | null;
   onSetEngineSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void | Promise<void>;
@@ -193,9 +195,11 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps & { routeInteractio
           listTargetOnCanvasCount={p.listTargetOnCanvasCount}
           onCreateListTarget={p.onCreateListTarget}
           onRequestRemoveListTarget={p.onRequestRemoveListTarget}
+          onFocusListTargetOnCanvas={p.onFocusListTargetOnCanvas}
           onPlaceListTargetOnCanvas={p.onPlaceListTargetOnCanvas}
           listTargetCreatePending={p.listTargetCreatePending}
           listTargetRemovePending={p.listTargetRemovePending}
+          listTargetFocusOnCanvasPending={p.listTargetFocusOnCanvasPending}
           listTargetPlaceOnCanvasPending={p.listTargetPlaceOnCanvasPending}
           engineSlotProps={p.engineListSlotFile ?? { v: 1, slots: [] }}
           onSetSlotExposed={p.onSetEngineSlotExposed}
@@ -323,6 +327,7 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
     addPending: p.addPending,
     resyncingEngineSlotKey: p.resyncingEngineSlotKey,
     listTargetCreatePending: p.listTargetCreatePending,
+    listTargetFocusOnCanvasPending: p.listTargetFocusOnCanvasPending,
     listTargetPlaceOnCanvasPending: p.listTargetPlaceOnCanvasPending,
     listTargetRemovePending: p.listTargetRemovePending,
     listTargetPhase: p.listTargetPhase,

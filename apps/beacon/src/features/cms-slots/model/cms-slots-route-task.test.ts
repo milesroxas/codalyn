@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveCmsSlotsRouteTask } from "@/features/cms-slots/model/cms-slots-route-task";
 import {
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
+  CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_SAVING_EXPOSED_PROPS,
   CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES,
   CMS_SLOTS_SCAN_MESSAGE,
@@ -17,6 +18,7 @@ const idleInput = {
   addPending: false,
   resyncingEngineSlotKey: null,
   listTargetCreatePending: false,
+  listTargetFocusOnCanvasPending: false,
   listTargetPlaceOnCanvasPending: false,
   listTargetRemovePending: false,
   listTargetPhase: "synced" as const,
@@ -57,6 +59,12 @@ describe("resolveCmsSlotsRouteTask", () => {
   it("returns add pending when no higher-priority task is active", () => {
     expect(resolveCmsSlotsRouteTask({ ...idleInput, addPending: true })?.message).toBe(
       CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT
+    );
+  });
+
+  it("returns focusing on canvas when focus pending", () => {
+    expect(resolveCmsSlotsRouteTask({ ...idleInput, listTargetFocusOnCanvasPending: true })?.message).toBe(
+      CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS
     );
   });
 

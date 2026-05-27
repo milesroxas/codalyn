@@ -5,6 +5,7 @@ import {
   CMS_SLOTS_ROUTE_TASK_CREATING_LIST,
   CMS_SLOTS_ROUTE_TASK_CREATING_LIST_TARGET,
   CMS_SLOTS_ROUTE_TASK_DELETING_LIST,
+  CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD,
   CMS_SLOTS_ROUTE_TASK_LOADING_COMPOSER_LISTS,
   CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS,
@@ -34,6 +35,7 @@ export type CmsSlotsRouteTaskInput = {
   addPending: boolean;
   resyncingEngineSlotKey: string | null;
   listTargetCreatePending: boolean;
+  listTargetFocusOnCanvasPending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
   listTargetRemovePending: boolean;
   listTargetPhase: CmsSlotListTargetPhase;
@@ -76,6 +78,9 @@ const CMS_SLOTS_ROUTE_TASK_RULES: RouteTaskRule[] = [
   },
   {
     match: (input) => (input.listTargetCreatePending ? task(CMS_SLOTS_ROUTE_TASK_CREATING_LIST_TARGET) : null),
+  },
+  {
+    match: (input) => (input.listTargetFocusOnCanvasPending ? task(CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS) : null),
   },
   {
     match: (input) => (input.listTargetPlaceOnCanvasPending ? task(CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS) : null),

@@ -28,9 +28,11 @@ export type CmsSlotCompositionPanelProps = {
   listTargetOnCanvasCount: number;
   onCreateListTarget: () => void;
   onRequestRemoveListTarget: () => void;
+  onFocusListTargetOnCanvas: () => void;
   onPlaceListTargetOnCanvas: () => void;
   listTargetCreatePending: boolean;
   listTargetRemovePending: boolean;
+  listTargetFocusOnCanvasPending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
   engineSlotProps: CmsSlotEngineSlotPropsFile;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
@@ -66,9 +68,11 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     listTargetPhase,
     onCreateListTarget,
     onRequestRemoveListTarget,
+    onFocusListTargetOnCanvas,
     onPlaceListTargetOnCanvas,
     listTargetCreatePending,
     listTargetRemovePending,
+    listTargetFocusOnCanvasPending,
     listTargetPlaceOnCanvasPending,
     listTargetOnCanvasCount,
     engineSlotProps,
@@ -86,6 +90,7 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
   const listTargetActionBusy =
     listTargetCreatePending ||
     listTargetRemovePending ||
+    listTargetFocusOnCanvasPending ||
     listTargetPlaceOnCanvasPending ||
     listTargetPhase === "loading" ||
     listTargetPhase === "updating";
@@ -100,10 +105,12 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
         listTargetCreatePending={listTargetCreatePending}
         listTargetOnCanvasCount={listTargetOnCanvasCount}
         listTargetPhase={listTargetPhase}
+        listTargetFocusOnCanvasPending={listTargetFocusOnCanvasPending}
         listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
         listTargetRemovePending={listTargetRemovePending}
         onBackToList={onBackToList}
         onCreateListTarget={onCreateListTarget}
+        onFocusListTargetOnCanvas={onFocusListTargetOnCanvas}
         onPlaceListTargetOnCanvas={onPlaceListTargetOnCanvas}
         onRequestRemoveListTarget={onRequestRemoveListTarget}
         removingKey={removingKey}

@@ -83,7 +83,10 @@ import {
   uninstallCmsSlotsPageInstall,
 } from "@/features/cms-slots/model/install-cms-slots-wrapper";
 import { paletteForConfiguredComponentIds } from "@/features/cms-slots/model/palette-for-configured-component-ids";
-import { placeCmsSlotListTargetOnCanvas } from "@/features/cms-slots/model/place-cms-slot-list-target-on-canvas";
+import {
+  focusCmsSlotListTargetOnCanvas,
+  placeCmsSlotListTargetOnCanvas,
+} from "@/features/cms-slots/model/place-cms-slot-list-target-on-canvas";
 import { resyncEngineSlotPropAttributesForSlotIndex } from "@/features/cms-slots/model/resync-engine-slot-prop-attrs";
 import { retryCmsSlotListTargetCmsFieldLink } from "@/features/cms-slots/model/retry-cms-slot-list-target-cms-field-link";
 import {
@@ -101,12 +104,15 @@ import {
   CMS_SLOTS_CMS_FIELD_NOT_VISIBLE_NOTIFY,
   CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON,
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
+  CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG,
   CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES,
   CMS_SLOTS_TOAST_LIST_CREATED,
   CMS_SLOTS_TOAST_LIST_REMOVED,
   CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED,
+  CMS_SLOTS_TOAST_LIST_TARGET_FOCUSED,
+  CMS_SLOTS_TOAST_LIST_TARGET_NOT_ON_CANVAS,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { useDesignerViewReturnDetect } from "@/shared/lib/use-designer-view-return-detect";
 import { formatWebflowDesignerError } from "@/shared/lib/webflow-designer-error";
@@ -504,7 +510,8 @@ function useListTargetOnCanvasCountWhenSynced(
   ]);
 }
 
-function isListTargetPlaceOnCanvasBlocked(
+function isListTargetCanvasActionBlocked(
+  listTargetFocusOnCanvasPending: boolean,
   listTargetPlaceOnCanvasPending: boolean,
   listTargetCreatePending: boolean,
   listTargetRemovePending: boolean,
@@ -512,6 +519,7 @@ function isListTargetPlaceOnCanvasBlocked(
   activeDataList: string | null
 ): boolean {
   return (
+    listTargetFocusOnCanvasPending ||
     listTargetPlaceOnCanvasPending ||
     listTargetCreatePending ||
     listTargetRemovePending ||
@@ -583,7 +591,7 @@ async function finishListTargetCanvasPlacement(params: {
   );
   void webflow.notify({
     type: "Success",
-    message: params.alreadyExisted ? "Selected the list target on the canvas." : "List target placed on the canvas.",
+    message: params.alreadyExisted ? CMS_SLOTS_TOAST_LIST_TARGET_FOCUSED : "List target placed on the canvas.",
   });
 }
 
@@ -640,6 +648,7 @@ export function CmsSlotsScreen() {
   const [listTargetRemovePending, setListTargetRemovePending] = useState(false);
   const [listTargetRemoveBusyKind, setListTargetRemoveBusyKind] = useState<"canvas" | "delete" | null>(null);
   const [listTargetPlaceOnCanvasPending, setListTargetPlaceOnCanvasPending] = useState(false);
+  const [listTargetFocusOnCanvasPending, setListTargetFocusOnCanvasPending] = useState(false);
   const [listTargetPhase, setListTargetPhase] = useState<CmsSlotListTargetPhase>("loading");
   const [, setListTargetRegisteredName] = useState<string | null>(null);
   const [listTargetOnCanvasCount, setListTargetOnCanvasCount] = useState(0);
@@ -1610,9 +1619,47 @@ export function CmsSlotsScreen() {
     }
   };
 
+  const handleFocusListTargetOnCanvas = async () => {
+    if (
+      isListTargetCanvasActionBlocked(
+        listTargetFocusOnCanvasPending,
+        listTargetPlaceOnCanvasPending,
+        listTargetCreatePending,
+        listTargetRemovePending,
+        listTargetPhase,
+        activeDataList
+      ) ||
+      activeDataList == null ||
+      listTargetOnCanvasCount === 0
+    ) {
+      return;
+    }
+    const dataList = activeDataList;
+    const listContainer = targetRef.current;
+    if (!listContainer) return;
+    setListTargetFocusOnCanvasPending(true);
+    setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS);
+    try {
+      const instance = await focusCmsSlotListTargetOnCanvas(dataList, listContainer, listTargetDefinitionIdRef.current);
+      if (instance == null) {
+        setListTargetOnCanvasCount(0);
+        void webflow.notify({ type: "Warning", message: CMS_SLOTS_TOAST_LIST_TARGET_NOT_ON_CANVAS });
+        return;
+      }
+      void webflow.notify({ type: "Success", message: CMS_SLOTS_TOAST_LIST_TARGET_FOCUSED });
+    } catch (err) {
+      const message = formatWebflowDesignerError(err);
+      void webflow.notify({ type: "Error", message });
+    } finally {
+      setListTargetFocusOnCanvasPending(false);
+      setRouteTaskPhase(null);
+    }
+  };
+
   const handlePlaceListTargetOnCanvas = async () => {
     if (
-      isListTargetPlaceOnCanvasBlocked(
+      isListTargetCanvasActionBlocked(
+        listTargetFocusOnCanvasPending,
         listTargetPlaceOnCanvasPending,
         listTargetCreatePending,
         listTargetRemovePending,
@@ -1794,9 +1841,11 @@ export function CmsSlotsScreen() {
       listTargetOnCanvasCount={listTargetOnCanvasCount}
       onCreateListTarget={handleCreateListTarget}
       onRequestRemoveListTarget={handleRequestRemoveListTarget}
+      onFocusListTargetOnCanvas={handleFocusListTargetOnCanvas}
       onPlaceListTargetOnCanvas={handlePlaceListTargetOnCanvas}
       listTargetCreatePending={listTargetCreatePending}
       listTargetRemovePending={listTargetRemovePending}
+      listTargetFocusOnCanvasPending={listTargetFocusOnCanvasPending}
       listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
       engineListSlotFile={engineListSlotFile}
       onSetEngineSlotExposed={handleSetEngineSlotExposed}

@@ -1,10 +1,12 @@
 "use client";
 
-import { IconCheck, IconMail, IconX } from "@tabler/icons-react";
+import { IconCheck, IconKey, IconMail, IconX } from "@tabler/icons-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { formatRelative } from "@/features/operator/model/format";
+import { useOperatorMetrics } from "@/features/operator/model/operator-metrics-provider";
+import { OperatorPendingReviewAlert } from "@/features/operator/ui/operator-pending-review-alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
@@ -14,6 +16,7 @@ const ACCESS_REQUEST_SKELETON_ROWS = ["one", "two", "three"] as const;
 const ACCESS_REQUEST_SKELETON_COLS = ["email", "name", "referral", "requested", "actions"] as const;
 
 export function OperatorAccessRequests() {
+  const { metrics, refresh: refreshMetrics } = useOperatorMetrics();
   const [rows, setRows] = useState<Awaited<ReturnType<typeof operatorApi.listEarlyAccessRequests>>["rows"]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,13 +28,14 @@ export function OperatorAccessRequests() {
     try {
       const res = await operatorApi.listEarlyAccessRequests("pending");
       setRows(res.rows);
+      await refreshMetrics();
     } catch (err) {
       setError(err instanceof OperatorApiError ? err.message : "Could not load access requests");
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshMetrics]);
 
   useEffect(() => {
     void load();
@@ -67,6 +71,8 @@ export function OperatorAccessRequests() {
     }
   }
 
+  const pendingCount = metrics?.totals.pendingEarlyAccessRequests ?? rows.length;
+
   return (
     <div className="space-y-6">
       <div className="space-y-1.5">
@@ -77,6 +83,14 @@ export function OperatorAccessRequests() {
           record when they sign up or sign in.
         </p>
       </div>
+
+      {pendingCount > 0 ? (
+        <OperatorPendingReviewAlert
+          icon={<IconKey aria-hidden />}
+          title={pendingCount === 1 ? "1 request awaiting review" : `${pendingCount} requests awaiting review`}
+          description="Review each request below. Operators are also notified by email when a new request is submitted."
+        />
+      ) : null}
 
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">

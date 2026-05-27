@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { formatRelative } from "@/features/operator/model/format";
+import { useOperatorMetrics } from "@/features/operator/model/operator-metrics-provider";
 import { TOWER_SUPPORT_REQUEST_CONFIG, type TowerSupportRequestKind } from "@/shared/lib/support/tower-support-request";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -42,6 +43,7 @@ function statusBadgeVariant(status: SupportRequestRow["status"]): "default" | "s
 }
 
 export function OperatorSupportRequests() {
+  const { refresh: refreshMetrics } = useOperatorMetrics();
   const [rows, setRows] = useState<SupportRequestRow[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
@@ -57,13 +59,16 @@ export function OperatorSupportRequests() {
     try {
       const res = await operatorApi.listSupportRequests({ status: statusFilter, kind: kindFilter });
       setRows(res.rows);
+      if (statusFilter === "pending") {
+        await refreshMetrics();
+      }
     } catch (err) {
       setError(err instanceof OperatorApiError ? err.message : "Could not load support requests");
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, kindFilter]);
+  }, [statusFilter, kindFilter, refreshMetrics]);
 
   useEffect(() => {
     void load();

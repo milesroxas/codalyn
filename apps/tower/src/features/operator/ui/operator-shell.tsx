@@ -24,7 +24,11 @@ import { authClient } from "@/features/auth/model/auth-client";
 import { useTowerWebSignOut } from "@/features/auth/model/use-tower-web-sign-out";
 import { persistBeaconThemePreference, toggledLightDarkTheme } from "@/features/beacon/lib/beacon-theme-preference";
 import { initialsFor } from "@/features/operator/model/format";
+import { OperatorMetricsProvider, useOperatorMetrics } from "@/features/operator/model/operator-metrics-provider";
+import { operatorPendingCountForHref } from "@/features/operator/model/operator-pending-counts";
 import { OperatorCommandPalette } from "@/features/operator/ui/operator-command-palette";
+import { OperatorNavCountBadge } from "@/features/operator/ui/operator-nav-count-badge";
+import { OperatorPendingReviewAlert } from "@/features/operator/ui/operator-pending-review-alert";
 import { TowerAccountMenu } from "@/features/tower-ui/tower-account-menu";
 import { cn } from "@/shared/lib/utils";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
@@ -54,7 +58,19 @@ export type OperatorShellProps = {
 };
 
 export function OperatorShell({ userEmail, userName, children }: OperatorShellProps) {
+  return (
+    <OperatorMetricsProvider>
+      <OperatorShellContent userEmail={userEmail} userName={userName}>
+        {children}
+      </OperatorShellContent>
+    </OperatorMetricsProvider>
+  );
+}
+
+function OperatorShellContent({ userEmail, userName, children }: OperatorShellProps) {
   const pathname = usePathname();
+  const { metrics } = useOperatorMetrics();
+  const pendingEarlyAccessRequests = metrics?.totals.pendingEarlyAccessRequests ?? 0;
   const { data: session } = authClient.useSession();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const effectiveResolved: "light" | "dark" = resolvedTheme === "dark" ? "dark" : "light";
@@ -107,6 +123,7 @@ export function OperatorShell({ userEmail, userName, children }: OperatorShellPr
     <nav className="flex flex-col gap-0.5 px-2">
       {nav.map(({ href, label, icon: Icon }) => {
         const active = isActiveNav(pathname, href);
+        const pendingCount = operatorPendingCountForHref(href, metrics?.totals);
         return (
           <Link
             key={href}
@@ -118,7 +135,8 @@ export function OperatorShell({ userEmail, userName, children }: OperatorShellPr
             )}
           >
             <Icon className={cn("size-4 shrink-0", active ? "text-foreground" : "opacity-70")} aria-hidden />
-            {label}
+            <span className="min-w-0 flex-1 truncate">{label}</span>
+            <OperatorNavCountBadge count={pendingCount} />
           </Link>
         );
       })}
@@ -260,7 +278,22 @@ export function OperatorShell({ userEmail, userName, children }: OperatorShellPr
         ) : null}
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
-          <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</div>
+          <div className="mx-auto w-full max-w-6xl flex-1 space-y-4 px-4 py-6 sm:px-6 sm:py-8">
+            {pendingEarlyAccessRequests > 0 && !isActiveNav(pathname, "/console/access-requests") ? (
+              <OperatorPendingReviewAlert
+                icon={<IconKey aria-hidden />}
+                title={
+                  pendingEarlyAccessRequests === 1
+                    ? "1 early access request needs review"
+                    : `${pendingEarlyAccessRequests} early access requests need review`
+                }
+                description="Someone requested access to Tower. Approve or dismiss the request in Access requests."
+                href="/console/access-requests"
+                actionLabel="Review requests"
+              />
+            ) : null}
+            {children}
+          </div>
         </main>
       </div>
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveCmsSlotsRouteTask } from "@/features/cms-slots/model/cms-slots-route-task";
 import {
+  CMS_SLOTS_OPENING_MESSAGE,
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
   CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION,
   CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
@@ -16,6 +17,8 @@ import {
 const idleInput = {
   pageBootBlocking: false,
   routeTaskPhase: null,
+  openingBeaconKey: null,
+  composerOpeningKey: null,
   isComposer: false,
   picking: false,
   activeComposer: null,
@@ -92,6 +95,15 @@ describe("resolveCmsSlotsRouteTask", () => {
         routeTaskPhase: CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
       })?.message
     ).toBe(CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL);
+  });
+
+  it("returns opening message while a slot list is opening", () => {
+    expect(
+      resolveCmsSlotsRouteTask({
+        ...idleInput,
+        openingBeaconKey: "beacon-1",
+      })?.message
+    ).toBe(CMS_SLOTS_OPENING_MESSAGE);
   });
 
   it("returns null when idle", () => {

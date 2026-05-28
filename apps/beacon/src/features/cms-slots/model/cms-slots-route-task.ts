@@ -1,5 +1,7 @@
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import {
+  CMS_SLOTS_OPENING_ARIA_LABEL,
+  CMS_SLOTS_OPENING_MESSAGE,
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
   CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET,
   CMS_SLOTS_ROUTE_TASK_CREATING_LIST,
@@ -28,6 +30,8 @@ export type CmsSlotsRouteTask = {
 export type CmsSlotsRouteTaskInput = {
   pageBootBlocking: boolean;
   routeTaskPhase: string | null;
+  openingBeaconKey: string | null;
+  composerOpeningKey: string | null;
   isComposer: boolean;
   picking: boolean;
   activeComposer: unknown;
@@ -66,6 +70,12 @@ const CMS_SLOTS_ROUTE_TASK_RULES: RouteTaskRule[] = [
       const phase = input.routeTaskPhase?.trim();
       return phase ? task(phase) : null;
     },
+  },
+  {
+    match: (input) =>
+      input.openingBeaconKey != null || input.composerOpeningKey != null
+        ? task(CMS_SLOTS_OPENING_MESSAGE, CMS_SLOTS_OPENING_ARIA_LABEL)
+        : null,
   },
   {
     match: (input) =>

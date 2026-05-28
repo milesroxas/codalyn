@@ -179,6 +179,8 @@ function cmsSlotsRouteTaskInputFromChromeProps(p: CmsSlotsRouteChromeProps): Cms
   return {
     pageBootBlocking: p.pageBootBlocking,
     routeTaskPhase: p.routeTaskPhase,
+    openingBeaconKey: p.openingBeaconKey,
+    composerOpeningKey: p.composerOpeningKey,
     isComposer: p.isComposer,
     picking: p.picking,
     activeComposer: p.activeComposer,

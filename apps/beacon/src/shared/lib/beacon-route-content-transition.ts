@@ -15,5 +15,5 @@ export const beaconRouteContentTransitionMotionClass = cn(
 );
 
 export function beaconRouteContentVisibleClass(visible: boolean) {
-  return visible ? "opacity-100" : "pointer-events-none opacity-0";
+  return visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0";
 }

@@ -6,7 +6,6 @@ import {
   CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LOADING_ARIA_LABEL,
   CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_SEARCH_PLACEHOLDER,
 } from "@/shared/lib/cms-slots-feature-copy";
-import { ScrollArea } from "@/shared/ui/scroll-area";
 import { SearchInput } from "@/shared/ui/search-input";
 
 export type CmsSlotCompositionComponentsCatalogProps = {
@@ -22,12 +21,11 @@ export type CmsSlotCompositionComponentsCatalogProps = {
 };
 
 const compositionComponentCatalogListRootClass = "flex min-w-0 flex-col gap-2";
-const compositionComponentCatalogListShellClass = "relative min-h-48 min-w-0 flex-1";
+const compositionComponentCatalogListShellClass = "relative min-h-48 min-w-0";
 const compositionComponentCatalogListLoaderClass =
-  "absolute inset-0 z-10 flex items-center justify-center rounded-md bg-popover/75 backdrop-blur-[1px]";
-const compositionComponentCatalogListScrollAreaClass = "min-h-48 min-w-0 flex-1 rounded-md";
-const compositionComponentCatalogListClass = "m-0 list-none px-1";
-const compositionComponentCatalogListItemClass = "mx-2 border-b border-border/80 last:border-b-0";
+  "pointer-events-auto absolute inset-0 z-10 flex items-center justify-center bg-popover/75 backdrop-blur-[1px]";
+const compositionComponentCatalogListClass = "m-0 list-none p-0";
+const compositionComponentCatalogListItemClass = "border-b border-border/80 last:border-b-0";
 const compositionComponentCatalogErrorClass = "text-sm text-destructive";
 
 const compositionComponentCatalogListItemButtonVariants = cva(
@@ -131,7 +129,7 @@ export function CmsSlotCompositionComponentsCatalogList(
         </p>
       ) : null}
 
-      <div className={compositionComponentCatalogListShellClass}>
+      <div className={compositionComponentCatalogListShellClass} data-state={showCatalogLoading ? "loading" : "idle"}>
         {showCatalogLoading ? (
           <div
             className={compositionComponentCatalogListLoaderClass}
@@ -143,34 +141,29 @@ export function CmsSlotCompositionComponentsCatalogList(
             <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
           </div>
         ) : null}
-        <ScrollArea
-          className={compositionComponentCatalogListScrollAreaClass}
-          data-state={showCatalogLoading ? "loading" : "idle"}
-        >
-          {componentCatalog.length === 0 && !showCatalogLoading ? (
-            <div className="min-h-28" aria-hidden />
-          ) : (
-            <ul
-              className={compositionComponentCatalogListClass}
-              aria-label={CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LIST_ARIA_LABEL}
-            >
-              {componentCatalog.map((component) => {
-                const isAlreadyAdded = selectedComponentIdSet.has(component.id);
-                const disabled = addPending || catalogLoading || isAlreadyAdded;
+        {componentCatalog.length === 0 && !showCatalogLoading ? (
+          <div className="min-h-28" aria-hidden />
+        ) : (
+          <ul
+            className={compositionComponentCatalogListClass}
+            aria-label={CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LIST_ARIA_LABEL}
+          >
+            {componentCatalog.map((component) => {
+              const isAlreadyAdded = selectedComponentIdSet.has(component.id);
+              const disabled = addPending || catalogLoading || isAlreadyAdded;
 
-                return (
-                  <CompositionComponentCatalogListItem
-                    key={component.id}
-                    component={component}
-                    added={isAlreadyAdded}
-                    disabled={disabled}
-                    onAdd={() => void onAddComponent(component)}
-                  />
-                );
-              })}
-            </ul>
-          )}
-        </ScrollArea>
+              return (
+                <CompositionComponentCatalogListItem
+                  key={component.id}
+                  component={component}
+                  added={isAlreadyAdded}
+                  disabled={disabled}
+                  onAdd={() => void onAddComponent(component)}
+                />
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );

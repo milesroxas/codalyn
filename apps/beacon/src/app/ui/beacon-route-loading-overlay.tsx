@@ -5,7 +5,6 @@ import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import {
   BEACON_ROUTE_CONTENT_ENTER_TRANSITION_MS,
   beaconRouteContentTransitionMotionClass,
-  beaconRouteContentVisibleClass,
 } from "@/shared/lib/beacon-route-content-transition";
 import { cn } from "@/shared/lib/utils";
 import { RouteLoadingSurface } from "@/shared/ui/route-loading";
@@ -91,7 +90,12 @@ function BeaconRouteLoadingOverlayShell(props: BeaconRouteLoadingOverlayShellPro
   return createPortal(
     <RouteLoadingSurface
       layout="overlay"
-      className={cn(beaconRouteContentTransitionMotionClass, beaconRouteContentVisibleClass(shown), className)}
+      className={cn(
+        beaconRouteContentTransitionMotionClass,
+        shown ? "opacity-100" : "opacity-0",
+        "pointer-events-auto",
+        className
+      )}
       role="status"
       aria-live="polite"
       aria-busy="true"

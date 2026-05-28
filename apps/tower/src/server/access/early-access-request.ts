@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { inviteCustomerForEarlyAccess } from "@/server/access/customer-early-access-invite";
 import { emailHasPendingOrgInvitation, normalizeAccessEmail, userMaySignIn } from "@/server/access/early-access";
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
+import { sendEarlyAccessRequestConfirmationEmail } from "@/server/email/early-access-request-confirmation-email";
 import { sendEarlyAccessRequestNotificationEmail } from "@/server/email/early-access-request-notification-email";
 import { listProductAdminEmails } from "@/server/membership/product-admin";
 import { normalizeEarlyAccessRequestNameFields } from "@/shared/lib/access/early-access-request-name";
@@ -107,7 +108,7 @@ export async function submitEarlyAccessRequest(input: {
         createdAt: new Date(),
       })
       .where(eq(earlyAccessRequest.id, existing.id));
-    await notifyOperatorsOfEarlyAccessRequest({ email, firstName, lastName, note, teamMemberEmails });
+    await notifyEarlyAccessRequestSubmitted({ email, firstName, lastName, note, teamMemberEmails });
     return "created";
   }
 
@@ -120,8 +121,25 @@ export async function submitEarlyAccessRequest(input: {
     teamMemberEmails,
     status: "pending",
   });
-  await notifyOperatorsOfEarlyAccessRequest({ email, firstName, lastName, note, teamMemberEmails });
+  await notifyEarlyAccessRequestSubmitted({ email, firstName, lastName, note, teamMemberEmails });
   return "created";
+}
+
+async function notifyEarlyAccessRequestSubmitted(data: {
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  note: string | null;
+  teamMemberEmails: string[] | null;
+}): Promise<void> {
+  await Promise.all([
+    notifyOperatorsOfEarlyAccessRequest(data),
+    sendEarlyAccessRequestConfirmationEmail({
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+    }),
+  ]);
 }
 
 async function notifyOperatorsOfEarlyAccessRequest(data: {

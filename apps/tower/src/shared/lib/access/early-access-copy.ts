@@ -6,10 +6,11 @@ export const EARLY_ACCESS_REQUIRED_MESSAGE =
 export const EARLY_ACCESS_SIGN_UP_BLOCKED_MESSAGE =
   "Tower is in early access. Request access below, or use the link in your invitation email.";
 
-export const EARLY_ACCESS_REQUEST_SUCCESS_MESSAGE = "Request received. We'll email you when you're approved.";
+export const EARLY_ACCESS_REQUEST_APPROVAL_FOLLOW_UP = "We'll review your request and email you when you're approved.";
 
-export const EARLY_ACCESS_REQUEST_ALREADY_PENDING_MESSAGE =
-  "We already have your request. We'll email you when you're approved.";
+export const EARLY_ACCESS_REQUEST_SUCCESS_MESSAGE = `Request received. ${EARLY_ACCESS_REQUEST_APPROVAL_FOLLOW_UP}`;
+
+export const EARLY_ACCESS_REQUEST_ALREADY_PENDING_MESSAGE = `We already have your request. ${EARLY_ACCESS_REQUEST_APPROVAL_FOLLOW_UP}`;
 
 export const EARLY_ACCESS_REQUEST_ALREADY_HAS_ACCESS_MESSAGE =
   "This email already has access. Sign in, or use your invite link.";

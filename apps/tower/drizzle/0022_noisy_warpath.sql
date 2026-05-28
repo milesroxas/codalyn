@@ -1,0 +1,1 @@
+ALTER TABLE "early_access_request" ADD COLUMN "decline_reason" text;

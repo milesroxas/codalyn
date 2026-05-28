@@ -1,3 +1,7 @@
+import {
+  operatorInviteLinkExpiryHtmlBlock,
+  operatorInviteLinkExpiryPlainTextLines,
+} from "@/server/email/operator-invite-link-expiry-copy";
 import { sendTransactionalEmail } from "@/server/email/resend-send";
 import { resolveTowerAbsoluteUrl } from "@/server/tower-public-url";
 
@@ -14,14 +18,17 @@ export async function sendOperatorNewCustomerInviteEmail(data: {
   inviterLabel: string;
 }): Promise<void> {
   const inviteUrl = resolveTowerAbsoluteUrl(data.inviteUrl);
+  const expiryLines = operatorInviteLinkExpiryPlainTextLines("operator_invite");
   const subject = "You're invited to Tower";
   const text = [
     `${data.inviterLabel} invited you to create a Tower account and a team workspace.`,
     "",
-    `Use this link (sign up with ${data.email}):`,
     inviteUrl,
     "",
-    "If you didn't expect this, you can ignore this email.",
+    `Sign up with ${data.email}.`,
+    ...expiryLines,
+    "",
+    "If you didn't expect this invitation, you can ignore this email.",
   ].join("\n");
   const html = `
 <!DOCTYPE html>
@@ -29,8 +36,9 @@ export async function sendOperatorNewCustomerInviteEmail(data: {
 <body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #171717;">
   <p><strong>${escapeHtml(data.inviterLabel)}</strong> invited you to create a Tower account and a team workspace.</p>
   <p><a href="${escapeHtml(inviteUrl)}" style="color: #171717;">Create your account</a></p>
-  <p style="font-size: 14px; color: #525252;">Use <strong>${escapeHtml(data.email)}</strong> when signing up.</p>
-  <p style="font-size: 12px; color: #737373;">If you didn't expect this, you can ignore this email.</p>
+  <p style="font-size: 14px; color: #525252;">Sign up with <strong>${escapeHtml(data.email)}</strong>.</p>
+  ${operatorInviteLinkExpiryHtmlBlock("operator_invite")}
+  <p style="font-size: 12px; color: #737373;">If you didn't expect this invitation, you can ignore this email.</p>
 </body>
 </html>`;
   await sendTransactionalEmail({ to: data.email, subject, html, text });

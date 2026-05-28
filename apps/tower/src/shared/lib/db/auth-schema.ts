@@ -349,6 +349,8 @@ export const earlyAccessRequest = pgTable(
     teamMemberEmails: jsonb("team_member_emails").$type<string[] | null>(),
     /** `pending` · `approved` · `dismissed` */
     status: text("status").notNull().default("pending"),
+    /** Operator-provided reason emailed to the requester when declined. */
+    declineReason: text("decline_reason"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     resolvedAt: timestamp("resolved_at"),
     resolvedByUserId: text("resolved_by_user_id").references(() => user.id, { onDelete: "set null" }),

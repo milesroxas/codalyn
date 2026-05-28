@@ -1,7 +1,12 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import { inviteCustomerForEarlyAccess } from "@/server/access/customer-early-access-invite";
+import {
+  type CustomerEarlyAccessInviteResult,
+  deliverEarlyAccessApproval,
+  inviteCustomerForEarlyAccess,
+} from "@/server/access/customer-early-access-invite";
 import { emailHasPendingOrgInvitation, normalizeAccessEmail, userMaySignIn } from "@/server/access/early-access";
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
+import { sendEarlyAccessDeclinedEmail } from "@/server/email/early-access-declined-email";
 import { sendEarlyAccessRequestConfirmationEmail } from "@/server/email/early-access-request-confirmation-email";
 import { sendEarlyAccessRequestNotificationEmail } from "@/server/email/early-access-request-notification-email";
 import { listProductAdminEmails } from "@/server/membership/product-admin";
@@ -17,6 +22,7 @@ export type EarlyAccessRequestRow = {
   note: string | null;
   teamMemberEmails: string[] | null;
   status: string;
+  declineReason: string | null;
   createdAt: Date;
   resolvedAt: Date | null;
   resolvedByUserId: string | null;
@@ -103,6 +109,7 @@ export async function submitEarlyAccessRequest(input: {
         lastName,
         note,
         teamMemberEmails,
+        declineReason: null,
         resolvedAt: null,
         resolvedByUserId: null,
         createdAt: new Date(),
@@ -175,6 +182,7 @@ export async function listEarlyAccessRequests(
       note: earlyAccessRequest.note,
       teamMemberEmails: earlyAccessRequest.teamMemberEmails,
       status: earlyAccessRequest.status,
+      declineReason: earlyAccessRequest.declineReason,
       createdAt: earlyAccessRequest.createdAt,
       resolvedAt: earlyAccessRequest.resolvedAt,
       resolvedByUserId: earlyAccessRequest.resolvedByUserId,
@@ -191,7 +199,7 @@ export async function approveEarlyAccessRequest(
   requestId: string,
   operatorUserId: string,
   inviterLabel: string
-): Promise<{ inviteUrl?: string }> {
+): Promise<{ inviteUrl?: string; signInUrl?: string }> {
   const [row] = await db
     .select({
       id: earlyAccessRequest.id,
@@ -220,12 +228,72 @@ export async function approveEarlyAccessRequest(
     })
     .where(eq(earlyAccessRequest.id, requestId));
 
-  return invite.kind === "new_user" ? { inviteUrl: invite.inviteUrl } : {};
+  return invite.kind === "new_user" ? { inviteUrl: invite.inviteUrl } : { signInUrl: invite.signInUrl };
 }
 
-export async function dismissEarlyAccessRequest(requestId: string, operatorUserId: string): Promise<void> {
+async function requireApprovedEarlyAccessRequest(requestId: string): Promise<{ email: string }> {
   const [row] = await db
-    .select({ id: earlyAccessRequest.id, status: earlyAccessRequest.status })
+    .select({
+      email: earlyAccessRequest.email,
+      status: earlyAccessRequest.status,
+    })
+    .from(earlyAccessRequest)
+    .where(eq(earlyAccessRequest.id, requestId))
+    .limit(1);
+
+  if (!row) {
+    throw new Error("not_found");
+  }
+  if (row.status !== "approved") {
+    throw new Error("not_approved");
+  }
+  return { email: row.email };
+}
+
+export async function resendEarlyAccessRequestApproval(
+  requestId: string,
+  inviterLabel: string
+): Promise<CustomerEarlyAccessInviteResult> {
+  const row = await requireApprovedEarlyAccessRequest(requestId);
+  return deliverEarlyAccessApproval(row.email, {
+    sendEmail: true,
+    reason: "early_access_request",
+    inviterLabel,
+    applyGrants: false,
+  });
+}
+
+export async function getEarlyAccessRequestInviteLink(
+  requestId: string,
+  inviterLabel: string
+): Promise<CustomerEarlyAccessInviteResult> {
+  const row = await requireApprovedEarlyAccessRequest(requestId);
+  return deliverEarlyAccessApproval(row.email, {
+    sendEmail: false,
+    reason: "early_access_request",
+    inviterLabel,
+    applyGrants: false,
+  });
+}
+
+export async function dismissEarlyAccessRequest(
+  requestId: string,
+  operatorUserId: string,
+  declineReason: string
+): Promise<void> {
+  const reason = declineReason.trim();
+  if (!reason) {
+    throw new Error("decline_reason_required");
+  }
+
+  const [row] = await db
+    .select({
+      id: earlyAccessRequest.id,
+      email: earlyAccessRequest.email,
+      firstName: earlyAccessRequest.firstName,
+      lastName: earlyAccessRequest.lastName,
+      status: earlyAccessRequest.status,
+    })
     .from(earlyAccessRequest)
     .where(eq(earlyAccessRequest.id, requestId))
     .limit(1);
@@ -237,10 +305,18 @@ export async function dismissEarlyAccessRequest(requestId: string, operatorUserI
     throw new Error("not_pending");
   }
 
+  await sendEarlyAccessDeclinedEmail({
+    email: row.email,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    declineReason: reason,
+  });
+
   await db
     .update(earlyAccessRequest)
     .set({
       status: "dismissed",
+      declineReason: reason,
       resolvedAt: new Date(),
       resolvedByUserId: operatorUserId,
     })

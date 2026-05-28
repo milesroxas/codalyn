@@ -287,7 +287,7 @@ function OperatorShellContent({ userEmail, userName, children }: OperatorShellPr
                     ? "1 early access request needs review"
                     : `${pendingEarlyAccessRequests} early access requests need review`
                 }
-                description="Someone requested access to Tower. Approve or dismiss the request in Access requests."
+                description="Someone requested access to Tower. Approve or decline the request in Access requests."
                 href="/console/access-requests"
                 actionLabel="Review requests"
               />

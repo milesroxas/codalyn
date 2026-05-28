@@ -108,7 +108,7 @@ export function OperatorSupportRequests() {
 
       <div className="flex flex-wrap gap-3">
         <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
-          <SelectTrigger aria-label="Filter by status">
+          <SelectTrigger size="sm" width="filterLg" aria-label="Filter by status">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -119,7 +119,7 @@ export function OperatorSupportRequests() {
           </SelectContent>
         </Select>
         <Select value={kindFilter} onValueChange={(value) => setKindFilter(value as KindFilter)}>
-          <SelectTrigger aria-label="Filter by kind">
+          <SelectTrigger size="sm" width="filter" aria-label="Filter by kind">
             <SelectValue placeholder="Kind" />
           </SelectTrigger>
           <SelectContent>

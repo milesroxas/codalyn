@@ -140,11 +140,12 @@ export const operatorApi = {
   }> => requestJson(`/api/operator/early-access-requests?status=${encodeURIComponent(status)}`),
   resolveEarlyAccessRequest: async (
     id: string,
-    action: "approve" | "dismiss"
-  ): Promise<{ ok: true; inviteUrl?: string }> =>
+    action: "approve" | "dismiss" | "resend_approval" | "invite_link",
+    declineReason?: string
+  ): Promise<{ ok: true; kind?: "existing_user" | "new_user"; inviteUrl?: string; signInUrl?: string }> =>
     requestJson(`/api/operator/early-access-requests/${encodeURIComponent(id)}`, {
       method: "POST",
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, ...(action === "dismiss" ? { declineReason } : {}) }),
     }),
   listSupportRequests: async (
     query: { status?: "pending" | "resolved" | "dismissed" | "all"; kind?: "all" | "feedback" | "help" } = {}

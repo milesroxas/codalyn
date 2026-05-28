@@ -34,6 +34,12 @@ export const CMS_SLOTS_COMPOSER_INSTALL_IN_ENGINE_TITLE = "Not installed";
 
 export const CMS_SLOTS_COMPOSER_INSTALL_IN_ENGINE_DESCRIPTION = `Install ${CMS_SLOTS_FEATURE_NAME} in Engine to compose slot content. Click the button below to install.`;
 
+/** Composer empty state when Engine is installed but no slot component is configured and synced yet. */
+export const CMS_SLOTS_COMPOSER_ENGINE_NOT_READY_TITLE = "Not ready";
+
+export const CMS_SLOTS_COMPOSER_ENGINE_NOT_READY_DESCRIPTION =
+  "Configure, expose, and sync at least one component in Engine to compose slot content.";
+
 export const CMS_SLOTS_INSTALL_ARIA_LABEL = `Installing ${CMS_SLOTS_FEATURE_NAME}`;
 
 export const CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL = "Checking install…";
@@ -134,6 +140,8 @@ export const CMS_SLOTS_UNINSTALL_PAGE_LABEL = `Also uninstall ${CMS_SLOTS_FEATUR
 export const CMS_SLOTS_EDITOR_NO_SLOTS_TITLE = "No Slots Found";
 
 export const CMS_SLOTS_EDITOR_NO_SLOTS_DESCRIPTION = "Contact your team admin or site designer to enable this feature";
+
+export const CMS_SLOTS_EDITOR_NO_SLOTS_BACK_LABEL = "Back";
 
 /** Action label on the home tile and route gate when CMS Slots is not on a collection template. */
 export const CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_LABEL = "Open a CMS collection template";

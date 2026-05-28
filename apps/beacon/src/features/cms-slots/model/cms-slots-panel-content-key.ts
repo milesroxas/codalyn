@@ -131,12 +131,17 @@ export function resolveCmsSlotsComposerRouteSurface(input: CmsSlotsComposerRoute
   };
 }
 
-export type CmsSlotsComposerListPanelContentKey = "editor-empty" | "engine-install-prompt" | "list";
+export type CmsSlotsComposerListPanelContentKey =
+  | "editor-empty"
+  | "engine-install-prompt"
+  | "engine-not-ready"
+  | "list";
 
 export function cmsSlotsComposerListPanelContentKey(input: {
   routeStateKnown: boolean;
   beaconsWrapperInstalled: boolean;
   showEditorNoSlotsEmpty: boolean;
+  showEngineNotReadyEmpty: boolean;
   canAccessEngine: boolean;
 }): CmsSlotsComposerListPanelContentKey {
   if (input.showEditorNoSlotsEmpty) {
@@ -150,6 +155,9 @@ export function cmsSlotsComposerListPanelContentKey(input: {
     })
   ) {
     return "engine-install-prompt";
+  }
+  if (input.showEngineNotReadyEmpty) {
+    return "engine-not-ready";
   }
   return "list";
 }

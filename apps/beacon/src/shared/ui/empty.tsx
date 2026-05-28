@@ -127,8 +127,20 @@ function EmptyContent({
   return <div data-slot="empty-content" className={cn(emptyContentVariants({ layout }), className)} {...props} />;
 }
 
-function EmptyAction({ className, ...props }: React.ComponentProps<typeof Button>) {
-  return <Button type="button" variant="emptyAction" size="emptyAction" className={className} {...props} />;
+function EmptyAction({
+  className,
+  width = "full",
+  ...props
+}: React.ComponentProps<typeof Button> & { width?: "full" | "fit" }) {
+  return (
+    <Button
+      type="button"
+      variant="emptyAction"
+      size={width === "fit" ? "emptyActionFit" : "emptyAction"}
+      className={className}
+      {...props}
+    />
+  );
 }
 
 export { Empty, EmptyAction, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle };

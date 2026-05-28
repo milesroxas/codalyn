@@ -69,6 +69,20 @@ export function shouldShowCmsSlotsComposerInstallInEngineEmpty(input: {
   );
 }
 
+/** Composer list: installed but no slot has an Engine-configured component ready for composing. */
+export function shouldShowCmsSlotsComposerEngineNotReadyEmpty(input: {
+  canAccessEngine: boolean;
+  /** True once page scan, runtime status, and composer eligibility have all settled. */
+  composerListSettled: boolean;
+  beaconsWrapperInstalled: boolean;
+  eligibleCount: number;
+}): boolean {
+  if (!input.canAccessEngine || !input.composerListSettled || !input.beaconsWrapperInstalled) {
+    return false;
+  }
+  return input.eligibleCount === 0;
+}
+
 /** Composer list panel: editor-only empty state when install/scan finished and no lists are available. */
 export function shouldShowCmsSlotsEditorNoSlotsEmpty(input: {
   composerOnly: boolean;

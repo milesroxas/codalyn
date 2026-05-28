@@ -4,6 +4,7 @@ import {
   computeEditorExperienceFromMembership,
   defaultCmsSlotsRouteSegment,
   resolveAllowedCmsSlotsSegment,
+  shouldShowCmsSlotsComposerEngineNotReadyEmpty,
   shouldShowCmsSlotsComposerInstallInEngineEmpty,
   shouldShowCmsSlotsEditorNoSlotsEmpty,
   shouldShowCmsSlotsPreInstall,
@@ -60,6 +61,49 @@ describe("cms-slots-access", () => {
         canAccessEngine: true,
         routeStateKnown: true,
         beaconsWrapperInstalled: true,
+      })
+    ).toBe(false);
+  });
+
+  it("shows composer engine-not-ready empty only for engine-capable members after install with no eligible lists", () => {
+    expect(
+      shouldShowCmsSlotsComposerEngineNotReadyEmpty({
+        canAccessEngine: false,
+        composerListSettled: true,
+        beaconsWrapperInstalled: true,
+        eligibleCount: 0,
+      })
+    ).toBe(false);
+    expect(
+      shouldShowCmsSlotsComposerEngineNotReadyEmpty({
+        canAccessEngine: true,
+        composerListSettled: false,
+        beaconsWrapperInstalled: true,
+        eligibleCount: 0,
+      })
+    ).toBe(false);
+    expect(
+      shouldShowCmsSlotsComposerEngineNotReadyEmpty({
+        canAccessEngine: true,
+        composerListSettled: true,
+        beaconsWrapperInstalled: false,
+        eligibleCount: 0,
+      })
+    ).toBe(false);
+    expect(
+      shouldShowCmsSlotsComposerEngineNotReadyEmpty({
+        canAccessEngine: true,
+        composerListSettled: true,
+        beaconsWrapperInstalled: true,
+        eligibleCount: 0,
+      })
+    ).toBe(true);
+    expect(
+      shouldShowCmsSlotsComposerEngineNotReadyEmpty({
+        canAccessEngine: true,
+        composerListSettled: true,
+        beaconsWrapperInstalled: true,
+        eligibleCount: 1,
       })
     ).toBe(false);
   });

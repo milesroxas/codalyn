@@ -2,13 +2,14 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { BEACON_HOME_TILE_CSS_VARS } from "@/shared/lib/beacon-app-backgrounds";
 import { cn } from "@/shared/lib/utils";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
 
 type CmsSlotsHeroEmptyStateProps = {
   "data-slot": string;
   icon: LucideIcon;
   title: string;
   description: string;
+  footer?: ReactNode;
   className?: string;
 };
 
@@ -24,7 +25,7 @@ export function CmsSlotsRouteHeroEmptyCenter(props: { "data-slot": string; child
 }
 
 export function CmsSlotsHeroEmptyState(props: CmsSlotsHeroEmptyStateProps) {
-  const { icon: Icon, title, description, "data-slot": dataSlot, className } = props;
+  const { icon: Icon, title, description, footer, "data-slot": dataSlot, className } = props;
 
   return (
     <Empty
@@ -50,6 +51,11 @@ export function CmsSlotsHeroEmptyState(props: CmsSlotsHeroEmptyStateProps) {
         <EmptyTitle className="text-base text-foreground">{title}</EmptyTitle>
         <EmptyDescription className="max-w-66 text-xs leading-relaxed">{description}</EmptyDescription>
       </EmptyHeader>
+      {footer ? (
+        <EmptyContent layout="actions" className="relative z-1">
+          {footer}
+        </EmptyContent>
+      ) : null}
     </Empty>
   );
 }

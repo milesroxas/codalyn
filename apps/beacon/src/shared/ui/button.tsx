@@ -69,9 +69,12 @@ const buttonVariants = cva(
           "!h-auto min-h-10 w-full max-w-none shrink-0 justify-center gap-1 rounded-md px-2 py-1.5 text-[0.8125rem] font-medium leading-tight whitespace-normal has-data-[icon=inline-start]:pl-1.5 [&_[data-icon=inline-start]_svg]:size-3.5",
         /** Full-width primary action in drawer footers. */
         drawerAction: "h-9 w-full gap-1.5 px-3",
-        /** Paired with `variant="emptyAction"` */
+        /** Paired with `variant="emptyAction"` — full width in panel empty states. */
         emptyAction:
           "h-8 min-h-8 w-full gap-1.5 px-3 text-sm has-data-[icon=inline-start]:pl-2.5 has-data-[icon=inline-end]:pr-2.5 [&_svg:not([class*='size-'])]:size-4",
+        /** Paired with `variant="emptyAction"` — content-width CTA below empty copy. */
+        emptyActionFit:
+          "h-8 min-h-8 gap-1.5 px-3 text-sm has-data-[icon=inline-start]:pl-2.5 has-data-[icon=inline-end]:pr-2.5 [&_svg:not([class*='size-'])]:size-4",
       },
     },
     defaultVariants: {

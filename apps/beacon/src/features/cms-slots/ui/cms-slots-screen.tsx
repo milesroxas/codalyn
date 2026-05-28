@@ -1412,6 +1412,10 @@ export function CmsSlotsScreen() {
     setComposerLeaveDialogOpen(false);
   }, []);
 
+  const handleEditorNoSlotsBack = useCallback(() => {
+    navigate("/home");
+  }, [navigate]);
+
   const handleRequestComposerBack = useCallback(() => {
     if (!composerDirty) {
       handleComposerBack();
@@ -2137,6 +2141,7 @@ export function CmsSlotsScreen() {
       onComposerReorderDraft={handleComposerReorderDraft}
       onComposerRemoveDraft={handleComposerRemoveDraft}
       onComposerBack={handleRequestComposerBack}
+      onEditorNoSlotsBack={handleEditorNoSlotsBack}
       onComposerSave={handleComposerSave}
       composerSavePending={composerSavePending}
       composerLeaveDialogOpen={composerLeaveDialogOpen}

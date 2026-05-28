@@ -146,6 +146,7 @@ export type CmsSlotsRouteChromeProps = {
   onComposerReorderDraft: (fromIndex: number, toIndex: number) => void;
   onComposerRemoveDraft: (key: string) => void;
   onComposerBack: () => void;
+  onEditorNoSlotsBack: () => void;
   onComposerSave: (draftOverride?: CmsSlotCompositionDraftRow[]) => Promise<boolean>;
   composerSavePending: boolean;
   composerLeaveDialogOpen: boolean;
@@ -331,6 +332,7 @@ function CmsSlotsComposerRouteBody(
           eligible={p.composerEligible}
           openingKey={p.composerOpeningKey}
           onOpenList={(b) => void p.onOpenComposer(b)}
+          onEditorNoSlotsBack={p.onEditorNoSlotsBack}
         />
       </div>
     );

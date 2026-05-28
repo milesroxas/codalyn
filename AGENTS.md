@@ -7,6 +7,7 @@ Persistent instructions for AI agents (Cursor and similar) live in **`.cursor/ru
 | `quality-gates.mdc` | Run Biome lint + TypeScript typecheck; fix all errors and warnings before done |
 | `code-quality.mdc` | DRY, single source of truth, no hacks; FSD and package boundaries |
 | `security.mdc` | Extra scrutiny for auth, secrets, APIs, and user data |
+| `runtime-value-shape-safety.mdc` | Normalize external/runtime data at integration boundaries |
 
 ## Verify commands (match CI)
 
@@ -46,7 +47,7 @@ Use **pnpm** only (`packageManager` in root `package.json`).
 | App | Extra agent context |
 | --- | --- |
 | Beacon | `apps/beacon/AGENTS.md` (Webflow Designer API), `apps/beacon/.cursor/rules/beacon.mdc` |
-| Tower | `apps/tower/README.md` (dashboard, DB, Docker) |
+| Tower | `apps/tower/README.md` (dashboard, DB, Docker), `apps/tower/drizzle/README.md` (migrations), `apps/tower/.cursor/rules/tower.mdc` |
 | Flint | `apps/flint/README.md` |
 
 When app docs conflict with repo-wide `.cursor/rules/`, **repo-wide rules win** for quality gates, DRY, and security.

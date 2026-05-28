@@ -1,0 +1,56 @@
+---
+description: Tower — Drizzle migrations, database commands, and agent workflow
+globs: apps/tower/**
+alwaysApply: false
+---
+
+# Tower (Next.js backend + dashboard)
+
+## Package manager
+
+Use **pnpm** only. From the repo root: `pnpm app tower <script>`.
+
+## Commands (verify changes)
+
+Follow repo **`.cursor/rules/quality-gates.mdc`** (mandatory). From this app:
+
+- `pnpm lint` — Biome check
+- `pnpm typecheck` — TypeScript
+- `pnpm test` — when tests cover the change
+
+## Drizzle migrations (required when schema changes)
+
+Schema source of truth: **`src/shared/lib/db/auth-schema.ts`**. Full command reference: **`apps/tower/drizzle/README.md`**.
+
+### Creating migrations
+
+1. Edit **`auth-schema.ts`** only — do not hand-write SQL as the primary workflow.
+2. Run **`pnpm app tower db:generate`** — produces `drizzle/*.sql` and updates `drizzle/meta/`.
+3. **Review** the generated SQL for correctness and safety (drops, data loss, locking).
+4. **Commit together**: new/changed `*.sql`, `drizzle/meta/_journal.json`, and matching `drizzle/meta/*_snapshot.json`.
+5. Apply locally: **`pnpm app tower db:migrate:local`** (or `db:reset:local -- --confirm` for a clean slate).
+6. Before finishing: **`pnpm app tower db:check`** — validates journal integrity, snapshot chain, and runs `drizzle-kit check`.
+
+### Journal and meta (do not break)
+
+- **Never** hand-edit `drizzle/meta/_journal.json` or snapshot files — `db:generate` maintains them.
+- **Never** delete, rename, or reorder committed migrations.
+- Every `*.sql` in `drizzle/` must have a matching entry in `_journal.json` (and vice versa).
+- Tags must follow Drizzle's `NNNN_snake_case` prefix pattern; `idx`, `when`, and snapshot `prevId` chain must stay consistent.
+- If `db:check` fails, fix by re-running **`db:generate`** from the current schema — do not patch meta files manually.
+
+### Dev vs release
+
+- **`db:push`** — local iteration only; skips migration history. Do **not** rely on it for changes that ship to preview/prod.
+- **`db:migrate`** / **`db:migrate:local`** — apply committed migration history (CI, deploys, teammates).
+- **Data backfills** — use dedicated scripts under `scripts/` (e.g. `db-beacon-preset-storage-migrate.mjs`), not ad hoc edits to generated schema migrations.
+
+### Better Auth schema regeneration
+
+When Better Auth core tables change, regenerate via the CLI (see **`apps/tower/README.md`**), then run **`db:generate`** and follow the migration flow above.
+
+## Agent behavior
+
+- Follow repo **`.cursor/rules/code-quality.mdc`** and **`security.mdc`** for every task.
+- Prefer **minimal, task-scoped** changes; match existing patterns in `src/`.
+- Database queries and API routes are **security-relevant** — validate input, enforce authZ on the server.

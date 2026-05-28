@@ -23,9 +23,11 @@ Shared **Webflow + image defaults** live in `@codalyn/webflow-kit` (workspace pa
 pnpm app tower dev          # Next dev (Turbopack)
 pnpm app tower build
 pnpm app tower test
-pnpm app tower db:push      # Drizzle → Neon (needs DATABASE_URL)
+pnpm app tower db:push      # Drizzle → Neon (needs DATABASE_URL) — dev-only; see drizzle/README.md
 
 # Migrations (see drizzle/README.md)
+pnpm app tower db:generate        # after auth-schema.ts changes; commit SQL + drizzle/meta/
+pnpm app tower db:check           # validate journal + snapshots before PR
 pnpm app tower db:migrate:local   # .env + .env.local only (ignores DATABASE_URL in shell)
 pnpm app tower db:reset:local -- --confirm   # wipe local Docker Postgres volume, migrate, seed operators
 pnpm app tower db:seed:local      # seed/update local operators without wiping the DB

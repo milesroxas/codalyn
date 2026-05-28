@@ -33,6 +33,16 @@ Beacon also supports `pnpm lint:all` (typecheck + lint in one command).
 - Do not add `biome-ignore` / `eslint-disable` unless unavoidable; Beacon enforces this via `scripts/assert-no-biome-ignore.mjs`.
 - Do not use `@ts-expect-error`, `@ts-ignore`, or `as any` to silence type errors without a documented, narrow reason.
 
+## Tower Drizzle migrations
+
+When you change **`apps/tower/src/shared/lib/db/auth-schema.ts`** or anything under **`apps/tower/drizzle/`**:
+
+1. Run **`pnpm app tower db:generate`** — do not hand-write migration SQL or edit `drizzle/meta/` manually.
+2. Commit the generated `*.sql`, **`drizzle/meta/_journal.json`**, and snapshot files together.
+3. Run **`pnpm app tower db:check`** before finishing — journal, snapshots, and `drizzle-kit check` must pass.
+
+See **`apps/tower/drizzle/README.md`** and **`apps/tower/.cursor/rules/tower.mdc`** for the full workflow.
+
 ## If checks fail
 
 Fix the root cause in the changed code. Do not leave the repo in a failing lint or typecheck state.

@@ -39,10 +39,29 @@ Preview/production do **not** use these scripts. There, set `TOWER_PRODUCT_ADMIN
 ## Recommended flow
 
 1. Change `auth-schema.ts`.
-2. `pnpm db:generate` → review `drizzle/*.sql` → commit.
-3. Locally: `pnpm db:migrate:local`, or `pnpm db:migrate` with `DATABASE_URL` set, or `pnpm db:push` (push skips migration history).
-4. Remote: `pnpm db:migrate:dev` / `pnpm db:migrate:preview` / `pnpm db:migrate:prod` (Neon or Vercel variants) — see `.env.example` keys under **db:migrate**.
-5. Deploy / CI: `pnpm db:migrate` with `DATABASE_URL` before or with app startup.
+2. `pnpm db:generate` → review `drizzle/*.sql` → commit **all** generated artifacts:
+   - `drizzle/NNNN_*.sql`
+   - `drizzle/meta/_journal.json`
+   - `drizzle/meta/NNNN_snapshot.json` (new snapshot for the migration)
+3. `pnpm db:check` — validates journal ↔ SQL alignment, snapshot chain, and runs `drizzle-kit check`. **Required before opening a PR** when schema or migration files changed.
+4. Locally: `pnpm db:migrate:local`, or `pnpm db:migrate` with `DATABASE_URL` set, or `pnpm db:push` (push skips migration history).
+5. Remote: `pnpm db:migrate:dev` / `pnpm db:migrate:preview` / `pnpm db:migrate:prod` (Neon or Vercel variants) — see `.env.example` keys under **db:migrate**.
+6. Deploy / CI: `pnpm db:migrate` with `DATABASE_URL` before or with app startup.
+
+## Journal integrity (agents and reviewers)
+
+Drizzle tracks migration history in **`meta/_journal.json`** and per-migration **`meta/NNNN_snapshot.json`** files. These are **generated** — do not edit them by hand.
+
+| Rule | Why |
+| --- | --- |
+| Always use **`db:generate`** after schema edits | Keeps SQL, journal entries, and snapshots in sync |
+| Commit SQL + `meta/` in the **same commit** | Partial commits break deploys and teammate DBs |
+| Run **`db:check`** before finishing | Catches missing journal entries, bad `idx`/`tag` prefixes, broken snapshot `prevId` chain |
+| Never delete, rename, or reorder shipped migrations | Breaks databases that already applied them |
+| Never hand-fix `_journal.json` or snapshots | Re-run `db:generate` from the current schema instead |
+| Use **`db:push`** only for throwaway local iteration | Push does not update migration history for releases |
+
+From the repo root: `pnpm app tower db:generate` and `pnpm app tower db:check`.
 
 ## Existing DB that was only ever `db:push`’d
 

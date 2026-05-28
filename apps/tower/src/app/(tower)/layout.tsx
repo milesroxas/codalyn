@@ -9,6 +9,8 @@ import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { getTowerSessionOnboardingContext } from "@/server/tower-onboarding-context";
 
+export const dynamic = "force-dynamic";
+
 export default async function TowerLayout({ children }: { children: React.ReactNode }) {
   const billingEnabled = isTowerBillingEnabled();
   const requestHeaders = await headers();

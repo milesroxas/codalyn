@@ -7,7 +7,9 @@ import { type FormEvent, type ReactNode, Suspense, useCallback, useEffect, useRe
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { createWorkspaceOrganization } from "@/features/team/api/create-workspace-organization";
+import { useWorkspaceCreationEligibility } from "@/features/team/model/use-workspace-creation-eligibility";
 import { CreateWorkspaceDialog } from "@/features/team/ui/create-workspace-dialog";
+import { effectiveWorkspaceMembershipCount } from "@/features/tower-ui/lib/effective-workspace-membership-count";
 import { notifyWebflowConnectionQueryStatus } from "@/features/tower-ui/lib/tower-webflow-connection-toasts";
 import {
   parseTowerWebflowQueryStatus,
@@ -53,20 +55,22 @@ function OnboardingBlockerAlert({ copy, actions, icon: Icon = IconAlertCircle }:
 
 function OnboardingAlertActions({
   blocker,
-  summary,
+  canCreateWorkspace,
+  showUpgradeForAnotherWorkspace,
   billingEnabled,
   oauthConfigured,
   onOpenCreate,
   onWebflowConnectSuccess,
 }: {
   blocker: TowerWorkspaceOnboardingBlocker;
-  summary: TowerOnboardingBannerSummary;
+  canCreateWorkspace: boolean;
+  showUpgradeForAnotherWorkspace: boolean;
   billingEnabled: boolean;
   oauthConfigured: boolean;
   onOpenCreate: () => void;
   onWebflowConnectSuccess: () => void;
 }) {
-  if (blocker === "needs_workspace" && summary.canCreateOrganization) {
+  if (blocker === "needs_workspace" && canCreateWorkspace) {
     return (
       <Button type="button" variant="default" size="sm" onClick={onOpenCreate}>
         Create workspace
@@ -74,7 +78,7 @@ function OnboardingAlertActions({
     );
   }
 
-  if (blocker === "needs_workspace" && !summary.canCreateOrganization) {
+  if (blocker === "needs_workspace" && showUpgradeForAnotherWorkspace) {
     return (
       <>
         {billingEnabled ? (
@@ -110,13 +114,13 @@ function OnboardingAlertActions({
 }
 
 function TowerWorkspaceCreateWorkspacePanel({
-  summary,
+  canCreateWorkspace,
   billingEnabled,
   oauthConfigured,
   blocker,
   onWebflowConnectSuccess,
 }: {
-  summary: TowerOnboardingBannerSummary;
+  canCreateWorkspace: boolean;
   billingEnabled: boolean;
   oauthConfigured: boolean;
   blocker: TowerWorkspaceOnboardingBlocker;
@@ -130,7 +134,7 @@ function TowerWorkspaceCreateWorkspacePanel({
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (blocker !== "needs_workspace" || !summary.canCreateOrganization) {
+    if (blocker !== "needs_workspace" || !canCreateWorkspace) {
       return;
     }
     try {
@@ -141,7 +145,7 @@ function TowerWorkspaceCreateWorkspacePanel({
       return;
     }
     setCreateOpen(true);
-  }, [blocker, summary.canCreateOrganization]);
+  }, [blocker, canCreateWorkspace]);
 
   const copy = towerWorkspaceOnboardingCopy(blocker);
 
@@ -184,7 +188,8 @@ function TowerWorkspaceCreateWorkspacePanel({
         actions={
           <OnboardingAlertActions
             blocker={blocker}
-            summary={summary}
+            canCreateWorkspace={canCreateWorkspace}
+            showUpgradeForAnotherWorkspace={!canCreateWorkspace}
             billingEnabled={billingEnabled}
             oauthConfigured={oauthConfigured}
             onOpenCreate={() => setCreateOpen(true)}
@@ -193,7 +198,7 @@ function TowerWorkspaceCreateWorkspacePanel({
         }
       />
 
-      {summary.canCreateOrganization ? (
+      {canCreateWorkspace ? (
         <CreateWorkspaceDialog
           open={createOpen}
           onOpenChange={onCreateDialogOpenChange}
@@ -217,10 +222,21 @@ function TowerWorkspaceOnboardingBannerInner({
 }: TowerWorkspaceOnboardingBannerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: orgs, isPending: orgsPending } = authClient.useListOrganizations();
+  const membershipCount = effectiveWorkspaceMembershipCount(
+    summary.workspaceMembershipCount,
+    orgs?.length,
+    orgsPending
+  );
+  const gateSummary = { ...summary, workspaceMembershipCount: membershipCount };
+  const { canCreateWorkspace, showUpgradeForAnotherWorkspace } = useWorkspaceCreationEligibility({
+    serverCanCreate: summary.canCreateOrganization,
+    refetchKey: `${membershipCount}:${orgs?.length ?? 0}`,
+  });
   const onWebflowConnectSuccess = useCallback(() => {
     router.refresh();
   }, [router]);
-  const blocker = resolveTowerWorkspaceOnboardingBlocker(summary, { includeWebflowConnect });
+  const blocker = resolveTowerWorkspaceOnboardingBlocker(gateSummary, { includeWebflowConnect });
   const queryStatus = parseTowerWebflowQueryStatus(
     searchParams.get(TOWER_CONNECTION_STATUS_QUERY) ?? searchParams.get("webflow")
   );
@@ -229,10 +245,10 @@ function TowerWorkspaceOnboardingBannerInner({
     return null;
   }
 
-  if (blocker === "needs_workspace" && summary.canCreateOrganization) {
+  if (blocker === "needs_workspace" && canCreateWorkspace) {
     return (
       <TowerWorkspaceCreateWorkspacePanel
-        summary={summary}
+        canCreateWorkspace={canCreateWorkspace}
         billingEnabled={billingEnabled}
         oauthConfigured={oauthConfigured}
         blocker={blocker}
@@ -248,7 +264,8 @@ function TowerWorkspaceOnboardingBannerInner({
       actions={
         <OnboardingAlertActions
           blocker={blocker}
-          summary={summary}
+          canCreateWorkspace={canCreateWorkspace}
+          showUpgradeForAnotherWorkspace={showUpgradeForAnotherWorkspace}
           billingEnabled={billingEnabled}
           oauthConfigured={oauthConfigured}
           onOpenCreate={() => undefined}

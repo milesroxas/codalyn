@@ -4,6 +4,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { createWorkspaceOrganization } from "@/features/team/api/create-workspace-organization";
+import { useWorkspaceCreationEligibility } from "@/features/team/model/use-workspace-creation-eligibility";
 import { TeamWorkspaceSwitcher } from "@/features/team/ui/team-workspace-switcher";
 
 type SessionUserWithPreferred = {
@@ -42,6 +43,11 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
   }, [refetchOrgs, refetchActiveOrg]);
 
   const preferredOrgId = (session?.user as SessionUserWithPreferred | undefined)?.preferredOrganizationId ?? undefined;
+  const orgList = orgs ?? [];
+  const { canCreateWorkspace } = useWorkspaceCreationEligibility({
+    serverCanCreate: props.canCreateWorkspace,
+    refetchKey: `${session?.user?.id ?? ""}:${orgList.length}`,
+  });
 
   useEffect(() => {
     const uid = session?.user?.id;
@@ -178,7 +184,7 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
       triggerLabel={workspaceTriggerLabel}
       busy={busy}
       compact
-      canCreateTeam={props.canCreateWorkspace}
+      canCreateTeam={canCreateWorkspace}
       billingEnabled={props.billingEnabled}
       orgName={orgName}
       onOrgNameChange={setOrgName}

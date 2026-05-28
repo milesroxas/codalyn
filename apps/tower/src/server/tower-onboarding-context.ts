@@ -1,13 +1,13 @@
-import { count, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { cache } from "react";
 import { auth } from "@/server/auth";
-import { resolveUserWorkspaceCreationEligibility } from "@/server/membership/user-workspace-creation-eligibility";
+import {
+  countUserActiveWorkspaceMemberships,
+  resolveUserWorkspaceCreationEligibility,
+} from "@/server/membership/user-workspace-creation-eligibility";
 import { resolveActiveOrganizationId } from "@/server/resolve-active-organization-id";
 import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
-import { db } from "@/shared/lib/db";
-import { member } from "@/shared/lib/db/auth-schema";
 
 /** Shared per-request session + workspace onboarding fields (layout banner, full summary). */
 export type TowerSessionOnboardingContext = {
@@ -48,19 +48,20 @@ export const getTowerSessionOnboardingContext = cache(async (): Promise<TowerSes
   const rawSession = sessionData.session as { id?: string } | undefined;
   const activeOrganizationId = await resolveActiveOrganizationId(userId, rawSession?.id);
 
-  const [membershipRow, activeOrgTeamAdmin, webflowAccessToken, workspaceCreationEligibility] = await Promise.all([
-    db.select({ total: count() }).from(member).where(eq(member.userId, userId)),
-    activeOrganizationId ? isTowerTeamAdminMemberOfOrg(userId, activeOrganizationId) : Promise.resolve(false),
-    resolveWebflowBearerToken({ userId, requestHeaders }),
-    resolveUserWorkspaceCreationEligibility(userId),
-  ]);
+  const [workspaceMembershipCount, activeOrgTeamAdmin, webflowAccessToken, workspaceCreationEligibility] =
+    await Promise.all([
+      countUserActiveWorkspaceMemberships(userId),
+      activeOrganizationId ? isTowerTeamAdminMemberOfOrg(userId, activeOrganizationId) : Promise.resolve(false),
+      resolveWebflowBearerToken({ userId, requestHeaders }),
+      resolveUserWorkspaceCreationEligibility(userId),
+    ]);
 
   return {
     signedIn: true,
     userId,
     userEmail,
     activeOrganizationId,
-    workspaceMembershipCount: membershipRow[0]?.total ?? 0,
+    workspaceMembershipCount,
     canCreateOrganization: workspaceCreationEligibility.canCreate,
     activeOrgTeamAdmin: activeOrgTeamAdmin,
     webflowOAuthConnected: Boolean(webflowAccessToken),

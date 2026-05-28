@@ -1,9 +1,9 @@
-import { and, count, eq, or } from "drizzle-orm";
+import { and, count, eq, isNull, or } from "drizzle-orm";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { userRowHasStripePro } from "@/server/billing/stripe-subscription-status";
 import { isTowerProductAdmin } from "@/server/membership/product-admin";
 import { db } from "@/shared/lib/db";
-import { member, user } from "@/shared/lib/db/auth-schema";
+import { member, organization, user } from "@/shared/lib/db/auth-schema";
 
 /** Free accounts may admin one workspace; additional owned workspaces require individual Pro (or ops override). */
 export const FREE_TIER_OWNED_WORKSPACE_LIMIT = 1;
@@ -24,11 +24,28 @@ export type UserWorkspaceEligibilityRow = {
   stripeSubscriptionId: string | null;
 };
 
+export async function countUserActiveWorkspaceMemberships(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ total: count() })
+    .from(member)
+    .innerJoin(organization, eq(member.organizationId, organization.id))
+    .where(and(eq(member.userId, userId), isNull(organization.deletedAt)));
+
+  return Number(row?.total ?? 0);
+}
+
 export async function countUserOwnedWorkspaces(userId: string): Promise<number> {
   const [row] = await db
     .select({ total: count() })
     .from(member)
-    .where(and(eq(member.userId, userId), or(eq(member.role, "admin"), eq(member.role, "owner"))));
+    .innerJoin(organization, eq(member.organizationId, organization.id))
+    .where(
+      and(
+        eq(member.userId, userId),
+        isNull(organization.deletedAt),
+        or(eq(member.role, "admin"), eq(member.role, "owner"))
+      )
+    );
 
   return Number(row?.total ?? 0);
 }

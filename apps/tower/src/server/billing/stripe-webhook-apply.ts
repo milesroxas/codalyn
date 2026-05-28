@@ -4,6 +4,7 @@ import { applyStripeSubscriptionToUser, clearStripeUserSubscription } from "@/se
 import {
   readStripeBillingScopeFromMetadata,
   readTowerOrgIdFromStripeMetadata,
+  readTowerOwnershipTransferIdFromStripeMetadata,
   readTowerUserIdFromStripeMetadata,
   STRIPE_BILLING_SCOPE_ORGANIZATION,
   STRIPE_BILLING_SCOPE_USER,
@@ -15,6 +16,7 @@ import {
   grantTeamBillingEligibilityToUser,
 } from "@/server/billing/stripe-org-app";
 import { subscriptionPlanForStatus } from "@/server/billing/stripe-subscription-status";
+import { workspaceOwnershipTransferService } from "@/server/membership/workspace-ownership-transfer";
 import { db } from "@/shared/lib/db";
 import { organization, user } from "@/shared/lib/db/auth-schema";
 
@@ -48,7 +50,16 @@ async function resolveTowerOrgIdBySubscription(sub: Stripe.Subscription): Promis
   return row?.id;
 }
 
-async function onCheckoutSessionCompleted(stripe: Stripe, session: Stripe.Checkout.Session): Promise<void> {
+export async function applyStripeCheckoutSessionCompleted(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session
+): Promise<void> {
+  const ownershipTransferId = readTowerOwnershipTransferIdFromStripeMetadata(session.metadata);
+  if (ownershipTransferId) {
+    await workspaceOwnershipTransferService.markBillingReadyForTransfer(ownershipTransferId);
+    return;
+  }
+
   if (session.mode !== "subscription" || !session.subscription) {
     return;
   }
@@ -67,8 +78,8 @@ async function onCheckoutSessionCompleted(stripe: Stripe, session: Stripe.Checko
   const sub = await stripe.subscriptions.retrieve(subId);
 
   if (towerOrgId) {
-    await applyStripeSubscriptionToOrganization(sub, towerOrgId);
     const purchaserId = readTowerUserIdFromStripeMetadata(session.metadata);
+    await applyStripeSubscriptionToOrganization(sub, towerOrgId, purchaserId);
     if (purchaserId) {
       await grantTeamBillingEligibilityToUser(purchaserId);
     }
@@ -92,8 +103,8 @@ async function onSubscriptionChanged(s: Stripe.Subscription): Promise<void> {
       await clearStripeOrganizationSubscription(orgId);
       return;
     }
-    await applyStripeSubscriptionToOrganization(s, orgId);
     const purchaserId = readTowerUserIdFromStripeMetadata(s.metadata);
+    await applyStripeSubscriptionToOrganization(s, orgId, purchaserId);
     if (purchaserId) {
       await grantTeamBillingEligibilityToUser(purchaserId);
     }
@@ -117,7 +128,7 @@ async function onSubscriptionChanged(s: Stripe.Subscription): Promise<void> {
 export async function applyStripeWebhookEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case "checkout.session.completed":
-      await onCheckoutSessionCompleted(stripe, event.data.object);
+      await applyStripeCheckoutSessionCompleted(stripe, event.data.object);
       break;
     case "customer.subscription.created":
     case "customer.subscription.updated":

@@ -74,6 +74,16 @@ export function parsePostgresDatabaseUrl(databaseUrl) {
   return parsed;
 }
 
+/** @param {string} databaseUrl */
+export function assertLocalDatabaseHost(databaseUrl) {
+  const parsed = parsePostgresDatabaseUrl(databaseUrl);
+  const host = parsed.hostname.toLowerCase();
+  if (!LOCAL_DB_HOSTS.has(host)) {
+    throw new Error(`Refusing local-only operation: DATABASE_URL host "${host}" is not local.`);
+  }
+  return parsed;
+}
+
 /**
  * @param {"local" | "dev" | "preview" | "prod" | "production"} target
  * @param {string} databaseUrl

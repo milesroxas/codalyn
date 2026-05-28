@@ -24,12 +24,16 @@ export function formatTeamWorkspaceDeleteError(error: TeamWorkspaceApiError): st
   return error.message;
 }
 
-export async function deleteTeamWorkspace(organizationId: string, confirmSlug: string): Promise<{ ok: true }> {
+export async function deleteTeamWorkspace(
+  organizationId: string,
+  confirmSlug: string,
+  password: string
+): Promise<{ ok: true }> {
   const res = await fetch("/api/team/workspace/delete", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ organizationId, confirmSlug }),
+    body: JSON.stringify({ organizationId, confirmSlug, password }),
   });
   const payload = (await res.json().catch(() => null)) as { ok?: true; error?: string } | null;
   if (!res.ok) {

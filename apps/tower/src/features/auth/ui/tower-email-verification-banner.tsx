@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
@@ -12,12 +12,16 @@ import {
 } from "@/features/auth/lib/email-verification";
 import { authClient } from "@/features/auth/model/auth-client";
 import { EmailVerificationBanner } from "@/features/auth/ui/email-verification-prompt";
+import { TEAM_INVITATION_ACCEPT_PATH } from "@/shared/lib/membership/team-invitation-accept";
+import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 
 function TowerEmailVerificationBannerInner() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const notifiedRef = useRef(false);
   const { data: session, isPending, refetch } = authClient.useSession();
+  const callbackPath = sanitizeRelativePath(pathname, searchParams.toString() ? `?${searchParams.toString()}` : "");
 
   useEffect(() => {
     if (notifiedRef.current) {
@@ -51,7 +55,11 @@ function TowerEmailVerificationBannerInner() {
     return null;
   }
 
-  return <EmailVerificationBanner email={session.user.email} />;
+  if (pathname.startsWith(TEAM_INVITATION_ACCEPT_PATH)) {
+    return null;
+  }
+
+  return <EmailVerificationBanner email={session.user.email} callbackPath={callbackPath} />;
 }
 
 export function TowerEmailVerificationBanner() {

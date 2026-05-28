@@ -1,6 +1,15 @@
-import { and, asc, desc, eq, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/shared/lib/db";
 import { member, organization, session as sessionTable, user } from "@/shared/lib/db/auth-schema";
+
+async function isActiveOrganizationId(organizationId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: organization.id })
+    .from(organization)
+    .where(and(eq(organization.id, organizationId), isNull(organization.deletedAt)))
+    .limit(1);
+  return Boolean(row);
+}
 
 /**
  * Single source of truth for active Tower workspace on a session.
@@ -15,7 +24,7 @@ export async function resolveActiveOrganizationId(userId: string, rawSessionId?:
       .where(eq(sessionTable.id, rawSessionId))
       .limit(1);
     const sessionActiveOrgId = rows[0]?.activeOrganizationId ?? null;
-    if (sessionActiveOrgId) {
+    if (sessionActiveOrgId && (await isActiveOrganizationId(sessionActiveOrgId))) {
       return sessionActiveOrgId;
     }
   }
@@ -27,7 +36,7 @@ export async function resolveActiveOrganizationId(userId: string, rawSessionId?:
     .orderBy(desc(sessionTable.updatedAt))
     .limit(1);
   const recentSessionActiveOrgId = recentSessionRows[0]?.activeOrganizationId ?? null;
-  if (recentSessionActiveOrgId) {
+  if (recentSessionActiveOrgId && (await isActiveOrganizationId(recentSessionActiveOrgId))) {
     return recentSessionActiveOrgId;
   }
 
@@ -37,7 +46,7 @@ export async function resolveActiveOrganizationId(userId: string, rawSessionId?:
       .select({ id: organization.id, name: organization.name })
       .from(member)
       .innerJoin(organization, eq(member.organizationId, organization.id))
-      .where(eq(member.userId, userId))
+      .where(and(eq(member.userId, userId), isNull(organization.deletedAt)))
       .orderBy(asc(organization.name)),
   ]);
   const preferredOrganizationId = preferredRow[0]?.preferredOrganizationId ?? null;

@@ -147,3 +147,33 @@ export const EMPTY_METERING_OVERRIDES: MeteringOverrideFields = {
   cmsWriteLimitOverride: null,
   imageOptimizeLimitOverride: null,
 };
+
+export type TowerUsageLimitsKind = "standard" | "custom" | "unmetered";
+
+export function hasMeteringLimitOverrides(
+  user: MeteringOverrideFields,
+  organization: MeteringOverrideFields | null
+): boolean {
+  const scopes = organization === null ? [user] : [user, organization];
+  return scopes.some(
+    (fields) =>
+      fields.webflowProxyLimitOverride !== null ||
+      fields.cmsWriteLimitOverride !== null ||
+      fields.imageOptimizeLimitOverride !== null
+  );
+}
+
+/** End-user billing UI: standard tier caps, custom operator caps, or unmetered. */
+export function resolveUsageLimitsKind(
+  policy: Pick<MeteringPolicy, "skipMetering">,
+  user: MeteringOverrideFields,
+  organization: MeteringOverrideFields | null
+): TowerUsageLimitsKind {
+  if (policy.skipMetering) {
+    return "unmetered";
+  }
+  if (hasMeteringLimitOverrides(user, organization)) {
+    return "custom";
+  }
+  return "standard";
+}

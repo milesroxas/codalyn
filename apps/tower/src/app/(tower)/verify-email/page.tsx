@@ -35,7 +35,7 @@ function VerifyEmailForm() {
         <Card className="border-border/80 shadow-lg shadow-black/4 dark:shadow-black/25">
           <CardHeader className="space-y-1 pb-2">
             <CardTitle className="text-xl font-semibold tracking-tight">
-              {VERIFY_EMAIL_PAGE_COPY.pendingTitle}
+              {VERIFY_EMAIL_PAGE_COPY.invalidTokenTitle}
             </CardTitle>
             <CardDescription className="text-base leading-relaxed">
               {VERIFY_EMAIL_PAGE_COPY.invalidTokenMessage}

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { requireStripeBillingSession, type StripeBillingSessionResult } from "@/server/billing/stripe-billing-routes";
 import { db } from "@/shared/lib/db";
 import { member, organization } from "@/shared/lib/db/auth-schema";
@@ -13,6 +13,8 @@ type WorkspaceBillingSuccess = {
     id: string;
     name: string;
     slug: string;
+    ownerUserId: string;
+    billingOwnerUserId: string | null;
     stripeCustomerId: string | null;
     stripeSubscriptionId: string | null;
     subscriptionStatus: string | null;
@@ -55,6 +57,8 @@ export async function requireStripeWorkspaceBillingAdmin(
       id: organization.id,
       name: organization.name,
       slug: organization.slug,
+      ownerUserId: organization.ownerUserId,
+      billingOwnerUserId: organization.billingOwnerUserId,
       stripeCustomerId: organization.stripeCustomerId,
       stripeSubscriptionId: organization.stripeSubscriptionId,
       subscriptionStatus: organization.subscriptionStatus,
@@ -62,11 +66,25 @@ export async function requireStripeWorkspaceBillingAdmin(
       seatLimit: organization.seatLimit,
     })
     .from(organization)
-    .where(eq(organization.id, orgId))
+    .where(and(eq(organization.id, orgId), isNull(organization.deletedAt)))
     .limit(1);
 
   if (!org) {
     return { ok: false, response: Response.json({ error: "Workspace not found" }, { status: 404 }) };
+  }
+
+  const isOwner = org.ownerUserId === gate.userId;
+  const isBillingOwner = org.billingOwnerUserId === gate.userId;
+  const hasPaidBilling = Boolean(org.stripeSubscriptionId);
+
+  if (hasPaidBilling && !isBillingOwner && !isOwner) {
+    return {
+      ok: false,
+      response: Response.json(
+        { error: "Only the billing owner or workspace owner may manage billing." },
+        { status: 403 }
+      ),
+    };
   }
 
   return { ok: true, stripe: gate.stripe, userId: gate.userId, organization: org };

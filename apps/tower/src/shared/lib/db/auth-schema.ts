@@ -1,6 +1,16 @@
 import type { BeaconAppSettings, BeaconOrgTeamSettings } from "@codalyn/webflow-kit";
 import { relations } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  type AnyPgColumn,
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -159,8 +169,68 @@ export const organization = pgTable(
     billingPlan: text("billing_plan"),
     /** Team-wide Beacon export presets (designers + product admins). Merged into members’ effective settings. */
     beaconTeamSettings: jsonb("beacon_team_settings").$type<BeaconOrgTeamSettings | null>(),
+    /** Canonical workspace owner; must always reference an active member. */
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references((): AnyPgColumn => user.id, { onDelete: "restrict" }),
+    /** User responsible for paid workspace billing; required when Team billing is active. */
+    billingOwnerUserId: text("billing_owner_user_id").references((): AnyPgColumn => user.id, {
+      onDelete: "restrict",
+    }),
+    /** When set, workspace is soft-deleted and hidden from members until purged or recovered. */
+    deletedAt: timestamp("deleted_at"),
+    /** Permanent purge time after soft delete (typically deletedAt + recovery window). */
+    purgeScheduledAt: timestamp("purge_scheduled_at"),
   },
-  (table) => [index("organization_slug_idx").on(table.slug)]
+  (table) => [
+    index("organization_slug_idx").on(table.slug),
+    index("organization_owner_user_id_idx").on(table.ownerUserId),
+    index("organization_billing_owner_user_id_idx").on(table.billingOwnerUserId),
+    index("organization_deleted_at_idx").on(table.deletedAt),
+  ]
+);
+
+export const WORKSPACE_OWNERSHIP_TRANSFER_STATUSES = [
+  "pending",
+  "accepted",
+  "declined",
+  "expired",
+  "canceled",
+] as const;
+export type WorkspaceOwnershipTransferStatus = (typeof WORKSPACE_OWNERSHIP_TRANSFER_STATUSES)[number];
+
+/** Pending workspace ownership handoff; recipient must accept before owner changes. */
+export const workspaceOwnershipTransfer = pgTable(
+  "workspace_ownership_transfer",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    fromUserId: text("from_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    toUserId: text("to_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    status: text("status").$type<WorkspaceOwnershipTransferStatus>().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    /** When true, recipient must complete Stripe billing setup before accept commits. */
+    requiresBillingAcceptance: boolean("requires_billing_acceptance").default(false).notNull(),
+    /** Set after recipient completes Stripe checkout/portal for billing handoff. */
+    stripeBillingReady: boolean("stripe_billing_ready").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("workspace_ownership_transfer_organization_id_idx").on(table.organizationId),
+    index("workspace_ownership_transfer_to_user_id_idx").on(table.toUserId),
+    index("workspace_ownership_transfer_from_user_id_idx").on(table.fromUserId),
+    index("workspace_ownership_transfer_status_idx").on(table.status),
+  ]
 );
 
 /** Webflow OAuth access token for Data API (Bearer), one row per workspace (organization). Admins connect once; all members use this token. */
@@ -379,9 +449,37 @@ export const beaconAppSettingsRelations = relations(beaconAppSettings, ({ one })
 export const organizationRelations = relations(organization, ({ many, one }) => ({
   members: many(member),
   invitations: many(invitation),
+  ownershipTransfers: many(workspaceOwnershipTransfer),
+  owner: one(user, {
+    fields: [organization.ownerUserId],
+    references: [user.id],
+    relationName: "organizationOwner",
+  }),
+  billingOwner: one(user, {
+    fields: [organization.billingOwnerUserId],
+    references: [user.id],
+    relationName: "organizationBillingOwner",
+  }),
   webflowOAuthToken: one(organizationWebflowOAuthToken, {
     fields: [organization.id],
     references: [organizationWebflowOAuthToken.organizationId],
+  }),
+}));
+
+export const workspaceOwnershipTransferRelations = relations(workspaceOwnershipTransfer, ({ one }) => ({
+  organization: one(organization, {
+    fields: [workspaceOwnershipTransfer.organizationId],
+    references: [organization.id],
+  }),
+  fromUser: one(user, {
+    fields: [workspaceOwnershipTransfer.fromUserId],
+    references: [user.id],
+    relationName: "ownershipTransferFrom",
+  }),
+  toUser: one(user, {
+    fields: [workspaceOwnershipTransfer.toUserId],
+    references: [user.id],
+    relationName: "ownershipTransferTo",
   }),
 }));
 

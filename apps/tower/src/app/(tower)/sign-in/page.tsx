@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
+import { resolveSignInCardDescription } from "@/features/auth/lib/auth-surface-copy";
 import {
   syncExistingTowerSessionToBeaconIfPopup,
   tryFinishBeaconTowerAuthPopup,
@@ -27,6 +28,7 @@ import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/u
 import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
+import { isTeamInvitationAcceptPath } from "@/shared/lib/membership/team-invitation-accept";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -85,6 +87,8 @@ function SignInForm() {
   const signUpHref = buildTowerAuthSurfaceHref("/sign-up", callbackUrl, authSearchParams);
   const forgotPasswordHref = buildTowerAuthSurfaceHref("/forgot-password", callbackUrl, authSearchParams);
   const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl, authSearchParams);
+  const joiningViaTeamInvite = isTeamInvitationAcceptPath(callbackUrl);
+  const verificationPromptContext = joiningViaTeamInvite ? "teamInvite" : "signIn";
 
   useEffect(() => {
     if (passwordResetNotifiedRef.current || !readPasswordResetSuccess(searchParams)) {
@@ -161,7 +165,12 @@ function SignInForm() {
   if (awaitingVerificationEmail) {
     return (
       <AuthShell>
-        <CheckEmailPrompt email={awaitingVerificationEmail} callbackPath={callbackUrl} signInHref={signInHref} />
+        <CheckEmailPrompt
+          email={awaitingVerificationEmail}
+          callbackPath={callbackUrl}
+          footerHref={joiningViaTeamInvite ? callbackUrl : signInHref}
+          context={verificationPromptContext}
+        />
       </AuthShell>
     );
   }
@@ -209,9 +218,7 @@ function SignInForm() {
         <CardHeader className="space-y-1 pb-2">
           <CardTitle className="text-xl font-semibold tracking-tight">Welcome back</CardTitle>
           <CardDescription className="text-base leading-relaxed">
-            {earlyAccessRequired
-              ? "Sign in with your Tower email and password. Early access is required while Tower is in MVP."
-              : "Sign in with your Tower email and password."}
+            {resolveSignInCardDescription({ joiningViaTeamInvite, earlyAccessRequired })}
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-4">

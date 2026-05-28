@@ -5,9 +5,10 @@ import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { resolveTowerAppCallbackUrl } from "@/features/auth/lib/email-verification";
 import { authClient } from "@/features/auth/model/auth-client";
+import { buildTeamPageHref } from "@/features/team/lib/team-workspace-tab";
 import {
-  formatSoleAdminWorkspacesMessage,
-  type WorkspaceDeletionBlocker,
+  type AccountDeletionBlocker,
+  formatAccountDeletionBlockedMessage,
 } from "@/shared/lib/membership/user-account-deletion";
 import {
   AlertDialog,
@@ -27,23 +28,16 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
 type DeleteEligibility = {
-  blockers: WorkspaceDeletionBlocker[];
-  soleMemberWorkspaceCount: number;
+  blockers: AccountDeletionBlocker[];
 };
 
 async function fetchDeleteEligibility(): Promise<DeleteEligibility> {
   const res = await fetch("/api/account/delete-eligibility", { credentials: "include" });
   if (!res.ok) {
-    return { blockers: [], soleMemberWorkspaceCount: 0 };
+    return { blockers: [] };
   }
-  const body = (await res.json()) as {
-    blockers?: WorkspaceDeletionBlocker[];
-    soleMemberWorkspaceCount?: number;
-  };
-  return {
-    blockers: body.blockers ?? [],
-    soleMemberWorkspaceCount: body.soleMemberWorkspaceCount ?? 0,
-  };
+  const body = (await res.json()) as { blockers?: AccountDeletionBlocker[] };
+  return { blockers: body.blockers ?? [] };
 }
 
 export function AccountDeleteSection(props: { sessionReady: boolean }) {
@@ -56,8 +50,7 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteBlockers, setDeleteBlockers] = useState<WorkspaceDeletionBlocker[]>([]);
-  const [soleMemberWorkspaceCount, setSoleMemberWorkspaceCount] = useState(0);
+  const [deleteBlockers, setDeleteBlockers] = useState<AccountDeletionBlocker[]>([]);
   const [deleteEligibilityPending, setDeleteEligibilityPending] = useState(true);
 
   const refreshDeleteEligibility = useCallback(async () => {
@@ -65,7 +58,6 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
     try {
       const eligibility = await fetchDeleteEligibility();
       setDeleteBlockers(eligibility.blockers);
-      setSoleMemberWorkspaceCount(eligibility.soleMemberWorkspaceCount);
     } finally {
       setDeleteEligibilityPending(false);
     }
@@ -116,7 +108,7 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
   }
 
   const deleteBlocked = deleteBlockers.length > 0;
-  const deleteBlockedMessage = deleteBlocked ? formatSoleAdminWorkspacesMessage(deleteBlockers) : null;
+  const deleteBlockedMessage = deleteBlocked ? formatAccountDeletionBlockedMessage(deleteBlockers) : null;
 
   return (
     <Card tone="destructive">
@@ -125,8 +117,8 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
           Delete account
         </CardTitle>
         <CardDescription>
-          Permanently removes your account and personal data. Promote another admin first if you are the only admin in a
-          workspace with other members.
+          Permanently removes your account and personal data. Transfer workspace ownership, resolve billing, or delete
+          owned workspaces first.
         </CardDescription>
         <CardAction align="center">
           <AlertDialog open={deleteDialogOpen} onOpenChange={onDeleteDialogOpenChange}>
@@ -146,10 +138,7 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
                   <AlertDialogTitle>Delete this account?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This permanently deletes your user and cannot be undone. Enter your password and type DELETE to
-                    confirm.
-                    {!deleteBlocked && soleMemberWorkspaceCount > 0
-                      ? " Any workspace where you are the only member will be deleted with your account."
-                      : null}
+                    confirm. Workspaces you own are not deleted automatically.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 {deleteBlockedMessage ? (
@@ -200,22 +189,15 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {deleteEligibilityPending ? (
-          <p className="text-sm text-muted-foreground">Checking workspace admin responsibilities…</p>
+          <p className="text-sm text-muted-foreground">Checking workspace ownership and billing responsibilities…</p>
         ) : null}
         {!deleteEligibilityPending && deleteBlockedMessage ? (
           <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
             <p className="text-sm text-destructive">{deleteBlockedMessage}</p>
             <Button asChild variant="outline" size="sm">
-              <Link href="/team">Open Team settings</Link>
+              <Link href={buildTeamPageHref({ tab: "settings" })}>Open Team settings</Link>
             </Button>
           </div>
-        ) : null}
-        {!deleteEligibilityPending && !deleteBlocked && soleMemberWorkspaceCount > 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {soleMemberWorkspaceCount === 1
-              ? "Your personal workspace with no other members will also be deleted."
-              : `${soleMemberWorkspaceCount} workspaces where you are the only member will also be deleted.`}
-          </p>
         ) : null}
       </CardContent>
       <CardFooter className="border-t border-border/60 text-xs text-muted-foreground">

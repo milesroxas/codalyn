@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveMeteringPolicy } from "@/server/billing/metering-policy";
+import { resolveMeteringPolicy, resolveUsageLimitsKind } from "@/server/billing/metering-policy";
 import type { TowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 
 describe("resolveMeteringPolicy", () => {
@@ -108,5 +108,28 @@ describe("resolveMeteringPolicy", () => {
     expect(policy.webflowProxyCap).toBe(500);
     expect(policy.cmsWriteCap).toBe(100);
     expect(policy.imageCap).toBe(20);
+  });
+});
+
+describe("resolveUsageLimitsKind", () => {
+  const user = {
+    meteringEnabled: true,
+    webflowProxyLimitOverride: null,
+    cmsWriteLimitOverride: null,
+    imageOptimizeLimitOverride: null,
+  };
+
+  it("returns standard for metered free tier without overrides", () => {
+    expect(resolveUsageLimitsKind({ skipMetering: false }, user, null)).toBe("standard");
+  });
+
+  it("returns custom when any limit override is set", () => {
+    expect(resolveUsageLimitsKind({ skipMetering: false }, { ...user, webflowProxyLimitOverride: 10_000 }, null)).toBe(
+      "custom"
+    );
+  });
+
+  it("returns unmetered when metering is skipped", () => {
+    expect(resolveUsageLimitsKind({ skipMetering: true }, user, null)).toBe("unmetered");
   });
 });

@@ -2,11 +2,9 @@ import type Stripe from "stripe";
 import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getStripe } from "@/server/billing/stripe-client";
+import { getStripePricePro } from "@/server/billing/stripe-config";
 
-export function getStripePricePro(): string | null {
-  const price = process.env.STRIPE_PRICE_PRO?.trim();
-  return price && price.length > 0 ? price : null;
-}
+export { getStripePricePro } from "@/server/billing/stripe-config";
 
 export function isStripeCheckoutConfigured(): boolean {
   return Boolean(getStripe() && getStripePricePro());

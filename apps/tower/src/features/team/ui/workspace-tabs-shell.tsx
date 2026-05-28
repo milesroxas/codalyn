@@ -1,8 +1,10 @@
 "use client";
 
 import { IconCreditCard, IconMailForward, IconSettings, IconUsers } from "@tabler/icons-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { DEFAULT_TEAM_WORKSPACE_TAB, parseTeamWorkspaceTab } from "@/features/team/lib/team-workspace-tab";
 import { resolveWorkspaceSeatState } from "@/features/team/lib/workspace-seat-state";
 import type { InvitationRow, MemberRow, WorkspaceOrgSummary } from "@/features/team/model/workspace-types";
 import { DeleteInvitationDialog } from "@/features/team/ui/delete-invitation-dialog";
@@ -34,7 +36,9 @@ export function WorkspaceTabsShell(props: {
   resendingInvitationId: string | null;
   deleteBusy: boolean;
   deleteConfirm: string;
+  deletePassword: string;
   onDeleteConfirmChange: (value: string) => void;
+  onDeletePasswordChange: (value: string) => void;
   onDeleteWorkspace: () => void | Promise<void>;
   onInviteEmailChange: (v: string) => void;
   onInviteRoleChange: (v: string) => void;
@@ -68,7 +72,9 @@ export function WorkspaceTabsShell(props: {
     resendingInvitationId,
     deleteBusy,
     deleteConfirm,
+    deletePassword,
     onDeleteConfirmChange,
+    onDeletePasswordChange,
     onDeleteWorkspace,
     onInviteEmailChange,
     onInviteRoleChange,
@@ -85,8 +91,30 @@ export function WorkspaceTabsShell(props: {
     onInviteAgain,
   } = props;
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [revokeTarget, setRevokeTarget] = useState<InvitationRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InvitationRow | null>(null);
+
+  const activeTab = useMemo(() => {
+    const parsed = parseTeamWorkspaceTab(searchParams.get("tab"));
+    if (parsed === "billing" && !workspaceBilling) {
+      return DEFAULT_TEAM_WORKSPACE_TAB;
+    }
+    return parsed;
+  }, [searchParams, workspaceBilling]);
+
+  const onTabChange = (value: string) => {
+    const tab = parseTeamWorkspaceTab(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === DEFAULT_TEAM_WORKSPACE_TAB) {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+    const query = params.toString();
+    router.replace(query ? `/team?${query}` : "/team", { scroll: false });
+  };
 
   const seatState = resolveWorkspaceSeatState({
     workspaceBilling,
@@ -119,7 +147,7 @@ export function WorkspaceTabsShell(props: {
     <>
       {canManageTeam ? (
         <>
-          <Tabs defaultValue="people" className="gap-4">
+          <Tabs value={activeTab} onValueChange={onTabChange} className="gap-4">
             <TabsList className="h-auto w-full gap-0.5 p-1 sm:max-w-lg">
               <TabsTrigger value="people" className="gap-2 px-3 py-2 sm:flex-1">
                 <IconUsers className="size-4 opacity-70" aria-hidden />
@@ -171,9 +199,11 @@ export function WorkspaceTabsShell(props: {
 
             <WorkspaceSettingsTab
               activeOrg={activeOrg}
+              currentUserId={currentUserId}
               busy={busy}
               deleteBusy={deleteBusy}
               deleteConfirm={deleteConfirm}
+              deletePassword={deletePassword}
               memberCount={members.length}
               pendingInviteCount={pendingInviteCount}
               activeTeamNameEdit={activeTeamNameEdit}
@@ -183,6 +213,7 @@ export function WorkspaceTabsShell(props: {
               onUpdateActiveTeamName={onUpdateActiveTeamName}
               onUpdateActiveTeamSlug={onUpdateActiveTeamSlug}
               onDeleteConfirmChange={onDeleteConfirmChange}
+              onDeletePasswordChange={onDeletePasswordChange}
               onDeleteWorkspace={onDeleteWorkspace}
             />
 

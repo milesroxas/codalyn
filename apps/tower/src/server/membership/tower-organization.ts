@@ -1,5 +1,6 @@
 import { APIError } from "better-auth/api";
 import { organization } from "better-auth/plugins";
+import { eq } from "drizzle-orm";
 import { grantEarlyAccess } from "@/server/access/early-access";
 import {
   assertOrganizationNotOverSeatCap,
@@ -16,6 +17,8 @@ import {
   resolveWorkspaceSlugForCreate,
   resolveWorkspaceSlugInput,
 } from "@/server/membership/workspace-slug-update";
+import { db } from "@/shared/lib/db";
+import { organization as organizationTable } from "@/shared/lib/db/auth-schema";
 import {
   towerOrganizationClientSchema,
   towerOrganizationRoles,
@@ -32,6 +35,7 @@ export const towerOrganization = organization({
   creatorRole: "admin",
   roles: towerOrganizationRoles,
   schema: towerOrganizationClientSchema,
+  requireEmailVerificationOnInvitation: true,
   /** All workspace deletes go through `deleteWorkspace` (Stripe cancel, session cleanup, slug confirm). */
   disableOrganizationDeletion: true,
   /**
@@ -75,8 +79,16 @@ export const towerOrganization = organization({
         data: {
           ...orgInput,
           slug: parsed.slug,
+          ownerUserId: user.id,
+          billingOwnerUserId: null,
         },
       };
+    },
+    afterCreateOrganization: async ({ organization: org, user }) => {
+      await db
+        .update(organizationTable)
+        .set({ ownerUserId: user.id, billingOwnerUserId: null })
+        .where(eq(organizationTable.id, org.id));
     },
     beforeUpdateOrganization: async ({ organization: orgInput, member }) => {
       if (typeof orgInput.slug !== "string") {

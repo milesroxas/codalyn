@@ -31,11 +31,15 @@ type TypedConfirmAlertDialogProps = {
   triggerLabel: string;
   triggerDisabled?: boolean;
   title: string;
+  description?: React.ReactNode;
   confirmFieldLabel: string;
   confirmFieldId: string;
   expectedValue: string;
   confirmValue: string;
   onConfirmValueChange: (value: string) => void;
+  passwordFieldId?: string;
+  passwordValue?: string;
+  onPasswordValueChange?: (value: string) => void;
   actionLabel?: string;
   busyLabel?: string;
   busy?: boolean;
@@ -46,17 +50,22 @@ function TypedConfirmAlertDialog({
   triggerLabel,
   triggerDisabled = false,
   title,
+  description,
   confirmFieldLabel,
   confirmFieldId,
   expectedValue,
   confirmValue,
   onConfirmValueChange,
+  passwordFieldId,
+  passwordValue = "",
+  onPasswordValueChange,
   actionLabel = "Delete permanently",
   busyLabel = "Deleting…",
   busy = false,
   onConfirm,
 }: TypedConfirmAlertDialogProps) {
   const matches = confirmTextMatches(confirmValue, expectedValue);
+  const passwordReady = !passwordFieldId || passwordValue.trim().length > 0;
 
   return (
     <AlertDialog>
@@ -73,10 +82,26 @@ function TypedConfirmAlertDialog({
             {title}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            This cannot be undone. Type the {confirmFieldLabel.toLowerCase()}{" "}
-            <ConfirmPromptValue>{expectedValue}</ConfirmPromptValue> to confirm.
+            {description ?? (
+              <>
+                This cannot be undone. Type the {confirmFieldLabel.toLowerCase()}{" "}
+                <ConfirmPromptValue>{expectedValue}</ConfirmPromptValue> to confirm.
+              </>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {passwordFieldId && onPasswordValueChange ? (
+          <FormField className="py-2">
+            <Label htmlFor={passwordFieldId}>Password</Label>
+            <Input
+              id={passwordFieldId}
+              type="password"
+              autoComplete="current-password"
+              value={passwordValue}
+              onChange={(event) => onPasswordValueChange(event.target.value)}
+            />
+          </FormField>
+        ) : null}
         <FormField className="py-2">
           <Label htmlFor={confirmFieldId}>{confirmFieldLabel}</Label>
           <Input
@@ -89,7 +114,12 @@ function TypedConfirmAlertDialog({
         </FormField>
         <AlertDialogFooter>
           <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-          <AlertDialogAction type="button" variant="destructive" disabled={busy || !matches} onClick={onConfirm}>
+          <AlertDialogAction
+            type="button"
+            variant="destructive"
+            disabled={busy || !matches || !passwordReady}
+            onClick={onConfirm}
+          >
             {busy ? busyLabel : actionLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

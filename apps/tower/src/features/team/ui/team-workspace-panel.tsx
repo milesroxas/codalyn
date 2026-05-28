@@ -9,7 +9,7 @@ import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-vi
 
 export function TeamWorkspacePanel(props: {
   activeOrgPending: boolean;
-  activeOrg: { id: string; name: string; slug: string } | null | undefined;
+  activeOrg: { id: string; name: string; slug: string; ownerUserId?: string | null } | null | undefined;
   canManageTeam: boolean;
   workspaceBilling: WorkspaceBillingView | null;
   billingOrganizationId: string | null;
@@ -38,7 +38,9 @@ export function TeamWorkspacePanel(props: {
   resendingInvitationId: string | null;
   deleteBusy: boolean;
   deleteConfirm: string;
+  deletePassword: string;
   onDeleteConfirmChange: (value: string) => void;
+  onDeletePasswordChange: (value: string) => void;
   onDeleteWorkspace: () => void | Promise<void>;
 }) {
   const { activeOrgPending, activeOrg, invitations } = props;
@@ -89,7 +91,9 @@ export function TeamWorkspacePanel(props: {
           onInviteAgain={props.onInviteAgain}
           deleteBusy={props.deleteBusy}
           deleteConfirm={props.deleteConfirm}
+          deletePassword={props.deletePassword}
           onDeleteConfirmChange={props.onDeleteConfirmChange}
+          onDeletePasswordChange={props.onDeletePasswordChange}
           onDeleteWorkspace={props.onDeleteWorkspace}
         />
       ) : null}

@@ -285,7 +285,11 @@ export async function DELETE(
 
   try {
     await assertWorkspaceDeleteRateLimit(authRes.user.id);
-    await deleteWorkspace({ organizationId: orgId, confirmSlug: parsedConfirm.confirmSlug });
+    await deleteWorkspace({
+      organizationId: orgId,
+      confirmSlug: parsedConfirm.confirmSlug,
+      operatorInitiated: true,
+    });
   } catch (error) {
     const response = workspaceDeleteErrorResponse(error);
     if (response) {

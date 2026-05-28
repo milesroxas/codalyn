@@ -3,6 +3,7 @@ import {
   buildTowerVerifyEmailApiUrl,
   isEmailNotVerifiedAuthError,
   readEmailVerificationCallbackUrl,
+  resolveCheckEmailPromptCopy,
   resolveTowerAppCallbackUrl,
   resolveTowerEmailVerificationAppCallbackUrl,
   resolveTowerEmailVerificationCallbackUrl,
@@ -75,6 +76,14 @@ describe("buildTowerVerifyEmailApiUrl", () => {
       "https://app.example.com/api/auth/verify-email?token=tok&callbackURL=https%3A%2F%2Fapp.example.com%2Fdashboard%3FemailVerified%3D1"
     );
     process.env.NEXT_PUBLIC_APP_URL = prev;
+  });
+});
+
+describe("resolveCheckEmailPromptCopy", () => {
+  it("uses invite-specific copy for team invitations", () => {
+    const copy = resolveCheckEmailPromptCopy("teamInvite");
+    expect(copy.title).toBe("Verify your email to join");
+    expect(copy.footerLabel).toBe("Back to invitation");
   });
 });
 

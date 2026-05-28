@@ -387,8 +387,8 @@ function OperatorCustomerDetailSheetBody(props: OperatorCustomerDetailSheetBodyP
           panelDescription={
             <>
               Permanently delete this customer, their sessions, OAuth tokens, and Beacon preferences. Workspace
-              memberships are removed. Deletion is blocked while they are the only admin of a workspace with other
-              members; promote another admin or delete the workspace first.
+              memberships are removed. Deletion is blocked while they are the only admin of a shared workspace; promote
+              another admin or delete the workspace first.
             </>
           }
           triggerLabel="Delete customer"

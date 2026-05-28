@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertLocalDatabaseHost,
   assertSafeRemoteDatabaseUrl,
   assertValidNeonBranchName,
   parseDbScriptArgs,
@@ -21,6 +22,18 @@ describe("assertValidNeonBranchName", () => {
     expect(() => assertValidNeonBranchName("")).toThrow(/Invalid Neon branch name/);
     expect(() => assertValidNeonBranchName("../prod")).toThrow(/Invalid Neon branch name/);
     expect(() => assertValidNeonBranchName("branch;drop table")).toThrow(/Invalid Neon branch name/);
+  });
+});
+
+describe("assertLocalDatabaseHost", () => {
+  it("allows localhost hosts", () => {
+    expect(assertLocalDatabaseHost("postgresql://tower:tower@127.0.0.1:35432/tower").hostname).toBe("127.0.0.1");
+  });
+
+  it("blocks remote hosts", () => {
+    expect(() =>
+      assertLocalDatabaseHost("postgresql://user:pass@ep-example-pooler.us-east-1.aws.neon.tech/neondb")
+    ).toThrow(/not local/);
   });
 });
 

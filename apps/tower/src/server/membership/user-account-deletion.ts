@@ -1,49 +1,50 @@
 import { APIError } from "better-auth/api";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { isOrganizationProEntitled } from "@/server/billing/organization-billing";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
-import { deleteWorkspacesForAccountCleanup } from "@/server/membership/delete-workspace";
 import { db } from "@/shared/lib/db";
 import { invitation, member, organization, user } from "@/shared/lib/db/auth-schema";
 import { TOWER_INVITATION_STATUS } from "@/shared/lib/membership/tower-invitation-status";
-import { isTowerTeamAdminRole } from "@/shared/lib/membership/tower-organization-access";
 import {
-  computeUserAccountDeletionPlan,
-  formatSoleAdminWorkspacesMessage,
-  type OrgMemberSnapshot,
+  ACCOUNT_DELETION_BLOCKED_CODE,
+  computeAccountDeletionBlockers,
+  formatAccountDeletionBlockedMessage,
+  type OrganizationOwnershipSnapshot,
   resolveSharedMembershipOrganizationIds,
-  SOLE_ADMIN_WORKSPACES_CODE,
   type UserAccountDeletionPlan,
-  type WorkspaceDeletionBlocker,
-} from "@/shared/lib/membership/user-account-deletion";
+} from "@/shared/lib/membership/workspace-ownership";
 
 export {
-  SOLE_ADMIN_WORKSPACES_CODE,
+  ACCOUNT_DELETION_BLOCKED_CODE,
+  ACCOUNT_DELETION_BLOCKED_CODE as SOLE_ADMIN_WORKSPACES_CODE,
+  type OrganizationOwnershipSnapshot,
   type UserAccountDeletionPlan,
-  type WorkspaceDeletionBlocker,
-} from "@/shared/lib/membership/user-account-deletion";
+} from "@/shared/lib/membership/workspace-ownership";
+
+export type AccountDeletionBlocker = import("@/shared/lib/membership/workspace-ownership").AccountDeletionBlocker;
+
+/** @deprecated Use AccountDeletionBlocker */
+export type WorkspaceDeletionBlocker = AccountDeletionBlocker;
 
 export class UserAccountDeletionBlockedError extends Error {
-  readonly code = SOLE_ADMIN_WORKSPACES_CODE;
-  readonly blockers: WorkspaceDeletionBlocker[];
+  readonly code = ACCOUNT_DELETION_BLOCKED_CODE;
+  readonly blockers: AccountDeletionBlocker[];
 
-  constructor(blockers: WorkspaceDeletionBlocker[]) {
-    super(formatSoleAdminWorkspacesMessage(blockers));
+  constructor(blockers: AccountDeletionBlocker[]) {
+    super(formatAccountDeletionBlockedMessage(blockers));
     this.name = "UserAccountDeletionBlockedError";
     this.blockers = blockers;
   }
 }
 
-async function loadOrgMemberSnapshotsForUser(userId: string): Promise<OrgMemberSnapshot[]> {
-  const adminMemberships = await db
-    .select({
-      organizationId: member.organizationId,
-      role: member.role,
-    })
+async function loadOrganizationOwnershipSnapshotsForUser(userId: string): Promise<OrganizationOwnershipSnapshot[]> {
+  const memberships = await db
+    .select({ organizationId: member.organizationId })
     .from(member)
     .where(eq(member.userId, userId));
 
-  const adminOrgIds = adminMemberships.filter((row) => isTowerTeamAdminRole(row.role)).map((row) => row.organizationId);
-  if (adminOrgIds.length === 0) {
+  const orgIds = [...new Set(memberships.map((row) => row.organizationId))];
+  if (orgIds.length === 0) {
     return [];
   }
 
@@ -53,37 +54,46 @@ async function loadOrgMemberSnapshotsForUser(userId: string): Promise<OrgMemberS
         id: organization.id,
         name: organization.name,
         slug: organization.slug,
+        ownerUserId: organization.ownerUserId,
+        billingOwnerUserId: organization.billingOwnerUserId,
+        subscriptionStatus: organization.subscriptionStatus,
+        billingPlan: organization.billingPlan,
+        stripeSubscriptionId: organization.stripeSubscriptionId,
       })
       .from(organization)
-      .where(inArray(organization.id, adminOrgIds)),
+      .where(and(inArray(organization.id, orgIds), isNull(organization.deletedAt))),
     db
       .select({
         organizationId: member.organizationId,
         userId: member.userId,
-        role: member.role,
       })
       .from(member)
-      .where(inArray(member.organizationId, adminOrgIds)),
+      .where(inArray(member.organizationId, orgIds)),
   ]);
 
-  const membersByOrg = new Map<string, OrgMemberSnapshot["members"]>();
+  const memberCountByOrg = new Map<string, number>();
   for (const row of memberRows) {
-    const existing = membersByOrg.get(row.organizationId) ?? [];
-    existing.push({ userId: row.userId, role: row.role });
-    membersByOrg.set(row.organizationId, existing);
+    memberCountByOrg.set(row.organizationId, (memberCountByOrg.get(row.organizationId) ?? 0) + 1);
   }
 
   return orgRows.map((orgRow) => ({
     organizationId: orgRow.id,
     organizationName: orgRow.name,
     organizationSlug: orgRow.slug,
-    members: membersByOrg.get(orgRow.id) ?? [],
+    ownerUserId: orgRow.ownerUserId,
+    billingOwnerUserId: orgRow.billingOwnerUserId,
+    hasTeamSubscription: isOrganizationProEntitled({
+      subscriptionStatus: orgRow.subscriptionStatus,
+      billingPlan: orgRow.billingPlan,
+      stripeSubscriptionId: orgRow.stripeSubscriptionId,
+    }),
+    memberCount: memberCountByOrg.get(orgRow.id) ?? 0,
   }));
 }
 
 export async function planUserAccountDeletion(userId: string): Promise<UserAccountDeletionPlan> {
-  const orgs = await loadOrgMemberSnapshotsForUser(userId);
-  return computeUserAccountDeletionPlan(userId, orgs);
+  const orgs = await loadOrganizationOwnershipSnapshotsForUser(userId);
+  return { blockers: computeAccountDeletionBlockers(userId, orgs) };
 }
 
 export async function assertUserMayDeleteAccount(userId: string): Promise<UserAccountDeletionPlan> {
@@ -105,10 +115,11 @@ export function toUserAccountDeletionApiError(error: UserAccountDeletionBlockedE
 /**
  * Releases shared-workspace seats when a member deletes their account: marks accepted invites,
  * removes membership rows, and syncs Stripe before the user row is deleted.
+ * Does not delete or modify workspaces the user owns.
  */
 async function releaseSharedTeamMembershipsForAccountDeletion(
   userId: string,
-  soleMemberOrganizationIds: string[]
+  ownedOrganizationIds: string[]
 ): Promise<void> {
   const [userRow] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1);
   if (!userRow) {
@@ -120,7 +131,7 @@ async function releaseSharedTeamMembershipsForAccountDeletion(
     .from(member)
     .where(eq(member.userId, userId));
 
-  const organizationIds = resolveSharedMembershipOrganizationIds(memberships, soleMemberOrganizationIds);
+  const organizationIds = resolveSharedMembershipOrganizationIds(memberships, ownedOrganizationIds);
   if (organizationIds.length === 0) {
     return;
   }
@@ -143,13 +154,13 @@ async function releaseSharedTeamMembershipsForAccountDeletion(
   await Promise.all(organizationIds.map((organizationId) => syncOrganizationSeatQuantityWithStripe(organizationId)));
 }
 
-/** Deletes sole-member workspaces and blocks when the user is the only admin of a shared workspace. */
+/** Validates account deletion eligibility and releases non-owner memberships. Workspaces are never modified. */
 export async function prepareUserAccountDeletion(userId: string): Promise<UserAccountDeletionPlan> {
   const plan = await assertUserMayDeleteAccount(userId);
-  if (plan.soleMemberOrganizationIds.length > 0) {
-    await deleteWorkspacesForAccountCleanup(plan.soleMemberOrganizationIds);
-  }
 
-  await releaseSharedTeamMembershipsForAccountDeletion(userId, plan.soleMemberOrganizationIds);
+  const snapshots = await loadOrganizationOwnershipSnapshotsForUser(userId);
+  const ownedOrganizationIds = snapshots.filter((org) => org.ownerUserId === userId).map((org) => org.organizationId);
+
+  await releaseSharedTeamMembershipsForAccountDeletion(userId, ownedOrganizationIds);
   return plan;
 }

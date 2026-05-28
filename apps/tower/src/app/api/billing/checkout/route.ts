@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     mode: "subscription",
     customer: customerId,
     line_items: [{ price, quantity: 1 }],
-    success_url: `${base}/billing?checkout=success`,
+    success_url: `${base}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${base}/billing?checkout=canceled`,
     client_reference_id: u.id,
     metadata: { towerUserId: u.id, towerBillingScope: STRIPE_BILLING_SCOPE_USER },

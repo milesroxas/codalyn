@@ -37,14 +37,42 @@ Documented in `../.env.example`. Summary:
 | Variable | Required when billing is on | Purpose |
 | -------- | --------------------------- | -------- |
 | `TOWER_BILLING_ENABLED` | For prod behavior | Master switch; default off. |
-| `STRIPE_SECRET_KEY` | Yes | API calls (Checkout, Portal, webhooks). |
-| `STRIPE_WEBHOOK_SECRET` | Yes (prod) / `stripe listen` (local) | Verifies `POST /api/stripe/webhook`. |
-| `STRIPE_PRICE_PRO` | Yes (individual Pro) | **Recurring** Price id (Pro product). |
+| `STRIPE_SECRET_KEY` | Yes | API calls (Checkout, Portal, webhooks). Test: `sk_test_…`; live: `sk_live_…`. |
+| `STRIPE_WEBHOOK_SECRET` | Yes (prod) / `stripe listen` (local) | Verifies `POST /api/stripe/webhook`. One secret per webhook endpoint. |
+| `STRIPE_PRICE_PRO` | Yes (individual Pro) | **Recurring** Price id (Pro product). Test and live modes use different ids. |
 | `STRIPE_PRICE_TEAM_SEAT` | Yes (team billing) | **Per-seat recurring** Price id for workspace Team plan. |
+| `TOWER_STRIPE_REQUIRE_LIVE_IN_PRODUCTION` | No | Set to `1` on Vercel **Production** at go-live to reject `sk_test_` keys. Omit while prod still uses test mode. |
 | `TOWER_TEAM_MIN_SEATS` | No | Minimum seats on team checkout and Stripe sync (default `2`). |
 | `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` | Yes | Origins for Checkout success/cancel and Portal return URL. |
 | `TOWER_METERING_DISABLED` | No | `1` disables free-tier **usage** caps only (emergency). |
 | `TOWER_FREE_*` / `TOWER_PRO_*` | No | Optional overrides for monthly Webflow and image-optimize limits. |
+
+## Multi-environment setup (local, preview, production)
+
+Stripe mode is selected by the **secret key prefix** (`sk_test_` vs `sk_live_`). Tower does not hard-code sandbox vs live — configure env vars per deployment.
+
+| Environment | Vercel scope | Stripe mode | Database |
+| ------------- | ------------ | ----------- | -------- |
+| Local | — | Test (`sk_test_…`) | Docker / Neon dev |
+| Preview | Preview | Test (`sk_test_…`) | Neon `preview` branch |
+| Production (pre-launch) | Production | Test (`sk_test_…`) | Neon prod |
+| Production (go-live) | Production | Live (`sk_live_…`) | Neon prod |
+
+**Vercel environment variables**
+
+- **Preview + Development:** shared test keys, test price ids, preview webhook secret, `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` pointing at preview (e.g. `https://tower-preview.codalyn.app`).
+- **Production (while building):** same test keys and test price ids as preview; separate webhook endpoint on the production URL with its own `STRIPE_WEBHOOK_SECRET`.
+- **Production (go-live):** replace Production-scoped vars with live keys, live price ids, and live webhook secret. Set `TOWER_STRIPE_REQUIRE_LIVE_IN_PRODUCTION=1` so a stray test key fails fast. Clear or migrate test-era `stripe_customer_id` / `stripe_subscription_id` rows in prod — test ids are invalid in live mode.
+
+**Webhook endpoints (one signing secret each)**
+
+| Environment | URL |
+| ------------- | --- |
+| Local | `stripe listen --forward-to localhost:3100/api/stripe/webhook` |
+| Preview | `https://tower-preview.codalyn.app/api/stripe/webhook` |
+| Production | `https://tower.codalyn.app/api/stripe/webhook` |
+
+Preview deployments reject live keys automatically (`VERCEL_ENV=preview`). Production allows test keys until `TOWER_STRIPE_REQUIRE_LIVE_IN_PRODUCTION=1`.
 
 ## Stripe Dashboard
 
@@ -77,12 +105,15 @@ Subscribe to at least:
 | Area | Path |
 | ---- | ---- |
 | Flag | `src/server/billing/billing-feature.ts` |
+| Env vars + deploy guards | `src/server/billing/stripe-config.ts` |
+| Stripe client | `src/server/billing/stripe-client.ts` |
 | Team plan constants | `src/server/billing/team-billing-config.ts` |
 | Org entitlement (single source) | `src/server/billing/organization-billing.ts` |
 | Entitlements (user + org) | `src/server/billing/entitlements.ts` |
 | Usage caps (Webflow + image) | `src/server/billing/usage-gate.ts`, `limits.ts` |
 | Subscription status | `src/server/billing/stripe-subscription-status.ts` |
 | Webhook application | `src/server/billing/stripe-webhook-apply.ts` |
+| Checkout return sync (webhook fallback) | `src/server/billing/stripe-checkout-sync.ts` |
 | User sync | `src/server/billing/stripe-app.ts` |
 | Org sync + seat quantity | `src/server/billing/stripe-org-app.ts`, `stripe-org-seat-sync.ts` |
 | Seat counting | `src/server/billing/organization-seat-count.ts`, `src/shared/lib/billing/organization-seat-cap.ts` |
@@ -90,12 +121,24 @@ Subscribe to at least:
 
 Individual checkout embeds `towerUserId` and `towerBillingScope: user`. Team checkout embeds `towerOrgId`, `towerUserId`, and `towerBillingScope: organization` so webhooks route to the correct table.
 
+Checkout success URLs include `session_id={CHECKOUT_SESSION_ID}`. When the user lands on `/billing?checkout=success&session_id=…` or `/team?checkout=success&session_id=…`, Tower retrieves the session from Stripe and applies the same DB updates as `checkout.session.completed`. That covers webhook delay and local dev when webhooks are not forwarded to localhost.
+
 ## Local development
 
-1. Set `TOWER_BILLING_ENABLED=1` and the Stripe keys / price ids in `.env.local`.
+1. Set `TOWER_BILLING_ENABLED=1` and the Stripe keys / price ids in `.env` / `.env.local`.
 2. Run the Tower app (`pnpm app tower dev`).
-3. In another terminal, forward webhooks: `stripe listen --forward-to localhost:3100/api/stripe/webhook` and copy the **signing secret** into `STRIPE_WEBHOOK_SECRET`.
+3. **Webhooks (recommended):** in another terminal, `stripe listen --forward-to localhost:3100/api/stripe/webhook` and copy the **signing secret** into `STRIPE_WEBHOOK_SECRET`. Restart Tower after updating the secret. The Stripe Dashboard “local listener active” state is the CLI on your machine — it is **not** the same as a Dashboard webhook pointing at preview/production.
 4. Open `/billing` for individual Pro or `/team` → **Billing** for workspace Team checkout (test mode).
+
+**Common local pitfall:** checkout runs on `localhost:3100`, but a Dashboard webhook may target `https://tower-preview.codalyn.app`. Payment succeeds in Stripe while the **local** database stays on the free plan. Use `stripe listen` for local Postgres, or rely on the checkout return sync in step 3 above.
+
+## Switching Stripe accounts or test ↔ live
+
+No code changes — update env vars and Dashboard setup per environment. Also:
+
+- **`STRIPE_SECRET_KEY`**, **`STRIPE_WEBHOOK_SECRET`**, **`STRIPE_PRICE_PRO`**, and **`STRIPE_PRICE_TEAM_SEAT`** must all belong to the same Stripe account **and** mode (`sk_test_…` + test price ids, or `sk_live_…` + live price ids).
+- Configure a webhook endpoint (or `stripe listen`) for the Tower host that matches where you are testing.
+- **Database:** `user` and `organization` rows store Stripe customer/subscription ids from the previous account. Reusing the same DB after switching accounts causes “subscribed” UI with broken portal/checkout until you clear those fields or use a fresh DB (`pnpm app tower db:reset:local -- --confirm` locally). Operator-set plans in the console are separate from Stripe.
 
 ## Usage metering (Vercel cost control)
 

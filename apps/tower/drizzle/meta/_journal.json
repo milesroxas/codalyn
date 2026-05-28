@@ -122,6 +122,13 @@
       "breakpoints": true
     },
     {
+      "idx": 17,
+      "version": "7",
+      "when": 1776720000015,
+      "tag": "0017_support_request",
+      "breakpoints": true
+    },
+    {
       "idx": 18,
       "version": "7",
       "when": 1776720000016,
@@ -133,6 +140,13 @@
       "version": "7",
       "when": 1776720000017,
       "tag": "0019_operator_seat_limit_override",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1776720000018,
+      "tag": "0020_workspace_ownership",
       "breakpoints": true
     }
   ]

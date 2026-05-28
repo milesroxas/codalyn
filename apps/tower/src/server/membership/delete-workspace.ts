@@ -1,13 +1,20 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, lte } from "drizzle-orm";
 import Stripe from "stripe";
 import { getStripe } from "@/server/billing/stripe-client";
-import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
+import {
+  sendWorkspaceDeletedMemberNotificationEmail,
+  sendWorkspaceDeletionPreNoticeEmail,
+} from "@/server/email/workspace-deletion-member-email";
+import { computePurgeScheduledAt } from "@/server/membership/workspace-deletion-preview";
+import { assertUserIsWorkspaceOwner } from "@/server/membership/workspace-ownership";
+import { ActorPasswordVerificationError, assertActorPassword } from "@/server/security/verify-actor-password";
 import { db } from "@/shared/lib/db";
-import { organization, session as sessionTable } from "@/shared/lib/db/auth-schema";
+import { member, organization, session as sessionTable, user } from "@/shared/lib/db/auth-schema";
 import {
   assertWorkspaceSlugConfirmation,
   type WorkspaceDeletionErrorCode,
 } from "@/shared/lib/membership/workspace-deletion";
+import { WORKSPACE_SOFT_DELETE_RECOVERY_DAYS } from "@/shared/lib/membership/workspace-ownership";
 
 const WORKSPACE_RECORD_DELETE_ATTEMPTS = 3;
 
@@ -15,16 +22,26 @@ export type DeleteWorkspaceInput = {
   organizationId: string;
   /** Required for destructive actions; compared case-insensitively to the workspace slug. */
   confirmSlug: string;
+  /** Required re-authentication for user-initiated workspace deletion. */
+  password?: string;
   /**
-   * When set, re-checks team admin membership immediately before delete (closes TOCTOU between route auth and delete).
+   * When set, re-checks workspace ownership immediately before delete (closes TOCTOU between route auth and delete).
    */
   actorUserId?: string;
+  /** Product-admin operator deletes bypass password and ownership checks. */
+  operatorInitiated?: boolean;
+  /** Notify members after deletion is scheduled. Defaults to true. */
+  notifyMembers?: boolean;
+  /** Optional pre-deletion notice for paid workspaces. Defaults to true when Team billing is active. */
+  notifyPaidPreDeletion?: boolean;
 };
 
 type WorkspaceDeletionTarget = {
   id: string;
   slug: string;
+  name: string;
   stripeSubscriptionId: string | null;
+  deletedAt: Date | null;
 };
 
 export class WorkspaceDeletionError extends Error {
@@ -93,7 +110,9 @@ async function loadWorkspaceDeletionTarget(organizationId: string): Promise<Work
     .select({
       id: organization.id,
       slug: organization.slug,
+      name: organization.name,
       stripeSubscriptionId: organization.stripeSubscriptionId,
+      deletedAt: organization.deletedAt,
     })
     .from(organization)
     .where(eq(organization.id, organizationId))
@@ -101,48 +120,100 @@ async function loadWorkspaceDeletionTarget(organizationId: string): Promise<Work
   return target ?? null;
 }
 
-async function loadWorkspaceDeletionTargets(organizationIds: string[]): Promise<WorkspaceDeletionTarget[]> {
-  if (organizationIds.length === 0) {
-    return [];
-  }
-  return db
-    .select({
-      id: organization.id,
-      slug: organization.slug,
-      stripeSubscriptionId: organization.stripeSubscriptionId,
-    })
-    .from(organization)
-    .where(inArray(organization.id, organizationIds));
+async function notifyWorkspaceMembersOfDeletion(input: {
+  organizationId: string;
+  workspaceName: string;
+  actorUserId: string;
+  recoveryDays: number;
+  notifyPaidPreDeletion: boolean;
+  hasTeamSubscription: boolean;
+}): Promise<void> {
+  const [actor] = await db
+    .select({ name: user.name, email: user.email })
+    .from(user)
+    .where(eq(user.id, input.actorUserId))
+    .limit(1);
+
+  const members = await db
+    .select({ email: user.email, userId: member.userId })
+    .from(member)
+    .innerJoin(user, eq(member.userId, user.id))
+    .where(eq(member.organizationId, input.organizationId));
+
+  const actorName = actor?.name ?? actor?.email ?? null;
+
+  await Promise.all(
+    members
+      .filter((row) => row.userId !== input.actorUserId)
+      .map(async (row) => {
+        if (input.notifyPaidPreDeletion && input.hasTeamSubscription) {
+          await sendWorkspaceDeletionPreNoticeEmail({
+            to: row.email,
+            workspaceName: input.workspaceName,
+            actorName,
+          });
+        }
+        await sendWorkspaceDeletedMemberNotificationEmail({
+          to: row.email,
+          workspaceName: input.workspaceName,
+          actorName,
+          recoveryDays: input.recoveryDays,
+        });
+      })
+  );
 }
 
-async function assertActorMayDeleteWorkspace(actorUserId: string, organizationId: string): Promise<void> {
-  const allowed = await isTowerTeamAdminMemberOfOrg(actorUserId, organizationId);
-  if (!allowed) {
-    throw new WorkspaceDeletionError("forbidden");
+async function softDeleteWorkspaceTarget(
+  target: WorkspaceDeletionTarget,
+  actorUserId: string,
+  input: DeleteWorkspaceInput
+): Promise<void> {
+  if (target.deletedAt) {
+    throw new WorkspaceDeletionError("not_found");
   }
-}
 
-async function deleteWorkspaceTargets(targets: WorkspaceDeletionTarget[]): Promise<void> {
-  if (targets.length === 0) {
-    return;
-  }
-  for (const target of targets) {
-    await cancelWorkspaceStripeSubscription(target.stripeSubscriptionId);
-  }
-  try {
-    await removeWorkspaceRecordsWithRetry(targets.map((target) => target.id));
-  } catch {
-    throw new WorkspaceDeletionError(
-      "deletion_incomplete",
-      "Billing was canceled but workspace deletion did not finish. Retry the delete operation."
-    );
+  await cancelWorkspaceStripeSubscription(target.stripeSubscriptionId);
+
+  const deletedAt = new Date();
+  const purgeScheduledAt = computePurgeScheduledAt(deletedAt);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(sessionTable)
+      .set({ activeOrganizationId: null })
+      .where(eq(sessionTable.activeOrganizationId, target.id));
+
+    await tx
+      .update(organization)
+      .set({
+        deletedAt,
+        purgeScheduledAt,
+        billingOwnerUserId: null,
+        stripeSubscriptionId: null,
+        subscriptionStatus: "canceled",
+        billingPlan: null,
+        seatLimit: null,
+        stripeSeatQuantity: null,
+      })
+      .where(and(eq(organization.id, target.id), eq(organization.ownerUserId, actorUserId)));
+  });
+
+  if (input.notifyMembers !== false) {
+    const hasTeamSubscription = Boolean(target.stripeSubscriptionId);
+    void notifyWorkspaceMembersOfDeletion({
+      organizationId: target.id,
+      workspaceName: target.name,
+      actorUserId,
+      recoveryDays: WORKSPACE_SOFT_DELETE_RECOVERY_DAYS,
+      notifyPaidPreDeletion: input.notifyPaidPreDeletion !== false,
+      hasTeamSubscription,
+    }).catch(() => undefined);
   }
 }
 
 /**
- * Single source of truth for deleting a workspace (`organization` row).
- * Members lose access; user accounts remain. FK cascades remove memberships, invitations,
- * and Webflow OAuth tokens. `user.preferred_organization_id` is cleared via ON DELETE SET NULL.
+ * Soft-deletes a workspace after slug confirmation and password re-authentication.
+ * Members lose access immediately; rows are permanently purged after the recovery window.
  */
 export async function deleteWorkspace(input: DeleteWorkspaceInput): Promise<void> {
   const organizationId = input.organizationId.trim();
@@ -150,12 +221,37 @@ export async function deleteWorkspace(input: DeleteWorkspaceInput): Promise<void
     throw new WorkspaceDeletionError("not_found");
   }
 
-  if (input.actorUserId) {
-    await assertActorMayDeleteWorkspace(input.actorUserId, organizationId);
+  if (input.operatorInitiated) {
+    const target = await loadWorkspaceDeletionTarget(organizationId);
+    if (!target || target.deletedAt) {
+      throw new WorkspaceDeletionError("not_found");
+    }
+    const confirmResult = assertWorkspaceSlugConfirmation(input.confirmSlug, target.slug);
+    if (!confirmResult.ok) {
+      throw new WorkspaceDeletionError(confirmResult.code);
+    }
+    await cancelWorkspaceStripeSubscription(target.stripeSubscriptionId);
+    await removeWorkspaceRecordsWithRetry([target.id]);
+    return;
+  }
+
+  if (!input.actorUserId) {
+    throw new WorkspaceDeletionError("forbidden");
+  }
+
+  await assertUserIsWorkspaceOwner(input.actorUserId, organizationId);
+
+  try {
+    await assertActorPassword(input.actorUserId, input.password ?? "");
+  } catch (error) {
+    if (error instanceof ActorPasswordVerificationError) {
+      throw new WorkspaceDeletionError("forbidden", error.message);
+    }
+    throw error;
   }
 
   const target = await loadWorkspaceDeletionTarget(organizationId);
-  if (!target) {
+  if (!target || target.deletedAt) {
     throw new WorkspaceDeletionError("not_found");
   }
 
@@ -164,23 +260,40 @@ export async function deleteWorkspace(input: DeleteWorkspaceInput): Promise<void
     throw new WorkspaceDeletionError(confirmResult.code);
   }
 
-  await deleteWorkspaceTargets([target]);
+  await softDeleteWorkspaceTarget(target, input.actorUserId, input);
 }
 
-/**
- * Account deletion cleanup for sole-member workspaces (system-initiated; slug loaded server-side).
- * Cancels Stripe for all targets first, then removes rows in one DB transaction.
- */
+/** Permanently removes workspaces whose recovery window has elapsed. */
+export async function purgeExpiredSoftDeletedWorkspaces(now = new Date()): Promise<number> {
+  const dueRows = await db
+    .select({ id: organization.id })
+    .from(organization)
+    .where(and(isNotNull(organization.deletedAt), lte(organization.purgeScheduledAt, now)));
+
+  const ids = dueRows.map((row) => row.id);
+  if (ids.length === 0) {
+    return 0;
+  }
+
+  try {
+    await removeWorkspaceRecordsWithRetry(ids);
+  } catch {
+    throw new WorkspaceDeletionError(
+      "deletion_incomplete",
+      "Scheduled purge did not finish. Retry the purge operation."
+    );
+  }
+
+  return ids.length;
+}
+
+/** @deprecated Account deletion no longer deletes workspaces. Kept for operator tooling compatibility. */
 export async function deleteWorkspacesForAccountCleanup(organizationIds: string[]): Promise<void> {
-  const uniqueIds = [...new Set(organizationIds.map((id) => id.trim()).filter(Boolean))];
-  if (uniqueIds.length === 0) {
+  if (organizationIds.length === 0) {
     return;
   }
-
-  const targets = await loadWorkspaceDeletionTargets(uniqueIds);
-  if (targets.length !== uniqueIds.length) {
-    throw new WorkspaceDeletionError("not_found");
-  }
-
-  await deleteWorkspaceTargets(targets);
+  throw new WorkspaceDeletionError(
+    "forbidden",
+    "Workspaces must be deleted through the dedicated workspace deletion flow."
+  );
 }

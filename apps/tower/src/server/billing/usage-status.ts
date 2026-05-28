@@ -5,6 +5,7 @@ import {
   capForMeterKind,
   referenceCapForMeterKind,
   resolveMeteringPolicyFromEntitlement,
+  resolveUsageLimitsKind,
 } from "@/server/billing/metering-policy";
 import { getTowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 import { getUsageSnapshot, loadMeteringOverrideFields } from "@/server/billing/usage-gate";
@@ -43,6 +44,7 @@ export async function fetchEndUserUsageStatus(
   return {
     yearMonth: usage.yearMonth,
     tier: entitlement.tier,
+    limitsKind: resolveUsageLimitsKind(policy, overrides.user, overrides.organization),
     metered: !policy.skipMetering,
     meters,
     approachingMeters: pickApproachingUsageMeters(meters),

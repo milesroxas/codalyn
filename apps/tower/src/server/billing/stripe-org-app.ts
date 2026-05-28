@@ -2,19 +2,10 @@ import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
 import { resolveOrganizationSeatLimitAfterStripeQuantity } from "@/server/billing/organization-seat-override";
 import { isStripeSubscriptionProEntitled } from "@/server/billing/stripe-subscription-status";
+import { stripeCustomerIdFrom } from "@/server/billing/stripe-utils";
 import { getStripePriceTeamSeat, TEAM_BILLING_PLAN } from "@/server/billing/team-billing-config";
 import { db } from "@/shared/lib/db";
 import { organization, user } from "@/shared/lib/db/auth-schema";
-
-function customerIdFrom(c: Stripe.Customer | Stripe.DeletedCustomer | string): string {
-  if (typeof c === "string") {
-    return c;
-  }
-  if ("deleted" in c && c.deleted) {
-    return c.id;
-  }
-  return c.id;
-}
 
 export function readSubscriptionSeatQuantity(sub: Stripe.Subscription): number | null {
   const teamPriceId = getStripePriceTeamSeat();
@@ -35,9 +26,13 @@ export function readSubscriptionSeatQuantity(sub: Stripe.Subscription): number |
 /**
  * Idempotent: keeps org Stripe fields in sync; maps subscription quantity → `seat_limit`.
  */
-export async function applyStripeSubscriptionToOrganization(sub: Stripe.Subscription, towerOrgId: string) {
+export async function applyStripeSubscriptionToOrganization(
+  sub: Stripe.Subscription,
+  towerOrgId: string,
+  billingOwnerUserId?: string | null
+) {
   const entitled = isStripeSubscriptionProEntitled(sub.status);
-  const customer = customerIdFrom(sub.customer);
+  const customer = stripeCustomerIdFrom(sub.customer);
   const stripeSeatQuantity = entitled ? readSubscriptionSeatQuantity(sub) : null;
 
   const [existing] = await db
@@ -70,6 +65,7 @@ export async function applyStripeSubscriptionToOrganization(sub: Stripe.Subscrip
       stripeSeatQuantity: entitled ? stripeSeatQuantity : null,
       seatLimit,
       operatorSeatLimitOverride: entitled ? (existing?.operatorSeatLimitOverride ?? false) : false,
+      ...(entitled && billingOwnerUserId ? { billingOwnerUserId } : {}),
     })
     .where(eq(organization.id, towerOrgId));
 }
@@ -84,6 +80,7 @@ export async function clearStripeOrganizationSubscription(towerOrgId: string) {
       stripeSeatQuantity: null,
       seatLimit: null,
       operatorSeatLimitOverride: false,
+      billingOwnerUserId: null,
     })
     .where(eq(organization.id, towerOrgId));
 }

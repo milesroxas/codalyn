@@ -1,20 +1,22 @@
 "use client";
 
 import type { FormEvent } from "react";
+import { WorkspaceDeleteDangerZone } from "@/features/team/ui/workspace-delete-danger-zone";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { TabsContent } from "@/shared/ui/tabs";
-import { DangerZoneTypedDelete } from "@/shared/ui/typed-confirm-alert-dialog";
 import { WorkspaceSlugField } from "@/shared/ui/workspace-slug-field";
 
 export function WorkspaceSettingsTab(props: {
-  activeOrg: { id: string; name: string; slug: string };
+  activeOrg: { id: string; name: string; slug: string; ownerUserId?: string | null };
+  currentUserId: string;
   busy: boolean;
   deleteBusy: boolean;
   deleteConfirm: string;
+  deletePassword: string;
   memberCount: number;
   pendingInviteCount: number;
   activeTeamNameEdit: string;
@@ -24,13 +26,16 @@ export function WorkspaceSettingsTab(props: {
   onUpdateActiveTeamName: (e: FormEvent) => void;
   onUpdateActiveTeamSlug: () => void | Promise<void>;
   onDeleteConfirmChange: (value: string) => void;
+  onDeletePasswordChange: (value: string) => void;
   onDeleteWorkspace: () => void | Promise<void>;
 }) {
   const {
     activeOrg,
+    currentUserId,
     busy,
     deleteBusy,
     deleteConfirm,
+    deletePassword,
     memberCount,
     pendingInviteCount,
     activeTeamNameEdit,
@@ -40,11 +45,11 @@ export function WorkspaceSettingsTab(props: {
     onUpdateActiveTeamName,
     onUpdateActiveTeamSlug,
     onDeleteConfirmChange,
+    onDeletePasswordChange,
     onDeleteWorkspace,
   } = props;
 
-  const memberLabel = memberCount === 1 ? "member" : "members";
-  const inviteLabel = pendingInviteCount === 1 ? "pending invitation" : "pending invitations";
+  const isOwner = activeOrg.ownerUserId === currentUserId;
 
   return (
     <TabsContent value="settings" className="space-y-6">
@@ -104,24 +109,20 @@ export function WorkspaceSettingsTab(props: {
           </form>
         </CardContent>
       </Card>
-      <DangerZoneTypedDelete
-        panelDescription={
-          <>
-            Permanently deletes this workspace. {memberCount} {memberLabel} lose access; Tower accounts are kept.
-            {pendingInviteCount > 0 ? ` ${pendingInviteCount} ${inviteLabel} are revoked.` : null} Removes Webflow,
-            presets, and billing. Active Team subscriptions are canceled.
-          </>
-        }
-        triggerLabel="Delete workspace"
-        title="Delete workspace?"
-        confirmFieldLabel="Slug"
-        confirmFieldId="team-delete-workspace-slug"
-        expectedValue={activeOrg.slug}
-        confirmValue={deleteConfirm}
-        onConfirmValueChange={onDeleteConfirmChange}
-        busy={deleteBusy}
-        onConfirm={() => void onDeleteWorkspace()}
-      />
+      {isOwner ? (
+        <WorkspaceDeleteDangerZone
+          organizationId={activeOrg.id}
+          organizationSlug={activeOrg.slug}
+          memberCount={memberCount}
+          pendingInviteCount={pendingInviteCount}
+          deleteBusy={deleteBusy}
+          deleteConfirm={deleteConfirm}
+          deletePassword={deletePassword}
+          onDeleteConfirmChange={onDeleteConfirmChange}
+          onDeletePasswordChange={onDeletePasswordChange}
+          onDeleteWorkspace={onDeleteWorkspace}
+        />
+      ) : null}
     </TabsContent>
   );
 }

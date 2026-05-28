@@ -27,6 +27,8 @@ pnpm app tower db:push      # Drizzle → Neon (needs DATABASE_URL)
 
 # Migrations (see drizzle/README.md)
 pnpm app tower db:migrate:local   # .env + .env.local only (ignores DATABASE_URL in shell)
+pnpm app tower db:reset:local -- --confirm   # wipe local Docker Postgres volume, migrate, seed operators
+pnpm app tower db:seed:local      # seed/update local operators without wiping the DB
 pnpm app tower db:migrate:dev     # TOWER_NEON_BRANCH_DEV + NEON_* (or TOWER_DATABASE_URL_DEV)
 pnpm app tower db:migrate:preview # TOWER_NEON_BRANCH_PREVIEW + NEON_* (or TOWER_DATABASE_URL_PREVIEW)
 pnpm app tower db:migrate:prod    # TOWER_NEON_BRANCH_PROD + NEON_*; requires `-- --confirm`
@@ -36,6 +38,33 @@ pnpm app tower db:migrate:prod:vercel    # Vercel Production DATABASE_URL; requi
 ```
 
 Copy `.env.example` to `.env.local` and fill values before `pnpm build` or `db:push`.
+
+### Local database reset
+
+Wipes the **Docker Postgres volume** (`docker compose down -v`), re-applies migrations, and seeds operator accounts. Requires `--confirm` and a **localhost** `DATABASE_URL` (see `.env` / `.env.local`).
+
+```bash
+pnpm app tower db:reset:local -- --confirm
+```
+
+Set in `apps/tower/.env`:
+
+```bash
+TOWER_PRODUCT_ADMIN_EMAILS=miles@example.com   # comma-separated
+# TOWER_LOCAL_DEV_PASSWORD=codalyn-local-dev    # optional; this is the default
+```
+
+After reset, sign in at `http://localhost:3100/sign-in` with a seeded email and the dev password. Open `/console` for the operator UI.
+
+To create or refresh operator logins **without** wiping data:
+
+```bash
+pnpm app tower db:seed:local
+```
+
+`db:seed:local` resets passwords for listed emails to `TOWER_LOCAL_DEV_PASSWORD` (or the default). See [drizzle/README.md](drizzle/README.md) for migration commands.
+
+**Runtime operator promotion:** on first `GET /api/health` per process, `syncProductAdminRolesFromEnv` sets `user.role = product_admin` for emails in `TOWER_PRODUCT_ADMIN_EMAILS` when those **user rows already exist** (preview/prod). Local reset/seed creates the rows and credentials for you.
 
 ### Local URL / port (dev owns **3100**)
 

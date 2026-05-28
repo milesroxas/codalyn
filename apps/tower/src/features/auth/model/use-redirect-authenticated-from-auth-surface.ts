@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { readSessionEmailVerified } from "@/features/auth/lib/email-verification";
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { authClient } from "@/features/auth/model/auth-client";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
@@ -21,10 +22,10 @@ export function useRedirectAuthenticatedFromAuthSurface({
   const router = useRouter();
   const safeCallbackUrl = sanitizeRelativePath(callbackUrl);
   const { data: session, isPending: sessionPending } = authClient.useSession();
-  const redirecting = Boolean(session?.user && !beaconOrigin);
+  const redirecting = Boolean(session?.user && readSessionEmailVerified(session.user) && !beaconOrigin);
 
   useEffect(() => {
-    if (beaconOrigin || sessionPending || !session?.user) {
+    if (beaconOrigin || sessionPending || !session?.user || !readSessionEmailVerified(session.user)) {
       return;
     }
     router.replace(resolvePostAuthRedirectTarget(session.user, safeCallbackUrl));

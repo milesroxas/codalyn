@@ -3,116 +3,204 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  EMAIL_VERIFIED_TOAST,
+  readSessionEmailVerified,
+  TOWER_EMAIL_VERIFIED_QUERY,
+} from "@/features/auth/lib/email-verification";
 import { authClient } from "@/features/auth/model/auth-client";
+import {
+  AcceptInvitationAuthGateScreen,
+  AcceptInvitationErrorScreen,
+  AcceptInvitationLoadingScreen,
+  AcceptInvitationMessageScreen,
+  AcceptInvitationVerifyEmailScreen,
+  AcceptInvitationWorkingScreen,
+  AcceptInvitationWrongAccountScreen,
+} from "@/features/team/ui/accept-invitation-screen";
+import {
+  classifyTeamInvitationAcceptError,
+  messageForTeamInvitationAcceptError,
+  readTeamInvitationIdFromSearchParams,
+  TEAM_INVITATION_ACCEPT_COPY,
+  type TeamInvitationPreview,
+} from "@/shared/lib/membership/team-invitation-accept";
 import { TowerDeferredLoadingFallback } from "@/shared/ui/deferred-loading";
-import { AcceptInvitationSkeleton, CompactRedirectSkeleton } from "@/shared/ui/page-loading-skeletons";
+import { CompactRedirectSkeleton } from "@/shared/ui/page-loading-skeletons";
+
+type PreviewState = { status: "loading" } | { status: "error" } | { status: "ready"; preview: TeamInvitationPreview };
 
 function AcceptInvitationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const invitationId = searchParams.get("invitationId");
+  const invitationId = readTeamInvitationIdFromSearchParams(searchParams);
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const showInvitationSkeleton = useDeferredLoadingIndicator(sessionPending);
-  const [error, setError] = useState<string | null>(null);
-  const [working, setWorking] = useState(false);
-  const attempted = useRef(false);
+  const verifiedToastRef = useRef(false);
+  const attemptedAcceptRef = useRef(false);
 
-  const callbackUrl = invitationId ? `/invitations/accept?invitationId=${encodeURIComponent(invitationId)}` : "/";
+  const [previewState, setPreviewState] = useState<PreviewState>({ status: "loading" });
+  const [acceptError, setAcceptError] = useState<string | null>(null);
+  const [accepting, setAccepting] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
-    if (!invitationId || sessionPending || attempted.current) {
+    if (!invitationId) {
       return;
     }
-    if (!session?.user) {
-      return;
-    }
-    attempted.current = true;
-    setWorking(true);
-    setError(null);
-    void authClient.organization
-      .acceptInvitation({ invitationId })
-      .then((result) => {
-        setWorking(false);
-        if (result.error) {
-          const msg = result.error.message ?? "Could not accept invitation";
-          setError(msg);
-          toast.error(msg);
-          attempted.current = false;
+    let cancelled = false;
+    void fetch(`/api/team/invitations/preview?invitationId=${encodeURIComponent(invitationId)}`, {
+      credentials: "same-origin",
+    })
+      .then(async (res) => (res.ok ? ((await res.json()) as TeamInvitationPreview) : null))
+      .then((preview) => {
+        if (cancelled) {
           return;
         }
-        toast.success("You joined the team");
-        router.push("/");
-        router.refresh();
+        setPreviewState(preview ? { status: "ready", preview } : { status: "error" });
       })
-      .catch((e: unknown) => {
-        setWorking(false);
-        attempted.current = false;
-        const msg = e instanceof Error ? e.message : "Could not accept invitation";
-        setError(msg);
-        toast.error(msg);
+      .catch(() => {
+        if (!cancelled) {
+          setPreviewState({ status: "error" });
+        }
       });
-  }, [invitationId, session?.user, sessionPending, router]);
+    return () => {
+      cancelled = true;
+    };
+  }, [invitationId]);
+
+  useEffect(() => {
+    if (verifiedToastRef.current || !searchParams.has(TOWER_EMAIL_VERIFIED_QUERY)) {
+      return;
+    }
+    verifiedToastRef.current = true;
+    toast.success(EMAIL_VERIFIED_TOAST.title, { description: EMAIL_VERIFIED_TOAST.description });
+    const url = new URL(window.location.href);
+    url.searchParams.delete(TOWER_EMAIL_VERIFIED_QUERY);
+    router.replace(`${url.pathname}${url.search}`, { scroll: false });
+  }, [router, searchParams]);
+
+  const acceptInvitation = useCallback(async () => {
+    if (!invitationId) {
+      return;
+    }
+    setAccepting(true);
+    setAcceptError(null);
+    const result = await authClient.organization.acceptInvitation({ invitationId });
+    setAccepting(false);
+    if (result.error) {
+      const kind = classifyTeamInvitationAcceptError(result.error);
+      if (kind === "email_verification_required") {
+        return;
+      }
+      const msg = messageForTeamInvitationAcceptError(kind, result.error.message);
+      setAcceptError(msg);
+      toast.error(msg);
+      attemptedAcceptRef.current = false;
+      return;
+    }
+    toast.success(TEAM_INVITATION_ACCEPT_COPY.successToast);
+    router.push("/team");
+    router.refresh();
+  }, [invitationId, router]);
+
+  useEffect(() => {
+    if (!invitationId || sessionPending || attemptedAcceptRef.current || !session?.user) {
+      return;
+    }
+    if (!readSessionEmailVerified(session.user)) {
+      return;
+    }
+    if (previewState.status !== "ready" || !previewState.preview.ok) {
+      return;
+    }
+    const invitedEmail = previewState.preview.email.trim().toLowerCase();
+    const signedInEmail = session.user.email.trim().toLowerCase();
+    if (invitedEmail !== signedInEmail) {
+      return;
+    }
+    attemptedAcceptRef.current = true;
+    void acceptInvitation();
+  }, [acceptInvitation, invitationId, previewState, session?.user, sessionPending]);
+
+  const onSignOut = useCallback(async () => {
+    setSigningOut(true);
+    try {
+      await authClient.signOut({ fetchOptions: { credentials: "include" } });
+      attemptedAcceptRef.current = false;
+      setAcceptError(null);
+      router.refresh();
+    } finally {
+      setSigningOut(false);
+    }
+  }, [router]);
 
   if (!invitationId) {
     return (
-      <main className="mx-auto max-w-sm px-6 py-8">
-        <p className="text-sm text-neutral-600">Missing invitation. Check the link in your email.</p>
-      </main>
+      <AcceptInvitationMessageScreen
+        title={TEAM_INVITATION_ACCEPT_COPY.unavailableTitle}
+        description={TEAM_INVITATION_ACCEPT_COPY.missingInvitation}
+        footer={<Link href="/">Back to home</Link>}
+      />
     );
   }
 
-  if (showInvitationSkeleton) {
-    return <AcceptInvitationSkeleton />;
+  if (showInvitationSkeleton || previewState.status === "loading" || sessionPending) {
+    return <AcceptInvitationLoadingScreen />;
   }
-  if (sessionPending) {
-    return null;
+
+  if (previewState.status === "error") {
+    return (
+      <AcceptInvitationMessageScreen
+        title={TEAM_INVITATION_ACCEPT_COPY.unavailableTitle}
+        description={TEAM_INVITATION_ACCEPT_COPY.previewLoadingError}
+        footer={<Link href="/">Back to home</Link>}
+      />
+    );
+  }
+
+  const preview = previewState.preview;
+  if (!preview.ok) {
+    const expired = preview.reason === "expired";
+    return (
+      <AcceptInvitationMessageScreen
+        title={expired ? TEAM_INVITATION_ACCEPT_COPY.expiredTitle : TEAM_INVITATION_ACCEPT_COPY.unavailableTitle}
+        description={
+          expired ? TEAM_INVITATION_ACCEPT_COPY.expiredDescription : TEAM_INVITATION_ACCEPT_COPY.unavailableDescription
+        }
+        footer={<Link href="/">Back to home</Link>}
+      />
+    );
   }
 
   if (!session?.user) {
+    return <AcceptInvitationAuthGateScreen preview={preview} invitationId={invitationId} />;
+  }
+
+  const signedInEmail = session.user.email.trim().toLowerCase();
+  const invitedEmail = preview.email.trim().toLowerCase();
+  if (signedInEmail !== invitedEmail) {
     return (
-      <main className="mx-auto flex max-w-sm flex-col gap-4 px-6 py-8">
-        <h1 className="text-xl font-semibold">Accept invitation</h1>
-        <p className="text-sm text-neutral-600">
-          Sign in or create an account with the email address that received the invite, then you’ll join the team.
-        </p>
-        <div className="flex flex-col gap-2">
-          <Link
-            href={`/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`}
-            className="rounded bg-neutral-900 px-3 py-2 text-center text-sm text-white"
-          >
-            Sign in
-          </Link>
-          <Link
-            href={`/sign-up?callbackUrl=${encodeURIComponent(callbackUrl)}`}
-            className="rounded border border-neutral-300 px-3 py-2 text-center text-sm"
-          >
-            Create account
-          </Link>
-        </div>
-      </main>
+      <AcceptInvitationWrongAccountScreen
+        signedInEmail={session.user.email}
+        invitedEmail={preview.email}
+        signingOut={signingOut}
+        onSignOut={() => void onSignOut()}
+      />
     );
   }
 
-  if (error) {
-    return (
-      <main className="mx-auto max-w-sm px-6 py-8">
-        <p className="text-sm text-red-600">{error}</p>
-        <p className="mt-4 text-sm text-neutral-600">
-          <Link href="/" className="underline">
-            Back to home
-          </Link>
-        </p>
-      </main>
-    );
+  if (!readSessionEmailVerified(session.user)) {
+    return <AcceptInvitationVerifyEmailScreen email={session.user.email} invitationId={invitationId} />;
   }
 
-  return (
-    <main className="mx-auto max-w-sm px-6 py-8">
-      <p className="text-sm text-neutral-600">{working ? "Joining team…" : "Finishing…"}</p>
-    </main>
-  );
+  if (acceptError) {
+    return <AcceptInvitationErrorScreen message={acceptError} />;
+  }
+
+  return <AcceptInvitationWorkingScreen organizationName={preview.organizationName} accepting={accepting} />;
 }
 
 export default function AcceptInvitationPage() {

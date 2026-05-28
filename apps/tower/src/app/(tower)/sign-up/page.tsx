@@ -4,6 +4,7 @@ import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useId, useState } from "react";
+import { resolveSignUpCardDescription, shouldShowEarlyAccessSignUpGate } from "@/features/auth/lib/auth-surface-copy";
 import {
   syncExistingTowerSessionToBeaconIfPopup,
   tryFinishBeaconTowerAuthPopup,
@@ -20,6 +21,7 @@ import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { TOWER_OPERATOR_INVITE_HEADER } from "@/shared/lib/access/operator-invite-header";
+import { isTeamInvitationAcceptPath } from "@/shared/lib/membership/team-invitation-accept";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -184,8 +186,10 @@ function SignUpForm() {
     invite: operatorInviteParam,
   };
   const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl, authSearchParams);
+  const signUpHref = buildTowerAuthSurfaceHref("/sign-up", callbackUrl, authSearchParams);
   const requestAccessHref = buildTowerAuthSurfaceHref("/request-access", callbackUrl, authSearchParams);
-  const joiningViaTeamInvite = callbackUrl.includes("/invitations/accept");
+  const joiningViaTeamInvite = isTeamInvitationAcceptPath(callbackUrl);
+  const verificationPromptContext = joiningViaTeamInvite ? "teamInvite" : "signUp";
 
   const authBusy = sessionPending || redirectingSignedInUser || earlyAccessRequired === null || !inviteValidated;
   const showAuthSkeleton = useDeferredLoadingIndicator(authBusy);
@@ -196,14 +200,26 @@ function SignUpForm() {
     return null;
   }
 
-  if (earlyAccessRequired && !operatorInviteToken && !operatorInviteParam && !joiningViaTeamInvite) {
+  if (
+    shouldShowEarlyAccessSignUpGate({
+      earlyAccessRequired,
+      operatorInviteToken,
+      operatorInviteParam,
+      joiningViaTeamInvite,
+    })
+  ) {
     return <EarlyAccessSignUpGate signInHref={signInHref} requestAccessHref={requestAccessHref} />;
   }
 
   if (awaitingVerificationEmail) {
     return (
       <AuthShell>
-        <CheckEmailPrompt email={awaitingVerificationEmail} callbackPath={callbackUrl} signInHref={signInHref} />
+        <CheckEmailPrompt
+          email={awaitingVerificationEmail}
+          callbackPath={callbackUrl}
+          footerHref={joiningViaTeamInvite ? callbackUrl : signUpHref}
+          context={verificationPromptContext}
+        />
       </AuthShell>
     );
   }
@@ -214,7 +230,7 @@ function SignUpForm() {
         <CardHeader className="space-y-1 pb-2">
           <CardTitle className="text-xl font-semibold tracking-tight">Create your account</CardTitle>
           <CardDescription className="text-base leading-relaxed">
-            Start using Tower with Beacon and team features.
+            {resolveSignUpCardDescription(joiningViaTeamInvite)}
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-4">

@@ -1,4 +1,5 @@
 import { authClient } from "@/features/auth/model/auth-client";
+import type { AuthCheckEmailCardCopy } from "@/features/auth/ui/auth-check-email-card";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 
 export const TOWER_EMAIL_VERIFIED_QUERY = "emailVerified";
@@ -18,6 +19,32 @@ export const CHECK_EMAIL_PROMPT_COPY = {
   signInLabel: "Back to sign in",
 } as const;
 
+export type EmailVerificationPromptContext = "signIn" | "signUp" | "teamInvite";
+
+export function resolveCheckEmailPromptCopy(context: EmailVerificationPromptContext): AuthCheckEmailCardCopy {
+  switch (context) {
+    case "signUp":
+      return {
+        ...CHECK_EMAIL_PROMPT_COPY,
+        description: "We sent a verification link to your inbox. Open it to finish creating your Tower account.",
+        footerLabel: "Back to sign up",
+      };
+    case "teamInvite":
+      return {
+        ...CHECK_EMAIL_PROMPT_COPY,
+        title: "Verify your email to join",
+        description:
+          "We sent a verification link to your inbox. Open it to confirm your address, then you'll join the workspace automatically.",
+        footerLabel: "Back to invitation",
+      };
+    default:
+      return {
+        ...CHECK_EMAIL_PROMPT_COPY,
+        footerLabel: CHECK_EMAIL_PROMPT_COPY.signInLabel,
+      };
+  }
+}
+
 export const EMAIL_VERIFIED_TOAST = {
   title: "Email verified",
   description: "Your Tower email address is confirmed.",
@@ -31,7 +58,8 @@ export const EMAIL_VERIFICATION_FAILED_TOAST = {
 export const VERIFY_EMAIL_PAGE_COPY = {
   pendingTitle: "Verifying your email",
   pendingDescription: "Hang tight while we confirm your address.",
-  invalidTokenMessage: "This verification link is invalid or expired.",
+  invalidTokenTitle: "Verification link expired",
+  invalidTokenMessage: "This verification link is invalid or expired. Request a new one from the sign-in page.",
   signInLabel: "Back to sign in",
 } as const;
 

@@ -54,6 +54,7 @@ export function TeamDashboard(props: {
   const [busy, setBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
   const [resendingInvitationId, setResendingInvitationId] = useState<string | null>(null);
   const canManageTeam = isTowerTeamAdminRole(activeMember?.role);
 
@@ -66,6 +67,7 @@ export function TeamDashboard(props: {
       setActiveTeamNameEdit(activeOrg.name);
       setActiveTeamSlugEdit(activeOrg.slug);
       setDeleteConfirm("");
+      setDeletePassword("");
     }
   }, [activeOrg]);
 
@@ -76,7 +78,7 @@ export function TeamDashboard(props: {
     setError(null);
     setDeleteBusy(true);
     try {
-      await deleteTeamWorkspace(activeOrg.id, deleteConfirm);
+      await deleteTeamWorkspace(activeOrg.id, deleteConfirm, deletePassword);
       toast.success("Workspace deleted");
       window.location.assign("/");
     } catch (err) {
@@ -86,7 +88,7 @@ export function TeamDashboard(props: {
     } finally {
       setDeleteBusy(false);
     }
-  }, [activeOrg, deleteConfirm]);
+  }, [activeOrg, deleteConfirm, deletePassword]);
 
   const onUpdateActiveTeamName = async (e: FormEvent) => {
     e.preventDefault();
@@ -359,7 +361,9 @@ export function TeamDashboard(props: {
         resendingInvitationId={resendingInvitationId}
         deleteBusy={deleteBusy}
         deleteConfirm={deleteConfirm}
+        deletePassword={deletePassword}
         onDeleteConfirmChange={setDeleteConfirm}
+        onDeletePasswordChange={setDeletePassword}
         onDeleteWorkspace={onDeleteWorkspace}
       />
     </TowerPageMain>

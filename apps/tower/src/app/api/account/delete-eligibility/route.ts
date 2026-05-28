@@ -14,6 +14,5 @@ export async function GET() {
   return NextResponse.json({
     canDelete: plan.blockers.length === 0,
     blockers: plan.blockers,
-    soleMemberWorkspaceCount: plan.soleMemberOrganizationIds.length,
   });
 }

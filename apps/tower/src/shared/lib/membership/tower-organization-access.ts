@@ -92,6 +92,10 @@ export const towerOrganizationClientSchema = {
       stripeSubscriptionId: { type: "string", required: false, input: false },
       subscriptionStatus: { type: "string", required: false, input: false },
       billingPlan: { type: "string", required: false, input: false },
+      ownerUserId: { type: "string", required: true, input: false },
+      billingOwnerUserId: { type: "string", required: false, input: false },
+      deletedAt: { type: "date", required: false, input: false },
+      purgeScheduledAt: { type: "date", required: false, input: false },
     },
   },
 } as const;

@@ -15,6 +15,13 @@ export function readTowerOrgIdFromStripeMetadata(metadata: Stripe.Metadata | nul
   return typeof raw === "string" && raw.length > 0 ? raw : null;
 }
 
+export function readTowerOwnershipTransferIdFromStripeMetadata(
+  metadata: Stripe.Metadata | null | undefined
+): string | null {
+  const raw = metadata?.towerOwnershipTransferId;
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
 export function readStripeBillingScopeFromMetadata(
   metadata: Stripe.Metadata | null | undefined
 ): StripeBillingScope | null {

@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import {
   CHECK_EMAIL_PROMPT_COPY,
   EMAIL_VERIFICATION_BANNER_COPY,
+  type EmailVerificationPromptContext,
+  resolveCheckEmailPromptCopy,
   sendTowerVerificationEmail,
 } from "@/features/auth/lib/email-verification";
 import { AuthCheckEmailCard } from "@/features/auth/ui/auth-check-email-card";
@@ -15,23 +17,24 @@ import { Button } from "@/shared/ui/button";
 type CheckEmailPromptProps = {
   email: string;
   callbackPath?: string;
+  footerHref?: string;
+  /** @deprecated Use footerHref */
   signInHref?: string;
+  context?: EmailVerificationPromptContext;
 };
 
-export function CheckEmailPrompt({ email, callbackPath = "/", signInHref = "/sign-in" }: CheckEmailPromptProps) {
+export function CheckEmailPrompt({
+  email,
+  callbackPath = "/",
+  footerHref,
+  signInHref = "/sign-in",
+  context = "signIn",
+}: CheckEmailPromptProps) {
+  const copy = resolveCheckEmailPromptCopy(context);
+  const resolvedFooterHref = footerHref ?? signInHref;
   const onResend = useCallback(() => sendTowerVerificationEmail(email, callbackPath), [callbackPath, email]);
 
-  return (
-    <AuthCheckEmailCard
-      email={email}
-      copy={{
-        ...CHECK_EMAIL_PROMPT_COPY,
-        footerLabel: CHECK_EMAIL_PROMPT_COPY.signInLabel,
-      }}
-      footerHref={signInHref}
-      onResend={onResend}
-    />
-  );
+  return <AuthCheckEmailCard email={email} copy={copy} footerHref={resolvedFooterHref} onResend={onResend} />;
 }
 
 type EmailVerificationResendButtonProps = {
@@ -62,9 +65,10 @@ export function EmailVerificationResendButton({ email, callbackPath = "/" }: Ema
 
 type EmailVerificationBannerProps = {
   email: string;
+  callbackPath?: string;
 };
 
-export function EmailVerificationBanner({ email }: EmailVerificationBannerProps) {
+export function EmailVerificationBanner({ email, callbackPath = "/" }: EmailVerificationBannerProps) {
   return (
     <Alert variant="warning">
       <IconAlertCircle />
@@ -73,7 +77,7 @@ export function EmailVerificationBanner({ email }: EmailVerificationBannerProps)
         {EMAIL_VERIFICATION_BANNER_COPY.description} Your address: {email}.
       </AlertDescription>
       <AlertAction>
-        <EmailVerificationResendButton email={email} />
+        <EmailVerificationResendButton email={email} callbackPath={callbackPath} />
       </AlertAction>
     </Alert>
   );

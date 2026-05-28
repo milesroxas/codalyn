@@ -9,6 +9,7 @@ import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { formatRelative } from "@/features/operator/model/format";
 import { useOperatorMetrics } from "@/features/operator/model/operator-metrics-provider";
 import { OperatorPendingReviewAlert } from "@/features/operator/ui/operator-pending-review-alert";
+import { earlyAccessRequestDisplayName } from "@/shared/lib/access/early-access-request-name";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
@@ -140,7 +141,7 @@ export function OperatorAccessRequests() {
                         <span className="font-medium">{row.email}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{row.name ?? "—"}</TableCell>
+                    <TableCell>{earlyAccessRequestDisplayName(row) ?? "—"}</TableCell>
                     <TableCell className="max-w-xs truncate text-muted-foreground">{row.note ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{formatRelative(row.createdAt)}</Badge>

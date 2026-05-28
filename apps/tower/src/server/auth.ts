@@ -11,6 +11,10 @@ import {
   readOperatorInviteTokenFromAuthContext,
 } from "@/server/access/early-access";
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
+import {
+  isValidOperatorInviteForEmail,
+  trustEmailForOperatorInvite,
+} from "@/server/access/operator-invite-email-trust";
 import { resolveTowerEmailChangeCompleteAppCallbackUrl } from "@/server/auth/change-email-callback";
 import {
   isChangeEmailVerificationRequest,
@@ -22,6 +26,11 @@ import { sendChangeEmailConfirmationEmail } from "@/server/email/change-email-co
 import { sendChangeEmailNewAddressVerificationEmail } from "@/server/email/change-email-new-address-email";
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
 import { sendPasswordResetEmail } from "@/server/email/password-reset-email";
+import {
+  isPendingTeamInvitationForEmail,
+  readTeamInvitationIdFromAuthContext,
+  trustEmailForPendingTeamInvitation,
+} from "@/server/membership/team-invitation-email-trust";
 import { towerOrganization } from "@/server/membership/tower-organization";
 import {
   prepareUserAccountDeletion,
@@ -75,7 +84,15 @@ export const auth = betterAuth({
     sendVerificationEmail: async ({ user, url, token }, request) => {
       const skipHeader = request?.headers.get(TOWER_SKIP_VERIFICATION_EMAIL_HEADER) === "1";
       const changeEmailVerification = isChangeEmailVerificationRequest(token);
-      if (skipHeader && !changeEmailVerification) {
+      const teamInvitationId = readTeamInvitationIdFromAuthContext({ request });
+      const operatorInviteToken = readOperatorInviteTokenFromAuthContext({ request });
+      const skipForTeamInvitation = teamInvitationId
+        ? await isPendingTeamInvitationForEmail(teamInvitationId, user.email)
+        : false;
+      const skipForOperatorInvite = operatorInviteToken
+        ? isValidOperatorInviteForEmail(operatorInviteToken, user.email)
+        : false;
+      if ((skipHeader || skipForTeamInvitation || skipForOperatorInvite) && !changeEmailVerification) {
         return;
       }
       if (changeEmailVerification) {
@@ -161,12 +178,37 @@ export const auth = betterAuth({
       if (ctx.path === "/sign-in/email") {
         const email = typeof ctx.body?.email === "string" ? ctx.body.email : "";
         await assertUserMaySignInByEmail(email);
+        await trustEmailForPendingTeamInvitation(email, readTeamInvitationIdFromAuthContext(ctx));
+        await trustEmailForOperatorInvite(email, readOperatorInviteTokenFromAuthContext(ctx));
       }
     }),
   },
   databaseHooks: {
     user: {
       create: {
+        before: async (createdUser, ctx) => {
+          if (!createdUser.email) {
+            return;
+          }
+          const invitationId = readTeamInvitationIdFromAuthContext(ctx);
+          if (invitationId && (await isPendingTeamInvitationForEmail(invitationId, createdUser.email))) {
+            return {
+              data: {
+                ...createdUser,
+                emailVerified: true,
+              },
+            };
+          }
+          const operatorInviteToken = readOperatorInviteTokenFromAuthContext(ctx);
+          if (operatorInviteToken && isValidOperatorInviteForEmail(operatorInviteToken, createdUser.email)) {
+            return {
+              data: {
+                ...createdUser,
+                emailVerified: true,
+              },
+            };
+          }
+        },
         after: async (createdUser) => {
           if (!isTowerEarlyAccessGateEnabled()) {
             return;

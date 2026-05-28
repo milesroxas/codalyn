@@ -7,10 +7,11 @@ import {
   EARLY_ACCESS_REQUEST_ALREADY_HAS_ACCESS_MESSAGE,
   EARLY_ACCESS_REQUEST_ALREADY_PENDING_MESSAGE,
   EARLY_ACCESS_REQUEST_EMAIL_LABEL,
+  EARLY_ACCESS_REQUEST_FIRST_NAME_LABEL,
   EARLY_ACCESS_REQUEST_INVALID_EMAIL,
   EARLY_ACCESS_REQUEST_INVALID_REFERRAL,
   EARLY_ACCESS_REQUEST_INVALID_REFERRAL_OTHER,
-  EARLY_ACCESS_REQUEST_NAME_LABEL,
+  EARLY_ACCESS_REQUEST_LAST_NAME_LABEL,
   EARLY_ACCESS_REQUEST_PAGE_DESCRIPTION,
   EARLY_ACCESS_REQUEST_PAGE_TITLE,
   EARLY_ACCESS_REQUEST_REFERRAL_LABEL,
@@ -29,7 +30,7 @@ import {
   type EarlyAccessReferralSource,
 } from "@/shared/lib/access/referral-source";
 import { Button } from "@/shared/ui/button";
-import { FormField } from "@/shared/ui/form-field";
+import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
@@ -76,11 +77,13 @@ export type EarlyAccessRequestFormProps = {
 
 export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
   const { signInHref = "/sign-in" } = props;
-  const nameId = useId();
+  const firstNameId = useId();
+  const lastNameId = useId();
   const emailId = useId();
   const referralId = useId();
   const referralOtherId = useId();
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [referralSource, setReferralSource] = useState<EarlyAccessReferralSource | "">("");
   const [referralOther, setReferralOther] = useState("");
@@ -106,7 +109,8 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
+          firstName: firstName.trim() || undefined,
+          lastName: lastName.trim() || undefined,
           email: normalizeAccessEmail(email),
           referralSource,
           referralOther: referralSource === "other" ? referralOther : undefined,
@@ -122,6 +126,8 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
       if (outcome === "already_has_access") {
         return;
       }
+      setFirstName("");
+      setLastName("");
       setReferralSource("");
       setReferralOther("");
     } catch {
@@ -145,18 +151,32 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
           </p>
         ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
-            <FormField>
-              <Label htmlFor={nameId}>{EARLY_ACCESS_REQUEST_NAME_LABEL}</Label>
-              <Input
-                id={nameId}
-                type="text"
-                autoComplete="name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                fieldSize="lg"
-                surface="elevated"
-              />
-            </FormField>
+            <FormFieldGrid>
+              <FormField>
+                <Label htmlFor={firstNameId}>{EARLY_ACCESS_REQUEST_FIRST_NAME_LABEL}</Label>
+                <Input
+                  id={firstNameId}
+                  type="text"
+                  autoComplete="given-name"
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  fieldSize="lg"
+                  surface="elevated"
+                />
+              </FormField>
+              <FormField>
+                <Label htmlFor={lastNameId}>{EARLY_ACCESS_REQUEST_LAST_NAME_LABEL}</Label>
+                <Input
+                  id={lastNameId}
+                  type="text"
+                  autoComplete="family-name"
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  fieldSize="lg"
+                  surface="elevated"
+                />
+              </FormField>
+            </FormFieldGrid>
             <FormField>
               <Label htmlFor={emailId}>{EARLY_ACCESS_REQUEST_EMAIL_LABEL}</Label>
               <Input

@@ -11,17 +11,21 @@ import {
 } from "@/features/auth/lib/beacon-opener-auth";
 import { buildTowerAuthSurfaceHref } from "@/features/auth/lib/build-tower-auth-surface-href";
 import { resolveTowerEmailVerificationAppCallbackUrl } from "@/features/auth/lib/email-verification";
-import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
+import {
+  fetchOperatorInviteSignUpPrefill,
+  messageForRedeemFailure,
+  redeemOperatorInviteClient,
+} from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
-import { authClient } from "@/features/auth/model/auth-client";
+import { submitTowerEmailSignUp } from "@/features/auth/lib/submit-tower-email-sign-up";
 import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
 import { EarlyAccessSignUpGate } from "@/features/auth/ui/early-access-sign-up-gate";
 import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
-import { TOWER_OPERATOR_INVITE_HEADER } from "@/shared/lib/access/operator-invite-header";
 import { isTeamInvitationAcceptPath } from "@/shared/lib/membership/team-invitation-accept";
+import { readTeamInvitationIdFromCallbackPath } from "@/shared/lib/membership/team-invitation-header";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -98,22 +102,23 @@ function SignUpForm() {
     }
     let cancelled = false;
     void (async () => {
-      const res = await fetch(`/api/account/operator-invite-details?token=${encodeURIComponent(operatorInviteParam)}`, {
-        credentials: "same-origin",
-      });
+      const result = await fetchOperatorInviteSignUpPrefill(operatorInviteParam);
       if (cancelled) {
         return;
       }
-      if (!res.ok) {
-        setError("This invite link is invalid or expired. Ask your administrator for a new one.");
+      if (!result.ok) {
+        setError(result.error);
         setInviteValidated(true);
         return;
       }
-      const data = (await res.json().catch(() => null)) as { email?: string } | null;
-      if (data?.email) {
-        setEmail(data.email);
-        setOperatorInviteToken(operatorInviteParam);
-        setInviteEmailLocked(true);
+      setEmail(result.prefill.email);
+      setOperatorInviteToken(operatorInviteParam);
+      setInviteEmailLocked(true);
+      if (result.prefill.firstName) {
+        setFirstName(result.prefill.firstName);
+      }
+      if (result.prefill.lastName) {
+        setLastName(result.prefill.lastName);
       }
       setInviteValidated(true);
     })();
@@ -138,6 +143,9 @@ function SignUpForm() {
     router.refresh();
   }
 
+  const joiningViaTeamInvite = isTeamInvitationAcceptPath(callbackUrl);
+  const teamInvitationId = readTeamInvitationIdFromCallbackPath(callbackUrl);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -146,28 +154,24 @@ function SignUpForm() {
       [firstName.trim(), lastName.trim()].filter(Boolean).join(" ").trim() || email.split("@")[0] || "User";
     const inviteToken = operatorInviteToken ?? operatorInviteParam?.trim() ?? null;
     const verificationCallback = resolveTowerEmailVerificationAppCallbackUrl(callbackUrl);
-    const { data, error: err } = await authClient.signUp.email({
+    const result = await submitTowerEmailSignUp({
       email,
       password,
-      name: displayName,
+      displayName,
       firstName: firstName.trim() || undefined,
       lastName: lastName.trim() || undefined,
-      callbackURL: verificationCallback,
-      fetchOptions: inviteToken
-        ? {
-            headers: {
-              [TOWER_OPERATOR_INVITE_HEADER]: inviteToken,
-            },
-          }
-        : undefined,
+      verificationCallback,
+      operatorInviteToken: inviteToken,
+      teamInvitationId,
+      joiningViaTeamInvite,
     });
     setPending(false);
-    if (err) {
-      setError(err.message ?? "Sign up failed");
+    if (result.kind === "error") {
+      setError(result.message);
       return;
     }
-    if (!data?.token) {
-      setAwaitingVerificationEmail(email);
+    if (result.kind === "awaiting_verification") {
+      setAwaitingVerificationEmail(result.email);
       return;
     }
     const postErr = await runAfterTowerSignUp({
@@ -178,7 +182,7 @@ function SignUpForm() {
       setError(postErr);
       return;
     }
-    await finishSignUp(data);
+    await finishSignUp(result.data);
   }
 
   const authSearchParams = {
@@ -188,7 +192,6 @@ function SignUpForm() {
   const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl, authSearchParams);
   const signUpHref = buildTowerAuthSurfaceHref("/sign-up", callbackUrl, authSearchParams);
   const requestAccessHref = buildTowerAuthSurfaceHref("/request-access", callbackUrl, authSearchParams);
-  const joiningViaTeamInvite = isTeamInvitationAcceptPath(callbackUrl);
   const verificationPromptContext = joiningViaTeamInvite ? "teamInvite" : "signUp";
 
   const authBusy = sessionPending || redirectingSignedInUser || earlyAccessRequired === null || !inviteValidated;

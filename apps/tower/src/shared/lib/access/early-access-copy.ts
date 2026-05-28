@@ -27,7 +27,9 @@ export const EARLY_ACCESS_REQUEST_PAGE_SIGN_UP_CTA = "Create an account";
 
 export const EARLY_ACCESS_REQUEST_EMAIL_LABEL = "Work email";
 
-export const EARLY_ACCESS_REQUEST_NAME_LABEL = "Name";
+export const EARLY_ACCESS_REQUEST_FIRST_NAME_LABEL = "First name";
+
+export const EARLY_ACCESS_REQUEST_LAST_NAME_LABEL = "Last name";
 
 export const EARLY_ACCESS_REQUEST_REFERRAL_LABEL = "How did you hear about Codalyn Tower?";
 

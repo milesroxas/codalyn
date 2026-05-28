@@ -128,7 +128,8 @@ export const operatorApi = {
     rows: Array<{
       id: string;
       email: string;
-      name: string | null;
+      firstName: string | null;
+      lastName: string | null;
       note: string | null;
       teamMemberEmails: string[] | null;
       status: string;

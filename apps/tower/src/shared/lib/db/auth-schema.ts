@@ -343,7 +343,8 @@ export const earlyAccessRequest = pgTable(
   {
     id: text("id").primaryKey(),
     email: text("email").notNull().unique(),
-    name: text("name"),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
     note: text("note"),
     teamMemberEmails: jsonb("team_member_emails").$type<string[] | null>(),
     /** `pending` · `approved` · `dismissed` */

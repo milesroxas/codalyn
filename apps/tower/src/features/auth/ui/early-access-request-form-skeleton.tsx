@@ -1,4 +1,5 @@
 import { EarlyAccessPageShell } from "@/features/tower-ui/early-access-page-shell";
+import { FormFieldGrid } from "@/shared/ui/form-field";
 import { FormFieldSkeleton } from "@/shared/ui/form-field-skeleton";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { SkeletonStatus } from "@/shared/ui/skeleton-status";
@@ -14,7 +15,10 @@ function EarlyAccessRequestFormSkeleton() {
 
       <div className="rounded-xl border border-border/80 bg-card p-6 shadow-lg shadow-black/4 dark:shadow-black/25">
         <div className="flex flex-col gap-5">
-          <FormFieldSkeleton fieldSize="lg" />
+          <FormFieldGrid>
+            <FormFieldSkeleton fieldSize="lg" />
+            <FormFieldSkeleton fieldSize="lg" />
+          </FormFieldGrid>
           <FormFieldSkeleton fieldSize="lg" />
           <FormFieldSkeleton fieldSize="lg" />
           <Skeleton className="h-10 w-full rounded-lg" />

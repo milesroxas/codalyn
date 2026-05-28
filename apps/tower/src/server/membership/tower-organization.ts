@@ -10,6 +10,7 @@ import {
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { resolveMembershipSeatCapFromOrg } from "@/server/billing/team-billing-config";
 import { sendOrganizationInvitationEmail } from "@/server/email/organization-invitation-email";
+import { markEmailVerifiedForUserId } from "@/server/membership/team-invitation-email-trust";
 import { resolveUserWorkspaceCreationEligibility } from "@/server/membership/user-workspace-creation-eligibility";
 import {
   assertWorkspaceSlugAvailableForUpdate,
@@ -17,6 +18,7 @@ import {
   resolveWorkspaceSlugForCreate,
   resolveWorkspaceSlugInput,
 } from "@/server/membership/workspace-slug-update";
+import { normalizeAccessEmail } from "@/shared/lib/access/email-input";
 import { db } from "@/shared/lib/db";
 import { organization as organizationTable } from "@/shared/lib/db/auth-schema";
 import {
@@ -35,7 +37,7 @@ export const towerOrganization = organization({
   creatorRole: "admin",
   roles: towerOrganizationRoles,
   schema: towerOrganizationClientSchema,
-  requireEmailVerificationOnInvitation: true,
+  requireEmailVerificationOnInvitation: false,
   /** All workspace deletes go through `deleteWorkspace` (Stripe cancel, session cleanup, slug confirm). */
   disableOrganizationDeletion: true,
   /**
@@ -115,7 +117,10 @@ export const towerOrganization = organization({
     afterCreateInvitation: async ({ organization: org }) => {
       await syncOrganizationSeatQuantityWithStripe(org.id);
     },
-    beforeAcceptInvitation: async ({ organization: org }) => {
+    beforeAcceptInvitation: async ({ invitation, user, organization: org }) => {
+      if (normalizeAccessEmail(invitation.email) === normalizeAccessEmail(user.email)) {
+        await markEmailVerifiedForUserId(user.id);
+      }
       await assertOrganizationNotOverSeatCap(org.id, org as { seatLimit?: number | null });
     },
     beforeAddMember: async ({ member: m, organization: org }) => {

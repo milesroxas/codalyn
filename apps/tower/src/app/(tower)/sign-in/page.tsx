@@ -23,12 +23,14 @@ import {
 } from "@/features/auth/lib/password-reset";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
+import { resolveTowerEmailLinkAuthFetchOptions } from "@/features/auth/lib/team-invitation-auth-fetch-options";
 import { authClient } from "@/features/auth/model/auth-client";
 import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
 import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { isTeamInvitationAcceptPath } from "@/shared/lib/membership/team-invitation-accept";
+import { readTeamInvitationIdFromCallbackPath } from "@/shared/lib/membership/team-invitation-header";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -88,6 +90,7 @@ function SignInForm() {
   const forgotPasswordHref = buildTowerAuthSurfaceHref("/forgot-password", callbackUrl, authSearchParams);
   const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl, authSearchParams);
   const joiningViaTeamInvite = isTeamInvitationAcceptPath(callbackUrl);
+  const teamInvitationId = readTeamInvitationIdFromCallbackPath(callbackUrl);
   const verificationPromptContext = joiningViaTeamInvite ? "teamInvite" : "signIn";
 
   useEffect(() => {
@@ -180,10 +183,15 @@ function SignInForm() {
     setError(null);
     setPending(true);
     const verificationCallback = resolveTowerEmailVerificationAppCallbackUrl(callbackUrl);
+    const operatorInviteToken = operatorInviteParam?.trim() || null;
     const { data, error: err } = await authClient.signIn.email({
       email,
       password,
       callbackURL: verificationCallback,
+      fetchOptions: resolveTowerEmailLinkAuthFetchOptions({
+        operatorInviteToken,
+        teamInvitationId,
+      }),
     });
     setPending(false);
     if (err) {

@@ -5,18 +5,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  EMAIL_VERIFIED_TOAST,
-  readSessionEmailVerified,
-  TOWER_EMAIL_VERIFIED_QUERY,
-} from "@/features/auth/lib/email-verification";
+import { EMAIL_VERIFIED_TOAST, TOWER_EMAIL_VERIFIED_QUERY } from "@/features/auth/lib/email-verification";
 import { authClient } from "@/features/auth/model/auth-client";
 import {
   AcceptInvitationAuthGateScreen,
   AcceptInvitationErrorScreen,
   AcceptInvitationLoadingScreen,
   AcceptInvitationMessageScreen,
-  AcceptInvitationVerifyEmailScreen,
   AcceptInvitationWorkingScreen,
   AcceptInvitationWrongAccountScreen,
 } from "@/features/team/ui/accept-invitation-screen";
@@ -92,9 +87,6 @@ function AcceptInvitationContent() {
     setAccepting(false);
     if (result.error) {
       const kind = classifyTeamInvitationAcceptError(result.error);
-      if (kind === "email_verification_required") {
-        return;
-      }
       const msg = messageForTeamInvitationAcceptError(kind, result.error.message);
       setAcceptError(msg);
       toast.error(msg);
@@ -108,9 +100,6 @@ function AcceptInvitationContent() {
 
   useEffect(() => {
     if (!invitationId || sessionPending || attemptedAcceptRef.current || !session?.user) {
-      return;
-    }
-    if (!readSessionEmailVerified(session.user)) {
       return;
     }
     if (previewState.status !== "ready" || !previewState.preview.ok) {
@@ -190,10 +179,6 @@ function AcceptInvitationContent() {
         onSignOut={() => void onSignOut()}
       />
     );
-  }
-
-  if (!readSessionEmailVerified(session.user)) {
-    return <AcceptInvitationVerifyEmailScreen email={session.user.email} invitationId={invitationId} />;
   }
 
   if (acceptError) {

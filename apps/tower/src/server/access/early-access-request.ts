@@ -4,13 +4,15 @@ import { emailHasPendingOrgInvitation, normalizeAccessEmail, userMaySignIn } fro
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
 import { sendEarlyAccessRequestNotificationEmail } from "@/server/email/early-access-request-notification-email";
 import { listProductAdminEmails } from "@/server/membership/product-admin";
+import { normalizeEarlyAccessRequestNameFields } from "@/shared/lib/access/early-access-request-name";
 import { db } from "@/shared/lib/db";
 import { earlyAccessRequest, user } from "@/shared/lib/db/auth-schema";
 
 export type EarlyAccessRequestRow = {
   id: string;
   email: string;
-  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
   note: string | null;
   teamMemberEmails: string[] | null;
   status: string;
@@ -42,9 +44,28 @@ async function emailAlreadyHasAccess(email: string): Promise<boolean> {
   return userMaySignIn(row);
 }
 
+export async function lookupEarlyAccessRequestProfileByEmail(
+  email: string
+): Promise<{ firstName: string | null; lastName: string | null }> {
+  const normalized = normalizeAccessEmail(email);
+  const [row] = await db
+    .select({
+      firstName: earlyAccessRequest.firstName,
+      lastName: earlyAccessRequest.lastName,
+    })
+    .from(earlyAccessRequest)
+    .where(eq(earlyAccessRequest.email, normalized))
+    .limit(1);
+  return normalizeEarlyAccessRequestNameFields({
+    firstName: row?.firstName,
+    lastName: row?.lastName,
+  });
+}
+
 export async function submitEarlyAccessRequest(input: {
   email: string;
-  name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   note?: string | null;
   teamMemberEmails?: string[] | null;
 }): Promise<EarlyAccessRequestSubmitOutcome> {
@@ -57,7 +78,7 @@ export async function submitEarlyAccessRequest(input: {
     return "already_has_access";
   }
 
-  const name = input.name?.trim() || null;
+  const { firstName, lastName } = normalizeEarlyAccessRequestNameFields(input);
   const note = input.note?.trim() || null;
   const teamMemberEmails = input.teamMemberEmails?.length ? input.teamMemberEmails : null;
 
@@ -77,7 +98,8 @@ export async function submitEarlyAccessRequest(input: {
       .update(earlyAccessRequest)
       .set({
         status: "pending",
-        name,
+        firstName,
+        lastName,
         note,
         teamMemberEmails,
         resolvedAt: null,
@@ -85,25 +107,27 @@ export async function submitEarlyAccessRequest(input: {
         createdAt: new Date(),
       })
       .where(eq(earlyAccessRequest.id, existing.id));
-    await notifyOperatorsOfEarlyAccessRequest({ email, name, note, teamMemberEmails });
+    await notifyOperatorsOfEarlyAccessRequest({ email, firstName, lastName, note, teamMemberEmails });
     return "created";
   }
 
   await db.insert(earlyAccessRequest).values({
     id,
     email,
-    name,
+    firstName,
+    lastName,
     note,
     teamMemberEmails,
     status: "pending",
   });
-  await notifyOperatorsOfEarlyAccessRequest({ email, name, note, teamMemberEmails });
+  await notifyOperatorsOfEarlyAccessRequest({ email, firstName, lastName, note, teamMemberEmails });
   return "created";
 }
 
 async function notifyOperatorsOfEarlyAccessRequest(data: {
   email: string;
-  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
   note: string | null;
   teamMemberEmails: string[] | null;
 }): Promise<void> {
@@ -114,7 +138,8 @@ async function notifyOperatorsOfEarlyAccessRequest(data: {
   await sendEarlyAccessRequestNotificationEmail({
     operatorEmails,
     email: data.email,
-    name: data.name,
+    firstName: data.firstName,
+    lastName: data.lastName,
     note: data.note,
     teamMemberEmails: data.teamMemberEmails,
   });
@@ -127,7 +152,8 @@ export async function listEarlyAccessRequests(
     .select({
       id: earlyAccessRequest.id,
       email: earlyAccessRequest.email,
-      name: earlyAccessRequest.name,
+      firstName: earlyAccessRequest.firstName,
+      lastName: earlyAccessRequest.lastName,
       note: earlyAccessRequest.note,
       teamMemberEmails: earlyAccessRequest.teamMemberEmails,
       status: earlyAccessRequest.status,

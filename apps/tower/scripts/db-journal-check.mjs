@@ -99,6 +99,26 @@ function validateJournalStructure(journal) {
   return issues;
 }
 
+function readSnapshotByIndex(index) {
+  const path = join(drizzleDir, "meta", `${String(index).padStart(4, "0")}_snapshot.json`);
+  if (!existsSync(path)) {
+    return null;
+  }
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function listSnapshotIds() {
+  const ids = new Map();
+  for (const name of readdirSync(join(drizzleDir, "meta"))) {
+    if (!name.endsWith("_snapshot.json")) {
+      continue;
+    }
+    const snap = JSON.parse(readFileSync(join(drizzleDir, "meta", name), "utf8"));
+    ids.set(snap.id, name);
+  }
+  return ids;
+}
+
 function validateLatestSnapshot(entries) {
   const issues = [];
   const latestIdx = entries.length - 1;
@@ -121,6 +141,25 @@ function validateLatestSnapshot(entries) {
     issues.push(
       `Latest snapshot idx ${snapshotIndices[snapshotIndices.length - 1]} does not match latest journal idx ${latestIdx}.`
     );
+  }
+
+  const latestSnapshot = readSnapshotByIndex(latestIdx);
+  const snapshotIds = listSnapshotIds();
+  const rootPrevId = "00000000-0000-0000-0000-000000000000";
+  if (latestSnapshot && latestSnapshot.prevId !== rootPrevId && !snapshotIds.has(latestSnapshot.prevId)) {
+    issues.push(
+      `Latest snapshot ${String(latestIdx).padStart(4, "0")}_snapshot.json prevId does not reference a known snapshot.`
+    );
+  }
+
+  const previousIdx = snapshotIndices.filter((index) => index < latestIdx).at(-1);
+  if (latestSnapshot && previousIdx !== undefined) {
+    const previousSnapshot = readSnapshotByIndex(previousIdx);
+    if (previousSnapshot && latestSnapshot.prevId !== previousSnapshot.id) {
+      issues.push(
+        `Latest snapshot prevId must match ${String(previousIdx).padStart(4, "0")}_snapshot.json id (${previousSnapshot.id}).`
+      );
+    }
   }
 
   return issues;

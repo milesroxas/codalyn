@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
 import { submitEarlyAccessRequest } from "@/server/access/early-access-request";
+import { parseEarlyAccessRequestNameBody } from "@/shared/lib/access/early-access-request-name";
 import { parseAccessEmailInput } from "@/shared/lib/access/email-input";
 import { parseEarlyAccessReferralRequestInput } from "@/shared/lib/access/referral-source";
 
@@ -11,7 +12,8 @@ export async function POST(req: Request) {
 
   const body = (await req.json().catch(() => null)) as {
     email?: unknown;
-    name?: unknown;
+    firstName?: unknown;
+    lastName?: unknown;
     referralSource?: unknown;
     referralOther?: unknown;
   } | null;
@@ -29,10 +31,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: referral.error }, { status: 400 });
   }
 
-  const name = typeof body?.name === "string" ? body.name : undefined;
+  const { firstName, lastName } = parseEarlyAccessRequestNameBody({
+    firstName: body?.firstName,
+    lastName: body?.lastName,
+  });
 
   try {
-    const outcome = await submitEarlyAccessRequest({ email, name, note: referral.note });
+    const outcome = await submitEarlyAccessRequest({ email, firstName, lastName, note: referral.note });
     return NextResponse.json({ ok: true, outcome });
   } catch (error) {
     if (error instanceof Error && error.message === "gate_disabled") {

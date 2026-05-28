@@ -12,7 +12,14 @@
  * `prod` requires `--confirm` (or TOWER_DB_MIGRATE_CONFIRM=1 in CI).
  */
 import { spawnSync } from "node:child_process";
-import { describeDatabaseHost, parseDbScriptArgs, resolveDatabaseUrl, towerRoot } from "./db-env.mjs";
+import { parseDbScriptArgs, towerRoot } from "./db-env.mjs";
+import {
+  fetchMigrationStatus,
+  logMigrateTarget,
+  logMigrationRunResult,
+  logMigrationStatusSummary,
+  resolveMigrateDatabaseUrl,
+} from "./db-migration-status.mjs";
 
 function mergeEnvForChild(base, databaseUrl) {
   const env = { ...base };
@@ -30,25 +37,50 @@ function runDrizzleMigrate(databaseUrl) {
     env: mergeEnvForChild(process.env, databaseUrl),
     stdio: "inherit",
   });
-  process.exit(r.status ?? 1);
+  return r.status ?? 1;
 }
 
-function main() {
+async function main() {
   const { target, useVercel, confirmed } = parseDbScriptArgs(process.argv);
 
-  if (target === "local") {
-    runDrizzleMigrate(undefined);
-    return;
-  }
-
+  let databaseUrl;
   try {
-    const databaseUrl = resolveDatabaseUrl(target, { useVercel, confirmed });
-    console.log(`Migrating ${target} database at ${describeDatabaseHost(databaseUrl)}`);
-    runDrizzleMigrate(databaseUrl);
+    databaseUrl = resolveMigrateDatabaseUrl(target, { useVercel, confirmed });
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
   }
+
+  logMigrateTarget(target, databaseUrl);
+
+  let before;
+  try {
+    before = await fetchMigrationStatus(databaseUrl);
+    logMigrationStatusSummary(before);
+  } catch (error) {
+    console.warn(
+      `Could not read migration status (${error instanceof Error ? error.message : error}). Continuing with migrate…`
+    );
+  }
+
+  const exitCode = runDrizzleMigrate(target === "local" ? undefined : databaseUrl);
+  if (exitCode !== 0) {
+    process.exit(exitCode);
+  }
+
+  if (!before) {
+    return;
+  }
+
+  try {
+    const after = await fetchMigrationStatus(databaseUrl);
+    logMigrationRunResult({ before, after });
+  } catch (error) {
+    console.warn(`Could not verify migration status after migrate: ${error instanceof Error ? error.message : error}`);
+  }
 }
 
-main();
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+});

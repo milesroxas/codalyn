@@ -6,6 +6,12 @@ import {
 import { type CmsSlotListOnPage, findCmsSlotListsOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 import { purgeCmsSlotListTargetDefinitionsForDataList } from "@/features/cms-slots/model/site-components";
+import {
+  CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
+  CMS_SLOTS_ROUTE_TASK_CREATING_INSTALL,
+  CMS_SLOTS_ROUTE_TASK_MOVING_SLOT_LISTS,
+  CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT,
+} from "@/shared/lib/cms-slots-feature-copy";
 
 type BodyWithAppend = AnyElement & {
   append: (preset: ElementPreset<AnyElement>) => Promise<AnyElement>;
@@ -70,17 +76,20 @@ async function reparentBodyDirectBeaconsInto(body: BodyWithAppend, wrapper: Bloc
 
 /**
  * Installs a hidden **`beacons-wrapper`** div (class style `beacons-wrapper`, `display: none`) at the end of
- * the page body. Beacon list blocks that were direct children of Body are moved into the wrapper.
+ * the page body. CMS slot blocks that were direct children of Body are moved into the wrapper.
  * Pushes the beacon runtime to the page via Webflow Data API **inline custom code** (footer). Idempotent for the
  * wrapper; custom code is refreshed on each install/sync.
  */
-export async function installCmsSlotsWrapperOnPage(): Promise<{
+export async function installCmsSlotsWrapperOnPage(options?: { onProgress?: (message: string) => void }): Promise<{
   wrapper: BlockElement;
   created: boolean;
   reparented: number;
 }> {
+  const report = options?.onProgress;
+  report?.(CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL);
   const found = await findCmsSlotsWrapperOnPage();
   if (found) {
+    report?.(CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT);
     await syncCmsSlotPageInlineScript();
     return { wrapper: found, created: false, reparented: 0 };
   }
@@ -91,6 +100,7 @@ export async function installCmsSlotsWrapperOnPage(): Promise<{
     throw new Error("Could not find Body on this page. Open a page in the Designer and try again.");
   }
 
+  report?.(CMS_SLOTS_ROUTE_TASK_CREATING_INSTALL);
   const wrapper = (await body.append(webflow.elementPresets.DivBlock)) as BlockElement;
   await wrapper.setTag("div");
   await runExclusiveDesignerStyleOp(async () => {
@@ -99,7 +109,9 @@ export async function installCmsSlotsWrapperOnPage(): Promise<{
   });
   await wrapper.setCustomAttribute(CMS_SLOT_WRAPPER_ATTR, CMS_SLOT_WRAPPER_ATTR_VALUE);
 
+  report?.(CMS_SLOTS_ROUTE_TASK_MOVING_SLOT_LISTS);
   const reparented = await reparentBodyDirectBeaconsInto(body, wrapper);
+  report?.(CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT);
   await syncCmsSlotPageInlineScript();
   return { wrapper, created: true, reparented };
 }
@@ -126,14 +138,14 @@ export async function syncCmsSlotsInstallEmbedOnPage(): Promise<void> {
  * no issue.
  */
 export type UninstallCmsSlotsPageInstallOptions = {
-  /** Beacon list ids whose list-target site components should be unregistered during uninstall. */
+  /** CMS slot ids whose list-target site components should be unregistered during uninstall. */
   dataLists?: string[];
 };
 
 /**
  * Removes the hidden `beacons-wrapper` block (if present) and the beacon **footer** runtime script from the
- * current page. Use after the last beacon list is deleted, when the user opts to uninstall the page install.
- * Also unregisters list-target site components for the given `dataLists` and any beacon lists still on the page.
+ * current page. Use after the last CMS slot is deleted, when the user opts to uninstall the page install.
+ * Also unregisters list-target site components for the given `dataLists` and any CMS slots still on the page.
  */
 export async function uninstallCmsSlotsPageInstall(options?: UninstallCmsSlotsPageInstallOptions): Promise<void> {
   const dataLists = new Set(options?.dataLists ?? []);

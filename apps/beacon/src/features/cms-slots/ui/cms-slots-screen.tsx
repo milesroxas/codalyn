@@ -110,6 +110,8 @@ import {
   CMS_SLOTS_CMS_FIELD_NOT_VISIBLE_NOTIFY,
   CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON,
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
+  CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
+  CMS_SLOTS_ROUTE_TASK_FINISHING,
   CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_RENAMING_LIST,
@@ -919,7 +921,7 @@ export function CmsSlotsScreen() {
     engineListCompositionStale
   );
 
-  /** Page script sync only matters once the wrapper is installed and at least one beacon list exists. */
+  /** Page script sync only matters once the wrapper is installed and at least one CMS slot exists. */
   const pageRuntimeSyncRelevant = beaconsWrapperInstalled && pageBeacons.length > 0;
 
   useEffect(() => {
@@ -1636,8 +1638,9 @@ export function CmsSlotsScreen() {
   const handleInstallWrapper = async () => {
     if (installPending) return;
     setInstallPending(true);
+    setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL);
     try {
-      const r = await installCmsSlotsWrapperOnPage();
+      const r = await installCmsSlotsWrapperOnPage({ onProgress: setRouteTaskPhase });
       const message = r.reparented
         ? `Installed. Moved ${r.reparented} beacon(s) into the wrapper.`
         : r.created
@@ -1651,12 +1654,14 @@ export function CmsSlotsScreen() {
       }
       setCreateFormOpen(true);
       setEngineListCompositionStale(false);
+      setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_FINISHING);
       void refreshPageBeacons();
     } catch (err) {
       const message = formatWebflowDesignerError(err);
       void webflow.notify({ type: "Error", message });
     } finally {
       setInstallPending(false);
+      setRouteTaskPhase(null);
     }
   };
 
@@ -1974,7 +1979,7 @@ export function CmsSlotsScreen() {
         void webflow.notify({
           type: "Success",
           message:
-            "List target component removed from the site. The CMS plain text field for this beacon list is unchanged — delete the beacon list to remove that field.",
+            "List target component removed from the site. The CMS plain text field for this CMS slot is unchanged — delete the CMS slot to remove that field.",
         });
       }
       listTargetDefinitionIdRef.current = null;

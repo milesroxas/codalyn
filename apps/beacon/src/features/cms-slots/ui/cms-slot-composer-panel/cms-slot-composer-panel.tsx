@@ -8,7 +8,7 @@ export type CmsSlotComposerPanelProps = {
   activeListLabel: string;
   draft: CmsSlotCompositionDraftRow[];
   dirty: boolean;
-  /** Component types present in the Engine-defined beacon list; Composer can only add from this set. */
+  /** Component types present in the Engine-defined CMS slot; Composer can only add from this set. */
   allowedPalette: CmsSlotPaletteEntry[];
   onAddFromPalette: (c: CmsSlotPaletteEntry) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;

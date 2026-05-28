@@ -1,4 +1,7 @@
-import { shouldShowCmsSlotsPreInstall } from "@/features/cms-slots/model/cms-slots-access";
+import {
+  shouldShowCmsSlotsComposerInstallInEngineEmpty,
+  shouldShowCmsSlotsPreInstall,
+} from "@/features/cms-slots/model/cms-slots-access";
 
 export type CmsSlotsHomePanelContentKey = "install" | "installed";
 
@@ -47,23 +50,25 @@ export function cmsSlotsComposerRouteContentKey(input: {
   return "list";
 }
 
-export type CmsSlotsComposerListPanelContentKey = "editor-empty" | "install" | "list";
+export type CmsSlotsComposerListPanelContentKey = "editor-empty" | "engine-install-prompt" | "list";
 
 export function cmsSlotsComposerListPanelContentKey(input: {
   routeStateKnown: boolean;
   beaconsWrapperInstalled: boolean;
   showEditorNoSlotsEmpty: boolean;
+  canAccessEngine: boolean;
 }): CmsSlotsComposerListPanelContentKey {
   if (input.showEditorNoSlotsEmpty) {
     return "editor-empty";
   }
   if (
-    shouldShowCmsSlotsPreInstall({
+    shouldShowCmsSlotsComposerInstallInEngineEmpty({
+      canAccessEngine: input.canAccessEngine,
       routeStateKnown: input.routeStateKnown,
       beaconsWrapperInstalled: input.beaconsWrapperInstalled,
     })
   ) {
-    return "install";
+    return "engine-install-prompt";
   }
   return "list";
 }

@@ -64,7 +64,7 @@ async function clearListTargetInstancePreview(
 }
 
 /**
- * Mirrors the hidden beacon list’s components into the list target while mirroring is enabled.
+ * Mirrors the hidden CMS slot’s components into the list target while mirroring is enabled.
  * When the list target already shows the same component instances in order, skips DOM churn.
  * @returns true when instances were updated; false when mirroring was skipped (no-op).
  */
@@ -116,7 +116,7 @@ export async function clearAllCmsSlotListTargetDesignerPreviewsOnPage(): Promise
 }
 
 /**
- * Re-applies designer mirrors for all beacon list targets on the current page.
+ * Re-applies designer mirrors for all CMS slot list targets on the current page.
  */
 export async function resyncAllCmsSlotListTargetDesignerPreviewsOnPage(): Promise<void> {
   if (!(await shouldMirrorCmsSlotListInDesignerTarget())) {

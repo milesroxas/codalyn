@@ -41,7 +41,7 @@ function parseBeaconEngineConfiguredComponentIds(raw: string): string[] {
   return uniqueComponentIds(trimmed.split(","));
 }
 
-/** Stable key for a beacon list container (page / tree identity). */
+/** Stable key for a CMS slot container (page / tree identity). */
 export function cmsSlotListKey(container: BlockElement): string {
   return `${container.id.component}:${container.id.element}`;
 }
@@ -96,7 +96,7 @@ export type HydratedCmsSlotRow = {
   instance: ComponentElement;
 };
 
-/** Engine-configured component ids for this beacon list, or `null` when not configured yet. */
+/** Engine-configured component ids for this CMS slot, or `null` when not configured yet. */
 export async function readCmsSlotEngineConfiguredComponentIds(container: BlockElement): Promise<string[] | null> {
   const raw = await container.getCustomAttribute(CMS_SLOT_ENGINE_COMPONENT_IDS_ATTR);
   if (raw == null) {
@@ -105,7 +105,7 @@ export async function readCmsSlotEngineConfiguredComponentIds(container: BlockEl
   return parseBeaconEngineConfiguredComponentIds(raw);
 }
 
-/** Persists the Engine-configured component ids for this beacon list. */
+/** Persists the Engine-configured component ids for this CMS slot. */
 export async function writeCmsSlotEngineConfiguredComponentIds(
   container: BlockElement,
   componentIds: readonly string[]
@@ -129,7 +129,7 @@ export function filterHydratedCmsSlotRowsByComponentIds(
 }
 
 /**
- * Returns Engine-configured component ids for this beacon list. Falls back to component ids from the
+ * Returns Engine-configured component ids for this CMS slot. Falls back to component ids from the
  * current hidden-list instances when the attribute is missing **or** persisted as empty (`__none__` —
  * written on new lists before any slot row exists). Non-empty stored ids always win (Engine palette).
  */

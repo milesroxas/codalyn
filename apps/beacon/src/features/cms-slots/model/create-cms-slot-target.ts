@@ -42,7 +42,7 @@ function ensureBeaconWrapperListBlockHiddenStyle(): Promise<Style> {
 
 /**
  * Prepends a **hidden** div **inside the installed `beacons-wrapper`** (class style **`beacon_list`**: `display: none`) as the
- * **first child** (before other beacon lists and before the install HTML embed), with:
+ * **first child** (before other CMS slots and before the install HTML embed), with:
  * - `data-target` = `beacons`
  * - `data-list` = `beacon-<slug from name>` (from {@link dataListValueForCmsSlotName})
  *

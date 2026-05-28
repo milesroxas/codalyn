@@ -43,7 +43,7 @@ async function isBeaconListTargetHintNode(el: AnyElement): Promise<boolean> {
   return false;
 }
 
-/** True when this DOM node is the registered list-target root for this beacon list (not Body / page chrome). */
+/** True when this DOM node is the registered list-target root for this CMS slot (not Body / page chrome). */
 export async function verifyCmsSlotListTargetDomRoot(
   el: AnyElement,
   dataList: string,
@@ -201,7 +201,7 @@ export async function clearListTargetMirrorSurfaceComponentInstances(
   }
 }
 
-/** True when this instance’s inner surface matches this beacon list (for filtering name collisions). */
+/** True when this instance’s inner surface matches this CMS slot (for filtering name collisions). */
 export async function instanceMatchesCmsSlotListTargetSurface(
   instance: ComponentElement,
   dataList: string,

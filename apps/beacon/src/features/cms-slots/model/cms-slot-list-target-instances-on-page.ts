@@ -85,7 +85,7 @@ export async function listCmsSlotListTargetInstancesOnPage(
   return out;
 }
 
-/** True when the Designer’s current selection is a list-target instance for this beacon list. */
+/** True when the Designer’s current selection is a list-target instance for this CMS slot. */
 export async function isCmsSlotListTargetInstanceSelected(
   dataList: string,
   listContainer: BlockElement,
@@ -106,7 +106,7 @@ export async function isCmsSlotListTargetInstanceSelected(
 }
 
 /**
- * Deletes every list-target (Beacon Utilities) **instance** on the current page for this beacon list. Call **before**
+ * Deletes every list-target (Beacon Utilities) **instance** on the current page for this CMS slot. Call **before**
  * {@link webflow.unregisterComponent} on that list-target definition so the canvas is not left with broken instances
  * and a new list target can be registered cleanly.
  */

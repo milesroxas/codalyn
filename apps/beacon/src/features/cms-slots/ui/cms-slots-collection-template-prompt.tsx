@@ -7,22 +7,19 @@ import {
 } from "@/shared/lib/cms-slots-feature-copy";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
-import { Empty } from "@/shared/ui/empty";
+import { Empty, EmptyAction } from "@/shared/ui/empty";
 
-const collectionTemplatePromptVariants = cva(
-  "border-border bg-background/95 text-foreground shadow-sm hover:bg-muted",
-  {
-    variants: {
-      variant: {
-        tile: "max-w-[min(100%,14rem)] text-center text-[0.8125rem] leading-snug",
-        gate: "text-sm",
-      },
+const collectionTemplatePromptVariants = cva("text-center", {
+  variants: {
+    variant: {
+      tile: "max-w-[min(100%,14rem)] text-[0.8125rem] leading-snug",
+      gate: "",
     },
-    defaultVariants: {
-      variant: "tile",
-    },
-  }
-);
+  },
+  defaultVariants: {
+    variant: "tile",
+  },
+});
 
 export type CmsSlotsCollectionTemplatePromptProps = VariantProps<typeof collectionTemplatePromptVariants> & {
   className?: string;
@@ -31,11 +28,26 @@ export type CmsSlotsCollectionTemplatePromptProps = VariantProps<typeof collecti
 export function CmsSlotsCollectionTemplatePrompt(props: CmsSlotsCollectionTemplatePromptProps) {
   const { variant = "tile", className } = props;
 
+  if (variant === "gate") {
+    return (
+      <EmptyAction
+        className={className}
+        aria-label={CMS_SLOTS_REQUIRES_COLLECTION_TEMPLATE_ARIA_LABEL}
+        onClick={(event) => {
+          event.stopPropagation();
+          promptOpenCmsCollectionTemplateInDesigner();
+        }}
+      >
+        {CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_LABEL}
+      </EmptyAction>
+    );
+  }
+
   return (
     <Button
       type="button"
-      variant="outline"
-      size={variant === "gate" ? "default" : "sm"}
+      variant="emptyAction"
+      size="emptyAction"
       className={cn(collectionTemplatePromptVariants({ variant }), className)}
       aria-label={CMS_SLOTS_REQUIRES_COLLECTION_TEMPLATE_ARIA_LABEL}
       onClick={(event) => {

@@ -1,12 +1,12 @@
 import type { ComposerEligibleList } from "@/features/cms-slots/model/cms-slot-composer-eligible";
 import { displayLabelForCmsSlotList } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import {
+  shouldShowCmsSlotsComposerInstallInEngineEmpty,
   shouldShowCmsSlotsEditorNoSlotsEmpty,
-  shouldShowCmsSlotsPreInstall,
 } from "@/features/cms-slots/model/cms-slots-access";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotListTile } from "@/features/cms-slots/ui/cms-slot-list-tile";
-import { CmsSlotPreInstallBlock } from "@/features/cms-slots/ui/cms-slot-pre-install-block";
+import { CmsSlotsComposerInstallInEngineEmptyState } from "@/features/cms-slots/ui/cms-slots-composer-install-in-engine-empty-state";
 import { CmsSlotsEditorNoSlotsEmptyState } from "@/features/cms-slots/ui/cms-slots-editor-no-slots-empty-state";
 import { CmsSlotsRouteMainIntro } from "@/features/cms-slots/ui/cms-slots-route-main-intro";
 
@@ -16,8 +16,6 @@ type CmsSlotComposerListPanelProps = {
   routeStateKnown: boolean;
   composerEligibleResolved: boolean;
   beaconsWrapperInstalled: boolean;
-  installPending: boolean;
-  onInstallWrapper: () => void;
   loading: boolean;
   runtimeOk: boolean;
   eligible: ComposerEligibleList[];
@@ -32,15 +30,13 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
     routeStateKnown,
     composerEligibleResolved,
     beaconsWrapperInstalled,
-    installPending,
-    onInstallWrapper,
     loading,
     runtimeOk,
     eligible,
     openingKey,
     onOpenList,
   } = props;
-  const { composerOnly } = useCmsSlotsAccess();
+  const { composerOnly, canAccessEngine } = useCmsSlotsAccess();
   const composerListSettled =
     routeStateKnown && !pageScanLoading && !pageRuntimeStatusLoading && !loading && composerEligibleResolved;
   const showEditorNoSlotsEmpty = shouldShowCmsSlotsEditorNoSlotsEmpty({
@@ -49,35 +45,22 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
     beaconsWrapperInstalled,
     eligibleCount: eligible.length,
   });
+  const showInstallInEngineEmpty = shouldShowCmsSlotsComposerInstallInEngineEmpty({
+    canAccessEngine,
+    routeStateKnown,
+    beaconsWrapperInstalled,
+  });
 
   if (!composerListSettled) {
     return null;
   }
 
   if (showEditorNoSlotsEmpty) {
-    return (
-      <div
-        className="flex min-h-[min(40vh,16rem)] flex-col items-center justify-center py-4"
-        data-slot="beacon_composer_editor_no_slots"
-      >
-        <CmsSlotsEditorNoSlotsEmptyState className="w-full max-w-md" />
-      </div>
-    );
+    return <CmsSlotsEditorNoSlotsEmptyState data-slot="beacon_composer_editor_no_slots" />;
   }
 
-  if (shouldShowCmsSlotsPreInstall({ routeStateKnown, beaconsWrapperInstalled })) {
-    return (
-      <div
-        className="flex min-h-[min(40vh,16rem)] flex-col items-center justify-center py-4"
-        data-slot="beacon_composer_install_first"
-      >
-        <CmsSlotPreInstallBlock
-          installPending={installPending}
-          pageScanLoading={pageScanLoading}
-          onInstallWrapper={onInstallWrapper}
-        />
-      </div>
-    );
+  if (showInstallInEngineEmpty) {
+    return <CmsSlotsComposerInstallInEngineEmptyState data-slot="beacon_composer_install_in_engine" />;
   }
 
   return (

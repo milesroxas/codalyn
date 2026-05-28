@@ -82,7 +82,7 @@ async function applyDesignerPlaceholderToListTargetInstance(
   }
 }
 
-/** Applies designer placeholder inline styles to every list-target instance for this beacon list. */
+/** Applies designer placeholder inline styles to every list-target instance for this CMS slot. */
 export async function applyCmsSlotListTargetDesignerPlaceholderForList(
   dataList: string,
   listContainer: BlockElement,

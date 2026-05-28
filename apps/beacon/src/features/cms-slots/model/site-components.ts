@@ -10,7 +10,7 @@ import {
 } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 
-/** Site component id + label for the Composer palette (types allowed by Engine for a beacon list). */
+/** Site component id + label for the Composer palette (types allowed by Engine for a CMS slot). */
 export type CmsSlotPaletteEntry = { id: string; name: string; group: string | null };
 
 function excludeCmsSlotUtilitiesGroup(results: ComponentSearchResult[]): ComponentSearchResult[] {
@@ -103,8 +103,8 @@ export async function purgeCmsSlotListTargetDefinitionsForDataList(
 }
 
 /**
- * If a Beacon list-target **site component** exists for this list (in {@link CMS_SLOT_UTILITIES_COMPONENT_GROUP}),
- * removes its **page instances** (Placed on canvas), unregisters the definition, then removes the hidden beacon list
+ * If a CMS slot list-target **site component** exists for this slot (in {@link CMS_SLOT_UTILITIES_COMPONENT_GROUP}),
+ * removes its **page instances** (Placed on canvas), unregisters the definition, then removes the hidden CMS slot
  * block. Order: resolve definition from `container` → remove instances → `unregisterComponent` → remove the block so
  * Webflow is not left with orphan list-target nodes or a definition that still references removed structure.
  */
@@ -129,7 +129,7 @@ export type CmsSlotCompositionDraftRow = {
 };
 
 /**
- * Replaces all component instances inside a beacon list container so their types and order match `draft`.
+ * Replaces all component instances inside a CMS slot container so their types and order match `draft`.
  * Used by Composer save so the hidden list, designer preview, and published runtime stay aligned.
  */
 export async function applyCmsSlotCompositionDraft(

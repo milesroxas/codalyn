@@ -1,8 +1,7 @@
 import {
-  CMS_SLOTS_CMS_FIELD_LINK_DIALOG_DESCRIPTION,
+  CMS_SLOTS_CMS_FIELD_LINK_DIALOG_HINT,
   CMS_SLOTS_CMS_FIELD_LINK_DIALOG_READY,
   CMS_SLOTS_CMS_FIELD_LINK_DIALOG_TITLE,
-  CMS_SLOTS_CMS_FIELD_LINK_DIALOG_WAITING,
   CMS_SLOTS_CMS_FIELD_LINK_RETRY_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import {
@@ -30,11 +29,10 @@ export function CmsSlotsCmsFieldLinkDialog(p: CmsSlotsCmsFieldLinkDialogProps) {
       <AlertDialogContent size="default">
         <AlertDialogHeader>
           <AlertDialogTitle>{CMS_SLOTS_CMS_FIELD_LINK_DIALOG_TITLE}</AlertDialogTitle>
-          <AlertDialogDescription>{CMS_SLOTS_CMS_FIELD_LINK_DIALOG_DESCRIPTION}</AlertDialogDescription>
+          <AlertDialogDescription>
+            {p.navReady ? CMS_SLOTS_CMS_FIELD_LINK_DIALOG_READY : CMS_SLOTS_CMS_FIELD_LINK_DIALOG_HINT}
+          </AlertDialogDescription>
         </AlertDialogHeader>
-        <p className="text-sm text-muted-foreground">
-          {p.navReady ? CMS_SLOTS_CMS_FIELD_LINK_DIALOG_READY : CMS_SLOTS_CMS_FIELD_LINK_DIALOG_WAITING}
-        </p>
         <AlertDialogFooter className="sm:flex-wrap">
           <AlertDialogCancel type="button" disabled={p.retryPending}>
             Dismiss

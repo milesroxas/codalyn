@@ -3,7 +3,10 @@ import { findCmsSlotListsOnPage } from "@/features/cms-slots/model/cms-slot-page
 import { towerFetch } from "@/shared/lib/tower-client";
 import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
 
-const LOG_PREFIX = "[beacon list CMS]";
+const LOG_PREFIX = "[CMS slot CMS]";
+
+/** Pre-rename Webflow Plain Text field display name; still matched when resolving existing fields. */
+const LEGACY_CMS_SLOT_LIST_PLAIN_TEXT_FIELD_PREFIX = "Beacon list target text · ";
 const MAX_EXIT_COMPONENT_STEPS = 4;
 const FIELD_VISIBILITY_ATTEMPTS = 10;
 const FIELD_VISIBILITY_DELAY_MS = 400;
@@ -15,10 +18,10 @@ const CMS_BIND_RETRY_DELAY_MS = 200;
 const CMS_BIND_POLL_ATTEMPTS = 24;
 const CMS_BIND_POLL_MS = 75;
 
-/** Hidden beacon list block: collection id of the CMS Plain Text field this list binds to. */
+/** Hidden CMS slot block: collection id of the CMS Plain Text field this slot binds to. */
 export const CMS_SLOT_LIST_TARGET_CMS_COLLECTION_ID_ATTR = "data-beacon-cms-collection-id";
 
-/** Hidden beacon list block: field id companion to {@link CMS_SLOT_LIST_TARGET_CMS_COLLECTION_ID_ATTR}. */
+/** Hidden CMS slot block: field id companion to {@link CMS_SLOT_LIST_TARGET_CMS_COLLECTION_ID_ATTR}. */
 export const CMS_SLOT_LIST_TARGET_CMS_FIELD_ID_ATTR = "data-beacon-cms-field-id";
 
 export type CmsSlotListCmsBinding = {
@@ -32,7 +35,11 @@ export type CmsSlotListCmsTextFieldEnsureResult = {
 };
 
 export function cmsSlotListCmsPlainTextFieldDisplayName(dataList: string): string {
-  return `Beacon list target text · ${dataList}`;
+  return `CMS slot target text · ${dataList}`;
+}
+
+function legacyCmsSlotListCmsPlainTextFieldDisplayName(dataList: string): string {
+  return `${LEGACY_CMS_SLOT_LIST_PLAIN_TEXT_FIELD_PREFIX}${dataList}`;
 }
 
 /**
@@ -102,14 +109,17 @@ function parseCollectionFields(data: unknown): ParsedField[] {
 }
 
 function findBeaconListTargetField(fields: readonly ParsedField[], dataList: string): ParsedField | null {
-  const want = cmsSlotListCmsPlainTextFieldDisplayName(dataList);
+  const wantNames = [
+    cmsSlotListCmsPlainTextFieldDisplayName(dataList),
+    legacyCmsSlotListCmsPlainTextFieldDisplayName(dataList),
+  ];
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").replace(/[·•]/g, "·");
-  const wantNorm = norm(want);
+  const wantNorms = new Set(wantNames.map(norm));
   for (const f of fields) {
     if (f.id == null || !isPlainTextFieldType(f.type) || f.displayName == null) {
       continue;
     }
-    if (f.displayName === want || norm(f.displayName) === wantNorm) {
+    if (wantNames.includes(f.displayName) || wantNorms.has(norm(f.displayName))) {
       return f;
     }
   }
@@ -168,7 +178,7 @@ async function postNewCmsPlainTextField(
     body: JSON.stringify({
       type: "PlainText",
       displayName: cmsSlotListCmsPlainTextFieldDisplayName(dataList),
-      helpText: "Codalyn Beacon: CMS text for this beacon list; list targets bind their Text prop here.",
+      helpText: "Codalyn Beacon: CMS text for this CMS slot; list targets bind their Text prop here.",
     }),
   });
   if (res.status === 409) {
@@ -214,7 +224,7 @@ export async function verifyCmsSlotListTargetPlainTextField(binding: CmsSlotList
 
 /**
  * Data API: find or create the per-list Plain Text CMS field. List render targets bind their `Text` prop to this
- * field (one field per beacon list, shared across all render-target instances).
+ * field (one field per CMS slot, shared across all render-target instances).
  */
 async function ensureCmsPlainTextField(
   collectionId: string,
@@ -254,7 +264,7 @@ function sameBlockElement(a: BlockElement, b: BlockElement): boolean {
   return a.id.component === b.id.component && a.id.element === b.id.element;
 }
 
-/** When off a CMS template page, reuse the collection id from another beacon list on the same page. */
+/** When off a CMS template page, reuse the collection id from another CMS slot on the same page. */
 async function inferCmsCollectionIdFromSiblingBeaconLists(excludeContainer: BlockElement): Promise<string | null> {
   const lists = await findCmsSlotListsOnPage();
   for (const { container } of lists) {
@@ -273,7 +283,7 @@ async function inferCmsCollectionIdFromSiblingBeaconLists(excludeContainer: Bloc
  * Resolves the CMS binding for this list (call **before** registering or placing a list-target component on a
  * collection template):
  * - On a CMS template page: ensures the field exists in **that** collection and persists ids on the list block.
- * - Off-template: reuses another beacon list’s collection id on the same page, then ensures the field there.
+ * - Off-template: reuses another CMS slot’s collection id on the same page, then ensures the field there.
  * - Off-template with stored attrs only: re-validates the stored field still exists in the stored collection.
  * - Otherwise: `null` (no CMS bind possible right now).
  *

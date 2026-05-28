@@ -4,6 +4,7 @@ import {
   computeEditorExperienceFromMembership,
   defaultCmsSlotsRouteSegment,
   resolveAllowedCmsSlotsSegment,
+  shouldShowCmsSlotsComposerInstallInEngineEmpty,
   shouldShowCmsSlotsEditorNoSlotsEmpty,
   shouldShowCmsSlotsPreInstall,
 } from "@/features/cms-slots/model/cms-slots-access";
@@ -30,6 +31,37 @@ describe("cms-slots-access", () => {
     expect(shouldShowCmsSlotsPreInstall({ routeStateKnown: false, beaconsWrapperInstalled: false })).toBe(false);
     expect(shouldShowCmsSlotsPreInstall({ routeStateKnown: true, beaconsWrapperInstalled: false })).toBe(true);
     expect(shouldShowCmsSlotsPreInstall({ routeStateKnown: true, beaconsWrapperInstalled: true })).toBe(false);
+  });
+
+  it("shows composer install-in-engine empty only for engine-capable members before install", () => {
+    expect(
+      shouldShowCmsSlotsComposerInstallInEngineEmpty({
+        canAccessEngine: false,
+        routeStateKnown: true,
+        beaconsWrapperInstalled: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldShowCmsSlotsComposerInstallInEngineEmpty({
+        canAccessEngine: true,
+        routeStateKnown: false,
+        beaconsWrapperInstalled: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldShowCmsSlotsComposerInstallInEngineEmpty({
+        canAccessEngine: true,
+        routeStateKnown: true,
+        beaconsWrapperInstalled: false,
+      })
+    ).toBe(true);
+    expect(
+      shouldShowCmsSlotsComposerInstallInEngineEmpty({
+        canAccessEngine: true,
+        routeStateKnown: true,
+        beaconsWrapperInstalled: true,
+      })
+    ).toBe(false);
   });
 
   it("shows editor no-slots empty only after composer list has fully settled", () => {

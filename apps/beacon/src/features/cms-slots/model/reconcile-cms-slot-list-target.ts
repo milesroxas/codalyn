@@ -101,7 +101,7 @@ export async function reconcileCmsSlotListTargetForOpen(
   }
   const toasts: CmsSlotListTargetOpenReconcile["toasts"] = [];
   if (r.listWasUpdated) {
-    toasts.push({ type: "Success", message: "List target updated to match this beacon list." });
+    toasts.push({ type: "Success", message: "List target updated to match this CMS slot." });
   }
   return { phase: "synced", displayName: r.name, toasts };
 }

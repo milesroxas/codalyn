@@ -20,6 +20,25 @@ export const CMS_SLOTS_PUBLISHED_SECTION_LABEL = "Published Slots";
 
 export const CMS_SLOTS_INSTALL_LABEL = "Install";
 
+export const CMS_SLOTS_INSTALL_PENDING_LABEL = "Installing…";
+
+export const CMS_SLOTS_PRE_INSTALL_TITLE = "Not installed";
+
+export const CMS_SLOTS_PRE_INSTALL_DESCRIPTION = `Install ${CMS_SLOTS_FEATURE_NAME} on this collection template to continue.`;
+
+/** Composer empty state when a designer must install from Engine before composing. */
+export const CMS_SLOTS_COMPOSER_INSTALL_IN_ENGINE_TITLE = "Not installed";
+
+export const CMS_SLOTS_COMPOSER_INSTALL_IN_ENGINE_DESCRIPTION = `Install ${CMS_SLOTS_FEATURE_NAME} in Engine to compose slot content. Click the button below to install.`;
+
+export const CMS_SLOTS_INSTALL_ARIA_LABEL = `Installing ${CMS_SLOTS_FEATURE_NAME}`;
+
+export const CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL = "Checking install…";
+
+export const CMS_SLOTS_ROUTE_TASK_CREATING_INSTALL = "Creating install…";
+
+export const CMS_SLOTS_ROUTE_TASK_MOVING_SLOT_LISTS = "Moving slot lists…";
+
 export const CMS_SLOTS_PAGE_LIST_ARIA_LABEL = "CMS slot lists on this page";
 
 export const CMS_SLOTS_SCAN_ARIA_LABEL = "Scanning page for CMS slot lists";
@@ -99,13 +118,11 @@ export const CMS_SLOTS_DELETE_DIALOG_TITLE = "Delete this CMS slot list?";
 
 export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_TITLE = "Refresh CMS in Webflow";
 
-export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_DESCRIPTION =
-  "A new CMS Plain Text field was created for this beacon list. Switch to CMS in Webflow, then return to the Designer so the field appears for binding.";
-
-export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_WAITING = "After you return to the Designer, use Link to CMS field below.";
+export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_HINT =
+  "In Webflow, open CMS to confirm the new field was created. Return to the Designer when you're ready to link it.";
 
 export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_READY =
-  "You switched views — link the list target Text prop to the new CMS field.";
+  "You're back in the Designer. Click below to link the list target to the CMS field. If you don't see the field, refresh this tab and try again.";
 
 export const CMS_SLOTS_CMS_FIELD_LINK_RETRY_LABEL = "Link to CMS field";
 

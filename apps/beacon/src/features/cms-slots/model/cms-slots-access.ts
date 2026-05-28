@@ -54,6 +54,21 @@ export function shouldShowCmsSlotsPreInstall(input: {
   return input.routeStateKnown && !input.beaconsWrapperInstalled;
 }
 
+/** Composer list: prompt Engine install (no install control) for members who can access Engine. */
+export function shouldShowCmsSlotsComposerInstallInEngineEmpty(input: {
+  canAccessEngine: boolean;
+  routeStateKnown: boolean;
+  beaconsWrapperInstalled: boolean;
+}): boolean {
+  return (
+    input.canAccessEngine &&
+    shouldShowCmsSlotsPreInstall({
+      routeStateKnown: input.routeStateKnown,
+      beaconsWrapperInstalled: input.beaconsWrapperInstalled,
+    })
+  );
+}
+
 /** Composer list panel: editor-only empty state when install/scan finished and no lists are available. */
 export function shouldShowCmsSlotsEditorNoSlotsEmpty(input: {
   composerOnly: boolean;

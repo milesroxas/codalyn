@@ -1,6 +1,6 @@
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { shouldShowCmsSlotsPreInstall } from "@/features/cms-slots/model/cms-slots-access";
-import { CmsSlotPreInstallBlock } from "@/features/cms-slots/ui/cms-slot-pre-install-block";
+import { CmsSlotsPreInstallEmptyState } from "@/features/cms-slots/ui/cms-slots-pre-install-empty-state";
 import { CmsSlotsRouteMainIntro } from "@/features/cms-slots/ui/cms-slots-route-main-intro";
 import { OnThisPageSection } from "./on-this-page-section";
 
@@ -55,13 +55,12 @@ export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
 
   if (shouldShowCmsSlotsPreInstall({ routeStateKnown, beaconsWrapperInstalled })) {
     return (
-      <div className="flex min-h-[40vh] flex-col items-stretch justify-center py-4" data-slot="beacon_install_prompt">
-        <CmsSlotPreInstallBlock
-          installPending={installPending}
-          pageScanLoading={pageScanLoading}
-          onInstallWrapper={onInstallWrapper}
-        />
-      </div>
+      <CmsSlotsPreInstallEmptyState
+        data-slot="beacon_install_prompt"
+        installPending={installPending}
+        pageScanLoading={pageScanLoading}
+        onInstallWrapper={onInstallWrapper}
+      />
     );
   }
 

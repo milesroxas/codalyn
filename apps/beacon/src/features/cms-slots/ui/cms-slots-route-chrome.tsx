@@ -344,8 +344,6 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
           routeStateKnown={p.routeStateKnown}
           composerEligibleResolved={p.composerEligibleResolved}
           beaconsWrapperInstalled={p.beaconsWrapperInstalled}
-          installPending={p.installPending}
-          onInstallWrapper={p.onInstallWrapper}
           loading={p.composerEligibleLoading}
           runtimeOk={p.composerRuntimeOk && p.syncShellOk}
           eligible={p.composerEligible}

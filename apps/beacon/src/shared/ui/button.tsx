@@ -33,9 +33,12 @@ const buttonVariants = cva(
         /** Route footer dock: active (selected tab, emphasized action; `--beacon-route-dock-*` in globals.css). */
         routeDockActive:
           "border-[color-mix(in_oklab,var(--beacon-route-dock-accent-line)_48%,var(--border))] text-foreground shadow-[inset_0_-2px_10px_-3px_color-mix(in_oklab,var(--beacon-route-dock-accent-line)_35%,transparent),inset_0_-1px_0_0_var(--beacon-route-dock-accent-line)] [background-image:linear-gradient(to_bottom,var(--beacon-route-dock-active-top)_0%,var(--beacon-route-dock-active-bottom)_100%)] hover:brightness-[1.04]",
-        /** Full-width action row (e.g. Add Slot / Install / Scan page). */
+        /** Full-width action row (e.g. Add Slot / Scan page). */
         actionCard:
           "border-border/65 bg-muted/50 text-foreground shadow-none hover:bg-muted/65 dark:bg-muted/35 dark:hover:bg-muted/50",
+        /** Compact full-width CTA in route/panel empty states. */
+        emptyAction:
+          "border-border bg-background/95 text-foreground shadow-sm hover:bg-muted dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         /** Composer row title opens slot-name drawer; reads like muted text row line. */
         composerSlotTitle:
           "min-h-9 h-auto max-w-none w-full flex-1 justify-start truncate border-transparent bg-transparent px-1 py-1.5 text-left text-sm leading-snug font-medium shadow-none hover:bg-muted/70 focus-visible:bg-muted dark:hover:bg-muted/35 [&_svg]:size-4",
@@ -66,6 +69,9 @@ const buttonVariants = cva(
           "!h-auto min-h-10 w-full max-w-none shrink-0 justify-center gap-1 rounded-md px-2 py-1.5 text-[0.8125rem] font-medium leading-tight whitespace-normal has-data-[icon=inline-start]:pl-1.5 [&_[data-icon=inline-start]_svg]:size-3.5",
         /** Full-width primary action in drawer footers. */
         drawerAction: "h-9 w-full gap-1.5 px-3",
+        /** Paired with `variant="emptyAction"` */
+        emptyAction:
+          "h-8 min-h-8 w-full gap-1.5 px-3 text-sm has-data-[icon=inline-start]:pl-2.5 has-data-[icon=inline-end]:pr-2.5 [&_svg:not([class*='size-'])]:size-4",
       },
     },
     defaultVariants: {

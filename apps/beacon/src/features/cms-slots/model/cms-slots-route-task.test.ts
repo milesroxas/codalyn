@@ -3,6 +3,7 @@ import { resolveCmsSlotsRouteTask } from "@/features/cms-slots/model/cms-slots-r
 import {
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
   CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION,
+  CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
   CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET,
   CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION,
@@ -82,6 +83,15 @@ describe("resolveCmsSlotsRouteTask", () => {
         listTargetOnCanvasCountResolved: false,
       })?.message
     ).toBe(CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET);
+  });
+
+  it("returns checking install when route task phase is set during install", () => {
+    expect(
+      resolveCmsSlotsRouteTask({
+        ...idleInput,
+        routeTaskPhase: CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
+      })?.message
+    ).toBe(CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL);
   });
 
   it("returns null when idle", () => {

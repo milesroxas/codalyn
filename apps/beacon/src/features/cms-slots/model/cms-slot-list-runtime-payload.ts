@@ -1,6 +1,6 @@
 /**
  * JSON stored in the **per-collection** Plain Text field whose display name is
- * “Beacon list target text · {dataList}” (and mirrored on the list target’s bound Text prop). Flow:
+ * “CMS slot target text · {dataList}” (and mirrored on the list target’s bound Text prop). Flow:
  *
  * 1. **Composer (CMS item)** — `saveCmsSlotListRuntimePayloadToCmsItem` writes this string to that field (staged + live) for
  *    the *current* collection entry, so every CMS row has its own `i` + `p`.

@@ -30,7 +30,7 @@ export function uniqueCmsSlotListTargetComponentName(dataList: string, listConta
   return `${dataList} · ${tail}`;
 }
 
-/** True when this definition’s DOM root matches the given beacon list (placement hint after create). */
+/** True when this definition’s DOM root matches the given CMS slot (placement hint after create). */
 async function beaconListTargetDefinitionMatchesList(
   comp: Component,
   dataList: string,
@@ -189,7 +189,7 @@ export function cmsSlotListTargetDataAttributes(dataList: string, listContainer:
 
 /**
  * @returns `true` when the registered component’s name and DOM root (tag + attributes) do not match the
- * current beacon list on the canvas (the list “instance” changed).
+ * current CMS slot on the canvas (the list “instance” changed).
  */
 export async function cmsSlotListTargetNeedsSync(
   component: Component,
@@ -251,7 +251,7 @@ export async function applyCmsSlotListTargetSync(
 
 /**
  * Registers a site component under {@link CMS_SLOT_UTILITIES_COMPONENT_GROUP} whose root is a single DOM node that
- * identifies **this beacon list** (the `data-list` target), not the component instances inside the list.
+ * identifies **this CMS slot** (the `data-list` target), not the component instances inside the slot.
  *
  * On a CMS collection template, call {@link ensureCmsSlotListCmsTextFieldOnList} **before** this so the Plain Text
  * field exists and the Designer bind catalog is refreshed prior to registration and placement.
@@ -296,7 +296,7 @@ export async function createCmsSlotListTargetComponent(input: {
       {
         name,
         group: CMS_SLOT_UTILITIES_COMPONENT_GROUP,
-        description: "Beacon list render target (Codalyn Beacon)",
+        description: "CMS slot render target (Codalyn Beacon)",
       },
       root
     );

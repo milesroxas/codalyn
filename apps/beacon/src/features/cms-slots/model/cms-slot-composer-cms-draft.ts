@@ -147,7 +147,7 @@ function draftFromPayloadRows(
 }
 
 /**
- * Resolves the Composer “target order” from the current CMS item’s **Beacon list target text** when on a
+ * Resolves the Composer “target order” from the current CMS item’s **CMS slot target text** when on a
  * collection template; otherwise from the **hidden** Engine list. Empty CMS field (or no item / no Tower) ⇒
  * **empty** draft, not a copy of the canvas list.
  */

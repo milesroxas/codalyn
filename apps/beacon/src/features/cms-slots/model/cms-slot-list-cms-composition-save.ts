@@ -51,11 +51,11 @@ async function resolveCmsFieldSlug(collectionId: string, fieldId: string): Promi
     }
     break;
   }
-  throw new Error("Could not resolve the beacon list CMS field slug.");
+  throw new Error("Could not resolve the CMS slot CMS field slug.");
 }
 
 /**
- * Read the current **staged** CMS item; `fieldData[slug]` is the per-entry beacon list text JSON.
+ * Read the current **staged** CMS item; `fieldData[slug]` is the per-entry CMS slot text JSON.
  */
 export async function fetchCmsSlotListCmsTextForItem(options: {
   collectionId: string;
@@ -210,7 +210,7 @@ async function patchBeaconListCmsTextFieldData(options: {
 }
 
 /**
- * Persists the runtime JSON to the **Beacon list target text** field created for this list
+ * Persists the runtime JSON to the **CMS slot target text** field created for this slot
  * (see `cmsSlotListCmsPlainTextFieldDisplayName` + list target Text prop CMS bind). Staged + **live** patches so
  * the **published** page sees the same payload the list target Text renders. One CMS item id ⇒ one v2
  * `{v,i,p}`; `p` holds every Composer prop value (including `""`) for that entry — see
@@ -220,7 +220,7 @@ export async function saveCmsSlotListRuntimePayloadToCmsItem(options: {
   collectionId: string;
   fieldId: string;
   cmsItemId: string;
-  /** Ordered indices into the hidden beacon list block’s `children` (what the site runtime will clone by index). */
+  /** Ordered indices into the hidden CMS slot block’s `children` (what the site runtime will clone by index). */
   hiddenListIndices: readonly number[];
   /** One entry per `hiddenListIndices` item; per-row `propId` → string (Engine-exposed props from Composer). */
   propValueRows?: readonly Readonly<Record<string, string>>[] | null;

@@ -28,7 +28,7 @@ export async function retryCmsSlotListTargetCmsFieldLink(options: {
     return {
       ok: false,
       message:
-        "Could not create or find the CMS Plain Text field for this beacon list. Check your Webflow connection in Tower and try again.",
+        "Could not create or find the CMS Plain Text field for this CMS slot. Check your Webflow connection in Tower and try again.",
     };
   }
   const def = await getCmsSlotListTargetComponentOrNull(
@@ -37,7 +37,7 @@ export async function retryCmsSlotListTargetCmsFieldLink(options: {
     options.preferredDefinitionId
   );
   if (def == null) {
-    return { ok: false, message: "No list target component found for this beacon list." };
+    return { ok: false, message: "No list target component found for this CMS slot." };
   }
 
   const instances = await listCmsSlotListTargetInstancesOnPage(options.dataList, options.listContainer, {

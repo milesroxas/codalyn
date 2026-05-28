@@ -2,6 +2,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
+import { Button } from "@/shared/ui/button";
 
 const emptyVariants = cva("flex min-w-0 flex-1 flex-col text-balance", {
   variants: {
@@ -10,7 +11,7 @@ const emptyVariants = cva("flex min-w-0 flex-1 flex-col text-balance", {
       plain: "w-full items-stretch gap-4 border-0 bg-transparent p-0 text-left",
       /** Inset panel empty state (CMS Slots Engine / Composer sections). */
       insetPanel:
-        "items-center justify-center gap-3 rounded-[10px] border border-border bg-muted/10 py-8 text-center min-h-28",
+        "items-center justify-center gap-3 rounded-[10px] border border-border bg-muted/10 px-6 py-8 text-center min-h-28",
     },
   },
   defaultVariants: {
@@ -126,4 +127,8 @@ function EmptyContent({
   return <div data-slot="empty-content" className={cn(emptyContentVariants({ layout }), className)} {...props} />;
 }
 
-export { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle };
+function EmptyAction({ className, ...props }: React.ComponentProps<typeof Button>) {
+  return <Button type="button" variant="emptyAction" size="emptyAction" className={className} {...props} />;
+}
+
+export { Empty, EmptyAction, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle };

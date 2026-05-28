@@ -21,6 +21,7 @@ import {
   RESET_PASSWORD_COPY,
   readPasswordResetSuccess,
 } from "@/features/auth/lib/password-reset";
+import { readEmailPasswordFromAuthForm } from "@/features/auth/lib/read-auth-form-credentials";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { resolveTowerEmailLinkAuthFetchOptions } from "@/features/auth/lib/team-invitation-auth-fetch-options";
@@ -178,15 +179,16 @@ function SignInForm() {
     );
   }
 
-  async function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const { email: submittedEmail, password: submittedPassword } = readEmailPasswordFromAuthForm(e.currentTarget);
     setError(null);
     setPending(true);
     const verificationCallback = resolveTowerEmailVerificationAppCallbackUrl(callbackUrl);
     const operatorInviteToken = operatorInviteParam?.trim() || null;
     const { data, error: err } = await authClient.signIn.email({
-      email,
-      password,
+      email: submittedEmail,
+      password: submittedPassword,
       callbackURL: verificationCallback,
       fetchOptions: resolveTowerEmailLinkAuthFetchOptions({
         operatorInviteToken,
@@ -196,7 +198,7 @@ function SignInForm() {
     setPending(false);
     if (err) {
       if (isEmailNotVerifiedAuthError(err)) {
-        setAwaitingVerificationEmail(email);
+        setAwaitingVerificationEmail(submittedEmail);
         return;
       }
       setError(err.message ?? "Sign in failed");
@@ -235,6 +237,7 @@ function SignInForm() {
               <Label htmlFor={emailId}>Email</Label>
               <Input
                 id={emailId}
+                name="email"
                 type="email"
                 autoComplete="email"
                 value={email}
@@ -248,6 +251,7 @@ function SignInForm() {
               <Label htmlFor={passwordId}>Password</Label>
               <Input
                 id={passwordId}
+                name="password"
                 type="password"
                 autoComplete="current-password"
                 value={password}

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 /**
  * Seed local operator accounts from TOWER_PRODUCT_ADMIN_EMAILS.
  * Localhost DATABASE_URL only — invoked by db:reset:local after migrations.
@@ -67,12 +69,23 @@ export async function seedLocalProductAdminUsers(databaseUrl) {
            WHERE id = $1`,
           [userId]
         );
-        await client.query(
+        const accountUpdate = await client.query(
           `UPDATE account
            SET password = $1, updated_at = NOW()
            WHERE user_id = $2 AND provider_id = 'credential'`,
           [passwordHash, userId]
         );
+        if (accountUpdate.rowCount === 0) {
+          const accountRowId = generateRandomString(32);
+          await client.query(
+            `INSERT INTO account (
+               id, account_id, provider_id, user_id, password, created_at, updated_at
+             ) VALUES (
+               $1, $2, 'credential', $3, $4, NOW(), NOW()
+             )`,
+            [accountRowId, userId, userId, passwordHash]
+          );
+        }
         results.push({ email, created: false, password });
         continue;
       }
@@ -150,4 +163,8 @@ async function main() {
   }
 }
 
-main();
+const isDirectRun = process.argv[1] != null && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  main();
+}

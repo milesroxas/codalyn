@@ -2,7 +2,7 @@ import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
 import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
 import { UsagePlanBadges } from "@/features/billing/ui/usage-plan-badges";
 import type { TowerEntitlement } from "@/server/billing/entitlements";
-import { usageLimitsKindDetailLine, usageTierBadgeLabel } from "@/shared/lib/usage-display";
+import { billingAccountPlanLabel, usageLimitsKindDetailLine } from "@/shared/lib/usage-display";
 import { Button } from "@/shared/ui/button";
 import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { TowerPageHeader, TowerPageMain } from "@/shared/ui/tower-page-shell";
@@ -22,7 +22,7 @@ function towerEntitlementSourceLine(source: TowerEntitlement["source"]): string 
     case "user_stripe":
       return "Pro subscription on your account.";
     case "organization":
-      return "Pro is included with your active workspace.";
+      return "Pro usage limits apply through your workspace Team subscription.";
     default:
       return null;
   }
@@ -39,7 +39,7 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
   const { email, entitlement, usageStatus, subscriptionPlan, subscriptionStatus, checkoutAvailable, showPortal } =
     props;
 
-  const tierLabel = usageTierBadgeLabel(entitlement.tier);
+  const tierLabel = billingAccountPlanLabel(entitlement);
   const limitsDetail = usageLimitsKindDetailLine(usageStatus.limitsKind, entitlement.tier);
   const entitlementSource = towerEntitlementSourceLine(entitlement.source);
   const statusLabel = formatSubscriptionStatus(subscriptionStatus);
@@ -50,14 +50,15 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
     subscriptionPlan && subscriptionPlan !== entitlement.tier ? `Recorded plan: ${subscriptionPlan}` : null,
   ].filter((line): line is string => Boolean(line));
 
+  const hasIndividualPro = entitlement.source === "user_stripe";
   const showUpgrade = entitlement.tier === "free" && checkoutAvailable;
-  const showPlanActions = showUpgrade || showPortal;
+  const showPlanActions = showUpgrade || (showPortal && hasIndividualPro);
 
   return (
     <TowerPageMain>
       <TowerPageHeader
         title="Billing & usage"
-        description="Manage your Pro plan and monthly usage limits."
+        description="Manage your plan and monthly usage limits."
         meta={
           email ? (
             <span>
@@ -74,7 +75,11 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
             <span>
               You are on the <span className="font-medium text-foreground">{tierLabel}</span> plan.
             </span>
-            <UsagePlanBadges tier={entitlement.tier} limitsKind={usageStatus.limitsKind} />
+            <UsagePlanBadges
+              tier={entitlement.tier}
+              entitlementSource={entitlement.source}
+              limitsKind={usageStatus.limitsKind}
+            />
             {planDescriptionParts.length > 0 ? (
               <ul className="list-inside list-disc space-y-1">
                 {planDescriptionParts.map((line) => (
@@ -102,6 +107,7 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
 
       <TowerUsageSection
         status={usageStatus}
+        entitlementSource={entitlement.source}
         title="This month"
         description="Your usage against plan limits this month."
       />

@@ -32,6 +32,17 @@ export function readStripeBillingScopeFromMetadata(
   return null;
 }
 
+/** True when a Stripe subscription should update the individual `user` row (not workspace team billing). */
+export function isIndividualUserStripeSubscriptionMetadata(metadata: Stripe.Metadata | null | undefined): boolean {
+  if (readStripeBillingScopeFromMetadata(metadata) === STRIPE_BILLING_SCOPE_ORGANIZATION) {
+    return false;
+  }
+  if (readTowerOrgIdFromStripeMetadata(metadata)) {
+    return false;
+  }
+  return true;
+}
+
 export function stripeSubscriptionIdFrom(subscription: string | Stripe.Subscription | null | undefined): string | null {
   if (!subscription) {
     return null;

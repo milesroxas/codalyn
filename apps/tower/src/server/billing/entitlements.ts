@@ -1,7 +1,6 @@
 import { eq, inArray } from "drizzle-orm";
-import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { isOrganizationProEntitled } from "@/server/billing/organization-billing";
-import { userRowHasStripePro } from "@/server/billing/stripe-subscription-status";
+import { userHasIndividualStripePro } from "@/server/billing/stripe-individual-pro";
 import { db } from "@/shared/lib/db";
 import { member, organization, user } from "@/shared/lib/db/auth-schema";
 
@@ -30,7 +29,7 @@ export async function resolveTowerEntitlement(
     .where(eq(user.id, userId))
     .limit(1);
 
-  if (isTowerBillingEnabled() && u && userRowHasStripePro(u)) {
+  if (u && (await userHasIndividualStripePro(u))) {
     return { tier: "pro", source: "user_stripe" };
   }
 

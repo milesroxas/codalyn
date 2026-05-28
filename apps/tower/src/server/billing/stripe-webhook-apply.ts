@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
 import { applyStripeSubscriptionToUser, clearStripeUserSubscription } from "@/server/billing/stripe-app";
 import {
+  isIndividualUserStripeSubscriptionMetadata,
   readStripeBillingScopeFromMetadata,
   readTowerOrgIdFromStripeMetadata,
   readTowerOwnershipTransferIdFromStripeMetadata,
@@ -13,7 +14,6 @@ import {
 import {
   applyStripeSubscriptionToOrganization,
   clearStripeOrganizationSubscription,
-  grantTeamBillingEligibilityToUser,
 } from "@/server/billing/stripe-org-app";
 import { subscriptionPlanForStatus } from "@/server/billing/stripe-subscription-status";
 import { workspaceOwnershipTransferService } from "@/server/membership/workspace-ownership-transfer";
@@ -21,8 +21,7 @@ import { db } from "@/shared/lib/db";
 import { organization, user } from "@/shared/lib/db/auth-schema";
 
 async function resolveTowerUserIdBySubscription(sub: Stripe.Subscription): Promise<string | undefined> {
-  const scope = readStripeBillingScopeFromMetadata(sub.metadata);
-  if (scope === STRIPE_BILLING_SCOPE_ORGANIZATION) {
+  if (!isIndividualUserStripeSubscriptionMetadata(sub.metadata)) {
     return undefined;
   }
   const fromMeta = readTowerUserIdFromStripeMetadata(sub.metadata);
@@ -80,9 +79,6 @@ export async function applyStripeCheckoutSessionCompleted(
   if (towerOrgId) {
     const purchaserId = readTowerUserIdFromStripeMetadata(session.metadata);
     await applyStripeSubscriptionToOrganization(sub, towerOrgId, purchaserId);
-    if (purchaserId) {
-      await grantTeamBillingEligibilityToUser(purchaserId);
-    }
     return;
   }
 
@@ -105,9 +101,6 @@ async function onSubscriptionChanged(s: Stripe.Subscription): Promise<void> {
     }
     const purchaserId = readTowerUserIdFromStripeMetadata(s.metadata);
     await applyStripeSubscriptionToOrganization(s, orgId, purchaserId);
-    if (purchaserId) {
-      await grantTeamBillingEligibilityToUser(purchaserId);
-    }
     return;
   }
 

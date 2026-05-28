@@ -42,7 +42,7 @@ export const towerOrganization = organization({
   disableOrganizationDeletion: true,
   /**
    * Free accounts may admin one workspace; additional owned workspaces require individual Pro
-   * (or `canCreateOrganization` ops / team-billing override). Non-admin memberships do not count.
+   * (or operator `canCreateOrganization` override). Paid workspace membership does not count.
    */
   allowUserToCreateOrganization: async (user) => {
     const eligibility = await resolveUserWorkspaceCreationEligibility(user.id);

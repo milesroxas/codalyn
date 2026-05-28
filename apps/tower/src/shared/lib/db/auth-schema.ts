@@ -24,7 +24,7 @@ export const user = pgTable("user", {
   role: text("role"),
   /**
    * Operator override to create owned workspaces beyond the free-tier cap without individual Pro.
-   * Does not affect the first free workspace. Set by ops, invites, or team checkout — not by default.
+   * Does not affect the first free workspace. Set by ops or invite redemption — not by team billing or default.
    */
   canCreateOrganization: boolean("can_create_organization").default(false).notNull(),
   banned: boolean("banned").default(false).notNull(),

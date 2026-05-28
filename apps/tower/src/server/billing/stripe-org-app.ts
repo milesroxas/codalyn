@@ -5,7 +5,7 @@ import { isStripeSubscriptionProEntitled } from "@/server/billing/stripe-subscri
 import { stripeCustomerIdFrom } from "@/server/billing/stripe-utils";
 import { getStripePriceTeamSeat, TEAM_BILLING_PLAN } from "@/server/billing/team-billing-config";
 import { db } from "@/shared/lib/db";
-import { organization, user } from "@/shared/lib/db/auth-schema";
+import { organization } from "@/shared/lib/db/auth-schema";
 
 export function readSubscriptionSeatQuantity(sub: Stripe.Subscription): number | null {
   const teamPriceId = getStripePriceTeamSeat();
@@ -83,9 +83,4 @@ export async function clearStripeOrganizationSubscription(towerOrgId: string) {
       billingOwnerUserId: null,
     })
     .where(eq(organization.id, towerOrgId));
-}
-
-/** Purchaser may create additional workspaces after a successful team subscription. */
-export async function grantTeamBillingEligibilityToUser(towerUserId: string) {
-  await db.update(user).set({ canCreateOrganization: true }).where(eq(user.id, towerUserId));
 }

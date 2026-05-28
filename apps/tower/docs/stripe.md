@@ -154,4 +154,4 @@ Independent of **Stripe** but part of the same “billing” story: the **free**
 - Checkout quantity = `max(TOWER_TEAM_MIN_SEATS, members + pending invitations)`.
 - Webhooks set `organization.seat_limit` from Stripe subscription quantity.
 - Member/invitation hooks call `syncOrganizationSeatQuantityWithStripe` to keep Stripe and `seat_limit` aligned.
-- Successful team checkout grants `canCreateOrganization` to the purchaser (for additional workspaces).
+- Additional owned workspaces require **individual Pro** on the user (or operator `canCreateOrganization`); team checkout does not grant that.

@@ -1,6 +1,5 @@
 import { and, count, eq, isNull, or } from "drizzle-orm";
-import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
-import { userRowHasStripePro } from "@/server/billing/stripe-subscription-status";
+import { userHasIndividualStripePro } from "@/server/billing/stripe-individual-pro";
 import { isTowerProductAdmin } from "@/server/membership/product-admin";
 import { db } from "@/shared/lib/db";
 import { member, organization, user } from "@/shared/lib/db/auth-schema";
@@ -85,11 +84,11 @@ export async function loadUserWorkspaceEligibilityRow(userId: string): Promise<U
   return row ?? null;
 }
 
-export function resolveUserWorkspaceCreationEligibilityFromRow(
+export async function resolveUserWorkspaceCreationEligibilityFromRow(
   row: UserWorkspaceEligibilityRow,
   ownedWorkspaceCount: number
-): UserWorkspaceCreationEligibility {
-  const hasIndividualPro = isTowerBillingEnabled() && userRowHasStripePro(row);
+): Promise<UserWorkspaceCreationEligibility> {
+  const hasIndividualPro = await userHasIndividualStripePro(row);
   const canCreate = userMayCreateAnotherWorkspace(ownedWorkspaceCount, {
     isProductAdmin: isTowerProductAdmin(row),
     canCreateOrganizationOverride: row.canCreateOrganization,
@@ -111,5 +110,5 @@ export async function resolveUserWorkspaceCreationEligibility(
     return { canCreate: false, ownedWorkspaceCount, hasIndividualPro: false };
   }
 
-  return resolveUserWorkspaceCreationEligibilityFromRow(row, ownedWorkspaceCount);
+  return await resolveUserWorkspaceCreationEligibilityFromRow(row, ownedWorkspaceCount);
 }

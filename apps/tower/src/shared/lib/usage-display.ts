@@ -20,6 +20,20 @@ export function usageTierBadgeLabel(tier: "free" | "pro"): string {
   return tier === "pro" ? "Pro" : "Free";
 }
 
+/** End-user billing label: distinguishes individual Pro from workspace Team entitlements. */
+export function billingAccountPlanLabel(entitlement: {
+  tier: "free" | "pro";
+  source: "user_stripe" | "organization" | "none";
+}): string {
+  if (entitlement.source === "user_stripe") {
+    return "Pro";
+  }
+  if (entitlement.source === "organization") {
+    return "Team";
+  }
+  return usageTierBadgeLabel(entitlement.tier);
+}
+
 /** Secondary badge on billing/usage when operator caps differ from the standard tier defaults. */
 export function usageLimitsKindBadgeLabel(limitsKind: TowerUsageLimitsKind, tier: "free" | "pro"): string | null {
   if (limitsKind === "custom") {

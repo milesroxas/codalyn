@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
+import { isIndividualUserStripeSubscriptionMetadata } from "@/server/billing/stripe-metadata";
 import { subscriptionPlanForStatus } from "@/server/billing/stripe-subscription-status";
 import { stripeCustomerIdFrom } from "@/server/billing/stripe-utils";
 import { db } from "@/shared/lib/db";
@@ -9,6 +10,9 @@ import { user } from "@/shared/lib/db/auth-schema";
  * Idempotent: keeps `stripeCustomerId` in sync, maps subscription → `subscription_plan` / `subscription_status`.
  */
 export async function applyStripeSubscriptionToUser(sub: Stripe.Subscription, towerUserId: string) {
+  if (!isIndividualUserStripeSubscriptionMetadata(sub.metadata)) {
+    return;
+  }
   const plan = subscriptionPlanForStatus(sub.status);
   const customer = stripeCustomerIdFrom(sub.customer);
   await db

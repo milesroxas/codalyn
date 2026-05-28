@@ -87,8 +87,8 @@ describe("userMayCreateAnotherWorkspace", () => {
 });
 
 describe("resolveUserWorkspaceCreationEligibilityFromRow", () => {
-  it("does not count toward limit when user only has non-admin memberships elsewhere", () => {
-    const result = resolveUserWorkspaceCreationEligibilityFromRow(baseRow, 0);
+  it("does not count toward limit when user only has non-admin memberships elsewhere", async () => {
+    const result = await resolveUserWorkspaceCreationEligibilityFromRow(baseRow, 0);
     expect(result.canCreate).toBe(true);
     expect(result.ownedWorkspaceCount).toBe(0);
   });

@@ -1,17 +1,27 @@
 "use client";
 
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
-import { IconBuilding, IconCreditCard, IconMail, IconUserPlus, IconUsers } from "@tabler/icons-react";
+import { IconBuilding, IconMail, IconUserPlus, IconUsers } from "@tabler/icons-react";
 import Link from "next/link";
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { formatOperatorWorkspaceDeleteError, OperatorApiError, operatorApi } from "@/features/operator/api/client";
+import {
+  formatOperatorWorkspaceDeleteError,
+  formatOperatorWorkspacePatchError,
+  OperatorApiError,
+  operatorApi,
+} from "@/features/operator/api/client";
+import { buildOperatorWorkspaceBillingOverridePatch } from "@/features/operator/lib/operator-workspace-billing-patch";
 import { formatDateTime, formatRelative, initialsFor } from "@/features/operator/model/format";
-import { OperatorDetailSheetSkeleton } from "@/features/operator/ui/operator-detail-sheet-skeleton";
+import {
+  OperatorDetailSheetAccessibleTitle,
+  OperatorDetailSheetSkeleton,
+} from "@/features/operator/ui/operator-detail-sheet-skeleton";
 import {
   OperatorUsageLimitsSection,
   reloadWorkspaceUsageLimits,
 } from "@/features/operator/ui/operator-usage-limits-section";
+import { OperatorWorkspaceBillingSection } from "@/features/operator/ui/operator-workspace-billing-section";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch, OperatorWorkspaceRow } from "@/server/operator/types";
 import {
   formatTowerInvitationStatusLabel,
@@ -20,7 +30,7 @@ import {
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { FormField, FormFieldGrid, FormFieldRow } from "@/shared/ui/form-field";
+import { FormField, FormFieldRow } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import {
@@ -57,6 +67,15 @@ function detailToRow(d: OperatorWorkspaceDetail): OperatorWorkspaceRow {
     subscriptionStatus: d.subscriptionStatus,
     stripeCustomerId: d.stripeCustomerId,
     stripeSubscriptionId: d.stripeSubscriptionId,
+    billingMode: d.billingMode,
+    billingManagedByStripe: d.billingManagedByStripe,
+    isProEntitled: d.isProEntitled,
+    displayBillingPlan: d.displayBillingPlan,
+    planLabel: d.planLabel,
+    canOperatorEditBilling: d.canOperatorEditBilling,
+    canOperatorEditSeatLimit: d.canOperatorEditSeatLimit,
+    operatorSeatLimitOverride: d.operatorSeatLimitOverride,
+    stripeSeatQuantity: d.stripeSeatQuantity,
     memberCount: d.memberCount,
     pendingInvitations: d.pendingInvitations,
     usage: d.usage,
@@ -130,7 +149,7 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
         onUpdated?.(detailToRow(next));
         toast.success("Workspace updated");
       } catch (err) {
-        const msg = err instanceof OperatorApiError ? err.message : "Update failed";
+        const msg = err instanceof OperatorApiError ? formatOperatorWorkspacePatchError(err) : "Update failed";
         setError(msg);
         toast.error(msg);
       } finally {
@@ -140,23 +159,21 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
     [detail, onUpdated]
   );
 
-  const seatLimitDirty = useMemo(() => {
+  const onRestoreStripeSeatSync = useCallback(() => {
+    void patch({ clearOperatorSeatOverride: true });
+  }, [patch]);
+
+  const billingOverridesDirty = useMemo(() => {
     if (!detail) {
       return false;
     }
     const raw = seatLimitDraft.trim();
-    const next = raw === "" ? null : Number(raw);
-    return next !== detail.seatLimit;
-  }, [detail, seatLimitDraft]);
-
-  const billingDirty = useMemo(() => {
-    if (!detail) {
-      return false;
-    }
-    return (
-      billingPlanDraft !== (detail.billingPlan ?? "") || subscriptionStatusDraft !== (detail.subscriptionStatus ?? "")
-    );
-  }, [detail, billingPlanDraft, subscriptionStatusDraft]);
+    const nextSeatLimit = raw === "" ? null : Number(raw);
+    const seatDirty = nextSeatLimit !== detail.seatLimit;
+    const billingDirty =
+      billingPlanDraft !== (detail.billingPlan ?? "") || subscriptionStatusDraft !== (detail.subscriptionStatus ?? "");
+    return seatDirty || billingDirty;
+  }, [detail, seatLimitDraft, billingPlanDraft, subscriptionStatusDraft]);
 
   const onSaveName = useCallback(() => {
     const v = nameDraft.trim();
@@ -174,28 +191,25 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
     void patch({ slug: v });
   }, [slugDraft, detail?.slug, patch]);
 
-  const onSaveSeatLimit = useCallback(() => {
-    const raw = seatLimitDraft.trim();
-    if (raw === "") {
-      void patch({ seatLimit: null });
+  const onSaveBillingOverrides = useCallback(() => {
+    if (!detail) {
       return;
     }
-    const n = Number(raw);
-    if (!Number.isFinite(n) || n < 1) {
-      const msg = "Seat limit must be a positive number or blank for unlimited.";
-      setError(msg);
-      toast.error(msg);
-      return;
-    }
-    void patch({ seatLimit: Math.floor(n) });
-  }, [seatLimitDraft, patch]);
-
-  const onSaveBilling = useCallback(() => {
-    void patch({
-      billingPlan: billingPlanDraft.trim() === "" ? null : billingPlanDraft.trim(),
-      subscriptionStatus: subscriptionStatusDraft.trim() === "" ? null : subscriptionStatusDraft.trim(),
+    const result = buildOperatorWorkspaceBillingOverridePatch(detail, {
+      seatLimitDraft,
+      billingPlanDraft,
+      subscriptionStatusDraft,
     });
-  }, [billingPlanDraft, subscriptionStatusDraft, patch]);
+    if (result === null) {
+      return;
+    }
+    if ("error" in result) {
+      setError(result.error);
+      toast.error(result.error);
+      return;
+    }
+    void patch(result);
+  }, [billingPlanDraft, subscriptionStatusDraft, detail, patch, seatLimitDraft]);
 
   const onDelete = useCallback(async () => {
     if (!detail) {
@@ -234,8 +248,7 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
           deleteConfirm={deleteConfirm}
           patchBusy={patchBusy}
           deleteBusy={deleteBusy}
-          seatLimitDirty={seatLimitDirty}
-          billingDirty={billingDirty}
+          billingOverridesDirty={billingOverridesDirty}
           onNameDraftChange={setNameDraft}
           onSlugDraftChange={setSlugDraft}
           onSeatLimitDraftChange={setSeatLimitDraft}
@@ -245,8 +258,8 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
           onOpenChange={onOpenChange}
           onSaveName={onSaveName}
           onSaveSlug={onSaveSlug}
-          onSaveSeatLimit={onSaveSeatLimit}
-          onSaveBilling={onSaveBilling}
+          onSaveBillingOverrides={onSaveBillingOverrides}
+          onRestoreStripeSeatSync={onRestoreStripeSeatSync}
           onDelete={onDelete}
           onUpdated={onUpdated}
           setDetail={setDetail}
@@ -268,8 +281,7 @@ type OperatorWorkspaceDetailSheetBodyProps = {
   deleteConfirm: string;
   patchBusy: boolean;
   deleteBusy: boolean;
-  seatLimitDirty: boolean;
-  billingDirty: boolean;
+  billingOverridesDirty: boolean;
   onNameDraftChange: (next: string) => void;
   onSlugDraftChange: (next: string) => void;
   onSeatLimitDraftChange: (next: string) => void;
@@ -279,8 +291,8 @@ type OperatorWorkspaceDetailSheetBodyProps = {
   onOpenChange: (open: boolean) => void;
   onSaveName: () => void;
   onSaveSlug: () => void;
-  onSaveSeatLimit: () => void;
-  onSaveBilling: () => void;
+  onSaveBillingOverrides: () => void;
+  onRestoreStripeSeatSync: () => void;
   onDelete: () => void | Promise<void>;
   onUpdated?: (row: OperatorWorkspaceRow) => void;
   setDetail: Dispatch<SetStateAction<OperatorWorkspaceDetail | null>>;
@@ -299,8 +311,7 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
     deleteConfirm,
     patchBusy,
     deleteBusy,
-    seatLimitDirty,
-    billingDirty,
+    billingOverridesDirty,
     onNameDraftChange,
     onSlugDraftChange,
     onSeatLimitDraftChange,
@@ -310,8 +321,8 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
     onOpenChange,
     onSaveName,
     onSaveSlug,
-    onSaveSeatLimit,
-    onSaveBilling,
+    onSaveBillingOverrides,
+    onRestoreStripeSeatSync,
     onDelete,
     onUpdated,
     setDetail,
@@ -340,7 +351,7 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
         </>
       );
     }
-    return null;
+    return <OperatorDetailSheetAccessibleTitle title="Workspace details" />;
   }
 
   return (
@@ -364,8 +375,11 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
                   {detail.pendingInvitations} pending
                 </Badge>
               ) : null}
-              {detail.billingPlan ? <Badge variant="secondary">{detail.billingPlan}</Badge> : null}
-              {detail.subscriptionStatus ? <Badge variant="outline">{detail.subscriptionStatus}</Badge> : null}
+              {detail.isOverSeatCap ? (
+                <Badge variant="destructive">Over seat limit</Badge>
+              ) : (
+                <Badge variant={detail.billingMode === "free" ? "outline" : "secondary"}>{detail.planLabel}</Badge>
+              )}
             </div>
           </div>
         </div>
@@ -388,23 +402,18 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
           onSaveName={onSaveName}
           onSaveSlug={onSaveSlug}
         />
-        <SeatsSection
-          detail={detail}
-          seatLimitDraft={seatLimitDraft}
-          onSeatLimitDraftChange={onSeatLimitDraftChange}
-          dirty={seatLimitDirty}
-          patchBusy={patchBusy}
-          onSave={onSaveSeatLimit}
-        />
-        <BillingSection
+        <OperatorWorkspaceBillingSection
           detail={detail}
           billingPlanDraft={billingPlanDraft}
           onBillingPlanDraftChange={onBillingPlanDraftChange}
           subscriptionStatusDraft={subscriptionStatusDraft}
           onSubscriptionStatusDraftChange={onSubscriptionStatusDraftChange}
-          dirty={billingDirty}
+          seatLimitDraft={seatLimitDraft}
+          onSeatLimitDraftChange={onSeatLimitDraftChange}
+          overridesDirty={billingOverridesDirty}
           patchBusy={patchBusy}
-          onSave={onSaveBilling}
+          onSaveOverrides={onSaveBillingOverrides}
+          onRestoreStripeSeatSync={onRestoreStripeSeatSync}
         />
         <OperatorUsageLimitsSection
           scope="workspace"
@@ -516,136 +525,6 @@ function IdentitySection({
         <p className="text-xs text-muted-foreground">
           Metadata: <span className="font-mono">{detail.metadata ?? "—"}</span>
         </p>
-      </div>
-    </section>
-  );
-}
-
-function SeatsSection({
-  detail,
-  seatLimitDraft,
-  onSeatLimitDraftChange,
-  dirty,
-  patchBusy,
-  onSave,
-}: {
-  detail: OperatorWorkspaceDetail;
-  seatLimitDraft: string;
-  onSeatLimitDraftChange: (next: string) => void;
-  dirty: boolean;
-  patchBusy: boolean;
-  onSave: () => void;
-}) {
-  return (
-    <section className="space-y-3">
-      <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Seats</h3>
-      <div className="space-y-3 rounded-lg border border-border bg-card p-3">
-        <FormField>
-          <Label htmlFor="workspace-seat-limit">
-            Seat limit (blank = unpaid solo cap)
-            {detail.stripeSubscriptionId ? " — managed by Stripe when billing is on" : null}
-          </Label>
-          <FormFieldRow>
-            <Input
-              id="workspace-seat-limit"
-              type="number"
-              min={1}
-              step={1}
-              value={seatLimitDraft}
-              disabled={Boolean(detail.stripeSubscriptionId)}
-              onChange={(event) => onSeatLimitDraftChange(event.target.value)}
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={patchBusy || !dirty || Boolean(detail.stripeSubscriptionId)}
-              onClick={onSave}
-            >
-              Save
-            </Button>
-          </FormFieldRow>
-        </FormField>
-        <p className="text-xs text-muted-foreground">
-          Current usage: <span className="text-foreground">{detail.memberCount + detail.pendingInvitations}</span> of{" "}
-          <span className="text-foreground">{detail.effectiveSeatLimit}</span> seats
-          {detail.pendingInvitations > 0 ? (
-            <>
-              {" "}
-              (<span className="text-foreground">{detail.pendingInvitations}</span> pending invite
-              {detail.pendingInvitations === 1 ? "" : "s"})
-            </>
-          ) : null}
-          .
-          {detail.isOverSeatCap ? (
-            <>
-              {" "}
-              <span className="text-destructive">Over seat limit — remove members or restore Team billing.</span>
-            </>
-          ) : null}
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function BillingSection({
-  detail,
-  billingPlanDraft,
-  onBillingPlanDraftChange,
-  subscriptionStatusDraft,
-  onSubscriptionStatusDraftChange,
-  dirty,
-  patchBusy,
-  onSave,
-}: {
-  detail: OperatorWorkspaceDetail;
-  billingPlanDraft: string;
-  onBillingPlanDraftChange: (next: string) => void;
-  subscriptionStatusDraft: string;
-  onSubscriptionStatusDraftChange: (next: string) => void;
-  dirty: boolean;
-  patchBusy: boolean;
-  onSave: () => void;
-}) {
-  return (
-    <section className="space-y-3">
-      <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Billing</h3>
-      <div className="space-y-3 rounded-lg border border-border bg-card p-3">
-        <FormFieldGrid className="sm:grid-cols-2">
-          <FormField>
-            <Label htmlFor="billing-plan">Plan</Label>
-            <Input
-              id="billing-plan"
-              value={billingPlanDraft}
-              onChange={(event) => onBillingPlanDraftChange(event.target.value)}
-              placeholder="starter · pro · scale"
-            />
-          </FormField>
-          <FormField>
-            <Label htmlFor="subscription-status">Subscription status</Label>
-            <Input
-              id="subscription-status"
-              value={subscriptionStatusDraft}
-              onChange={(event) => onSubscriptionStatusDraftChange(event.target.value)}
-              placeholder="active · past_due · canceled"
-            />
-          </FormField>
-        </FormFieldGrid>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <IconCreditCard className="size-3.5" />
-            <span>
-              Stripe customer: <code className="font-mono">{detail.stripeCustomerId ?? "—"}</code>
-            </span>
-            <span>
-              Sub: <code className="font-mono">{detail.stripeSubscriptionId ?? "—"}</code>
-            </span>
-          </div>
-          <Button type="button" size="sm" variant="outline" disabled={patchBusy || !dirty} onClick={onSave}>
-            Save billing
-          </Button>
-        </div>
       </div>
     </section>
   );

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { resolveOrganizationSeatQuantity } from "@/server/billing/organization-seat-count";
+import { shouldSkipStripeSeatQuantitySync } from "@/server/billing/organization-seat-override";
 import { getStripe } from "@/server/billing/stripe-client";
 import { readSubscriptionSeatQuantity } from "@/server/billing/stripe-org-app";
 import { getStripePriceTeamSeat } from "@/server/billing/team-billing-config";
@@ -26,6 +27,7 @@ export async function syncOrganizationSeatQuantityWithStripe(organizationId: str
       id: organization.id,
       stripeSubscriptionId: organization.stripeSubscriptionId,
       billingPlan: organization.billingPlan,
+      operatorSeatLimitOverride: organization.operatorSeatLimitOverride,
     })
     .from(organization)
     .where(eq(organization.id, organizationId))
@@ -35,11 +37,18 @@ export async function syncOrganizationSeatQuantityWithStripe(organizationId: str
     return;
   }
 
+  if (shouldSkipStripeSeatQuantitySync(org)) {
+    return;
+  }
+
   const desiredQuantity = await resolveOrganizationSeatQuantity(organizationId);
   const sub = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
   const currentQuantity = readSubscriptionSeatQuantity(sub);
   if (currentQuantity === desiredQuantity) {
-    await db.update(organization).set({ seatLimit: desiredQuantity }).where(eq(organization.id, organizationId));
+    await db
+      .update(organization)
+      .set({ seatLimit: desiredQuantity, stripeSeatQuantity: desiredQuantity })
+      .where(eq(organization.id, organizationId));
     return;
   }
 
@@ -53,5 +62,8 @@ export async function syncOrganizationSeatQuantityWithStripe(organizationId: str
     proration_behavior: "create_prorations",
   });
 
-  await db.update(organization).set({ seatLimit: desiredQuantity }).where(eq(organization.id, organizationId));
+  await db
+    .update(organization)
+    .set({ seatLimit: desiredQuantity, stripeSeatQuantity: desiredQuantity })
+    .where(eq(organization.id, organizationId));
 }

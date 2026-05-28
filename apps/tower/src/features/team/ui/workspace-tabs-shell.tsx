@@ -38,7 +38,7 @@ export function WorkspaceTabsShell(props: {
   onDeleteWorkspace: () => void | Promise<void>;
   onInviteEmailChange: (v: string) => void;
   onInviteRoleChange: (v: string) => void;
-  onInvite: (e: FormEvent) => void;
+  onInvite: (e: FormEvent) => boolean | undefined | Promise<boolean | undefined>;
   onUpdateActiveTeamName: (e: FormEvent) => void;
   onUpdateActiveTeamSlug: () => void | Promise<void>;
   onActiveTeamNameEditChange: (v: string) => void;
@@ -102,6 +102,14 @@ export function WorkspaceTabsShell(props: {
       canManageTeam={canManageTeam}
       busy={busy}
       currentUserId={currentUserId}
+      inviteEmail={inviteEmail}
+      inviteRole={inviteRole}
+      seatState={seatState}
+      organizationId={billingOrganizationId}
+      invitationsCount={invitations.length}
+      onInviteEmailChange={onInviteEmailChange}
+      onInviteRoleChange={onInviteRoleChange}
+      onInvite={onInvite}
       onUpdateMemberRole={onUpdateMemberRole}
       onRemoveMember={onRemoveMember}
     />

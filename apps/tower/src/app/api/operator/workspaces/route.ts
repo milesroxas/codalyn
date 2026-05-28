@@ -4,6 +4,7 @@ import {
   buildOrganizationSeatSnapshot,
   countOrganizationSeatsUsedBatch,
 } from "@/server/billing/organization-seat-count";
+import { mapOperatorOrgBillingFields } from "@/server/operator/operator-billing";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorWorkspaceListResponse, OperatorWorkspaceRow } from "@/server/operator/types";
 import {
@@ -60,6 +61,8 @@ export async function GET(req: Request): Promise<NextResponse<OperatorWorkspaceL
         slug: organization.slug,
         logo: organization.logo,
         seatLimit: organization.seatLimit,
+        stripeSeatQuantity: organization.stripeSeatQuantity,
+        operatorSeatLimitOverride: organization.operatorSeatLimitOverride,
         billingPlan: organization.billingPlan,
         subscriptionStatus: organization.subscriptionStatus,
         stripeCustomerId: organization.stripeCustomerId,
@@ -98,10 +101,14 @@ export async function GET(req: Request): Promise<NextResponse<OperatorWorkspaceL
       effectiveSeatLimit: seatSnapshot.effectiveSeatLimit,
       isAtSeatCap: seatSnapshot.isAtSeatCap,
       isOverSeatCap: seatSnapshot.isOverSeatCap,
-      billingPlan: r.billingPlan ?? null,
-      subscriptionStatus: r.subscriptionStatus ?? null,
-      stripeCustomerId: r.stripeCustomerId ?? null,
-      stripeSubscriptionId: r.stripeSubscriptionId ?? null,
+      ...mapOperatorOrgBillingFields({
+        billingPlan: r.billingPlan ?? null,
+        subscriptionStatus: r.subscriptionStatus ?? null,
+        stripeCustomerId: r.stripeCustomerId ?? null,
+        stripeSubscriptionId: r.stripeSubscriptionId ?? null,
+        operatorSeatLimitOverride: r.operatorSeatLimitOverride ?? false,
+        stripeSeatQuantity: r.stripeSeatQuantity ?? null,
+      }),
       memberCount,
       pendingInvitations,
       usage: usageByOrgId.get(r.id) ?? defaultUsage,

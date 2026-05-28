@@ -1,9 +1,13 @@
 "use client";
 
+import { IconUserPlus } from "@tabler/icons-react";
+import type { FormEvent } from "react";
+import type { WorkspaceSeatState } from "@/features/team/lib/workspace-seat-state";
 import type { MemberRow } from "@/features/team/model/workspace-types";
+import { WorkspaceInviteDialog } from "@/features/team/ui/workspace-invite-dialog";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { NativeSelect } from "@/shared/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 
@@ -25,16 +29,61 @@ export function WorkspaceMemberDirectoryCard(props: {
   canManageTeam: boolean;
   busy: boolean;
   currentUserId: string;
+  inviteEmail: string;
+  inviteRole: string;
+  seatState: WorkspaceSeatState;
+  organizationId: string | null;
+  invitationsCount: number;
+  onInviteEmailChange: (value: string) => void;
+  onInviteRoleChange: (value: string) => void;
+  onInvite: (event: FormEvent) => boolean | undefined | Promise<boolean | undefined>;
   onUpdateMemberRole: (memberId: string, role: string) => void;
   onRemoveMember: (memberId: string) => void;
 }) {
-  const { members, memberRoleOptions, canManageTeam, busy, currentUserId, onUpdateMemberRole, onRemoveMember } = props;
+  const {
+    members,
+    memberRoleOptions,
+    canManageTeam,
+    busy,
+    currentUserId,
+    inviteEmail,
+    inviteRole,
+    seatState,
+    organizationId,
+    invitationsCount,
+    onInviteEmailChange,
+    onInviteRoleChange,
+    onInvite,
+    onUpdateMemberRole,
+    onRemoveMember,
+  } = props;
 
   return (
     <Card size="sm" layout="table-section">
       <CardHeader>
         <CardTitle>Directory</CardTitle>
         <CardDescription>Workspace members and their access levels.</CardDescription>
+        {canManageTeam ? (
+          <CardAction align="center">
+            <WorkspaceInviteDialog
+              busy={busy}
+              inviteEmail={inviteEmail}
+              inviteRole={inviteRole}
+              seatState={seatState}
+              organizationId={organizationId}
+              invitationsCount={invitationsCount}
+              onInviteEmailChange={onInviteEmailChange}
+              onInviteRoleChange={onInviteRoleChange}
+              onInvite={onInvite}
+              trigger={
+                <Button type="button" size="sm" disabled={busy}>
+                  <IconUserPlus aria-hidden />
+                  Invite
+                </Button>
+              }
+            />
+          </CardAction>
+        ) : null}
       </CardHeader>
       <CardContent>
         {members.length === 0 ? (

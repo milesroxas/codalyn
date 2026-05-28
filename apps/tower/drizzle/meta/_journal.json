@@ -127,6 +127,13 @@
       "when": 1776720000016,
       "tag": "0018_reset_can_create_organization_default",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1776720000017,
+      "tag": "0019_operator_seat_limit_override",
+      "breakpoints": true
     }
   ]
 }

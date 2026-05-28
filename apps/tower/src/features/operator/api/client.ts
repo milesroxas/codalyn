@@ -59,6 +59,16 @@ export function formatOperatorWorkspaceDeleteError(error: OperatorApiError): str
   return error.message;
 }
 
+export function formatOperatorWorkspacePatchError(error: OperatorApiError): string {
+  if (error.message === "billing_managed_by_stripe") {
+    return "Plan and subscription status are managed by Stripe for this workspace.";
+  }
+  if (error.message === "seat_limit_below_usage") {
+    return "Seat limit cannot be below current members and pending invites.";
+  }
+  return error.message;
+}
+
 export type OperatorUserListQuery = {
   q?: string;
   limit?: number;

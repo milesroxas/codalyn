@@ -28,7 +28,7 @@ export function TeamWorkspacePanel(props: {
   currentUserId: string;
   onInviteEmailChange: (v: string) => void;
   onInviteRoleChange: (v: string) => void;
-  onInvite: (e: FormEvent) => void;
+  onInvite: (e: FormEvent) => boolean | undefined | Promise<boolean | undefined>;
   onUpdateMemberRole: (memberId: string, role: string) => void;
   onRemoveMember: (memberId: string) => void;
   onResendInvite: (inv: InvitationRow) => void;

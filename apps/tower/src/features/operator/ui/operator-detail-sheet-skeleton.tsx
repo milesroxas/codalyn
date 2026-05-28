@@ -5,6 +5,15 @@ type OperatorDetailSheetSkeletonProps = {
   title: string;
 };
 
+/** Screen-reader title when sheet content is not ready yet (e.g. before deferred loading UI). */
+export function OperatorDetailSheetAccessibleTitle(props: OperatorDetailSheetSkeletonProps) {
+  return (
+    <SheetHeader>
+      <SheetTitle className="sr-only">{props.title}</SheetTitle>
+    </SheetHeader>
+  );
+}
+
 export function OperatorDetailSheetSkeleton(props: OperatorDetailSheetSkeletonProps) {
   return (
     <>

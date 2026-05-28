@@ -1,20 +1,19 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { buildOrganizationSeatSnapshot, countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
 import { deleteWorkspace } from "@/server/membership/delete-workspace";
 import {
   parseWorkspaceDeleteConfirmBody,
   workspaceDeleteErrorResponse,
 } from "@/server/membership/workspace-delete-http";
-import { resolveWorkspaceSlugPatch } from "@/server/membership/workspace-slug-update";
+import { mapOperatorOrgBillingFields } from "@/server/operator/operator-billing";
+import { applyOperatorWorkspacePatch } from "@/server/operator/operator-workspace-patch-apply";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch } from "@/server/operator/types";
 import {
   defaultOperatorWorkspaceUsageLimits,
   fetchOperatorWorkspaceUsageLimits,
   sanitizeUsageLimitsPatch,
-  usageLimitsPatchToDbUpdates,
 } from "@/server/operator/usage-limits";
 import { assertWorkspaceDeleteRateLimit } from "@/server/security/destructive-action-rate-limit";
 import { db } from "@/shared/lib/db";
@@ -39,6 +38,8 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
       logo: organization.logo,
       metadata: organization.metadata,
       seatLimit: organization.seatLimit,
+      stripeSeatQuantity: organization.stripeSeatQuantity,
+      operatorSeatLimitOverride: organization.operatorSeatLimitOverride,
       billingPlan: organization.billingPlan,
       subscriptionStatus: organization.subscriptionStatus,
       stripeCustomerId: organization.stripeCustomerId,
@@ -103,10 +104,14 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
     effectiveSeatLimit: seatSnapshot.effectiveSeatLimit,
     isAtSeatCap: seatSnapshot.isAtSeatCap,
     isOverSeatCap: seatSnapshot.isOverSeatCap,
-    billingPlan: row.billingPlan ?? null,
-    subscriptionStatus: row.subscriptionStatus ?? null,
-    stripeCustomerId: row.stripeCustomerId ?? null,
-    stripeSubscriptionId: row.stripeSubscriptionId ?? null,
+    ...mapOperatorOrgBillingFields({
+      billingPlan: row.billingPlan ?? null,
+      subscriptionStatus: row.subscriptionStatus ?? null,
+      stripeCustomerId: row.stripeCustomerId ?? null,
+      stripeSubscriptionId: row.stripeSubscriptionId ?? null,
+      operatorSeatLimitOverride: row.operatorSeatLimitOverride ?? false,
+      stripeSeatQuantity: row.stripeSeatQuantity ?? null,
+    }),
     memberCount,
     pendingInvitations,
     usage: (await fetchOperatorWorkspaceUsageLimits(orgId)) ?? (await defaultOperatorWorkspaceUsageLimits()),
@@ -199,6 +204,20 @@ function applyNullableStringField(
   return null;
 }
 
+function applyClearOperatorSeatOverrideField(
+  body: Record<string, unknown>,
+  patch: OperatorWorkspacePatch
+): string | null {
+  if (!("clearOperatorSeatOverride" in body)) {
+    return null;
+  }
+  if (body.clearOperatorSeatOverride !== true) {
+    return "invalid_clearOperatorSeatOverride";
+  }
+  patch.clearOperatorSeatOverride = true;
+  return null;
+}
+
 function sanitizePatch(raw: unknown): OperatorWorkspacePatch | { error: string } {
   if (!raw || typeof raw !== "object") {
     return { error: "invalid_body" };
@@ -215,7 +234,8 @@ function sanitizePatch(raw: unknown): OperatorWorkspacePatch | { error: string }
     applySlugField(body, patch) ??
     applySeatLimitField(body, patch) ??
     applyNullableStringField(body, patch, "billingPlan") ??
-    applyNullableStringField(body, patch, "subscriptionStatus");
+    applyNullableStringField(body, patch, "subscriptionStatus") ??
+    applyClearOperatorSeatOverrideField(body, patch);
   if (err) {
     return { error: err };
   }
@@ -237,35 +257,11 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  if ("seatLimit" in parsed && isTowerBillingEnabled()) {
-    const [billingRow] = await db
-      .select({ stripeSubscriptionId: organization.stripeSubscriptionId })
-      .from(organization)
-      .where(eq(organization.id, orgId))
-      .limit(1);
-    if (billingRow?.stripeSubscriptionId) {
-      return NextResponse.json({ error: "seat_limit_managed_by_stripe" }, { status: 409 });
-    }
+  const applied = await applyOperatorWorkspacePatch(orgId, parsed);
+  if (!applied.ok) {
+    return NextResponse.json({ error: applied.error }, { status: applied.status });
   }
 
-  const updates: Record<string, unknown> = { ...parsed };
-  Object.assign(updates, usageLimitsPatchToDbUpdates(parsed));
-
-  if ("slug" in updates) {
-    const slugPatch = await resolveWorkspaceSlugPatch(orgId, updates.slug);
-    if (!slugPatch.ok) {
-      return NextResponse.json({ error: slugPatch.error }, { status: slugPatch.status });
-    }
-    if (!slugPatch.changed) {
-      delete updates.slug;
-    } else {
-      updates.slug = slugPatch.slug;
-    }
-  }
-
-  if (Object.keys(updates).length > 0) {
-    await db.update(organization).set(updates).where(eq(organization.id, orgId));
-  }
   const detail = await fetchWorkspaceDetail(orgId);
   if (!detail) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });

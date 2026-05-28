@@ -5,6 +5,7 @@ import {
   IconBan,
   IconBuilding,
   IconCheck,
+  IconCreditCard,
   IconDeviceDesktop,
   IconMail,
   IconShieldCheck,
@@ -22,7 +23,11 @@ import {
   initialsFor,
   userAgentSummary,
 } from "@/features/operator/model/format";
-import { OperatorDetailSheetSkeleton } from "@/features/operator/ui/operator-detail-sheet-skeleton";
+import {
+  OperatorDetailSheetAccessibleTitle,
+  OperatorDetailSheetSkeleton,
+} from "@/features/operator/ui/operator-detail-sheet-skeleton";
+import { OperatorStripeBillingMeta } from "@/features/operator/ui/operator-stripe-billing-meta";
 import {
   OperatorUsageLimitsSection,
   reloadUserUsageLimits,
@@ -87,6 +92,12 @@ function detailToRow(d: OperatorUserDetail): OperatorUserRow {
     banReason: d.banReason,
     banExpires: d.banExpires,
     canCreateOrganization: d.canCreateOrganization,
+    subscriptionPlan: d.subscriptionPlan,
+    subscriptionStatus: d.subscriptionStatus,
+    stripeCustomerId: d.stripeCustomerId,
+    stripeSubscriptionId: d.stripeSubscriptionId,
+    billingManagedByStripe: d.billingManagedByStripe,
+    hasStripePro: d.hasStripePro,
     webflowConnected: d.webflowConnected,
     memberships: d.memberships,
     usage: d.usage,
@@ -277,7 +288,7 @@ function OperatorCustomerDetailSheetBody(props: OperatorCustomerDetailSheetBodyP
         </>
       );
     }
-    return null;
+    return <OperatorDetailSheetAccessibleTitle title="Customer details" />;
   }
 
   const detail = state.detail;
@@ -315,6 +326,12 @@ function OperatorCustomerDetailSheetBody(props: OperatorCustomerDetailSheetBodyP
                   Banned
                 </Badge>
               ) : null}
+              {detail.hasStripePro ? (
+                <Badge variant="secondary">
+                  <IconCreditCard className="size-3" />
+                  Stripe Pro
+                </Badge>
+              ) : null}
             </div>
           </div>
         </div>
@@ -334,6 +351,7 @@ function OperatorCustomerDetailSheetBody(props: OperatorCustomerDetailSheetBodyP
           onToggleRole={onToggleRole}
           onToggleEligibility={onToggleEligibility}
         />
+        <CustomerBillingSection detail={detail} />
         <ModerationSection
           detail={detail}
           banReasonDraft={state.banReasonDraft}
@@ -392,6 +410,39 @@ function OperatorCustomerDetailSheetBody(props: OperatorCustomerDetailSheetBodyP
         </Button>
       </SheetFooter>
     </>
+  );
+}
+
+function CustomerBillingSection({ detail }: { detail: OperatorUserDetail }) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Billing</h3>
+      <div className="space-y-3 rounded-lg border border-border bg-card p-3">
+        {detail.billingManagedByStripe ? (
+          <p className="text-xs text-muted-foreground">
+            Individual Pro plan and subscription status sync from Stripe webhooks.
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No active Stripe subscription. Grant Pro entitlements via workspace billing or ops overrides.
+          </p>
+        )}
+        <dl className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <dt className="text-muted-foreground">Plan</dt>
+            <dd className="font-mono text-foreground">{detail.subscriptionPlan ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Subscription status</dt>
+            <dd className="font-mono text-foreground">{detail.subscriptionStatus ?? "—"}</dd>
+          </div>
+        </dl>
+        <OperatorStripeBillingMeta
+          stripeCustomerId={detail.stripeCustomerId}
+          stripeSubscriptionId={detail.stripeSubscriptionId}
+        />
+      </div>
+    </section>
   );
 }
 

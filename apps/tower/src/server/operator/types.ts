@@ -100,6 +100,12 @@ export type OperatorUserRow = {
   banExpires: string | null;
   canCreateOrganization: boolean;
   webflowConnected: boolean;
+  subscriptionPlan: string | null;
+  subscriptionStatus: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  billingManagedByStripe: boolean;
+  hasStripePro: boolean;
   memberships: number;
   usage: OperatorUsageLimitsView;
   createdAt: string;
@@ -138,6 +144,8 @@ export type OperatorUserDetail = OperatorUserRow & {
   activeSessions: OperatorUserSession[];
 };
 
+export type OperatorWorkspaceBillingMode = "free" | "stripe_team" | "legacy_paid";
+
 export type OperatorWorkspaceRow = {
   id: string;
   name: string;
@@ -151,6 +159,15 @@ export type OperatorWorkspaceRow = {
   subscriptionStatus: string | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
+  billingMode: OperatorWorkspaceBillingMode;
+  billingManagedByStripe: boolean;
+  isProEntitled: boolean;
+  displayBillingPlan: string | null;
+  planLabel: string;
+  canOperatorEditBilling: boolean;
+  canOperatorEditSeatLimit: boolean;
+  operatorSeatLimitOverride: boolean;
+  stripeSeatQuantity: number | null;
   memberCount: number;
   pendingInvitations: number;
   usage: OperatorUsageLimitsView;
@@ -204,4 +221,6 @@ export type OperatorWorkspacePatch = OperatorUsageLimitsPatch & {
   seatLimit?: number | null;
   billingPlan?: string | null;
   subscriptionStatus?: string | null;
+  operatorSeatLimitOverride?: boolean;
+  clearOperatorSeatOverride?: boolean;
 };

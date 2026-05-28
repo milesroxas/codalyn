@@ -141,6 +141,10 @@ export const organization = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     /** Nullable cap on members; null means unpaid solo workspace (see `TEAM_UNPAID_SEAT_CAP`). Set from Stripe team billing. */
     seatLimit: integer("seat_limit"),
+    /** Last known per-seat quantity on the Stripe subscription (paid seats); not raised by operator grants. */
+    stripeSeatQuantity: integer("stripe_seat_quantity"),
+    /** When true, seat cap is operator-granted and Stripe quantity sync must not change billing or seat_limit. */
+    operatorSeatLimitOverride: boolean("operator_seat_limit_override").default(false).notNull(),
     /** When false, members bypass monthly usage metering while this workspace is active (operator override). */
     meteringEnabled: boolean("metering_enabled").default(true).notNull(),
     /** Operator override for member Webflow proxy cap when this workspace is active; null uses tier/user default. */

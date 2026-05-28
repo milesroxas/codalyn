@@ -7,6 +7,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconCircleCheck,
+  IconCreditCard,
   IconMail,
   IconMailCheck,
   IconRefresh,
@@ -371,7 +372,7 @@ function CustomerRow({
   selected: boolean;
   onOpen: (id: string) => void;
 }) {
-  const noFlags = !user.banned && !user.canCreateOrganization && !user.emailVerified;
+  const noFlags = !user.banned && !user.canCreateOrganization && !user.emailVerified && !user.hasStripePro;
   return (
     <TableRow className="cursor-pointer" onClick={() => onOpen(user.id)} data-state={selected ? "selected" : undefined}>
       <TableCell>
@@ -407,6 +408,12 @@ function CustomerRow({
             <Badge variant="outline" className="gap-1">
               <IconCircleCheck className="size-3" />
               Eligible
+            </Badge>
+          ) : null}
+          {user.hasStripePro ? (
+            <Badge variant="secondary" className="gap-1">
+              <IconCreditCard className="size-3" />
+              Stripe Pro
             </Badge>
           ) : null}
           <VerifiedBadge verified={user.emailVerified} />

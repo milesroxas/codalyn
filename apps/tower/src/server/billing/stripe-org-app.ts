@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
+import { resolveOrganizationSeatLimitAfterStripeQuantity } from "@/server/billing/organization-seat-override";
 import { isStripeSubscriptionProEntitled } from "@/server/billing/stripe-subscription-status";
 import { getStripePriceTeamSeat, TEAM_BILLING_PLAN } from "@/server/billing/team-billing-config";
 import { db } from "@/shared/lib/db";
@@ -37,7 +38,27 @@ export function readSubscriptionSeatQuantity(sub: Stripe.Subscription): number |
 export async function applyStripeSubscriptionToOrganization(sub: Stripe.Subscription, towerOrgId: string) {
   const entitled = isStripeSubscriptionProEntitled(sub.status);
   const customer = customerIdFrom(sub.customer);
-  const seatLimit = entitled ? readSubscriptionSeatQuantity(sub) : null;
+  const stripeSeatQuantity = entitled ? readSubscriptionSeatQuantity(sub) : null;
+
+  const [existing] = await db
+    .select({
+      seatLimit: organization.seatLimit,
+      operatorSeatLimitOverride: organization.operatorSeatLimitOverride,
+      stripeSeatQuantity: organization.stripeSeatQuantity,
+    })
+    .from(organization)
+    .where(eq(organization.id, towerOrgId))
+    .limit(1);
+
+  const seatLimit = resolveOrganizationSeatLimitAfterStripeQuantity(
+    {
+      seatLimit: existing?.seatLimit ?? null,
+      operatorSeatLimitOverride: existing?.operatorSeatLimitOverride ?? false,
+      stripeSeatQuantity: existing?.stripeSeatQuantity ?? null,
+    },
+    stripeSeatQuantity,
+    entitled
+  );
 
   await db
     .update(organization)
@@ -46,7 +67,9 @@ export async function applyStripeSubscriptionToOrganization(sub: Stripe.Subscrip
       stripeSubscriptionId: entitled ? sub.id : null,
       subscriptionStatus: sub.status,
       billingPlan: entitled ? TEAM_BILLING_PLAN : null,
-      seatLimit: entitled ? seatLimit : null,
+      stripeSeatQuantity: entitled ? stripeSeatQuantity : null,
+      seatLimit,
+      operatorSeatLimitOverride: entitled ? (existing?.operatorSeatLimitOverride ?? false) : false,
     })
     .where(eq(organization.id, towerOrgId));
 }
@@ -58,7 +81,9 @@ export async function clearStripeOrganizationSubscription(towerOrgId: string) {
       billingPlan: null,
       subscriptionStatus: "canceled",
       stripeSubscriptionId: null,
+      stripeSeatQuantity: null,
       seatLimit: null,
+      operatorSeatLimitOverride: false,
     })
     .where(eq(organization.id, towerOrgId));
 }

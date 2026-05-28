@@ -6,56 +6,18 @@ import { formatInvitationExpiry } from "@/features/team/lib/workspace-invitation
 import { getInviteSeatUiState, type WorkspaceSeatState } from "@/features/team/lib/workspace-seat-state";
 import type { InvitationRow } from "@/features/team/model/workspace-types";
 import { InvitationRowActions } from "@/features/team/ui/invitation-row-actions";
+import { InviteSeatLimitMessages, WorkspaceInviteFields } from "@/features/team/ui/workspace-invite-form-fields";
 import { WorkspaceInvitesUpsellState } from "@/features/team/ui/workspace-invites-upsell";
 import {
   formatTowerInvitationStatusLabel,
   TOWER_INVITATION_STATUS,
 } from "@/shared/lib/membership/tower-invitation-status";
-import { TOWER_TEAM_ROLES } from "@/shared/lib/membership/tower-organization-access";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import {
-  FormField,
-  FormFieldAction,
-  FormFieldActionLabelSpacer,
-  FormFieldGrid,
-  FormInlineLayout,
-} from "@/shared/ui/form-field";
-import { Input } from "@/shared/ui/input";
-import { Label } from "@/shared/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { FormFieldAction, FormFieldActionLabelSpacer, FormFieldGrid, FormInlineLayout } from "@/shared/ui/form-field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { TabsContent } from "@/shared/ui/tabs";
-
-function InviteSeatLimitMessages(props: {
-  seatState: WorkspaceSeatState;
-  inviteBlocked: boolean;
-  showTeamUpgradeHint: boolean;
-}) {
-  const { seatState, inviteBlocked, showTeamUpgradeHint } = props;
-
-  if (seatState.isOverSeatCap) {
-    return (
-      <p className="text-sm text-destructive">
-        Seat limit exceeded. Remove members or resubscribe on Billing before inviting.
-      </p>
-    );
-  }
-  if (showTeamUpgradeHint) {
-    return (
-      <p className="text-sm text-muted-foreground">Free includes one seat. Upgrade on Billing to invite others.</p>
-    );
-  }
-  if (inviteBlocked) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        At seat limit ({seatState.effectiveSeatLimit}). Free a seat or upgrade on Billing to invite.
-      </p>
-    );
-  }
-  return null;
-}
 
 export function WorkspaceInvitesTab(props: {
   busy: boolean;
@@ -68,7 +30,7 @@ export function WorkspaceInvitesTab(props: {
   canManageBilling: boolean;
   onInviteEmailChange: (v: string) => void;
   onInviteRoleChange: (v: string) => void;
-  onInvite: (e: FormEvent) => void;
+  onInvite: (e: FormEvent) => boolean | undefined | Promise<boolean | undefined>;
   onResendInvite: (inv: InvitationRow) => void;
   onRequestRevoke: (inv: InvitationRow) => void;
   onRequestDelete: (inv: InvitationRow) => void;
@@ -132,34 +94,15 @@ export function WorkspaceInvitesTab(props: {
           >
             <FormInlineLayout>
               <FormFieldGrid grow>
-                <FormField>
-                  <Label htmlFor={emailFieldId}>Email</Label>
-                  <Input
-                    id={emailFieldId}
-                    type="email"
-                    autoComplete="email"
-                    placeholder="colleague@company.com"
-                    value={inviteEmail}
-                    onChange={(ev) => onInviteEmailChange(ev.target.value)}
-                    required
-                    disabled={inviteBlocked}
-                  />
-                </FormField>
-                <FormField>
-                  <Label htmlFor={roleFieldId}>Role</Label>
-                  <Select value={inviteRole} onValueChange={onInviteRoleChange} disabled={inviteBlocked}>
-                    <SelectTrigger id={roleFieldId} aria-label="Role">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TOWER_TEAM_ROLES.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormField>
+                <WorkspaceInviteFields
+                  emailFieldId={emailFieldId}
+                  roleFieldId={roleFieldId}
+                  inviteEmail={inviteEmail}
+                  inviteRole={inviteRole}
+                  inviteBlocked={inviteBlocked}
+                  onInviteEmailChange={onInviteEmailChange}
+                  onInviteRoleChange={onInviteRoleChange}
+                />
               </FormFieldGrid>
               <FormFieldAction>
                 <FormFieldActionLabelSpacer />

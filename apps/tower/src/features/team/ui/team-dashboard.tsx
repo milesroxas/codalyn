@@ -150,12 +150,12 @@ export function TeamDashboard(props: {
     setError(null);
     const email = inviteEmail.trim().toLowerCase();
     if (!email) {
-      return;
+      return false;
     }
     const role = parseTowerTeamRole(inviteRole);
     if (!role) {
       toast.error("Invalid role");
-      return;
+      return false;
     }
     setBusy(true);
     const res = await authClient.organization.inviteMember({
@@ -167,11 +167,12 @@ export function TeamDashboard(props: {
       const msg = res.error.message ?? "Could not send invite";
       setError(msg);
       toast.error(msg);
-      return;
+      return false;
     }
     setInviteEmail("");
     await refreshTeam();
     toast.success("Invitation sent");
+    return true;
   };
 
   const onResendInvite = async (inv: InvitationRow) => {

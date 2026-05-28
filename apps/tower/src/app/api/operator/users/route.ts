@@ -1,5 +1,6 @@
 import { and, count, desc, eq, ilike, or, type SQL, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { mapOperatorUserBillingFields } from "@/server/operator/operator-billing";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorUserListResponse, OperatorUserRow } from "@/server/operator/types";
 import { defaultOperatorUserUsageLimits, fetchOperatorUserUsageLimits } from "@/server/operator/usage-limits";
@@ -98,6 +99,10 @@ export async function GET(req: Request): Promise<NextResponse<OperatorUserListRe
         banReason: user.banReason,
         banExpires: user.banExpires,
         canCreateOrganization: user.canCreateOrganization,
+        subscriptionPlan: user.subscriptionPlan,
+        subscriptionStatus: user.subscriptionStatus,
+        stripeCustomerId: user.stripeCustomerId,
+        stripeSubscriptionId: user.stripeSubscriptionId,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
         webflowConnected: sql<boolean>`EXISTS(SELECT 1 FROM ${member} m INNER JOIN ${organizationWebflowOAuthToken} w ON w."organization_id" = m."organization_id" WHERE m."user_id" = "user"."id")`,
@@ -134,6 +139,12 @@ export async function GET(req: Request): Promise<NextResponse<OperatorUserListRe
       banReason: r.banReason ?? null,
       banExpires: r.banExpires ? toIso(r.banExpires) : null,
       canCreateOrganization: Boolean(r.canCreateOrganization),
+      ...mapOperatorUserBillingFields({
+        subscriptionPlan: r.subscriptionPlan ?? null,
+        subscriptionStatus: r.subscriptionStatus ?? null,
+        stripeCustomerId: r.stripeCustomerId ?? null,
+        stripeSubscriptionId: r.stripeSubscriptionId ?? null,
+      }),
       webflowConnected: Boolean(r.webflowConnected),
       memberships: Number(r.memberships ?? 0),
       usage: usageByUserId.get(r.id) ?? (await defaultOperatorUserUsageLimits()),

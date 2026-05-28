@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prepareUserAccountDeletion, UserAccountDeletionBlockedError } from "@/server/membership/user-account-deletion";
+import { mapOperatorUserBillingFields } from "@/server/operator/operator-billing";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorUserDetail, OperatorUserPatch } from "@/server/operator/types";
 import {
@@ -41,6 +42,10 @@ async function fetchUserDetail(userId: string): Promise<OperatorUserDetail | nul
       banReason: user.banReason,
       banExpires: user.banExpires,
       canCreateOrganization: user.canCreateOrganization,
+      subscriptionPlan: user.subscriptionPlan,
+      subscriptionStatus: user.subscriptionStatus,
+      stripeCustomerId: user.stripeCustomerId,
+      stripeSubscriptionId: user.stripeSubscriptionId,
       image: user.image,
       webflowAuthorizedUserId: user.webflowAuthorizedUserId,
       createdAt: user.createdAt,
@@ -98,6 +103,12 @@ async function fetchUserDetail(userId: string): Promise<OperatorUserDetail | nul
     banReason: row.banReason ?? null,
     banExpires: toIso(row.banExpires),
     canCreateOrganization: Boolean(row.canCreateOrganization),
+    ...mapOperatorUserBillingFields({
+      subscriptionPlan: row.subscriptionPlan ?? null,
+      subscriptionStatus: row.subscriptionStatus ?? null,
+      stripeCustomerId: row.stripeCustomerId ?? null,
+      stripeSubscriptionId: row.stripeSubscriptionId ?? null,
+    }),
     image: row.image ?? null,
     webflowAuthorizedUserId: row.webflowAuthorizedUserId ?? null,
     webflowConnected: webflowConnected.length > 0,

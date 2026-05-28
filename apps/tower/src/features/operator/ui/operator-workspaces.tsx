@@ -327,7 +327,7 @@ function WorkspaceRow({
   selected: boolean;
   onOpen: (id: string) => void;
 }) {
-  const hasBilling = Boolean(workspace.billingPlan || workspace.subscriptionStatus);
+  const planLabel = workspace.planLabel;
   return (
     <TableRow
       className="cursor-pointer"
@@ -347,14 +347,17 @@ function WorkspaceRow({
       </TableCell>
       <TableCell>
         <div className="flex flex-wrap gap-1">
-          {workspace.billingPlan ? (
-            <Badge variant="secondary" className="gap-1">
+          {workspace.isOverSeatCap ? (
+            <Badge variant="destructive">Over limit</Badge>
+          ) : (
+            <Badge variant={workspace.billingMode === "free" ? "outline" : "secondary"} className="gap-1">
               <IconCreditCard className="size-3" />
-              {workspace.billingPlan}
+              {planLabel}
             </Badge>
+          )}
+          {workspace.subscriptionStatus && workspace.billingMode !== "free" ? (
+            <Badge variant="outline">{workspace.subscriptionStatus}</Badge>
           ) : null}
-          {workspace.subscriptionStatus ? <Badge variant="outline">{workspace.subscriptionStatus}</Badge> : null}
-          {!hasBilling ? <span className="text-xs text-muted-foreground">—</span> : null}
         </div>
       </TableCell>
       <TableCell className="text-right text-sm tabular-nums text-foreground">

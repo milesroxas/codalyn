@@ -11,7 +11,8 @@ import {
   IconStarFilled,
 } from "@tabler/icons-react";
 import Link from "next/link";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
+import { sortWorkspacesWithPreferredFirst } from "@/features/team/lib/sort-workspaces-with-preferred-first";
 import { CreateWorkspaceDialog } from "@/features/team/ui/create-workspace-dialog";
 import { Button } from "@/shared/ui/button";
 import {
@@ -97,7 +98,10 @@ export function TeamWorkspaceSwitcher(props: {
 }) {
   const [createOpen, setCreateOpen] = useState(false);
 
-  const list = props.orgs ?? [];
+  const list = useMemo(
+    () => sortWorkspacesWithPreferredFirst(props.orgs ?? [], props.preferredOrgId),
+    [props.orgs, props.preferredOrgId]
+  );
   const disabled = props.busy || props.orgsPending;
   const showOrgsPending = useDeferredLoadingIndicator(props.orgsPending);
 

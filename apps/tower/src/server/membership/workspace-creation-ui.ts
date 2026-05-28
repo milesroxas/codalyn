@@ -13,8 +13,9 @@ export type WorkspaceCreationUiEligibility = UserWorkspaceCreationEligibility & 
 
 /**
  * Server-side gate for workspace creation UI. Team membership alone never enables
- * creating another owned workspace; viewing a paid Team workspace hides create unless
- * the user has individual Pro.
+ * creating another owned workspace. While viewing a paid Team workspace without
+ * individual Pro, hide create only after the user already has a free-tier owned
+ * workspace — invited editors with zero owned workspaces may still create one.
  */
 export async function resolveWorkspaceCreationUiEligibility(
   userId: string,
@@ -28,7 +29,8 @@ export async function resolveWorkspaceCreationUiEligibility(
   const viewingTeamWorkspaceWithoutPro =
     entitlement.tier === "team" && entitlement.source === "workspace_team" && !eligibility.hasIndividualPro;
 
-  const canShowInSwitcher = eligibility.canCreate && !viewingTeamWorkspaceWithoutPro;
+  const suppressCreateWhileViewingTeam = viewingTeamWorkspaceWithoutPro && eligibility.ownedWorkspaceCount > 0;
+  const canShowInSwitcher = eligibility.canCreate && !suppressCreateWhileViewingTeam;
 
   return {
     ...eligibility,

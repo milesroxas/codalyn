@@ -176,8 +176,12 @@ function TowerWorkspaceCreateWorkspacePanel({
       // ignore storage failures
     }
     await Promise.all([refetchOrgs(), refetchActiveOrg()]);
-    toast.success("Workspace created");
     router.refresh();
+    if (!result.activated) {
+      toast.warning("Workspace created. Switch to it from the workspace menu to see your own usage limits.");
+    } else {
+      toast.success("Workspace created");
+    }
     return true;
   }
 
@@ -223,6 +227,7 @@ function TowerWorkspaceOnboardingBannerInner({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: orgs, isPending: orgsPending } = authClient.useListOrganizations();
+  const { data: activeOrg } = authClient.useActiveOrganization();
   const membershipCount = effectiveWorkspaceMembershipCount(
     summary.workspaceMembershipCount,
     orgs?.length,
@@ -231,7 +236,7 @@ function TowerWorkspaceOnboardingBannerInner({
   const gateSummary = { ...summary, workspaceMembershipCount: membershipCount };
   const { canCreateWorkspace, showUpgradeForAnotherWorkspace } = useWorkspaceCreationEligibility({
     serverCanCreate: summary.canCreateOrganization,
-    refetchKey: `${membershipCount}:${orgs?.length ?? 0}`,
+    refetchKey: `${membershipCount}:${orgs?.length ?? 0}:${activeOrg?.id ?? ""}`,
   });
   const onWebflowConnectSuccess = useCallback(() => {
     router.refresh();

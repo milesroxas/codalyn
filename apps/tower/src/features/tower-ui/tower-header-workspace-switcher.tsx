@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
@@ -25,6 +26,7 @@ function pickAutoWorkspaceId(orgList: { id: string }[], preferred: string | null
 }
 
 export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; canCreateWorkspace: boolean }) {
+  const router = useRouter();
   const { data: session, isPending: sessionPending, refetch: refetchSession } = authClient.useSession();
   const { data: orgs, isPending: orgsPending, refetch: refetchOrgs } = authClient.useListOrganizations();
   const {
@@ -40,7 +42,8 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
 
   const refreshTeam = useCallback(async () => {
     await Promise.all([refetchOrgs(), refetchActiveOrg()]);
-  }, [refetchOrgs, refetchActiveOrg]);
+    router.refresh();
+  }, [refetchOrgs, refetchActiveOrg, router]);
 
   const preferredOrgId = (session?.user as SessionUserWithPreferred | undefined)?.preferredOrganizationId ?? undefined;
   const orgList = orgs ?? [];
@@ -103,7 +106,11 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
     }
     setOrgName("");
     await refreshTeam();
-    toast.success("Team created");
+    if (!result.activated) {
+      toast.warning("Workspace created. Switch to it from the workspace menu to see your own usage limits.");
+    } else {
+      toast.success("Workspace created");
+    }
     return true;
   };
 

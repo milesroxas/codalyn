@@ -5,6 +5,7 @@ import {
   activeUsageTierLabel,
   usageLimitsKindBadgeLabel,
   usageLimitsPlanLabel,
+  usagePlanBadgeLabel,
 } from "@/shared/lib/usage-display";
 import { Badge } from "@/shared/ui/badge";
 
@@ -12,22 +13,33 @@ type UsagePlanBadgesProps = {
   tier: "free" | "pro" | "team";
   limitsKind: TowerUsageLimitsKind;
   entitlementSource?: TowerEntitlement["source"];
+  /** When false, omits individual subscription badge (e.g. dashboard usage card). */
+  showAccountBadge?: boolean;
+  /** `plan` for usage cards; `limits` for account/billing summary. */
+  tierBadgeStyle?: "limits" | "plan";
 };
 
 export function UsagePlanBadges(props: UsagePlanBadgesProps) {
-  const { tier, limitsKind, entitlementSource } = props;
+  const { tier, limitsKind, entitlementSource, showAccountBadge = true, tierBadgeStyle = "limits" } = props;
   const limitsLabel = usageLimitsKindBadgeLabel(limitsKind, tier);
   const source = entitlementSource ?? "none";
   const accountLabel = accountSubscriptionPlanLabel({ tier, source });
-  const usageLabel = usageLimitsPlanLabel(tier);
+  const usageLabel = tierBadgeStyle === "plan" ? usagePlanBadgeLabel(tier) : usageLimitsPlanLabel(tier);
   const contextLabel = source === "workspace_team" ? activeUsageTierLabel({ tier, source }) : null;
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Badge variant="secondary">Account: {accountLabel}</Badge>
+      {showAccountBadge ? <Badge variant="secondary">Account: {accountLabel}</Badge> : null}
       <Badge variant="outline">{usageLabel}</Badge>
       {contextLabel ? <Badge variant="outline">Active: {contextLabel}</Badge> : null}
       {limitsLabel ? <Badge variant="outline">{limitsLabel}</Badge> : null}
     </div>
   );
+}
+
+/** Plan badges for usage meters — active workspace tier only. */
+export function UsageLimitsBadges(
+  props: Omit<UsagePlanBadgesProps, "showAccountBadge" | "entitlementSource" | "tierBadgeStyle">
+) {
+  return <UsagePlanBadges {...props} showAccountBadge={false} tierBadgeStyle="plan" />;
 }

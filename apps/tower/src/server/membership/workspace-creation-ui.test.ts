@@ -13,10 +13,23 @@ import { resolveUserWorkspaceCreationEligibility } from "@/server/membership/use
 import { resolveWorkspaceCreationUiEligibility } from "@/server/membership/workspace-creation-ui";
 
 describe("resolveWorkspaceCreationUiEligibility", () => {
-  it("hides switcher create while viewing a Team workspace without individual Pro", async () => {
+  it("shows switcher create for invited Team members with no owned workspace", async () => {
     vi.mocked(resolveUserWorkspaceCreationEligibility).mockResolvedValue({
       canCreate: true,
       ownedWorkspaceCount: 0,
+      hasIndividualPro: false,
+    });
+    vi.mocked(resolveTowerEntitlement).mockResolvedValue({ tier: "team", source: "workspace_team" });
+
+    const result = await resolveWorkspaceCreationUiEligibility("user-1", "org-team");
+    expect(result.canShowInSwitcher).toBe(true);
+    expect(result.viewingTeamWorkspaceWithoutPro).toBe(true);
+  });
+
+  it("hides switcher create while viewing a Team workspace after free owned workspace", async () => {
+    vi.mocked(resolveUserWorkspaceCreationEligibility).mockResolvedValue({
+      canCreate: false,
+      ownedWorkspaceCount: 1,
       hasIndividualPro: false,
     });
     vi.mocked(resolveTowerEntitlement).mockResolvedValue({ tier: "team", source: "workspace_team" });

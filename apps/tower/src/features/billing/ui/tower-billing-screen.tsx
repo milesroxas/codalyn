@@ -9,6 +9,7 @@ import {
   buildBillingPlanPresentation,
   usageLimitsKindDetailLine,
   usageLimitsPlanLabel,
+  usagePlanBadgeLabel,
 } from "@/shared/lib/usage-display";
 import { Button } from "@/shared/ui/button";
 import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -128,9 +129,8 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
 
       <TowerUsageSection
         status={usageStatus}
-        entitlementSource={entitlement.source}
         title="This month"
-        description={`Usage against ${usageLimitsPlanLabel(entitlement.tier).toLowerCase()} for your active workspace.`}
+        description={`Usage against ${usagePlanBadgeLabel(usageStatus.tier).toLowerCase()} for your active workspace.`}
       />
     </TowerPageMain>
   );

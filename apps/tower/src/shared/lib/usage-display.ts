@@ -28,6 +28,11 @@ export function usageLimitsPlanLabel(tier: TowerUsageTier): string {
   return `${usageTierLabel(tier)} limits`;
 }
 
+/** Short tier label for usage meter cards (follows active workspace). */
+export function usagePlanBadgeLabel(tier: TowerUsageTier): string {
+  return `${usageTierLabel(tier)} plan`;
+}
+
 export function meteringStatusLabel(opts: {
   meteringEnabled: boolean;
   globalMeteringDisabled: boolean;

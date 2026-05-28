@@ -1,8 +1,7 @@
 import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
 import { towerUsageLimitResetDetailLine } from "@codalyn/webflow-kit";
 import Link from "next/link";
-import { UsagePlanBadges } from "@/features/billing/ui/usage-plan-badges";
-import type { TowerEntitlement } from "@/server/billing/entitlements";
+import { UsageLimitsBadges } from "@/features/billing/ui/usage-plan-badges";
 import { usageLimitsKindDetailLine } from "@/shared/lib/usage-display";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -10,8 +9,6 @@ import { UsageMeterRow } from "@/shared/ui/usage-meter-row";
 
 type TowerUsageSectionProps = {
   status: TowerUsageStatusSnapshot;
-  /** When set, plan badges distinguish workspace Team from individual Pro. */
-  entitlementSource?: TowerEntitlement["source"];
   billingEnabled?: boolean;
   showBillingLink?: boolean;
   fillHeight?: boolean;
@@ -22,7 +19,6 @@ type TowerUsageSectionProps = {
 export function TowerUsageSection(props: TowerUsageSectionProps) {
   const {
     status,
-    entitlementSource,
     billingEnabled = false,
     showBillingLink = false,
     fillHeight = false,
@@ -42,7 +38,7 @@ export function TowerUsageSection(props: TowerUsageSectionProps) {
             <CardDescription>{description}</CardDescription>
             {limitsDetail ? <p className="text-xs text-muted-foreground">{limitsDetail}</p> : null}
           </div>
-          <UsagePlanBadges tier={status.tier} entitlementSource={entitlementSource} limitsKind={status.limitsKind} />
+          <UsageLimitsBadges tier={status.tier} limitsKind={status.limitsKind} />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

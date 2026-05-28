@@ -5,6 +5,7 @@ import type * as React from "react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
+import { Skeleton } from "@/shared/ui/skeleton";
 
 const surfaceSummaryCardVariants = cva("flex min-w-0 flex-col gap-2 rounded-sm border px-3 py-2.5 text-left", {
   variants: {
@@ -541,6 +542,40 @@ function SurfaceSummaryCardSurfaceDisplay({
   );
 }
 
+const surfaceSummaryCardSurfaceDisplaySkeletonIconClass =
+  "size-9 shrink-0 rounded-sm border border-border/70 bg-muted/40";
+const surfaceSummaryCardSurfaceDisplaySkeletonTitleClass = "h-4 w-[min(100%,12rem)] rounded-sm";
+const surfaceSummaryCardSurfaceDisplaySkeletonMetaClass = "h-2.5 w-[min(100%,10rem)] rounded-sm";
+const surfaceSummaryCardSurfaceDisplaySkeletonHintMetaClass = "h-3 w-[min(100%,8rem)] rounded-sm";
+
+type SurfaceSummaryCardSurfaceDisplaySkeletonProps = {
+  /** Mirrors optional third meta line on the loaded surface display (e.g. slot list). */
+  showSlotList?: boolean;
+  loadingLabel: string;
+};
+
+function SurfaceSummaryCardSurfaceDisplaySkeleton(props: SurfaceSummaryCardSurfaceDisplaySkeletonProps) {
+  const { showSlotList = false, loadingLabel } = props;
+
+  return (
+    <SurfaceSummaryCardSurfaceDisplay
+      contained
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      data-slot="surface-summary-card-surface-display-skeleton"
+    >
+      <span className="sr-only">{loadingLabel}</span>
+      <Skeleton className={surfaceSummaryCardSurfaceDisplaySkeletonIconClass} />
+      <SurfaceSummaryCardIconRowCopy>
+        <Skeleton className={surfaceSummaryCardSurfaceDisplaySkeletonTitleClass} />
+        <Skeleton className={surfaceSummaryCardSurfaceDisplaySkeletonMetaClass} />
+        {showSlotList ? <Skeleton className={surfaceSummaryCardSurfaceDisplaySkeletonHintMetaClass} /> : null}
+      </SurfaceSummaryCardIconRowCopy>
+    </SurfaceSummaryCardSurfaceDisplay>
+  );
+}
+
 function SurfaceSummaryCardSelectRowList({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -719,6 +754,7 @@ export {
   SurfaceSummaryCardSelectRowList,
   SurfaceSummaryCardSurfaceActionsMenu,
   SurfaceSummaryCardSurfaceDisplay,
+  SurfaceSummaryCardSurfaceDisplaySkeleton,
   SurfaceSummaryCardSurfaceSummary,
   SurfaceSummaryCardTitle,
 };

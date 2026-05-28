@@ -103,6 +103,7 @@ import {
   listSiteComponentsForPicker,
   removeComponentInstanceFromCanvas,
 } from "@/features/cms-slots/model/site-components";
+import { useCmsComposerEditingContextState } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotsRouteChrome } from "@/features/cms-slots/ui/cms-slots-route-chrome";
 import {
@@ -395,6 +396,58 @@ type LoadComposerEligibleOptions = {
   refreshRuntime?: boolean;
   runtime?: CmsSlotPageRuntimeSyncStatus;
 };
+
+async function refreshComposerEligibleLists(args: {
+  pageBeacons: CmsSlotListOnPage[];
+  opts?: LoadComposerEligibleOptions;
+  pageRuntimeSyncedRef: MutableRefObject<boolean>;
+  pageRuntimeSyncReasonRef: MutableRefObject<string | undefined>;
+  applyPageRuntimeSyncStatus: (runtime: CmsSlotPageRuntimeSyncStatus) => void;
+  setPageBeacons: (beacons: CmsSlotListOnPage[]) => void;
+  setComposerEligible: (eligible: CmsSlotListOnPage[]) => void;
+  setComposerRuntimeOk: (runtimeOk: boolean) => void;
+}): Promise<void> {
+  const {
+    pageBeacons,
+    opts,
+    pageRuntimeSyncedRef,
+    pageRuntimeSyncReasonRef,
+    applyPageRuntimeSyncStatus,
+    setPageBeacons,
+    setComposerEligible,
+    setComposerRuntimeOk,
+  } = args;
+
+  try {
+    let beacons = pageBeacons;
+    if (opts?.rescanLists) {
+      beacons = await findCmsSlotListsOnPage();
+      setPageBeacons(beacons);
+    }
+
+    let runtime: CmsSlotPageRuntimeSyncStatus | undefined = opts?.runtime;
+    if (runtime == null) {
+      runtime = opts?.refreshRuntime
+        ? await getCmsSlotPageRuntimeSyncStatus()
+        : {
+            synced: pageRuntimeSyncedRef.current,
+            reason: pageRuntimeSyncReasonRef.current,
+          };
+    }
+    if (opts?.refreshRuntime || opts?.runtime != null) {
+      applyPageRuntimeSyncStatus(runtime);
+    }
+
+    const r = await listComposerEligibleLists(beacons, runtime);
+    setComposerEligible(r.eligible);
+    setComposerRuntimeOk(r.runtimeOk);
+  } catch {
+    setComposerEligible([]);
+    setComposerRuntimeOk(false);
+    const runtime = await getCmsSlotPageRuntimeSyncStatus();
+    applyPageRuntimeSyncStatus(runtime);
+  }
+}
 
 function useDebounceComponentCatalog(picking: boolean, componentQuery: string, runCatalogLoad: (q: string) => void) {
   useEffect(() => {
@@ -773,7 +826,7 @@ export function CmsSlotsScreen() {
 
   const isEngine = segment === "engine";
   const isComposer = segment === "composer";
-  const [composerEligibleLoading, setComposerEligibleLoading] = useState(isComposer);
+  const [composerEligibleLoading, setComposerEligibleLoading] = useState(false);
   const [composerEligibleResolved, setComposerEligibleResolved] = useState(false);
   const [composerEligible, setComposerEligible] = useState<CmsSlotListOnPage[]>([]);
   const [composerRuntimeOk, setComposerRuntimeOk] = useState(false);
@@ -792,11 +845,18 @@ export function CmsSlotsScreen() {
   const [composerSavePending, setComposerSavePending] = useState(false);
   const [composerLeaveDialogOpen, setComposerLeaveDialogOpen] = useState(false);
   const [currentCmsItemId, setCurrentCmsItemId] = useState<string | null>(null);
+  const composerEditingContext = useCmsComposerEditingContextState({
+    enabled: isComposer,
+    currentCmsItemId,
+  });
   const activeComposerRef = useRef<{
     beacon: CmsSlotListOnPage;
     initialSignature: string;
   } | null>(null);
   activeComposerRef.current = activeComposer;
+
+  const composerEligibleResolvedRef = useRef(composerEligibleResolved);
+  composerEligibleResolvedRef.current = composerEligibleResolved;
 
   /** Latest engine rows — avoids stale closures inside queued slot-prop writes. */
   const selectedRef = useRef(selected);
@@ -877,37 +937,22 @@ export function CmsSlotsScreen() {
 
   const loadComposerEligible = useCallback(
     async (opts?: LoadComposerEligibleOptions) => {
-      setComposerEligibleLoading(true);
-      setComposerEligibleResolved(false);
-      try {
-        let beacons = pageBeacons;
-        if (opts?.rescanLists) {
-          beacons = await findCmsSlotListsOnPage();
-          setPageBeacons(beacons);
-        }
-
-        let runtime = opts?.runtime;
-        if (runtime == null) {
-          runtime = opts?.refreshRuntime
-            ? await getCmsSlotPageRuntimeSyncStatus()
-            : {
-                synced: pageRuntimeSyncedRef.current,
-                reason: pageRuntimeSyncReasonRef.current,
-              };
-        }
-        if (opts?.refreshRuntime || opts?.runtime != null) {
-          applyPageRuntimeSyncStatus(runtime);
-        }
-
-        const r = await listComposerEligibleLists(beacons, runtime);
-        setComposerEligible(r.eligible);
-        setComposerRuntimeOk(r.runtimeOk);
-      } catch {
-        setComposerEligible([]);
-        setComposerRuntimeOk(false);
-        const runtime = await getCmsSlotPageRuntimeSyncStatus();
-        applyPageRuntimeSyncStatus(runtime);
-      } finally {
+      const firstLoad = !composerEligibleResolvedRef.current;
+      if (firstLoad) {
+        setComposerEligibleLoading(true);
+        setComposerEligibleResolved(false);
+      }
+      await refreshComposerEligibleLists({
+        pageBeacons,
+        opts,
+        pageRuntimeSyncedRef,
+        pageRuntimeSyncReasonRef,
+        applyPageRuntimeSyncStatus,
+        setPageBeacons,
+        setComposerEligible,
+        setComposerRuntimeOk,
+      });
+      if (firstLoad) {
         setComposerEligibleLoading(false);
         setComposerEligibleResolved(true);
       }
@@ -2099,6 +2144,7 @@ export function CmsSlotsScreen() {
       composerRowMeta={composerRowMeta}
       onComposerSetPropValue={handleComposerSetPropValue}
       onComposerRenameSlotRow={handleComposerRenameSlotRow}
+      composerEditingContext={composerEditingContext}
       beaconToDelete={beaconToDelete}
       isLastCmsSlotListOnPageForDelete={isLastCmsSlotListOnPageForDelete}
       uninstallWithLastBeaconDelete={uninstallWithLastBeaconDelete}

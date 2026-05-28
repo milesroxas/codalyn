@@ -1,11 +1,14 @@
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
 import type { CmsSlotCompositionDraftRow, CmsSlotPaletteEntry } from "@/features/cms-slots/model/site-components";
+import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
+import { CmsSlotsComposerEditingContextCard } from "@/features/cms-slots/ui/cms-slots-composer-editing-context-card";
 import { Button } from "@/shared/ui/button";
 import { ComposerOrderSection } from "./composer-order-section";
 import { ComposerPaletteSection } from "./composer-palette-section";
 
 export type CmsSlotComposerPanelProps = {
   activeListLabel: string;
+  composerEditingContext: CmsComposerEditingContextViewModel;
   draft: CmsSlotCompositionDraftRow[];
   dirty: boolean;
   /** Component types present in the Engine-defined CMS slot; Composer can only add from this set. */
@@ -29,6 +32,7 @@ export type CmsSlotComposerPanelProps = {
 export function CmsSlotComposerPanel(props: CmsSlotComposerPanelProps) {
   const {
     activeListLabel,
+    composerEditingContext,
     draft,
     dirty,
     allowedPalette,
@@ -50,21 +54,16 @@ export function CmsSlotComposerPanel(props: CmsSlotComposerPanelProps) {
 
   return (
     <div className="space-y-3" data-slot="beacon_composer">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-medium">{activeListLabel}</p>
-          <p className="mt-0.5 truncate text-[0.7rem] text-muted-foreground">Composer</p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onBack()}>
-            {composerOnly ? "Back to List" : "Back"}
+      <CmsSlotsComposerEditingContextCard context={composerEditingContext} slotListLabel={activeListLabel} />
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
+        <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onBack()}>
+          {composerOnly ? "Back to List" : "Back"}
+        </Button>
+        {composerOnly ? null : (
+          <Button type="button" size="sm" disabled={!dirty || busy} onClick={() => void onSave()}>
+            {savePending ? "Saving…" : "Save"}
           </Button>
-          {composerOnly ? null : (
-            <Button type="button" size="sm" disabled={!dirty || busy} onClick={() => void onSave()}>
-              {savePending ? "Saving…" : "Save"}
-            </Button>
-          )}
-        </div>
+        )}
       </div>
 
       <ComposerOrderSection

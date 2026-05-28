@@ -1,7 +1,6 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { List, PanelsTopLeft } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
 import { type NavigateFunction, NavLink } from "react-router-dom";
 import {
   BeaconFeatureRouteChrome,
@@ -26,6 +25,7 @@ import {
 } from "@/features/cms-slots/model/cms-slots-panel-content-key";
 import { type CmsSlotsRouteTaskInput, resolveCmsSlotsRouteTask } from "@/features/cms-slots/model/cms-slots-route-task";
 import type { CmsSlotCompositionDraftRow, CmsSlotPaletteEntry } from "@/features/cms-slots/model/site-components";
+import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotComposerListPanel } from "@/features/cms-slots/ui/cms-slot-composer-list-panel";
 import { CmsSlotComposerPanel } from "@/features/cms-slots/ui/cms-slot-composer-panel";
@@ -157,6 +157,7 @@ export type CmsSlotsRouteChromeProps = {
   composerRowMeta: CmsSlotComposerRowMeta[];
   onComposerSetPropValue: (rowKey: string, propId: string, value: string) => void;
   onComposerRenameSlotRow: (rowKey: string, name: string) => void;
+  composerEditingContext: CmsComposerEditingContextViewModel;
   beaconToDelete: CmsSlotListOnPage | null;
   isLastCmsSlotListOnPageForDelete: boolean;
   uninstallWithLastBeaconDelete: boolean;
@@ -319,6 +320,7 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
       <div className="space-y-4" data-route="cms-slots-composer-editor">
         <CmsSlotComposerPanel
           activeListLabel={displayLabelForCmsSlotList(activeComposer.beacon)}
+          composerEditingContext={p.composerEditingContext}
           draft={p.composerDraft}
           dirty={p.composerDirty}
           allowedPalette={p.composerAllowedPalette}
@@ -341,6 +343,7 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
     panel = (
       <div className="space-y-4" data-route="cms-slots-composer-list">
         <CmsSlotComposerListPanel
+          composerEditingContext={p.composerEditingContext}
           pageScanLoading={p.pageScanLoading}
           pageRuntimeStatusLoading={p.pageRuntimeStatusLoading}
           routeStateKnown={p.routeStateKnown}
@@ -367,9 +370,7 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
   const routeTask = resolveCmsSlotsRouteTask(cmsSlotsRouteTaskInputFromChromeProps(p));
   const routeBlocking = routeTask != null;
   const showRouteBlocking = useDeferredLoadingIndicator(routeBlocking);
-  const [overlayOccupied, setOverlayOccupied] = useState(false);
-  const suppressRouteContent = showRouteBlocking || overlayOccupied;
-  const routeInteractionIdle = !suppressRouteContent;
+  const routeInteractionIdle = !showRouteBlocking;
 
   return (
     <BeaconFeatureRouteScrollBody
@@ -377,15 +378,14 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
         <BeaconRouteLoadingOverlay
           visible={routeBlocking}
           deferredVisible={showRouteBlocking}
-          onOccupancyChange={setOverlayOccupied}
           ariaLabel={routeTask?.ariaLabel ?? CMS_SLOTS_SCAN_ARIA_LABEL}
           message={routeTask?.message}
         />
       }
     >
       <div
-        className={cn("flex min-h-0 min-w-0 flex-1 flex-col", suppressRouteContent && "pointer-events-none invisible")}
-        aria-hidden={suppressRouteContent}
+        className={cn("flex min-h-0 min-w-0 flex-1 flex-col", showRouteBlocking && "pointer-events-none invisible")}
+        aria-hidden={showRouteBlocking}
       >
         {p.isEngine ? (
           <CmsSlotsEngineRouteBody {...p} routeInteractionIdle={routeInteractionIdle} />

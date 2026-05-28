@@ -9,7 +9,6 @@ import {
   CMS_SLOTS_ROUTE_TASK_DELETING_LIST,
   CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD,
-  CMS_SLOTS_ROUTE_TASK_LOADING_COMPOSER_LISTS,
   CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_REMOVING_COMPONENT,
   CMS_SLOTS_ROUTE_TASK_REMOVING_LIST_TARGET,
@@ -73,9 +72,7 @@ const CMS_SLOTS_ROUTE_TASK_RULES: RouteTaskRule[] = [
   },
   {
     match: (input) =>
-      input.openingBeaconKey != null || input.composerOpeningKey != null
-        ? task(CMS_SLOTS_OPENING_MESSAGE, CMS_SLOTS_OPENING_ARIA_LABEL)
-        : null,
+      input.openingBeaconKey != null ? task(CMS_SLOTS_OPENING_MESSAGE, CMS_SLOTS_OPENING_ARIA_LABEL) : null,
   },
   {
     match: (input) =>
@@ -133,12 +130,6 @@ const CMS_SLOTS_ROUTE_TASK_RULES: RouteTaskRule[] = [
       }
       return null;
     },
-  },
-  {
-    match: (input) =>
-      input.isComposer && input.activeComposer == null && input.composerEligibleLoading
-        ? task(CMS_SLOTS_ROUTE_TASK_LOADING_COMPOSER_LISTS)
-        : null,
   },
 ];
 

@@ -18,6 +18,9 @@ export const CMS_SLOTS_TOAST_LIST_RENAMED = "CMS slot renamed.";
 /** Section heading for CMS slot lists already on the page (home grid). */
 export const CMS_SLOTS_PUBLISHED_SECTION_LABEL = "Published Slots";
 
+/** Section heading for slot lists available to open in Composer. */
+export const CMS_SLOTS_COMPOSER_EDITABLE_SECTION_LABEL = "Editable Slots";
+
 export const CMS_SLOTS_INSTALL_LABEL = "Install";
 
 export const CMS_SLOTS_INSTALL_PENDING_LABEL = "Installing…";
@@ -154,6 +157,24 @@ export const CMS_SLOTS_ENGINE_MAIN_DESCRIPTION = "Set up slots, components, and 
 export const CMS_SLOTS_COMPOSER_MAIN_TITLE = "Compose";
 
 export const CMS_SLOTS_COMPOSER_MAIN_DESCRIPTION = "Manage CMS Slot content for collection entries.";
+
+export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SECTION_LABEL = "Editing";
+
+export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_COLLECTION_LABEL = "Collection";
+
+export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SLOT_LIST_LABEL = "Slot list";
+
+export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_LOADING = "Loading CMS context…";
+
+export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_NO_ENTRY =
+  "Select a collection item in the Designer to edit its slot content.";
+
+export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_NO_TOWER = "Connect Webflow in Tower to load collection entries.";
+
+export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_STATIC_PAGE =
+  "Open a CMS collection template to compose entry-specific slot content.";
+
+export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_UNAVAILABLE = "Could not load this collection from Webflow.";
 
 export const CMS_SLOTS_ENGINE_EDITING_TITLE = "Configure Slot Settings";
 

@@ -132,49 +132,47 @@ function WorkspaceMemberDirectoryRow(props: {
 function WorkspaceMemberDeparturesSection(props: { departures: MemberDepartureRow[]; departuresPending: boolean }) {
   const { departures, departuresPending } = props;
 
+  if (departuresPending || departures.length === 0) {
+    return null;
+  }
+
   return (
-    <section className="space-y-3 border-t pt-6">
+    <section className="space-y-3 border-t px-4 pt-6">
       <div>
         <h3 className="text-sm font-medium">Recent departures</h3>
         <p className="text-xs text-muted-foreground">
           Members who left this workspace on their own. Only admins can see this list.
         </p>
       </div>
-      {departuresPending ? (
-        <p className="text-sm text-muted-foreground">Loading departures…</p>
-      ) : departures.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No members have left this workspace yet.</p>
-      ) : (
-        <Table className="min-w-130">
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Former member</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Left</TableHead>
+      <Table className="min-w-130">
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead>Former member</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Left</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {departures.map((departure) => (
+            <TableRow key={departure.id}>
+              <TableCell>
+                <div className="min-w-0">
+                  <div className="font-medium">{departure.userName || "—"}</div>
+                  <div className="truncate text-xs text-muted-foreground">{departure.userEmail}</div>
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className="font-mono text-xs">
+                  {departure.role}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {formatDepartureTime(departure.departedAt)}
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {departures.map((departure) => (
-              <TableRow key={departure.id}>
-                <TableCell>
-                  <div className="min-w-0">
-                    <div className="font-medium">{departure.userName || "—"}</div>
-                    <div className="truncate text-xs text-muted-foreground">{departure.userEmail}</div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="font-mono text-xs">
-                    {departure.role}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {formatDepartureTime(departure.departedAt)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+          ))}
+        </TableBody>
+      </Table>
     </section>
   );
 }
@@ -247,7 +245,7 @@ export function WorkspaceMemberDirectoryCard(props: {
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 pb-4">
         {members.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">No members yet.</p>
         ) : (

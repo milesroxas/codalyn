@@ -1,12 +1,50 @@
 # Stripe billing (Tower)
 
-Individual **Pro** subscriptions via **Stripe Checkout** and **Customer Portal**, with webhooks persisting state on the `user` table. **Workspace (Team)** billing uses per-seat Stripe subscriptions on `organization`, with seat quantity synced from members and pending invitations.
+Tower uses **two Stripe products** that map to different database tables and customer stories. Runtime usage follows three tiers: **`free`**, **`pro`** (individual subscription), and **`team`** (paid workspace while active).
+
+| Stripe product | Env price id | Billed entity | What it unlocks |
+| -------------- | ------------ | ------------- | ---------------- |
+| **Pro** (flat recurring) | `STRIPE_PRICE_PRO` | `user` | Individual Pro: **Pro usage limits** on unpaid workspaces; create **additional owned workspaces** (beyond one free). |
+| **Team** (per-seat recurring) | `STRIPE_PRICE_TEAM_SEAT` | `organization` | Paid workspace: **seats** (invites), **Team usage limits** while that workspace is active; does **not** replace individual Pro for multi-workspace creation. |
+
+Checkout and Customer Portal are separate per scope (`/billing` for Pro, `/team` → **Billing** for Team). Webhooks persist subscription state and sync seat quantity.
+
+## Pro vs Team (product model)
+
+### Usage limits (`free`, `pro`, `team`)
+
+Limits apply to the **active workspace** (UTC month). See [Usage metering](#usage-metering-vercel-cost-control).
+
+| Active context | Usage tier |
+| -------------- | ---------- |
+| Unpaid workspace (or no workspace) and no individual Pro | **Free** |
+| Unpaid workspace (or no workspace) with individual Pro | **Pro** |
+| Paid workspace (Stripe Team or operator-set plan) | **Team** |
+
+Resolution: `src/server/billing/entitlements.ts` (`resolveTowerEntitlement`). Only the **active** organization is considered — membership in other paid workspaces does not change limits until you switch.
+
+Individual Pro is detected with `userHasIndividualStripePro` — it ignores subscriptions whose id is also stored on an `organization` row (team subs must not grant individual Pro on `user`).
+
+### Workspace creation (separate from Team membership)
+
+| Rule | Detail |
+| ---- | ------ |
+| First owned workspace | Everyone (free tier). “Owned” = `admin` or `owner` on the workspace. |
+| Additional owned workspaces | **Individual Pro** on the signed-in user (`STRIPE_PRICE_PRO`), or operator `user.canCreateOrganization`, or product admin. |
+| Invited to a paid Team workspace | Members get **Pro usage** in that context; they do **not** gain extra workspace creation. |
+| Team checkout purchaser | Does **not** receive `canCreateOrganization`; team billing does not substitute for individual Pro here. |
+
+Server gate: `src/server/membership/user-workspace-creation-eligibility.ts`, enforced in Better Auth `allowUserToCreateOrganization` and `beforeCreateOrganization` (`src/server/membership/tower-organization.ts`). Client re-check: `GET /api/account/workspace-creation-eligibility`.
+
+### Team seats (collaboration only)
+
+- Unpaid workspace (`seat_limit` null): **1 member** (`TEAM_UNPAID_SEAT_CAP`) — solo; real invites need Team billing.
+- Paid Team: `organization.billing_plan = "team"`, `seat_limit` from Stripe quantity (min `TOWER_TEAM_MIN_SEATS`, default 2).
+- Seats count **members + pending invitations**; hooks sync quantity back to Stripe when membership changes.
 
 ## Feature flag
 
 **Billing UI and all Stripe server routes are off by default.**
-
-Set in the environment:
 
 | Value | Effect |
 | ----- | ------ |
@@ -21,7 +59,7 @@ TOWER_BILLING_ENABLED=1
 
 Migration **`0004_tower_billing_usage`** adds to `user`: `stripe_customer_id`, `stripe_subscription_id`, `subscription_plan` (default `free`), `subscription_status`, and table **`tower_usage_month`** (monthly usage for free-tier caps).
 
-Organization rows already include `stripe_customer_id`, `stripe_subscription_id`, `billing_plan`, `subscription_status`, and `seat_limit`.
+Organization rows include `stripe_customer_id`, `stripe_subscription_id`, `billing_plan`, `subscription_status`, `seat_limit`, and related team fields.
 
 Apply with your usual process (see [README.md](../README.md#scripts)):
 
@@ -45,7 +83,7 @@ Documented in `../.env.example`. Summary:
 | `TOWER_TEAM_MIN_SEATS` | No | Minimum seats on team checkout and Stripe sync (default `2`). |
 | `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` | Yes | Origins for Checkout success/cancel and Portal return URL. |
 | `TOWER_METERING_DISABLED` | No | `1` disables free-tier **usage** caps only (emergency). |
-| `TOWER_FREE_*` / `TOWER_PRO_*` | No | Optional overrides for monthly Webflow and image-optimize limits. |
+| `TOWER_FREE_*` / `TOWER_PRO_*` | No | Optional seed overrides for monthly limits (Operator Platform UI is runtime source of truth after migrate). |
 
 ## Multi-environment setup (local, preview, production)
 
@@ -76,8 +114,13 @@ Preview deployments reject live keys automatically (`VERCEL_ENV=preview`). Produ
 
 ## Stripe Dashboard
 
-1. **Pro product** with a **recurring** price — copy the **Price id** into `STRIPE_PRICE_PRO`.
-2. **Team product** with a **per-seat recurring** price — copy the **Price id** into `STRIPE_PRICE_TEAM_SEAT`.
+Create **two products** (names are up to you; Tower only cares about price ids and recurrence):
+
+1. **Pro** — one **recurring** price (flat per user) → `STRIPE_PRICE_PRO`.
+2. **Team** — one **per-seat recurring** price → `STRIPE_PRICE_TEAM_SEAT`.
+
+Also:
+
 3. **Customer portal** — enable in [Settings → Billing → Customer portal](https://dashboard.stripe.com/settings/billing/portal) so portal routes work.
 4. **Webhooks** — endpoint: `https://<your-tower-host>/api/stripe/webhook` (same path in dev with `stripe listen` forwarding to localhost).
 
@@ -92,13 +135,25 @@ Subscribe to at least:
 
 | Route | Method | Behavior |
 | ----- | ------ | -------- |
-| `/billing` | GET | Server page: individual plan, usage, links to checkout/portal. |
+| `/billing` | GET | Individual plan, usage, Pro checkout/portal when eligible. |
 | `/api/billing/checkout` | POST | Individual Pro Checkout (session required). |
 | `/api/billing/portal` | GET | Individual Stripe Customer Portal. |
 | `/team` | GET | Team page with workspace **Billing** tab (admins). |
 | `/api/billing/workspace/checkout` | POST | Team per-seat Checkout for a workspace (`organizationId`). |
 | `/api/billing/workspace/portal` | GET | Workspace Stripe Customer Portal (`organizationId` query). |
-| `/api/stripe/webhook` | POST | Verifies signature, updates `user` or `organization` from events. |
+| `/api/account/workspace-creation-eligibility` | GET | Authoritative gate for creating another owned workspace. |
+| `/api/stripe/webhook` | POST | Verifies signature; updates `user` or `organization`. |
+
+## Webhook routing and metadata
+
+Checkout and subscription metadata distinguish scopes so events update the correct table:
+
+| Scope | Metadata | Persisted on |
+| ----- | -------- | -------------- |
+| Individual Pro | `towerBillingScope: user`, `towerUserId` | `user` (`subscription_plan`, `subscription_status`, …) |
+| Team | `towerBillingScope: organization`, `towerOrgId`, `towerUserId` (purchaser) | `organization` (`billing_plan: team`, `seat_limit`, …) |
+
+Helpers: `src/server/billing/stripe-metadata.ts`. User-row updates are skipped when metadata indicates organization billing or when the subscription id is tied to an org row (`stripe-individual-pro.ts`).
 
 ## Code map
 
@@ -108,18 +163,18 @@ Subscribe to at least:
 | Env vars + deploy guards | `src/server/billing/stripe-config.ts` |
 | Stripe client | `src/server/billing/stripe-client.ts` |
 | Team plan constants | `src/server/billing/team-billing-config.ts` |
-| Org entitlement (single source) | `src/server/billing/organization-billing.ts` |
+| Individual Pro detection | `src/server/billing/stripe-individual-pro.ts` |
+| Org entitlement | `src/server/billing/organization-billing.ts` |
 | Entitlements (user + org) | `src/server/billing/entitlements.ts` |
-| Usage caps (Webflow + image) | `src/server/billing/usage-gate.ts`, `limits.ts` |
+| Workspace creation eligibility | `src/server/membership/user-workspace-creation-eligibility.ts` |
+| Usage caps | `src/server/billing/usage-gate.ts`, `metering-policy.ts`, `tower-limits-config.ts` |
 | Subscription status | `src/server/billing/stripe-subscription-status.ts` |
 | Webhook application | `src/server/billing/stripe-webhook-apply.ts` |
 | Checkout return sync (webhook fallback) | `src/server/billing/stripe-checkout-sync.ts` |
-| User sync | `src/server/billing/stripe-app.ts` |
-| Org sync + seat quantity | `src/server/billing/stripe-org-app.ts`, `stripe-org-seat-sync.ts` |
+| User Stripe sync | `src/server/billing/stripe-app.ts` |
+| Org Stripe sync + seats | `src/server/billing/stripe-org-app.ts`, `stripe-org-seat-sync.ts` |
 | Seat counting | `src/server/billing/organization-seat-count.ts`, `src/shared/lib/billing/organization-seat-cap.ts` |
-| Workspace billing UI data | `src/server/billing/workspace-billing-view.ts` |
-
-Individual checkout embeds `towerUserId` and `towerBillingScope: user`. Team checkout embeds `towerOrgId`, `towerUserId`, and `towerBillingScope: organization` so webhooks route to the correct table.
+| Workspace billing UI | `src/server/billing/workspace-billing-view.ts` |
 
 Checkout success URLs include `session_id={CHECKOUT_SESSION_ID}`. When the user lands on `/billing?checkout=success&session_id=…` or `/team?checkout=success&session_id=…`, Tower retrieves the session from Stripe and applies the same DB updates as `checkout.session.completed`. That covers webhook delay and local dev when webhooks are not forwarded to localhost.
 
@@ -130,7 +185,7 @@ Checkout success URLs include `session_id={CHECKOUT_SESSION_ID}`. When the user 
 3. **Webhooks (recommended):** in another terminal, `stripe listen --forward-to localhost:3100/api/stripe/webhook` and copy the **signing secret** into `STRIPE_WEBHOOK_SECRET`. Restart Tower after updating the secret. The Stripe Dashboard “local listener active” state is the CLI on your machine — it is **not** the same as a Dashboard webhook pointing at preview/production.
 4. Open `/billing` for individual Pro or `/team` → **Billing** for workspace Team checkout (test mode).
 
-**Common local pitfall:** checkout runs on `localhost:3100`, but a Dashboard webhook may target `https://tower-preview.codalyn.app`. Payment succeeds in Stripe while the **local** database stays on the free plan. Use `stripe listen` for local Postgres, or rely on the checkout return sync in step 3 above.
+**Common local pitfall:** checkout runs on `localhost:3100`, but a Dashboard webhook may target `https://tower-preview.codalyn.app`. Payment succeeds in Stripe while the **local** database stays on the free plan. Use `stripe listen` for local Postgres, or rely on the checkout return sync above.
 
 ## Switching Stripe accounts or test ↔ live
 
@@ -142,16 +197,26 @@ No code changes — update env vars and Dashboard setup per environment. Also:
 
 ## Usage metering (Vercel cost control)
 
-Independent of **Stripe** but part of the same “billing” story: the **free** tier applies separate monthly caps (UTC) to Webflow Data API proxy traffic (`/api/v2/webflow/*`), CMS layout writes (`POST /api/v1/beacon/cms-layout/save`), and `POST /api/v1/images/optimize` for session-authenticated users on Vercel. **Pro** (via individual Stripe, **paid workspace**, or operator-set org plan) skips incrementing those counters. See `src/server/billing/limits.ts` and `.env.example` for override env names.
+Independent of **Stripe** but part of the same “billing” story: the **free** tier applies separate monthly caps (UTC) to Webflow Data API proxy traffic (`/api/v2/webflow/*`), CMS layout writes (`POST /api/v1/beacon/cms-layout/save`), and `POST /api/v1/images/optimize` for session-authenticated users on Vercel.
 
-## Team seats
+**Pro** tier (individual Stripe, paid workspace membership, or operator org plan) skips incrementing those counters. Operator per-user or per-org overrides can set custom caps or disable metering without Stripe.
 
-- Unpaid workspaces (`seat_limit` null) allow **1 member** (`TEAM_UNPAID_SEAT_CAP`) — solo only; invites require Team billing.
-- Seat enforcement uses members **plus** pending invitations (shared helpers under `src/shared/lib/billing/organization-seat-cap.ts`).
+Defaults and env seed names: `src/server/billing/tower-limits-config.ts`, `../.env.example`.
+
+## Team seats (implementation checklist)
+
+- Unpaid workspaces (`seat_limit` null): **1 member** — solo only; invites require Team billing.
+- Seat enforcement: members **plus** pending invitations (`src/shared/lib/billing/organization-seat-cap.ts`).
 - Better Auth hooks: `beforeCreateInvitation`, `beforeAcceptInvitation`, `beforeAddMember`, plus dynamic `invitationLimit`.
-- `seat_limit` is not client-writable; Stripe webhooks and operator API (non-Stripe orgs only) update it.
+- `seat_limit` is not client-writable; Stripe webhooks and operator API (non-Stripe orgs) update it.
 - Over-cap workspaces (e.g. after subscription cancel) keep existing members but block new invites/accepts until resolved.
 - Checkout quantity = `max(TOWER_TEAM_MIN_SEATS, members + pending invitations)`.
 - Webhooks set `organization.seat_limit` from Stripe subscription quantity.
 - Member/invitation hooks call `syncOrganizationSeatQuantityWithStripe` to keep Stripe and `seat_limit` aligned.
-- Additional owned workspaces require **individual Pro** on the user (or operator `canCreateOrganization`); team checkout does not grant that.
+
+## Customer-facing positioning (suggested copy)
+
+- **Pro** — freelancers: higher limits and multiple workspaces you own; work solo in each until that workspace subscribes to Team for collaborators.
+- **Team** — studios: pay per seat on a workspace; every member gets Pro limits **in paid workspaces**; buying Team does not add personal multi-workspace creation (that stays on individual Pro).
+
+Avoid positioning Team as “includes Pro on your account” for workspace creation — it shares **usage tier** only.

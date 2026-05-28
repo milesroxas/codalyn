@@ -31,16 +31,21 @@ export type WorkspaceOrgRow = { id: string; name: string; slug: string };
 
 function workspaceEmptyStateMessage(canCreateTeam: boolean, billingEnabled: boolean | undefined): string {
   if (canCreateTeam) {
-    return "No workspaces yet. Create one to connect Webflow and manage Beacon presets.";
+    return "Create your first workspace to connect Webflow and manage Beacon presets.";
   }
   if (billingEnabled) {
-    return "Upgrade to Pro to create a workspace.";
+    return "Subscribe to individual Pro to create a workspace.";
   }
   return "No workspaces yet.";
 }
 
+function workspaceCreateAnotherLabel(showUpgradeForAnother: boolean): string {
+  return showUpgradeForAnother ? "Subscribe to Pro for another workspace" : "New workspace";
+}
+
 function WorkspaceSwitcherCreateActions(props: {
   canCreateTeam: boolean;
+  showUpgradeForAnother: boolean;
   billingEnabled: boolean | undefined;
   onOpenCreate: () => void;
 }) {
@@ -50,13 +55,13 @@ function WorkspaceSwitcherCreateActions(props: {
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={props.onOpenCreate}>
           <IconPlus className="size-4" />
-          New workspace
+          {workspaceCreateAnotherLabel(props.showUpgradeForAnother)}
         </DropdownMenuItem>
       </>
     );
   }
 
-  if (!props.billingEnabled) {
+  if (!props.billingEnabled || !props.showUpgradeForAnother) {
     return null;
   }
 
@@ -64,7 +69,7 @@ function WorkspaceSwitcherCreateActions(props: {
     <>
       <DropdownMenuSeparator />
       <DropdownMenuItem asChild>
-        <Link href="/billing">Upgrade to Pro for another workspace</Link>
+        <Link href="/billing">Subscribe to Pro for another workspace</Link>
       </DropdownMenuItem>
     </>
   );
@@ -80,6 +85,7 @@ export function TeamWorkspaceSwitcher(props: {
   /** Narrow trigger for app header. */
   compact?: boolean;
   canCreateTeam: boolean;
+  showUpgradeForAnother?: boolean;
   billingEnabled?: boolean;
   orgName: string;
   onOrgNameChange: (v: string) => void;
@@ -180,6 +186,7 @@ export function TeamWorkspaceSwitcher(props: {
           )}
           <WorkspaceSwitcherCreateActions
             canCreateTeam={props.canCreateTeam}
+            showUpgradeForAnother={props.showUpgradeForAnother ?? false}
             billingEnabled={props.billingEnabled}
             onOpenCreate={() => setCreateOpen(true)}
           />

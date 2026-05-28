@@ -20,10 +20,13 @@ export type TowerUsageMeterSnapshot = {
 /** How monthly caps are determined for the signed-in account (operator overrides vs tier defaults). */
 export type TowerUsageLimitsKind = "standard" | "custom" | "unmetered";
 
+/** Monthly usage cap tier for the signed-in user in the active workspace context. */
+export type TowerUsageTier = "free" | "pro" | "team";
+
 export type TowerUsageStatusSnapshot = {
   yearMonth: string;
-  tier: "free" | "pro";
-  /** `custom` = operator-set caps; `unmetered` = no monthly caps (Pro or operator grant). */
+  tier: TowerUsageTier;
+  /** `custom` = operator-set caps; `unmetered` = metering disabled by operator or platform. */
   limitsKind: TowerUsageLimitsKind;
   metered: boolean;
   meters: TowerUsageMeterSnapshot[];

@@ -1,11 +1,11 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import {
   EMPTY_METERING_OVERRIDES,
   parseLimitOverrideField,
   resolveMeteringPolicy,
   utcYearMonth,
 } from "@/server/billing/metering-policy";
+import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
 import { getTowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 import { getUsageSnapshot, resetUsageForOrganizationMembers, resetUsageForUser } from "@/server/billing/usage-gate";
 import type { OperatorUsageLimitsPatch, OperatorUsageLimitsView } from "@/server/operator/types";
@@ -32,7 +32,6 @@ export async function fetchOperatorUserUsageLimits(userId: string): Promise<Oper
     return null;
   }
 
-  const entitlement = await resolveTowerEntitlement(userId, null);
   const usage = await getUsageSnapshot(userId);
   const limits = await getTowerLimitsSnapshot();
   const userFields = {
@@ -42,7 +41,7 @@ export async function fetchOperatorUserUsageLimits(userId: string): Promise<Oper
     imageOptimizeLimitOverride: row.imageOptimizeLimitOverride ?? null,
   };
   const policy = resolveMeteringPolicy({
-    tier: entitlement.tier,
+    tier: "free",
     user: userFields,
     organization: null,
     limits,
@@ -50,7 +49,7 @@ export async function fetchOperatorUserUsageLimits(userId: string): Promise<Oper
 
   return mapUsageLimitsView({
     scope: "user",
-    tier: entitlement.tier,
+    tier: "free",
     meteringEnabled: userFields.meteringEnabled,
     globalMeteringDisabled: policy.globalMeteringDisabled,
     webflowProxyLimitOverride: userFields.webflowProxyLimitOverride,
@@ -73,6 +72,9 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
       webflowProxyLimitOverride: organization.webflowProxyLimitOverride,
       cmsWriteLimitOverride: organization.cmsWriteLimitOverride,
       imageOptimizeLimitOverride: organization.imageOptimizeLimitOverride,
+      subscriptionStatus: organization.subscriptionStatus,
+      billingPlan: organization.billingPlan,
+      stripeSubscriptionId: organization.stripeSubscriptionId,
     })
     .from(organization)
     .where(eq(organization.id, orgId))
@@ -99,9 +101,16 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
     cmsWriteLimitOverride: row.cmsWriteLimitOverride ?? null,
     imageOptimizeLimitOverride: row.imageOptimizeLimitOverride ?? null,
   };
+  const workspaceTier = isOrganizationTeamEntitled({
+    subscriptionStatus: row.subscriptionStatus,
+    billingPlan: row.billingPlan,
+    stripeSubscriptionId: row.stripeSubscriptionId,
+  })
+    ? ("team" as const)
+    : ("free" as const);
   const limits = await getTowerLimitsSnapshot();
   const policy = resolveMeteringPolicy({
-    tier: "free",
+    tier: workspaceTier,
     user: EMPTY_METERING_OVERRIDES,
     organization: orgFields,
     limits,
@@ -109,7 +118,7 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
 
   return mapUsageLimitsView({
     scope: "workspace",
-    tier: "free",
+    tier: workspaceTier,
     meteringEnabled: orgFields.meteringEnabled,
     globalMeteringDisabled: policy.globalMeteringDisabled,
     webflowProxyLimitOverride: orgFields.webflowProxyLimitOverride,
@@ -146,6 +155,9 @@ export async function fetchOperatorWorkspaceUsageLimitsBatch(
         webflowProxyLimitOverride: organization.webflowProxyLimitOverride,
         cmsWriteLimitOverride: organization.cmsWriteLimitOverride,
         imageOptimizeLimitOverride: organization.imageOptimizeLimitOverride,
+        subscriptionStatus: organization.subscriptionStatus,
+        billingPlan: organization.billingPlan,
+        stripeSubscriptionId: organization.stripeSubscriptionId,
       })
       .from(organization)
       .where(inArray(organization.id, orgIds)),
@@ -182,8 +194,15 @@ export async function fetchOperatorWorkspaceUsageLimitsBatch(
       cmsWriteLimitOverride: row.cmsWriteLimitOverride ?? null,
       imageOptimizeLimitOverride: row.imageOptimizeLimitOverride ?? null,
     };
+    const workspaceTier = isOrganizationTeamEntitled({
+      subscriptionStatus: row.subscriptionStatus,
+      billingPlan: row.billingPlan,
+      stripeSubscriptionId: row.stripeSubscriptionId,
+    })
+      ? ("team" as const)
+      : ("free" as const);
     const policy = resolveMeteringPolicy({
-      tier: "free",
+      tier: workspaceTier,
       user: EMPTY_METERING_OVERRIDES,
       organization: orgFields,
       limits,
@@ -194,7 +213,7 @@ export async function fetchOperatorWorkspaceUsageLimitsBatch(
       row.id,
       mapUsageLimitsView({
         scope: "workspace",
-        tier: "free",
+        tier: workspaceTier,
         meteringEnabled: orgFields.meteringEnabled,
         globalMeteringDisabled: policy.globalMeteringDisabled,
         webflowProxyLimitOverride: orgFields.webflowProxyLimitOverride,

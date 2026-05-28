@@ -11,6 +11,11 @@ export type OperatorPlatformMeteringConfig = {
     cmsWritesPerMonth: number;
     imageOptimizesPerMonth: number;
   };
+  team: {
+    webflowProxyRequestsPerMonth: number;
+    cmsWritesPerMonth: number;
+    imageOptimizesPerMonth: number;
+  };
   updatedAt: string | null;
 };
 
@@ -22,6 +27,11 @@ export type OperatorPlatformMeteringPatch = {
     imageOptimizesPerMonth?: number;
   };
   pro?: {
+    webflowProxyRequestsPerMonth?: number;
+    cmsWritesPerMonth?: number;
+    imageOptimizesPerMonth?: number;
+  };
+  team?: {
     webflowProxyRequestsPerMonth?: number;
     cmsWritesPerMonth?: number;
     imageOptimizesPerMonth?: number;
@@ -71,7 +81,7 @@ export type OperatorUsageLimitsPatch = {
 
 export type OperatorUsageLimitsView = {
   scope: "user" | "workspace";
-  tier: "free" | "pro";
+  tier: "free" | "pro" | "team";
   meteringEnabled: boolean;
   globalMeteringDisabled: boolean;
   webflowProxyLimitOverride: number | null;

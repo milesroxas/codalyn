@@ -1,10 +1,8 @@
 import { headers } from "next/headers";
 import { cache } from "react";
 import { auth } from "@/server/auth";
-import {
-  countUserActiveWorkspaceMemberships,
-  resolveUserWorkspaceCreationEligibility,
-} from "@/server/membership/user-workspace-creation-eligibility";
+import { countUserActiveWorkspaceMemberships } from "@/server/membership/user-workspace-creation-eligibility";
+import { resolveWorkspaceCreationUiEligibility } from "@/server/membership/workspace-creation-ui";
 import { resolveActiveOrganizationId } from "@/server/resolve-active-organization-id";
 import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
@@ -53,7 +51,7 @@ export const getTowerSessionOnboardingContext = cache(async (): Promise<TowerSes
       countUserActiveWorkspaceMemberships(userId),
       activeOrganizationId ? isTowerTeamAdminMemberOfOrg(userId, activeOrganizationId) : Promise.resolve(false),
       resolveWebflowBearerToken({ userId, requestHeaders }),
-      resolveUserWorkspaceCreationEligibility(userId),
+      resolveWorkspaceCreationUiEligibility(userId, activeOrganizationId),
     ]);
 
   return {
@@ -62,7 +60,7 @@ export const getTowerSessionOnboardingContext = cache(async (): Promise<TowerSes
     userEmail,
     activeOrganizationId,
     workspaceMembershipCount,
-    canCreateOrganization: workspaceCreationEligibility.canCreate,
+    canCreateOrganization: workspaceCreationEligibility.canShowInSwitcher,
     activeOrgTeamAdmin: activeOrgTeamAdmin,
     webflowOAuthConnected: Boolean(webflowAccessToken),
     webflowAccessToken: webflowAccessToken ?? null,

@@ -67,9 +67,6 @@ function resolveCap(
   organization: MeteringOverrideFields | null,
   limits: TowerLimitsSnapshot
 ): number | null {
-  if (tier === "pro") {
-    return null;
-  }
   const userOverride = overrideField(user, kind);
   if (userOverride !== null) {
     return userOverride;
@@ -86,8 +83,7 @@ export function resolveMeteringPolicy(input: MeteringPolicyInput): MeteringPolic
   const skipMetering =
     globalMeteringDisabled ||
     !input.user.meteringEnabled ||
-    (input.organization !== null && !input.organization.meteringEnabled) ||
-    input.tier === "pro";
+    (input.organization !== null && !input.organization.meteringEnabled);
 
   return {
     skipMetering,

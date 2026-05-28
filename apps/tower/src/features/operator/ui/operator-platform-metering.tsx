@@ -27,6 +27,9 @@ type DraftState = {
   proWebflowProxy: string;
   proCmsWrites: string;
   proImage: string;
+  teamWebflowProxy: string;
+  teamCmsWrites: string;
+  teamImage: string;
 };
 
 function configToDraft(config: OperatorPlatformMeteringConfig): DraftState {
@@ -38,6 +41,9 @@ function configToDraft(config: OperatorPlatformMeteringConfig): DraftState {
     proWebflowProxy: limitIntegerToDraft(config.pro.webflowProxyRequestsPerMonth),
     proCmsWrites: limitIntegerToDraft(config.pro.cmsWritesPerMonth),
     proImage: limitIntegerToDraft(config.pro.imageOptimizesPerMonth),
+    teamWebflowProxy: limitIntegerToDraft(config.team.webflowProxyRequestsPerMonth),
+    teamCmsWrites: limitIntegerToDraft(config.team.cmsWritesPerMonth),
+    teamImage: limitIntegerToDraft(config.team.imageOptimizesPerMonth),
   };
 }
 
@@ -129,6 +135,11 @@ type DraftPatch = {
     cmsWritesPerMonth: number;
     imageOptimizesPerMonth: number;
   };
+  team: {
+    webflowProxyRequestsPerMonth: number;
+    cmsWritesPerMonth: number;
+    imageOptimizesPerMonth: number;
+  };
 };
 
 function parseDraftPatch(draft: DraftState): DraftPatch | "invalid" {
@@ -138,13 +149,19 @@ function parseDraftPatch(draft: DraftState): DraftPatch | "invalid" {
   const proWebflowProxy = parseRequiredLimitInteger(draft.proWebflowProxy);
   const proCmsWrites = parseRequiredLimitInteger(draft.proCmsWrites);
   const proImage = parseRequiredLimitInteger(draft.proImage);
+  const teamWebflowProxy = parseRequiredLimitInteger(draft.teamWebflowProxy);
+  const teamCmsWrites = parseRequiredLimitInteger(draft.teamCmsWrites);
+  const teamImage = parseRequiredLimitInteger(draft.teamImage);
   if (
     freeWebflowProxy === "invalid" ||
     freeCmsWrites === "invalid" ||
     freeImage === "invalid" ||
     proWebflowProxy === "invalid" ||
     proCmsWrites === "invalid" ||
-    proImage === "invalid"
+    proImage === "invalid" ||
+    teamWebflowProxy === "invalid" ||
+    teamCmsWrites === "invalid" ||
+    teamImage === "invalid"
   ) {
     return "invalid";
   }
@@ -159,6 +176,11 @@ function parseDraftPatch(draft: DraftState): DraftPatch | "invalid" {
       webflowProxyRequestsPerMonth: proWebflowProxy,
       cmsWritesPerMonth: proCmsWrites,
       imageOptimizesPerMonth: proImage,
+    },
+    team: {
+      webflowProxyRequestsPerMonth: teamWebflowProxy,
+      cmsWritesPerMonth: teamCmsWrites,
+      imageOptimizesPerMonth: teamImage,
     },
   };
 }
@@ -175,7 +197,10 @@ function isDraftDirty(config: OperatorPlatformMeteringConfig, draft: DraftState)
     parsed.free.imageOptimizesPerMonth !== config.free.imageOptimizesPerMonth ||
     parsed.pro.webflowProxyRequestsPerMonth !== config.pro.webflowProxyRequestsPerMonth ||
     parsed.pro.cmsWritesPerMonth !== config.pro.cmsWritesPerMonth ||
-    parsed.pro.imageOptimizesPerMonth !== config.pro.imageOptimizesPerMonth
+    parsed.pro.imageOptimizesPerMonth !== config.pro.imageOptimizesPerMonth ||
+    parsed.team.webflowProxyRequestsPerMonth !== config.team.webflowProxyRequestsPerMonth ||
+    parsed.team.cmsWritesPerMonth !== config.team.cmsWritesPerMonth ||
+    parsed.team.imageOptimizesPerMonth !== config.team.imageOptimizesPerMonth
   );
 }
 
@@ -249,7 +274,7 @@ function PlatformMeteringFormBody({
       <Separator />
 
       <TierLimitFields
-        tierLabel="Pro tier display defaults"
+        tierLabel="Pro tier defaults (individual subscription)"
         webflowProxyId="platform-pro-webflow-proxy"
         cmsWritesId="platform-pro-cms-writes"
         imageId="platform-pro-image"
@@ -261,9 +286,22 @@ function PlatformMeteringFormBody({
         onImageChange={(next) => onDraftChange({ ...draft, proImage: next })}
         disabled={disabled}
       />
-      <p className="text-xs text-muted-foreground">
-        Pro usage is not incremented in Tower; these values appear on billing and operator views only.
-      </p>
+
+      <Separator />
+
+      <TierLimitFields
+        tierLabel="Team tier defaults (paid workspace)"
+        webflowProxyId="platform-team-webflow-proxy"
+        cmsWritesId="platform-team-cms-writes"
+        imageId="platform-team-image"
+        webflowProxyValue={draft.teamWebflowProxy}
+        cmsWritesValue={draft.teamCmsWrites}
+        imageValue={draft.teamImage}
+        onWebflowProxyChange={(next) => onDraftChange({ ...draft, teamWebflowProxy: next })}
+        onCmsWritesChange={(next) => onDraftChange({ ...draft, teamCmsWrites: next })}
+        onImageChange={(next) => onDraftChange({ ...draft, teamImage: next })}
+        disabled={disabled}
+      />
     </>
   );
 }

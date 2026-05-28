@@ -144,7 +144,7 @@ Webflow’s [Working with the Data API](https://developers.webflow.com/data/docs
 
 ## Stripe billing (optional)
 
-**[docs/stripe.md](docs/stripe.md)** — Checkout, Customer Portal, webhooks, `TOWER_BILLING_ENABLED` flag, env vars, and local testing with the Stripe CLI. **Disabled by default** until you set the flag and keys.
+**[docs/stripe.md](docs/stripe.md)** — Pro (individual) vs Team (per-seat workspace) products, entitlements, workspace-creation rules, Checkout/Portal, webhooks, env vars, and local testing with the Stripe CLI. **Disabled by default** until you set the flag and keys.
 
 ## Regenerating Better Auth Drizzle schema
 

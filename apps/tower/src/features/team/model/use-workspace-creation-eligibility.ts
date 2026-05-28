@@ -6,9 +6,20 @@ import { parseWorkspaceCreationEligibilityPayload } from "@/features/team/lib/wo
 type WorkspaceCreationEligibilityState = {
   ready: boolean;
   canCreate: boolean;
+  canShowInSwitcher: boolean;
+  ownedWorkspaceCount: number;
+  hasIndividualPro: boolean;
+  viewingTeamWorkspaceWithoutPro: boolean;
 };
 
-const failClosed: WorkspaceCreationEligibilityState = { ready: true, canCreate: false };
+const failClosed: WorkspaceCreationEligibilityState = {
+  ready: true,
+  canCreate: false,
+  canShowInSwitcher: false,
+  ownedWorkspaceCount: 0,
+  hasIndividualPro: false,
+  viewingTeamWorkspaceWithoutPro: false,
+};
 
 async function fetchWorkspaceCreationEligibility(refetchToken: string): Promise<WorkspaceCreationEligibilityState> {
   try {
@@ -23,6 +34,10 @@ async function fetchWorkspaceCreationEligibility(refetchToken: string): Promise<
     return {
       ready: true,
       canCreate: parsed?.canCreate ?? false,
+      canShowInSwitcher: parsed?.canShowInSwitcher ?? false,
+      ownedWorkspaceCount: parsed?.ownedWorkspaceCount ?? 0,
+      hasIndividualPro: parsed?.hasIndividualPro ?? false,
+      viewingTeamWorkspaceWithoutPro: parsed?.viewingTeamWorkspaceWithoutPro ?? false,
     };
   } catch {
     return failClosed;
@@ -31,7 +46,7 @@ async function fetchWorkspaceCreationEligibility(refetchToken: string): Promise<
 
 /**
  * Re-validates workspace creation on the client. Creation UI stays hidden until the server
- * confirms eligibility (fail-closed). Pass `refetchKey` when org membership may have changed.
+ * confirms eligibility (fail-closed). Pass `refetchKey` when org membership or active workspace changes.
  */
 export function useWorkspaceCreationEligibility(options?: {
   /** SSR/layout hint — used only to show upgrade CTA before the client fetch completes when false. */
@@ -39,16 +54,32 @@ export function useWorkspaceCreationEligibility(options?: {
   refetchKey?: string | number;
 }): {
   canCreateWorkspace: boolean;
+  ownedWorkspaceCount: number;
+  hasIndividualPro: boolean;
   /** When true, show billing upgrade for users blocked from creating another workspace. */
   showUpgradeForAnotherWorkspace: boolean;
   isReady: boolean;
 } {
-  const [state, setState] = useState<WorkspaceCreationEligibilityState>({ ready: false, canCreate: false });
+  const [state, setState] = useState<WorkspaceCreationEligibilityState>({
+    ready: false,
+    canCreate: false,
+    canShowInSwitcher: false,
+    ownedWorkspaceCount: 0,
+    hasIndividualPro: false,
+    viewingTeamWorkspaceWithoutPro: false,
+  });
   const refetchKey = options?.refetchKey != null ? String(options.refetchKey) : "";
 
   useEffect(() => {
     let cancelled = false;
-    setState({ ready: false, canCreate: false });
+    setState({
+      ready: false,
+      canCreate: false,
+      canShowInSwitcher: false,
+      ownedWorkspaceCount: 0,
+      hasIndividualPro: false,
+      viewingTeamWorkspaceWithoutPro: false,
+    });
 
     void fetchWorkspaceCreationEligibility(refetchKey).then((next) => {
       if (!cancelled) {
@@ -62,10 +93,16 @@ export function useWorkspaceCreationEligibility(options?: {
   }, [refetchKey]);
 
   const serverCanCreate = options?.serverCanCreate ?? false;
+  const ownedWorkspaceCount = state.ready ? state.ownedWorkspaceCount : 0;
+  const hasIndividualPro = state.ready ? state.hasIndividualPro : false;
+  const canCreateWorkspace = state.ready ? state.canShowInSwitcher : false;
+  const needsProForAnother = state.ready && !state.canCreate && ownedWorkspaceCount >= 1 && !hasIndividualPro;
 
   return {
-    canCreateWorkspace: state.ready ? state.canCreate : false,
-    showUpgradeForAnotherWorkspace: state.ready ? !state.canCreate : !serverCanCreate,
+    canCreateWorkspace,
+    ownedWorkspaceCount,
+    hasIndividualPro,
+    showUpgradeForAnotherWorkspace: state.ready ? needsProForAnother : !serverCanCreate,
     isReady: state.ready,
   };
 }

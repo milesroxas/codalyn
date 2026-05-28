@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
-import { resolveUserWorkspaceCreationEligibility } from "@/server/membership/user-workspace-creation-eligibility";
+import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
+import { resolveWorkspaceCreationUiEligibility } from "@/server/membership/workspace-creation-ui";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +13,14 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const eligibility = await resolveUserWorkspaceCreationEligibility(session.user.id);
+  const activeOrg = await getActiveOrganizationIdForAuthHeaders(await headers());
+  const eligibility = await resolveWorkspaceCreationUiEligibility(session.user.id, activeOrg);
 
   return NextResponse.json({
     canCreate: eligibility.canCreate,
+    canShowInSwitcher: eligibility.canShowInSwitcher,
     ownedWorkspaceCount: eligibility.ownedWorkspaceCount,
+    hasIndividualPro: eligibility.hasIndividualPro,
+    viewingTeamWorkspaceWithoutPro: eligibility.viewingTeamWorkspaceWithoutPro,
   });
 }

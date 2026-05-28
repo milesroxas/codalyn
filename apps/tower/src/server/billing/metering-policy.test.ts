@@ -22,6 +22,7 @@ describe("resolveMeteringPolicy", () => {
     envEmergencyMeteringDisabled: false,
     free: { webflowProxyRequestsPerMonth: 2_500, cmsWritesPerMonth: 500, imageOptimizesPerMonth: 50 },
     pro: { webflowProxyRequestsPerMonth: 150_000, cmsWritesPerMonth: 50_000, imageOptimizesPerMonth: 10_000 },
+    team: { webflowProxyRequestsPerMonth: 200_000, cmsWritesPerMonth: 60_000, imageOptimizesPerMonth: 12_000 },
     updatedAt: null,
   };
 
@@ -33,12 +34,20 @@ describe("resolveMeteringPolicy", () => {
     expect(policy.imageCap).toBe(50);
   });
 
-  it("skips metering for pro tier", () => {
+  it("applies pro tier defaults when metering is enabled", () => {
     const policy = resolveMeteringPolicy({ tier: "pro", user, organization, limits });
-    expect(policy.skipMetering).toBe(true);
-    expect(policy.webflowProxyCap).toBeNull();
-    expect(policy.cmsWriteCap).toBeNull();
-    expect(policy.imageCap).toBeNull();
+    expect(policy.skipMetering).toBe(false);
+    expect(policy.webflowProxyCap).toBe(150_000);
+    expect(policy.cmsWriteCap).toBe(50_000);
+    expect(policy.imageCap).toBe(10_000);
+  });
+
+  it("applies team tier defaults when metering is enabled", () => {
+    const policy = resolveMeteringPolicy({ tier: "team", user, organization, limits });
+    expect(policy.skipMetering).toBe(false);
+    expect(policy.webflowProxyCap).toBe(200_000);
+    expect(policy.cmsWriteCap).toBe(60_000);
+    expect(policy.imageCap).toBe(12_000);
   });
 
   it("skips metering when user metering is disabled", () => {

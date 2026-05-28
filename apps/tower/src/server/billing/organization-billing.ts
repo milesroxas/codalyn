@@ -2,8 +2,8 @@ import type Stripe from "stripe";
 import { isStripeSubscriptionProEntitled, orgRowHasStripeTeam } from "@/server/billing/stripe-subscription-status";
 import { TEAM_BILLING_PLAN } from "@/server/billing/team-billing-config";
 
-/** Operator-console plan strings that grant Pro entitlements without Stripe (legacy). */
-const LEGACY_OPERATOR_PAID_PLANS = new Set(["pro", "pro+", "pro team", "team pro"]);
+/** Operator-console plan strings that grant Team workspace limits without Stripe (legacy). */
+const LEGACY_OPERATOR_TEAM_PLANS = new Set(["pro team", "team", "team pro", "pro+", "pro"]);
 
 export type OrganizationBillingRow = {
   subscriptionStatus: string | null;
@@ -12,10 +12,10 @@ export type OrganizationBillingRow = {
 };
 
 /**
- * Whether a workspace row grants Pro entitlements to members (Stripe team sub or operator-set plan).
- * Single source of truth — used by entitlements and billing UI.
+ * Whether a workspace row grants Team usage limits and paid-seat collaboration.
+ * Single source of truth — used by entitlements and workspace billing UI.
  */
-export function isOrganizationProEntitled(row: OrganizationBillingRow): boolean {
+export function isOrganizationTeamEntitled(row: OrganizationBillingRow): boolean {
   if (
     !row.subscriptionStatus ||
     !isStripeSubscriptionProEntitled(row.subscriptionStatus as Stripe.Subscription.Status)
@@ -29,8 +29,11 @@ export function isOrganizationProEntitled(row: OrganizationBillingRow): boolean 
     return true;
   }
   const plan = row.billingPlan?.trim().toLowerCase() ?? "";
-  return LEGACY_OPERATOR_PAID_PLANS.has(plan);
+  return LEGACY_OPERATOR_TEAM_PLANS.has(plan);
 }
+
+/** @deprecated Use {@link isOrganizationTeamEntitled}. */
+export const isOrganizationProEntitled = isOrganizationTeamEntitled;
 
 export function organizationBillingPlanLabel(row: OrganizationBillingRow): string | null {
   if (orgRowHasStripeTeam(row)) {

@@ -3,19 +3,43 @@ import { parseWorkspaceCreationEligibilityPayload } from "@/features/team/lib/wo
 
 describe("parseWorkspaceCreationEligibilityPayload", () => {
   it("accepts canonical shape", () => {
-    expect(parseWorkspaceCreationEligibilityPayload({ canCreate: true, ownedWorkspaceCount: 1 })).toEqual({
+    expect(
+      parseWorkspaceCreationEligibilityPayload({
+        canCreate: true,
+        canShowInSwitcher: false,
+        ownedWorkspaceCount: 1,
+        hasIndividualPro: false,
+        viewingTeamWorkspaceWithoutPro: true,
+      })
+    ).toEqual({
       canCreate: true,
+      canShowInSwitcher: false,
       ownedWorkspaceCount: 1,
+      hasIndividualPro: false,
+      viewingTeamWorkspaceWithoutPro: true,
     });
   });
 
-  it("rejects missing canCreate", () => {
-    expect(parseWorkspaceCreationEligibilityPayload({ ownedWorkspaceCount: 0 })).toBeNull();
+  it("rejects missing canShowInSwitcher", () => {
+    expect(
+      parseWorkspaceCreationEligibilityPayload({
+        canCreate: true,
+        ownedWorkspaceCount: 0,
+        hasIndividualPro: false,
+      })
+    ).toBeNull();
   });
 
   it("rejects invalid ownedWorkspaceCount", () => {
-    expect(parseWorkspaceCreationEligibilityPayload({ canCreate: false, ownedWorkspaceCount: -1 })).toBeNull();
-    expect(parseWorkspaceCreationEligibilityPayload({ canCreate: false, ownedWorkspaceCount: "1" })).toBeNull();
+    expect(
+      parseWorkspaceCreationEligibilityPayload({
+        canCreate: false,
+        canShowInSwitcher: false,
+        ownedWorkspaceCount: -1,
+        hasIndividualPro: false,
+        viewingTeamWorkspaceWithoutPro: false,
+      })
+    ).toBeNull();
   });
 
   it("rejects non-object input", () => {

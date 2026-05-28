@@ -9,6 +9,7 @@ import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-
 import { isStripeCheckoutConfigured } from "@/server/billing/stripe-billing-routes";
 import { syncStripeCheckoutSessionForUser } from "@/server/billing/stripe-checkout-sync";
 import { getStripe } from "@/server/billing/stripe-client";
+import { userHasIndividualStripePro } from "@/server/billing/stripe-individual-pro";
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { db } from "@/shared/lib/db";
 import { user } from "@/shared/lib/db/auth-schema";
@@ -57,21 +58,23 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       email: user.email,
       subscriptionPlan: user.subscriptionPlan,
       subscriptionStatus: user.subscriptionStatus,
+      stripeSubscriptionId: user.stripeSubscriptionId,
       stripeCustomerId: user.stripeCustomerId,
     })
     .from(user)
     .where(eq(user.id, userId))
     .limit(1);
 
+  const hasIndividualPro = row ? await userHasIndividualStripePro(row) : false;
+
   return (
     <TowerBillingScreen
       email={row?.email}
       entitlement={ent}
       usageStatus={usageStatus}
-      subscriptionPlan={row?.subscriptionPlan}
-      subscriptionStatus={row?.subscriptionStatus}
+      individualSubscriptionStatus={hasIndividualPro ? row?.subscriptionStatus : null}
       checkoutAvailable={isStripeCheckoutConfigured()}
-      showPortal={Boolean(row?.stripeCustomerId)}
+      showIndividualPortal={hasIndividualPro && Boolean(row?.stripeCustomerId)}
     />
   );
 }

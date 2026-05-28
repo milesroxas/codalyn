@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import type { TowerTier } from "@/server/billing/entitlements";
 import { db } from "@/shared/lib/db";
 import { towerPlatformMetering } from "@/shared/lib/db/auth-schema";
 
@@ -15,6 +16,7 @@ export type TowerLimitsSnapshot = {
   envEmergencyMeteringDisabled: boolean;
   free: TowerTierLimits;
   pro: TowerTierLimits;
+  team: TowerTierLimits;
   updatedAt: string | null;
 };
 
@@ -22,6 +24,7 @@ export type TowerLimitsPatch = {
   globalMeteringEnabled?: boolean;
   free?: Partial<TowerTierLimits>;
   pro?: Partial<TowerTierLimits>;
+  team?: Partial<TowerTierLimits>;
 };
 
 const CODE_DEFAULTS = {
@@ -36,7 +39,12 @@ const CODE_DEFAULTS = {
     cmsWritesPerMonth: 50_000,
     imageOptimizesPerMonth: 10_000,
   },
-} as const satisfies Pick<TowerLimitsSnapshot, "globalMeteringEnabled" | "free" | "pro">;
+  team: {
+    webflowProxyRequestsPerMonth: 150_000,
+    cmsWritesPerMonth: 50_000,
+    imageOptimizesPerMonth: 10_000,
+  },
+} as const satisfies Pick<TowerLimitsSnapshot, "globalMeteringEnabled" | "free" | "pro" | "team">;
 
 const envNum = (name: string, fallback: number): number => {
   const v = process.env[name]?.trim();
@@ -53,7 +61,15 @@ function envEmergencyMeteringDisabled(): boolean {
   return process.env.TOWER_METERING_DISABLED === "1" || process.env.TOWER_METERING_DISABLED === "true";
 }
 
-function seedTierLimitsFromEnv(): { free: TowerTierLimits; pro: TowerTierLimits } {
+function seedTierLimitsFromEnv(): { free: TowerTierLimits; pro: TowerTierLimits; team: TowerTierLimits } {
+  const pro = {
+    webflowProxyRequestsPerMonth: envNum(
+      "TOWER_PRO_WEBFLOW_PROXY_REQUESTS_PER_MONTH",
+      CODE_DEFAULTS.pro.webflowProxyRequestsPerMonth
+    ),
+    cmsWritesPerMonth: envNum("TOWER_PRO_CMS_WRITES_PER_MONTH", CODE_DEFAULTS.pro.cmsWritesPerMonth),
+    imageOptimizesPerMonth: envNum("TOWER_PRO_IMAGE_OPTIMIZES_PER_MONTH", CODE_DEFAULTS.pro.imageOptimizesPerMonth),
+  };
   return {
     free: {
       webflowProxyRequestsPerMonth: envNum(
@@ -63,13 +79,20 @@ function seedTierLimitsFromEnv(): { free: TowerTierLimits; pro: TowerTierLimits 
       cmsWritesPerMonth: envNum("TOWER_FREE_CMS_WRITES_PER_MONTH", CODE_DEFAULTS.free.cmsWritesPerMonth),
       imageOptimizesPerMonth: envNum("TOWER_FREE_IMAGE_OPTIMIZES_PER_MONTH", CODE_DEFAULTS.free.imageOptimizesPerMonth),
     },
-    pro: {
+    pro,
+    team: {
       webflowProxyRequestsPerMonth: envNum(
-        "TOWER_PRO_WEBFLOW_PROXY_REQUESTS_PER_MONTH",
-        CODE_DEFAULTS.pro.webflowProxyRequestsPerMonth
+        "TOWER_TEAM_WEBFLOW_PROXY_REQUESTS_PER_MONTH",
+        envNum("TOWER_PRO_WEBFLOW_PROXY_REQUESTS_PER_MONTH", CODE_DEFAULTS.team.webflowProxyRequestsPerMonth)
       ),
-      cmsWritesPerMonth: envNum("TOWER_PRO_CMS_WRITES_PER_MONTH", CODE_DEFAULTS.pro.cmsWritesPerMonth),
-      imageOptimizesPerMonth: envNum("TOWER_PRO_IMAGE_OPTIMIZES_PER_MONTH", CODE_DEFAULTS.pro.imageOptimizesPerMonth),
+      cmsWritesPerMonth: envNum(
+        "TOWER_TEAM_CMS_WRITES_PER_MONTH",
+        envNum("TOWER_PRO_CMS_WRITES_PER_MONTH", CODE_DEFAULTS.team.cmsWritesPerMonth)
+      ),
+      imageOptimizesPerMonth: envNum(
+        "TOWER_TEAM_IMAGE_OPTIMIZES_PER_MONTH",
+        envNum("TOWER_PRO_IMAGE_OPTIMIZES_PER_MONTH", CODE_DEFAULTS.team.imageOptimizesPerMonth)
+      ),
     },
   };
 }
@@ -95,6 +118,11 @@ function rowToSnapshot(row: typeof towerPlatformMetering.$inferSelect): TowerLim
       cmsWritesPerMonth: row.proCmsWritesPerMonth,
       imageOptimizesPerMonth: row.proImageOptimizesPerMonth,
     },
+    team: {
+      webflowProxyRequestsPerMonth: row.teamWebflowProxyRequestsPerMonth,
+      cmsWritesPerMonth: row.teamCmsWritesPerMonth,
+      imageOptimizesPerMonth: row.teamImageOptimizesPerMonth,
+    },
     updatedAt: toIso(row.updatedAt),
   };
 }
@@ -106,6 +134,7 @@ function bootstrapSnapshot(): TowerLimitsSnapshot {
     envEmergencyMeteringDisabled: envEmergencyMeteringDisabled(),
     free: seeded.free,
     pro: seeded.pro,
+    team: seeded.team,
     updatedAt: null,
   };
 }
@@ -120,8 +149,14 @@ export function isGlobalMeteringDisabled(snapshot: TowerLimitsSnapshot): boolean
   return snapshot.envEmergencyMeteringDisabled || !snapshot.globalMeteringEnabled;
 }
 
-export function tierLimitsFromSnapshot(snapshot: TowerLimitsSnapshot, tier: "free" | "pro"): TowerTierLimits {
-  return tier === "pro" ? snapshot.pro : snapshot.free;
+export function tierLimitsFromSnapshot(snapshot: TowerLimitsSnapshot, tier: TowerTier): TowerTierLimits {
+  if (tier === "team") {
+    return snapshot.team;
+  }
+  if (tier === "pro") {
+    return snapshot.pro;
+  }
+  return snapshot.free;
 }
 
 export async function getTowerLimitsSnapshot(): Promise<TowerLimitsSnapshot> {
@@ -152,6 +187,9 @@ export async function getTowerLimitsSnapshot(): Promise<TowerLimitsSnapshot> {
       proWebflowProxyRequestsPerMonth: seeded.pro.webflowProxyRequestsPerMonth,
       proCmsWritesPerMonth: seeded.pro.cmsWritesPerMonth,
       proImageOptimizesPerMonth: seeded.pro.imageOptimizesPerMonth,
+      teamWebflowProxyRequestsPerMonth: seeded.team.webflowProxyRequestsPerMonth,
+      teamCmsWritesPerMonth: seeded.team.cmsWritesPerMonth,
+      teamImageOptimizesPerMonth: seeded.team.imageOptimizesPerMonth,
     })
     .onConflictDoNothing()
     .returning();
@@ -178,7 +216,10 @@ export function parseRequiredPlatformLimitField(raw: unknown): number | "invalid
   return raw;
 }
 
-function parseTierLimitsPatch(tier: "free" | "pro", tierRaw: unknown): Partial<TowerTierLimits> | { error: string } {
+function parseTierLimitsPatch(
+  tier: "free" | "pro" | "team",
+  tierRaw: unknown
+): Partial<TowerTierLimits> | { error: string } {
   if (!tierRaw || typeof tierRaw !== "object") {
     return { error: `invalid_${tier}` };
   }
@@ -226,7 +267,7 @@ export function sanitizeTowerLimitsPatch(raw: unknown): TowerLimitsPatch | { err
     patch.globalMeteringEnabled = body.globalMeteringEnabled;
   }
 
-  for (const tier of ["free", "pro"] as const) {
+  for (const tier of ["free", "pro", "team"] as const) {
     if (!(tier in body)) {
       continue;
     }
@@ -266,6 +307,15 @@ export async function saveTowerLimitsSnapshot(patch: TowerLimitsPatch): Promise<
   }
   if (patch.pro?.imageOptimizesPerMonth !== undefined) {
     updates.proImageOptimizesPerMonth = patch.pro.imageOptimizesPerMonth;
+  }
+  if (patch.team?.webflowProxyRequestsPerMonth !== undefined) {
+    updates.teamWebflowProxyRequestsPerMonth = patch.team.webflowProxyRequestsPerMonth;
+  }
+  if (patch.team?.cmsWritesPerMonth !== undefined) {
+    updates.teamCmsWritesPerMonth = patch.team.cmsWritesPerMonth;
+  }
+  if (patch.team?.imageOptimizesPerMonth !== undefined) {
+    updates.teamImageOptimizesPerMonth = patch.team.imageOptimizesPerMonth;
   }
 
   if (Object.keys(updates).length > 0) {

@@ -388,6 +388,9 @@ export const towerPlatformMetering = pgTable("tower_platform_metering", {
   proWebflowProxyRequestsPerMonth: integer("pro_webflow_proxy_requests_per_month").notNull(),
   proCmsWritesPerMonth: integer("pro_cms_writes_per_month").notNull(),
   proImageOptimizesPerMonth: integer("pro_image_optimizes_per_month").notNull(),
+  teamWebflowProxyRequestsPerMonth: integer("team_webflow_proxy_requests_per_month").notNull(),
+  teamCmsWritesPerMonth: integer("team_cms_writes_per_month").notNull(),
+  teamImageOptimizesPerMonth: integer("team_image_optimizes_per_month").notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())

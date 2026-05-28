@@ -13,6 +13,7 @@ export function mapPlatformMeteringConfig(snapshot: TowerLimitsSnapshot): Operat
     envEmergencyMeteringDisabled: snapshot.envEmergencyMeteringDisabled,
     free: snapshot.free,
     pro: snapshot.pro,
+    team: snapshot.team,
     updatedAt: snapshot.updatedAt,
   };
 }

@@ -44,9 +44,9 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
 
   const preferredOrgId = (session?.user as SessionUserWithPreferred | undefined)?.preferredOrganizationId ?? undefined;
   const orgList = orgs ?? [];
-  const { canCreateWorkspace } = useWorkspaceCreationEligibility({
+  const { canCreateWorkspace, showUpgradeForAnotherWorkspace } = useWorkspaceCreationEligibility({
     serverCanCreate: props.canCreateWorkspace,
-    refetchKey: `${session?.user?.id ?? ""}:${orgList.length}`,
+    refetchKey: `${session?.user?.id ?? ""}:${activeOrg?.id ?? ""}:${orgList.length}`,
   });
 
   useEffect(() => {
@@ -185,6 +185,7 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
       busy={busy}
       compact
       canCreateTeam={canCreateWorkspace}
+      showUpgradeForAnother={showUpgradeForAnotherWorkspace}
       billingEnabled={props.billingEnabled}
       orgName={orgName}
       onOrgNameChange={setOrgName}

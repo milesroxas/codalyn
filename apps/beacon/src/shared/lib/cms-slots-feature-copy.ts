@@ -129,6 +129,13 @@ export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_READY =
 
 export const CMS_SLOTS_CMS_FIELD_LINK_RETRY_LABEL = "Link to CMS field";
 
+export const CMS_SLOTS_CMS_FIELD_LINK_PENDING_LABEL = "Linking…";
+
+export const CMS_SLOTS_LIST_TARGET_CMS_FIELD_LINK_DIALOG_TITLE = "Link CMS field";
+
+export const CMS_SLOTS_LIST_TARGET_CMS_FIELD_LINK_DIALOG_DESCRIPTION =
+  "The slot component Text prop is not linked to the CMS field. Link it to continue setup. If linking fails, refresh this Designer tab and try again.";
+
 export const CMS_SLOTS_CMS_FIELD_LINK_TOAST_SUCCESS = "List target linked to the CMS field.";
 
 export const CMS_SLOTS_CMS_FIELD_NOT_VISIBLE_NOTIFY =

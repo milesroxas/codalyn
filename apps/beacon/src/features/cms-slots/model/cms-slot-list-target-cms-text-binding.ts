@@ -414,6 +414,23 @@ function matchesCmsBinding(value: unknown, expected: CmsSlotListCmsBinding): boo
   return value.collectionId === expected.collectionId && value.fieldId === expected.fieldId;
 }
 
+/** True when an instance Text prop value is bound to the expected CMS Plain Text field. */
+export function isListTargetTextPropValueLinkedToCms(value: unknown, expected: CmsSlotListCmsBinding): boolean {
+  return matchesCmsBinding(value, expected);
+}
+
+/** Reads persisted CMS field ids from the hidden list block (does not create or ensure fields). */
+export async function readCmsSlotListTargetCmsBindingFromListContainer(
+  listContainer: BlockElement
+): Promise<CmsSlotListCmsBinding | null> {
+  const collectionId = await getCmsSlotListTargetCmsCollectionIdFromListContainer(listContainer);
+  const fieldId = await getCmsSlotListTargetCmsFieldIdFromListContainer(listContainer);
+  if (collectionId == null || fieldId == null) {
+    return null;
+  }
+  return { collectionId, fieldId };
+}
+
 /** Concatenate nested Designer error messages (`cause`, etc.) — wording varies by Webflow release / locale. */
 function extractDesignerErrorText(err: unknown): string {
   const seen = new Set<unknown>();

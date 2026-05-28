@@ -35,7 +35,10 @@ import { ComposerUnsavedChangesDialog } from "@/features/cms-slots/ui/cms-slot-c
 import { CmsSlotCompositionPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel";
 import { CmsSlotEngineBackToListDock } from "@/features/cms-slots/ui/cms-slot-composition-panel/cms-slot-engine-back-to-list-dock";
 import { CmsSlotHomePanel } from "@/features/cms-slots/ui/cms-slot-home-panel";
-import { CmsSlotsCmsFieldLinkDialog } from "@/features/cms-slots/ui/cms-slots-cms-field-link-dialog";
+import {
+  CmsSlotsCmsFieldLinkDialog,
+  type CmsSlotsCmsFieldLinkDialogVariant,
+} from "@/features/cms-slots/ui/cms-slots-cms-field-link-dialog";
 import { CmsSlotsPageRuntimeSyncButton } from "@/features/cms-slots/ui/cms-slots-page-runtime-sync-button";
 import { CmsSlotsRouteInteractionProvider } from "@/features/cms-slots/ui/cms-slots-route-interaction-context";
 import {
@@ -60,8 +63,7 @@ import {
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
 import { Button, buttonVariants } from "@/shared/ui/button";
-import { Checkbox } from "@/shared/ui/checkbox";
-import { Label } from "@/shared/ui/label";
+import { CheckboxField } from "@/shared/ui/checkbox-field";
 import { StepNav } from "@/shared/ui/step-nav";
 
 export type CmsSlotsRouteChromeProps = {
@@ -171,9 +173,10 @@ export type CmsSlotsRouteChromeProps = {
   onRemoveListTargetFromCanvasOnly: () => void | Promise<void>;
   onConfirmDeleteListTargetCompletely: () => void | Promise<void>;
   cmsFieldLinkPromptOpen: boolean;
+  cmsFieldLinkPromptVariant: CmsSlotsCmsFieldLinkDialogVariant;
   cmsFieldLinkNavReady: boolean;
   cmsFieldLinkRetryPending: boolean;
-  setCmsFieldLinkPromptOpen: (v: boolean) => void;
+  onCmsFieldLinkPromptOpenChange: (open: boolean) => void;
   onRetryCmsFieldLink: () => void | Promise<void>;
 };
 
@@ -427,18 +430,16 @@ function CmsSlotsBeaconDeleteDialog(p: CmsSlotsRouteChromeProps) {
         </AlertDialogHeader>
         {p.isLastCmsSlotListOnPageForDelete ? (
           <div
-            className="flex max-w-sm gap-2.5 rounded-sm border border-border/70 bg-muted/25 p-2.5 sm:max-w-none"
+            className="max-w-sm rounded-sm border border-border/70 bg-muted/25 p-2.5 sm:max-w-none"
             data-slot="cms_slots_delete_uninstall_page"
           >
-            <Checkbox
+            <CheckboxField
               id={p.lastBeaconUninstallChoiceId}
+              label={CMS_SLOTS_UNINSTALL_PAGE_LABEL}
               checked={p.uninstallWithLastBeaconDelete}
               disabled={p.deletePendingKey != null}
-              onCheckedChange={(v) => p.setUninstallWithLastBeaconDelete(v === true)}
+              onCheckedChange={p.setUninstallWithLastBeaconDelete}
             />
-            <div className="min-w-0">
-              <Label htmlFor={p.lastBeaconUninstallChoiceId}>{CMS_SLOTS_UNINSTALL_PAGE_LABEL}</Label>
-            </div>
           </div>
         ) : null}
         <AlertDialogFooter>
@@ -647,9 +648,10 @@ export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
           <CmsSlotsRemoveListTargetDialog {...p} />
           <CmsSlotsCmsFieldLinkDialog
             open={p.cmsFieldLinkPromptOpen}
+            variant={p.cmsFieldLinkPromptVariant}
             navReady={p.cmsFieldLinkNavReady}
             retryPending={p.cmsFieldLinkRetryPending}
-            onOpenChange={p.setCmsFieldLinkPromptOpen}
+            onOpenChange={p.onCmsFieldLinkPromptOpenChange}
             onRetryLink={p.onRetryCmsFieldLink}
           />
           <ComposerUnsavedChangesDialog

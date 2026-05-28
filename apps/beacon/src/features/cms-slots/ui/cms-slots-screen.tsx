@@ -105,6 +105,8 @@ import {
 } from "@/features/cms-slots/model/site-components";
 import { useCmsComposerEditingContextState } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
+import { useListTargetCmsFieldLinkStatus } from "@/features/cms-slots/model/use-list-target-cms-field-link-status";
+import type { CmsSlotsCmsFieldLinkDialogVariant } from "@/features/cms-slots/ui/cms-slots-cms-field-link-dialog";
 import { CmsSlotsRouteChrome } from "@/features/cms-slots/ui/cms-slots-route-chrome";
 import {
   CMS_SLOTS_CMS_FIELD_LINK_TOAST_SUCCESS,
@@ -797,6 +799,10 @@ export function CmsSlotsScreen() {
   const [listTargetOnCanvasCountResolved, setListTargetOnCanvasCountResolved] = useState(false);
   const [removeListTargetDialogOpen, setRemoveListTargetDialogOpen] = useState(false);
   const [cmsFieldLinkPromptOpen, setCmsFieldLinkPromptOpen] = useState(false);
+  const [cmsFieldLinkPromptVariant, setCmsFieldLinkPromptVariant] =
+    useState<CmsSlotsCmsFieldLinkDialogVariant>("post-create");
+  const cmsFieldLinkPromptVariantRef = useRef<CmsSlotsCmsFieldLinkDialogVariant>("post-create");
+  const cmsFieldLinkDismissedBeaconKeyRef = useRef<string | null>(null);
   const [cmsFieldLinkDetectEpoch, setCmsFieldLinkDetectEpoch] = useState(0);
   const [cmsFieldLinkRetryPending, setCmsFieldLinkRetryPending] = useState(false);
   const cmsFieldLinkBindingRef = useRef<{ collectionId: string; fieldId: string } | null>(null);
@@ -1150,6 +1156,8 @@ export function CmsSlotsScreen() {
     setListTargetOnCanvasCount(0);
     setListTargetOnCanvasCountResolved(false);
     setRemoveListTargetDialogOpen(false);
+    setCmsFieldLinkPromptOpen(false);
+    cmsFieldLinkDismissedBeaconKeyRef.current = null;
     setActiveBeaconKey(null);
     setEngineListSlotFile(null);
     setEnginePublishedDisplayNames(null);
@@ -1179,6 +1187,47 @@ export function CmsSlotsScreen() {
     listTargetDefinitionIdRef
   );
 
+  const storeUnlinkedCmsFieldBinding = useCallback((binding: { collectionId: string; fieldId: string }) => {
+    cmsFieldLinkBindingRef.current = binding;
+  }, []);
+
+  const { listTargetCmsFieldUnlinked, listTargetCmsFieldLinkCheckPending, refreshListTargetCmsFieldLinkStatus } =
+    useListTargetCmsFieldLinkStatus({
+      picking,
+      listTargetPhase,
+      listTargetOnCanvasCount,
+      listTargetOnCanvasCountResolved,
+      activeDataList,
+      activeBeaconKey,
+      targetRef,
+      listTargetDefinitionIdRef,
+      onUnlinkedBinding: storeUnlinkedCmsFieldBinding,
+    });
+
+  useEffect(() => {
+    if (
+      !picking ||
+      listTargetCmsFieldLinkCheckPending ||
+      !listTargetCmsFieldUnlinked ||
+      activeBeaconKey == null ||
+      cmsFieldLinkPromptOpen
+    ) {
+      return;
+    }
+    if (cmsFieldLinkDismissedBeaconKeyRef.current === activeBeaconKey) {
+      return;
+    }
+    cmsFieldLinkPromptVariantRef.current = "detected-unlinked";
+    setCmsFieldLinkPromptVariant("detected-unlinked");
+    setCmsFieldLinkPromptOpen(true);
+  }, [
+    picking,
+    listTargetCmsFieldLinkCheckPending,
+    listTargetCmsFieldUnlinked,
+    activeBeaconKey,
+    cmsFieldLinkPromptOpen,
+  ]);
+
   const handleOpenBeacon = async (beacon: CmsSlotListOnPage) => {
     setCreateFormOpen(false);
     setOpeningBeaconKey(beacon.key);
@@ -1195,6 +1244,7 @@ export function CmsSlotsScreen() {
       setListTargetRegisteredName(null);
       setListTargetOnCanvasCount(0);
       setListTargetOnCanvasCountResolved(false);
+      cmsFieldLinkDismissedBeaconKeyRef.current = null;
       setPicking(true);
     } catch (err) {
       const message = formatWebflowDesignerError(err);
@@ -1206,9 +1256,21 @@ export function CmsSlotsScreen() {
 
   const openCmsFieldLinkPrompt = useCallback((binding: { collectionId: string; fieldId: string }) => {
     cmsFieldLinkBindingRef.current = binding;
+    cmsFieldLinkPromptVariantRef.current = "post-create";
+    setCmsFieldLinkPromptVariant("post-create");
     setCmsFieldLinkDetectEpoch((epoch) => epoch + 1);
     setCmsFieldLinkPromptOpen(true);
   }, []);
+
+  const handleCmsFieldLinkPromptOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open && activeBeaconKey != null) {
+        cmsFieldLinkDismissedBeaconKeyRef.current = activeBeaconKey;
+      }
+      setCmsFieldLinkPromptOpen(open);
+    },
+    [activeBeaconKey]
+  );
 
   const promptCmsFieldLinkIfCreated = useCallback(
     (ensure: CmsSlotListCmsTextFieldEnsureResult | null | undefined) => {
@@ -1237,6 +1299,8 @@ export function CmsSlotsScreen() {
       });
       if (result.ok) {
         setCmsFieldLinkPromptOpen(false);
+        cmsFieldLinkDismissedBeaconKeyRef.current = null;
+        refreshListTargetCmsFieldLinkStatus();
         void webflow.notify({ type: "Success", message: CMS_SLOTS_CMS_FIELD_LINK_TOAST_SUCCESS });
       } else {
         void webflow.notify({ type: "Error", message: result.message });
@@ -2166,9 +2230,10 @@ export function CmsSlotsScreen() {
       onRemoveListTargetFromCanvasOnly={handleRemoveListTargetFromCanvasOnly}
       onConfirmDeleteListTargetCompletely={handleConfirmDeleteListTargetCompletely}
       cmsFieldLinkPromptOpen={cmsFieldLinkPromptOpen}
+      cmsFieldLinkPromptVariant={cmsFieldLinkPromptVariant}
       cmsFieldLinkNavReady={cmsFieldLinkNavReady}
       cmsFieldLinkRetryPending={cmsFieldLinkRetryPending}
-      setCmsFieldLinkPromptOpen={setCmsFieldLinkPromptOpen}
+      onCmsFieldLinkPromptOpenChange={handleCmsFieldLinkPromptOpenChange}
       onRetryCmsFieldLink={handleRetryCmsFieldLink}
     />
   );

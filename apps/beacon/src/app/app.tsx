@@ -58,11 +58,11 @@ export function App() {
           <HashRouter>
             <TooltipProvider delayDuration={200}>
               <Routes>
-                <Route path="/settings" element={<BeaconSettingsPage />} />
                 <Route element={<BeaconAppShell />}>
                   <Route index element={<Navigate to="/home" replace />} />
                   <Route path="home" element={<BeaconHomeScreen />} />
                   <Route path="images" element={<BeaconImagesPage />} />
+                  <Route path="settings" element={<BeaconSettingsPage />} />
                   <Route path="cms-slots/:segment" element={<CmsSlotsRoutePage />} />
                   <Route path="cms-slots" element={<CmsSlotsIndexRedirect />} />
                   <Route path="beacons/:segment" element={<LegacyBeaconsSegmentRedirect />} />

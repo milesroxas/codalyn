@@ -195,7 +195,6 @@ function BeaconMenuSettingsGroup(props: { pathname: string }) {
 
   return (
     <DropdownMenuGroup>
-      <BeaconMenuSectionLabel>Settings</BeaconMenuSectionLabel>
       <DropdownMenuItem className={routeActiveClass("/settings", pathname)} onSelect={() => navigate("/settings")}>
         <Settings aria-hidden />
         Settings

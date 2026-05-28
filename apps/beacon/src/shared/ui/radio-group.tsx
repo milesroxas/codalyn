@@ -27,4 +27,95 @@ function RadioGroupItem({ className, ...props }: React.ComponentProps<typeof Rad
   );
 }
 
-export { RadioGroup, RadioGroupItem };
+const radioGroupTileGridClass = "grid grid-cols-3 gap-1.5";
+
+/** Three-column grid for icon tile radio choices (e.g. theme picker). */
+function RadioGroupTileGrid({ className, ...props }: React.ComponentProps<typeof RadioGroup>) {
+  return <RadioGroup className={cn(radioGroupTileGridClass, className)} {...props} />;
+}
+
+const radioGroupTileOptionClass =
+  "relative flex min-h-0 min-w-0 cursor-pointer flex-col items-center gap-1 rounded-sm border border-border/80 bg-muted/20 p-2 pt-5 text-center transition-colors hover:bg-muted/35 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-muted/40 has-[[data-state=checked]]:shadow-sm";
+
+function RadioGroupTileOption({
+  className,
+  htmlFor,
+  children,
+  ...props
+}: React.ComponentProps<"label"> & { htmlFor: string }) {
+  return (
+    <label
+      htmlFor={htmlFor}
+      data-slot="radio-group-tile-option"
+      className={cn(radioGroupTileOptionClass, className)}
+      {...props}
+    >
+      {children}
+    </label>
+  );
+}
+
+const radioGroupTileOptionControlClass = "absolute top-1.5 right-1.5";
+
+function RadioGroupTileOptionControl({ className, ...props }: React.ComponentProps<typeof RadioGroupItem>) {
+  return (
+    <RadioGroupItem
+      data-slot="radio-group-tile-option-control"
+      className={cn(radioGroupTileOptionControlClass, className)}
+      {...props}
+    />
+  );
+}
+
+const radioGroupTileOptionIconClass = "size-5 shrink-0 text-muted-foreground";
+const radioGroupTileOptionCopyClass = "flex min-w-0 flex-col gap-0.5";
+const radioGroupTileOptionTitleClass = "text-xs leading-tight font-medium";
+const radioGroupTileOptionDescriptionClass = "text-muted-foreground text-xs leading-snug";
+
+function RadioGroupTileOptionIcon({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="radio-group-tile-option-icon"
+      className={cn(radioGroupTileOptionIconClass, className)}
+      {...props}
+    />
+  );
+}
+
+function RadioGroupTileOptionCopy({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div data-slot="radio-group-tile-option-copy" className={cn(radioGroupTileOptionCopyClass, className)} {...props} />
+  );
+}
+
+function RadioGroupTileOptionTitle({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="radio-group-tile-option-title"
+      className={cn(radioGroupTileOptionTitleClass, className)}
+      {...props}
+    />
+  );
+}
+
+function RadioGroupTileOptionDescription({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="radio-group-tile-option-description"
+      className={cn(radioGroupTileOptionDescriptionClass, className)}
+      {...props}
+    />
+  );
+}
+
+export {
+  RadioGroup,
+  RadioGroupItem,
+  RadioGroupTileGrid,
+  RadioGroupTileOption,
+  RadioGroupTileOptionControl,
+  RadioGroupTileOptionCopy,
+  RadioGroupTileOptionDescription,
+  RadioGroupTileOptionIcon,
+  RadioGroupTileOptionTitle,
+};

@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { ChevronLeft } from "lucide-react";
+import { ArrowLeft, ChevronLeft } from "lucide-react";
 import type * as React from "react";
 import type { ReactNode } from "react";
 import { useLayoutEffect, useRef } from "react";
@@ -29,6 +29,29 @@ export function BeaconFeatureRouteHeader(props: BeaconFeatureRouteHeaderProps) {
         <h2 className="min-w-0 w-full truncate text-center text-sm font-medium leading-none tracking-tight text-foreground">
           {title}
         </h2>
+      </div>
+    </div>
+  );
+}
+
+export type BeaconFeatureRouteBackHeaderProps = {
+  title: string;
+  onBack: () => void;
+  backLabel?: string;
+  dataSlot?: string;
+};
+
+/** Route header with a leading back control and truncated title (e.g. settings drill-down). */
+export function BeaconFeatureRouteBackHeader(props: BeaconFeatureRouteBackHeaderProps) {
+  const { title, onBack, backLabel = "Back", dataSlot = "beacon_feature_route_back_header" } = props;
+
+  return (
+    <div className="shrink-0 border-b border-border/65 bg-background" data-slot={dataSlot}>
+      <div className={cn(beaconPanelContainClass, "grid h-8 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 px-3")}>
+        <Button type="button" size="icon-sm" variant="ghost" onClick={onBack} aria-label={backLabel}>
+          <ArrowLeft aria-hidden className="size-4" />
+        </Button>
+        <h2 className="min-w-0 truncate text-sm font-medium leading-none tracking-tight text-foreground">{title}</h2>
       </div>
     </div>
   );

@@ -431,6 +431,16 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
     [user?.id, pullSettingsFromTower]
   );
 
+  useEffect(() => {
+    if (syncState !== "synced" || !user?.id || activeOrganizationId || beaconWorkspaces.length !== 1) {
+      return;
+    }
+    const onlyWorkspaceId = beaconWorkspaces[0]?.id;
+    if (onlyWorkspaceId) {
+      setActiveBeaconWorkspace(onlyWorkspaceId);
+    }
+  }, [syncState, user?.id, activeOrganizationId, beaconWorkspaces, setActiveBeaconWorkspace]);
+
   const handleThemeChange = useCallback(
     (theme: BeaconAppSettings["theme"]) => {
       updateSettings({ theme });

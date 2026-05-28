@@ -15,6 +15,8 @@ import { type ReactNode, useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { isTowerConfigured, openTowerAppHome, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
+import { BeaconWorkspaceMenuGroup } from "@/features/settings/ui/beacon-workspace-control";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
@@ -280,6 +282,19 @@ function BeaconTowerUnavailableBanner() {
   );
 }
 
+function BeaconMenuWorkspaceSection() {
+  const { syncState, beaconWorkspaces, activeOrganizationId, setActiveBeaconWorkspace } = useBeaconAppSettings();
+
+  return (
+    <BeaconWorkspaceMenuGroup
+      syncState={syncState}
+      workspaces={beaconWorkspaces}
+      activeOrganizationId={activeOrganizationId}
+      onSelectWorkspace={setActiveBeaconWorkspace}
+    />
+  );
+}
+
 function BeaconAppMenu({
   towerConfigured,
   user,
@@ -331,6 +346,12 @@ function BeaconAppMenu({
               onOpenTowerEmailPopup={onOpenTowerEmailPopup}
               onOpenTowerActions={() => setTowerActionsOpen(true)}
             />
+            {user ? (
+              <>
+                <DropdownMenuSeparator />
+                <BeaconMenuWorkspaceSection />
+              </>
+            ) : null}
             <DropdownMenuSeparator />
             <BeaconMenuNavigateGroup pathname={pathname} />
             <DropdownMenuSeparator />

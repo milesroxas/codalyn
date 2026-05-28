@@ -10,10 +10,10 @@ import type {
   BeaconTowerWorkspace,
 } from "@/features/settings/model/beacon-app-settings-provider";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
+import { BeaconWorkspaceSelectField } from "@/features/settings/ui/beacon-workspace-control";
 import { cn } from "@/shared/lib/utils";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Separator } from "@/shared/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
@@ -70,8 +70,6 @@ function formatMemberRoleForBadge(workspaceMemberRole: string | null, hasActiveW
   return workspaceMemberRole.replace(/_/g, " ");
 }
 
-const WORKSPACE_SELECT_NONE = "__beacon_workspace_none__";
-
 function roleAuxLabel(
   syncState: BeaconSettingsSyncState,
   workspaceMemberRole: string | null,
@@ -90,81 +88,6 @@ function roleAuxLabel(
     text: formatMemberRoleForBadge(workspaceMemberRole, hasActiveWorkspace),
     tone: "muted",
   };
-}
-
-function WorkspaceField({
-  syncState,
-  workspaces,
-  activeOrganizationId,
-  setActiveBeaconWorkspace,
-}: {
-  syncState: BeaconSettingsSyncState;
-  workspaces: BeaconTowerWorkspace[];
-  activeOrganizationId: string | null;
-  setActiveBeaconWorkspace: (organizationId: string) => void;
-}) {
-  const wrapperClass = "flex min-w-0 shrink-0 flex-col items-end gap-0.5";
-  const captionClass = "text-muted-foreground text-[10px] font-normal uppercase tracking-wide leading-none";
-  if (syncState === "error") {
-    return (
-      <div className={wrapperClass}>
-        <span className={captionClass}>Workspace</span>
-        <span className="text-destructive max-w-40 truncate text-xs leading-tight">Unavailable</span>
-      </div>
-    );
-  }
-  if (syncState !== "synced") {
-    return (
-      <div className={wrapperClass}>
-        <span className={captionClass}>Workspace</span>
-        <span className="text-muted-foreground text-xs leading-tight">…</span>
-      </div>
-    );
-  }
-  if (workspaces.length === 0) {
-    return (
-      <div className={wrapperClass}>
-        <span className={captionClass}>Workspace</span>
-        <span className="text-muted-foreground text-xs leading-tight">None</span>
-      </div>
-    );
-  }
-  if (workspaces.length === 1) {
-    return (
-      <div className={wrapperClass}>
-        <span className={captionClass}>Workspace</span>
-        <span className="max-w-40 truncate text-xs font-medium leading-tight">{workspaces[0].name}</span>
-      </div>
-    );
-  }
-  return (
-    <Select
-      value={activeOrganizationId ?? WORKSPACE_SELECT_NONE}
-      onValueChange={(v) => {
-        if (v !== WORKSPACE_SELECT_NONE) {
-          setActiveBeaconWorkspace(v);
-        }
-      }}
-    >
-      <SelectTrigger
-        size="sm"
-        aria-label="Workspace"
-        className="max-w-44 shrink-0 font-normal *:data-[slot=select-value]:truncate"
-      >
-        <SelectValue placeholder="Select workspace" />
-      </SelectTrigger>
-      <SelectContent align="end">
-        <SelectItem value={WORKSPACE_SELECT_NONE} disabled className="text-muted-foreground">
-          Select workspace…
-        </SelectItem>
-        {workspaces.map((w) => (
-          <SelectItem key={w.id} value={w.id}>
-            {w.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
 }
 
 function syncStatusMeta(syncState: BeaconSettingsSyncState): {
@@ -313,11 +236,11 @@ function SignedInAccountSections({
               ) : null}
             </p>
           </div>
-          <WorkspaceField
+          <BeaconWorkspaceSelectField
             syncState={syncState}
             workspaces={beaconWorkspaces}
             activeOrganizationId={activeOrganizationId}
-            setActiveBeaconWorkspace={setActiveBeaconWorkspace}
+            onSelectWorkspace={setActiveBeaconWorkspace}
           />
         </div>
       </section>

@@ -44,7 +44,7 @@ export function useWorkspaceCreationEligibility(options?: {
   isReady: boolean;
 } {
   const [state, setState] = useState<WorkspaceCreationEligibilityState>({ ready: false, canCreate: false });
-  const refetchKey = options?.refetchKey ?? "";
+  const refetchKey = options?.refetchKey != null ? String(options.refetchKey) : "";
 
   useEffect(() => {
     let cancelled = false;

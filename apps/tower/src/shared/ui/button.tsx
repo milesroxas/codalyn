@@ -41,7 +41,6 @@ const buttonVariants = cva(
         auto: "",
         fit: "w-fit self-start",
         full: "w-full",
-        formInline: "w-full shrink-0 lg:w-auto",
       },
     },
     defaultVariants: {

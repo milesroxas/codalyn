@@ -3,7 +3,11 @@
 import { IconUserPlus } from "@tabler/icons-react";
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { getInviteSeatUiState, type WorkspaceSeatState } from "@/features/team/lib/workspace-seat-state";
-import { InviteSeatLimitMessages, WorkspaceInviteFields } from "@/features/team/ui/workspace-invite-form-fields";
+import {
+  InviteSeatLimitMessages,
+  WorkspaceInviteEmailField,
+  WorkspaceInviteRoleField,
+} from "@/features/team/ui/workspace-invite-form-fields";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -14,6 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shared/ui/dialog";
+import { FormFieldGrid } from "@/shared/ui/form-field";
 
 export function WorkspaceInviteDialog(props: {
   busy: boolean;
@@ -93,15 +98,20 @@ export function WorkspaceInviteDialog(props: {
             inviteBlocked={inviteBlocked}
             showTeamUpgradeHint={showTeamUpgradeHint}
           />
-          <WorkspaceInviteFields
-            emailFieldId={emailFieldId}
-            roleFieldId={roleFieldId}
-            inviteEmail={inviteEmail}
-            inviteRole={inviteRole}
-            inviteBlocked={inviteBlocked}
-            onInviteEmailChange={onInviteEmailChange}
-            onInviteRoleChange={onInviteRoleChange}
-          />
+          <FormFieldGrid>
+            <WorkspaceInviteEmailField
+              id={emailFieldId}
+              value={inviteEmail}
+              disabled={inviteBlocked}
+              onChange={onInviteEmailChange}
+            />
+            <WorkspaceInviteRoleField
+              id={roleFieldId}
+              value={inviteRole}
+              disabled={inviteBlocked}
+              onChange={onInviteRoleChange}
+            />
+          </FormFieldGrid>
           <DialogFooter showCloseButton>
             <Button type="submit" disabled={busy || inviteBlocked}>
               {busy ? "Sending…" : "Send invite"}

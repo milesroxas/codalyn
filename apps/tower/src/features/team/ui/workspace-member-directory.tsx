@@ -1,10 +1,9 @@
 "use client";
 
-import { IconUserPlus } from "@tabler/icons-react";
 import type { FormEvent } from "react";
 import type { WorkspaceSeatState } from "@/features/team/lib/workspace-seat-state";
 import type { MemberRow } from "@/features/team/model/workspace-types";
-import { WorkspaceInviteDialog } from "@/features/team/ui/workspace-invite-dialog";
+import { WorkspaceInviteAction } from "@/features/team/ui/workspace-invite-action";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -65,7 +64,7 @@ export function WorkspaceMemberDirectoryCard(props: {
         <CardDescription>Workspace members and their access levels.</CardDescription>
         {canManageTeam ? (
           <CardAction align="center">
-            <WorkspaceInviteDialog
+            <WorkspaceInviteAction
               busy={busy}
               inviteEmail={inviteEmail}
               inviteRole={inviteRole}
@@ -75,12 +74,6 @@ export function WorkspaceMemberDirectoryCard(props: {
               onInviteEmailChange={onInviteEmailChange}
               onInviteRoleChange={onInviteRoleChange}
               onInvite={onInvite}
-              trigger={
-                <Button type="button" size="sm" disabled={busy}>
-                  <IconUserPlus aria-hidden />
-                  Invite
-                </Button>
-              }
             />
           </CardAction>
         ) : null}

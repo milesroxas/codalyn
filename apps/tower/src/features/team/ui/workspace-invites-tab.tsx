@@ -1,21 +1,19 @@
 "use client";
 
-import { IconClockHour4, IconMailForward, IconUserPlus } from "@tabler/icons-react";
-import { type FormEvent, useId } from "react";
+import { IconClockHour4, IconMailForward } from "@tabler/icons-react";
+import type { FormEvent } from "react";
 import { formatInvitationExpiry } from "@/features/team/lib/workspace-invitation-utils";
 import { getInviteSeatUiState, type WorkspaceSeatState } from "@/features/team/lib/workspace-seat-state";
 import type { InvitationRow } from "@/features/team/model/workspace-types";
 import { InvitationRowActions } from "@/features/team/ui/invitation-row-actions";
-import { InviteSeatLimitMessages, WorkspaceInviteFields } from "@/features/team/ui/workspace-invite-form-fields";
+import { WorkspaceInviteAction } from "@/features/team/ui/workspace-invite-action";
 import { WorkspaceInvitesUpsellState } from "@/features/team/ui/workspace-invites-upsell";
 import {
   formatTowerInvitationStatusLabel,
   TOWER_INVITATION_STATUS,
 } from "@/shared/lib/membership/tower-invitation-status";
 import { Badge } from "@/shared/ui/badge";
-import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { FormFieldAction, FormFieldActionLabelSpacer, FormFieldGrid, FormInlineLayout } from "@/shared/ui/form-field";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { TabsContent } from "@/shared/ui/tabs";
 
@@ -54,14 +52,7 @@ export function WorkspaceInvitesTab(props: {
     onInviteAgain,
   } = props;
 
-  const emailFieldId = useId();
-  const roleFieldId = useId();
-
-  const { showInvitesUpsellState, inviteBlocked, showTeamUpgradeHint } = getInviteSeatUiState(
-    seatState,
-    invitations.length,
-    organizationId
-  );
+  const { showInvitesUpsellState } = getInviteSeatUiState(seatState, invitations.length, organizationId);
 
   if (showInvitesUpsellState && organizationId) {
     return <WorkspaceInvitesUpsellState organizationId={organizationId} canManageBilling={canManageBilling} />;
@@ -69,52 +60,6 @@ export function WorkspaceInvitesTab(props: {
 
   return (
     <TabsContent value="invites" className="space-y-6">
-      <Card size="sm" className="border-primary/20 bg-linear-to-br from-primary/5 via-transparent to-transparent">
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <IconUserPlus className="size-4" aria-hidden />
-            </span>
-            <div>
-              <CardTitle className="text-base">Invite someone</CardTitle>
-              <CardDescription>They receive an email to join this workspace.</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <InviteSeatLimitMessages
-            seatState={seatState}
-            inviteBlocked={inviteBlocked}
-            showTeamUpgradeHint={showTeamUpgradeHint}
-          />
-          <form
-            onSubmit={(ev) => {
-              void onInvite(ev);
-            }}
-          >
-            <FormInlineLayout>
-              <FormFieldGrid grow>
-                <WorkspaceInviteFields
-                  emailFieldId={emailFieldId}
-                  roleFieldId={roleFieldId}
-                  inviteEmail={inviteEmail}
-                  inviteRole={inviteRole}
-                  inviteBlocked={inviteBlocked}
-                  onInviteEmailChange={onInviteEmailChange}
-                  onInviteRoleChange={onInviteRoleChange}
-                />
-              </FormFieldGrid>
-              <FormFieldAction>
-                <FormFieldActionLabelSpacer />
-                <Button type="submit" disabled={busy || inviteBlocked} width="formInline">
-                  Send invite
-                </Button>
-              </FormFieldAction>
-            </FormInlineLayout>
-          </form>
-        </CardContent>
-      </Card>
-
       <Card size="sm" layout="table-section">
         <CardHeader>
           <CardTitle>Invitations</CardTitle>
@@ -122,6 +67,19 @@ export function WorkspaceInvitesTab(props: {
             Manage pending invites or clean up past invitations. Pending invites can be resent or revoked; ended invites
             can be deleted or re-sent.
           </CardDescription>
+          <CardAction align="center">
+            <WorkspaceInviteAction
+              busy={busy}
+              inviteEmail={inviteEmail}
+              inviteRole={inviteRole}
+              seatState={seatState}
+              organizationId={organizationId}
+              invitationsCount={invitations.length}
+              onInviteEmailChange={onInviteEmailChange}
+              onInviteRoleChange={onInviteRoleChange}
+              onInvite={onInvite}
+            />
+          </CardAction>
         </CardHeader>
         <CardContent>
           {invitations.length === 0 ? (

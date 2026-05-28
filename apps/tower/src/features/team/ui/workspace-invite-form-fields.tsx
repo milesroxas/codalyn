@@ -36,48 +36,54 @@ export function InviteSeatLimitMessages(props: {
   return null;
 }
 
-export function WorkspaceInviteFields(props: {
-  emailFieldId: string;
-  roleFieldId: string;
-  inviteEmail: string;
-  inviteRole: string;
-  inviteBlocked: boolean;
-  onInviteEmailChange: (value: string) => void;
-  onInviteRoleChange: (value: string) => void;
+export function WorkspaceInviteEmailField(props: {
+  id: string;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
 }) {
-  const { emailFieldId, roleFieldId, inviteEmail, inviteRole, inviteBlocked, onInviteEmailChange, onInviteRoleChange } =
-    props;
+  const { id, value, disabled, onChange } = props;
 
   return (
-    <>
-      <FormField>
-        <Label htmlFor={emailFieldId}>Email</Label>
-        <Input
-          id={emailFieldId}
-          type="email"
-          autoComplete="email"
-          placeholder="colleague@company.com"
-          value={inviteEmail}
-          onChange={(event) => onInviteEmailChange(event.target.value)}
-          required
-          disabled={inviteBlocked}
-        />
-      </FormField>
-      <FormField>
-        <Label htmlFor={roleFieldId}>Role</Label>
-        <Select value={inviteRole} onValueChange={onInviteRoleChange} disabled={inviteBlocked}>
-          <SelectTrigger id={roleFieldId} aria-label="Role">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TOWER_TEAM_ROLES.map((role) => (
-              <SelectItem key={role} value={role}>
-                {role}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FormField>
-    </>
+    <FormField>
+      <Label htmlFor={id}>Email</Label>
+      <Input
+        id={id}
+        type="email"
+        autoComplete="email"
+        placeholder="colleague@company.com"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        required
+        disabled={disabled}
+      />
+    </FormField>
+  );
+}
+
+export function WorkspaceInviteRoleField(props: {
+  id: string;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const { id, value, disabled, onChange } = props;
+
+  return (
+    <FormField>
+      <Label htmlFor={id}>Role</Label>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
+        <SelectTrigger id={id} aria-label="Role">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {TOWER_TEAM_ROLES.map((role) => (
+            <SelectItem key={role} value={role}>
+              {role}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </FormField>
   );
 }

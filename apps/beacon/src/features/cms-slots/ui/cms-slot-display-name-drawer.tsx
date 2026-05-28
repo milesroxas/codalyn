@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { CMS_SLOT_ROW_NAME_MAX } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
+import { useCmsSlotsDrawerDismissBlocked } from "@/features/cms-slots/ui/cms-slots-route-interaction-context";
 import { Button } from "@/shared/ui/button";
 import {
   Drawer,
@@ -51,9 +52,10 @@ export function CmsSlotDisplayNameDrawer(props: CmsSlotDisplayNameDrawerProps) {
   } = props;
 
   const len = value.length > CMS_SLOT_ROW_NAME_MAX ? CMS_SLOT_ROW_NAME_MAX : value.length;
+  const dismissBlocked = useCmsSlotsDrawerDismissBlocked(primaryPending);
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} dismissible>
+    <Drawer open={open} onOpenChange={onOpenChange} interactionBlocked={dismissBlocked}>
       {trigger != null ? <DrawerTrigger asChild>{trigger}</DrawerTrigger> : null}
       <DrawerContent>
         <DrawerHeader>

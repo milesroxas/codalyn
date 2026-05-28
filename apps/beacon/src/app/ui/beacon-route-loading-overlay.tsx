@@ -13,7 +13,7 @@ type BeaconRouteLoadingOverlayProps = {
   visible: boolean;
   /** When set, skips an internal deferred-loading timer (pass from a parent that already deferred the same signal). */
   deferredVisible?: boolean;
-  /** Fires when the overlay mounts or fully unmounts after its exit transition. */
+  /** Fires when the overlay is visibly blocking the viewport (not during opacity-0 exit). */
   onOccupancyChange?: (occupied: boolean) => void;
   ariaLabel: string;
   message?: string;
@@ -48,8 +48,8 @@ function BeaconRouteLoadingOverlayShell(props: BeaconRouteLoadingOverlayShellPro
   const exitFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    onOccupancyChange?.(mounted);
-  }, [mounted, onOccupancyChange]);
+    onOccupancyChange?.(shown);
+  }, [shown, onOccupancyChange]);
 
   useLayoutEffect(() => {
     if (showVisible) {
@@ -92,8 +92,7 @@ function BeaconRouteLoadingOverlayShell(props: BeaconRouteLoadingOverlayShellPro
       layout="overlay"
       className={cn(
         beaconRouteContentTransitionMotionClass,
-        shown ? "opacity-100" : "opacity-0",
-        "pointer-events-auto",
+        shown ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
         className
       )}
       role="status"

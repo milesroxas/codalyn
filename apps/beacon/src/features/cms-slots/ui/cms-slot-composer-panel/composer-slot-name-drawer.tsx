@@ -167,7 +167,7 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
 
   return (
     <>
-      <Drawer open={open} dismissible onOpenChange={handleComposerDrawerOpenChange}>
+      <Drawer open={open} onOpenChange={handleComposerDrawerOpenChange}>
         <DrawerTrigger asChild>
           <Button type="button" variant="composerSlotTitle" disabled={disabled} className={triggerClassName}>
             <span className="min-w-0 truncate">{row.name}</span>

@@ -1,6 +1,7 @@
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
+import { cmsSlotListTargetPhaseUnsettled } from "@/features/cms-slots/model/cms-slot-list-target-settled";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { CMS_SLOTS_ENGINE_COMPONENTS_LABEL } from "@/shared/lib/cms-slots-feature-copy";
 import {
@@ -52,8 +53,6 @@ export type CmsSlotCompositionPanelProps = {
   renamingPublishedSlotKey: string | null;
   autoOpenExposeDrawerRowKey?: string | null;
   onAutoOpenExposeDrawerConsumed?: () => void;
-  /** False while route loading overlay is visible or exiting — defer auto-open until idle. */
-  routeInteractionIdle?: boolean;
 };
 
 export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
@@ -92,7 +91,6 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     renamingPublishedSlotKey,
     autoOpenExposeDrawerRowKey = null,
     onAutoOpenExposeDrawerConsumed,
-    routeInteractionIdle = true,
   } = props;
 
   const listTargetActionBusy =
@@ -100,9 +98,7 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     listTargetRemovePending ||
     listTargetFocusOnCanvasPending ||
     listTargetPlaceOnCanvasPending ||
-    listTargetPhase === "loading" ||
-    listTargetPhase === "updating" ||
-    (listTargetPhase === "synced" && !listTargetOnCanvasCountResolved);
+    cmsSlotListTargetPhaseUnsettled(listTargetPhase, listTargetOnCanvasCountResolved);
 
   const { composableByKey, composableLoading } = useCompositionComposableMeta(selected);
 
@@ -148,7 +144,6 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
             onResyncEngineSlotAttrs={onResyncEngineSlotAttrs}
             autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
             onAutoOpenExposeDrawerConsumed={onAutoOpenExposeDrawerConsumed}
-            routeInteractionIdle={routeInteractionIdle}
           />
         )}
         <CmsSlotCompositionComponentsCatalogSheet

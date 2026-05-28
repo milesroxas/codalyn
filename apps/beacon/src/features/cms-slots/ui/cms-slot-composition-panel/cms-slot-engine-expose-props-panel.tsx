@@ -43,7 +43,7 @@ export function CmsSlotEngineExposePropsPanel(props: CmsSlotEngineExposePropsPan
   }
 
   return (
-    <CheckboxFieldList aria-label={CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL}>
+    <CheckboxFieldList aria-label={CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL} data-vaul-no-drag="">
       {available.map((prop) => {
         const checked = slotExposed.some((entry) => entry.propId === prop.propId);
         const fieldId = `cms-slot-expose-${rowKey}-${prop.propId}`;

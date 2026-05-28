@@ -1,5 +1,5 @@
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
-import { shouldShowCmsSlotsPreInstall } from "@/features/cms-slots/model/cms-slots-access";
+import { cmsSlotsHomePanelContentKey } from "@/features/cms-slots/model/cms-slots-panel-content-key";
 import { CmsSlotsPreInstallEmptyState } from "@/features/cms-slots/ui/cms-slots-pre-install-empty-state";
 import { CmsSlotsRouteMainIntro } from "@/features/cms-slots/ui/cms-slots-route-main-intro";
 import { OnThisPageSection } from "./on-this-page-section";
@@ -49,11 +49,9 @@ export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
     renamePendingKey,
   } = props;
 
-  if (!routeStateKnown) {
-    return null;
-  }
+  const homeContentKey = cmsSlotsHomePanelContentKey({ routeStateKnown, beaconsWrapperInstalled });
 
-  if (shouldShowCmsSlotsPreInstall({ routeStateKnown, beaconsWrapperInstalled })) {
+  if (homeContentKey === "install") {
     return (
       <CmsSlotsPreInstallEmptyState
         data-slot="beacon_install_prompt"

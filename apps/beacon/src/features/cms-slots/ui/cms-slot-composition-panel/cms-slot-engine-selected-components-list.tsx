@@ -27,7 +27,6 @@ type CmsSlotEngineSelectedComponentsListProps = {
   onResyncEngineSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
   autoOpenExposeDrawerRowKey?: string | null;
   onAutoOpenExposeDrawerConsumed?: () => void;
-  routeInteractionIdle?: boolean;
 };
 
 export function CmsSlotEngineSelectedComponentsList(props: CmsSlotEngineSelectedComponentsListProps) {
@@ -48,7 +47,6 @@ export function CmsSlotEngineSelectedComponentsList(props: CmsSlotEngineSelected
     onResyncEngineSlotAttrs,
     autoOpenExposeDrawerRowKey = null,
     onAutoOpenExposeDrawerConsumed,
-    routeInteractionIdle = true,
   } = props;
 
   return (
@@ -79,7 +77,6 @@ export function CmsSlotEngineSelectedComponentsList(props: CmsSlotEngineSelected
               onResyncEngineSlotAttrs={onResyncEngineSlotAttrs}
               autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
               onAutoOpenExposeDrawerConsumed={onAutoOpenExposeDrawerConsumed}
-              routeInteractionIdle={routeInteractionIdle}
             />
           ))}
         </ul>

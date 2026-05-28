@@ -48,10 +48,6 @@ export const CMS_SLOTS_SCAN_ARIA_LABEL = "Scanning page for CMS slot lists";
 
 export const CMS_SLOTS_SCAN_MESSAGE = "Scanning page for slot lists…";
 
-export const CMS_SLOTS_OPENING_ARIA_LABEL = "Opening CMS slot";
-
-export const CMS_SLOTS_OPENING_MESSAGE = "Opening slot list…";
-
 export const CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT = "Adding component…";
 
 export const CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG = "Saving slot config…";
@@ -79,8 +75,6 @@ export const CMS_SLOTS_ROUTE_TASK_OPENING_LIST_TARGET = "Opening list target…"
 export const CMS_SLOTS_ROUTE_TASK_FINISHING = "Finishing up…";
 
 export const CMS_SLOTS_ROUTE_TASK_REMOVING_LIST_TARGET = "Removing list target…";
-
-export const CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET = "Checking list target…";
 
 export const CMS_SLOTS_ROUTE_TASK_REMOVING_COMPONENT = "Removing component…";
 

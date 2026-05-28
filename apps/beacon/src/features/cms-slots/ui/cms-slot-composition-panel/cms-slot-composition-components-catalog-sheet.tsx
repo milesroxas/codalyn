@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { useCmsSlotsDrawerDismissBlocked } from "@/features/cms-slots/ui/cms-slots-route-interaction-context";
 import {
   CMS_SLOTS_ENGINE_ADD_COMPONENT_LABEL,
   CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_DESCRIPTION,
@@ -16,9 +17,10 @@ import {
 export function CmsSlotCompositionComponentsCatalogSheet(props: CmsSlotCompositionComponentsCatalogProps) {
   const { addPending, searchFieldId, componentQuery, setComponentQuery, catalogLoading } = props;
   const [open, setOpen] = useState(false);
+  const dismissBlocked = useCmsSlotsDrawerDismissBlocked(catalogLoading, addPending);
 
   return (
-    <Drawer open={open} onOpenChange={setOpen} dismissible>
+    <Drawer open={open} onOpenChange={setOpen} interactionBlocked={dismissBlocked}>
       <DrawerTrigger asChild>
         <Button type="button" variant="actionCard" size="actionCard" disabled={addPending}>
           <Plus data-icon="inline-start" aria-hidden strokeWidth={2.25} />

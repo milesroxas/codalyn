@@ -7,6 +7,10 @@ import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site
 import { ComposerSlotNameDrawer } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-slot-name-drawer";
 import { CmsSlotEngineExposePropsPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel/cms-slot-engine-expose-props-panel";
 import {
+  useCmsSlotsDrawerDismissBlocked,
+  useCmsSlotsRouteInteractionBlocked,
+} from "@/features/cms-slots/ui/cms-slots-route-interaction-context";
+import {
   CMS_SLOTS_ENGINE_EXPOSE_PROPS_DESCRIPTION,
   CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL,
   CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION,
@@ -76,7 +80,6 @@ type CmsSlotEngineSelectedRowProps = {
   /** When set to this row’s `key`, opens the expose/tag drawer once (e.g. right after adding the component). */
   autoOpenExposeDrawerRowKey?: string | null;
   onAutoOpenExposeDrawerConsumed?: () => void;
-  routeInteractionIdle?: boolean;
 };
 
 export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
@@ -99,9 +102,9 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     onResyncEngineSlotAttrs,
     autoOpenExposeDrawerRowKey = null,
     onAutoOpenExposeDrawerConsumed,
-    routeInteractionIdle = true,
   } = props;
   const showComposableLoading = useDeferredLoadingIndicator(composableLoading);
+  const routeInteractionBlocked = useCmsSlotsRouteInteractionBlocked();
 
   const [propsDrawerOpen, setPropsDrawerOpen] = useState(false);
   const [closeBeforeTagDialogOpen, setCloseBeforeTagDialogOpen] = useState(false);
@@ -111,6 +114,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
   const exposedCount = slotExposed.length;
 
   const tagAttrsBusy = tagAttrsPending || resyncingEngineSlotKey === row.key;
+  const exposeDrawerDismissBlocked = useCmsSlotsDrawerDismissBlocked(tagAttrsBusy);
 
   const hasNewExposeSelections = propsDrawerOpen && !sameExposedPropSelection(slotExposed, exposeBaselineRef.current);
 
@@ -123,7 +127,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     if (autoOpenExposeDrawerRowKey !== row.key) {
       return;
     }
-    if (addPending || listTargetActionBusy || composableLoading || !composableMetaReady || !routeInteractionIdle) {
+    if (addPending || listTargetActionBusy || composableLoading || !composableMetaReady || routeInteractionBlocked) {
       return;
     }
     const frame = requestAnimationFrame(() => {
@@ -141,7 +145,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     listTargetActionBusy,
     onAutoOpenExposeDrawerConsumed,
     openExposeDrawer,
-    routeInteractionIdle,
+    routeInteractionBlocked,
     row.key,
   ]);
 
@@ -149,6 +153,9 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     (nextOpen: boolean) => {
       if (nextOpen) {
         setPropsDrawerOpen(true);
+        return;
+      }
+      if (exposeDrawerDismissBlocked) {
         return;
       }
       if (tagAttrsPendingRef.current || resyncingEngineSlotKey === row.key) {
@@ -160,7 +167,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
       }
       setCloseBeforeTagDialogOpen(true);
     },
-    [resyncingEngineSlotKey, row.key, slotExposed]
+    [exposeDrawerDismissBlocked, resyncingEngineSlotKey, row.key, slotExposed]
   );
 
   const handleDiscardExposeChangesClose = useCallback(() => {
@@ -232,7 +239,11 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
         </Button>
       </div>
 
-      <Drawer open={propsDrawerOpen} dismissible={!tagAttrsBusy} onOpenChange={handlePropsDrawerOpenChange}>
+      <Drawer
+        open={propsDrawerOpen}
+        interactionBlocked={exposeDrawerDismissBlocked}
+        onOpenChange={handlePropsDrawerOpenChange}
+      >
         <DrawerContent stickyFooter>
           <DrawerHeader align="start">
             <DrawerTitle>{publishedDisplayName}</DrawerTitle>
@@ -245,7 +256,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
               available={available}
               slotExposed={slotExposed}
               showComposableLoading={showComposableLoading}
-              disabled={removingKey !== null || listTargetActionBusy || tagAttrsBusy}
+              disabled={removingKey !== null || tagAttrsBusy}
               onSetSlotExposed={onSetSlotExposed}
             />
           </DrawerBody>

@@ -1191,6 +1191,10 @@ export function CmsSlotsScreen() {
       setSelected(rows);
       const f = await readCmsSlotEngineSlotPropsFile(beacon.container, rows.length);
       setEngineListSlotFile(f);
+      setListTargetPhase("loading");
+      setListTargetRegisteredName(null);
+      setListTargetOnCanvasCount(0);
+      setListTargetOnCanvasCountResolved(false);
       setPicking(true);
     } catch (err) {
       const message = formatWebflowDesignerError(err);

@@ -6,8 +6,29 @@ import { Drawer as VaulDrawer } from "vaul";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 
-function Drawer({ ...props }: ComponentProps<typeof VaulDrawer.Root>) {
-  return <VaulDrawer.Root data-slot="drawer" repositionInputs={false} {...props} />;
+type DrawerProps = ComponentProps<typeof VaulDrawer.Root> & {
+  /** When true, backdrop swipe/click and dismiss gestures cannot close the drawer. */
+  interactionBlocked?: boolean;
+};
+
+function Drawer(props: DrawerProps) {
+  const { interactionBlocked = false, dismissible = true, onOpenChange, ...rest } = props;
+  const effectiveDismissible = dismissible && !interactionBlocked;
+
+  return (
+    <VaulDrawer.Root
+      data-slot="drawer"
+      repositionInputs={false}
+      dismissible={effectiveDismissible}
+      onOpenChange={(open) => {
+        if (!open && interactionBlocked) {
+          return;
+        }
+        onOpenChange?.(open);
+      }}
+      {...rest}
+    />
+  );
 }
 
 function DrawerTrigger({ ...props }: ComponentProps<typeof VaulDrawer.Trigger>) {

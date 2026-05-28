@@ -1,4 +1,3 @@
-import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Database } from "lucide-react";
 import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
 import {
@@ -108,13 +107,8 @@ function ComposerEditingContextBody(props: {
 
 export function CmsSlotsComposerEditingContextCard(props: CmsSlotsComposerEditingContextCardProps) {
   const { context, slotListLabel } = props;
-  const showLoading = useDeferredLoadingIndicator(context.phase === "loading");
 
   if (context.phase === "idle") {
-    return null;
-  }
-
-  if (context.phase === "loading" && !showLoading) {
     return null;
   }
 

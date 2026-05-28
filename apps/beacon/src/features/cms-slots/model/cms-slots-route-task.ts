@@ -1,9 +1,5 @@
-import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import {
-  CMS_SLOTS_OPENING_ARIA_LABEL,
-  CMS_SLOTS_OPENING_MESSAGE,
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
-  CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET,
   CMS_SLOTS_ROUTE_TASK_CREATING_LIST,
   CMS_SLOTS_ROUTE_TASK_CREATING_LIST_TARGET,
   CMS_SLOTS_ROUTE_TASK_DELETING_LIST,
@@ -16,7 +12,6 @@ import {
   CMS_SLOTS_ROUTE_TASK_SAVING_EXPOSED_PROPS,
   CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT,
   CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES,
-  CMS_SLOTS_ROUTE_TASK_UPDATING_LIST_TARGET,
   CMS_SLOTS_SCAN_ARIA_LABEL,
   CMS_SLOTS_SCAN_MESSAGE,
 } from "@/shared/lib/cms-slots-feature-copy";
@@ -29,20 +24,13 @@ export type CmsSlotsRouteTask = {
 export type CmsSlotsRouteTaskInput = {
   pageBootBlocking: boolean;
   routeTaskPhase: string | null;
-  openingBeaconKey: string | null;
-  composerOpeningKey: string | null;
-  isComposer: boolean;
   picking: boolean;
-  activeComposer: unknown;
-  composerEligibleLoading: boolean;
   addPending: boolean;
   resyncingEngineSlotKey: string | null;
   listTargetCreatePending: boolean;
   listTargetFocusOnCanvasPending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
   listTargetRemovePending: boolean;
-  listTargetPhase: CmsSlotListTargetPhase;
-  listTargetOnCanvasCountResolved: boolean;
   slotPropsWritePending: boolean;
   embedSyncPending: boolean;
   composerSavePending: boolean;
@@ -69,10 +57,6 @@ const CMS_SLOTS_ROUTE_TASK_RULES: RouteTaskRule[] = [
       const phase = input.routeTaskPhase?.trim();
       return phase ? task(phase) : null;
     },
-  },
-  {
-    match: (input) =>
-      input.openingBeaconKey != null ? task(CMS_SLOTS_OPENING_MESSAGE, CMS_SLOTS_OPENING_ARIA_LABEL) : null,
   },
   {
     match: (input) =>
@@ -113,23 +97,6 @@ const CMS_SLOTS_ROUTE_TASK_RULES: RouteTaskRule[] = [
   },
   {
     match: (input) => (input.cmsFieldLinkRetryPending ? task(CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD) : null),
-  },
-  {
-    match: (input) => {
-      if (!input.picking) {
-        return null;
-      }
-      if (input.listTargetPhase === "loading") {
-        return task(CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET);
-      }
-      if (input.listTargetPhase === "updating") {
-        return task(CMS_SLOTS_ROUTE_TASK_UPDATING_LIST_TARGET);
-      }
-      if (input.listTargetPhase === "synced" && !input.listTargetOnCanvasCountResolved) {
-        return task(CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET);
-      }
-      return null;
-    },
   },
 ];
 

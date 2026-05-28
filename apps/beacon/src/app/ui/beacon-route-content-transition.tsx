@@ -1,4 +1,4 @@
-import { type ReactNode, type TransitionEvent, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, type TransitionEvent, useCallback, useLayoutEffect, useRef, useState } from "react";
 import {
   BEACON_ROUTE_CONTENT_ENTER_DELAY_MS,
   BEACON_ROUTE_CONTENT_ENTER_TRANSITION_MS,
@@ -11,44 +11,75 @@ type BeaconRouteContentTransitionProps = {
   contentKey: string;
   children: ReactNode;
   className?: string;
+  /** When false, the panel stays at opacity 0 until ready. Fades in as soon as this becomes true. */
+  contentReady?: boolean;
 };
+
+type PendingSwap = { key: string; child: ReactNode };
+
+function applySameContentKeyUpdate(args: {
+  children: ReactNode;
+  contentReady: boolean;
+  visible: boolean;
+  prevContentReadyRef: { current: boolean };
+  beginEnter: () => void;
+  setRenderedChild: (child: ReactNode) => void;
+  setVisible: (visible: boolean) => void;
+}) {
+  args.setRenderedChild(args.children);
+  const becameReady = args.contentReady && !args.prevContentReadyRef.current;
+  args.prevContentReadyRef.current = args.contentReady;
+  if (!args.contentReady) {
+    if (args.visible) {
+      args.setVisible(false);
+    }
+    return;
+  }
+  if (becameReady && !args.visible) {
+    args.beginEnter();
+  }
+}
+
+function applyContentKeyChange(args: {
+  contentKey: string;
+  children: ReactNode;
+  contentReady: boolean;
+  visible: boolean;
+  pendingRef: { current: PendingSwap | null };
+  commitPendingSwap: (ready: boolean) => void;
+  setVisible: (visible: boolean) => void;
+}) {
+  args.pendingRef.current = { key: args.contentKey, child: args.children };
+  if (!args.visible) {
+    args.commitPendingSwap(args.contentReady);
+    return;
+  }
+  args.setVisible(false);
+}
 
 /**
  * Fades out the current route panel, swaps content when the key changes, then fades in the next panel.
+ * Incoming panels start hidden and only become visible once `contentReady` is true.
  */
 export function BeaconRouteContentTransition(props: BeaconRouteContentTransitionProps) {
-  const { contentKey, children, className } = props;
+  const { contentKey, children, className, contentReady = true } = props;
   const [renderedKey, setRenderedKey] = useState(contentKey);
   const [renderedChild, setRenderedChild] = useState(children);
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(false);
   const pendingRef = useRef<{ key: string; child: ReactNode } | null>(null);
+  const prevContentReadyRef = useRef(false);
   const enterRafRef = useRef<number | null>(null);
   const enterFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useLayoutEffect(() => {
-    if (contentKey === renderedKey) {
-      setRenderedChild(children);
-      if (!visible) {
-        setVisible(true);
-      }
-      return;
+  const clearEnterFallback = useCallback(() => {
+    if (enterFallbackRef.current != null) {
+      clearTimeout(enterFallbackRef.current);
+      enterFallbackRef.current = null;
     }
-    pendingRef.current = { key: contentKey, child: children };
-    setVisible(false);
-  }, [contentKey, children, renderedKey, visible]);
-
-  useLayoutEffect(() => {
-    return () => {
-      if (enterRafRef.current != null) {
-        cancelAnimationFrame(enterRafRef.current);
-      }
-      if (enterFallbackRef.current != null) {
-        clearTimeout(enterFallbackRef.current);
-      }
-    };
   }, []);
 
-  const beginEnter = () => {
+  const beginEnter = useCallback(() => {
+    clearEnterFallback();
     setVisible(false);
     const id = requestAnimationFrame(() => {
       enterRafRef.current = requestAnimationFrame(() => {
@@ -64,7 +95,60 @@ export function BeaconRouteContentTransition(props: BeaconRouteContentTransition
       },
       BEACON_ROUTE_CONTENT_ENTER_DELAY_MS + BEACON_ROUTE_CONTENT_ENTER_TRANSITION_MS + 48
     );
-  };
+  }, [clearEnterFallback]);
+
+  const commitPendingSwap = useCallback(
+    (ready: boolean) => {
+      const pending = pendingRef.current;
+      if (pending == null) {
+        return;
+      }
+      pendingRef.current = null;
+      setRenderedKey(pending.key);
+      setRenderedChild(pending.child);
+      prevContentReadyRef.current = ready;
+      if (ready) {
+        beginEnter();
+      }
+    },
+    [beginEnter]
+  );
+
+  useLayoutEffect(() => {
+    if (contentKey === renderedKey) {
+      applySameContentKeyUpdate({
+        children,
+        contentReady,
+        visible,
+        prevContentReadyRef,
+        beginEnter,
+        setRenderedChild,
+        setVisible,
+      });
+      return;
+    }
+    applyContentKeyChange({
+      contentKey,
+      children,
+      contentReady,
+      visible,
+      pendingRef,
+      commitPendingSwap,
+      setVisible,
+    });
+  }, [contentKey, renderedKey, contentReady, visible, beginEnter, commitPendingSwap, children]);
+
+  useLayoutEffect(() => {
+    return () => {
+      if (enterRafRef.current != null) {
+        cancelAnimationFrame(enterRafRef.current);
+      }
+      if (enterFallbackRef.current != null) {
+        clearTimeout(enterFallbackRef.current);
+        enterFallbackRef.current = null;
+      }
+    };
+  }, []);
 
   const handleTransitionEnd = (e: TransitionEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget || e.propertyName !== "opacity") {
@@ -73,14 +157,7 @@ export function BeaconRouteContentTransition(props: BeaconRouteContentTransition
     if (visible) {
       return;
     }
-    const pending = pendingRef.current;
-    if (pending == null) {
-      return;
-    }
-    pendingRef.current = null;
-    setRenderedKey(pending.key);
-    setRenderedChild(pending.child);
-    beginEnter();
+    commitPendingSwap(contentReady);
   };
 
   return (

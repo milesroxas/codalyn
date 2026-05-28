@@ -1,6 +1,7 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { List, PanelsTopLeft } from "lucide-react";
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { type NavigateFunction, NavLink } from "react-router-dom";
 import {
   BeaconFeatureRouteChrome,
@@ -12,7 +13,6 @@ import {
 } from "@/app/ui/beacon-feature-route-chrome";
 import { BeaconRouteContentTransition } from "@/app/ui/beacon-route-content-transition";
 import { BeaconRouteLoadingOverlay } from "@/app/ui/beacon-route-loading-overlay";
-import { BeaconRouteLoadingShell } from "@/app/ui/beacon-route-loading-shell";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
 import { displayLabelForCmsSlotList } from "@/features/cms-slots/model/cms-slot-data-list-display";
@@ -20,9 +20,10 @@ import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import type { CmsSlotListOnPage, HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import {
-  cmsSlotsComposerRouteContentKey,
-  cmsSlotsEngineRouteContentKey,
+  resolveCmsSlotsComposerRouteSurface,
+  resolveCmsSlotsEngineRouteSurface,
 } from "@/features/cms-slots/model/cms-slots-panel-content-key";
+import { cmsSlotsRouteInteractionBlocked } from "@/features/cms-slots/model/cms-slots-route-interaction";
 import { type CmsSlotsRouteTaskInput, resolveCmsSlotsRouteTask } from "@/features/cms-slots/model/cms-slots-route-task";
 import type { CmsSlotCompositionDraftRow, CmsSlotPaletteEntry } from "@/features/cms-slots/model/site-components";
 import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
@@ -36,6 +37,7 @@ import { CmsSlotEngineBackToListDock } from "@/features/cms-slots/ui/cms-slot-co
 import { CmsSlotHomePanel } from "@/features/cms-slots/ui/cms-slot-home-panel";
 import { CmsSlotsCmsFieldLinkDialog } from "@/features/cms-slots/ui/cms-slots-cms-field-link-dialog";
 import { CmsSlotsPageRuntimeSyncButton } from "@/features/cms-slots/ui/cms-slots-page-runtime-sync-button";
+import { CmsSlotsRouteInteractionProvider } from "@/features/cms-slots/ui/cms-slots-route-interaction-context";
 import {
   CMS_SLOTS_AREA_NAV_LABEL,
   CMS_SLOTS_DELETE_DIALOG_TITLE,
@@ -43,8 +45,6 @@ import {
   CMS_SLOTS_ENGINE_MAIN_TITLE,
   CMS_SLOTS_ENGINE_STEP_NAV_ARIA_LABEL,
   CMS_SLOTS_FEATURE_NAME,
-  CMS_SLOTS_OPENING_ARIA_LABEL,
-  CMS_SLOTS_OPENING_MESSAGE,
   CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION,
   CMS_SLOTS_SCAN_ARIA_LABEL,
   CMS_SLOTS_UNINSTALL_PAGE_LABEL,
@@ -180,20 +180,13 @@ function cmsSlotsRouteTaskInputFromChromeProps(p: CmsSlotsRouteChromeProps): Cms
   return {
     pageBootBlocking: p.pageBootBlocking,
     routeTaskPhase: p.routeTaskPhase,
-    openingBeaconKey: p.openingBeaconKey,
-    composerOpeningKey: p.composerOpeningKey,
-    isComposer: p.isComposer,
     picking: p.picking,
-    activeComposer: p.activeComposer,
-    composerEligibleLoading: p.composerEligibleLoading,
     addPending: p.addPending,
     resyncingEngineSlotKey: p.resyncingEngineSlotKey,
     listTargetCreatePending: p.listTargetCreatePending,
     listTargetFocusOnCanvasPending: p.listTargetFocusOnCanvasPending,
     listTargetPlaceOnCanvasPending: p.listTargetPlaceOnCanvasPending,
     listTargetRemovePending: p.listTargetRemovePending,
-    listTargetPhase: p.listTargetPhase,
-    listTargetOnCanvasCountResolved: p.listTargetOnCanvasCountResolved,
     slotPropsWritePending: p.slotPropsWritePending,
     embedSyncPending: p.embedSyncPending,
     composerSavePending: p.composerSavePending,
@@ -204,23 +197,14 @@ function cmsSlotsRouteTaskInputFromChromeProps(p: CmsSlotsRouteChromeProps): Cms
   };
 }
 
-function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps & { routeInteractionIdle?: boolean }) {
-  const showOpeningLoader = useDeferredLoadingIndicator(p.openingBeaconKey != null);
-  const contentKey = cmsSlotsEngineRouteContentKey({
-    picking: p.picking,
-    openingBeaconKey: showOpeningLoader ? p.openingBeaconKey : null,
-  });
-
+function CmsSlotsEngineRouteBody(
+  p: CmsSlotsRouteChromeProps & {
+    contentKey: ReturnType<typeof resolveCmsSlotsEngineRouteSurface>["contentKey"];
+    contentReady: boolean;
+  }
+) {
   let panel: ReactNode;
-  if (contentKey === "opening") {
-    panel = (
-      <BeaconRouteLoadingShell
-        ariaLabel={CMS_SLOTS_OPENING_ARIA_LABEL}
-        message={CMS_SLOTS_OPENING_MESSAGE}
-        dataSlot="cms_slots_engine_opening"
-      />
-    );
-  } else if (contentKey === "composition") {
+  if (p.contentKey === "composition") {
     panel = (
       <div className="space-y-4" data-route="cms-slots-engine-composition">
         <CmsSlotCompositionPanel
@@ -258,7 +242,6 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps & { routeInteractio
           renamingPublishedSlotKey={p.renamingPublishedSlotKey}
           autoOpenExposeDrawerRowKey={p.autoOpenExposeDrawerRowKey}
           onAutoOpenExposeDrawerConsumed={p.onAutoOpenExposeDrawerConsumed}
-          routeInteractionIdle={p.routeInteractionIdle ?? true}
         />
       </div>
     );
@@ -292,29 +275,23 @@ function CmsSlotsEngineRouteBody(p: CmsSlotsRouteChromeProps & { routeInteractio
 
   return (
     <div data-route="cms-slots-engine">
-      <BeaconRouteContentTransition contentKey={contentKey}>{panel}</BeaconRouteContentTransition>
+      <BeaconRouteContentTransition contentKey={p.contentKey} contentReady={p.contentReady}>
+        {panel}
+      </BeaconRouteContentTransition>
     </div>
   );
 }
 
-function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
+function CmsSlotsComposerRouteBody(
+  p: CmsSlotsRouteChromeProps & {
+    contentKey: ReturnType<typeof resolveCmsSlotsComposerRouteSurface>["contentKey"];
+    contentReady: boolean;
+  }
+) {
   const { composerOnly } = useCmsSlotsAccess();
-  const showOpeningLoader = useDeferredLoadingIndicator(p.composerOpeningKey != null);
-  const contentKey = cmsSlotsComposerRouteContentKey({
-    activeComposer: p.activeComposer,
-    composerOpeningKey: showOpeningLoader ? p.composerOpeningKey : null,
-  });
 
   let panel: ReactNode;
-  if (contentKey === "opening") {
-    panel = (
-      <BeaconRouteLoadingShell
-        ariaLabel={CMS_SLOTS_OPENING_ARIA_LABEL}
-        message={CMS_SLOTS_OPENING_MESSAGE}
-        dataSlot="cms_slots_composer_opening"
-      />
-    );
-  } else if (contentKey === "composer" && p.activeComposer != null) {
+  if (p.contentKey === "composer" && p.activeComposer != null) {
     const activeComposer = p.activeComposer;
     panel = (
       <div className="space-y-4" data-route="cms-slots-composer-editor">
@@ -344,7 +321,7 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
       <div className="space-y-4" data-route="cms-slots-composer-list">
         <CmsSlotComposerListPanel
           composerEditingContext={p.composerEditingContext}
-          pageScanLoading={p.pageScanLoading}
+          pageBootBlocking={p.pageBootBlocking}
           pageRuntimeStatusLoading={p.pageRuntimeStatusLoading}
           routeStateKnown={p.routeStateKnown}
           composerEligibleResolved={p.composerEligibleResolved}
@@ -361,7 +338,9 @@ function CmsSlotsComposerRouteBody(p: CmsSlotsRouteChromeProps) {
 
   return (
     <div data-route="cms-slots-composer">
-      <BeaconRouteContentTransition contentKey={contentKey}>{panel}</BeaconRouteContentTransition>
+      <BeaconRouteContentTransition contentKey={p.contentKey} contentReady={p.contentReady}>
+        {panel}
+      </BeaconRouteContentTransition>
     </div>
   );
 }
@@ -370,7 +349,35 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
   const routeTask = resolveCmsSlotsRouteTask(cmsSlotsRouteTaskInputFromChromeProps(p));
   const routeBlocking = routeTask != null;
   const showRouteBlocking = useDeferredLoadingIndicator(routeBlocking);
-  const routeInteractionIdle = !showRouteBlocking;
+  const [overlayBlocking, setOverlayBlocking] = useState(false);
+
+  const engineSurface = p.isEngine
+    ? resolveCmsSlotsEngineRouteSurface({
+        picking: p.picking,
+        openingBeaconKey: p.openingBeaconKey,
+        routeStateKnown: p.routeStateKnown,
+        pageBootBlocking: p.pageBootBlocking,
+        listTargetPhase: p.listTargetPhase,
+      })
+    : null;
+  const composerSurface = p.isComposer
+    ? resolveCmsSlotsComposerRouteSurface({
+        activeComposer: p.activeComposer,
+        composerOpeningKey: p.composerOpeningKey,
+        routeStateKnown: p.routeStateKnown,
+        pageBootBlocking: p.pageBootBlocking,
+        pageRuntimeStatusLoading: p.pageRuntimeStatusLoading,
+        composerEligibleLoading: p.composerEligibleLoading,
+        composerEligibleResolved: p.composerEligibleResolved,
+        composerEditingContextPhase: p.composerEditingContext.phase,
+      })
+    : null;
+  const surfaceReady = engineSurface?.contentReady ?? composerSurface?.contentReady ?? true;
+  const routeInteractionBlocked = cmsSlotsRouteInteractionBlocked({
+    routeBlocking,
+    surfaceReady,
+    overlayBlocking,
+  });
 
   return (
     <BeaconFeatureRouteScrollBody
@@ -378,21 +385,32 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
         <BeaconRouteLoadingOverlay
           visible={routeBlocking}
           deferredVisible={showRouteBlocking}
+          onOccupancyChange={setOverlayBlocking}
           ariaLabel={routeTask?.ariaLabel ?? CMS_SLOTS_SCAN_ARIA_LABEL}
           message={routeTask?.message}
         />
       }
     >
-      <div
-        className={cn("flex min-h-0 min-w-0 flex-1 flex-col", showRouteBlocking && "pointer-events-none invisible")}
-        aria-hidden={showRouteBlocking}
-      >
-        {p.isEngine ? (
-          <CmsSlotsEngineRouteBody {...p} routeInteractionIdle={routeInteractionIdle} />
-        ) : p.isComposer ? (
-          <CmsSlotsComposerRouteBody {...p} />
-        ) : null}
-      </div>
+      <CmsSlotsRouteInteractionProvider blocked={routeInteractionBlocked}>
+        <div
+          className={cn("flex min-h-0 min-w-0 flex-1 flex-col", routeInteractionBlocked && "pointer-events-none")}
+          aria-hidden={routeInteractionBlocked}
+        >
+          {p.isEngine && engineSurface != null ? (
+            <CmsSlotsEngineRouteBody
+              {...p}
+              contentKey={engineSurface.contentKey}
+              contentReady={engineSurface.contentReady}
+            />
+          ) : p.isComposer && composerSurface != null ? (
+            <CmsSlotsComposerRouteBody
+              {...p}
+              contentKey={composerSurface.contentKey}
+              contentReady={composerSurface.contentReady}
+            />
+          ) : null}
+        </div>
+      </CmsSlotsRouteInteractionProvider>
     </BeaconFeatureRouteScrollBody>
   );
 }

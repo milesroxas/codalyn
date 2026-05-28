@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { resolveCmsSlotsRouteTask } from "@/features/cms-slots/model/cms-slots-route-task";
 import {
-  CMS_SLOTS_OPENING_MESSAGE,
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
   CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION,
   CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
-  CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET,
   CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION,
   CMS_SLOTS_ROUTE_TASK_SAVING_EXPOSED_PROPS,
@@ -17,20 +15,13 @@ import {
 const idleInput = {
   pageBootBlocking: false,
   routeTaskPhase: null,
-  openingBeaconKey: null,
-  composerOpeningKey: null,
-  isComposer: false,
   picking: false,
-  activeComposer: null,
-  composerEligibleLoading: false,
   addPending: false,
   resyncingEngineSlotKey: null,
   listTargetCreatePending: false,
   listTargetFocusOnCanvasPending: false,
   listTargetPlaceOnCanvasPending: false,
   listTargetRemovePending: false,
-  listTargetPhase: "synced" as const,
-  listTargetOnCanvasCountResolved: true,
   slotPropsWritePending: false,
   embedSyncPending: false,
   composerSavePending: false,
@@ -77,15 +68,13 @@ describe("resolveCmsSlotsRouteTask", () => {
     );
   });
 
-  it("returns checking list target while synced canvas count is unresolved", () => {
+  it("returns null while list target is loading without an explicit pending action", () => {
     expect(
       resolveCmsSlotsRouteTask({
         ...idleInput,
         picking: true,
-        listTargetPhase: "synced",
-        listTargetOnCanvasCountResolved: false,
-      })?.message
-    ).toBe(CMS_SLOTS_ROUTE_TASK_CHECKING_LIST_TARGET);
+      })
+    ).toBeNull();
   });
 
   it("returns checking install when route task phase is set during install", () => {
@@ -95,15 +84,6 @@ describe("resolveCmsSlotsRouteTask", () => {
         routeTaskPhase: CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
       })?.message
     ).toBe(CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL);
-  });
-
-  it("returns opening message while a slot list is opening", () => {
-    expect(
-      resolveCmsSlotsRouteTask({
-        ...idleInput,
-        openingBeaconKey: "beacon-1",
-      })?.message
-    ).toBe(CMS_SLOTS_OPENING_MESSAGE);
   });
 
   it("returns null when idle", () => {

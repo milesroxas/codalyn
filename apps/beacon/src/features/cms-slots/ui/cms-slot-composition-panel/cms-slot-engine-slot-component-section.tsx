@@ -2,6 +2,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
+import { cmsSlotListTargetPhaseUnsettled } from "@/features/cms-slots/model/cms-slot-list-target-settled";
 import {
   CMS_SLOTS_ENGINE_CREATE_TARGET_LABEL,
   CMS_SLOTS_ENGINE_CREATE_TARGET_PENDING_LABEL,
@@ -284,10 +285,10 @@ export function CmsSlotEngineSlotComponentSection(props: CmsSlotEngineSlotCompon
     onPlaceListTargetOnCanvas,
   } = props;
 
-  const listTargetCanvasStatusPending =
-    listTargetPhase === "loading" ||
-    listTargetPhase === "updating" ||
-    (listTargetPhase === "synced" && !listTargetOnCanvasCountResolved);
+  const listTargetCanvasStatusPending = cmsSlotListTargetPhaseUnsettled(
+    listTargetPhase,
+    listTargetOnCanvasCountResolved
+  );
   const showSyncedActions = listTargetPhase === "synced" && listTargetOnCanvasCountResolved;
   const showPlaceStep = showSyncedActions && listTargetOnCanvasCount === 0;
   const showOnCanvasStep = showSyncedActions && listTargetOnCanvasCount > 0;

@@ -1,7 +1,7 @@
 "use client";
 
 import { IconClockHour4, IconMailForward, IconUserPlus } from "@tabler/icons-react";
-import type { FormEvent } from "react";
+import { type FormEvent, useId } from "react";
 import { formatInvitationExpiry } from "@/features/team/lib/workspace-invitation-utils";
 import { getInviteSeatUiState, type WorkspaceSeatState } from "@/features/team/lib/workspace-seat-state";
 import type { InvitationRow } from "@/features/team/model/workspace-types";
@@ -15,10 +15,16 @@ import { TOWER_TEAM_ROLES } from "@/shared/lib/membership/tower-organization-acc
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
+import {
+  FormField,
+  FormFieldAction,
+  FormFieldActionLabelSpacer,
+  FormFieldGrid,
+  FormInlineLayout,
+} from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { NativeSelect } from "@/shared/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { TabsContent } from "@/shared/ui/tabs";
 
@@ -86,6 +92,9 @@ export function WorkspaceInvitesTab(props: {
     onInviteAgain,
   } = props;
 
+  const emailFieldId = useId();
+  const roleFieldId = useId();
+
   const { showInvitesUpsellState, inviteBlocked, showTeamUpgradeHint } = getInviteSeatUiState(
     seatState,
     invitations.length,
@@ -117,49 +126,48 @@ export function WorkspaceInvitesTab(props: {
             showTeamUpgradeHint={showTeamUpgradeHint}
           />
           <form
-            className="flex flex-col gap-4 lg:flex-row lg:items-start"
             onSubmit={(ev) => {
               void onInvite(ev);
             }}
           >
-            <FormFieldGrid className="min-w-0 flex-1">
-              <FormField>
-                <Label htmlFor="ws-invite-email">Email</Label>
-                <Input
-                  id="ws-invite-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="colleague@company.com"
-                  value={inviteEmail}
-                  onChange={(ev) => onInviteEmailChange(ev.target.value)}
-                  required
-                  disabled={inviteBlocked}
-                />
-              </FormField>
-              <FormField>
-                <Label htmlFor="ws-invite-role">Role</Label>
-                <NativeSelect
-                  id="ws-invite-role"
-                  value={inviteRole}
-                  onChange={(ev) => onInviteRoleChange(ev.target.value)}
-                  disabled={inviteBlocked}
-                >
-                  {TOWER_TEAM_ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </FormField>
-            </FormFieldGrid>
-            <div className="flex min-w-0 flex-col space-y-1.5 lg:shrink-0">
-              <span className="hidden text-sm font-medium leading-none select-none lg:block lg:invisible" aria-hidden>
-                &nbsp;
-              </span>
-              <Button type="submit" disabled={busy || inviteBlocked} className="w-full shrink-0 lg:w-auto">
-                Send invite
-              </Button>
-            </div>
+            <FormInlineLayout>
+              <FormFieldGrid grow>
+                <FormField>
+                  <Label htmlFor={emailFieldId}>Email</Label>
+                  <Input
+                    id={emailFieldId}
+                    type="email"
+                    autoComplete="email"
+                    placeholder="colleague@company.com"
+                    value={inviteEmail}
+                    onChange={(ev) => onInviteEmailChange(ev.target.value)}
+                    required
+                    disabled={inviteBlocked}
+                  />
+                </FormField>
+                <FormField>
+                  <Label htmlFor={roleFieldId}>Role</Label>
+                  <Select value={inviteRole} onValueChange={onInviteRoleChange} disabled={inviteBlocked}>
+                    <SelectTrigger id={roleFieldId} aria-label="Role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TOWER_TEAM_ROLES.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {r}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+              </FormFieldGrid>
+              <FormFieldAction>
+                <FormFieldActionLabelSpacer />
+                <Button type="submit" disabled={busy || inviteBlocked} width="formInline">
+                  Send invite
+                </Button>
+              </FormFieldAction>
+            </FormInlineLayout>
           </form>
         </CardContent>
       </Card>

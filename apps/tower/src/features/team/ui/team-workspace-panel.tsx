@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 import { countPendingInvitations } from "@/features/team/lib/team-org-boundary";
-import type { InvitationRow, MemberRow } from "@/features/team/model/workspace-types";
+import type { InvitationRow, MemberDepartureRow, MemberRow } from "@/features/team/model/workspace-types";
 import { TeamWorkspacePanelSkeleton } from "@/features/team/ui/team-workspace-panel-skeleton";
 import { WorkspaceTabsShell } from "@/features/team/ui/workspace-tabs-shell";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
@@ -31,6 +31,9 @@ export function TeamWorkspacePanel(props: {
   onInvite: (e: FormEvent) => boolean | undefined | Promise<boolean | undefined>;
   onUpdateMemberRole: (memberId: string, role: string) => void;
   onRemoveMember: (memberId: string) => void;
+  onLeaveWorkspace: () => void | Promise<void>;
+  departures: MemberDepartureRow[];
+  departuresPending: boolean;
   onResendInvite: (inv: InvitationRow) => void;
   onCancelInvite: (invitationId: string) => void | Promise<void>;
   onDeleteInvite: (invitationId: string) => void | Promise<void>;
@@ -85,6 +88,9 @@ export function TeamWorkspacePanel(props: {
           onActiveTeamSlugEditChange={props.onActiveTeamSlugEditChange}
           onUpdateMemberRole={props.onUpdateMemberRole}
           onRemoveMember={props.onRemoveMember}
+          onLeaveWorkspace={props.onLeaveWorkspace}
+          departures={props.departures}
+          departuresPending={props.departuresPending}
           onResendInvite={props.onResendInvite}
           onCancelInvite={props.onCancelInvite}
           onDeleteInvite={props.onDeleteInvite}

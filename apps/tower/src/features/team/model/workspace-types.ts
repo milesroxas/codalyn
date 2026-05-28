@@ -5,6 +5,15 @@ export type MemberRow = {
   user: { id: string; name: string; email: string };
 };
 
+export type MemberDepartureRow = {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string | null;
+  role: string;
+  departedAt: string;
+};
+
 export type InvitationRow = {
   id: string;
   email: string;
@@ -18,4 +27,5 @@ export type WorkspaceOrgSummary = {
   name: string;
   slug: string;
   seatLimit?: number | null;
+  ownerUserId?: string | null;
 };

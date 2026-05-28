@@ -290,6 +290,29 @@ export const member = pgTable(
   ]
 );
 
+/** Voluntary member exit from a workspace; visible to workspace admins/owners only. */
+export const workspaceMemberDeparture = pgTable(
+  "workspace_member_departure",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    memberId: text("member_id"),
+    userEmail: text("user_email").notNull(),
+    userName: text("user_name"),
+    role: text("role").notNull(),
+    departedAt: timestamp("departed_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("workspace_member_departure_organization_id_idx").on(table.organizationId),
+    index("workspace_member_departure_departed_at_idx").on(table.departedAt),
+  ]
+);
+
 export const invitation = pgTable(
   "invitation",
   {
@@ -455,6 +478,7 @@ export const beaconAppSettingsRelations = relations(beaconAppSettings, ({ one })
 export const organizationRelations = relations(organization, ({ many, one }) => ({
   members: many(member),
   invitations: many(invitation),
+  memberDepartures: many(workspaceMemberDeparture),
   ownershipTransfers: many(workspaceOwnershipTransfer),
   owner: one(user, {
     fields: [organization.ownerUserId],
@@ -496,6 +520,17 @@ export const memberRelations = relations(member, ({ one }) => ({
   }),
   user: one(user, {
     fields: [member.userId],
+    references: [user.id],
+  }),
+}));
+
+export const workspaceMemberDepartureRelations = relations(workspaceMemberDeparture, ({ one }) => ({
+  organization: one(organization, {
+    fields: [workspaceMemberDeparture.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [workspaceMemberDeparture.userId],
     references: [user.id],
   }),
 }));

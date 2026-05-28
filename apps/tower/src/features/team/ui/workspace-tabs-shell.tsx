@@ -6,8 +6,15 @@ import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { DEFAULT_TEAM_WORKSPACE_TAB, parseTeamWorkspaceTab } from "@/features/team/lib/team-workspace-tab";
 import { resolveWorkspaceSeatState } from "@/features/team/lib/workspace-seat-state";
-import type { InvitationRow, MemberRow, WorkspaceOrgSummary } from "@/features/team/model/workspace-types";
+import type {
+  InvitationRow,
+  MemberDepartureRow,
+  MemberRow,
+  WorkspaceOrgSummary,
+} from "@/features/team/model/workspace-types";
 import { DeleteInvitationDialog } from "@/features/team/ui/delete-invitation-dialog";
+import { LeaveWorkspaceDialog } from "@/features/team/ui/leave-workspace-dialog";
+import { RemoveMemberDialog } from "@/features/team/ui/remove-member-dialog";
 import { RevokeInvitationDialog } from "@/features/team/ui/revoke-invitation-dialog";
 import { WorkspaceBillingSection } from "@/features/team/ui/workspace-billing-section";
 import { WorkspaceIdentityCard } from "@/features/team/ui/workspace-identity-card";
@@ -49,6 +56,9 @@ export function WorkspaceTabsShell(props: {
   onActiveTeamSlugEditChange: (v: string) => void;
   onUpdateMemberRole: (memberId: string, role: string) => void;
   onRemoveMember: (memberId: string) => void;
+  onLeaveWorkspace: () => void | Promise<void>;
+  departures: MemberDepartureRow[];
+  departuresPending: boolean;
   onResendInvite: (inv: InvitationRow) => void;
   onCancelInvite: (invitationId: string) => void;
   onDeleteInvite: (invitationId: string) => void;
@@ -85,6 +95,9 @@ export function WorkspaceTabsShell(props: {
     onActiveTeamSlugEditChange,
     onUpdateMemberRole,
     onRemoveMember,
+    onLeaveWorkspace,
+    departures,
+    departuresPending,
     onResendInvite,
     onCancelInvite,
     onDeleteInvite,
@@ -95,6 +108,8 @@ export function WorkspaceTabsShell(props: {
   const searchParams = useSearchParams();
   const [revokeTarget, setRevokeTarget] = useState<InvitationRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InvitationRow | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<MemberRow | null>(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
 
   const activeTab = useMemo(() => {
     const parsed = parseTeamWorkspaceTab(searchParams.get("tab"));
@@ -130,16 +145,20 @@ export function WorkspaceTabsShell(props: {
       canManageTeam={canManageTeam}
       busy={busy}
       currentUserId={currentUserId}
+      ownerUserId={activeOrg.ownerUserId}
       inviteEmail={inviteEmail}
       inviteRole={inviteRole}
       seatState={seatState}
       organizationId={billingOrganizationId}
       invitationsCount={invitations.length}
+      departures={departures}
+      departuresPending={departuresPending}
       onInviteEmailChange={onInviteEmailChange}
       onInviteRoleChange={onInviteRoleChange}
       onInvite={onInvite}
       onUpdateMemberRole={onUpdateMemberRole}
-      onRemoveMember={onRemoveMember}
+      onRequestRemoveMember={setRemoveTarget}
+      onRequestLeaveWorkspace={() => setLeaveDialogOpen(true)}
     />
   );
 
@@ -251,6 +270,31 @@ export function WorkspaceTabsShell(props: {
               setDeleteTarget(null);
             }}
           />
+
+          <RemoveMemberDialog
+            removeTarget={removeTarget}
+            busy={busy}
+            onOpenChange={(open) => {
+              if (!open) {
+                setRemoveTarget(null);
+              }
+            }}
+            onConfirmRemove={(memberId) => {
+              void onRemoveMember(memberId);
+              setRemoveTarget(null);
+            }}
+          />
+
+          <LeaveWorkspaceDialog
+            open={leaveDialogOpen}
+            workspaceName={activeOrg.name}
+            busy={busy}
+            onOpenChange={setLeaveDialogOpen}
+            onConfirmLeave={() => {
+              void onLeaveWorkspace();
+              setLeaveDialogOpen(false);
+            }}
+          />
         </>
       ) : (
         <div className="space-y-6">
@@ -262,6 +306,16 @@ export function WorkspaceTabsShell(props: {
             showPendingInvitesSummary={false}
           />
           {memberDirectory}
+          <LeaveWorkspaceDialog
+            open={leaveDialogOpen}
+            workspaceName={activeOrg.name}
+            busy={busy}
+            onOpenChange={setLeaveDialogOpen}
+            onConfirmLeave={() => {
+              void onLeaveWorkspace();
+              setLeaveDialogOpen(false);
+            }}
+          />
         </div>
       )}
     </>

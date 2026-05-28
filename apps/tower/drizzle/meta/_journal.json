@@ -169,6 +169,13 @@
       "when": 1779985826181,
       "tag": "0023_team_platform_usage_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1779999556723,
+      "tag": "0024_fixed_medusa",
+      "breakpoints": true
     }
   ]
 }

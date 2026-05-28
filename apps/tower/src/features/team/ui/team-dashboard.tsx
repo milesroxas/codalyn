@@ -16,8 +16,14 @@ import {
   formatTeamWorkspaceDeleteError,
   TeamWorkspaceApiError,
 } from "@/features/team/api/delete-workspace";
+import { fetchTeamWorkspaceDepartures } from "@/features/team/api/fetch-workspace-departures";
+import {
+  formatTeamWorkspaceLeaveError,
+  leaveTeamWorkspace,
+  TeamWorkspaceLeaveApiError,
+} from "@/features/team/api/leave-workspace";
 import { normalizeInvitationRows, normalizeMemberRows } from "@/features/team/lib/team-org-boundary";
-import type { InvitationRow } from "@/features/team/model/workspace-types";
+import type { InvitationRow, MemberDepartureRow } from "@/features/team/model/workspace-types";
 import { TeamDashboardSkeleton } from "@/features/team/ui/team-dashboard-skeleton";
 import { TeamWorkspacePanel } from "@/features/team/ui/team-workspace-panel";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
@@ -56,6 +62,8 @@ export function TeamDashboard(props: {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deletePassword, setDeletePassword] = useState("");
   const [resendingInvitationId, setResendingInvitationId] = useState<string | null>(null);
+  const [departures, setDepartures] = useState<MemberDepartureRow[]>([]);
+  const [departuresPending, setDeparturesPending] = useState(false);
   const canManageTeam = isTowerTeamAdminRole(activeMember?.role);
 
   const refreshTeam = useCallback(async () => {
@@ -70,6 +78,37 @@ export function TeamDashboard(props: {
       setDeletePassword("");
     }
   }, [activeOrg]);
+
+  useEffect(() => {
+    if (!canManageTeam || !activeOrg?.id) {
+      setDepartures([]);
+      setDeparturesPending(false);
+      return;
+    }
+
+    let cancelled = false;
+    setDeparturesPending(true);
+    void fetchTeamWorkspaceDepartures(activeOrg.id)
+      .then((rows) => {
+        if (!cancelled) {
+          setDepartures(rows);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDepartures([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDeparturesPending(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeOrg?.id, canManageTeam]);
 
   const onDeleteWorkspace = useCallback(async () => {
     if (!activeOrg) {
@@ -297,6 +336,26 @@ export function TeamDashboard(props: {
     toast.success("Member removed");
   };
 
+  const onLeaveWorkspace = useCallback(async () => {
+    if (!activeOrg) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await leaveTeamWorkspace(activeOrg.id);
+      toast.success("You left the workspace");
+      window.location.assign("/");
+    } catch (err) {
+      const msg =
+        err instanceof TeamWorkspaceLeaveApiError ? formatTeamWorkspaceLeaveError(err) : "Could not leave workspace";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
+  }, [activeOrg]);
+
   const members = useMemo(() => normalizeMemberRows(activeOrg?.members), [activeOrg?.members]);
   const memberRoleOptions = useMemo(() => {
     const fromMembers = members.map((m) => m.role);
@@ -354,6 +413,9 @@ export function TeamDashboard(props: {
         onInvite={onInvite}
         onUpdateMemberRole={onUpdateMemberRole}
         onRemoveMember={onRemoveMember}
+        onLeaveWorkspace={onLeaveWorkspace}
+        departures={departures}
+        departuresPending={departuresPending}
         onResendInvite={(inv) => void onResendInvite(inv)}
         onCancelInvite={onCancelInvite}
         onDeleteInvite={onDeleteInvite}

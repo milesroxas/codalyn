@@ -7,7 +7,7 @@ export type OperatorInviteLinkExpiryContext = "early_access_approval" | "operato
 
 function operatorInviteLinkExpiredHelp(context: OperatorInviteLinkExpiryContext): string {
   if (context === "early_access_approval") {
-    return "If the link has expired, ask your Tower operator to resend the approval email.";
+    return "If the link has expired, contact support@codalyn.app for a new approval link.";
   }
   return "If the link has expired, ask the person who invited you to send a new invite.";
 }

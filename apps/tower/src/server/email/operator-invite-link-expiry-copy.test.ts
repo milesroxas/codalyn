@@ -14,7 +14,7 @@ describe("operatorInviteLinkExpiry copy", () => {
   it("includes expiry duration and early-access resend guidance in plain text", () => {
     const lines = operatorInviteLinkExpiryPlainTextLines("early_access_approval");
     expect(lines[0]).toContain(`${OPERATOR_INVITE_LINK_VALID_DAYS} days`);
-    expect(lines[1]).toContain("operator");
+    expect(lines[1]).toContain("support@codalyn.app");
   });
 
   it("includes expiry duration in HTML", () => {

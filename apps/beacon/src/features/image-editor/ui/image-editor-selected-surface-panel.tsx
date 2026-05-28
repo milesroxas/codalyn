@@ -41,16 +41,6 @@ type ImageEditorSelectedSurfacePanelProps = {
   onAddScope?: (scope: PresetFormAddableScope["scope"]) => void;
 };
 
-function SelectedSurfaceSection(props: { target: ImagePageTarget | null; discoveryPending: boolean }) {
-  const { target, discoveryPending } = props;
-
-  return (
-    <SurfaceSummaryCardPanelSection showDivider>
-      <ImagePageTargetSurfaceSummary discoveryPending={discoveryPending} target={target} />
-    </SurfaceSummaryCardPanelSection>
-  );
-}
-
 function ExistingPresetSection(props: {
   existingPresets: PresetFormExistingMatch[];
   onEditPreset?: (match: PresetFormExistingMatch) => void;
@@ -154,11 +144,17 @@ export function ImageEditorSelectedSurfacePanel(props: ImageEditorSelectedSurfac
     onAddScope,
   } = props;
 
+  const hasPresetSections = existingPresets.length > 0 || addableScopes.length > 0;
+
   return (
-    <SurfaceSummaryCardPanel>
-      <SelectedSurfaceSection discoveryPending={discoveryPending} target={target} />
-      <ExistingPresetSection existingPresets={existingPresets} onEditPreset={onEditPreset} />
-      <CreatePresetSection addableScopes={addableScopes} onAddScope={onAddScope} />
-    </SurfaceSummaryCardPanel>
+    <div className="flex min-w-0 flex-col gap-2">
+      <ImagePageTargetSurfaceSummary discoveryPending={discoveryPending} target={target} />
+      {hasPresetSections ? (
+        <SurfaceSummaryCardPanel>
+          <ExistingPresetSection existingPresets={existingPresets} onEditPreset={onEditPreset} />
+          <CreatePresetSection addableScopes={addableScopes} onAddScope={onAddScope} />
+        </SurfaceSummaryCardPanel>
+      ) : null}
+    </div>
   );
 }

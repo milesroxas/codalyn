@@ -17,7 +17,7 @@ export const IMAGE_TARGET_STEP_USE_SELECTION_DISABLED_HINT =
 export const IMAGE_TARGET_STEP_SELECTED_SURFACE_LABEL = "Selected surface";
 
 export const IMAGE_TARGET_STEP_NO_SURFACE_SELECTED =
-  "No surface selected yet. Use the canvas selection or pick an image below.";
+  "Select an element with an image field on the canvas or press scan to find an image on the page.";
 
 export const IMAGE_TARGET_STEP_IMAGE_ELEMENT = "Image element";
 

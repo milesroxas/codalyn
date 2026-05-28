@@ -1,14 +1,14 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
+import { IconLayoutGrid } from "@tabler/icons-react";
 import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
   Image as ImageIcon,
-  LayoutGrid,
   Loader2,
   LogIn,
   LogOut,
-  Radio,
+  Menu,
   Settings,
 } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
@@ -16,6 +16,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { isTowerConfigured, openTowerAppHome, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
+import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
@@ -167,7 +168,7 @@ function BeaconMenuNavigateGroup(props: { pathname: string }) {
 
   return (
     <DropdownMenuGroup>
-      <BeaconMenuSectionLabel>Navigate</BeaconMenuSectionLabel>
+      <BeaconMenuSectionLabel>Tools</BeaconMenuSectionLabel>
       {showCmsSlotsNav ? (
         <DropdownMenuItem
           className={cn(
@@ -176,13 +177,13 @@ function BeaconMenuNavigateGroup(props: { pathname: string }) {
           )}
           onSelect={() => navigate(`/cms-slots/${defaultSegment}`)}
         >
-          <Radio aria-hidden />
+          <IconLayoutGrid aria-hidden />
           {CMS_SLOTS_FEATURE_NAME}
         </DropdownMenuItem>
       ) : null}
       <DropdownMenuItem className={routeActiveClass("/images", pathname)} onSelect={() => navigate("/images")}>
         <ImageIcon aria-hidden />
-        Images
+        {IMAGE_UPLOAD_FEATURE_NAME}
       </DropdownMenuItem>
     </DropdownMenuGroup>
   );
@@ -304,7 +305,7 @@ function BeaconAppMenu({
     >
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="headerMenu" aria-haspopup="menu">
-          <LayoutGrid aria-hidden className="size-[1.05rem]" strokeWidth={2} />
+          <Menu aria-hidden className="size-[1.05rem]" strokeWidth={2} />
           Menu
         </Button>
       </DropdownMenuTrigger>

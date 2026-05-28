@@ -12,6 +12,7 @@ import {
 } from "@/features/image-editor/lib/image-editor-target-surface-label";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import {
+  SurfaceSummaryCard,
   SurfaceSummaryCardEmpty,
   SurfaceSummaryCardIconBox,
   SurfaceSummaryCardIconRowCopy,
@@ -39,14 +40,18 @@ export function ImagePageTargetSurfaceSummary(props: ImagePageTargetSurfaceSumma
         {IMAGE_TARGET_STEP_SELECTED_SURFACE_LABEL}
       </SurfaceSummaryCardPanelSectionLabel>
       {showDiscoveryPending ? (
-        <SurfaceSummaryCardPending>
-          <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
-          {IMAGE_TARGET_STEP_DISCOVERY_PENDING}
-        </SurfaceSummaryCardPending>
+        <SurfaceSummaryCard state="empty">
+          <SurfaceSummaryCardPending>
+            <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+            {IMAGE_TARGET_STEP_DISCOVERY_PENDING}
+          </SurfaceSummaryCardPending>
+        </SurfaceSummaryCard>
       ) : target == null ? (
-        <SurfaceSummaryCardEmpty>{IMAGE_TARGET_STEP_NO_SURFACE_SELECTED}</SurfaceSummaryCardEmpty>
+        <SurfaceSummaryCard state="empty">
+          <SurfaceSummaryCardEmpty>{IMAGE_TARGET_STEP_NO_SURFACE_SELECTED}</SurfaceSummaryCardEmpty>
+        </SurfaceSummaryCard>
       ) : (
-        <SurfaceSummaryCardSurfaceDisplay>
+        <SurfaceSummaryCardSurfaceDisplay contained>
           <SurfaceSummaryCardIconBox>
             <SurfaceIcon aria-hidden stroke={1.5} />
           </SurfaceSummaryCardIconBox>

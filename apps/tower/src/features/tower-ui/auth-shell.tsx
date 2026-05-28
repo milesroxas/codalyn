@@ -1,13 +1,11 @@
 import { IconPlug, IconRadar2, IconUsers } from "@tabler/icons-react";
 import type * as React from "react";
-import { AuthPageBackdrop } from "@/features/tower-ui/auth-page-backdrop";
+import { AuthPageFrame } from "@/features/tower-ui/auth-page-frame";
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative min-h-dvh overflow-x-hidden">
-      <AuthPageBackdrop />
-
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-6xl flex-col items-start justify-center gap-10 px-4 py-10 sm:gap-12 sm:py-12 md:items-center lg:flex-row lg:items-center lg:justify-between lg:gap-10 lg:px-8 lg:py-14">
+    <AuthPageFrame>
+      <div className="relative mx-auto flex h-full w-full max-w-6xl flex-col items-start justify-center gap-10 px-4 py-10 sm:gap-12 sm:py-12 md:items-center lg:flex-row lg:items-center lg:justify-between lg:gap-10 lg:px-8 lg:py-14">
         <div className="mx-auto w-full max-w-sm shrink-0 text-left md:max-w-3xl md:text-center lg:mx-0 lg:max-w-sm lg:text-left">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground md:text-center lg:text-left">
             Tower
@@ -41,6 +39,6 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="mx-auto w-full max-w-md shrink-0 lg:mx-0">{children}</div>
       </div>
-    </div>
+    </AuthPageFrame>
   );
 }

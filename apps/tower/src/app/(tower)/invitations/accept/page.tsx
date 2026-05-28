@@ -23,7 +23,6 @@ import {
   type TeamInvitationPreview,
 } from "@/shared/lib/membership/team-invitation-accept";
 import { TowerDeferredLoadingFallback } from "@/shared/ui/deferred-loading";
-import { CompactRedirectSkeleton } from "@/shared/ui/page-loading-skeletons";
 
 type PreviewState = { status: "loading" } | { status: "error" } | { status: "ready"; preview: TeamInvitationPreview };
 
@@ -193,7 +192,7 @@ export default function AcceptInvitationPage() {
     <Suspense
       fallback={
         <TowerDeferredLoadingFallback>
-          <CompactRedirectSkeleton />
+          <AcceptInvitationLoadingScreen />
         </TowerDeferredLoadingFallback>
       }
     >

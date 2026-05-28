@@ -1,18 +1,24 @@
+import { Card, CardContent, CardFooter, CardHeader } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { SkeletonStatus } from "@/shared/ui/skeleton-status";
 
 function AcceptInvitationSkeleton() {
   return (
     <SkeletonStatus label="Loading invitation">
-      <main className="mx-auto max-w-sm px-6 py-8">
-        <Skeleton className="h-7 w-40" />
-        <Skeleton className="mt-3 h-4 w-full" />
-        <Skeleton className="mt-1 h-4 w-5/6" />
-        <div className="mt-6 flex flex-col gap-2">
+      <Card className="border-border/80 shadow-lg shadow-black/4 dark:shadow-black/25">
+        <CardHeader className="space-y-1 pb-2">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
+        </CardHeader>
+        <CardContent className="space-y-3 pt-2">
           <Skeleton className="h-10 w-full rounded-lg" />
           <Skeleton className="h-10 w-full rounded-lg" />
-        </div>
-      </main>
+        </CardContent>
+        <CardFooter className="flex-col border-t border-border/60 bg-muted/20 px-6 py-4">
+          <Skeleton className="h-4 w-48" />
+        </CardFooter>
+      </Card>
     </SkeletonStatus>
   );
 }

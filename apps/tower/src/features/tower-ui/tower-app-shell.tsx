@@ -3,10 +3,10 @@
 import { usePathname } from "next/navigation";
 import type * as React from "react";
 import { authClient } from "@/features/auth/model/auth-client";
-import { TOWER_PUBLIC_LOGGED_OUT_SURFACES } from "@/features/tower-ui/lib/tower-app-nav";
 import { TowerAppSidebar } from "@/features/tower-ui/tower-app-sidebar";
 import { TowerLoggedOutHeader } from "@/features/tower-ui/tower-logged-out-header";
 import { TowerSiteHeader } from "@/features/tower-ui/tower-site-header";
+import { isTowerAuthSurfacePath } from "@/shared/lib/navigation/tower-auth-surfaces";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import { SidebarInset, SidebarProvider } from "@/shared/ui/sidebar";
 
@@ -81,7 +81,11 @@ export function TowerAppShell({
 
   const authenticated = isPending ? signedIn : Boolean(session?.user);
 
-  if (!authenticated && TOWER_PUBLIC_LOGGED_OUT_SURFACES.has(pathname)) {
+  if (isTowerAuthSurfacePath(pathname)) {
+    return children;
+  }
+
+  if (!authenticated && (pathname === "/" || pathname === "")) {
     return children;
   }
 

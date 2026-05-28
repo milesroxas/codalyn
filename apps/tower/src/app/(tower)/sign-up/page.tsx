@@ -1,7 +1,6 @@
 "use client";
 
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useId, useState } from "react";
 import { resolveSignUpCardDescription, shouldShowEarlyAccessSignUpGate } from "@/features/auth/lib/auth-surface-copy";
@@ -11,28 +10,21 @@ import {
 } from "@/features/auth/lib/beacon-opener-auth";
 import { buildTowerAuthSurfaceHref } from "@/features/auth/lib/build-tower-auth-surface-href";
 import { resolveTowerEmailVerificationAppCallbackUrl } from "@/features/auth/lib/email-verification";
-import {
-  fetchOperatorInviteSignUpPrefill,
-  messageForRedeemFailure,
-  redeemOperatorInviteClient,
-} from "@/features/auth/lib/operator-invite-client";
+import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { submitTowerEmailSignUp } from "@/features/auth/lib/submit-tower-email-sign-up";
+import { useAuthInviteSignUpPrefill } from "@/features/auth/model/use-auth-invite-sign-up-prefill";
 import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
 import { EarlyAccessSignUpGate } from "@/features/auth/ui/early-access-sign-up-gate";
 import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
+import { SignUpAccountCard } from "@/features/auth/ui/sign-up-account-card";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { isTeamInvitationAcceptPath } from "@/shared/lib/membership/team-invitation-accept";
 import { readTeamInvitationIdFromCallbackPath } from "@/shared/lib/membership/team-invitation-header";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
-import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { TowerDeferredLoadingFallback } from "@/shared/ui/deferred-loading";
-import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
-import { Input } from "@/shared/ui/input";
-import { Label } from "@/shared/ui/label";
 
 async function runAfterTowerSignUp(opts: {
   operatorInviteToken: string | null;
@@ -61,17 +53,22 @@ function SignUpForm() {
   const lastNameId = useId();
   const emailId = useId();
   const passwordId = useId();
-  const workspaceHintId = useId();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [operatorInviteToken, setOperatorInviteToken] = useState<string | null>(null);
-  const [inviteEmailLocked, setInviteEmailLocked] = useState(false);
   const [earlyAccessRequired, setEarlyAccessRequired] = useState<boolean | null>(null);
-  const [inviteValidated, setInviteValidated] = useState(!operatorInviteParam && !beaconOrigin);
+  const joiningViaTeamInvite = isTeamInvitationAcceptPath(callbackUrl);
+  const teamInvitationId = readTeamInvitationIdFromCallbackPath(callbackUrl);
+  const invitePrefill = useAuthInviteSignUpPrefill({
+    operatorInviteToken: operatorInviteParam,
+    teamInvitationId,
+    skipPrefill: Boolean(beaconOrigin),
+  });
+  const operatorInviteToken = invitePrefill.operatorInviteToken ?? operatorInviteParam?.trim() ?? null;
+  const inviteEmailLocked = invitePrefill.emailLocked;
   const [awaitingVerificationEmail, setAwaitingVerificationEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -94,38 +91,17 @@ function SignUpForm() {
   }, []);
 
   useEffect(() => {
-    if (!operatorInviteParam || beaconOrigin) {
-      if (!operatorInviteParam) {
-        setInviteValidated(true);
-      }
+    if (!invitePrefill.prefill) {
       return;
     }
-    let cancelled = false;
-    void (async () => {
-      const result = await fetchOperatorInviteSignUpPrefill(operatorInviteParam);
-      if (cancelled) {
-        return;
-      }
-      if (!result.ok) {
-        setError(result.error);
-        setInviteValidated(true);
-        return;
-      }
-      setEmail(result.prefill.email);
-      setOperatorInviteToken(operatorInviteParam);
-      setInviteEmailLocked(true);
-      if (result.prefill.firstName) {
-        setFirstName(result.prefill.firstName);
-      }
-      if (result.prefill.lastName) {
-        setLastName(result.prefill.lastName);
-      }
-      setInviteValidated(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [operatorInviteParam, beaconOrigin]);
+    setEmail(invitePrefill.prefill.email);
+    if (invitePrefill.prefill.firstName) {
+      setFirstName(invitePrefill.prefill.firstName);
+    }
+    if (invitePrefill.prefill.lastName) {
+      setLastName(invitePrefill.prefill.lastName);
+    }
+  }, [invitePrefill.prefill]);
 
   useEffect(() => {
     if (!beaconOrigin) {
@@ -142,9 +118,6 @@ function SignUpForm() {
     router.push(resolvePostAuthRedirectTarget(u, callbackUrl));
     router.refresh();
   }
-
-  const joiningViaTeamInvite = isTeamInvitationAcceptPath(callbackUrl);
-  const teamInvitationId = readTeamInvitationIdFromCallbackPath(callbackUrl);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -194,7 +167,8 @@ function SignUpForm() {
   const requestAccessHref = buildTowerAuthSurfaceHref("/request-access", callbackUrl, authSearchParams);
   const verificationPromptContext = joiningViaTeamInvite ? "teamInvite" : "signUp";
 
-  const authBusy = sessionPending || redirectingSignedInUser || earlyAccessRequired === null || !inviteValidated;
+  const authBusy =
+    sessionPending || redirectingSignedInUser || earlyAccessRequired === null || !invitePrefill.validated;
   const showAuthSkeleton = useDeferredLoadingIndicator(authBusy);
   if (showAuthSkeleton) {
     return <AuthCardSkeleton variant="sign-up" />;
@@ -229,99 +203,26 @@ function SignUpForm() {
 
   return (
     <AuthShell>
-      <Card className="border-border/80 shadow-lg shadow-black/4 dark:shadow-black/25">
-        <CardHeader className="space-y-1 pb-2">
-          <CardTitle className="text-xl font-semibold tracking-tight">Create your account</CardTitle>
-          <CardDescription className="text-base leading-relaxed">
-            {resolveSignUpCardDescription(joiningViaTeamInvite)}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <form onSubmit={onSubmit} className="flex flex-col gap-5">
-            <FormFieldGrid>
-              <FormField>
-                <Label htmlFor={firstNameId}>First name</Label>
-                <Input
-                  id={firstNameId}
-                  type="text"
-                  autoComplete="given-name"
-                  value={firstName}
-                  onChange={(ev) => setFirstName(ev.target.value)}
-                  fieldSize="lg"
-                  surface="elevated"
-                />
-              </FormField>
-              <FormField>
-                <Label htmlFor={lastNameId}>Last name</Label>
-                <Input
-                  id={lastNameId}
-                  type="text"
-                  autoComplete="family-name"
-                  value={lastName}
-                  onChange={(ev) => setLastName(ev.target.value)}
-                  fieldSize="lg"
-                  surface="elevated"
-                />
-              </FormField>
-            </FormFieldGrid>
-            <FormField>
-              <Label htmlFor={emailId}>Email</Label>
-              <Input
-                id={emailId}
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(ev) => setEmail(ev.target.value)}
-                fieldSize="lg"
-                surface="elevated"
-                required
-                readOnly={inviteEmailLocked}
-                aria-readonly={inviteEmailLocked}
-              />
-            </FormField>
-            <FormField>
-              <Label htmlFor={passwordId}>Password</Label>
-              <Input
-                id={passwordId}
-                type="password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(ev) => setPassword(ev.target.value)}
-                fieldSize="lg"
-                surface="elevated"
-                required
-                minLength={8}
-              />
-              <p className="text-xs text-muted-foreground">At least 8 characters.</p>
-            </FormField>
-            {!beaconOrigin ? (
-              <div className="rounded-xl border border-border/60 bg-muted/25 p-4 dark:bg-muted/15">
-                <p id={workspaceHintId} className="text-xs leading-relaxed text-muted-foreground">
-                  {operatorInviteToken
-                    ? "Your invite includes permission to create additional workspaces."
-                    : "Every account can create one workspace for free after sign-up."}
-                </p>
-              </div>
-            ) : null}
-            {error ? (
-              <p className="text-sm text-destructive" role="alert">
-                {error}
-              </p>
-            ) : null}
-            <Button type="submit" disabled={pending} size="form" width="full">
-              {pending ? "Creating account…" : "Create account"}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex-col border-t border-border/60 bg-muted/20 px-6 py-4">
-          <p className="text-left text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link href={signInHref} className="font-medium text-foreground underline-offset-4 hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </CardFooter>
-      </Card>
+      <SignUpAccountCard
+        cardDescription={resolveSignUpCardDescription(joiningViaTeamInvite)}
+        firstNameId={firstNameId}
+        lastNameId={lastNameId}
+        emailId={emailId}
+        passwordId={passwordId}
+        firstName={firstName}
+        lastName={lastName}
+        email={email}
+        password={password}
+        inviteEmailLocked={inviteEmailLocked}
+        errorMessage={error ?? invitePrefill.error}
+        pending={pending}
+        signInHref={signInHref}
+        onFirstNameChange={setFirstName}
+        onLastNameChange={setLastName}
+        onEmailChange={setEmail}
+        onPasswordChange={setPassword}
+        onSubmit={onSubmit}
+      />
     </AuthShell>
   );
 }

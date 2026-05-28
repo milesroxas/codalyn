@@ -1,8 +1,6 @@
 import { CreditCardIcon, LayoutDashboardIcon, type LucideIcon, PlugIcon, RadarIcon, UsersIcon } from "lucide-react";
 import { TOWER_CONNECTION_PATH } from "@/shared/lib/navigation/tower-app-paths";
 
-export const TOWER_PUBLIC_LOGGED_OUT_SURFACES = new Set(["/", "/sign-in", "/sign-up", "/request-access"]);
-
 export type TowerNavItem = {
   title: string;
   href: string;

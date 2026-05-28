@@ -10,6 +10,7 @@ import {
   normalizeHostname,
   sanitizeRelativePath,
 } from "@/server/tower-hosts";
+import { TOWER_AUTH_SURFACE_PATHS } from "@/shared/lib/navigation/tower-auth-surfaces";
 
 function needsCors(pathname: string): boolean {
   return (
@@ -23,13 +24,7 @@ function needsCors(pathname: string): boolean {
 /** Paths that stay reachable without a Tower session cookie (same-origin relative URLs only). */
 const PUBLIC_PREFIXES = [
   "/",
-  "/sign-in",
-  "/sign-up",
-  "/forgot-password",
-  "/reset-password",
-  "/verify-email",
-  "/request-access",
-  "/invitations/accept",
+  ...TOWER_AUTH_SURFACE_PATHS,
   "/integrations/webflow/success",
   "/integrations/webflow/error",
   "/integrations/beacon-popup-done",

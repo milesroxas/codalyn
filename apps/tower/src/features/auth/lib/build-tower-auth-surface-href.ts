@@ -1,9 +1,10 @@
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
+import type { TowerAuthSurfaceHrefPath } from "@/shared/lib/navigation/tower-auth-surfaces";
 
-export type TowerAuthSurfacePath = "/sign-in" | "/sign-up" | "/forgot-password" | "/reset-password" | "/request-access";
+export type { TowerAuthSurfaceHrefPath as TowerAuthSurfacePath } from "@/shared/lib/navigation/tower-auth-surfaces";
 
 export function buildTowerAuthSurfaceHref(
-  path: TowerAuthSurfacePath,
+  path: TowerAuthSurfaceHrefPath,
   callbackPath: string,
   searchParams?: Record<string, string | null | undefined>
 ): string {

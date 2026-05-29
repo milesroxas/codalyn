@@ -148,6 +148,7 @@ export type CmsSlotsRouteChromeProps = {
   onComposerReorderDraft: (fromIndex: number, toIndex: number) => void;
   onComposerRemoveDraft: (key: string) => void;
   onComposerBack: () => void;
+  onRequestNavigateToEngine: () => void;
   onEditorNoSlotsBack: () => void;
   onComposerSave: (draftOverride?: CmsSlotCompositionDraftRow[]) => Promise<boolean>;
   composerSavePending: boolean;
@@ -576,7 +577,7 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
           onClick={(event) => {
             if (p.activeComposer != null) {
               event.preventDefault();
-              p.onComposerBack();
+              p.onRequestNavigateToEngine();
             }
           }}
         >

@@ -44,7 +44,6 @@ import {
   ensureCmsSlotListCmsTextFieldOnList,
   getCmsSlotListTargetCmsFieldIdFromListContainer,
   resolveCmsSlotListTargetCmsCollectionIdForCleanup,
-  tryDeleteCmsSlotListTargetCmsPlainTextField,
   verifyCmsSlotListTargetPlainTextField,
 } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import { clearAllCmsSlotListTargetDesignerPreviewsOnPage } from "@/features/cms-slots/model/cms-slot-list-target-designer-preview";
@@ -852,6 +851,8 @@ export function CmsSlotsScreen() {
   const [engineListSlotFile, setEngineListSlotFile] = useState<CmsSlotEngineSlotPropsFile | null>(null);
   const [composerSavePending, setComposerSavePending] = useState(false);
   const [composerLeaveDialogOpen, setComposerLeaveDialogOpen] = useState(false);
+  type ComposerLeaveDestination = "composer-list" | "engine";
+  const composerLeaveDestinationRef = useRef<ComposerLeaveDestination>("composer-list");
   const [currentCmsItemId, setCurrentCmsItemId] = useState<string | null>(null);
   const composerEditingContext = useCmsComposerEditingContextState({
     enabled: isComposer,
@@ -1484,7 +1485,24 @@ export function CmsSlotsScreen() {
     navigate("/home");
   }, [navigate]);
 
+  const finishComposerLeave = useCallback(() => {
+    const destination = composerLeaveDestinationRef.current;
+    composerLeaveDestinationRef.current = "composer-list";
+    handleComposerBack();
+    if (destination === "engine") {
+      void navigate("/cms-slots/engine");
+    }
+  }, [handleComposerBack, navigate]);
+
+  const handleComposerLeaveDialogOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      composerLeaveDestinationRef.current = "composer-list";
+    }
+    setComposerLeaveDialogOpen(open);
+  }, []);
+
   const handleRequestComposerBack = useCallback(() => {
+    composerLeaveDestinationRef.current = "composer-list";
     if (!composerDirty) {
       handleComposerBack();
       return;
@@ -1492,9 +1510,22 @@ export function CmsSlotsScreen() {
     setComposerLeaveDialogOpen(true);
   }, [composerDirty, handleComposerBack]);
 
+  const handleRequestNavigateToEngine = useCallback(() => {
+    if (activeComposer == null) {
+      void navigate("/cms-slots/engine");
+      return;
+    }
+    composerLeaveDestinationRef.current = "engine";
+    if (!composerDirty) {
+      finishComposerLeave();
+      return;
+    }
+    setComposerLeaveDialogOpen(true);
+  }, [activeComposer, composerDirty, finishComposerLeave, navigate]);
+
   const handleDiscardComposerLeave = useCallback(() => {
-    handleComposerBack();
-  }, [handleComposerBack]);
+    finishComposerLeave();
+  }, [finishComposerLeave]);
 
   const handleComposerSave = useCallback(
     async (draftOverride?: CmsSlotCompositionDraftRow[]): Promise<boolean> => {
@@ -1557,8 +1588,8 @@ export function CmsSlotsScreen() {
     if (!saved) {
       return;
     }
-    handleComposerBack();
-  }, [handleComposerBack, handleComposerSave]);
+    finishComposerLeave();
+  }, [finishComposerLeave, handleComposerSave]);
 
   const handleComposerAddFromPalette = useCallback((c: CmsSlotPaletteEntry) => {
     setComposerDraft((prev) => [
@@ -1845,16 +1876,7 @@ export function CmsSlotsScreen() {
     const shouldUninstallPage = uninstallWithLastBeaconDelete;
     setDeletePendingKey(target.key);
     try {
-      const cmsCollectionIdForCleanup = await resolveCmsSlotListTargetCmsCollectionIdForCleanup(target.container);
-      const cmsFieldIdForCleanup = await getCmsSlotListTargetCmsFieldIdFromListContainer(target.container);
       await deleteCmsSlotListAndListTargetDefinition(target.dataList, target.container);
-      if (cmsCollectionIdForCleanup != null) {
-        await tryDeleteCmsSlotListTargetCmsPlainTextField(
-          cmsCollectionIdForCleanup,
-          target.dataList,
-          cmsFieldIdForCleanup
-        );
-      }
       if (shouldUninstallPage) {
         await uninstallCmsSlotsPageInstall({ dataLists: [target.dataList] });
         await removeCmsSlotsWrapperIfNoSlotListsOnPage();
@@ -2218,11 +2240,12 @@ export function CmsSlotsScreen() {
       onComposerReorderDraft={handleComposerReorderDraft}
       onComposerRemoveDraft={handleComposerRemoveDraft}
       onComposerBack={handleRequestComposerBack}
+      onRequestNavigateToEngine={handleRequestNavigateToEngine}
       onEditorNoSlotsBack={handleEditorNoSlotsBack}
       onComposerSave={handleComposerSave}
       composerSavePending={composerSavePending}
       composerLeaveDialogOpen={composerLeaveDialogOpen}
-      setComposerLeaveDialogOpen={setComposerLeaveDialogOpen}
+      setComposerLeaveDialogOpen={handleComposerLeaveDialogOpenChange}
       onComposerLeaveDiscard={handleDiscardComposerLeave}
       onComposerLeaveSave={handleSaveComposerLeave}
       onSyncInstallEmbed={handleSyncInstallEmbed}

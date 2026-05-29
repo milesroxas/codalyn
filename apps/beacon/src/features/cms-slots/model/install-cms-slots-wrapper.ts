@@ -5,7 +5,10 @@ import {
 } from "@/features/cms-slots/model/cms-slot-page-inline-script";
 import { type CmsSlotListOnPage, findCmsSlotListsOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
-import { purgeCmsSlotListTargetDefinitionsForDataList } from "@/features/cms-slots/model/site-components";
+import {
+  purgeCmsSlotListTargetDefinitionsForDataList,
+  purgeCmsSlotRuntimeForDataList,
+} from "@/features/cms-slots/model/site-components";
 import {
   CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
   CMS_SLOTS_ROUTE_TASK_CREATING_INSTALL,
@@ -145,13 +148,14 @@ export type UninstallCmsSlotsPageInstallOptions = {
 /**
  * Removes the hidden `beacons-wrapper` block (if present) and the beacon **footer** runtime script from the
  * current page. Use after the last CMS slot is deleted, when the user opts to uninstall the page install.
- * Also unregisters list-target site components for the given `dataLists` and any CMS slots still on the page.
+ * Unregisters list-target site components and deletes the per-list CMS Plain Text field for every CMS slot still on
+ * the page (resolved from each hidden list block before the wrapper is removed), plus the given `dataLists`.
  */
 export async function uninstallCmsSlotsPageInstall(options?: UninstallCmsSlotsPageInstallOptions): Promise<void> {
   const dataLists = new Set(options?.dataLists ?? []);
   for (const beacon of await findCmsSlotListsOnPage()) {
     dataLists.add(beacon.dataList);
-    await purgeCmsSlotListTargetDefinitionsForDataList(beacon.dataList, beacon.container);
+    await purgeCmsSlotRuntimeForDataList(beacon.dataList, beacon.container);
   }
   for (const dataList of dataLists) {
     await purgeCmsSlotListTargetDefinitionsForDataList(dataList);

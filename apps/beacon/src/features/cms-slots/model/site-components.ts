@@ -3,6 +3,11 @@ import {
   writeCmsSlotEngineSlotPropsFile,
 } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
 import {
+  getCmsSlotListTargetCmsFieldIdFromListContainer,
+  resolveCmsSlotListTargetCmsCollectionIdForCleanup,
+  tryDeleteCmsSlotListTargetCmsPlainTextField,
+} from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
+import {
   removeAllCmsSlotListTargetInstancesOnPage,
   removeAllInstancesOfComponentOnPage,
 } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
@@ -113,17 +118,38 @@ export async function purgeCmsSlotListTargetDefinitionsForDataList(
 }
 
 /**
+ * Single source of truth for removing **all runtime artifacts** of one CMS slot in its collection: the per-list
+ * Plain Text CMS field, the list-target site component definitions, and their canvas instances. Resolves the
+ * collection/field ids from the hidden list block **before** purging definitions (so they are still readable), then
+ * best-effort deletes the field (no-op when already gone or Tower/API is unavailable). Does **not** remove the hidden
+ * list block itself — callers that also delete the block use {@link deleteCmsSlotListAndListTargetDefinition}.
+ */
+export async function purgeCmsSlotRuntimeForDataList(
+  dataList: string,
+  listContainer: BlockElement,
+  preferredDefinitionId?: string | null
+): Promise<void> {
+  const collectionId = await resolveCmsSlotListTargetCmsCollectionIdForCleanup(listContainer);
+  const fieldId = await getCmsSlotListTargetCmsFieldIdFromListContainer(listContainer);
+  await purgeCmsSlotListTargetDefinitionsForDataList(dataList, listContainer, preferredDefinitionId);
+  if (collectionId != null) {
+    await tryDeleteCmsSlotListTargetCmsPlainTextField(collectionId, dataList, fieldId);
+  }
+}
+
+/**
  * If a CMS slot list-target **site component** exists for this slot (in {@link CMS_SLOT_UTILITIES_COMPONENT_GROUP}),
- * removes its **page instances** (Placed on canvas), unregisters the definition, then removes the hidden CMS slot
- * block. Order: resolve definition from `container` → remove instances → `unregisterComponent` → remove the block so
- * Webflow is not left with orphan list-target nodes or a definition that still references removed structure.
+ * removes its **page instances** (Placed on canvas), unregisters the definition, deletes the per-list CMS field, then
+ * removes the hidden CMS slot block. Order: resolve definition + CMS ids from `container` → remove instances →
+ * `unregisterComponent` → delete CMS field → remove the block so Webflow is not left with orphan list-target nodes,
+ * a definition that still references removed structure, or a dangling per-list Plain Text field.
  */
 export async function deleteCmsSlotListAndListTargetDefinition(
   dataList: string,
   container: BlockElement,
   preferredDefinitionId?: string | null
 ): Promise<void> {
-  await purgeCmsSlotListTargetDefinitionsForDataList(dataList, container, preferredDefinitionId);
+  await purgeCmsSlotRuntimeForDataList(dataList, container, preferredDefinitionId);
   await removeCmsSlotListFromPage(container);
 }
 

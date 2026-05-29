@@ -130,7 +130,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     expect(target.children.length).toBe(0);
   });
 
-  it("renders nothing when list target text is empty or invalid (no Engine fallback)", () => {
+  it("falls back to cloning Engine rows when list target text is empty or invalid", () => {
     for (const payloadJson of ["", "not-json", '{"v":3,"i":[0]}']) {
       const doc = document;
       const source = doc.createElement("div");
@@ -147,7 +147,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
       doc.body.append(source, target);
 
       runCmsSlotBeaconRuntime(doc);
-      expect(target.children.length).toBe(0);
+      expect(target.children.length).toBe(1);
       doc.body.innerHTML = "";
     }
   });

@@ -1903,20 +1903,23 @@ export function CmsSlotsScreen() {
     if (!container) return;
     setRemovingKey(row.key);
     try {
-      const strip = await stripEngineCodalynAttrsFromComponentInstance(row.instance);
+      const removeIdx = selected.findIndex((p) => p.key === row.key);
+      const slotFileBefore = await readCmsSlotEngineSlotPropsFile(container, selected.length);
+      const ownerExposedIds = new Set(
+        (removeIdx >= 0 ? (slotFileBefore.slots[removeIdx]?.exposed ?? []) : []).map((e) => e.propId)
+      );
+      const strip = await stripEngineCodalynAttrsFromComponentInstance(row.instance, ownerExposedIds);
       if (strip.errors.length > 0) {
         console.warn("[beacon] engine attr strip before remove (non-fatal):", strip.errors);
       }
       await removeComponentInstanceFromCanvas(row.instance);
       const nextSelected = selected.filter((p) => p.key !== row.key);
-      const removeIdx = selected.findIndex((p) => p.key === row.key);
       setSelected(nextSelected);
       await writeCmsSlotEngineConfiguredComponentIds(
         container,
         nextSelected.map((entry) => entry.componentId)
       );
-      const f = await readCmsSlotEngineSlotPropsFile(container, selected.length);
-      const nextSlots = removeIdx >= 0 ? f.slots.filter((_, j) => j !== removeIdx) : f.slots;
+      const nextSlots = removeIdx >= 0 ? slotFileBefore.slots.filter((_, j) => j !== removeIdx) : slotFileBefore.slots;
       const out: CmsSlotEngineSlotPropsFile = { v: 1, slots: nextSlots };
       await writeCmsSlotEngineSlotPropsFile(container, out);
       setEngineListSlotFile(out);

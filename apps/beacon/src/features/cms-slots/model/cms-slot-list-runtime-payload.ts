@@ -7,9 +7,10 @@
  * 2. **Published page** — the footer `beacon` runtime reads `listTarget.textContent` (JSON), clones hidden Engine children
  *    by `i` into the list target (empty or missing `i` ⇒ no rows; invalid JSON does not fall back to the full Engine list),
  *    then for each row applies `p[propId]` onto elements with matching `data-cb-c`
- *    (keys are matched case-insensitively; the attribute may list `propId@bindId` separated by `|` for duplicate sites).
- *    When the same exposed prop is bound on multiple elements, later sites are tagged `propId@bindId` but still resolve
- *    the Composer value via the base `propId`. Each tagged node also carries `data-cb-id` (unique bind id).
+ *    (keys are matched case-insensitively; the attribute may list `propId@N` segments separated by `|` for duplicate sites).
+ *    When the same exposed prop is bound on multiple elements, later sites are tagged `propId@N` (ordinal) but still
+ *    resolve the Composer value via the base `propId`. A shared nested definition carries one segment per Engine
+ *    component that exposes it, so each cloned row resolves its own value.
  *
  * v3: `i` = clone order (indices into the hidden list’s children), `p` = parallel array of per-row `propId` → string.
  * `p` keys are **only** propIds the Engine had marked `exposed` in the slot file (not every Webflow prop on the

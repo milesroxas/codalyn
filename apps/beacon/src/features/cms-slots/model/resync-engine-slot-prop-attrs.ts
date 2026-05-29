@@ -78,8 +78,17 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
 
     const f = await readCmsSlotEngineSlotPropsFile(container, scoped.length);
     const exposed = f.slots[slotIndex]?.exposed ?? [];
+    const foreignExposedIds = new Set<string>();
+    f.slots.forEach((slot, i) => {
+      if (i === slotIndex) {
+        return;
+      }
+      for (const e of slot.exposed) {
+        foreignExposedIds.add(e.propId);
+      }
+    });
 
-    const r = await syncEngineCodalynSlotPropAttributes(row.instance, exposed, onProgress);
+    const r = await syncEngineCodalynSlotPropAttributes(row.instance, exposed, foreignExposedIds, onProgress);
 
     setSelected((prev) => mergeScopedIntoSelected(prev, scoped));
     notifyResyncOutcome(r, exposed);

@@ -2,8 +2,8 @@ import { CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME } from "@/features/cms-slots/mo
 
 /**
  * Content tag on a prop-bound element; footer runtime swaps this element's content with the Composer value.
- * Value is a `|`-separated list of exposed prop ids; duplicate binding sites use `propId@bindId` (see
- * {@link formatContentAttrSegmentsForBindings}).
+ * Value is a `|`-separated list of exposed prop ids; duplicate binding sites use an ordinal suffix `propId@N`
+ * (see {@link formatContentAttrSegmentsForBindings}). The footer `pickP` resolves any segment back to its base propId.
  */
 export const CMS_SLOT_CONTENT_ATTR = "data-cb-c";
 
@@ -14,24 +14,19 @@ export const CMS_SLOT_CONTENT_ATTR = "data-cb-c";
 export const CMS_SLOT_COND_ATTR = "data-cb-v";
 
 /**
- * Stable Designer element identity on each tagged node (`component|element`).
- * Disambiguates duplicate bindings to the same exposed prop (e.g. direct image + nested image wrapper).
+ * Legacy per-element identity attribute (`component|element`) written by older Engine versions. No longer written —
+ * duplicate-binding disambiguation now lives in the `propId@N` ordinal suffix on `data-cb-c`, and the footer runtime
+ * never read it. Retained only so cleanup/stripping removes it from elements tagged by older versions.
  */
-export const CMS_SLOT_BIND_ATTR = "data-cb-id";
+export const CMS_SLOT_LEGACY_BIND_ATTR = "data-cb-id";
 
-/** All CMS slot tag attributes the Engine writes; used for cleanup/stripping. */
-export const CMS_SLOT_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR, CMS_SLOT_BIND_ATTR] as const;
+/** Tag attributes the Engine currently writes onto bound elements. */
+export const CMS_SLOT_WRITTEN_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR] as const;
 
-/** Stable bind id for a Webflow element, or null when `id` is incomplete. */
-export function cmsSlotBeaconBindIdFromElement(el: AnyElement): string | null {
-  const id = el.id as { component?: unknown; element?: unknown };
-  if (typeof id.component === "string" && typeof id.element === "string") {
-    return `${id.component}|${id.element}`;
-  }
-  return null;
-}
+/** All CMS slot tag attributes cleanup removes — current attrs plus the legacy `data-cb-id`. */
+export const CMS_SLOT_TAG_ATTRS = [...CMS_SLOT_WRITTEN_TAG_ATTRS, CMS_SLOT_LEGACY_BIND_ATTR] as const;
 
-/** Canonical exposed prop id from a `data-cb-c` segment (strips `@bindId` suffix). */
+/** Canonical exposed prop id from a `data-cb-c` segment (strips the `@N` / `@…` suffix). */
 export function canonicalPropIdFromContentAttrSegment(segment: string): string {
   const t = segment.trim();
   const at = t.indexOf("@");
@@ -39,19 +34,19 @@ export function canonicalPropIdFromContentAttrSegment(segment: string): string {
 }
 
 /**
- * Builds content attr segments: first binding site keeps `propId`; later sites use `propId@bindId`
- * so published DOM never repeats the same tag signature on two elements.
+ * Builds content attr segments: the first binding site for a prop keeps `propId`; later sites use an ordinal
+ * `propId@N` (N = 1, 2, …) so the published DOM never repeats the same tag signature on two elements. The ordinal is
+ * delimiter-free (no `|`/`@` collision); the footer `pickP` strips it to resolve the base propId.
  */
 export function formatContentAttrSegmentsForBindings(
   canonicalPropIds: readonly string[],
-  bindId: string,
   bindingCounts: Map<string, number>
 ): string[] {
   const segments: string[] = [];
   for (const canonical of canonicalPropIds) {
     const prior = bindingCounts.get(canonical) ?? 0;
     bindingCounts.set(canonical, prior + 1);
-    segments.push(prior === 0 ? canonical : `${canonical}@${bindId}`);
+    segments.push(prior === 0 ? canonical : `${canonical}@${prior}`);
   }
   return segments;
 }
@@ -60,6 +55,11 @@ export function formatContentAttrSegmentsForBindings(
 export type BeaconCmsSlotAttrRemoveOps = {
   get: (name: string) => Promise<null | string>;
   remove: (name: string) => Promise<null>;
+};
+
+/** Attr API for ownership-aware tag edits (rewrites `data-cb-c` instead of always clearing it). */
+export type BeaconCmsSlotAttrOps = BeaconCmsSlotAttrRemoveOps & {
+  set: (name: string, value: string) => Promise<null>;
 };
 
 /** Removes all CMS slot tag attrs when present; returns how many attrs were removed. */
@@ -73,6 +73,106 @@ export async function removeCmsSlotTagAttrsIfPresent(attr: BeaconCmsSlotAttrRemo
     }
   }
   return removed;
+}
+
+/** Split a `data-cb-c` value into trimmed, non-empty segments. */
+export function parseContentAttrSegments(value: string | null | undefined): string[] {
+  if (value == null) {
+    return [];
+  }
+  const out: string[] = [];
+  for (const part of value.split("|")) {
+    const seg = part.trim();
+    if (seg.length > 0) {
+      out.push(seg);
+    }
+  }
+  return out;
+}
+
+/** True when a `data-cb-c` segment's canonical prop id belongs to `ownerIds` (case-insensitive). */
+export function contentAttrSegmentOwnedBy(segment: string, ownerIds: ReadonlySet<string>): boolean {
+  const canonical = canonicalPropIdFromContentAttrSegment(segment);
+  if (canonical.length === 0) {
+    return false;
+  }
+  if (ownerIds.has(canonical)) {
+    return true;
+  }
+  const lower = canonical.toLowerCase();
+  for (const id of ownerIds) {
+    if (id.toLowerCase() === lower) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Recomputes a (possibly shared) element's `data-cb-c` segments during **one** Engine component's tag sync.
+ * Keeps segments owned by **other** Engine components (`foreignExposedIds`); drops the current component's old
+ * segments and any segment owned by no current component (stale); then appends this sync's `newSegments`.
+ * The same nested component definition can therefore carry one segment per Engine component that exposes it
+ * (e.g. an Image nested in both Hero and Card), and the footer runtime resolves the right value per row via `pickP`.
+ */
+export function mergeContentAttrSegments(input: {
+  existing: string | null;
+  foreignExposedIds: ReadonlySet<string>;
+  newSegments: readonly string[];
+}): string[] {
+  const kept = parseContentAttrSegments(input.existing).filter((seg) =>
+    contentAttrSegmentOwnedBy(seg, input.foreignExposedIds)
+  );
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const seg of [...kept, ...input.newSegments]) {
+    if (seg.length === 0 || seen.has(seg)) {
+      continue;
+    }
+    seen.add(seg);
+    out.push(seg);
+  }
+  return out;
+}
+
+/**
+ * Removes segments owned by `ownerExposedIds` (one deleted Engine component) from a `data-cb-c` value, returning the
+ * segments that remain (owned by other Engine components). Used to clean a deleted component's tags off shared
+ * element definitions without disturbing the rest.
+ */
+export function removeOwnedContentAttrSegments(
+  existing: string | null,
+  ownerExposedIds: ReadonlySet<string>
+): string[] {
+  return parseContentAttrSegments(existing).filter((seg) => !contentAttrSegmentOwnedBy(seg, ownerExposedIds));
+}
+
+/**
+ * Strips one Engine component's tags from a (possibly shared) element. Rewrites `data-cb-c` to the segments owned by
+ * other components; when none remain also removes `data-cb-v` (and any legacy `data-cb-id`). `ownerExposedIds` empty
+ * ⇒ removes all tags (single-owner / legacy). Returns the number of attributes changed.
+ */
+export async function removeOwnedCmsSlotTagAttrs(
+  attr: BeaconCmsSlotAttrOps,
+  ownerExposedIds: ReadonlySet<string>
+): Promise<number> {
+  if (ownerExposedIds.size === 0) {
+    return removeCmsSlotTagAttrsIfPresent(attr);
+  }
+  const existing = await attr.get(CMS_SLOT_CONTENT_ATTR);
+  const had = parseContentAttrSegments(existing);
+  if (had.length === 0) {
+    return removeCmsSlotTagAttrsIfPresent(attr);
+  }
+  const remaining = removeOwnedContentAttrSegments(existing, ownerExposedIds);
+  if (remaining.length === had.length) {
+    return 0;
+  }
+  if (remaining.length === 0) {
+    return removeCmsSlotTagAttrsIfPresent(attr);
+  }
+  await attr.set(CMS_SLOT_CONTENT_ATTR, remaining.join("|"));
+  return 1;
 }
 
 /** Webflow conditional visibility class on published elements when “Keep in HTML when hidden” is enabled. */
@@ -124,7 +224,7 @@ export function isBeaconRuntimePropValueEmpty(v: unknown): boolean {
   return isBeaconPublishPlaceholderValue(v);
 }
 
-/** Minified `function pickP(ps,k){…}` — resolves prop payload keys; `@bindId` segments fall back to the base prop id. */
+/** Minified `function pickP(ps,k){…}` — resolves prop payload keys; `@`-suffixed segments fall back to the base prop id. */
 export function beaconPropPickRuntimeSource(): string {
   return 'function pickP(ps,k){if(!k||!ps||typeof ps!=="object")return;var a=String(k);if(Object.prototype.hasOwnProperty.call(ps,a))return ps[a];var al=a.toLowerCase();for(var x in ps)if(Object.prototype.hasOwnProperty.call(ps,x)&&x.toLowerCase()===al)return ps[x];var at=a.indexOf("@");if(at>0){var b=a.slice(0,at);if(Object.prototype.hasOwnProperty.call(ps,b))return ps[b];var bl=b.toLowerCase();for(var y in ps)if(Object.prototype.hasOwnProperty.call(ps,y)&&y.toLowerCase()===bl)return ps[y]}}';
 }

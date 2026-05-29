@@ -624,14 +624,12 @@ describe("cms slot beacon runtime (published DOM)", () => {
     const row = doc.createElement("div");
     const direct = doc.createElement("img");
     direct.setAttribute(CMS_SLOT_CONTENT_ATTR, "hero-image");
-    direct.setAttribute("data-cb-id", "cmp-root|direct-img");
     row.appendChild(direct);
 
     const nested = doc.createElement("div");
     nested.className = "nested-image";
     const nestedImg = doc.createElement("img");
-    nestedImg.setAttribute(CMS_SLOT_CONTENT_ATTR, "hero-image@cmp-nested|inner-img");
-    nestedImg.setAttribute("data-cb-id", "cmp-nested|inner-img");
+    nestedImg.setAttribute(CMS_SLOT_CONTENT_ATTR, "hero-image@1");
     nested.appendChild(nestedImg);
     row.appendChild(nested);
     source.appendChild(row);

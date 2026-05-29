@@ -1,11 +1,10 @@
 import {
-  CMS_SLOT_BIND_ATTR,
   CMS_SLOT_COND_ATTR,
   CMS_SLOT_CONTENT_ATTR,
-  canonicalPropIdFromContentAttrSegment,
-  cmsSlotBeaconBindIdFromElement,
+  contentAttrSegmentOwnedBy,
   formatContentAttrSegmentsForBindings,
-  removeCmsSlotTagAttrsIfPresent,
+  mergeContentAttrSegments,
+  removeOwnedCmsSlotTagAttrs,
 } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
@@ -52,17 +51,6 @@ export type EngineTagWalkResult = {
 };
 
 export { mapNestedPropsToExposedIds } from "@/features/cms-slots/model/cms-slot-nested-prop-alias";
-
-function attrValueStillWanted(value: string, exposedIds: ReadonlySet<string>): boolean {
-  const lowerExposed = new Set([...exposedIds].map((id) => id.toLowerCase()));
-  for (const part of value.split("|")) {
-    const canonical = canonicalPropIdFromContentAttrSegment(part);
-    if (canonical.length > 0 && (exposedIds.has(canonical) || lowerExposed.has(canonical.toLowerCase()))) {
-      return true;
-    }
-  }
-  return false;
-}
 
 function hasChildren(el: AnyElement): el is AnyElement & { getChildren: () => Promise<AnyElement[]> } {
   return "children" in el && (el as { children?: boolean }).children === true;
@@ -150,31 +138,9 @@ type WalkAcc = {
   taggedPropIds: Set<string>;
   contentBindingCounts: Map<string, number>;
   conditionalControllerPropIds: Set<string>;
+  /** Exposed prop ids of the **other** Engine components in this list; their `data-cb-c` segments are preserved. */
+  foreignExposedIds: ReadonlySet<string>;
 };
-
-async function stripStaleContentAttr(
-  attr: PropAttrOps,
-  exposedIds: ReadonlySet<string>,
-  out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">
-): Promise<void> {
-  try {
-    const existing = await attr.get(CMS_SLOT_CONTENT_ATTR);
-    if (existing != null && existing.length > 0 && !attrValueStillWanted(existing, exposedIds)) {
-      await attr.remove(CMS_SLOT_CONTENT_ATTR);
-      out.removed += 1;
-    }
-    const bind = await attr.get(CMS_SLOT_BIND_ATTR);
-    if (bind != null && bind.length > 0) {
-      const content = await attr.get(CMS_SLOT_CONTENT_ATTR);
-      if (content == null || content.length === 0) {
-        await attr.remove(CMS_SLOT_BIND_ATTR);
-        out.removed += 1;
-      }
-    }
-  } catch (e) {
-    out.errors.push(String(e instanceof Error ? e.message : e));
-  }
-}
 
 async function setOrClearAttr(attr: PropAttrOps, name: string, value: string | null): Promise<boolean> {
   const cur = await attr.get(name);
@@ -192,47 +158,104 @@ async function setOrClearAttr(attr: PropAttrOps, name: string, value: string | n
   return false;
 }
 
-async function applyCmsSlotAttrsForElement(
+/**
+ * `data-cb-v` target for a shared element: `"1"` when the current component binds it conditionally; otherwise keep
+ * the existing flag while another Engine component still owns a segment here (that component may rely on it); else clear.
+ */
+async function resolveConditionalTarget(
   attr: PropAttrOps,
-  bindId: string,
-  classification: ElementBindingClassification,
+  conditional: boolean,
+  mergedSegments: readonly string[],
+  foreignExposedIds: ReadonlySet<string>
+): Promise<string | null> {
+  if (conditional) {
+    return "1";
+  }
+  const foreignRemains = mergedSegments.some((seg) => contentAttrSegmentOwnedBy(seg, foreignExposedIds));
+  if (!foreignRemains) {
+    return null;
+  }
+  const prev = await attr.get(CMS_SLOT_COND_ATTR);
+  return prev != null && prev.length > 0 ? "1" : null;
+}
+
+/** This component's content prop ids + conditional flag for one element; records its conditional controller seed. */
+function deriveOwnedBindingForElement(
+  classification: ElementBindingClassification | null,
+  exposedIds: ReadonlySet<string>,
+  nestedAlias: ReadonlyMap<string, string>,
+  acc: WalkAcc,
+  nestedDepth: number
+): { contentIds: string[]; conditional: boolean } {
+  if (classification == null) {
+    return { contentIds: [], conditional: false };
+  }
+  const contentIds = [...new Set(collectExposedContentPropIds(classification.content, exposedIds, nestedAlias))].sort();
+  const conditional = isConditionalVisibilityValue(classification.visibility);
+  const controllerPropId = bindingPropIdFromSettingValue(classification.visibility);
+  if (conditional && controllerPropId != null) {
+    const seedable = seedablePropIdForController(controllerPropId, exposedIds, nestedAlias, nestedDepth);
+    if (seedable != null) {
+      acc.conditionalControllerPropIds.add(seedable);
+    }
+  }
+  return { contentIds, conditional };
+}
+
+/** Writes the merged `data-cb-c` and its companion `data-cb-v`; counts a tag when anything changed. */
+async function writeMergedTagAttrs(
+  attr: PropAttrOps,
+  merged: readonly string[],
+  conditional: boolean,
+  acc: WalkAcc
+): Promise<void> {
+  const contentChanged = await setOrClearAttr(attr, CMS_SLOT_CONTENT_ATTR, merged.join("|"));
+  const condTarget = await resolveConditionalTarget(attr, conditional, merged, acc.foreignExposedIds);
+  const condChanged = await setOrClearAttr(attr, CMS_SLOT_COND_ATTR, condTarget);
+  if (contentChanged || condChanged) {
+    acc.out.tagged += 1;
+  }
+}
+
+/**
+ * Writes this component's tags onto one element while preserving other Engine components' segments. `data-cb-c`
+ * becomes the merge of foreign-owned segments and this sync's new segments; `data-cb-v` (conditional) is kept while
+ * any segment remains, and cleared (along with `data-cb-c`) when none do.
+ */
+async function applyMergedCmsSlotAttrsForElement(
+  attr: PropAttrOps,
+  classification: ElementBindingClassification | null,
   exposedIds: ReadonlySet<string>,
   nestedAlias: ReadonlyMap<string, string>,
   acc: WalkAcc,
   nestedDepth: number
 ): Promise<void> {
   try {
-    const contentIds = [
-      ...new Set(collectExposedContentPropIds(classification.content, exposedIds, nestedAlias)),
-    ].sort();
-    const conditional = isConditionalVisibilityValue(classification.visibility);
-    const controllerPropId = bindingPropIdFromSettingValue(classification.visibility);
+    const { contentIds, conditional } = deriveOwnedBindingForElement(
+      classification,
+      exposedIds,
+      nestedAlias,
+      acc,
+      nestedDepth
+    );
+    const newSegments =
+      contentIds.length > 0 ? formatContentAttrSegmentsForBindings(contentIds, acc.contentBindingCounts) : [];
+    const merged = mergeContentAttrSegments({
+      existing: await attr.get(CMS_SLOT_CONTENT_ATTR),
+      foreignExposedIds: acc.foreignExposedIds,
+      newSegments,
+    });
 
-    if (conditional && controllerPropId != null) {
-      const seedable = seedablePropIdForController(controllerPropId, exposedIds, nestedAlias, nestedDepth);
-      if (seedable != null) {
-        acc.conditionalControllerPropIds.add(seedable);
-      }
-    }
-
-    if (contentIds.length === 0) {
-      acc.out.removed += await removeCmsSlotTagAttrsIfPresent(attr);
+    if (merged.length === 0) {
+      acc.out.removed += await removeOwnedCmsSlotTagAttrs(attr, exposedIds);
       return;
     }
-
-    for (const pid of contentIds) {
-      acc.taggedPropIds.add(pid);
+    if (newSegments.length > 0) {
+      for (const pid of contentIds) {
+        acc.taggedPropIds.add(pid);
+      }
     }
-    const segments = formatContentAttrSegmentsForBindings(contentIds, bindId, acc.contentBindingCounts);
-    if (await setOrClearAttr(attr, CMS_SLOT_CONTENT_ATTR, segments.join("|"))) {
-      acc.out.tagged += 1;
-    }
-    if (await setOrClearAttr(attr, CMS_SLOT_BIND_ATTR, bindId)) {
-      acc.out.tagged += 1;
-    }
-    if (await setOrClearAttr(attr, CMS_SLOT_COND_ATTR, conditional ? "1" : null)) {
-      acc.out.tagged += 1;
-    }
+    await writeMergedTagAttrs(attr, merged, conditional, acc);
   } catch (e) {
     acc.out.errors.push(String(e instanceof Error ? e.message : e));
   }
@@ -283,18 +306,8 @@ async function syncElementCmsSlotAttr(
   if (attr == null) {
     return;
   }
-  await stripStaleContentAttr(attr, exposedIds, acc.out);
   const classification = await classifyElementBindings(el);
-  if (classification == null) {
-    acc.out.removed += await removeCmsSlotTagAttrsIfPresent(attr);
-    return;
-  }
-  const bindId = cmsSlotBeaconBindIdFromElement(el);
-  if (bindId == null) {
-    acc.out.removed += await removeCmsSlotTagAttrsIfPresent(attr);
-    return;
-  }
-  await applyCmsSlotAttrsForElement(attr, bindId, classification, exposedIds, nestedAlias, acc, nestedDepth);
+  await applyMergedCmsSlotAttrsForElement(attr, classification, exposedIds, nestedAlias, acc, nestedDepth);
 }
 
 async function walkTree(
@@ -332,6 +345,7 @@ async function enterComponentDefinitionsAndWalk(
   instance: ComponentElement,
   comp: Component,
   exposed: readonly ComposableInstancePropMeta[],
+  foreignExposedIds: ReadonlySet<string>,
   out: EngineCodalynAttrSyncResult,
   gate: TagSyncEnteredGate,
   onProgress?: (message: string) => void
@@ -342,6 +356,7 @@ async function enterComponentDefinitionsAndWalk(
     taggedPropIds: new Set<string>(),
     contentBindingCounts: new Map<string, number>(),
     conditionalControllerPropIds: new Set<string>(),
+    foreignExposedIds,
   };
   await exitUntilPageForComponentEnter();
   onProgress?.(CMS_SLOTS_ROUTE_TASK_ENTERING_COMPONENT);
@@ -360,13 +375,17 @@ async function enterComponentDefinitionsAndWalk(
   };
 }
 
-async function stripElementCmsSlotAttrs(el: AnyElement, out: EngineCodalynAttrStripResult): Promise<void> {
+async function stripElementCmsSlotAttrs(
+  el: AnyElement,
+  out: EngineCodalynAttrStripResult,
+  ownerExposedIds: ReadonlySet<string>
+): Promise<void> {
   const attr = propAttrOpsFor(el);
   if (attr == null) {
     return;
   }
   try {
-    out.removed += await removeCmsSlotTagAttrsIfPresent(attr);
+    out.removed += await removeOwnedCmsSlotTagAttrs(attr, ownerExposedIds);
   } catch (e) {
     out.errors.push(String(e instanceof Error ? e.message : e));
   }
@@ -375,7 +394,8 @@ async function stripElementCmsSlotAttrs(el: AnyElement, out: EngineCodalynAttrSt
 async function enterNestedDefinitionAndStripCmsSlotAttrs(
   inst: ComponentElement,
   out: EngineCodalynAttrStripResult,
-  nestedDepth: number
+  nestedDepth: number,
+  ownerExposedIds: ReadonlySet<string>
 ): Promise<void> {
   if (nestedDepth > MAX_DESIGNER_COMPONENT_NESTING) {
     return;
@@ -389,7 +409,7 @@ async function enterNestedDefinitionAndStripCmsSlotAttrs(
   try {
     const root = await (await inst.getComponent()).getRootElement();
     if (root != null) {
-      await stripTreeCmsSlotAttrs(root, out, nestedDepth + 1);
+      await stripTreeCmsSlotAttrs(root, out, nestedDepth + 1, ownerExposedIds);
     }
   } finally {
     await webflow.exitComponent().catch(() => undefined);
@@ -399,9 +419,10 @@ async function enterNestedDefinitionAndStripCmsSlotAttrs(
 async function stripTreeCmsSlotAttrs(
   el: AnyElement,
   out: EngineCodalynAttrStripResult,
-  nestedDepth: number
+  nestedDepth: number,
+  ownerExposedIds: ReadonlySet<string>
 ): Promise<void> {
-  await stripElementCmsSlotAttrs(el, out);
+  await stripElementCmsSlotAttrs(el, out, ownerExposedIds);
   if (el.type === "ComponentInstance") {
     const inst = el as ComponentElement;
     const slots = await inst.getSlots().catch(() => [] as SlotInstanceElement[]);
@@ -410,15 +431,15 @@ async function stripTreeCmsSlotAttrs(
         continue;
       }
       for (const ch of await slot.getChildren()) {
-        await stripTreeCmsSlotAttrs(ch, out, nestedDepth);
+        await stripTreeCmsSlotAttrs(ch, out, nestedDepth, ownerExposedIds);
       }
     }
-    await enterNestedDefinitionAndStripCmsSlotAttrs(inst, out, nestedDepth);
+    await enterNestedDefinitionAndStripCmsSlotAttrs(inst, out, nestedDepth, ownerExposedIds);
     return;
   }
   if (hasChildren(el)) {
     for (const ch of await el.getChildren()) {
-      await stripTreeCmsSlotAttrs(ch, out, nestedDepth);
+      await stripTreeCmsSlotAttrs(ch, out, nestedDepth, ownerExposedIds);
     }
   }
 }
@@ -426,16 +447,22 @@ async function stripTreeCmsSlotAttrs(
 /**
  * Removes CMS slot tag attributes from a component definition before the hidden-list instance is deleted so the
  * site component is not left with stale CMS slot attrs.
+ *
+ * Pass `ownerExposedIds` (the deleted component's exposed prop ids) so a **shared** nested definition keeps the
+ * `data-cb-c` segments owned by other Engine components (e.g. an Image used by both Hero and Card): only this
+ * component's segments are removed, and the element's tags are cleared only when no segment remains. Omit / empty
+ * set ⇒ remove all tags (single-owner / legacy callers).
  */
 export function stripEngineCodalynAttrsFromComponentInstance(
-  instance: ComponentElement
+  instance: ComponentElement,
+  ownerExposedIds: ReadonlySet<string> = new Set()
 ): Promise<EngineCodalynAttrStripResult> {
   return withComponentDefinitionScope(
     instance,
     async ({ definitionRoot }) => {
       const out: EngineCodalynAttrStripResult = { removed: 0, errors: [] };
       if (definitionRoot != null) {
-        await stripTreeCmsSlotAttrs(definitionRoot, out, 0);
+        await stripTreeCmsSlotAttrs(definitionRoot, out, 0, ownerExposedIds);
       }
       return out;
     },
@@ -446,15 +473,19 @@ export function stripEngineCodalynAttrsFromComponentInstance(
 }
 
 /**
- * Tags `data-cb-c` (content prop ids), `data-cb-id` (bind id), and `data-cb-v` (conditional flag) on elements bound
- * to exposed instance props. Each tagged node gets a unique bind id; duplicate bindings to the same exposed prop use
- * `propId@bindId` on later sites. Enters nested component definitions only when `getProps()` shows their props are
- * wired to an exposed parent prop. Seeds publish placeholders on every conditional element's controller prop so
- * conditionally visible nodes survive publish.
+ * Tags `data-cb-c` (content prop ids) and `data-cb-v` (conditional flag) on elements bound to exposed instance
+ * props. Duplicate bindings to the same exposed prop use an ordinal suffix `propId@N` on later sites. Enters nested
+ * component definitions only when `getProps()` shows their props are wired to an exposed parent prop. Seeds publish
+ * placeholders on every conditional element's controller prop so conditionally visible nodes survive publish.
+ *
+ * `foreignExposedIds` are the exposed prop ids of the **other** Engine components in this list. When a nested
+ * component definition is shared across multiple Engine components (e.g. an Image used by both Hero and Card), their
+ * `data-cb-c` segments are preserved so each row resolves its own prop at runtime instead of last-write-wins.
  */
 export function syncEngineCodalynSlotPropAttributes(
   instance: ComponentElement,
   exposed: readonly ComposableInstancePropMeta[],
+  foreignExposedIds: ReadonlySet<string> = new Set(),
   onProgress?: (message: string) => void
 ): Promise<EngineCodalynAttrSyncResult> {
   return runExclusiveDesignerOp(async () => {
@@ -473,6 +504,7 @@ export function syncEngineCodalynSlotPropAttributes(
         instance,
         comp,
         exposed,
+        foreignExposedIds,
         out,
         gate,
         onProgress

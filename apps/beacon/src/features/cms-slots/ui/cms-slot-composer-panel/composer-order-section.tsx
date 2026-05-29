@@ -20,30 +20,16 @@ const DROP_ANIMATION_MS = 200;
 
 type ComposerOrderSectionProps = {
   draft: CmsSlotCompositionDraftRow[];
-  /** Full composition snapshot for drawer Save → CMS persist (same as {@link draft}). */
-  composerDraft: CmsSlotCompositionDraftRow[];
   rowMeta: CmsSlotComposerRowMeta[];
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
   busy: boolean;
   onReorder: (fromIndex: number, toIndex: number) => void;
   onRenameSlot: (rowKey: string, name: string) => void;
-  /** Persist merged draft after slot drawer commits name — matches header Save. */
-  onPersistComposerSlot?: (merged: CmsSlotCompositionDraftRow[]) => void | Promise<void>;
   onRemove: (key: string) => void;
 };
 
 export function ComposerOrderSection(props: ComposerOrderSectionProps) {
-  const {
-    draft,
-    composerDraft,
-    rowMeta,
-    onChangePropValue,
-    busy,
-    onReorder,
-    onRenameSlot,
-    onPersistComposerSlot,
-    onRemove,
-  } = props;
+  const { draft, rowMeta, onChangePropValue, busy, onReorder, onRenameSlot, onRemove } = props;
 
   const [removeConfirmKey, setRemoveConfirmKey] = useState<string | null>(null);
   const removeConfirmRow = draft.find((row) => row.key === removeConfirmKey) ?? null;
@@ -106,10 +92,8 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
                       row={row}
                       meta={meta}
                       busy={busy}
-                      composerDraft={composerDraft}
                       onChangePropValue={onChangePropValue}
                       onRenameSlot={onRenameSlot}
-                      onPersistComposerSlot={onPersistComposerSlot}
                       onRemove={handleRequestRemove}
                     />
                   );

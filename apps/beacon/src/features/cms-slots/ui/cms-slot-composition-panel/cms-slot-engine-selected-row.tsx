@@ -219,6 +219,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
         <ComposerSlotNameDrawer
           row={drawerRow}
           exposed={[]}
+          renameCommit="persist"
           disabled={
             removingKey !== null || listTargetActionBusy || resyncingEngineSlotKey !== null || publishedRenameBusy
           }

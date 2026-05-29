@@ -68,11 +68,9 @@ export function CmsSlotComposerPanel(props: CmsSlotComposerPanelProps) {
 
       <ComposerOrderSection
         draft={draft}
-        composerDraft={draft}
         rowMeta={rowMeta}
         onChangePropValue={onChangePropValue}
         onRenameSlot={onRenameSlot}
-        onPersistComposerSlot={(merged) => void onSave(merged)}
         busy={busy}
         onReorder={onReorder}
         onRemove={onRemove}

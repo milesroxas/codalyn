@@ -317,6 +317,8 @@ export const CMS_SLOTS_COMPOSER_LEAVE_UNSAVED_DIALOG_DISCARD = "Discard changes"
 
 export const CMS_SLOTS_COMPOSER_LEAVE_UNSAVED_DIALOG_SAVE = "Save changes";
 
+export const CMS_SLOTS_COMPOSER_SLOT_EDIT_DONE = "Done";
+
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DESCRIPTION = "Choose which props to include for this slot.";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_LOADING = "Loading…";

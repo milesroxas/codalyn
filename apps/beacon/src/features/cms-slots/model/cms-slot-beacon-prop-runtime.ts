@@ -1,13 +1,26 @@
 import { CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME } from "@/features/cms-slots/model/cms-slot-publish-placeholder-image-asset";
 
-/** Custom attribute Engine tags on prop-bound elements; footer runtime reads this key. */
-export const CMS_SLOT_BEACON_PROP_ATTR = "data-codalyn-beacon-prop";
+/**
+ * Content tag on a prop-bound element; footer runtime swaps this element's content with the Composer value.
+ * Value is a `|`-separated list of exposed prop ids; duplicate binding sites use `propId@bindId` (see
+ * {@link formatContentAttrSegmentsForBindings}).
+ */
+export const CMS_SLOT_CONTENT_ATTR = "data-cb-c";
 
 /**
- * Stable Designer element identity on each tagged node (component|element).
+ * Conditional-visibility marker. `"1"` when the element's visibility is bound to a prop/CMS condition. The runtime
+ * hides such an element when the Composer leaves its content empty (instead of falling back to the seeded default).
+ */
+export const CMS_SLOT_COND_ATTR = "data-cb-v";
+
+/**
+ * Stable Designer element identity on each tagged node (`component|element`).
  * Disambiguates duplicate bindings to the same exposed prop (e.g. direct image + nested image wrapper).
  */
-export const CMS_SLOT_BEACON_BIND_ATTR = "data-codalyn-beacon-bind";
+export const CMS_SLOT_BIND_ATTR = "data-cb-id";
+
+/** All CMS slot tag attributes the Engine writes; used for cleanup/stripping. */
+export const CMS_SLOT_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR, CMS_SLOT_BIND_ATTR] as const;
 
 /** Stable bind id for a Webflow element, or null when `id` is incomplete. */
 export function cmsSlotBeaconBindIdFromElement(el: AnyElement): string | null {
@@ -18,18 +31,18 @@ export function cmsSlotBeaconBindIdFromElement(el: AnyElement): string | null {
   return null;
 }
 
-/** Canonical exposed prop id from a `data-codalyn-beacon-prop` segment (strips `@bindId` suffix). */
-export function canonicalPropIdFromBeaconPropAttrSegment(segment: string): string {
+/** Canonical exposed prop id from a `data-cb-c` segment (strips `@bindId` suffix). */
+export function canonicalPropIdFromContentAttrSegment(segment: string): string {
   const t = segment.trim();
   const at = t.indexOf("@");
   return at >= 0 ? t.slice(0, at) : t;
 }
 
 /**
- * Builds prop attr segments: first binding site keeps `propId`; later sites use `propId@bindId`
+ * Builds content attr segments: first binding site keeps `propId`; later sites use `propId@bindId`
  * so published DOM never repeats the same tag signature on two elements.
  */
-export function formatBeaconPropAttrSegmentsForBindings(
+export function formatContentAttrSegmentsForBindings(
   canonicalPropIds: readonly string[],
   bindId: string,
   bindingCounts: Map<string, number>
@@ -44,15 +57,15 @@ export function formatBeaconPropAttrSegmentsForBindings(
 }
 
 /** Minimal attr API for removing Engine tags from a bound element. */
-export type BeaconCodalynAttrRemoveOps = {
+export type BeaconCmsSlotAttrRemoveOps = {
   get: (name: string) => Promise<null | string>;
   remove: (name: string) => Promise<null>;
 };
 
-/** Removes both beacon prop/bind attrs when present; returns how many attrs were removed. */
-export async function removeBeaconCodalynAttrsIfPresent(attr: BeaconCodalynAttrRemoveOps): Promise<number> {
+/** Removes all CMS slot tag attrs when present; returns how many attrs were removed. */
+export async function removeCmsSlotTagAttrsIfPresent(attr: BeaconCmsSlotAttrRemoveOps): Promise<number> {
   let removed = 0;
-  for (const key of [CMS_SLOT_BEACON_PROP_ATTR, CMS_SLOT_BEACON_BIND_ATTR] as const) {
+  for (const key of CMS_SLOT_TAG_ATTRS) {
     const cur = await attr.get(key);
     if (cur != null && cur.length > 0) {
       await attr.remove(key);
@@ -148,8 +161,8 @@ export function beaconPropVisibilityRuntimeSource(): string {
   const assetName = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME);
   return [
     "function bPropSetHidden(n,h){if(h){n.setAttribute('hidden','');n.setAttribute('aria-hidden','true')}else{n.removeAttribute('hidden');n.removeAttribute('aria-hidden')}}",
-    `function bPropReveal(n,row){bPropSetHidden(n,false);var cur=n.parentElement;while(cur&&cur!==row){if(cur.classList.contains(${cls})){cur.classList.remove(${cls});cur.style.removeProperty('display');cur.style.removeProperty('visibility')}cur=cur.parentElement}}`,
-    `function bPropConceal(n,row){bPropSetHidden(n,true);var cur=n.parentElement,touched=false;while(cur&&cur!==row){if(cur.classList.contains(${cls})){cur.style.setProperty('display','none');cur.style.removeProperty('visibility');touched=true}cur=cur.parentElement}if(!touched){var p=n.parentElement;if(p&&p!==row){p.classList.add(${cls});p.style.setProperty('display','none')}}}`,
+    `function bPropReveal(n,row){bPropSetHidden(n,false);var cur=n===row?null:n.parentElement;while(cur&&cur!==row){if(cur.classList.contains(${cls})){cur.classList.remove(${cls});cur.style.removeProperty('display');cur.style.removeProperty('visibility')}cur=cur.parentElement}}`,
+    `function bPropConceal(n,row){bPropSetHidden(n,true);var cur=n===row?null:n.parentElement,touched=false;while(cur&&cur!==row){if(cur.classList.contains(${cls})){cur.style.setProperty('display','none');cur.style.removeProperty('visibility');touched=true}cur=cur.parentElement}if(!touched&&n!==row){var p=n.parentElement;if(p&&p!==row){p.classList.add(${cls});p.style.setProperty('display','none')}}}`,
     `function bIsPlaceholderImageSrc(s){s=String(s||"");return s===${url}||s.indexOf(${assetName})>=0}`,
     `function bPropClearPublishPlaceholder(n){var tag=String(n.tagName||'').toUpperCase();if(tag==='SOURCE'){var ss=n.getAttribute('srcset')||'';if(bIsPlaceholderImageSrc(ss)||ss.indexOf(${assetName})>=0)n.removeAttribute('srcset');return}if(tag==='IMG'||tag==='IFRAME'||tag==='EMBED'){var s=n.getAttribute('src')||'';if(bIsPlaceholderImageSrc(s))n.removeAttribute('src');return}if(tag==='A'){var h=n.getAttribute('href')||'';if(h===${url})n.removeAttribute('href');return}var pic=n.querySelector&&n.querySelector('picture');if(pic){var sources=pic.querySelectorAll('source'),i;for(i=0;i<sources.length;i++){var si=sources[i].getAttribute('srcset')||'';if(bIsPlaceholderImageSrc(si)||si.indexOf(${assetName})>=0)sources[i].removeAttribute('srcset')}}var img=n.querySelector&&n.querySelector('img');if(img){var si=img.getAttribute('src')||'';if(bIsPlaceholderImageSrc(si))img.removeAttribute('src')}var t=n.textContent||'';if(t===${text})n.textContent=''}`,
   ].join("");

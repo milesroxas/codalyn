@@ -20,6 +20,7 @@ import {
   enginePoolIndexForRuntimeCloneIndex,
   engineRowForRuntimeCloneIndex,
   maxHiddenListDomChildIndex,
+  runtimeCloneIndexForEnginePoolIndex,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import { getTowerOrigin } from "@/shared/lib/tower-client";
@@ -44,14 +45,6 @@ function findHiddenListPoolIndexForRow(
     }
   }
   return -1;
-}
-
-function runtimeCloneIndexForPoolRow(pool: ReadonlyArray<{ domChildIndex?: number }>, poolIndex: number): number {
-  const row = pool[poolIndex];
-  if (row == null) {
-    return poolIndex;
-  }
-  return row.domChildIndex ?? poolIndex;
 }
 
 export type CmsSlotComposerCmsSource =
@@ -95,7 +88,7 @@ export function draftToHiddenListIndices(
       return { ok: false };
     }
     used.add(found);
-    indices.push(runtimeCloneIndexForPoolRow(pool, found));
+    indices.push(runtimeCloneIndexForEnginePoolIndex(pool, found));
   }
   return { ok: true, indices };
 }

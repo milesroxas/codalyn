@@ -25,6 +25,7 @@ import {
   getCmsTemplateCollectionIdFromCurrentPage,
 } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
+import { syncCmsSlotPageInlineScript } from "@/features/cms-slots/model/cms-slot-page-inline-script";
 import {
   type CmsSlotListOnPage,
   enginePoolIndexForRuntimeCloneIndex,
@@ -57,6 +58,21 @@ type ActiveComposerState = {
   beacon: CmsSlotListOnPage;
   initialSignature: string;
 };
+
+/**
+ * Best-effort re-upload of the footer runtime so a save always ships a runtime that can read the current payload
+ * contract. The manual Sync button remains the explicit repair path. No-op without Tower; never fails the save.
+ */
+async function trySyncCmsSlotPageRuntime(): Promise<void> {
+  if (!getTowerOrigin().trim()) {
+    return;
+  }
+  try {
+    await syncCmsSlotPageInlineScript();
+  } catch (e) {
+    console.warn("[cms-slots] runtime sync after save (non-fatal)", e);
+  }
+}
 
 function buildPropValueRowsForDraft(params: {
   draftToApply: CmsSlotCompositionDraftRow[];
@@ -179,6 +195,9 @@ async function applyComposerSaveCmsTemplatePath(args: {
     cmsLayoutSaveFailed = true;
     console.warn("[cms-slots] CMS list text save", e);
   }
+  if (!cmsLayoutSaveFailed) {
+    await trySyncCmsSlotPageRuntime();
+  }
   onProgress?.(CMS_SLOTS_ROUTE_TASK_FINISHING);
   setters.setComposerDraft(draftToApply);
   if (!cmsLayoutSaveFailed) {
@@ -244,6 +263,7 @@ async function applyComposerSaveStaticPagePath(args: {
     preferredDefinitionId: listTargetDefinitionIdRef.current,
     text: runtimeText,
   });
+  await trySyncCmsSlotPageRuntime();
   const normalizedDraft = draftToApply.map((d) => ({
     key: d.key,
     componentId: d.componentId,

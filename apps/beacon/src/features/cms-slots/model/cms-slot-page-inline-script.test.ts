@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  CMS_SLOT_COND_ATTR,
+  CMS_SLOT_CONTENT_ATTR,
   CMS_SLOT_PUBLISH_PLACEHOLDER_URL,
   WEBFLOW_CONDITION_INVISIBLE_CLASS,
 } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
@@ -47,6 +49,13 @@ describe("getCmsSlotPageInlineScriptSource", () => {
     const s = getCmsSlotPageInlineScriptSource();
     expect(s).toContain(`classList.add("${CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME}")`);
     expect(s).toContain('setProperty("display","contents","important")');
+  });
+
+  it("reads the v3 content and conditional attributes", () => {
+    const s = getCmsSlotPageInlineScriptSource();
+    expect(s).toContain(`querySelectorAll("[${CMS_SLOT_CONTENT_ATTR}]")`);
+    expect(s).toContain(`getAttribute("${CMS_SLOT_CONTENT_ATTR}")`);
+    expect(s).toContain(`getAttribute("${CMS_SLOT_COND_ATTR}")`);
   });
 });
 
@@ -103,11 +112,12 @@ describe("cms slot beacon runtime (published DOM)", () => {
     const nested = doc.createElement("div");
     nested.className = "nested-component";
     const title = doc.createElement("h2");
-    title.setAttribute("data-codalyn-beacon-prop", "parent-title");
+    title.setAttribute(CMS_SLOT_CONTENT_ATTR, "parent-title");
     title.textContent = "Designer placeholder";
     const inner = doc.createElement("div");
     const imgSlot = doc.createElement("span");
-    imgSlot.setAttribute("data-codalyn-beacon-prop", "parent-img");
+    imgSlot.setAttribute(CMS_SLOT_CONTENT_ATTR, "parent-img");
+    imgSlot.setAttribute(CMS_SLOT_COND_ATTR, "1");
     imgSlot.textContent = "img placeholder";
     inner.appendChild(imgSlot);
     nested.appendChild(title);
@@ -125,13 +135,13 @@ describe("cms slot beacon runtime (published DOM)", () => {
   }
 
   it("renders nothing when payload has empty i (Composer order cleared)", () => {
-    const { target } = mountListFixture(JSON.stringify({ v: 2, i: [], p: [] }));
+    const { target } = mountListFixture(JSON.stringify({ v: 3, i: [], p: [] }));
     runCmsSlotBeaconRuntime(document);
     expect(target.children.length).toBe(0);
   });
 
   it("falls back to cloning Engine rows when list target text is empty or invalid", () => {
-    for (const payloadJson of ["", "not-json", '{"v":3,"i":[0]}']) {
+    for (const payloadJson of ["", "not-json", '{"v":2,"i":[0]}']) {
       const doc = document;
       const source = doc.createElement("div");
       source.setAttribute("data-target", "beacons");
@@ -174,7 +184,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     target.setAttribute("data-beacon-target", "list");
     target.setAttribute("data-list", LIST);
     target.textContent = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [1, 2],
       p: [{}, {}],
     });
@@ -189,7 +199,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
 
   it("deep-clones nested component markup and applies per-row props inside nested nodes", () => {
     const payload = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [0],
       p: [{ "parent-title": "Row A title" }],
     });
@@ -202,17 +212,95 @@ describe("cms slot beacon runtime (published DOM)", () => {
     expect(nested).not.toBeNull();
     expect(nested).not.toBe(document.querySelector("[data-target=beacons] .nested-component"));
 
-    const title = clonedRow?.querySelector<HTMLHeadingElement>("[data-codalyn-beacon-prop='parent-title']");
+    const title = clonedRow?.querySelector<HTMLHeadingElement>(`[${CMS_SLOT_CONTENT_ATTR}='parent-title']`);
     expect(title?.textContent).toBe("Row A title");
     expect(title?.hasAttribute("hidden")).toBe(false);
 
-    const imgSlot = clonedRow?.querySelector("[data-codalyn-beacon-prop='parent-img']");
+    const imgSlot = clonedRow?.querySelector(`[${CMS_SLOT_CONTENT_ATTR}='parent-img']`);
     expect(imgSlot?.hasAttribute("hidden")).toBe(true);
+  });
+
+  it("leaves un-edited non-conditional content at its authored default (fail-open)", () => {
+    const doc = document;
+    const source = doc.createElement("div");
+    source.setAttribute("data-target", "beacons");
+    source.setAttribute("data-list", LIST);
+
+    const row = doc.createElement("div");
+    const title = doc.createElement("h2");
+    title.setAttribute(CMS_SLOT_CONTENT_ATTR, "parent-title");
+    title.textContent = "Authored default";
+    row.appendChild(title);
+    source.appendChild(row);
+
+    const target = doc.createElement("div");
+    target.setAttribute("data-beacon-target", "list");
+    target.setAttribute("data-list", LIST);
+    target.textContent = JSON.stringify({ v: 3, i: [0], p: [{}] });
+    doc.body.append(source, target);
+
+    runCmsSlotBeaconRuntime(doc);
+
+    const clonedTitle = target.querySelector<HTMLHeadingElement>(`[${CMS_SLOT_CONTENT_ATTR}='parent-title']`);
+    expect(clonedTitle?.textContent).toBe("Authored default");
+    expect(clonedTitle?.hasAttribute("hidden")).toBe(false);
+  });
+
+  it("applies a Composer value when the cloned row root is itself the tagged element", () => {
+    const doc = document;
+    const source = doc.createElement("div");
+    source.setAttribute("data-target", "beacons");
+    source.setAttribute("data-list", LIST);
+
+    const row = doc.createElement("div");
+    row.setAttribute(CMS_SLOT_CONTENT_ATTR, "root-text");
+    row.textContent = "Designer placeholder";
+    source.appendChild(row);
+
+    const target = doc.createElement("div");
+    target.setAttribute("data-beacon-target", "list");
+    target.setAttribute("data-list", LIST);
+    target.textContent = JSON.stringify({ v: 3, i: [0], p: [{ "root-text": "Composed value" }] });
+    doc.body.append(source, target);
+
+    runCmsSlotBeaconRuntime(doc);
+
+    const clonedRoot = target.querySelector<HTMLDivElement>(`[${CMS_SLOT_CONTENT_ATTR}='root-text']`);
+    expect(clonedRoot).not.toBeNull();
+    expect(clonedRoot).toBe(target.children[0]);
+    expect(clonedRoot?.textContent).toBe("Composed value");
+    expect(clonedRoot?.hasAttribute("hidden")).toBe(false);
+  });
+
+  it("conceals an empty conditional row root without hiding the list target", () => {
+    const doc = document;
+    const source = doc.createElement("div");
+    source.setAttribute("data-target", "beacons");
+    source.setAttribute("data-list", LIST);
+
+    const row = doc.createElement("a");
+    row.setAttribute(CMS_SLOT_CONTENT_ATTR, "root-link");
+    row.setAttribute(CMS_SLOT_COND_ATTR, "1");
+    row.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
+    source.appendChild(row);
+
+    const target = doc.createElement("div");
+    target.setAttribute("data-beacon-target", "list");
+    target.setAttribute("data-list", LIST);
+    target.textContent = JSON.stringify({ v: 3, i: [0], p: [{}] });
+    doc.body.append(source, target);
+
+    runCmsSlotBeaconRuntime(doc);
+
+    const clonedRoot = target.querySelector<HTMLAnchorElement>(`[${CMS_SLOT_CONTENT_ATTR}='root-link']`);
+    expect(clonedRoot?.hasAttribute("hidden")).toBe(true);
+    expect(target.classList.contains(WEBFLOW_CONDITION_INVISIBLE_CLASS)).toBe(false);
+    expect(target.style.display).not.toBe("none");
   });
 
   it("clones the same nested template twice with independent prop payloads", () => {
     const payload = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [0, 0],
       p: [{ "parent-title": "First" }, { "parent-title": "Second" }],
     });
@@ -220,7 +308,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     runCmsSlotBeaconRuntime(document);
 
     expect(target.children.length).toBe(2);
-    const titles = [...target.querySelectorAll<HTMLHeadingElement>("[data-codalyn-beacon-prop='parent-title']")];
+    const titles = [...target.querySelectorAll<HTMLHeadingElement>(`[${CMS_SLOT_CONTENT_ATTR}='parent-title']`)];
     expect(titles.map((el) => el.textContent)).toEqual(["First", "Second"]);
     expect(titles[0]).not.toBe(titles[1]);
   });
@@ -240,7 +328,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     const sourceEl = doc.createElement("source");
     sourceEl.setAttribute("srcset", CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
     const img = doc.createElement("img");
-    img.setAttribute("data-codalyn-beacon-prop", "card-image");
+    img.setAttribute(CMS_SLOT_CONTENT_ATTR, "card-image");
     img.setAttribute("src", CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
     picture.append(sourceEl, img);
     nested.appendChild(picture);
@@ -251,7 +339,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     target.setAttribute("data-beacon-target", "list");
     target.setAttribute("data-list", LIST);
     target.textContent = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [0],
       p: [{ "card-image": avif }],
     });
@@ -259,7 +347,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
 
     runCmsSlotBeaconRuntime(doc);
 
-    const clonedImg = target.querySelector<HTMLImageElement>("[data-codalyn-beacon-prop='card-image']");
+    const clonedImg = target.querySelector<HTMLImageElement>(`[${CMS_SLOT_CONTENT_ATTR}='card-image']`);
     const clonedSource = target.querySelector<HTMLSourceElement>("picture source");
     expect(clonedImg?.getAttribute("src")).toBe(avif);
     expect(clonedSource?.getAttribute("srcset")).toBe(avif);
@@ -278,7 +366,8 @@ describe("cms slot beacon runtime (published DOM)", () => {
     wrap.className = WEBFLOW_CONDITION_INVISIBLE_CLASS;
     wrap.style.display = "none";
     const link = doc.createElement("a");
-    link.setAttribute("data-codalyn-beacon-prop", "cta-link");
+    link.setAttribute(CMS_SLOT_CONTENT_ATTR, "cta-link");
+    link.setAttribute(CMS_SLOT_COND_ATTR, "1");
     link.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
     wrap.appendChild(link);
     row.appendChild(wrap);
@@ -288,7 +377,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     target.setAttribute("data-beacon-target", "list");
     target.setAttribute("data-list", LIST);
     target.textContent = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [0],
       p: [{ "cta-link": "https://example.com/go" }],
     });
@@ -296,7 +385,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
 
     runCmsSlotBeaconRuntime(doc);
 
-    const clonedLink = target.querySelector<HTMLAnchorElement>("a[data-codalyn-beacon-prop='cta-link']");
+    const clonedLink = target.querySelector<HTMLAnchorElement>(`a[${CMS_SLOT_CONTENT_ATTR}='cta-link']`);
     expect(clonedLink?.getAttribute("href")).toBe("https://example.com/go");
     expect(clonedLink?.hasAttribute("hidden")).toBe(false);
     expect(clonedLink?.parentElement?.classList.contains(WEBFLOW_CONDITION_INVISIBLE_CLASS)).toBe(false);
@@ -316,7 +405,8 @@ describe("cms slot beacon runtime (published DOM)", () => {
     wrap.className = WEBFLOW_CONDITION_INVISIBLE_CLASS;
     wrap.style.display = "none";
     const link = doc.createElement("a");
-    link.setAttribute("data-codalyn-beacon-prop", "card-link");
+    link.setAttribute(CMS_SLOT_CONTENT_ATTR, "card-link");
+    link.setAttribute(CMS_SLOT_COND_ATTR, "1");
     link.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
     wrap.appendChild(link);
     nested.appendChild(wrap);
@@ -327,7 +417,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     target.setAttribute("data-beacon-target", "list");
     target.setAttribute("data-list", LIST);
     target.textContent = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [0],
       p: [{ "card-link": "https://example.com/nested" }],
     });
@@ -336,13 +426,13 @@ describe("cms slot beacon runtime (published DOM)", () => {
     runCmsSlotBeaconRuntime(doc);
 
     const clonedLink = target.querySelector<HTMLAnchorElement>(
-      ".nested-component a[data-codalyn-beacon-prop='card-link']"
+      `.nested-component a[${CMS_SLOT_CONTENT_ATTR}='card-link']`
     );
     expect(clonedLink?.getAttribute("href")).toBe("https://example.com/nested");
     expect(clonedLink?.parentElement?.classList.contains(WEBFLOW_CONDITION_INVISIBLE_CLASS)).toBe(false);
   });
 
-  it("conceals publish placeholders when Composer leaves the prop empty", () => {
+  it("conceals empty conditionals while leaving plain content visible", () => {
     const doc = document;
     const source = doc.createElement("div");
     source.setAttribute("data-target", "beacons");
@@ -353,7 +443,8 @@ describe("cms slot beacon runtime (published DOM)", () => {
     title.textContent = "Card title";
     const wrap = doc.createElement("div");
     const link = doc.createElement("a");
-    link.setAttribute("data-codalyn-beacon-prop", "cta-link");
+    link.setAttribute(CMS_SLOT_CONTENT_ATTR, "cta-link");
+    link.setAttribute(CMS_SLOT_COND_ATTR, "1");
     link.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
     link.textContent = "Click me";
     wrap.appendChild(link);
@@ -365,16 +456,16 @@ describe("cms slot beacon runtime (published DOM)", () => {
     target.setAttribute("data-beacon-target", "list");
     target.setAttribute("data-list", LIST);
     target.textContent = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [0],
-      p: [{ "cta-link": "" }],
+      p: [{}],
     });
     doc.body.append(source, target);
 
     runCmsSlotBeaconRuntime(doc);
 
     const clonedTitle = target.querySelector<HTMLHeadingElement>("h2");
-    const clonedLink = target.querySelector<HTMLAnchorElement>("a[data-codalyn-beacon-prop='cta-link']");
+    const clonedLink = target.querySelector<HTMLAnchorElement>(`a[${CMS_SLOT_CONTENT_ATTR}='cta-link']`);
     expect(clonedTitle?.hasAttribute("hidden")).toBe(false);
     expect(clonedTitle?.textContent).toBe("Card title");
     expect(clonedLink?.hasAttribute("hidden")).toBe(true);
@@ -397,7 +488,8 @@ describe("cms slot beacon runtime (published DOM)", () => {
     const wrap = doc.createElement("div");
     wrap.className = WEBFLOW_CONDITION_INVISIBLE_CLASS;
     const link = doc.createElement("a");
-    link.setAttribute("data-codalyn-beacon-prop", "card-link");
+    link.setAttribute(CMS_SLOT_CONTENT_ATTR, "card-link");
+    link.setAttribute(CMS_SLOT_COND_ATTR, "1");
     link.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
     wrap.appendChild(link);
     nested.appendChild(title);
@@ -409,9 +501,9 @@ describe("cms slot beacon runtime (published DOM)", () => {
     target.setAttribute("data-beacon-target", "list");
     target.setAttribute("data-list", LIST);
     target.textContent = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [0],
-      p: [{ "card-link": "" }],
+      p: [{}],
     });
     doc.body.append(source, target);
 
@@ -419,7 +511,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
 
     const nestedRoot = target.querySelector<HTMLDivElement>(".nested-component");
     const nestedTitle = nestedRoot?.querySelector<HTMLHeadingElement>("h3");
-    const clonedLink = target.querySelector<HTMLAnchorElement>("a[data-codalyn-beacon-prop='card-link']");
+    const clonedLink = target.querySelector<HTMLAnchorElement>(`a[${CMS_SLOT_CONTENT_ATTR}='card-link']`);
     expect(nestedRoot?.classList.contains(WEBFLOW_CONDITION_INVISIBLE_CLASS)).toBe(false);
     expect(nestedRoot?.style.display).not.toBe("none");
     expect(nestedTitle?.hasAttribute("hidden")).toBe(false);
@@ -428,7 +520,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     expect(clonedLink?.parentElement?.style.display).toBe("none");
   });
 
-  it("conceals nodes when Composer payload still contains the publish placeholder sentinel", () => {
+  it("conceals conditional nodes when Composer payload still contains the publish placeholder sentinel", () => {
     const doc = document;
     const source = doc.createElement("div");
     source.setAttribute("data-target", "beacons");
@@ -436,7 +528,8 @@ describe("cms slot beacon runtime (published DOM)", () => {
 
     const row = doc.createElement("div");
     const link = doc.createElement("a");
-    link.setAttribute("data-codalyn-beacon-prop", "cta-link");
+    link.setAttribute(CMS_SLOT_CONTENT_ATTR, "cta-link");
+    link.setAttribute(CMS_SLOT_COND_ATTR, "1");
     link.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
     row.appendChild(link);
     source.appendChild(row);
@@ -445,7 +538,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     target.setAttribute("data-beacon-target", "list");
     target.setAttribute("data-list", LIST);
     target.textContent = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [0],
       p: [{ "cta-link": "https://codalyn.beacon/publish-placeholder" }],
     });
@@ -453,7 +546,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
 
     runCmsSlotBeaconRuntime(doc);
 
-    const clonedLink = target.querySelector<HTMLAnchorElement>("a[data-codalyn-beacon-prop='cta-link']");
+    const clonedLink = target.querySelector<HTMLAnchorElement>(`a[${CMS_SLOT_CONTENT_ATTR}='cta-link']`);
     expect(clonedLink?.hasAttribute("hidden")).toBe(true);
     expect(clonedLink?.hasAttribute("href")).toBe(false);
   });
@@ -466,7 +559,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
 
     const row = doc.createElement("div");
     const img = doc.createElement("img");
-    img.setAttribute("data-codalyn-beacon-prop", "hero-image");
+    img.setAttribute(CMS_SLOT_CONTENT_ATTR, "hero-image");
     img.setAttribute("src", CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
     row.appendChild(img);
     source.appendChild(row);
@@ -475,7 +568,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     target.setAttribute("data-beacon-target", "list");
     target.setAttribute("data-list", LIST);
     target.textContent = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [0],
       p: [{ "hero-image": "https://cdn.example.com/photo.jpg" }],
     });
@@ -483,7 +576,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
 
     runCmsSlotBeaconRuntime(doc);
 
-    const clonedImg = target.querySelector<HTMLImageElement>("img[data-codalyn-beacon-prop='hero-image']");
+    const clonedImg = target.querySelector<HTMLImageElement>(`img[${CMS_SLOT_CONTENT_ATTR}='hero-image']`);
     expect(clonedImg?.getAttribute("src")).toBe("https://cdn.example.com/photo.jpg");
     expect(clonedImg?.hasAttribute("hidden")).toBe(false);
   });
@@ -496,7 +589,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
 
     const row = doc.createElement("div");
     const wrap = doc.createElement("div");
-    wrap.setAttribute("data-codalyn-beacon-prop", "hero-image");
+    wrap.setAttribute(CMS_SLOT_CONTENT_ATTR, "hero-image");
     const img = doc.createElement("img");
     img.setAttribute("src", CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
     wrap.appendChild(img);
@@ -507,7 +600,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     target.setAttribute("data-beacon-target", "list");
     target.setAttribute("data-list", LIST);
     target.textContent = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [0],
       p: [{ "hero-image": "https://cdn.example.com/wrapped.jpg" }],
     });
@@ -515,7 +608,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
 
     runCmsSlotBeaconRuntime(doc);
 
-    const clonedWrap = target.querySelector<HTMLDivElement>("[data-codalyn-beacon-prop='hero-image']");
+    const clonedWrap = target.querySelector<HTMLDivElement>(`[${CMS_SLOT_CONTENT_ATTR}='hero-image']`);
     const clonedImg = clonedWrap?.querySelector("img");
     expect(clonedImg?.getAttribute("src")).toBe("https://cdn.example.com/wrapped.jpg");
     expect(clonedWrap?.hasAttribute("hidden")).toBe(false);
@@ -530,15 +623,15 @@ describe("cms slot beacon runtime (published DOM)", () => {
 
     const row = doc.createElement("div");
     const direct = doc.createElement("img");
-    direct.setAttribute("data-codalyn-beacon-prop", "hero-image");
-    direct.setAttribute("data-codalyn-beacon-bind", "cmp-root|direct-img");
+    direct.setAttribute(CMS_SLOT_CONTENT_ATTR, "hero-image");
+    direct.setAttribute("data-cb-id", "cmp-root|direct-img");
     row.appendChild(direct);
 
     const nested = doc.createElement("div");
     nested.className = "nested-image";
     const nestedImg = doc.createElement("img");
-    nestedImg.setAttribute("data-codalyn-beacon-prop", "hero-image@cmp-nested|inner-img");
-    nestedImg.setAttribute("data-codalyn-beacon-bind", "cmp-nested|inner-img");
+    nestedImg.setAttribute(CMS_SLOT_CONTENT_ATTR, "hero-image@cmp-nested|inner-img");
+    nestedImg.setAttribute("data-cb-id", "cmp-nested|inner-img");
     nested.appendChild(nestedImg);
     row.appendChild(nested);
     source.appendChild(row);
@@ -547,7 +640,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     target.setAttribute("data-beacon-target", "list");
     target.setAttribute("data-list", LIST);
     target.textContent = JSON.stringify({
-      v: 2,
+      v: 3,
       i: [0],
       p: [{ "hero-image": url }],
     });

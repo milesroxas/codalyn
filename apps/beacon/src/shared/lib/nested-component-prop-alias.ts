@@ -68,24 +68,3 @@ export async function nestedAliasForComponentInstance(
   const props = await inst.getProps().catch(() => [] as InstancePropSummary[]);
   return mapNestedPropsToExposedIds(props, exposedIds, upstreamAlias);
 }
-
-export type NestedPublishSeedPair = {
-  nestedPropId: string;
-  canonicalPropId: string;
-};
-
-export function nestedPublishSeedPairKey(pair: NestedPublishSeedPair): string {
-  return `${pair.nestedPropId.toLowerCase()}|${pair.canonicalPropId.toLowerCase()}`;
-}
-
-/** Record nested prop ids tagged inside a nested component definition (not the root slot component). */
-export function collectNestedPublishSeedPairsFromBinding(
-  boundPropId: string,
-  canonicalPropId: string,
-  nestedDepth: number
-): NestedPublishSeedPair | null {
-  if (nestedDepth <= 0 || boundPropId === canonicalPropId) {
-    return null;
-  }
-  return { nestedPropId: boundPropId, canonicalPropId };
-}

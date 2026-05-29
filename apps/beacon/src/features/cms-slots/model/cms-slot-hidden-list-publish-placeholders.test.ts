@@ -1,19 +1,28 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
   CMS_SLOT_PUBLISH_PLACEHOLDER_URL,
   isHiddenListInstancePropEmpty,
   isSearchInstancePropEmpty,
-  needsParentSeedForNestedTaggedCanonical,
   publishPlaceholderForExposedProp,
   publishPlaceholderForValueType,
   resolveSeedPlaceholderValue,
-  seedHiddenListPublishPlaceholders,
-  seedNestedPublishPlaceholdersOnPlacedInstance,
+  seedConditionalControllerPlaceholders,
 } from "@/features/cms-slots/model/cms-slot-hidden-list-publish-placeholders";
 
 const linkMeta: ComposableInstancePropMeta = { propId: "cta-link", label: "Link", valueType: "link" };
 const linkPlaceholder = { mode: "url", to: CMS_SLOT_PUBLISH_PLACEHOLDER_URL } as const;
+
+function stubWebflowForPageScope(): void {
+  vi.stubGlobal("webflow", {
+    getCurrentComponent: vi.fn().mockResolvedValue(null),
+    exitComponent: vi.fn().mockResolvedValue(undefined),
+  });
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("isHiddenListInstancePropEmpty", () => {
   it("treats unset link props as empty", () => {
@@ -32,10 +41,6 @@ describe("isHiddenListInstancePropEmpty", () => {
         "link"
       )
     ).toBe(false);
-  });
-
-  it("treats link with destination as set", () => {
-    expect(isHiddenListInstancePropEmpty({ value: { mode: "url", to: "https://a.test" } }, "link")).toBe(false);
   });
 });
 
@@ -68,6 +73,11 @@ describe("publishPlaceholderForValueType", () => {
     expect(publishPlaceholderForValueType("url")).toBe(CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
   });
 
+  it("uses a truthy boolean for visibility toggles", () => {
+    expect(publishPlaceholderForValueType("boolean")).toBe(true);
+    expect(publishPlaceholderForValueType("visibility")).toBe(true);
+  });
+
   it("does not use a URL string for imageAsset setProps", () => {
     expect(publishPlaceholderForValueType("imageAsset")).toBe("\u00a0");
     expect(resolveSeedPlaceholderValue("imageAsset", "asset-123")).toBe("asset-123");
@@ -75,130 +85,9 @@ describe("publishPlaceholderForValueType", () => {
   });
 });
 
-describe("needsParentSeedForNestedTaggedCanonical", () => {
-  it("seeds parent exposed props with component link defaults (#)", () => {
-    expect(
-      needsParentSeedForNestedTaggedCanonical(
-        {
-          valueType: "link",
-          value: { sourceType: "static", value: { mode: "url", to: "#" } },
-          resolvedValue: { mode: "url", to: "#" },
-        },
-        linkMeta
-      )
-    ).toBe(true);
-  });
-
-  it("seeds empty parent exposed props", () => {
-    expect(
-      needsParentSeedForNestedTaggedCanonical(
-        {
-          valueType: "link",
-          value: { sourceType: "static", value: null },
-          resolvedValue: null,
-        },
-        linkMeta
-      )
-    ).toBe(true);
-  });
-
-  it("skips parent props that already have the publish placeholder", () => {
-    expect(
-      needsParentSeedForNestedTaggedCanonical(
-        {
-          valueType: "link",
-          value: { sourceType: "static", value: linkPlaceholder },
-          resolvedValue: linkPlaceholder,
-        },
-        linkMeta
-      )
-    ).toBe(false);
-  });
-
-  it("skips parent props with real content", () => {
-    expect(
-      needsParentSeedForNestedTaggedCanonical(
-        {
-          valueType: "string",
-          value: { sourceType: "static", value: "Lorem ipsum" },
-          resolvedValue: "Lorem ipsum",
-        },
-        { valueType: "string" }
-      )
-    ).toBe(false);
-  });
-});
-
-describe("seedNestedPublishPlaceholdersOnPlacedInstance", () => {
-  it("sets placeholders on the parent list-row instance using exposed prop ids", async () => {
-    vi.stubGlobal("webflow", {
-      getCurrentComponent: vi.fn().mockResolvedValue(null),
-      exitComponent: vi.fn().mockResolvedValue(undefined),
-    });
-    const setProps = vi.fn().mockResolvedValue([]);
-    const parentInstance = {
-      searchProps: vi.fn().mockResolvedValue([
-        {
-          propId: "cta-link",
-          valueType: "link",
-          hasOverride: false,
-          value: { sourceType: "static", value: { mode: "url", to: "#" } },
-          resolvedValue: { mode: "url", to: "#" },
-          defaultValue: null,
-          display: { label: "Link", group: null },
-        },
-      ]),
-      setProps,
-      getComponent: vi.fn().mockResolvedValue({ id: "card-primary" }),
-    } as unknown as ComponentElement;
-
-    const n = await seedNestedPublishPlaceholdersOnPlacedInstance(
-      parentInstance,
-      [linkMeta],
-      new Set(["cta-link"]),
-      new Set(["nested-link|cta-link"])
-    );
-    expect(n).toBe(1);
-    expect(setProps).toHaveBeenCalledWith([{ propId: "cta-link", value: linkPlaceholder }]);
-    vi.unstubAllGlobals();
-  });
-
-  it("matches nested seed pair keys case-insensitively against tagged prop ids", async () => {
-    vi.stubGlobal("webflow", {
-      getCurrentComponent: vi.fn().mockResolvedValue(null),
-      exitComponent: vi.fn().mockResolvedValue(undefined),
-    });
-    const setProps = vi.fn().mockResolvedValue([]);
-    const parentInstance = {
-      searchProps: vi.fn().mockResolvedValue([
-        {
-          propId: "CTA-LINK",
-          valueType: "link",
-          hasOverride: false,
-          value: { sourceType: "static", value: null },
-          resolvedValue: null,
-          defaultValue: null,
-          display: { label: "Link", group: null },
-        },
-      ]),
-      setProps,
-      getComponent: vi.fn().mockResolvedValue({ id: "card-primary" }),
-    } as unknown as ComponentElement;
-
-    const n = await seedNestedPublishPlaceholdersOnPlacedInstance(
-      parentInstance,
-      [linkMeta],
-      new Set(["CTA-LINK"]),
-      new Set(["nested-link|cta-link"])
-    );
-    expect(n).toBe(1);
-    expect(setProps).toHaveBeenCalledWith([{ propId: "CTA-LINK", value: linkPlaceholder }]);
-    vi.unstubAllGlobals();
-  });
-});
-
-describe("seedHiddenListPublishPlaceholders", () => {
-  it("sets placeholders only for tagged exposed props that are empty", async () => {
+describe("seedConditionalControllerPlaceholders", () => {
+  it("seeds a truthy placeholder on empty controller props", async () => {
+    stubWebflowForPageScope();
     const setProps = vi.fn().mockResolvedValue([]);
     const instance = {
       searchProps: vi.fn().mockResolvedValue([
@@ -215,12 +104,13 @@ describe("seedHiddenListPublishPlaceholders", () => {
       setProps,
     } as unknown as ComponentElement;
 
-    const n = await seedHiddenListPublishPlaceholders(instance, [linkMeta], new Set(["cta-link"]));
+    const n = await seedConditionalControllerPlaceholders(instance, new Set(["cta-link"]));
     expect(n).toBe(1);
     expect(setProps).toHaveBeenCalledWith([{ propId: "cta-link", value: linkPlaceholder }]);
   });
 
-  it("skips props that already have a value", async () => {
+  it("skips controller props that already have a value", async () => {
+    stubWebflowForPageScope();
     const setProps = vi.fn();
     const instance = {
       searchProps: vi.fn().mockResolvedValue([
@@ -237,12 +127,13 @@ describe("seedHiddenListPublishPlaceholders", () => {
       setProps,
     } as unknown as ComponentElement;
 
-    const n = await seedHiddenListPublishPlaceholders(instance, [linkMeta], new Set(["cta-link"]));
+    const n = await seedConditionalControllerPlaceholders(instance, new Set(["cta-link"]));
     expect(n).toBe(0);
     expect(setProps).not.toHaveBeenCalled();
   });
 
-  it("matches exposed + tagged prop ids case-insensitively", async () => {
+  it("matches controller ids case-insensitively and skips ids absent from the instance", async () => {
+    stubWebflowForPageScope();
     const setProps = vi.fn().mockResolvedValue([]);
     const instance = {
       searchProps: vi.fn().mockResolvedValue([
@@ -259,7 +150,7 @@ describe("seedHiddenListPublishPlaceholders", () => {
       setProps,
     } as unknown as ComponentElement;
 
-    const n = await seedHiddenListPublishPlaceholders(instance, [linkMeta], new Set(["cta-link"]));
+    const n = await seedConditionalControllerPlaceholders(instance, new Set(["cta-link", "not-a-prop"]));
     expect(n).toBe(1);
     expect(setProps).toHaveBeenCalledWith([{ propId: "CTA-LINK", value: linkPlaceholder }]);
   });

@@ -6,33 +6,27 @@
  *    the *current* collection entry, so every CMS row has its own `i` + `p`.
  * 2. **Published page** — the footer `beacon` runtime reads `listTarget.textContent` (JSON), clones hidden Engine children
  *    by `i` into the list target (empty or missing `i` ⇒ no rows; invalid JSON does not fall back to the full Engine list),
- *    then for each row applies `p[propId]` onto elements with matching `data-codalyn-beacon-prop`
- *    (keys are matched case-insensitively; the attribute may list `oldId|newId` separated by `|` for Webflow id churn).
+ *    then for each row applies `p[propId]` onto elements with matching `data-cb-c`
+ *    (keys are matched case-insensitively; the attribute may list `propId@bindId` separated by `|` for duplicate sites).
  *    When the same exposed prop is bound on multiple elements, later sites are tagged `propId@bindId` but still resolve
- *    the Composer value via the base `propId`. Each tagged node also carries `data-codalyn-beacon-bind` (unique bind id).
+ *    the Composer value via the base `propId`. Each tagged node also carries `data-cb-id` (unique bind id).
  *
- * v2: `i` = clone order (indices into the hidden list’s children), `p` = parallel array of per-row `propId` → string.
+ * v3: `i` = clone order (indices into the hidden list’s children), `p` = parallel array of per-row `propId` → string.
  * `p` keys are **only** propIds the Engine had marked `exposed` in the slot file (not every Webflow prop on the
- * component). The footer runtime applies those keys to `data-codalyn-beacon-prop` nodes in each cloned row; a missing
- * key or empty/whitespace-only value sets `hidden` on that node (placeholders are not shown). When a value is set,
- * the runtime also clears Webflow conditional visibility (`w-condition-invisible`) on ancestor wrappers so Composer
- * can show elements that were kept in HTML with publish-time placeholders on the hidden Engine list instance.
+ * component), and **only** props the Composer actually set (empty values are omitted). The footer runtime applies those
+ * keys to `data-cb-c` nodes in each cloned row; when a value is set it reveals the node (clearing
+ * `w-condition-invisible` on ancestor wrappers). When a key is absent the runtime leaves the authored default content
+ * for plain content, and hides nodes flagged conditional (`data-cb-v`) so empty conditionals do not show placeholders.
  *
  * Optional `n` (parallel to `i`/`p`) stores Composer-only **slot display names**. The footer runtime ignores `n`; it is
  * for Composer UX persistence in the same JSON blob.
  */
+import { isBeaconPropValueEmpty } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import { enginePoolIndexForRuntimeCloneIndex } from "@/features/cms-slots/model/cms-slot-page-targets";
 
-export const CMS_SLOT_LIST_RUNTIME_JSON_VERSION = 2 as const;
+export const CMS_SLOT_LIST_RUNTIME_JSON_VERSION = 3 as const;
 /** Max length for a Composer slot display name persisted in payload `n[]`. */
 export const CMS_SLOT_ROW_NAME_MAX = 80 as const;
-/** Backward compatible reader for old CMS data. */
-export const CMS_SLOT_LIST_RUNTIME_JSON_VERSION_LEGACY = 1 as const;
-
-export type CmsSlotListRuntimePayloadV1 = {
-  v: typeof CMS_SLOT_LIST_RUNTIME_JSON_VERSION_LEGACY;
-  i: number[];
-};
 
 export type CmsSlotListRuntimePayload = {
   v: typeof CMS_SLOT_LIST_RUNTIME_JSON_VERSION;
@@ -54,10 +48,7 @@ function normalizeBeaconPayloadVersion(v: unknown): number | null {
     return null;
   }
   const iv = Math.round(n);
-  if (iv === CMS_SLOT_LIST_RUNTIME_JSON_VERSION || iv === CMS_SLOT_LIST_RUNTIME_JSON_VERSION_LEGACY) {
-    return iv;
-  }
-  return null;
+  return iv === CMS_SLOT_LIST_RUNTIME_JSON_VERSION ? iv : null;
 }
 
 function isIndexArray(x: unknown): x is number[] {
@@ -232,6 +223,11 @@ export function parseCmsSlotListRuntimePayload(raw: string, childCount?: number)
   return out;
 }
 
+/**
+ * v3 omits empty/whitespace content values so the footer runtime leaves un-edited props at their authored default
+ * (fail-open). Conditional elements (`data-cb-v`) without a value are hidden by the runtime, so an absent key both
+ * preserves defaults for plain content and conceals empty conditionals.
+ */
 function serializePropValueRow(src: Readonly<Record<string, string>> | null | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   if (src == null) {
@@ -241,7 +237,11 @@ function serializePropValueRow(src: Readonly<Record<string, string>> | null | un
     if (v === undefined) {
       continue;
     }
-    out[k] = typeof v === "string" ? v : String(v);
+    const str = typeof v === "string" ? v : String(v);
+    if (isBeaconPropValueEmpty(str)) {
+      continue;
+    }
+    out[k] = str;
   }
   return out;
 }

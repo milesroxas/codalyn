@@ -189,7 +189,7 @@ export function enginePoolIndexForRuntimeCloneIndex(
 }
 
 export function runtimeCloneIndexForEnginePoolIndex(
-  engineScopedRows: readonly HydratedCmsSlotRow[],
+  engineScopedRows: ReadonlyArray<{ domChildIndex?: number }>,
   poolIndex: number
 ): number {
   return engineScopedRows[poolIndex]?.domChildIndex ?? poolIndex;

@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  CMS_SLOT_BEACON_BIND_ATTR,
-  CMS_SLOT_BEACON_PROP_ATTR,
-} from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
+import { CMS_SLOT_BIND_ATTR, CMS_SLOT_CONTENT_ATTR } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import { stripEngineCodalynAttrsFromComponentInstance } from "@/features/cms-slots/model/cms-slot-engine-codalyn-attr-sync";
 
 function domWithCodalynAttrs(attrs: Record<string, string>, children: AnyElement[] = []): AnyElement {
@@ -41,8 +38,8 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
 
   it("removes codalyn attrs from the definition tree and nested component definitions", async () => {
     const nestedRoot = domWithCodalynAttrs({
-      [CMS_SLOT_BEACON_PROP_ATTR]: "nested-title",
-      [CMS_SLOT_BEACON_BIND_ATTR]: "cmp-nested|title",
+      [CMS_SLOT_CONTENT_ATTR]: "nested-title",
+      [CMS_SLOT_BIND_ATTR]: "cmp-nested|title",
     });
     const nestedInstance = {
       type: "ComponentInstance",
@@ -54,8 +51,8 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
 
     const root = domWithCodalynAttrs(
       {
-        [CMS_SLOT_BEACON_PROP_ATTR]: "hero-title",
-        [CMS_SLOT_BEACON_BIND_ATTR]: "cmp-root|hero",
+        [CMS_SLOT_CONTENT_ATTR]: "hero-title",
+        [CMS_SLOT_BIND_ATTR]: "cmp-root|hero",
       },
       [nestedInstance]
     );
@@ -77,10 +74,10 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
     const nestedRootDom = nestedRoot as unknown as {
       removeAttribute: ReturnType<typeof vi.fn>;
     };
-    expect(rootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_BEACON_PROP_ATTR);
-    expect(rootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_BEACON_BIND_ATTR);
-    expect(nestedRootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_BEACON_PROP_ATTR);
-    expect(nestedRootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_BEACON_BIND_ATTR);
+    expect(rootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_CONTENT_ATTR);
+    expect(rootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_BIND_ATTR);
+    expect(nestedRootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_CONTENT_ATTR);
+    expect(nestedRootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_BIND_ATTR);
   });
 
   it("returns a non-fatal error when the component definition cannot be opened", async () => {

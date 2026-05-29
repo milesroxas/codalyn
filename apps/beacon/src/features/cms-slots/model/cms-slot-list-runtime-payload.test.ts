@@ -57,19 +57,28 @@ describe("cmsSlotListRuntimePayloadSequential", () => {
 });
 
 describe("parseCmsSlotListRuntimePayload", () => {
-  it("returns null for empty or invalid", () => {
+  it("returns null for empty, invalid, or unsupported version", () => {
     expect(parseCmsSlotListRuntimePayload("")).toBeNull();
     expect(parseCmsSlotListRuntimePayload("not json")).toBeNull();
-    expect(parseCmsSlotListRuntimePayload('{"v":3,"i":[0]}')).toBeNull();
+    expect(parseCmsSlotListRuntimePayload('{"v":2,"i":[0]}')).toBeNull();
+    expect(parseCmsSlotListRuntimePayload('{"v":1,"i":[0,1]}')).toBeNull();
+  });
+
+  it("tolerates a missing p (fills empty rows)", () => {
+    expect(parseCmsSlotListRuntimePayload('{"v":3,"i":[0]}')).toEqual({
+      v: CMS_SLOT_LIST_RUNTIME_JSON_VERSION,
+      i: [0],
+      p: [{}],
+    });
   });
 
   it("round-trips parallel slot labels in n", () => {
-    const s = serializeCmsSlotListRuntimePayload([0, 1], [{ a: "" }, {}], ["Alpha", "Beta"]);
+    const s = serializeCmsSlotListRuntimePayload([0, 1], [{ a: "x" }, {}], ["Alpha", "Beta"]);
     const a = parseCmsSlotListRuntimePayload(s);
     expect(a).toEqual({
       v: CMS_SLOT_LIST_RUNTIME_JSON_VERSION,
       i: [0, 1],
-      p: [{ a: "" }, {}],
+      p: [{ a: "x" }, {}],
       n: ["Alpha", "Beta"],
     });
   });
@@ -89,13 +98,8 @@ describe("parseCmsSlotListRuntimePayload", () => {
     expect(b?.n).toEqual(["L1", "L2"]);
   });
 
-  it("accepts v1 payload without p", () => {
-    const p = parseCmsSlotListRuntimePayload('{"v":1,"i":[0,1]}');
-    expect(p).toEqual({ v: CMS_SLOT_LIST_RUNTIME_JSON_VERSION, i: [0, 1], p: [{}, {}] });
-  });
-
-  it("accepts string v like CMS round-trips sometimes emit", () => {
-    const p = parseCmsSlotListRuntimePayload('{"v":"2","i":[0],"p":[{"a":"x"}]}');
+  it("accepts stringified v like CMS round-trips sometimes emit", () => {
+    const p = parseCmsSlotListRuntimePayload('{"v":"3","i":[0],"p":[{"a":"x"}]}');
     expect(p).toEqual({
       v: CMS_SLOT_LIST_RUNTIME_JSON_VERSION,
       i: [0],
@@ -103,13 +107,13 @@ describe("parseCmsSlotListRuntimePayload", () => {
     });
   });
 
-  it("serializes empty strings in p so CMS + runtime can clear overrides", () => {
+  it("omits empty strings in p so the runtime falls open to authored defaults", () => {
     const s = serializeCmsSlotListRuntimePayload([0, 1], [{ "prop-a": "hello", "prop-b": "" }, { x: "0" }]);
     const parsed = parseCmsSlotListRuntimePayload(s);
     expect(parsed).toEqual({
       v: CMS_SLOT_LIST_RUNTIME_JSON_VERSION,
       i: [0, 1],
-      p: [{ "prop-a": "hello", "prop-b": "" }, { x: "0" }],
+      p: [{ "prop-a": "hello" }, { x: "0" }],
     });
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { beaconPropDebugRuntimeSource } from "@/features/cms-slots/model/cms-slot-beacon-debug";
 import {
   beaconPropApplyValueRuntimeSource,
   beaconPropEmptyRuntimeSource,
@@ -68,11 +69,19 @@ describe("beacon prop runtime source snippets", () => {
     }).not.toThrow();
   });
 
+  it("debug overlay helper source parses", () => {
+    expect(() => {
+      void new Function(beaconPropDebugRuntimeSource());
+    }).not.toThrow();
+  });
+
   it("embeds shared empty + visibility helpers in the footer script", () => {
     const s = getCmsSlotPageInlineScriptSource();
     expect(s).toContain(beaconPropEmptyRuntimeSource());
     expect(s).toContain(beaconPropVisibilityRuntimeSource());
     expect(s).toContain(beaconPropApplyValueRuntimeSource());
+    expect(s).toContain(beaconPropDebugRuntimeSource());
+    expect(s).toContain("bDbgBindKeys()");
     expect(s).toContain("bPropReveal(node,row)");
     expect(s).toContain("bPropConceal(node,row)");
     expect(s).toContain("bPropClearPublishPlaceholder(node)");

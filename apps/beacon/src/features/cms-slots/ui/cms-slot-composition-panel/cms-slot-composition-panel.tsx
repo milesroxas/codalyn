@@ -44,7 +44,7 @@ export type CmsSlotCompositionPanelProps = {
   listTargetSelectedOnCanvas: boolean;
   engineSlotProps: CmsSlotEngineSlotPropsFile;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
-  /** Re-apply `data-codalyn-beacon-prop` on the component definition from current Engine “Expose” + bindings. */
+  /** Re-apply `data-cb-c` content tags on the component definition from current Engine “Expose” + bindings. */
   onResyncEngineSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
   resyncingEngineSlotKey: string | null;
   /** Index-aligned with `selected`; from runtime JSON `n[]` (null while loading). */

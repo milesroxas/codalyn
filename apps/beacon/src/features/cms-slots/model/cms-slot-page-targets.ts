@@ -94,6 +94,8 @@ export type HydratedCmsSlotRow = {
   componentId: string;
   name: string;
   instance: ComponentElement;
+  /** Index in `container.getChildren()` — matches published `sourceNode.children` for runtime clone `i[]`. */
+  domChildIndex: number;
 };
 
 /** Engine-configured component ids for this CMS slot, or `null` when not configured yet. */
@@ -150,12 +152,56 @@ export async function resolveCmsSlotEngineConfiguredComponentIds(
 export async function listInstancesInSlotListContainer(container: BlockElement): Promise<HydratedCmsSlotRow[]> {
   const children = await container.getChildren();
   const out: HydratedCmsSlotRow[] = [];
-  for (const ch of children) {
+  for (let domChildIndex = 0; domChildIndex < children.length; domChildIndex++) {
+    const ch = children[domChildIndex];
     if (ch.type !== "ComponentInstance") continue;
     const inst = ch as ComponentElement;
     const comp = await inst.getComponent();
     const name = await comp.getName();
-    out.push({ key: crypto.randomUUID(), componentId: comp.id, name, instance: inst });
+    out.push({ key: crypto.randomUUID(), componentId: comp.id, name, instance: inst, domChildIndex });
   }
   return out;
+}
+
+/** Resolves a published runtime clone index (`payload.i[]`) to the matching Engine pool row. */
+export function engineRowForRuntimeCloneIndex(
+  engineScopedRows: readonly HydratedCmsSlotRow[],
+  runtimeIndex: number
+): HydratedCmsSlotRow | undefined {
+  for (const row of engineScopedRows) {
+    if (row.domChildIndex === runtimeIndex) {
+      return row;
+    }
+  }
+  return runtimeIndex >= 0 && runtimeIndex < engineScopedRows.length ? engineScopedRows[runtimeIndex] : undefined;
+}
+
+export function enginePoolIndexForRuntimeCloneIndex(
+  engineScopedRows: ReadonlyArray<{ domChildIndex?: number }>,
+  runtimeIndex: number
+): number {
+  for (let i = 0; i < engineScopedRows.length; i++) {
+    if (engineScopedRows[i]?.domChildIndex === runtimeIndex) {
+      return i;
+    }
+  }
+  return runtimeIndex >= 0 && runtimeIndex < engineScopedRows.length ? runtimeIndex : -1;
+}
+
+export function runtimeCloneIndexForEnginePoolIndex(
+  engineScopedRows: readonly HydratedCmsSlotRow[],
+  poolIndex: number
+): number {
+  return engineScopedRows[poolIndex]?.domChildIndex ?? poolIndex;
+}
+
+/** Upper bound for clamping runtime payload `i[]` against published clone sources (DOM child count). */
+export function maxHiddenListDomChildIndex(rows: ReadonlyArray<{ domChildIndex: number }>): number {
+  let max = -1;
+  for (const row of rows) {
+    if (row.domChildIndex > max) {
+      max = row.domChildIndex;
+    }
+  }
+  return max;
 }

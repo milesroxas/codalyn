@@ -1,8 +1,18 @@
 import {
+  readCmsSlotEngineSlotPropsFile,
+  writeCmsSlotEngineSlotPropsFile,
+} from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+import {
   removeAllCmsSlotListTargetInstancesOnPage,
   removeAllInstancesOfComponentOnPage,
 } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
+import {
+  filterHydratedCmsSlotRowsByComponentIds,
+  listInstancesInSlotListContainer,
+  resolveCmsSlotEngineConfiguredComponentIds,
+  writeCmsSlotEngineConfiguredComponentIds,
+} from "@/features/cms-slots/model/cms-slot-page-targets";
 import {
   CMS_SLOT_UTILITIES_COMPONENT_GROUP,
   getCmsSlotListTargetComponentOrNull,
@@ -129,6 +139,48 @@ export type CmsSlotCompositionDraftRow = {
 };
 
 /**
+ * Ensures the hidden Engine list has at least one instance per component type in `draft`. Appends missing
+ * types (existing rows first, then first-seen draft order) and refreshes configured ids + slot props length.
+ */
+export async function ensureEnginePoolHasDraftComponentTypes(
+  container: BlockElement,
+  draft: ReadonlyArray<{ componentId: string }>
+): Promise<HydratedCmsSlotRow[]> {
+  let rows = await listInstancesInSlotListContainer(container);
+  const configured = await resolveCmsSlotEngineConfiguredComponentIds(container, rows);
+  let scoped = filterHydratedCmsSlotRowsByComponentIds(rows, configured);
+
+  const present = new Set(scoped.map((row) => row.componentId));
+  const toAppend: string[] = [];
+  for (const row of draft) {
+    if (!present.has(row.componentId)) {
+      toAppend.push(row.componentId);
+      present.add(row.componentId);
+    }
+  }
+
+  if (toAppend.length === 0) {
+    return scoped;
+  }
+
+  for (const componentId of toAppend) {
+    await appendComponentToSlotListContainer(container, componentId);
+  }
+
+  rows = await listInstancesInSlotListContainer(container);
+  await writeCmsSlotEngineConfiguredComponentIds(
+    container,
+    rows.map((row) => row.componentId)
+  );
+  const slotFile = await readCmsSlotEngineSlotPropsFile(container, rows.length);
+  await writeCmsSlotEngineSlotPropsFile(container, slotFile);
+
+  const configuredAfter = await resolveCmsSlotEngineConfiguredComponentIds(container, rows);
+  scoped = filterHydratedCmsSlotRowsByComponentIds(rows, configuredAfter);
+  return scoped;
+}
+
+/**
  * Replaces all component instances inside a CMS slot container so their types and order match `draft`.
  * Used by Composer save so the hidden list, designer preview, and published runtime stay aligned.
  */
@@ -143,13 +195,9 @@ export async function applyCmsSlotCompositionDraft(
         await (ch as ComponentElement).remove();
       }
     }
-    const out: HydratedCmsSlotRow[] = [];
     for (const row of draft) {
-      const instance = await appendComponentToSlotListContainer(container, row.componentId);
-      const comp = await webflow.getComponent(row.componentId);
-      const name = await comp.getName();
-      out.push({ key: crypto.randomUUID(), componentId: row.componentId, name, instance });
+      await appendComponentToSlotListContainer(container, row.componentId);
     }
-    return out;
+    return listInstancesInSlotListContainer(container);
   });
 }

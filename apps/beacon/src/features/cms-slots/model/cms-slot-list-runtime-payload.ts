@@ -8,6 +8,8 @@
  *    by `i` into the list target (empty or missing `i` ⇒ no rows; invalid JSON does not fall back to the full Engine list),
  *    then for each row applies `p[propId]` onto elements with matching `data-codalyn-beacon-prop`
  *    (keys are matched case-insensitively; the attribute may list `oldId|newId` separated by `|` for Webflow id churn).
+ *    When the same exposed prop is bound on multiple elements, later sites are tagged `propId@bindId` but still resolve
+ *    the Composer value via the base `propId`. Each tagged node also carries `data-codalyn-beacon-bind` (unique bind id).
  *
  * v2: `i` = clone order (indices into the hidden list’s children), `p` = parallel array of per-row `propId` → string.
  * `p` keys are **only** propIds the Engine had marked `exposed` in the slot file (not every Webflow prop on the
@@ -19,6 +21,8 @@
  * Optional `n` (parallel to `i`/`p`) stores Composer-only **slot display names**. The footer runtime ignores `n`; it is
  * for Composer UX persistence in the same JSON blob.
  */
+import { enginePoolIndexForRuntimeCloneIndex } from "@/features/cms-slots/model/cms-slot-page-targets";
+
 export const CMS_SLOT_LIST_RUNTIME_JSON_VERSION = 2 as const;
 /** Max length for a Composer slot display name persisted in payload `n[]`. */
 export const CMS_SLOT_ROW_NAME_MAX = 80 as const;
@@ -113,14 +117,14 @@ export function resolveCmsSlotPublishedDisplayName(
  */
 export function publishedDisplayNamesForEnginePool(
   payload: CmsSlotListRuntimePayload | null,
-  engineScopedRows: ReadonlyArray<{ name: string }>
+  engineScopedRows: ReadonlyArray<{ name: string; domChildIndex?: number }>
 ): string[] {
   if (payload == null || payload.i.length === 0) {
     return engineScopedRows.map((r) => r.name);
   }
   const collected = new Map<number, string[]>();
   for (let u = 0; u < payload.i.length; u++) {
-    const poolIdx = payload.i[u];
+    const poolIdx = enginePoolIndexForRuntimeCloneIndex(engineScopedRows, payload.i[u]);
     if (poolIdx < 0 || poolIdx >= engineScopedRows.length) {
       continue;
     }

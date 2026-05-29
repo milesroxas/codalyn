@@ -17,6 +17,11 @@ import {
 import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import { syncCmsSlotPageInlineScript } from "@/features/cms-slots/model/cms-slot-page-inline-script";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
+import {
+  engineRowForRuntimeCloneIndex,
+  maxHiddenListDomChildIndex,
+  runtimeCloneIndexForEnginePoolIndex,
+} from "@/features/cms-slots/model/cms-slot-page-targets";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { getTowerOrigin } from "@/shared/lib/tower-client";
 
@@ -31,11 +36,13 @@ function nextSlotLabelsAfterPoolRename(
   const sanitizedInput = sanitizeSlotLabelForPayload(rawNextName);
   const labelForRenamedPool = sanitizedInput !== "" ? sanitizedInput : fallback;
 
-  return payload.i.map((poolIdx, u) => {
-    if (poolIdx === poolIndex) {
+  return payload.i.map((runtimeIdx, u) => {
+    const renamedRuntimeIdx = runtimeCloneIndexForEnginePoolIndex(engineScopedRows, poolIndex);
+    if (runtimeIdx === renamedRuntimeIdx) {
       return labelForRenamedPool;
     }
-    const defName = engineScopedRows[poolIdx]?.name ?? "";
+    const defRow = engineRowForRuntimeCloneIndex(engineScopedRows, runtimeIdx);
+    const defName = defRow?.name ?? "";
     return resolveCmsSlotPublishedDisplayName(defName, payload.n?.[u]);
   });
 }
@@ -73,7 +80,7 @@ export async function renamePublishedSlotDisplayNameAtPoolIndex(input: {
     };
   }
 
-  const parsed = parseCmsSlotListRuntimePayload(text, engineScopedRows.length);
+  const parsed = parseCmsSlotListRuntimePayload(text, maxHiddenListDomChildIndex(engineScopedRows) + 1);
   if (parsed == null || parsed.i.length === 0) {
     return {
       ok: false,

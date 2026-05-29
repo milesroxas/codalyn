@@ -16,11 +16,16 @@ import {
   getCmsTemplateCollectionIdFromCurrentPage,
 } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
+import {
+  enginePoolIndexForRuntimeCloneIndex,
+  engineRowForRuntimeCloneIndex,
+  maxHiddenListDomChildIndex,
+} from "@/features/cms-slots/model/cms-slot-page-targets";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import { getTowerOrigin } from "@/shared/lib/tower-client";
 
 /** Prefer an unused pool slot; if the type repeats more times than slots, reuse the first matching index. */
-function findHiddenListIndexForRow(
+function findHiddenListPoolIndexForRow(
   pool: ReadonlyArray<{ componentId: string }>,
   componentId: string,
   used: Set<number>
@@ -39,6 +44,14 @@ function findHiddenListIndexForRow(
     }
   }
   return -1;
+}
+
+function runtimeCloneIndexForPoolRow(pool: ReadonlyArray<{ domChildIndex?: number }>, poolIndex: number): number {
+  const row = pool[poolIndex];
+  if (row == null) {
+    return poolIndex;
+  }
+  return row.domChildIndex ?? poolIndex;
 }
 
 export type CmsSlotComposerCmsSource =
@@ -65,24 +78,24 @@ export function cmsSlotCompositionSignature(draft: ReadonlyArray<CmsSlotComposit
 }
 
 /**
- * Map Composer rows (in order) to indices into the **Engine** hidden list in DOM order, matching
- * `componentId` with greedy “next unused” instances when the Engine has multiple of that type. If the
- * draft repeats a type more times than the pool has distinct children, the **same** pool index is
+ * Map Composer rows (in order) to indices into the hidden list block’s **published DOM children**
+ * (`sourceNode.children`), matching `componentId` with greedy “next unused” Engine instances. If the
+ * draft repeats a type more times than the pool has distinct children, the **same** clone source is
  * reused (published runtime clones the same child multiple times; each row still gets its own `p[]`).
  */
 export function draftToHiddenListIndices(
-  pool: ReadonlyArray<{ componentId: string }>,
+  pool: ReadonlyArray<{ componentId: string; domChildIndex?: number }>,
   draft: ReadonlyArray<{ componentId: string }>
 ): { ok: true; indices: number[] } | { ok: false } {
   const used = new Set<number>();
   const indices: number[] = [];
   for (const row of draft) {
-    const found = findHiddenListIndexForRow(pool, row.componentId, used);
+    const found = findHiddenListPoolIndexForRow(pool, row.componentId, used);
     if (found < 0) {
       return { ok: false };
     }
     used.add(found);
-    indices.push(found);
+    indices.push(runtimeCloneIndexForPoolRow(pool, found));
   }
   return { ok: true, indices };
 }
@@ -91,36 +104,46 @@ export function draftToHiddenListIndices(
  * Re-keys each row’s `propValues` to current Webflow `searchProps` `propId`s (aliases, label rematch, case), and drops
  * keys that no longer map to an exposed field.
  */
+function normalizeComposerDraftPropRow(
+  row: CmsSlotCompositionDraftRow,
+  domIdx: number | undefined,
+  engineRows: readonly HydratedCmsSlotRow[],
+  slotProps: CmsSlotEngineSlotPropsFile,
+  liveByInstanceKey: Readonly<Record<string, ComposableInstancePropMeta[]>>
+): CmsSlotCompositionDraftRow {
+  if (domIdx == null || domIdx < 0) {
+    return { ...row };
+  }
+  const eng = engineRowForRuntimeCloneIndex(engineRows, domIdx);
+  if (eng == null) {
+    return { ...row };
+  }
+  const poolI = enginePoolIndexForRuntimeCloneIndex(engineRows, domIdx);
+  const rawEx = poolI >= 0 ? (slotProps.slots[poolI]?.exposed ?? []) : [];
+  const { metas, aliasToCanonical } = mergeComposableMetaWithLiveResolved(rawEx, liveByInstanceKey[eng.key]);
+  if (row.propValues == null || Object.keys(row.propValues).length === 0) {
+    return { ...row, propValues: { ...row.propValues } };
+  }
+  const next: Record<string, string> = {};
+  for (const ep of metas) {
+    const v = pickRemappedPropValue(ep.propId, row.propValues, aliasToCanonical);
+    if (v !== undefined) {
+      next[ep.propId] = v;
+    }
+  }
+  return { ...row, propValues: next };
+}
+
 export function normalizeComposerDraftPropValues(
   draft: readonly CmsSlotCompositionDraftRow[],
-  poolIndexPerRow: readonly number[],
+  runtimeDomIndexPerRow: readonly number[],
   engineRows: readonly HydratedCmsSlotRow[],
   slotProps: CmsSlotEngineSlotPropsFile,
   liveByInstanceKey: Readonly<Record<string, ComposableInstancePropMeta[]>>
 ): CmsSlotCompositionDraftRow[] {
-  return draft.map((row, j) => {
-    const poolI = poolIndexPerRow[j];
-    if (poolI == null || poolI < 0) {
-      return { ...row };
-    }
-    const eng = engineRows[poolI];
-    if (eng == null) {
-      return { ...row };
-    }
-    const rawEx = slotProps.slots[poolI]?.exposed ?? [];
-    const { metas, aliasToCanonical } = mergeComposableMetaWithLiveResolved(rawEx, liveByInstanceKey[eng.key]);
-    if (row.propValues == null || Object.keys(row.propValues).length === 0) {
-      return { ...row, propValues: { ...row.propValues } };
-    }
-    const next: Record<string, string> = {};
-    for (const ep of metas) {
-      const v = pickRemappedPropValue(ep.propId, row.propValues, aliasToCanonical);
-      if (v !== undefined) {
-        next[ep.propId] = v;
-      }
-    }
-    return { ...row, propValues: next };
-  });
+  return draft.map((row, j) =>
+    normalizeComposerDraftPropRow(row, runtimeDomIndexPerRow[j], engineRows, slotProps, liveByInstanceKey)
+  );
 }
 
 function draftFromPayloadRows(
@@ -132,10 +155,7 @@ function draftFromPayloadRows(
   const out: CmsSlotCompositionDraftRow[] = [];
   for (let u = 0; u < indices.length; u++) {
     const n = indices[u];
-    if (n < 0 || n >= engineScopedRows.length) {
-      continue;
-    }
-    const r = engineScopedRows[n];
+    const r = engineRowForRuntimeCloneIndex(engineScopedRows, n);
     if (r == null) {
       continue;
     }
@@ -198,7 +218,7 @@ export async function resolveComposerTargetOrder(input: {
   if (text == null || text.trim() === "") {
     return { draft: [], initialSignature: "", cmsSource: "cms_field_empty" };
   }
-  const parsed = parseCmsSlotListRuntimePayload(text, input.engineScopedRows.length);
+  const parsed = parseCmsSlotListRuntimePayload(text, maxHiddenListDomChildIndex(input.engineScopedRows) + 1);
   if (parsed == null || parsed.i.length === 0) {
     return { draft: [], initialSignature: "", cmsSource: "cms_field_empty" };
   }

@@ -2,6 +2,7 @@ import SparkMD5 from "spark-md5";
 import {
   beaconPropApplyValueRuntimeSource,
   beaconPropEmptyRuntimeSource,
+  beaconPropPickRuntimeSource,
   beaconPropVisibilityRuntimeSource,
 } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import { cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
@@ -46,11 +47,11 @@ function isSource(el){return String(el.getAttribute("data-target")||"").toLowerC
 ${beaconPropApplyValueRuntimeSource()}
 function bBeaconNormHeadingTag(v){v=String(v==null?"":v).trim().toLowerCase();var m=v.match(/^h([1-6])$/);if(m)return"H"+m[1];if(/^[1-6]$/.test(v))return"H"+v;return""}
 function bBeaconResolveHeadingTagEl(el,v){var want=bBeaconNormHeadingTag(v);if(!want)return el;var cur=String(el.tagName||"").toUpperCase();var head=/^H[1-6]$/.test(cur),wrap=cur==="DIV"||cur==="SPAN";if(!head&&!wrap)return el;if(head&&cur===want)return el;var doc=el.ownerDocument,nw=doc.createElement(want),a,i;while(el.firstChild)nw.appendChild(el.firstChild);for(i=el.attributes.length-1;i>=0;i--){a=el.attributes[i];nw.setAttribute(a.name,a.value)}if(el.parentNode){el.parentNode.replaceChild(nw,el);return nw}return el}
-function pickP(ps,k){if(!k||!ps||typeof ps!=="object")return;var a=String(k);if(Object.prototype.hasOwnProperty.call(ps,a))return ps[a];var al=a.toLowerCase();for(var x in ps)if(Object.prototype.hasOwnProperty.call(ps,x)&&x.toLowerCase()===al)return ps[x]}
+${beaconPropPickRuntimeSource()}
 ${beaconPropEmptyRuntimeSource()}
 ${beaconPropVisibilityRuntimeSource()}
 function bListTargetReveal(target){target.classList.remove("${CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");${cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource()}${cmsSlotListTargetRuntimeLayoutRevealSource()}target.style.removeProperty("visibility");target.removeAttribute("aria-label")}
-function applyProps(target,payload){var vn=payload?+payload.v:NaN;if(!payload||!isFinite(vn)||vn<2)return;var pc=payload.p;if(!Array.isArray(pc))return;var rows=target.children,i,j,row,props,nodes,node,rawP,segs,si,seg,pv,ra,rh,anyV,totA=0,totH=0,nLen=rows.length<pc.length?rows.length:pc.length;for(i=0;i<nLen;i++){row=rows[i];props=pc[i];if(!row||props===null||typeof props!=="object"){continue}nodes=row.querySelectorAll("[data-codalyn-beacon-prop]");ra=0;rh=0;for(j=0;j<nodes.length;j++){node=nodes[j];rawP=node.getAttribute("data-codalyn-beacon-prop")||"";if(!rawP)continue;segs=String(rawP).split("|");anyV=false;for(si=0;si<segs.length;si++){seg=segs[si].trim();if(!seg)continue;pv=pickP(props,seg);if(bPropEmpty(pv))continue;anyV=true;if(bBeaconNormHeadingTag(String(pv))){node=bBeaconResolveHeadingTagEl(node,String(pv));continue}applyValue(node,String(pv))}if(!anyV){bPropClearPublishPlaceholder(node);bPropConceal(node,row);rh++;continue}bPropReveal(node,row);ra++}totA+=ra;totH+=rh}}
+function applyProps(target,payload){var vn=payload?+payload.v:NaN;if(!payload||!isFinite(vn)||vn<2)return;var pc=payload.p;if(!Array.isArray(pc))return;var rows=target.children,i,j,row,props,nodes,node,rawP,segs,si,seg,pv,anyV,nLen=rows.length<pc.length?rows.length:pc.length;for(i=0;i<nLen;i++){row=rows[i];props=pc[i];if(!row||props===null||typeof props!=="object"){continue}nodes=row.querySelectorAll("[data-codalyn-beacon-prop]");for(j=0;j<nodes.length;j++){node=nodes[j];rawP=node.getAttribute("data-codalyn-beacon-prop")||"";if(!rawP)continue;segs=String(rawP).split("|");anyV=false;for(si=0;si<segs.length;si++){seg=segs[si].trim();if(!seg)continue;pv=pickP(props,seg);if(bPropEmpty(pv))continue;anyV=true;if(bBeaconNormHeadingTag(String(pv))){node=bBeaconResolveHeadingTagEl(node,String(pv));continue}applyValue(node,String(pv))}if(!anyV){bPropClearPublishPlaceholder(node);bPropConceal(node,row);continue}bPropReveal(node,row)}}}
 function reapply(target,payload,done){applyProps(target,payload);setTimeout(function(){applyProps(target,payload);setTimeout(function(){applyProps(target,payload);if(typeof done==="function")done()},100)},0)}
 function run(){
 var sourcesByList={},sources=document.querySelectorAll("[data-target=beacons][data-list]");
@@ -221,7 +222,8 @@ async function registerHostedScript(
   siteId: string,
   hostedLocation: string,
   integrityHash: string,
-  version: string
+  version: string,
+  displayName: string
 ): Promise<{ id: string; version: string }> {
   const res = await towerFetch(`/api/v2/webflow/sites/${encodeURIComponent(siteId)}/registered_scripts/hosted`, {
     method: "POST",
@@ -230,7 +232,7 @@ async function registerHostedScript(
       hostedLocation,
       integrityHash,
       version,
-      displayName: REGISTER_DISPLAY_NAME,
+      displayName,
       canCopy: true,
     }),
   });
@@ -242,14 +244,13 @@ async function registerHostedScript(
   return { id: data.id, version: data.version };
 }
 
-async function registerHostedRuntimeScript(
+async function registerHostedAssetScript(
   siteId: string,
   sourceCode: string,
-  version: string
+  version: string,
+  options: { fileName: string; displayName: string }
 ): Promise<{ id: string; version: string }> {
-  const runtimeHash = hashCmsSlotRuntimeSource(sourceCode);
-  const fileName = `codalyn-beacon-runtime-${runtimeHash}.js`;
-  const asset = await createRuntimeAsset(siteId, fileName, sourceCode);
+  const asset = await createRuntimeAsset(siteId, options.fileName, sourceCode);
   const uploadUrl = typeof asset.uploadUrl === "string" ? asset.uploadUrl : "";
   const uploadDetails = asset.uploadDetails;
   if (uploadUrl.length === 0 || uploadDetails == null) {
@@ -260,7 +261,19 @@ async function registerHostedRuntimeScript(
   if (typeof hostedLocation !== "string" || hostedLocation.length === 0) {
     throw new Error("Create runtime asset: missing hosted URL.");
   }
-  return registerHostedScript(siteId, hostedLocation, await sourceSRIHash(sourceCode), version);
+  return registerHostedScript(siteId, hostedLocation, await sourceSRIHash(sourceCode), version, options.displayName);
+}
+
+async function registerHostedRuntimeScript(
+  siteId: string,
+  sourceCode: string,
+  version: string
+): Promise<{ id: string; version: string }> {
+  const runtimeHash = hashCmsSlotRuntimeSource(sourceCode);
+  return registerHostedAssetScript(siteId, sourceCode, version, {
+    fileName: `codalyn-beacon-runtime-${runtimeHash}.js`,
+    displayName: REGISTER_DISPLAY_NAME,
+  });
 }
 
 async function getPageCustomScripts(pageId: string): Promise<PageCustomScript[]> {

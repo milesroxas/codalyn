@@ -8,17 +8,21 @@ import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 
 describe("draftToHiddenListIndices", () => {
-  it("maps draft to first matching instance per row in pool order", () => {
-    const pool = [{ componentId: "a" }, { componentId: "b" }, { componentId: "a" }];
+  it("maps draft to DOM clone indices for first matching pool row", () => {
+    const pool = [
+      { componentId: "a", domChildIndex: 0 },
+      { componentId: "b", domChildIndex: 2 },
+      { componentId: "a", domChildIndex: 4 },
+    ];
     const r = draftToHiddenListIndices(pool, [{ componentId: "a" }, { componentId: "a" }, { componentId: "b" }]);
-    expect(r).toEqual({ ok: true, indices: [0, 2, 1] });
+    expect(r).toEqual({ ok: true, indices: [0, 4, 2] });
   });
 
   it("reuses a pool index when the draft repeats a type more times than the pool has children", () => {
-    const pool = [{ componentId: "a" }];
+    const pool = [{ componentId: "a", domChildIndex: 1 }];
     expect(draftToHiddenListIndices(pool, [{ componentId: "a" }, { componentId: "a" }])).toEqual({
       ok: true,
-      indices: [0, 0],
+      indices: [1, 1],
     });
   });
 
@@ -33,7 +37,7 @@ describe("normalizeComposerDraftPropValues", () => {
     const ex: ComposableInstancePropMeta[] = [{ propId: "old", label: "Title", valueType: "string" }];
     const slotProps: CmsSlotEngineSlotPropsFile = { v: 1, slots: [{ exposed: ex }] };
     const engineRows = [
-      { key: "k1", componentId: "c1", name: "C", instance: null as unknown as ComponentElement },
+      { key: "k1", componentId: "c1", name: "C", instance: null as unknown as ComponentElement, domChildIndex: 0 },
     ] satisfies HydratedCmsSlotRow[];
     const live: Record<string, ComposableInstancePropMeta[]> = {
       k1: [{ propId: "new", label: "Title", valueType: "string" }],

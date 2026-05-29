@@ -162,6 +162,39 @@ describe("seedNestedPublishPlaceholdersOnPlacedInstance", () => {
     expect(setProps).toHaveBeenCalledWith([{ propId: "cta-link", value: linkPlaceholder }]);
     vi.unstubAllGlobals();
   });
+
+  it("matches nested seed pair keys case-insensitively against tagged prop ids", async () => {
+    vi.stubGlobal("webflow", {
+      getCurrentComponent: vi.fn().mockResolvedValue(null),
+      exitComponent: vi.fn().mockResolvedValue(undefined),
+    });
+    const setProps = vi.fn().mockResolvedValue([]);
+    const parentInstance = {
+      searchProps: vi.fn().mockResolvedValue([
+        {
+          propId: "CTA-LINK",
+          valueType: "link",
+          hasOverride: false,
+          value: { sourceType: "static", value: null },
+          resolvedValue: null,
+          defaultValue: null,
+          display: { label: "Link", group: null },
+        },
+      ]),
+      setProps,
+      getComponent: vi.fn().mockResolvedValue({ id: "card-primary" }),
+    } as unknown as ComponentElement;
+
+    const n = await seedNestedPublishPlaceholdersOnPlacedInstance(
+      parentInstance,
+      [linkMeta],
+      new Set(["CTA-LINK"]),
+      new Set(["nested-link|cta-link"])
+    );
+    expect(n).toBe(1);
+    expect(setProps).toHaveBeenCalledWith([{ propId: "CTA-LINK", value: linkPlaceholder }]);
+    vi.unstubAllGlobals();
+  });
 });
 
 describe("seedHiddenListPublishPlaceholders", () => {

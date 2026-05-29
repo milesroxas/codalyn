@@ -291,6 +291,16 @@ export function needsParentSeedForNestedTaggedCanonical(
   return false;
 }
 
+/** Resolves a canonical prop id against tagged ids (pair keys store lowercase segments). */
+function resolveTaggedCanonicalPropId(taggedPropIds: ReadonlySet<string>, canonicalPropId: string): string | null {
+  for (const id of taggedPropIds) {
+    if (id === canonicalPropId || id.toLowerCase() === canonicalPropId.toLowerCase()) {
+      return id;
+    }
+  }
+  return null;
+}
+
 function parseNestedPublishSeedPairKey(key: string): NestedPublishSeedPair | null {
   const sep = key.indexOf("|");
   if (sep <= 0) {
@@ -311,8 +321,12 @@ function canonicalPropIdsFromNestedPublishSeedPairs(
   const ids = new Set<string>();
   for (const key of nestedPublishSeedPairKeys) {
     const pair = parseNestedPublishSeedPairKey(key);
-    if (pair != null && taggedPropIds.has(pair.canonicalPropId)) {
-      ids.add(pair.canonicalPropId);
+    if (pair == null) {
+      continue;
+    }
+    const tagged = resolveTaggedCanonicalPropId(taggedPropIds, pair.canonicalPropId);
+    if (tagged != null) {
+      ids.add(tagged);
     }
   }
   return [...ids];

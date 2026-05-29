@@ -79,3 +79,42 @@ describe("beacon prop runtime source snippets", () => {
     expect(s).toContain(WEBFLOW_CONDITION_INVISIBLE_CLASS);
   });
 });
+
+/** @vitest-environment jsdom */
+describe("beacon prop applyValue runtime", () => {
+  it("sets nested img src and picture source srcset for AVIF URLs", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+    const avif =
+      "https://cdn.prod.website-files.com/6a19b630fc79ff670f827e0e/6a19bd9570056bbef3abe15a_cms-test-01.avif";
+
+    const picture = document.createElement("picture");
+    const source = document.createElement("source");
+    source.setAttribute("srcset", "https://codalyn.beacon/publish-placeholder");
+    const img = document.createElement("img");
+    picture.append(source, img);
+
+    applyValue(picture, avif);
+    expect(source.getAttribute("srcset")).toBe(avif);
+    expect(source.getAttribute("type")).toBe("image/avif");
+    expect(img.getAttribute("src")).toBe(avif);
+
+    const link = document.createElement("a");
+    const linkImg = document.createElement("img");
+    link.appendChild(linkImg);
+    applyValue(link, avif);
+    expect(link.getAttribute("href")).toBeNull();
+    expect(linkImg.getAttribute("src")).toBe(avif);
+
+    const taggedImg = document.createElement("img");
+    const picWrap = document.createElement("picture");
+    const picSource = document.createElement("source");
+    picSource.setAttribute("srcset", "https://codalyn.beacon/publish-placeholder");
+    picWrap.append(picSource, taggedImg);
+    applyValue(taggedImg, avif);
+    expect(taggedImg.getAttribute("src")).toBe(avif);
+    expect(picSource.getAttribute("srcset")).toBe(avif);
+  });
+});

@@ -27,6 +27,7 @@ import {
   displayLabelForCmsSlotList,
   displayLabelForDataList,
 } from "@/features/cms-slots/model/cms-slot-data-list-display";
+import { stripEngineCodalynAttrsFromComponentInstance } from "@/features/cms-slots/model/cms-slot-engine-codalyn-attr-sync";
 import { renamePublishedSlotDisplayNameAtPoolIndex } from "@/features/cms-slots/model/cms-slot-engine-rename-published-slot";
 import {
   type CmsSlotEngineSlotPropsFile,
@@ -60,6 +61,7 @@ import {
 import {
   type CmsSlotListOnPage,
   cmsSlotListKey,
+  enginePoolIndexForRuntimeCloneIndex,
   filterHydratedCmsSlotRowsByComponentIds,
   findCmsSlotListsOnPage,
   type HydratedCmsSlotRow,
@@ -1422,9 +1424,11 @@ export function CmsSlotsScreen() {
       return composerDraft.map((row) => ({ row, exposed: [] as ComposableInstancePropMeta[] }));
     }
     return composerDraft.map((row, j) => {
-      const idx = map.indices[j];
-      const raw = idx != null ? (composerSlotProps.slots[idx]?.exposed ?? []) : [];
-      const engineRow = idx != null ? composerEngineRows[idx] : undefined;
+      const runtimeDomIdx = map.indices[j];
+      const poolIdx =
+        runtimeDomIdx != null ? enginePoolIndexForRuntimeCloneIndex(composerEngineRows, runtimeDomIdx) : -1;
+      const raw = poolIdx >= 0 ? (composerSlotProps.slots[poolIdx]?.exposed ?? []) : [];
+      const engineRow = poolIdx >= 0 ? composerEngineRows[poolIdx] : undefined;
       const live = engineRow != null ? composerEngineComposable[engineRow.key] : undefined;
       return {
         row,
@@ -1687,8 +1691,13 @@ export function CmsSlotsScreen() {
     let rowKeyToAutoOpen: string | null = null;
     try {
       const instance = await appendComponentToSlotListContainer(container, c.id);
+      const freshRows = await listInstancesInSlotListContainer(container);
+      const addedRow = freshRows.find((row) => row.instance === instance) ?? freshRows[freshRows.length - 1];
+      if (addedRow == null) {
+        throw new Error("Could not resolve the new component on the hidden list.");
+      }
       const rowKey = crypto.randomUUID();
-      const nextSelected = [...selected, { key: rowKey, componentId: c.id, name: c.name, instance }];
+      const nextSelected = [...selected, { ...addedRow, key: rowKey }];
       setSelected(nextSelected);
       setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG);
       await writeCmsSlotEngineConfiguredComponentIds(
@@ -1872,6 +1881,10 @@ export function CmsSlotsScreen() {
     if (!container) return;
     setRemovingKey(row.key);
     try {
+      const strip = await stripEngineCodalynAttrsFromComponentInstance(row.instance);
+      if (strip.errors.length > 0) {
+        console.warn("[beacon] engine attr strip before remove (non-fatal):", strip.errors);
+      }
       await removeComponentInstanceFromCanvas(row.instance);
       const nextSelected = selected.filter((p) => p.key !== row.key);
       const removeIdx = selected.findIndex((p) => p.key === row.key);

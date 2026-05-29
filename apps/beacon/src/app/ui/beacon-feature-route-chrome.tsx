@@ -63,16 +63,18 @@ export type BeaconFeatureRouteScrollBodyProps = {
   overlay?: ReactNode;
   className?: string;
   contentClassName?: string;
+  /** When false, children fill the body without a route-level ScrollArea (use for nested scroll regions). */
+  scrollable?: boolean;
   /** When this value changes, the scroll viewport resets to the top (e.g. image editor flow step). */
   scrollResetKey?: string | number | boolean | null;
 };
 
 export function BeaconFeatureRouteScrollBody(props: BeaconFeatureRouteScrollBodyProps) {
-  const { children, overlay, className, contentClassName, scrollResetKey } = props;
+  const { children, overlay, className, contentClassName, scrollable = true, scrollResetKey } = props;
   const viewportRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    if (scrollResetKey === undefined) {
+    if (!scrollable || scrollResetKey === undefined) {
       return;
     }
     const viewport = viewportRef.current;
@@ -80,16 +82,27 @@ export function BeaconFeatureRouteScrollBody(props: BeaconFeatureRouteScrollBody
       return;
     }
     viewport.scrollTop = 0;
-  }, [scrollResetKey]);
+  }, [scrollResetKey, scrollable]);
+
+  const contentClass = cn(
+    beaconRouteScrollContentClass,
+    beaconRouteScrollViewportFillClass,
+    !scrollable && "min-h-0 flex-1 overflow-hidden",
+    contentClassName
+  );
+
+  const content = <div className={contentClass}>{children}</div>;
 
   return (
-    <div className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", className)}>
+    <div className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", !scrollable && "overflow-hidden", className)}>
       {overlay}
-      <ScrollArea className="h-full min-h-0 min-w-0 flex-1" viewportRef={viewportRef}>
-        <div className={cn(beaconRouteScrollContentClass, beaconRouteScrollViewportFillClass, contentClassName)}>
-          {children}
-        </div>
-      </ScrollArea>
+      {scrollable ? (
+        <ScrollArea className="h-full min-h-0 min-w-0 flex-1" viewportRef={viewportRef}>
+          {content}
+        </ScrollArea>
+      ) : (
+        content
+      )}
     </div>
   );
 }

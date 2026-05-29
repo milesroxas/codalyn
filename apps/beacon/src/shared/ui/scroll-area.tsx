@@ -43,11 +43,15 @@ function ScrollArea({ className, children, viewportRef, ...props }: ScrollAreaPr
   );
 
   return (
-    <ScrollAreaPrimitive.Root data-slot="scroll-area" className={cn("relative min-w-0", className)} {...props}>
+    <ScrollAreaPrimitive.Root
+      data-slot="scroll-area"
+      className={cn("relative min-w-0 overflow-hidden", className)}
+      {...props}
+    >
       <ScrollAreaPrimitive.Viewport
         ref={handleViewportRef}
         data-slot="scroll-area-viewport"
-        className="size-full min-h-0 min-w-0 overflow-x-hidden rounded-[inherit] outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
+        className="size-full min-h-0 min-w-0 overflow-x-hidden rounded-[inherit] outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>

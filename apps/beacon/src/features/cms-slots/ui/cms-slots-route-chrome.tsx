@@ -30,7 +30,6 @@ import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/mo
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotComposerListPanel } from "@/features/cms-slots/ui/cms-slot-composer-list-panel";
 import { CmsSlotComposerPanel } from "@/features/cms-slots/ui/cms-slot-composer-panel";
-import { ComposerPaletteSection } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-palette-section";
 import { ComposerUnsavedChangesDialog } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-unsaved-changes-dialog";
 import { CmsSlotCompositionPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel";
 import { CmsSlotEngineBackToListDock } from "@/features/cms-slots/ui/cms-slot-composition-panel/cms-slot-engine-back-to-list-dock";
@@ -300,7 +299,7 @@ function CmsSlotsComposerRouteBody(
   if (p.contentKey === "composer" && p.activeComposer != null) {
     const activeComposer = p.activeComposer;
     panel = (
-      <div className="space-y-4" data-route="cms-slots-composer-editor">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-route="cms-slots-composer-editor">
         <CmsSlotComposerPanel
           activeListLabel={displayLabelForCmsSlotList(activeComposer.beacon)}
           composerEditingContext={p.composerEditingContext}
@@ -317,7 +316,6 @@ function CmsSlotsComposerRouteBody(
           rowMeta={p.composerRowMeta}
           onChangePropValue={p.onComposerSetPropValue}
           onRenameSlot={p.onComposerRenameSlotRow}
-          omitPalette
           composerOnly={composerOnly}
         />
       </div>
@@ -344,7 +342,7 @@ function CmsSlotsComposerRouteBody(
   }
 
   return (
-    <div data-route="cms-slots-composer">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-route="cms-slots-composer">
       <BeaconRouteContentTransition contentKey={p.contentKey} contentReady={p.contentReady}>
         {panel}
       </BeaconRouteContentTransition>
@@ -386,8 +384,12 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
     overlayBlocking,
   });
 
+  const composerEditorFill = p.isComposer && p.activeComposer != null;
+
   return (
     <BeaconFeatureRouteScrollBody
+      scrollable={!composerEditorFill}
+      contentClassName={composerEditorFill ? "h-full min-h-0 overflow-hidden" : undefined}
       overlay={
         <BeaconRouteLoadingOverlay
           visible={routeBlocking}
@@ -616,7 +618,6 @@ type CmsSlotsEngineStepId = "engine-home" | "configure";
 
 /** Route shell/header, scroll region, dialogs, footer — splits cognitive complexity off `CmsSlotsScreen`. */
 export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
-  const composerPaletteDocked = p.isComposer && p.activeComposer != null;
   const engineBackToListDocked = p.isEngine && p.picking;
   const engineStepNav =
     p.isEngine && p.picking ? (
@@ -669,14 +670,6 @@ export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
       footer={
         <>
           {engineBackToListDocked ? <CmsSlotEngineBackToListDock onBackToList={p.exitToList} /> : null}
-          {composerPaletteDocked ? (
-            <ComposerPaletteSection
-              variant="docked"
-              allowedPalette={p.composerAllowedPalette}
-              busy={p.composerSavePending || p.embedSyncPending}
-              onAddFromPalette={p.onComposerAddFromPalette}
-            />
-          ) : null}
           <CmsSlotsRouteDock {...p} />
         </>
       }

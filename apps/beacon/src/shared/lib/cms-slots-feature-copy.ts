@@ -290,7 +290,15 @@ export const CMS_SLOTS_ENGINE_BACK_TO_LIST_LABEL = "Back to list";
 
 export const CMS_SLOTS_COMPOSER_ORDER_EMPTY_TITLE = "No components yet";
 
-export const CMS_SLOTS_COMPOSER_ORDER_EMPTY_DESCRIPTION = "Pick component types below to add them to this composition.";
+export const CMS_SLOTS_COMPOSER_ORDER_EMPTY_DESCRIPTION = "Use Add Component to choose types for this composition.";
+
+export const CMS_SLOTS_COMPOSER_ADD_COMPONENT_LABEL = "Add Component";
+
+export const CMS_SLOTS_COMPOSER_PALETTE_SHEET_TITLE = "Add components";
+
+export const CMS_SLOTS_COMPOSER_PALETTE_SHEET_DESCRIPTION = "Component types exposed in Engine for this list.";
+
+export const CMS_SLOTS_COMPOSER_PALETTE_LIST_ARIA_LABEL = "Allowed component types for this list";
 
 export const CMS_SLOTS_COMPOSER_PALETTE_EMPTY_TITLE = "No component types available";
 

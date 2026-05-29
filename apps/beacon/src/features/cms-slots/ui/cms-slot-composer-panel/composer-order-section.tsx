@@ -9,14 +9,22 @@ import { CmsSlotsPanelEmptyState } from "@/features/cms-slots/ui/cms-slots-panel
 import {
   CMS_SLOTS_COMPOSER_ORDER_EMPTY_DESCRIPTION,
   CMS_SLOTS_COMPOSER_ORDER_EMPTY_TITLE,
+  CMS_SLOTS_ENGINE_COMPONENTS_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { ScrollArea } from "@/shared/ui/scroll-area";
+import {
+  SurfaceSummaryCardPanel,
+  SurfaceSummaryCardPanelSectionLabel,
+  SurfaceSummaryCardSurfaceSummary,
+} from "@/shared/ui/surface-summary-card";
 import { ComposerCollapsedDragPreview } from "./composer-collapsed-drag-preview";
 import { ComposerOrderSortableRow } from "./composer-order-sortable-row";
 import { ComposerRemoveDraftDialog } from "./composer-remove-draft-dialog";
 import { useComposerOrderSortable } from "./use-composer-order-sortable";
 
 const DROP_ANIMATION_MS = 200;
+const composerOrderListScrollAreaClass = "min-h-0 w-full flex-1 basis-0";
+const composerOrderListClass = "m-0 list-none space-y-2 p-2 pb-3";
 
 type ComposerOrderSectionProps = {
   draft: CmsSlotCompositionDraftRow[];
@@ -65,52 +73,66 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
   const sortableIds = useMemo(() => draft.map((r) => r.key), [draft]);
 
   return (
-    <section className="space-y-2" data-slot="beacon_composer_order">
-      {draft.length === 0 ? (
-        <CmsSlotsPanelEmptyState
-          data-slot="cms_slots_composer_order_empty"
-          icon={ListOrdered}
-          title={CMS_SLOTS_COMPOSER_ORDER_EMPTY_TITLE}
-          description={CMS_SLOTS_COMPOSER_ORDER_EMPTY_DESCRIPTION}
-        />
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={collisionDetection}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-          onDragCancel={onDragCancel}
-        >
-          <ScrollArea className="h-[min(48vh,22rem)]">
-            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-              <ul className="m-0 list-none space-y-2 p-0" aria-label="Composition order">
-                {draft.map((row, index) => {
-                  const meta = rowMeta[index];
-                  return (
-                    <ComposerOrderSortableRow
-                      key={row.key}
-                      row={row}
-                      meta={meta}
-                      busy={busy}
-                      onChangePropValue={onChangePropValue}
-                      onRenameSlot={onRenameSlot}
-                      onRemove={handleRequestRemove}
-                    />
-                  );
-                })}
-              </ul>
-            </SortableContext>
-          </ScrollArea>
-          <DragOverlay
-            dropAnimation={{
-              duration: DROP_ANIMATION_MS,
-              easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
-            }}
+    <>
+      <SurfaceSummaryCardSurfaceSummary
+        className="flex min-h-0 min-w-0 flex-1 flex-col"
+        data-slot="beacon_composer_order"
+      >
+        <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_ENGINE_COMPONENTS_LABEL}</SurfaceSummaryCardPanelSectionLabel>
+        {draft.length === 0 ? (
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-3">
+            <CmsSlotsPanelEmptyState
+              data-slot="cms_slots_composer_order_empty"
+              icon={ListOrdered}
+              title={CMS_SLOTS_COMPOSER_ORDER_EMPTY_TITLE}
+              description={CMS_SLOTS_COMPOSER_ORDER_EMPTY_DESCRIPTION}
+            />
+          </div>
+        ) : (
+          <SurfaceSummaryCardPanel
+            tone="default"
+            className="flex min-h-0 flex-1 flex-col"
+            data-slot="beacon_composer_order_list"
           >
-            {dragOverlay != null ? <ComposerCollapsedDragPreview row={dragOverlay.row} /> : null}
-          </DragOverlay>
-        </DndContext>
-      )}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={collisionDetection}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              onDragCancel={onDragCancel}
+            >
+              <ScrollArea className={composerOrderListScrollAreaClass}>
+                <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+                  <ul className={composerOrderListClass} aria-label="Composition order">
+                    {draft.map((row, index) => {
+                      const meta = rowMeta[index];
+                      return (
+                        <ComposerOrderSortableRow
+                          key={row.key}
+                          row={row}
+                          meta={meta}
+                          busy={busy}
+                          onChangePropValue={onChangePropValue}
+                          onRenameSlot={onRenameSlot}
+                          onRemove={handleRequestRemove}
+                        />
+                      );
+                    })}
+                  </ul>
+                </SortableContext>
+              </ScrollArea>
+              <DragOverlay
+                dropAnimation={{
+                  duration: DROP_ANIMATION_MS,
+                  easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
+                }}
+              >
+                {dragOverlay != null ? <ComposerCollapsedDragPreview row={dragOverlay.row} /> : null}
+              </DragOverlay>
+            </DndContext>
+          </SurfaceSummaryCardPanel>
+        )}
+      </SurfaceSummaryCardSurfaceSummary>
       <ComposerRemoveDraftDialog
         open={removeConfirmKey != null}
         componentName={removeConfirmRow?.name ?? null}
@@ -122,6 +144,6 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
         }}
         onConfirm={handleConfirmRemove}
       />
-    </section>
+    </>
   );
 }

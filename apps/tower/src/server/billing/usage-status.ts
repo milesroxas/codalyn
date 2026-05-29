@@ -1,5 +1,10 @@
 import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
-import { buildTowerUsageMeterSnapshot, pickApproachingUsageMeters } from "@codalyn/webflow-kit";
+import {
+  buildTowerUsageDesignerApiBreakdown,
+  buildTowerUsageMeterSnapshot,
+  hasTowerUsageDesignerApiBreakdown,
+  pickApproachingUsageMeters,
+} from "@codalyn/webflow-kit";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import {
   capForMeterKind,
@@ -41,6 +46,11 @@ export async function fetchEndUserUsageStatus(
     ),
   ];
 
+  const designerApiBreakdown = buildTowerUsageDesignerApiBreakdown(
+    usage.webflowProxyCmsSlotsCount,
+    usage.webflowProxyImageUploadCmsCount
+  );
+
   return {
     yearMonth: usage.yearMonth,
     tier: entitlement.tier,
@@ -48,5 +58,6 @@ export async function fetchEndUserUsageStatus(
     metered: !policy.skipMetering,
     meters,
     approachingMeters: pickApproachingUsageMeters(meters),
+    designerApiBreakdown: hasTowerUsageDesignerApiBreakdown(designerApiBreakdown) ? designerApiBreakdown : null,
   };
 }

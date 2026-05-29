@@ -23,6 +23,8 @@ export type TowerUsageLimitsKind = "standard" | "custom" | "unmetered";
 /** Monthly usage cap tier for the signed-in user in the active workspace context. */
 export type TowerUsageTier = "free" | "pro" | "team";
 
+import type { TowerUsageDesignerApiBreakdown } from "./webflow-proxy-usage-category.js";
+
 export type TowerUsageStatusSnapshot = {
   yearMonth: string;
   tier: TowerUsageTier;
@@ -31,6 +33,8 @@ export type TowerUsageStatusSnapshot = {
   metered: boolean;
   meters: TowerUsageMeterSnapshot[];
   approachingMeters: TowerUsageMeterSnapshot[];
+  /** Per-feature split of Designer API (webflow proxy) usage when category tracking is available. */
+  designerApiBreakdown: TowerUsageDesignerApiBreakdown | null;
 };
 
 export function isTowerUsageMeterKind(raw: string): raw is TowerUsageMeterKind {

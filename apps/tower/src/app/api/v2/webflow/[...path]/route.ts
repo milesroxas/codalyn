@@ -1,4 +1,4 @@
-import { webflowDataApiUrl } from "@codalyn/webflow-kit";
+import { classifyWebflowProxyUsage, webflowDataApiUrl } from "@codalyn/webflow-kit";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import { getActiveOrganizationIdForApiRequest } from "@/server/billing/session-org";
 import { consumeWebflowProxy } from "@/server/billing/usage-gate";
@@ -55,7 +55,7 @@ async function forward(req: Request, segments: string[]) {
   if (auth.userId) {
     const activeOrg = await getActiveOrganizationIdForApiRequest(req);
     const entitlement = await resolveTowerEntitlement(auth.userId, activeOrg);
-    const usage = await consumeWebflowProxy(auth.userId, entitlement, activeOrg);
+    const usage = await consumeWebflowProxy(auth.userId, entitlement, activeOrg, classifyWebflowProxyUsage(segments));
     if (!usage.ok) {
       return usage.response;
     }

@@ -1,11 +1,11 @@
 import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
 import { towerUsageLimitResetDetailLine } from "@codalyn/webflow-kit";
 import Link from "next/link";
-import { UsageLimitsBadges } from "@/features/billing/ui/usage-plan-badges";
+import { UsageLimitsPlanHeader } from "@/features/billing/ui/usage-plan-badges";
 import { usageLimitsKindDetailLine } from "@/shared/lib/usage-display";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
-import { UsageMeterRow } from "@/shared/ui/usage-meter-row";
+import { UsageFeatureUsageDisplay } from "@/shared/ui/usage-feature-usage-display";
 
 type TowerUsageSectionProps = {
   status: TowerUsageStatusSnapshot;
@@ -23,7 +23,7 @@ export function TowerUsageSection(props: TowerUsageSectionProps) {
     showBillingLink = false,
     fillHeight = false,
     title = "Monthly usage",
-    description = "Beacon and Tower API traffic for your signed-in account. Limits reset on the first day of each month.",
+    description = "Usage by Beacon feature for your signed-in account. Limits reset on the first day of each month.",
   } = props;
 
   const resetLine = towerUsageLimitResetDetailLine();
@@ -38,14 +38,11 @@ export function TowerUsageSection(props: TowerUsageSectionProps) {
             <CardDescription>{description}</CardDescription>
             {limitsDetail ? <p className="text-xs text-muted-foreground">{limitsDetail}</p> : null}
           </div>
-          <UsageLimitsBadges tier={status.tier} limitsKind={status.limitsKind} />
+          <UsageLimitsPlanHeader resetLine={resetLine} tier={status.tier} limitsKind={status.limitsKind} />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {status.meters.map((meter) => (
-          <UsageMeterRow key={meter.kind} meter={meter} />
-        ))}
-        <p className="text-xs text-muted-foreground">Resets {resetLine}</p>
+        <UsageFeatureUsageDisplay status={status} />
       </CardContent>
       {showBillingLink && billingEnabled && status.tier === "free" ? (
         <CardFooter className="justify-end border-t border-border">

@@ -8,6 +8,7 @@ import {
   usagePlanBadgeLabel,
 } from "@/shared/lib/usage-display";
 import { Badge } from "@/shared/ui/badge";
+import { UsageLimitsHeaderMeta } from "@/shared/ui/usage-limits-reset-label";
 
 type UsagePlanBadgesProps = {
   tier: "free" | "pro" | "team";
@@ -42,4 +43,21 @@ export function UsageLimitsBadges(
   props: Omit<UsagePlanBadgesProps, "showAccountBadge" | "entitlementSource" | "tierBadgeStyle">
 ) {
   return <UsagePlanBadges {...props} showAccountBadge={false} tierBadgeStyle="plan" />;
+}
+
+type UsageLimitsPlanHeaderProps = {
+  resetLine: string;
+  tier: "free" | "pro" | "team";
+  limitsKind: TowerUsageLimitsKind;
+};
+
+/** Reset schedule plus plan badges for usage cards. */
+export function UsageLimitsPlanHeader(props: UsageLimitsPlanHeaderProps) {
+  const { resetLine, tier, limitsKind } = props;
+
+  return (
+    <UsageLimitsHeaderMeta resetLine={resetLine}>
+      <UsageLimitsBadges tier={tier} limitsKind={limitsKind} />
+    </UsageLimitsHeaderMeta>
+  );
 }

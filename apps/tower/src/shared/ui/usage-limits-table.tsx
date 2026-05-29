@@ -1,16 +1,17 @@
 "use client";
 
 import {
-  TOWER_USAGE_LIMIT_RESET_LABEL,
+  buildTowerUsageFeatureGroups,
   type TowerUsageLimitsKind,
   type TowerUsageMeterSnapshot,
   towerUsageLimitResetDetailLine,
 } from "@codalyn/webflow-kit";
-import { IconCalendarEvent, IconInfinity } from "@tabler/icons-react";
+import { IconInfinity } from "@tabler/icons-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/shared/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
+import { UsageLimitsHeaderMeta } from "@/shared/ui/usage-limits-reset-label";
 import { UsageMeterLabel } from "@/shared/ui/usage-meter-label";
 
 type UsageLimitsTableProps = {
@@ -59,10 +60,10 @@ export function UsageLimitsTable(props: UsageLimitsTableProps) {
             <span className="min-w-0 flex-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {title}
             </span>
-            <span className="flex shrink-0 items-center gap-2">
+            <UsageLimitsHeaderMeta resetLine={resetLine}>
               <Badge variant="secondary">{tierLabel}</Badge>
               {limitsKindBadge ? <Badge variant="outline">{limitsKindBadge}</Badge> : null}
-            </span>
+            </UsageLimitsHeaderMeta>
           </span>
         </AccordionTrigger>
         <AccordionContent className="space-y-3">
@@ -73,37 +74,39 @@ export function UsageLimitsTable(props: UsageLimitsTableProps) {
           {limitsKind === "unmetered" ? (
             <UsageLimitsUnmeteredNotice />
           ) : (
-            <div className="overflow-hidden rounded-lg border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Feature</TableHead>
-                    <TableHead className="text-right">Monthly limit</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {meters.map((meter) => (
-                    <TableRow key={meter.kind}>
-                      <TableCell>
-                        <UsageMeterLabel kind={meter.kind} />
-                      </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {formatMonthlyLimitValue(meter.limit)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-4">
+              {buildTowerUsageFeatureGroups(meters).map((group) => (
+                <div key={group.feature} className="space-y-2">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium text-foreground">{group.label}</p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">{group.description}</p>
+                  </div>
+                  <div className="overflow-hidden rounded-lg border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Activity</TableHead>
+                          <TableHead className="text-right">Monthly limit</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {group.meters.map((meter) => (
+                          <TableRow key={meter.kind}>
+                            <TableCell>
+                              <UsageMeterLabel kind={meter.kind} />
+                            </TableCell>
+                            <TableCell className="text-right font-medium tabular-nums">
+                              {formatMonthlyLimitValue(meter.limit)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-
-          <Alert variant="info">
-            <IconCalendarEvent aria-hidden />
-            <AlertTitle>
-              {TOWER_USAGE_LIMIT_RESET_LABEL} {resetLine}
-            </AlertTitle>
-            <AlertDescription>Usage counters reset at the start of each UTC calendar month.</AlertDescription>
-          </Alert>
         </AccordionContent>
       </AccordionItem>
     </Accordion>

@@ -176,6 +176,13 @@
       "when": 1779999556723,
       "tag": "0024_fixed_medusa",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1780094541170,
+      "tag": "0025_cultured_next_avengers",
+      "breakpoints": true
     }
   ]
 }

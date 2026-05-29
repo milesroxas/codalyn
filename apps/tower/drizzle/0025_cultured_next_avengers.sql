@@ -1,0 +1,2 @@
+ALTER TABLE "tower_usage_month" ADD COLUMN "webflow_proxy_cms_slots_count" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "tower_usage_month" ADD COLUMN "webflow_proxy_image_upload_cms_count" integer DEFAULT 0 NOT NULL;

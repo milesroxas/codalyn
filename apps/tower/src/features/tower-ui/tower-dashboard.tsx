@@ -247,7 +247,7 @@ export function TowerDashboard({ summary, usage, billingEnabled }: TowerDashboar
           showBillingLink
           fillHeight
           title="Usage this month"
-          description="Proxy traffic, CMS writes, and image processing."
+          description="Usage by Beacon feature for your month."
         />
       </TowerDashboardGrid>
 

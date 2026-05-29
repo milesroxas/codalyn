@@ -391,6 +391,8 @@ export const towerUsageMonth = pgTable(
     /** `YYYY-MM` (UTC) */
     yearMonth: text("year_month").notNull(),
     webflowProxyRequestCount: integer("webflow_proxy_request_count").notNull().default(0),
+    webflowProxyCmsSlotsCount: integer("webflow_proxy_cms_slots_count").notNull().default(0),
+    webflowProxyImageUploadCmsCount: integer("webflow_proxy_image_upload_cms_count").notNull().default(0),
     cmsWriteCount: integer("cms_write_count").notNull().default(0),
     imageOptimizeCount: integer("image_optimize_count").notNull().default(0),
     updatedAt: timestamp("updated_at")

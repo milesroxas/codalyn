@@ -474,6 +474,9 @@ importers:
 
   packages/webflow-kit:
     dependencies:
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
       zod:
         specifier: ^3.24.2
         version: 3.25.76

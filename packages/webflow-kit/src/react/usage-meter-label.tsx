@@ -1,18 +1,30 @@
 "use client";
 
 import { IconInfoCircle } from "@tabler/icons-react";
+import { cva } from "class-variance-authority";
 import { Tooltip as TooltipPrimitive } from "radix-ui";
 import type { TowerUsageMeterKind } from "../tower/tower-usage-metering.js";
-import { towerUsageMeterLabel, towerUsageMeterTooltip } from "../tower/tower-usage-metering-copy.js";
+import { towerUsageMeterLabel } from "../tower/tower-usage-metering-copy.js";
+import { UsageMeterTooltipDetail } from "./usage-meter-tooltip-detail.js";
+import { USAGE_METER_TOOLTIP_COLLISION_PADDING, usageMeterTooltipMaxWidthClass } from "./usage-meter-tooltip-shell.js";
 
 export type UsageMeterLabelProps = {
   kind: TowerUsageMeterKind;
   label?: string;
 };
 
+export const usageMeterTooltipSurfaceVariants = cva(
+  [
+    "z-50 w-fit",
+    usageMeterTooltipMaxWidthClass,
+    "origin-(--radix-tooltip-content-transform-origin) rounded-lg border border-background/10 bg-foreground px-3 py-2.5 text-xs text-background shadow-md",
+    "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+    "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+  ].join(" ")
+);
+
 export function UsageMeterLabel({ kind, label }: UsageMeterLabelProps) {
   const displayLabel = label ?? towerUsageMeterLabel(kind);
-  const tooltip = towerUsageMeterTooltip(kind);
 
   return (
     <span className="inline-flex items-center gap-1">
@@ -31,9 +43,10 @@ export function UsageMeterLabel({ kind, label }: UsageMeterLabelProps) {
             <TooltipPrimitive.Content
               side="top"
               sideOffset={6}
-              className="z-50 max-w-[300px] origin-(--radix-tooltip-content-transform-origin) rounded-md bg-foreground px-2 py-1 text-left text-xs leading-snug font-normal whitespace-pre-line text-background data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
+              collisionPadding={USAGE_METER_TOOLTIP_COLLISION_PADDING}
+              className={usageMeterTooltipSurfaceVariants()}
             >
-              {tooltip}
+              <UsageMeterTooltipDetail kind={kind} />
             </TooltipPrimitive.Content>
           </TooltipPrimitive.Portal>
         </TooltipPrimitive.Root>

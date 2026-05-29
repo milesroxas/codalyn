@@ -1,45 +1,13 @@
 "use client";
 
-import { type TowerUsageMeterKind, towerUsageMeterLabel, towerUsageMeterTooltipContent } from "@codalyn/webflow-kit";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDetailHeading,
-  TooltipDetailList,
-  TooltipDetailListItem,
-  TooltipDetailNote,
-  TooltipDetailSection,
-  TooltipDetailSummary,
-  TooltipHelpTrigger,
-} from "@/shared/ui/tooltip";
+import { type TowerUsageMeterKind, towerUsageMeterLabel } from "@codalyn/webflow-kit";
+import { UsageMeterTooltipDetail } from "@codalyn/webflow-kit/react";
+import { Tooltip, TooltipContent, TooltipHelpTrigger } from "@/shared/ui/tooltip";
 
 export type UsageMeterLabelProps = {
   kind: TowerUsageMeterKind;
   label?: string;
 };
-
-function UsageMeterTooltipDetail({ kind }: { kind: TowerUsageMeterKind }) {
-  const content = towerUsageMeterTooltipContent(kind);
-
-  return (
-    <>
-      <TooltipDetailSummary>{content.summary}</TooltipDetailSummary>
-      <TooltipDetailSection>
-        <TooltipDetailHeading>{content.sectionHeading}</TooltipDetailHeading>
-        <TooltipDetailList>
-          {content.actions.map((action) => (
-            <TooltipDetailListItem
-              key={`${action.feature}:${action.detail}`}
-              feature={action.feature}
-              detail={action.detail}
-            />
-          ))}
-        </TooltipDetailList>
-      </TooltipDetailSection>
-      <TooltipDetailNote>{content.footnote}</TooltipDetailNote>
-    </>
-  );
-}
 
 export function UsageMeterLabel({ kind, label }: UsageMeterLabelProps) {
   const displayLabel = label ?? towerUsageMeterLabel(kind);
@@ -49,7 +17,7 @@ export function UsageMeterLabel({ kind, label }: UsageMeterLabelProps) {
       <span>{displayLabel}</span>
       <Tooltip>
         <TooltipHelpTrigger label={`About ${displayLabel}`} />
-        <TooltipContent side="top" variant="detail">
+        <TooltipContent side="top" variant="usageMeter">
           <UsageMeterTooltipDetail kind={kind} />
         </TooltipContent>
       </Tooltip>

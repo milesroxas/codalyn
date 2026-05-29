@@ -1,63 +1,108 @@
 import type { TowerUsageMeterKind } from "./tower-usage-metering.js";
 import { formatTowerUsageRatio } from "./tower-usage-metering.js";
+import type { TowerUsageProductFeature } from "./tower-usage-product-feature.js";
+import { parseTowerUsageProductFeature, towerUsageProductFeatureLabel } from "./tower-usage-product-feature.js";
 
 export const TOWER_USAGE_APPROACHING_ALERT_TITLE = "Approaching monthly usage limit";
 
 export function towerUsageMeterLabel(kind: TowerUsageMeterKind): string {
   switch (kind) {
     case "webflowProxy":
-      return "Webflow proxy";
+      return "Designer API requests";
     case "cmsWrite":
-      return "CMS writes";
+      return "Layout saves";
     case "image":
-      return "Image optimize (AVIF)";
+      return "AVIF exports";
   }
 }
 
 /** User-facing Beacon actions that increment each meter (one API call = one unit unless noted). */
 export const TOWER_USAGE_METER_CONTRIBUTING_ACTIONS: Record<TowerUsageMeterKind, readonly string[]> = {
   webflowProxy: [
-    "CMS Slots — install or sync the page script",
-    "CMS Slots — create a list target or link it to a CMS field",
-    "CMS Slots — open or save a layout in Composer on a collection template",
-    "Image Upload — publish an image to a CMS collection field",
+    "CMS Slots — Setting up or syncing the page script",
+    "CMS Slots — Creating a slot target",
+    "CMS Slots — Connecting a slot to a CMS field",
+    "CMS Slots — Opening or saving a Composer layout on a collection template",
+    "Image Upload — Publishing an image to a CMS collection field",
   ],
-  cmsWrite: ["CMS Slots — save a block-based layout composition through Tower's layout API"],
+  cmsWrite: ["CMS Slots — Saving a block-based layout composition in Composer"],
   image: [
-    "Image Upload — export an image as AVIF",
-    "Image Upload — AVIF size estimates while adjusting crop, size, or quality",
+    "Image Upload — Exporting an image as AVIF",
+    "Image Upload — Previewing AVIF size estimates while adjusting crop, size, or quality",
   ],
 };
 
 export type TowerUsageMeterTooltipAction = {
-  feature: string;
+  product: TowerUsageProductFeature;
   detail: string;
 };
 
+export type TowerUsageMeterTooltipActionGroup = {
+  product: TowerUsageProductFeature;
+  details: readonly string[];
+};
+
 export type TowerUsageMeterTooltipContent = {
+  title?: string;
   summary: string;
   sectionHeading: string;
-  actions: readonly TowerUsageMeterTooltipAction[];
+  actionGroups: readonly TowerUsageMeterTooltipActionGroup[];
+  footnoteHeading?: string;
   footnote: string;
 };
 
-const TOWER_USAGE_METER_TOOLTIP_SECTION_HEADING = "Counts when you:";
+const TOWER_USAGE_METER_TOOLTIP_SECTION_HEADING = "Actions that use this limit";
+const TOWER_USAGE_METER_TOOLTIP_FOOTNOTE_HEADING = "Separate limits";
 
-function parseContributingAction(action: string): TowerUsageMeterTooltipAction {
+function parseContributingAction(action: string): TowerUsageMeterTooltipAction | null {
   const separatorIndex = action.indexOf(" — ");
   if (separatorIndex === -1) {
-    return { feature: action, detail: "" };
+    return null;
+  }
+
+  const productName = action.slice(0, separatorIndex).trim();
+  const product = parseTowerUsageProductFeature(productName);
+  if (product == null) {
+    return null;
   }
 
   return {
-    feature: action.slice(0, separatorIndex).trim(),
+    product,
     detail: action.slice(separatorIndex + 3).trim(),
   };
 }
 
+function groupTooltipActions(actions: readonly TowerUsageMeterTooltipAction[]): TowerUsageMeterTooltipActionGroup[] {
+  const groups: TowerUsageMeterTooltipActionGroup[] = [];
+  const indexByProduct = new Map<TowerUsageProductFeature, number>();
+
+  for (const action of actions) {
+    const existingIndex = indexByProduct.get(action.product);
+    if (existingIndex != null) {
+      const group = groups[existingIndex];
+      if (group) {
+        groups[existingIndex] = { product: group.product, details: [...group.details, action.detail] };
+      }
+      continue;
+    }
+
+    indexByProduct.set(action.product, groups.length);
+    groups.push({ product: action.product, details: [action.detail] });
+  }
+
+  return groups;
+}
+
+function parseMeterContributingActions(kind: TowerUsageMeterKind): readonly TowerUsageMeterTooltipAction[] {
+  return TOWER_USAGE_METER_CONTRIBUTING_ACTIONS[kind].flatMap((action) => {
+    const parsed = parseContributingAction(action);
+    return parsed ? [parsed] : [];
+  });
+}
+
 function uniqueMeterFeatureNames(kind: TowerUsageMeterKind): string {
   const names = [
-    ...new Set(TOWER_USAGE_METER_CONTRIBUTING_ACTIONS[kind].map((action) => parseContributingAction(action).feature)),
+    ...new Set(parseMeterContributingActions(kind).map((action) => towerUsageProductFeatureLabel(action.product))),
   ];
   if (names.length === 0) {
     return "";
@@ -72,42 +117,59 @@ function uniqueMeterFeatureNames(kind: TowerUsageMeterKind): string {
 }
 
 export function towerUsageMeterTooltipContent(kind: TowerUsageMeterKind): TowerUsageMeterTooltipContent {
-  const actions = TOWER_USAGE_METER_CONTRIBUTING_ACTIONS[kind].map(parseContributingAction);
+  const actionGroups = groupTooltipActions(parseMeterContributingActions(kind));
 
   switch (kind) {
     case "webflowProxy":
       return {
-        summary: "Each Webflow Data API request through Tower counts as one. A single action may use several requests.",
+        title: "Shared Webflow request limit",
+        summary:
+          "Beacon uses this limit whenever it updates your Webflow site. CMS Slots and Image Upload both count toward this same monthly limit.",
         sectionHeading: TOWER_USAGE_METER_TOOLTIP_SECTION_HEADING,
-        actions,
+        actionGroups,
+        footnoteHeading: TOWER_USAGE_METER_TOOLTIP_FOOTNOTE_HEADING,
         footnote:
-          "Composer saves to a CMS text field and CMS field uploads use this meter. AVIF exports and layout API saves are counted separately.",
+          "Layout saves and AVIF exports have their own monthly limits. One action may use more than one Webflow request.",
       };
     case "cmsWrite":
       return {
-        summary: "Each layout save through Tower's CMS layout API counts as one.",
+        title: "Layout save limit",
+        summary:
+          "Beacon uses this limit when CMS Slots saves a block-based layout through Tower. Each save counts as one.",
         sectionHeading: TOWER_USAGE_METER_TOOLTIP_SECTION_HEADING,
-        actions,
+        actionGroups,
+        footnoteHeading: TOWER_USAGE_METER_TOOLTIP_FOOTNOTE_HEADING,
         footnote:
-          "Saving slot order in Composer to a CMS text field counts toward Webflow proxy instead. Loading layouts does not count.",
+          "Designer API requests and AVIF exports have their own monthly limits. Saving slot order to a CMS text field counts toward Designer API requests instead. Loading layouts does not count.",
       };
     case "image":
       return {
-        summary: "Each AVIF optimize request through Tower counts as one.",
+        title: "AVIF export limit",
+        summary:
+          "Beacon uses this limit when Image Upload optimizes images through Tower. Each AVIF optimize request counts as one.",
         sectionHeading: TOWER_USAGE_METER_TOOLTIP_SECTION_HEADING,
-        actions,
-        footnote: "WebP exports in the Designer do not count toward this limit.",
+        actionGroups,
+        footnoteHeading: TOWER_USAGE_METER_TOOLTIP_FOOTNOTE_HEADING,
+        footnote:
+          "Designer API requests and layout saves have their own monthly limits. WebP exports in the Designer do not count toward this limit.",
       };
   }
 }
 
 export function towerUsageMeterTooltip(kind: TowerUsageMeterKind): string {
   const content = towerUsageMeterTooltipContent(kind);
-  const actionLines = content.actions
-    .map((action) => (action.detail ? `• ${action.feature} — ${action.detail}` : `• ${action.feature}`))
-    .join("\n");
+  const actionLines = content.actionGroups
+    .map((group) => {
+      const label = towerUsageProductFeatureLabel(group.product);
+      const detailLines = group.details.map((detail) => `  • ${detail}`).join("\n");
+      return `${label}\n${detailLines}`;
+    })
+    .join("\n\n");
 
-  return `${content.summary}\n\n${content.sectionHeading}\n${actionLines}\n\n${content.footnote}`;
+  const titlePart = content.title ? `${content.title}\n\n` : "";
+  const footnotePart = content.footnoteHeading ? `${content.footnoteHeading}\n${content.footnote}` : content.footnote;
+
+  return `${titlePart}${content.summary}\n\n${content.sectionHeading}\n${actionLines}\n\n${footnotePart}`;
 }
 
 export function towerUsageApproachingAlertDescription(
@@ -142,13 +204,13 @@ export function towerUsageLimitDialogDescription(kind: TowerUsageMeterKind): str
     return `${TOWER_AVIF_LIMIT_FALLBACK_DESCRIPTION} Applies to ${scope}.`;
   }
   if (kind === "cmsWrite") {
-    return `You've used your free plan allowance for CMS layout saves through Tower this month. Applies to ${scope}. Composer text-field saves count toward Webflow proxy instead.`;
+    return `You've used your free plan allowance for CMS layout saves through Tower this month. Applies to ${scope}. Composer text-field saves count toward Designer API requests instead.`;
   }
-  return `You've used your free plan allowance for Webflow Data API traffic through Tower this month. Applies to ${scope}.`;
+  return `You've used your free plan allowance for Designer API requests through Tower this month. Applies to ${scope}.`;
 }
 
 export function towerUsageLimitDialogUsageLine(used: number, limit: number, kind: TowerUsageMeterKind): string {
-  const label = kind === "image" ? "AVIF optimizes" : kind === "cmsWrite" ? "CMS writes" : "Webflow proxy requests";
+  const label = kind === "image" ? "AVIF exports" : kind === "cmsWrite" ? "layout saves" : "Designer API requests";
   return `${used.toLocaleString()} / ${limit.toLocaleString()} ${label} used this month.`;
 }
 

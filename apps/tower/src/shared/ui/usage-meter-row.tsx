@@ -1,4 +1,11 @@
-import { formatTowerUsageRatio, type TowerUsageMeterSnapshot, towerUsageMeterLabel } from "@codalyn/webflow-kit";
+import {
+  formatTowerUsageDesignerApiBreakdown,
+  formatTowerUsageRatio,
+  hasTowerUsageDesignerApiBreakdown,
+  type TowerUsageDesignerApiBreakdown,
+  type TowerUsageMeterSnapshot,
+  towerUsageMeterLabel,
+} from "@codalyn/webflow-kit";
 import { usageMeterLevelLabel, usageMeterProgressValue } from "@/shared/lib/usage-meter-ui";
 import { Badge } from "@/shared/ui/badge";
 import { Progress, type ProgressIndicatorLevel } from "@/shared/ui/progress";
@@ -17,9 +24,19 @@ function progressLevelForMeter(level: TowerUsageMeterSnapshot["level"]): Progres
   }
 }
 
-export function UsageMeterRow({ meter }: { meter: TowerUsageMeterSnapshot }) {
+export function UsageMeterRow({
+  meter,
+  designerApiBreakdown = null,
+}: {
+  meter: TowerUsageMeterSnapshot;
+  designerApiBreakdown?: TowerUsageDesignerApiBreakdown | null;
+}) {
   const statusLabel = usageMeterLevelLabel(meter.level);
   const progressValue = usageMeterProgressValue(meter.used, meter.progressMax);
+  const breakdownLine =
+    meter.kind === "webflowProxy" && hasTowerUsageDesignerApiBreakdown(designerApiBreakdown)
+      ? formatTowerUsageDesignerApiBreakdown(designerApiBreakdown)
+      : null;
 
   return (
     <div className="space-y-2">
@@ -41,6 +58,7 @@ export function UsageMeterRow({ meter }: { meter: TowerUsageMeterSnapshot }) {
         indicatorLevel={progressLevelForMeter(meter.level)}
         aria-label={`${towerUsageMeterLabel(meter.kind)} ${formatTowerUsageRatio(meter.used, meter.limit)}`}
       />
+      {breakdownLine ? <p className="text-xs text-muted-foreground">{breakdownLine}</p> : null}
     </div>
   );
 }

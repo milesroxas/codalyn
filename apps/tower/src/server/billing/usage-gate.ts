@@ -1,3 +1,4 @@
+import type { WebflowProxyUsageCategory } from "@codalyn/webflow-kit";
 import { and, eq, sql } from "drizzle-orm";
 import type { TowerEntitlement } from "@/server/billing/entitlements";
 import {
@@ -19,7 +20,11 @@ type GateNo = { ok: false; used: number; limit: number; tier: TowerEntitlement["
 
 type UsageCountPatch = Pick<
   typeof towerUsageMonth.$inferInsert,
-  "webflowProxyRequestCount" | "cmsWriteCount" | "imageOptimizeCount"
+  | "webflowProxyRequestCount"
+  | "webflowProxyCmsSlotsCount"
+  | "webflowProxyImageUploadCmsCount"
+  | "cmsWriteCount"
+  | "imageOptimizeCount"
 >;
 
 const METER_COUNT_FIELD: Record<MeterKind, keyof UsageCountPatch> = {
@@ -28,8 +33,15 @@ const METER_COUNT_FIELD: Record<MeterKind, keyof UsageCountPatch> = {
   image: "imageOptimizeCount",
 };
 
+const WEBFLOW_PROXY_CATEGORY_FIELD: Record<WebflowProxyUsageCategory, keyof UsageCountPatch> = {
+  cmsSlots: "webflowProxyCmsSlotsCount",
+  imageUploadCms: "webflowProxyImageUploadCmsCount",
+};
+
 const METER_INSERT_DEFAULTS: UsageCountPatch = {
   webflowProxyRequestCount: 0,
+  webflowProxyCmsSlotsCount: 0,
+  webflowProxyImageUploadCmsCount: 0,
   cmsWriteCount: 0,
   imageOptimizeCount: 0,
 };
@@ -93,7 +105,8 @@ async function consumeMeter(
   userId: string,
   entitlement: TowerEntitlement,
   activeOrganizationId: string | null,
-  kind: MeterKind
+  kind: MeterKind,
+  webflowProxyCategory?: WebflowProxyUsageCategory
 ): Promise<GateOk | GateNo> {
   const overrides = await loadMeteringOverrideFields(userId, activeOrganizationId);
   const limits = await getTowerLimitsSnapshot();
@@ -102,15 +115,16 @@ async function consumeMeter(
   if (policy.skipMetering || cap === null) {
     return { ok: true, used: 0, limit: null, tier: entitlement.tier };
   }
-  return runConsume(userId, kind, entitlement.tier, cap);
+  return runConsume(userId, kind, entitlement.tier, cap, webflowProxyCategory);
 }
 
 export function consumeWebflowProxy(
   userId: string,
   entitlement: TowerEntitlement,
-  activeOrganizationId: string | null
+  activeOrganizationId: string | null,
+  category: WebflowProxyUsageCategory
 ): Promise<GateOk | GateNo> {
-  return consumeMeter(userId, entitlement, activeOrganizationId, "webflowProxy");
+  return consumeMeter(userId, entitlement, activeOrganizationId, "webflowProxy", category);
 }
 
 export function consumeCmsWrite(
@@ -136,7 +150,8 @@ async function reserveMonthlyCount(
   userId: string,
   ym: string,
   kind: MeterKind,
-  cap: number
+  cap: number,
+  webflowProxyCategory?: WebflowProxyUsageCategory
 ): Promise<TxBlock> {
   const lockKey = `${userId}|${ym}|${kind}`;
   await tx.execute(sql`SELECT pg_advisory_xact_lock((hashtext(${lockKey}::text))::bigint)`);
@@ -154,11 +169,18 @@ async function reserveMonthlyCount(
     return { blocked: true, used: current, limit: cap };
   }
   const next = current + 1;
+  const categoryField =
+    kind === "webflowProxy" && webflowProxyCategory != null ? WEBFLOW_PROXY_CATEGORY_FIELD[webflowProxyCategory] : null;
+  const categoryCurrent = categoryField != null && row != null ? ((row[categoryField] as number | undefined) ?? 0) : 0;
+  const categoryNext = categoryField != null ? categoryCurrent + 1 : undefined;
 
   if (row) {
     await tx
       .update(towerUsageMonth)
-      .set({ [countField]: next })
+      .set({
+        [countField]: next,
+        ...(categoryField != null && categoryNext != null ? { [categoryField]: categoryNext } : {}),
+      })
       .where(and(eq(towerUsageMonth.userId, userId), eq(towerUsageMonth.yearMonth, ym)));
   } else {
     await tx.insert(towerUsageMonth).values({
@@ -166,6 +188,7 @@ async function reserveMonthlyCount(
       yearMonth: ym,
       ...METER_INSERT_DEFAULTS,
       [countField]: 1,
+      ...(categoryField != null ? { [categoryField]: 1 } : {}),
     });
   }
   return { blocked: false, used: next, limit: cap };
@@ -175,10 +198,11 @@ async function runConsume(
   userId: string,
   kind: MeterKind,
   tier: TowerEntitlement["tier"],
-  cap: number
+  cap: number,
+  webflowProxyCategory?: WebflowProxyUsageCategory
 ): Promise<GateOk | GateNo> {
   const ym = utcYearMonth();
-  const res = await db.transaction((tx) => reserveMonthlyCount(tx, userId, ym, kind, cap));
+  const res = await db.transaction((tx) => reserveMonthlyCount(tx, userId, ym, kind, cap, webflowProxyCategory));
 
   if (res.blocked) {
     return {
@@ -206,6 +230,8 @@ async function runConsume(
 export async function getUsageSnapshot(userId: string): Promise<{
   yearMonth: string;
   webflowProxyRequestCount: number;
+  webflowProxyCmsSlotsCount: number;
+  webflowProxyImageUploadCmsCount: number;
   cmsWriteCount: number;
   imageOptimizeCount: number;
 }> {
@@ -218,6 +244,8 @@ export async function getUsageSnapshot(userId: string): Promise<{
   return {
     yearMonth: ym,
     webflowProxyRequestCount: row?.webflowProxyRequestCount ?? 0,
+    webflowProxyCmsSlotsCount: row?.webflowProxyCmsSlotsCount ?? 0,
+    webflowProxyImageUploadCmsCount: row?.webflowProxyImageUploadCmsCount ?? 0,
     cmsWriteCount: row?.cmsWriteCount ?? 0,
     imageOptimizeCount: row?.imageOptimizeCount ?? 0,
   };
@@ -226,7 +254,13 @@ export async function getUsageSnapshot(userId: string): Promise<{
 export async function resetUsageForUser(userId: string, yearMonth = utcYearMonth()): Promise<void> {
   await db
     .update(towerUsageMonth)
-    .set({ webflowProxyRequestCount: 0, cmsWriteCount: 0, imageOptimizeCount: 0 })
+    .set({
+      webflowProxyRequestCount: 0,
+      webflowProxyCmsSlotsCount: 0,
+      webflowProxyImageUploadCmsCount: 0,
+      cmsWriteCount: 0,
+      imageOptimizeCount: 0,
+    })
     .where(and(eq(towerUsageMonth.userId, userId), eq(towerUsageMonth.yearMonth, yearMonth)));
 }
 

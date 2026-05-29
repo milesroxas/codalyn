@@ -31,6 +31,7 @@ export type CmsSlotsEngineRouteSurfaceInput = {
   routeStateKnown: boolean;
   pageBootBlocking: boolean;
   listTargetPhase: CmsSlotListTargetPhase;
+  editingContextPhase: CmsComposerEditingContextViewModel["phase"];
 };
 
 export function cmsSlotsEngineRouteContentKey(input: {
@@ -45,6 +46,9 @@ export function cmsSlotsEngineRouteContentKey(input: {
 
 export function cmsSlotsEngineRouteContentReady(input: CmsSlotsEngineRouteSurfaceInput): boolean {
   if (input.openingBeaconKey != null) {
+    return false;
+  }
+  if (input.editingContextPhase === "loading") {
     return false;
   }
   if (input.picking) {

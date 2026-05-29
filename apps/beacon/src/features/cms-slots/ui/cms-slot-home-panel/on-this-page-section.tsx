@@ -12,7 +12,7 @@ import {
   CMS_SLOTS_RENAME_SLOT_DRAWER_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
-import { SectionLabelDivider } from "@/shared/ui/section-label-divider";
+import { SurfaceSummaryCardPanelSectionLabel } from "@/shared/ui/surface-summary-card";
 
 type OnThisPageSectionProps = {
   nameFieldId: string;
@@ -75,36 +75,6 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
   return (
     <div className="space-y-3" data-slot="cms_slots_on_page">
       <CmsSlotDisplayNameDrawer
-        open={createFormOpen}
-        onOpenChange={setCreateFormOpen}
-        title={CMS_SLOTS_ADD_SLOT_LABEL}
-        fieldId={nameFieldId}
-        value={beaconName}
-        onValueChange={setBeaconName}
-        primaryLabel="Create"
-        primaryPending={createPending}
-        primaryDisabled={!beaconName.trim()}
-        onPrimary={() => void onCreate()}
-        secondaryLabel="Cancel"
-        secondaryDisabled={createPending}
-        onSecondary={() => setCreateFormOpen(false)}
-        trigger={
-          <Button
-            type="button"
-            variant="actionCard"
-            size="actionCard"
-            disabled={pageScanLoading}
-            aria-busy={showPageScanLoading}
-            aria-expanded={createFormOpen}
-            aria-haspopup="dialog"
-          >
-            <Plus data-icon="inline-start" aria-hidden strokeWidth={2.25} />
-            <span>{CMS_SLOTS_ADD_SLOT_LABEL}</span>
-          </Button>
-        }
-      />
-
-      <CmsSlotDisplayNameDrawer
         open={renameTarget != null}
         onOpenChange={(open) => {
           if (!open) {
@@ -136,8 +106,8 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
 
       {hasBeacons ? (
         <div className="space-y-3">
-          <SectionLabelDivider label={CMS_SLOTS_PUBLISHED_SECTION_LABEL} />
-          <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0" aria-label={CMS_SLOTS_PAGE_LIST_ARIA_LABEL}>
+          <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_PUBLISHED_SECTION_LABEL}</SurfaceSummaryCardPanelSectionLabel>
+          <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0" aria-label={CMS_SLOTS_PAGE_LIST_ARIA_LABEL}>
             {pageBeacons.map((b) => (
               <CmsSlotPublishedSlotTile
                 key={b.key}
@@ -155,6 +125,36 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
           </ul>
         </div>
       ) : null}
+
+      <CmsSlotDisplayNameDrawer
+        open={createFormOpen}
+        onOpenChange={setCreateFormOpen}
+        title={CMS_SLOTS_ADD_SLOT_LABEL}
+        fieldId={nameFieldId}
+        value={beaconName}
+        onValueChange={setBeaconName}
+        primaryLabel="Create"
+        primaryPending={createPending}
+        primaryDisabled={!beaconName.trim()}
+        onPrimary={() => void onCreate()}
+        secondaryLabel="Cancel"
+        secondaryDisabled={createPending}
+        onSecondary={() => setCreateFormOpen(false)}
+        trigger={
+          <Button
+            type="button"
+            variant="default"
+            size="actionCard"
+            disabled={pageScanLoading}
+            aria-busy={showPageScanLoading}
+            aria-expanded={createFormOpen}
+            aria-haspopup="dialog"
+          >
+            <Plus data-icon="inline-start" aria-hidden strokeWidth={2.25} />
+            <span>{CMS_SLOTS_ADD_SLOT_LABEL}</span>
+          </Button>
+        }
+      />
     </div>
   );
 }

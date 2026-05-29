@@ -188,9 +188,11 @@ export const CMS_SLOTS_COMPOSER_MAIN_TITLE = "Compose";
 
 export const CMS_SLOTS_COMPOSER_MAIN_DESCRIPTION = "Manage CMS Slot content for collection entries.";
 
-export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SECTION_LABEL = "Editing";
+export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SECTION_LABEL = "Collection Entry";
 
 export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_COLLECTION_LABEL = "Collection";
+
+export const CMS_SLOTS_EDITING_CONTEXT_ENTRY_LABEL = "Entry";
 
 export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SLOT_LIST_LABEL = "Slot list";
 

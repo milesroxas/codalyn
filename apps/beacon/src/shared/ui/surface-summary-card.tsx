@@ -127,13 +127,14 @@ const surfaceSummaryCardSelectRowVariants = cva(
 
 const surfaceSummaryCardSurfaceDisplayVariants = cva("flex min-w-0 w-full items-center gap-3 text-left", {
   variants: {
-    contained: {
-      true: "overflow-hidden rounded-md border border-border/80 bg-card px-3 py-2.5 text-card-foreground shadow-sm",
-      false: "",
+    frame: {
+      inline: "",
+      inset: "overflow-hidden rounded-md bg-card px-3 py-2.5 text-card-foreground",
+      card: "overflow-hidden rounded-md border border-border/80 bg-card px-3 py-2.5 text-card-foreground shadow-sm",
     },
   },
   defaultVariants: {
-    contained: false,
+    frame: "inline",
   },
 });
 
@@ -529,14 +530,14 @@ function SurfaceSummaryCardSelectRow({
 
 function SurfaceSummaryCardSurfaceDisplay({
   className,
-  contained,
+  frame,
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardSurfaceDisplayVariants>) {
   return (
     <div
       data-slot="surface-summary-card-surface-display"
-      data-contained={contained ? "true" : "false"}
-      className={cn(surfaceSummaryCardSurfaceDisplayVariants({ contained }), className)}
+      data-frame={frame ?? "inline"}
+      className={cn(surfaceSummaryCardSurfaceDisplayVariants({ frame }), className)}
       {...props}
     />
   );
@@ -552,14 +553,15 @@ type SurfaceSummaryCardSurfaceDisplaySkeletonProps = {
   /** Mirrors optional third meta line on the loaded surface display (e.g. slot list). */
   showSlotList?: boolean;
   loadingLabel: string;
+  frame?: VariantProps<typeof surfaceSummaryCardSurfaceDisplayVariants>["frame"];
 };
 
 function SurfaceSummaryCardSurfaceDisplaySkeleton(props: SurfaceSummaryCardSurfaceDisplaySkeletonProps) {
-  const { showSlotList = false, loadingLabel } = props;
+  const { showSlotList = false, loadingLabel, frame = "card" } = props;
 
   return (
     <SurfaceSummaryCardSurfaceDisplay
-      contained
+      frame={frame}
       role="status"
       aria-live="polite"
       aria-busy="true"

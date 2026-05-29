@@ -17,7 +17,7 @@ import { CmsSlotsComposerInstallInEngineEmptyState } from "@/features/cms-slots/
 import { CmsSlotsEditorNoSlotsEmptyState } from "@/features/cms-slots/ui/cms-slots-editor-no-slots-empty-state";
 import { CmsSlotsRouteMainIntro } from "@/features/cms-slots/ui/cms-slots-route-main-intro";
 import { CMS_SLOTS_COMPOSER_EDITABLE_SECTION_LABEL } from "@/shared/lib/cms-slots-feature-copy";
-import { SectionLabelDivider } from "@/shared/ui/section-label-divider";
+import { SurfaceSummaryCardPanelSectionLabel } from "@/shared/ui/surface-summary-card";
 
 type CmsSlotComposerListPanelProps = {
   composerEditingContext: CmsComposerEditingContextViewModel;
@@ -100,8 +100,10 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
       <CmsSlotsComposerEditingContextCard context={composerEditingContext} />
       {runtimeOk && eligible.length > 0 ? (
         <div className="space-y-3">
-          <SectionLabelDivider label={CMS_SLOTS_COMPOSER_EDITABLE_SECTION_LABEL} />
-          <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0" aria-label="Lists available in Composer">
+          <SurfaceSummaryCardPanelSectionLabel>
+            {CMS_SLOTS_COMPOSER_EDITABLE_SECTION_LABEL}
+          </SurfaceSummaryCardPanelSectionLabel>
+          <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0" aria-label="Lists available in Composer">
             {eligible.map((b) => (
               <CmsSlotListTile
                 key={b.key}

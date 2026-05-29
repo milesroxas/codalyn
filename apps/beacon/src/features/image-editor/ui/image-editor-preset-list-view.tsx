@@ -13,7 +13,7 @@ import {
   IMAGE_UPLOAD_SITE_DEFAULT_SECTION_LABEL,
 } from "@/shared/lib/beacon-feature-route-copy";
 import { Button } from "@/shared/ui/button";
-import { SectionLabelDivider } from "@/shared/ui/section-label-divider";
+import { SurfaceSummaryCardPanelSectionLabel } from "@/shared/ui/surface-summary-card";
 
 export type PresetListRow = {
   id: string;
@@ -114,7 +114,9 @@ export function ImageEditorConfigurationPresetsListView(props: {
 
       {exportPresetRows.length > 0 ? (
         <div className="space-y-3">
-          <SectionLabelDivider label={IMAGE_UPLOAD_PRESETS_SECTION_LABEL} />
+          <SurfaceSummaryCardPanelSectionLabel>
+            {IMAGE_UPLOAD_PRESETS_SECTION_LABEL}
+          </SurfaceSummaryCardPanelSectionLabel>
           <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0" aria-label={IMAGE_UPLOAD_PRESETS_LIST_ARIA_LABEL}>
             {exportPresetRows.map(renderPresetTile)}
           </ul>
@@ -123,7 +125,9 @@ export function ImageEditorConfigurationPresetsListView(props: {
 
       {siteDefaultPresetRow ? (
         <div className="space-y-3">
-          <SectionLabelDivider label={IMAGE_UPLOAD_SITE_DEFAULT_SECTION_LABEL} />
+          <SurfaceSummaryCardPanelSectionLabel>
+            {IMAGE_UPLOAD_SITE_DEFAULT_SECTION_LABEL}
+          </SurfaceSummaryCardPanelSectionLabel>
           <ul
             className="m-0 grid list-none grid-cols-2 gap-3 p-0"
             aria-label={IMAGE_UPLOAD_SITE_DEFAULT_LIST_ARIA_LABEL}

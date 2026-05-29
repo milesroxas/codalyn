@@ -51,7 +51,7 @@ export function ImagePageTargetSurfaceSummary(props: ImagePageTargetSurfaceSumma
           <SurfaceSummaryCardEmpty>{IMAGE_TARGET_STEP_NO_SURFACE_SELECTED}</SurfaceSummaryCardEmpty>
         </SurfaceSummaryCard>
       ) : (
-        <SurfaceSummaryCardSurfaceDisplay contained>
+        <SurfaceSummaryCardSurfaceDisplay frame="card">
           <SurfaceSummaryCardIconBox>
             <SurfaceIcon aria-hidden stroke={1.5} />
           </SurfaceSummaryCardIconBox>

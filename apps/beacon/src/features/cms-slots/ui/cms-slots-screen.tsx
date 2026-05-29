@@ -854,7 +854,7 @@ export function CmsSlotsScreen() {
   const composerLeaveDestinationRef = useRef<ComposerLeaveDestination>("composer-list");
   const [currentCmsItemId, setCurrentCmsItemId] = useState<string | null>(null);
   const composerEditingContext = useCmsComposerEditingContextState({
-    enabled: isComposer,
+    enabled: isComposer || isEngine,
     currentCmsItemId,
   });
   const activeComposerRef = useRef<{

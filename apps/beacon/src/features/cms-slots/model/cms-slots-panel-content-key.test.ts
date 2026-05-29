@@ -40,6 +40,7 @@ describe("cmsSlotsEngineRouteSurface", () => {
     routeStateKnown: true,
     pageBootBlocking: false,
     listTargetPhase: "synced" as const,
+    editingContextPhase: "ready" as const,
   };
 
   it("keeps home key while opening a slot", () => {
@@ -87,6 +88,15 @@ describe("cmsSlotsEngineRouteSurface", () => {
         listTargetPhase: "synced",
       })
     ).toBe(true);
+  });
+
+  it("waits for editing context on engine routes", () => {
+    expect(
+      cmsSlotsEngineRouteContentReady({
+        ...idleHome,
+        editingContextPhase: "loading",
+      })
+    ).toBe(false);
   });
 });
 

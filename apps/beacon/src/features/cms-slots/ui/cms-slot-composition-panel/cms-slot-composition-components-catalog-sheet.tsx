@@ -22,7 +22,7 @@ export function CmsSlotCompositionComponentsCatalogSheet(props: CmsSlotCompositi
   return (
     <Drawer open={open} onOpenChange={setOpen} interactionBlocked={dismissBlocked}>
       <DrawerTrigger asChild>
-        <Button type="button" variant="actionCard" size="actionCard" disabled={addPending}>
+        <Button type="button" variant="default" size="actionCard" disabled={addPending}>
           <Plus data-icon="inline-start" aria-hidden strokeWidth={2.25} />
           <span>{CMS_SLOTS_ENGINE_ADD_COMPONENT_LABEL}</span>
         </Button>

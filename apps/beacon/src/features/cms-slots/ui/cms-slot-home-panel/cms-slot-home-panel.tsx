@@ -1,10 +1,13 @@
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { cmsSlotsHomePanelContentKey } from "@/features/cms-slots/model/cms-slots-panel-content-key";
+import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
+import { CmsSlotsComposerEditingContextCard } from "@/features/cms-slots/ui/cms-slots-composer-editing-context-card";
 import { CmsSlotsPreInstallEmptyState } from "@/features/cms-slots/ui/cms-slots-pre-install-empty-state";
 import { CmsSlotsRouteMainIntro } from "@/features/cms-slots/ui/cms-slots-route-main-intro";
 import { OnThisPageSection } from "./on-this-page-section";
 
 type CmsSlotHomePanelProps = {
+  composerEditingContext: CmsComposerEditingContextViewModel;
   nameFieldId: string;
   beaconsWrapperInstalled: boolean;
   installPending: boolean;
@@ -28,6 +31,7 @@ type CmsSlotHomePanelProps = {
 
 export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
   const {
+    composerEditingContext,
     nameFieldId,
     beaconsWrapperInstalled,
     installPending,
@@ -65,6 +69,7 @@ export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
   return (
     <div className="space-y-4" data-slot="beacon_home_installed">
       <CmsSlotsRouteMainIntro segment="engine" />
+      <CmsSlotsComposerEditingContextCard context={composerEditingContext} primaryField="collection" />
       <OnThisPageSection
         nameFieldId={nameFieldId}
         pageBeacons={pageBeacons}

@@ -213,6 +213,8 @@ function CmsSlotsEngineRouteBody(
     panel = (
       <div className="space-y-4" data-route="cms-slots-engine-composition">
         <CmsSlotCompositionPanel
+          composerEditingContext={p.composerEditingContext}
+          activeListLabel={p.activeListLabel}
           searchFieldId={p.searchFieldId}
           activeDataList={p.activeDataList}
           componentQuery={p.componentQuery}
@@ -254,6 +256,7 @@ function CmsSlotsEngineRouteBody(
     panel = (
       <div className="space-y-4" data-route="cms-slots-engine-home">
         <CmsSlotHomePanel
+          composerEditingContext={p.composerEditingContext}
           nameFieldId={p.nameFieldId}
           beaconsWrapperInstalled={p.beaconsWrapperInstalled}
           installPending={p.installPending}
@@ -363,6 +366,7 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
         routeStateKnown: p.routeStateKnown,
         pageBootBlocking: p.pageBootBlocking,
         listTargetPhase: p.listTargetPhase,
+        editingContextPhase: p.composerEditingContext.phase,
       })
     : null;
   const composerSurface = p.isComposer

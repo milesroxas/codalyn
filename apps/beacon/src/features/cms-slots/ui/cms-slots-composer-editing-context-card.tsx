@@ -1,4 +1,4 @@
-import { Database } from "lucide-react";
+import { Database, FileText, type LucideIcon } from "lucide-react";
 import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
 import {
   CMS_SLOTS_COMPOSER_EDITING_CONTEXT_COLLECTION_LABEL,
@@ -9,6 +9,7 @@ import {
   CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SLOT_LIST_LABEL,
   CMS_SLOTS_COMPOSER_EDITING_CONTEXT_STATIC_PAGE,
   CMS_SLOTS_COMPOSER_EDITING_CONTEXT_UNAVAILABLE,
+  CMS_SLOTS_EDITING_CONTEXT_ENTRY_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import {
   SurfaceSummaryCardEmpty,
@@ -26,10 +27,17 @@ type CmsSlotsComposerEditingContextCardProps = {
   context: CmsComposerEditingContextViewModel;
   /** When set, shown as a third line while editing a specific slot list. */
   slotListLabel?: string | null;
+  /** Composer shows the entry title as primary; Engine shows the collection name. */
+  primaryField?: "entry" | "collection";
 };
 
 function formatCollectionMeta(collectionName: string): string {
   return `${CMS_SLOTS_COMPOSER_EDITING_CONTEXT_COLLECTION_LABEL} · ${collectionName}`;
+}
+
+function formatEntryMeta(entryTitle: string | null): string {
+  const title = entryTitle ?? CMS_SLOTS_COMPOSER_EDITING_CONTEXT_NO_ENTRY;
+  return `${CMS_SLOTS_EDITING_CONTEXT_ENTRY_LABEL} · ${title}`;
 }
 
 function formatSlotListMeta(slotListLabel: string): string {
@@ -40,23 +48,42 @@ function composerEditingContextShowsSlotList(slotListLabel: string | null | unde
   return slotListLabel != null && slotListLabel.trim() !== "";
 }
 
+function editingContextIcon(primaryField: "entry" | "collection"): LucideIcon {
+  return primaryField === "collection" ? Database : FileText;
+}
+
 function ComposerEditingContextReadyBody(props: {
   collectionName: string;
   entryTitle: string | null;
   slotListLabel?: string | null;
+  primaryField: "entry" | "collection";
 }) {
-  const { collectionName, entryTitle, slotListLabel } = props;
+  const { collectionName, entryTitle, slotListLabel, primaryField } = props;
   const trimmedSlotListLabel = slotListLabel?.trim() ?? "";
+  const editingEngineSlot = primaryField === "collection" && trimmedSlotListLabel !== "";
+
+  const primaryText = editingEngineSlot
+    ? trimmedSlotListLabel
+    : primaryField === "collection"
+      ? collectionName
+      : (entryTitle ?? CMS_SLOTS_COMPOSER_EDITING_CONTEXT_NO_ENTRY);
+  const secondaryMeta = editingEngineSlot
+    ? formatCollectionMeta(collectionName)
+    : primaryField === "collection"
+      ? formatEntryMeta(entryTitle)
+      : formatCollectionMeta(collectionName);
+  const showSlotListMeta = !editingEngineSlot && trimmedSlotListLabel !== "";
+  const ContextIcon = editingContextIcon(primaryField);
 
   return (
-    <SurfaceSummaryCardSurfaceDisplay contained>
+    <SurfaceSummaryCardSurfaceDisplay frame="inset">
       <SurfaceSummaryCardIconBox>
-        <Database aria-hidden strokeWidth={1.75} />
+        <ContextIcon aria-hidden strokeWidth={1.75} />
       </SurfaceSummaryCardIconBox>
       <SurfaceSummaryCardIconRowCopy>
-        <SurfaceSummaryCardTitle>{entryTitle ?? CMS_SLOTS_COMPOSER_EDITING_CONTEXT_NO_ENTRY}</SurfaceSummaryCardTitle>
-        <SurfaceSummaryCardMeta>{formatCollectionMeta(collectionName)}</SurfaceSummaryCardMeta>
-        {trimmedSlotListLabel !== "" ? (
+        <SurfaceSummaryCardTitle>{primaryText}</SurfaceSummaryCardTitle>
+        <SurfaceSummaryCardMeta>{secondaryMeta}</SurfaceSummaryCardMeta>
+        {showSlotListMeta ? (
           <SurfaceSummaryCardMeta emphasis="hint">{formatSlotListMeta(trimmedSlotListLabel)}</SurfaceSummaryCardMeta>
         ) : null}
       </SurfaceSummaryCardIconRowCopy>
@@ -67,13 +94,15 @@ function ComposerEditingContextReadyBody(props: {
 function ComposerEditingContextBody(props: {
   context: CmsComposerEditingContextViewModel;
   slotListLabel?: string | null;
+  primaryField: "entry" | "collection";
 }) {
-  const { context, slotListLabel } = props;
+  const { context, slotListLabel, primaryField } = props;
   const showSlotList = composerEditingContextShowsSlotList(slotListLabel);
 
   if (context.phase === "loading") {
     return (
       <SurfaceSummaryCardSurfaceDisplaySkeleton
+        frame="inset"
         showSlotList={showSlotList}
         loadingLabel={CMS_SLOTS_COMPOSER_EDITING_CONTEXT_LOADING}
       />
@@ -98,6 +127,7 @@ function ComposerEditingContextBody(props: {
         collectionName={context.collectionName}
         entryTitle={context.entryTitle}
         slotListLabel={slotListLabel}
+        primaryField={primaryField}
       />
     );
   }
@@ -106,18 +136,25 @@ function ComposerEditingContextBody(props: {
 }
 
 export function CmsSlotsComposerEditingContextCard(props: CmsSlotsComposerEditingContextCardProps) {
-  const { context, slotListLabel } = props;
+  const { context, slotListLabel, primaryField = "entry" } = props;
 
   if (context.phase === "idle") {
     return null;
   }
 
+  const sectionLabel =
+    primaryField === "collection"
+      ? CMS_SLOTS_COMPOSER_EDITING_CONTEXT_COLLECTION_LABEL
+      : CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SECTION_LABEL;
+
   return (
-    <SurfaceSummaryCardSurfaceSummary data-slot="cms_slots_composer_editing_context">
-      <SurfaceSummaryCardPanelSectionLabel>
-        {CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SECTION_LABEL}
-      </SurfaceSummaryCardPanelSectionLabel>
-      <ComposerEditingContextBody context={context} slotListLabel={slotListLabel} />
+    <SurfaceSummaryCardSurfaceSummary
+      data-slot={
+        primaryField === "collection" ? "cms_slots_engine_editing_context" : "cms_slots_composer_editing_context"
+      }
+    >
+      <SurfaceSummaryCardPanelSectionLabel>{sectionLabel}</SurfaceSummaryCardPanelSectionLabel>
+      <ComposerEditingContextBody context={context} slotListLabel={slotListLabel} primaryField={primaryField} />
     </SurfaceSummaryCardSurfaceSummary>
   );
 }

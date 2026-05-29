@@ -3,8 +3,15 @@ import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import { cmsSlotListTargetPhaseUnsettled } from "@/features/cms-slots/model/cms-slot-list-target-settled";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
-import { CMS_SLOTS_ENGINE_COMPONENTS_LABEL } from "@/shared/lib/cms-slots-feature-copy";
+import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
+import { CmsSlotsComposerEditingContextCard } from "@/features/cms-slots/ui/cms-slots-composer-editing-context-card";
 import {
+  CMS_SLOTS_ENGINE_COMPONENTS_LABEL,
+  CMS_SLOTS_ENGINE_EDITING_DESCRIPTION,
+  CMS_SLOTS_ENGINE_EDITING_TITLE,
+} from "@/shared/lib/cms-slots-feature-copy";
+import {
+  SurfaceSummaryCardPageIntro,
   SurfaceSummaryCardPanelSectionLabel,
   SurfaceSummaryCardSurfaceSummary,
 } from "@/shared/ui/surface-summary-card";
@@ -15,6 +22,8 @@ import { CmsSlotEngineSelectedComponentsList } from "./cms-slot-engine-selected-
 import { useCompositionComposableMeta } from "./use-composition-composable-meta";
 
 export type CmsSlotCompositionPanelProps = {
+  composerEditingContext: CmsComposerEditingContextViewModel;
+  activeListLabel: string | null;
   searchFieldId: string;
   activeDataList: string | null;
   componentQuery: string;
@@ -57,6 +66,8 @@ export type CmsSlotCompositionPanelProps = {
 
 export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
   const {
+    composerEditingContext,
+    activeListLabel,
     searchFieldId,
     activeDataList,
     componentQuery,
@@ -104,6 +115,17 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
 
   return (
     <>
+      <SurfaceSummaryCardPageIntro
+        title={CMS_SLOTS_ENGINE_EDITING_TITLE}
+        description={CMS_SLOTS_ENGINE_EDITING_DESCRIPTION}
+      />
+
+      <CmsSlotsComposerEditingContextCard
+        context={composerEditingContext}
+        primaryField="collection"
+        slotListLabel={activeListLabel}
+      />
+
       <CmsSlotEngineListContextSection
         activeDataList={activeDataList}
         listTargetActionBusy={listTargetActionBusy}

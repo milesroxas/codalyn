@@ -50,6 +50,7 @@ import {
   CMS_SLOTS_FEATURE_NAME,
   CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION,
   CMS_SLOTS_SCAN_ARIA_LABEL,
+  CMS_SLOTS_UNINSTALL_PAGE_HINT,
   CMS_SLOTS_UNINSTALL_PAGE_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { cn } from "@/shared/lib/utils";
@@ -441,6 +442,7 @@ function CmsSlotsBeaconDeleteDialog(p: CmsSlotsRouteChromeProps) {
               disabled={p.deletePendingKey != null}
               onCheckedChange={p.setUninstallWithLastBeaconDelete}
             />
+            <p className="mt-2 text-xs leading-snug text-muted-foreground">{CMS_SLOTS_UNINSTALL_PAGE_HINT}</p>
           </div>
         ) : null}
         <AlertDialogFooter>

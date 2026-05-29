@@ -117,6 +117,23 @@ export const CMS_SLOTS_TOAST_LIST_REMOVED = "CMS slot list removed.";
 
 export const CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED = "CMS slot list removed. CMS Slots page install cleared.";
 
+export const CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_REMOVED =
+  "CMS slot list removed. Page install cleared and footer beacon script removed. Publish the site to apply on the live site.";
+
+export const CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_NOT_FOUND =
+  "CMS slot list removed. Page install cleared. No beacon footer script was on this page.";
+
+export const CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_SKIPPED_NO_TOWER =
+  "CMS slot list removed. Page install cleared, but the footer beacon script was not removed because Tower is not configured. Remove it manually in Page settings → Custom code.";
+
+export const CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_FAILED_PREFIX =
+  "CMS slot list removed. Page install cleared, but the footer beacon script could not be removed:";
+
+export const CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_MANUAL_SUFFIX = "Remove it manually in Page settings → Custom code.";
+
+export const CMS_SLOTS_TOAST_LIST_REMOVED_INSTALL_REMAINS =
+  'CMS slot list removed. The page install and footer beacon script remain on this page. Delete the last list with "Also uninstall CMS Slots on this page" to remove them, or remove the footer script manually in Page settings → Custom code.';
+
 export const CMS_SLOTS_DELETE_DIALOG_TITLE = "Delete this CMS slot list?";
 
 export const CMS_SLOTS_CMS_FIELD_LINK_DIALOG_TITLE = "Refresh CMS in Webflow";
@@ -142,6 +159,10 @@ export const CMS_SLOTS_CMS_FIELD_NOT_VISIBLE_NOTIFY =
   "Could not confirm the CMS Plain Text field on this collection. Check your Webflow connection in Tower, then try creating the list target again.";
 
 export const CMS_SLOTS_UNINSTALL_PAGE_LABEL = `Also uninstall ${CMS_SLOTS_FEATURE_NAME} on this page`;
+
+/** Shown when deleting the last list without also uninstalling the page install. */
+export const CMS_SLOTS_UNINSTALL_PAGE_HINT =
+  "The footer beacon script and hidden page install stay on this page unless you check the option above.";
 
 /** Composer empty state when an editor has no slot lists to open on this page. */
 export const CMS_SLOTS_EDITOR_NO_SLOTS_TITLE = "No Slots Found";

@@ -85,6 +85,7 @@ import {
   installCmsSlotsWrapperOnPage,
   isCmsSlotsWrapperInstalledOnPage,
   removeCmsSlotsWrapperIfNoSlotListsOnPage,
+  resolveCmsSlotsDeleteBeaconNotify,
   syncCmsSlotsInstallEmbedOnPage,
   uninstallCmsSlotsPageInstall,
 } from "@/features/cms-slots/model/install-cms-slots-wrapper";
@@ -123,8 +124,6 @@ import {
   CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG,
   CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES,
   CMS_SLOTS_TOAST_LIST_CREATED,
-  CMS_SLOTS_TOAST_LIST_REMOVED,
-  CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED,
   CMS_SLOTS_TOAST_LIST_RENAMED,
   CMS_SLOTS_TOAST_LIST_TARGET_FOCUSED,
   CMS_SLOTS_TOAST_LIST_TARGET_NOT_ON_CANVAS,
@@ -1874,19 +1873,23 @@ export function CmsSlotsScreen() {
     const target = beaconToDelete;
     if (!target) return;
     const shouldUninstallPage = uninstallWithLastBeaconDelete;
+    const wasLastBeaconOnPage = isLastCmsSlotListOnPageForDelete;
     setDeletePendingKey(target.key);
     try {
       await deleteCmsSlotListAndListTargetDefinition(target.dataList, target.container);
+      let uninstallResult: Awaited<ReturnType<typeof uninstallCmsSlotsPageInstall>> | undefined;
       if (shouldUninstallPage) {
-        await uninstallCmsSlotsPageInstall({ dataLists: [target.dataList] });
+        uninstallResult = await uninstallCmsSlotsPageInstall({ dataLists: [target.dataList] });
         await removeCmsSlotsWrapperIfNoSlotListsOnPage();
       }
       setBeaconToDelete(null);
       setUninstallWithLastBeaconDelete(false);
-      void webflow.notify({
-        type: "Success",
-        message: shouldUninstallPage ? CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED : CMS_SLOTS_TOAST_LIST_REMOVED,
+      const notify = resolveCmsSlotsDeleteBeaconNotify({
+        shouldUninstallPage,
+        wasLastBeaconOnPage,
+        uninstallResult,
       });
+      void webflow.notify({ type: notify.type, message: notify.message });
       setEngineListCompositionStale(true);
       void refreshPageBeacons();
     } catch (err) {

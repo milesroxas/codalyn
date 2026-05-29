@@ -567,25 +567,36 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
   await putPageCustomScripts(pageId, merged);
 }
 
+export type CmsSlotPageRuntimeRemovalResult =
+  | { status: "removed" }
+  | { status: "not_found" }
+  | { status: "skipped_no_tower" }
+  | { status: "failed"; reason: string };
+
 /**
  * Removes the Codalyn beacon **footer** custom code from the current page (Tower + Data API) and deletes unreferenced
  * `codalyn-beacon-runtime-*.js` assets from the site. No-op if Tower is not configured or the page has no matching
  * script.
  */
-export async function removeCmsSlotPageRuntimeFromPage(): Promise<void> {
+export async function removeCmsSlotPageRuntimeFromPage(): Promise<CmsSlotPageRuntimeRemovalResult> {
   if (!getTowerOrigin()) {
-    return;
+    return { status: "skipped_no_tower" };
   }
 
-  const siteId = (await webflow.getSiteInfo()).siteId;
-  const pageId = (await webflow.getCurrentPage()).id as string;
-  const existing = await getPageCustomScripts(pageId);
-  const next = withoutCmsSlotMarkedScripts(existing);
-  if (next.length === existing.length) {
-    return;
+  try {
+    const siteId = (await webflow.getSiteInfo()).siteId;
+    const pageId = (await webflow.getCurrentPage()).id as string;
+    const existing = await getPageCustomScripts(pageId);
+    const next = withoutCmsSlotMarkedScripts(existing);
+    if (next.length === existing.length) {
+      return { status: "not_found" };
+    }
+    await putPageCustomScripts(pageId, next);
+    await purgeUnreferencedBeaconRuntimeAssets(siteId);
+    return { status: "removed" };
+  } catch (err) {
+    return { status: "failed", reason: formatRuntimeStatusError(err) };
   }
-  await putPageCustomScripts(pageId, next);
-  await purgeUnreferencedBeaconRuntimeAssets(siteId);
 }
 
 function formatRuntimeStatusError(err: unknown): string {

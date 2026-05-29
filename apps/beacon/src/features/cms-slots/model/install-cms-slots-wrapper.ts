@@ -14,6 +14,13 @@ import {
   CMS_SLOTS_ROUTE_TASK_CREATING_INSTALL,
   CMS_SLOTS_ROUTE_TASK_MOVING_SLOT_LISTS,
   CMS_SLOTS_ROUTE_TASK_SYNCING_PAGE_SCRIPT,
+  CMS_SLOTS_TOAST_LIST_REMOVED,
+  CMS_SLOTS_TOAST_LIST_REMOVED_INSTALL_REMAINS,
+  CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_FAILED_PREFIX,
+  CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_MANUAL_SUFFIX,
+  CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_NOT_FOUND,
+  CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_REMOVED,
+  CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_SKIPPED_NO_TOWER,
 } from "@/shared/lib/cms-slots-feature-copy";
 
 type BodyWithAppend = AnyElement & {
@@ -145,13 +152,25 @@ export type UninstallCmsSlotsPageInstallOptions = {
   dataLists?: string[];
 };
 
+export type CmsSlotsPageUninstallResult = {
+  wrapperRemoved: boolean;
+  runtimeRemoval: Awaited<ReturnType<typeof removeCmsSlotPageRuntimeFromPage>>;
+};
+
+export type CmsSlotsDeleteBeaconNotify = {
+  type: "Success" | "Warning";
+  message: string;
+};
+
 /**
  * Removes the hidden `beacons-wrapper` block (if present) and the beacon **footer** runtime script from the
  * current page. Use after the last CMS slot is deleted, when the user opts to uninstall the page install.
  * Unregisters list-target site components and deletes the per-list CMS Plain Text field for every CMS slot still on
  * the page (resolved from each hidden list block before the wrapper is removed), plus the given `dataLists`.
  */
-export async function uninstallCmsSlotsPageInstall(options?: UninstallCmsSlotsPageInstallOptions): Promise<void> {
+export async function uninstallCmsSlotsPageInstall(
+  options?: UninstallCmsSlotsPageInstallOptions
+): Promise<CmsSlotsPageUninstallResult> {
   const dataLists = new Set(options?.dataLists ?? []);
   for (const beacon of await findCmsSlotListsOnPage()) {
     dataLists.add(beacon.dataList);
@@ -162,10 +181,45 @@ export async function uninstallCmsSlotsPageInstall(options?: UninstallCmsSlotsPa
   }
 
   const wrapper = await findCmsSlotsWrapperOnPage();
+  const wrapperRemoved = wrapper != null;
   if (wrapper != null) {
     await wrapper.remove();
   }
-  await removeCmsSlotPageRuntimeFromPage();
+  const runtimeRemoval = await removeCmsSlotPageRuntimeFromPage();
+  return { wrapperRemoved, runtimeRemoval };
+}
+
+export function resolveCmsSlotsDeleteBeaconNotify(input: {
+  shouldUninstallPage: boolean;
+  wasLastBeaconOnPage: boolean;
+  uninstallResult?: CmsSlotsPageUninstallResult;
+}): CmsSlotsDeleteBeaconNotify {
+  if (input.shouldUninstallPage) {
+    const runtime = input.uninstallResult?.runtimeRemoval.status ?? "failed";
+    if (runtime === "removed") {
+      return { type: "Success", message: CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_REMOVED };
+    }
+    if (runtime === "not_found") {
+      return { type: "Success", message: CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_NOT_FOUND };
+    }
+    if (runtime === "skipped_no_tower") {
+      return { type: "Warning", message: CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_SKIPPED_NO_TOWER };
+    }
+    const reason =
+      input.uninstallResult?.runtimeRemoval.status === "failed"
+        ? input.uninstallResult.runtimeRemoval.reason
+        : "Unknown error";
+    return {
+      type: "Warning",
+      message: `${CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_FAILED_PREFIX} ${reason}. ${CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_MANUAL_SUFFIX}`,
+    };
+  }
+
+  if (input.wasLastBeaconOnPage) {
+    return { type: "Warning", message: CMS_SLOTS_TOAST_LIST_REMOVED_INSTALL_REMAINS };
+  }
+
+  return { type: "Success", message: CMS_SLOTS_TOAST_LIST_REMOVED };
 }
 
 /**

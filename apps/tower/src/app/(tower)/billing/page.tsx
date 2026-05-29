@@ -11,8 +11,9 @@ import { syncStripeCheckoutSessionForUser } from "@/server/billing/stripe-checko
 import { getStripe } from "@/server/billing/stripe-client";
 import { userHasIndividualStripePro } from "@/server/billing/stripe-individual-pro";
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
+import { fetchWorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import { db } from "@/shared/lib/db";
-import { user } from "@/shared/lib/db/auth-schema";
+import { organization, user } from "@/shared/lib/db/auth-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -67,14 +68,30 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
   const hasIndividualPro = row ? await userHasIndividualStripePro(row) : false;
 
+  const [activeOrganizationName, workspaceBilling] = activeOrg
+    ? await Promise.all([
+        db
+          .select({ name: organization.name })
+          .from(organization)
+          .where(eq(organization.id, activeOrg))
+          .limit(1)
+          .then((rows) => rows[0]?.name ?? null),
+        fetchWorkspaceBillingView(userId, activeOrg),
+      ])
+    : [null, null];
+
   return (
     <TowerBillingScreen
       email={row?.email}
+      hasIndividualPro={hasIndividualPro}
       entitlement={ent}
       usageStatus={usageStatus}
       individualSubscriptionStatus={hasIndividualPro ? row?.subscriptionStatus : null}
       checkoutAvailable={isStripeCheckoutConfigured()}
       showIndividualPortal={hasIndividualPro && Boolean(row?.stripeCustomerId)}
+      activeOrganizationId={activeOrg}
+      activeOrganizationName={activeOrganizationName}
+      workspaceBilling={workspaceBilling}
     />
   );
 }

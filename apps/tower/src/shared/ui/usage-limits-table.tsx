@@ -53,7 +53,7 @@ export function UsageLimitsTable(props: UsageLimitsTableProps) {
   const resetLine = towerUsageLimitResetDetailLine();
 
   return (
-    <Accordion type="single" collapsible defaultValue="monthly-limits">
+    <Accordion type="single" collapsible>
       <AccordionItem value="monthly-limits" className="border-none">
         <AccordionTrigger>
           <span className="flex min-w-0 items-center gap-3">

@@ -16,6 +16,8 @@ import { getTowerAuthBaseUrl, towerAuthClient } from "@/features/auth/model/towe
 
 /** Single-flighted across all hook instances so multiple mounted consumers don't fire duplicate exchanges. */
 let designerExchangeInFlight = false;
+/** Once an exchange fails, stop the focus/visibility auto-retry from hammering Tower until an explicit sign-in. */
+let designerExchangeBlockedAfterFailure = false;
 
 export type BridgedTowerUser = {
   id: string;
@@ -115,9 +117,12 @@ export function useBeaconTowerSession(): {
   const signInWithDesignerSession = useCallback(async (): Promise<{ ok: true } | { ok: false; error: string }> => {
     invalidateBeaconTowerSignOut();
     setSuppressDesignerSessionExchange(false);
+    designerExchangeBlockedAfterFailure = false;
     const result = await exchangeWebflowDesignerSession();
     if (result.ok) {
       await refetch();
+    } else {
+      designerExchangeBlockedAfterFailure = true;
     }
     return result;
   }, [refetch]);
@@ -133,7 +138,7 @@ export function useBeaconTowerSession(): {
     }
     let cancelled = false;
     const attemptExchange = () => {
-      if (cancelled || designerExchangeInFlight) {
+      if (cancelled || designerExchangeInFlight || designerExchangeBlockedAfterFailure) {
         return;
       }
       if (readBeaconTowerSessionToken() || readSuppressDesignerSessionExchange()) {
@@ -142,12 +147,16 @@ export function useBeaconTowerSession(): {
       designerExchangeInFlight = true;
       void exchangeWebflowDesignerSession()
         .then((r) => {
-          if (!cancelled && r.ok) {
-            void refetch();
+          if (r.ok) {
+            if (!cancelled) {
+              void refetch();
+            }
+          } else {
+            designerExchangeBlockedAfterFailure = true;
           }
         })
         .catch(() => {
-          /* network errors are handled inside exchangeWebflowDesignerSession */
+          designerExchangeBlockedAfterFailure = true;
         })
         .finally(() => {
           designerExchangeInFlight = false;

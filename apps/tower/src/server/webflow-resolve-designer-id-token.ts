@@ -26,10 +26,12 @@ export async function resolveWebflowDesignerIdToken(
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({ token: idToken }),
+    body: JSON.stringify({ idToken }),
   });
 
   if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    console.warn(`[tower/webflow-designer] token/resolve failed: ${res.status} ${detail.slice(0, 300)}`);
     return null;
   }
 
@@ -37,6 +39,7 @@ export async function resolveWebflowDesignerIdToken(
   const id = pickString(raw.userId) ?? pickString(raw.id) ?? pickString(raw.user_id);
   const email = pickString(raw.email)?.toLowerCase();
   if (!id || !email) {
+    console.warn("[tower/webflow-designer] token/resolve ok but missing id/email in response");
     return null;
   }
 

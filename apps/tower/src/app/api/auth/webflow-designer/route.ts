@@ -49,11 +49,15 @@ export async function POST(request: Request) {
 
   const resolved = await resolveWebflowDesignerIdToken(idToken, resolveBearer);
   if (!resolved) {
+    console.warn("[tower/webflow-designer] id_token_resolve_failed (resolve bearer present but resolve returned null)");
     return jsonWithCors(request, { error: "id_token_resolve_failed" }, { status: 401 });
   }
 
   const session = await establishDesignerBetterAuthSession(request, resolved);
   if (!session.ok) {
+    console.warn(
+      `[tower/webflow-designer] establish session failed for ${resolved.email}: ${session.status} ${session.message}`
+    );
     return jsonWithCors(request, { error: session.message }, { status: session.status });
   }
 

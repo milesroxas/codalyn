@@ -33,6 +33,7 @@ export function useBeaconTowerInlineSignIn(): { signIn: () => void; pending: boo
     void signInWithDesignerSession()
       .then((result) => {
         if (result.ok) {
+          void webflow.notify({ type: "Success", message: "Signed in to Tower." });
           return;
         }
         const message = describeSignInFailure(result.error);

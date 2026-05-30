@@ -228,10 +228,7 @@ function BeaconMenuAccountGroup(props: {
           Checking session…
         </div>
       ) : !user ? (
-        <div data-slot="beacon-menu-account-guest" className="space-y-2 px-2 pb-1">
-          <p className="rounded-sm bg-muted/50 px-2.5 py-2 text-muted-foreground text-xs leading-relaxed">
-            Sign in with Tower to sync presets and workspace settings across devices.
-          </p>
+        <div data-slot="beacon-menu-account-guest" className="space-y-2 pb-1">
           <DropdownMenuItem className="font-medium text-foreground" onSelect={() => onSignIn()}>
             <LogIn aria-hidden />
             Sign in to Tower

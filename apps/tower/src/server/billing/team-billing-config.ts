@@ -25,5 +25,5 @@ export {
 
 /** Minimum seats billed on team checkout (and floor when syncing subscription quantity). */
 export function getTeamMinSeats(): number {
-  return envInt("TOWER_TEAM_MIN_SEATS", 2);
+  return envInt("TOWER_TEAM_MIN_SEATS", 6);
 }

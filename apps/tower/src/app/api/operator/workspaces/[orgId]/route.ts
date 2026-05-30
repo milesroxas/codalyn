@@ -1,6 +1,6 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { buildOrganizationSeatSnapshot, countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
+import { countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
 import { deleteWorkspace } from "@/server/membership/delete-workspace";
 import {
   parseWorkspaceDeleteConfirmBody,
@@ -16,6 +16,7 @@ import {
   sanitizeUsageLimitsPatch,
 } from "@/server/operator/usage-limits";
 import { assertWorkspaceDeleteRateLimit } from "@/server/security/destructive-action-rate-limit";
+import { buildWorkspaceSeatUsage } from "@/shared/lib/billing/workspace-seat-usage";
 import { db } from "@/shared/lib/db";
 import { invitation, member, organization, user } from "@/shared/lib/db/auth-schema";
 import { parseWorkspaceSlug } from "@/shared/lib/membership/workspace-slug";
@@ -90,8 +91,10 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
   const memberCount = Number(row.memberCount ?? 0);
   const pendingInvitations = Number(row.pendingInvitations ?? 0);
   const seatsUsed = await countOrganizationSeatsUsed(orgId);
-  const seatSnapshot = buildOrganizationSeatSnapshot(seatsUsed, {
+  const seatUsage = buildWorkspaceSeatUsage(seatsUsed, {
     seatLimit: row.seatLimit ?? null,
+    stripeSeatQuantity: row.stripeSeatQuantity ?? null,
+    operatorSeatLimitOverride: row.operatorSeatLimitOverride ?? false,
   });
 
   return {
@@ -100,10 +103,10 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
     slug: row.slug,
     logo: row.logo ?? null,
     metadata: row.metadata ?? null,
-    seatLimit: row.seatLimit ?? null,
-    effectiveSeatLimit: seatSnapshot.effectiveSeatLimit,
-    isAtSeatCap: seatSnapshot.isAtSeatCap,
-    isOverSeatCap: seatSnapshot.isOverSeatCap,
+    seatLimit: seatUsage.seatLimit,
+    effectiveSeatLimit: seatUsage.effectiveSeatLimit,
+    isAtSeatCap: seatUsage.isAtSeatCap,
+    isOverSeatCap: seatUsage.isOverSeatCap,
     ...mapOperatorOrgBillingFields({
       billingPlan: row.billingPlan ?? null,
       subscriptionStatus: row.subscriptionStatus ?? null,

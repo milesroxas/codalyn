@@ -1,16 +1,16 @@
-import { ArrowRight, Check, Sparkles } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
+import { BeaconTowerSignInButton } from "@/features/auth/ui/beacon-tower-sign-in-button";
 import { Button } from "@/shared/ui/button";
 
 type ImageEditorOnboardingProps = {
   towerConfigured: boolean;
-  onSignInToTower: () => void;
   onContinueAsGuest: () => void;
 };
 
 const TOWER_BENEFITS = ["AVIF compression", "CMS-connected assets", "Synced sessions"] as const;
 
 export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
-  const { towerConfigured, onSignInToTower, onContinueAsGuest } = props;
+  const { towerConfigured, onContinueAsGuest } = props;
 
   return (
     <section
@@ -47,10 +47,15 @@ export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
           ))}
         </ul>
 
-        <Button type="button" className="mt-4 w-full" disabled={!towerConfigured} onClick={onSignInToTower}>
-          {towerConfigured ? "Sign in to Tower" : "Tower unavailable"}
-          {towerConfigured ? <ArrowRight aria-hidden data-icon="inline-end" /> : null}
-        </Button>
+        {towerConfigured ? (
+          <div className="mt-4">
+            <BeaconTowerSignInButton />
+          </div>
+        ) : (
+          <p className="mt-4 rounded-sm bg-muted/50 px-3 py-2 text-xs leading-snug text-muted-foreground">
+            Tower sign-in isn’t available in this environment. You can continue as a guest below.
+          </p>
+        )}
       </article>
 
       <article className="rounded-sm border border-border bg-card/40 p-4">

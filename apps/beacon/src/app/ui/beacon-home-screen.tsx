@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBeaconGuestWelcomeVisible } from "@/features/auth/lib/use-beacon-guest-welcome-visible";
 import { isTowerConfigured } from "@/features/auth/model/tower-auth-client";
-import { useBeaconTowerInlineSignIn } from "@/features/auth/model/use-beacon-tower-inline-sign-in";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotsCollectionTemplatePrompt } from "@/features/cms-slots/ui/cms-slots-collection-template-prompt";
 import { CmsSlotsPageInstallPrefetch } from "@/features/cms-slots/ui/cms-slots-page-install-prefetch";
@@ -107,17 +106,11 @@ export function BeaconHomeScreen() {
   const cmsSlotsNeedsCollectionTemplate = cmsSlotsSurfaceEnabled && cmsPageKindReady && !cmsSlotsOnCollectionTemplate;
   const { visible: showWelcomeGate, markGuestWelcomeComplete } = useBeaconGuestWelcomeVisible();
 
-  const { signIn: signInToTower } = useBeaconTowerInlineSignIn();
-
   if (showWelcomeGate) {
     return (
       <ScrollArea className="min-h-0 min-w-0 flex-1">
         <div className="flex min-h-full min-w-0 flex-col items-center justify-center px-3 py-6">
-          <ImageEditorOnboarding
-            towerConfigured={towerConfigured}
-            onSignInToTower={signInToTower}
-            onContinueAsGuest={markGuestWelcomeComplete}
-          />
+          <ImageEditorOnboarding towerConfigured={towerConfigured} onContinueAsGuest={markGuestWelcomeComplete} />
         </div>
       </ScrollArea>
     );

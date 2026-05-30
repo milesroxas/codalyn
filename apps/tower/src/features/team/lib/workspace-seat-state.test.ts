@@ -13,6 +13,8 @@ function billingView(overrides: Partial<WorkspaceBillingView> = {}): WorkspaceBi
     seatLimit: null,
     seatsUsed: 1,
     seatsRemaining: 0,
+    stripeSeatQuantity: null,
+    operatorSeatLimitOverride: false,
     teamCheckoutConfigured: true,
     hasStripeCustomer: false,
     billingPlan: null,

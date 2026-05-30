@@ -1,8 +1,10 @@
 "use client";
 
 import { IconCreditCard } from "@tabler/icons-react";
+import { WorkspaceSeatUsageBlock } from "@/features/billing/ui/workspace-seat-usage-block";
 import { operatorWorkspaceBillingModeDescription } from "@/features/operator/lib/operator-workspace-billing-copy";
 import type { OperatorWorkspaceDetail } from "@/server/operator/types";
+import { buildWorkspaceSeatUsage } from "@/shared/lib/billing/workspace-seat-usage";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { FormField, FormFieldGrid, FormFieldRow } from "@/shared/ui/form-field";
@@ -26,7 +28,11 @@ export type OperatorWorkspaceBillingSectionProps = {
 function WorkspaceBillingSummary(props: { detail: OperatorWorkspaceDetail }) {
   const { detail } = props;
   const seatsUsed = detail.memberCount + detail.pendingInvitations;
-  const seatLabel = `${seatsUsed} of ${detail.effectiveSeatLimit} seat${detail.effectiveSeatLimit === 1 ? "" : "s"} used`;
+  const seatUsage = buildWorkspaceSeatUsage(seatsUsed, {
+    seatLimit: detail.seatLimit,
+    stripeSeatQuantity: detail.stripeSeatQuantity,
+    operatorSeatLimitOverride: detail.operatorSeatLimitOverride,
+  });
 
   return (
     <dl className="grid gap-3 text-sm sm:grid-cols-3">
@@ -42,37 +48,8 @@ function WorkspaceBillingSummary(props: { detail: OperatorWorkspaceDetail }) {
       </div>
       <div>
         <dt className="text-xs text-muted-foreground">Seats</dt>
-        <dd className="mt-1 text-foreground">{seatLabel}</dd>
-      </div>
-    </dl>
-  );
-}
-
-function StripeSeatBillingSummary(props: { detail: OperatorWorkspaceDetail }) {
-  const { detail } = props;
-  if (detail.billingMode !== "stripe_team") {
-    return null;
-  }
-
-  const paidSeats = detail.stripeSeatQuantity ?? detail.seatLimit;
-  const showPaidVsEffective =
-    detail.operatorSeatLimitOverride || (paidSeats !== null && paidSeats !== detail.effectiveSeatLimit);
-
-  if (!showPaidVsEffective) {
-    return null;
-  }
-
-  return (
-    <dl className="grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs sm:grid-cols-2">
-      <div>
-        <dt className="text-muted-foreground">Paid seats (Stripe)</dt>
-        <dd className="mt-1 text-foreground">{paidSeats ?? "—"}</dd>
-      </div>
-      <div>
-        <dt className="text-muted-foreground">Effective cap</dt>
-        <dd className="mt-1 flex items-center gap-2 text-foreground">
-          {detail.effectiveSeatLimit}
-          {detail.operatorSeatLimitOverride ? <Badge variant="secondary">Operator override</Badge> : null}
+        <dd className="mt-1">
+          <WorkspaceSeatUsageBlock usage={seatUsage} />
         </dd>
       </div>
     </dl>
@@ -257,8 +234,6 @@ export function OperatorWorkspaceBillingSection(props: OperatorWorkspaceBillingS
             inviting.
           </p>
         ) : null}
-
-        <StripeSeatBillingSummary detail={detail} />
 
         {detail.billingMode === "stripe_team" ? <StripeBillingReferences detail={detail} /> : null}
 

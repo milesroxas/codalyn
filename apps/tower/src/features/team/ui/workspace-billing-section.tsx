@@ -1,4 +1,5 @@
 import { IconCreditCard } from "@tabler/icons-react";
+import { WorkspaceSeatUsageBlock } from "@/features/billing/ui/workspace-seat-usage-block";
 import { WorkspaceTeamCheckoutForm } from "@/features/team/ui/workspace-team-checkout-form";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import { Button } from "@/shared/ui/button";
@@ -39,7 +40,6 @@ function WorkspaceBillingActions(props: { organizationId: string; billing: Works
 
 export function WorkspaceBillingSection(props: { organizationId: string; billing: WorkspaceBillingView }) {
   const { organizationId, billing } = props;
-  const seatLabel = `${billing.seatsUsed} of ${billing.effectiveSeatLimit} seat${billing.effectiveSeatLimit === 1 ? "" : "s"} used`;
 
   return (
     <Card size="sm">
@@ -60,13 +60,13 @@ export function WorkspaceBillingSection(props: { organizationId: string; billing
               </span>
             </span>
           ) : null}
-          <span className="text-muted-foreground">{seatLabel}</span>
           {billing.billingEnabled && billing.subscriptionStatus ? (
             <span className="text-muted-foreground">
               Status: <span className="font-mono text-xs">{billing.subscriptionStatus}</span>
             </span>
           ) : null}
         </div>
+        <WorkspaceSeatUsageBlock usage={billing} />
 
         {billing.isOverSeatCap ? (
           <p className="text-sm text-destructive">

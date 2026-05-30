@@ -2,6 +2,7 @@ import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
 import { IconBuilding, IconExternalLink, IconUser } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
+import { WorkspaceSeatUsageBlock } from "@/features/billing/ui/workspace-seat-usage-block";
 import { WorkspaceTeamCheckoutForm } from "@/features/team/ui/workspace-team-checkout-form";
 import type { TowerEntitlement } from "@/server/billing/entitlements";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
@@ -155,14 +156,6 @@ function IndividualSubscriptionCard(props: {
   );
 }
 
-function formatWorkspaceSeatLabel(billing: WorkspaceBillingView | null): string | null {
-  if (!billing?.billingEnabled) {
-    return null;
-  }
-  const seatWord = billing.effectiveSeatLimit === 1 ? "seat" : "seats";
-  return `${billing.seatsUsed} of ${billing.effectiveSeatLimit} ${seatWord} used`;
-}
-
 function NoActiveWorkspaceBillingCard() {
   return (
     <Card>
@@ -191,13 +184,11 @@ function ActiveWorkspaceBillingDetails(props: {
   const workspacePlanCaption = workspaceBilling?.isPaid
     ? "Paid Team billing covers seats and Team usage limits for this workspace."
     : "Free workspace. Add Team billing for seats and Team limits.";
-  const seatLabel = formatWorkspaceSeatLabel(workspaceBilling);
   const subscriptionStatus = workspaceBilling?.subscriptionStatus
     ? formatSubscriptionStatus(workspaceBilling.subscriptionStatus)
     : null;
 
   const metadata: BillingMetadataItem[] = [
-    ...(seatLabel ? [{ label: "Seats", value: seatLabel }] : []),
     ...(subscriptionStatus ? [{ label: "Subscription status", value: subscriptionStatus }] : []),
   ];
 
@@ -209,6 +200,13 @@ function ActiveWorkspaceBillingDetails(props: {
         <>
           <Separator />
           <BillingMetadataGrid items={metadata} />
+        </>
+      ) : null}
+
+      {workspaceBilling?.billingEnabled ? (
+        <>
+          <Separator />
+          <WorkspaceSeatUsageBlock usage={workspaceBilling} />
         </>
       ) : null}
 

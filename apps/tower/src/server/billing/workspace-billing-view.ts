@@ -1,8 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { isOrganizationProEntitled, organizationBillingPlanLabel } from "@/server/billing/organization-billing";
-import { buildOrganizationSeatSnapshot, countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
+import { countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
+import { shouldBumpStripeTeamQuantityToMinimum } from "@/server/billing/organization-seat-override";
+import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { isTeamBillingCheckoutConfigured } from "@/server/billing/team-billing-config";
+import { buildWorkspaceSeatUsage } from "@/shared/lib/billing/workspace-seat-usage";
 import { db } from "@/shared/lib/db";
 import { member, organization } from "@/shared/lib/db/auth-schema";
 import { isTowerTeamAdminRole } from "@/shared/lib/membership/tower-organization-access";
@@ -20,6 +23,8 @@ export type WorkspaceBillingView = {
   isAtSeatCap: boolean;
   isOverSeatCap: boolean;
   seatsRemaining: number;
+  stripeSeatQuantity: number | null;
+  operatorSeatLimitOverride: boolean;
   hasStripeCustomer: boolean;
 };
 
@@ -40,6 +45,8 @@ export async function fetchWorkspaceBillingView(
         stripeSubscriptionId: organization.stripeSubscriptionId,
         stripeCustomerId: organization.stripeCustomerId,
         seatLimit: organization.seatLimit,
+        stripeSeatQuantity: organization.stripeSeatQuantity,
+        operatorSeatLimitOverride: organization.operatorSeatLimitOverride,
       })
       .from(organization)
       .where(eq(organization.id, organizationId))
@@ -56,7 +63,30 @@ export async function fetchWorkspaceBillingView(
     billingPlan: org.billingPlan,
     stripeSubscriptionId: org.stripeSubscriptionId,
   };
-  const seatSnapshot = buildOrganizationSeatSnapshot(seatsUsed, org);
+
+  if (
+    isOrganizationProEntitled(billingRow) &&
+    org.stripeSubscriptionId &&
+    shouldBumpStripeTeamQuantityToMinimum(true, org, org.stripeSeatQuantity ?? null)
+  ) {
+    await syncOrganizationSeatQuantityWithStripe(organizationId);
+    const [refreshed] = await db
+      .select({
+        seatLimit: organization.seatLimit,
+        stripeSeatQuantity: organization.stripeSeatQuantity,
+        operatorSeatLimitOverride: organization.operatorSeatLimitOverride,
+      })
+      .from(organization)
+      .where(eq(organization.id, organizationId))
+      .limit(1);
+    if (refreshed) {
+      org.seatLimit = refreshed.seatLimit;
+      org.stripeSeatQuantity = refreshed.stripeSeatQuantity;
+      org.operatorSeatLimitOverride = refreshed.operatorSeatLimitOverride;
+    }
+  }
+
+  const seatUsage = buildWorkspaceSeatUsage(seatsUsed, org);
 
   return {
     billingEnabled: isTowerBillingEnabled(),
@@ -65,12 +95,14 @@ export async function fetchWorkspaceBillingView(
     isPaid: isOrganizationProEntitled(billingRow),
     billingPlan: organizationBillingPlanLabel(billingRow),
     subscriptionStatus: org.subscriptionStatus,
-    seatLimit: org.seatLimit,
-    seatsUsed,
-    effectiveSeatLimit: seatSnapshot.effectiveSeatLimit,
-    isAtSeatCap: seatSnapshot.isAtSeatCap,
-    isOverSeatCap: seatSnapshot.isOverSeatCap,
-    seatsRemaining: seatSnapshot.seatsRemaining,
+    seatLimit: seatUsage.seatLimit,
+    seatsUsed: seatUsage.seatsUsed,
+    effectiveSeatLimit: seatUsage.effectiveSeatLimit,
+    isAtSeatCap: seatUsage.isAtSeatCap,
+    isOverSeatCap: seatUsage.isOverSeatCap,
+    seatsRemaining: seatUsage.seatsRemaining,
+    stripeSeatQuantity: seatUsage.stripeSeatQuantity,
+    operatorSeatLimitOverride: seatUsage.operatorSeatLimitOverride,
     hasStripeCustomer: Boolean(org.stripeCustomerId),
   };
 }

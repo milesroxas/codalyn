@@ -360,9 +360,7 @@ function WorkspaceRow({
           ) : null}
         </div>
       </TableCell>
-      <TableCell className="text-right text-sm tabular-nums text-foreground">
-        {workspace.seatLimit ?? workspace.effectiveSeatLimit}
-      </TableCell>
+      <TableCell className="text-right text-sm tabular-nums text-foreground">{workspace.effectiveSeatLimit}</TableCell>
       <TableCell>
         <OperatorUsageLimitsTableCell usage={workspace.usage} />
       </TableCell>

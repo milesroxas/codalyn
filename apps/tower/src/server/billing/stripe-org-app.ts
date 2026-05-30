@@ -1,6 +1,10 @@
 import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
-import { resolveOrganizationSeatLimitAfterStripeQuantity } from "@/server/billing/organization-seat-override";
+import {
+  resolveOrganizationSeatLimitAfterStripeQuantity,
+  shouldBumpStripeTeamQuantityToMinimum,
+} from "@/server/billing/organization-seat-override";
+import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { isStripeSubscriptionProEntitled } from "@/server/billing/stripe-subscription-status";
 import { stripeCustomerIdFrom } from "@/server/billing/stripe-utils";
 import { getStripePriceTeamSeat, TEAM_BILLING_PLAN } from "@/server/billing/team-billing-config";
@@ -55,6 +59,8 @@ export async function applyStripeSubscriptionToOrganization(
     entitled
   );
 
+  const operatorSeatLimitOverride = entitled ? (existing?.operatorSeatLimitOverride ?? false) : false;
+
   await db
     .update(organization)
     .set({
@@ -64,10 +70,14 @@ export async function applyStripeSubscriptionToOrganization(
       billingPlan: entitled ? TEAM_BILLING_PLAN : null,
       stripeSeatQuantity: entitled ? stripeSeatQuantity : null,
       seatLimit,
-      operatorSeatLimitOverride: entitled ? (existing?.operatorSeatLimitOverride ?? false) : false,
+      operatorSeatLimitOverride,
       ...(entitled && billingOwnerUserId ? { billingOwnerUserId } : {}),
     })
     .where(eq(organization.id, towerOrgId));
+
+  if (shouldBumpStripeTeamQuantityToMinimum(entitled, { operatorSeatLimitOverride }, stripeSeatQuantity)) {
+    await syncOrganizationSeatQuantityWithStripe(towerOrgId);
+  }
 }
 
 export async function clearStripeOrganizationSubscription(towerOrgId: string) {

@@ -39,7 +39,7 @@ Server gate: `src/server/membership/user-workspace-creation-eligibility.ts`, enf
 ### Team seats (collaboration only)
 
 - Unpaid workspace (`seat_limit` null): **1 member** (`TEAM_UNPAID_SEAT_CAP`) — solo; real invites need Team billing.
-- Paid Team: `organization.billing_plan = "team"`, `seat_limit` from Stripe quantity (min `TOWER_TEAM_MIN_SEATS`, default 2).
+- Paid Team: `organization.billing_plan = "team"`, `seat_limit` from Stripe quantity (min `TOWER_TEAM_MIN_SEATS`, default 6).
 - Seats count **members + pending invitations**; hooks sync quantity back to Stripe when membership changes.
 
 ## Feature flag
@@ -80,7 +80,7 @@ Documented in `../.env.example`. Summary:
 | `STRIPE_PRICE_PRO` | Yes (individual Pro) | **Recurring** Price id (Pro product). Test and live modes use different ids. |
 | `STRIPE_PRICE_TEAM_SEAT` | Yes (team billing) | **Per-seat recurring** Price id for workspace Team plan. |
 | `TOWER_STRIPE_REQUIRE_LIVE_IN_PRODUCTION` | No | Set to `1` on Vercel **Production** at go-live to reject `sk_test_` keys. Omit while prod still uses test mode. |
-| `TOWER_TEAM_MIN_SEATS` | No | Minimum seats on team checkout and Stripe sync (default `2`). |
+| `TOWER_TEAM_MIN_SEATS` | No | Minimum seats on team checkout and Stripe sync (default `6`). |
 | `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` | Yes | Origins for Checkout success/cancel and Portal return URL. |
 | `TOWER_METERING_DISABLED` | No | `1` disables free-tier **usage** caps only (emergency). |
 | `TOWER_FREE_*` / `TOWER_PRO_*` | No | Optional seed overrides for monthly limits (Operator Platform UI is runtime source of truth after migrate). |

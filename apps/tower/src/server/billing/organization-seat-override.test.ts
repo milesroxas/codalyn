@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveOrganizationSeatLimitAfterStripeQuantity,
+  shouldBumpStripeTeamQuantityToMinimum,
   shouldSkipStripeSeatQuantitySync,
 } from "@/server/billing/organization-seat-override";
 
@@ -11,6 +12,16 @@ describe("shouldSkipStripeSeatQuantitySync", () => {
 
   it("allows sync when override is inactive", () => {
     expect(shouldSkipStripeSeatQuantitySync({ operatorSeatLimitOverride: false })).toBe(false);
+  });
+});
+
+describe("shouldBumpStripeTeamQuantityToMinimum", () => {
+  it("requests bump when stripe quantity is below product minimum", () => {
+    expect(shouldBumpStripeTeamQuantityToMinimum(true, { operatorSeatLimitOverride: false }, 2)).toBe(true);
+  });
+
+  it("skips when operator override is active", () => {
+    expect(shouldBumpStripeTeamQuantityToMinimum(true, { operatorSeatLimitOverride: true }, 2)).toBe(false);
   });
 });
 

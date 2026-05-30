@@ -10,7 +10,8 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import type { Area } from "react-easy-crop";
 import { useNavigate } from "react-router-dom";
 import { useBeaconGuestWelcomeVisible } from "@/features/auth/lib/use-beacon-guest-welcome-visible";
-import { isTowerConfigured, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
+import { isTowerConfigured } from "@/features/auth/model/tower-auth-client";
+import { useBeaconTowerInlineSignIn } from "@/features/auth/model/use-beacon-tower-inline-sign-in";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
 import {
@@ -1316,9 +1317,7 @@ export function ImageEditor() {
     [handleDragState, queueFile]
   );
 
-  const openTowerEmailSignInPopup = useCallback(() => {
-    openTowerAuthPopup("/sign-in");
-  }, []);
+  const { signIn: signInToTower } = useBeaconTowerInlineSignIn();
 
   const offerSelectionPlacement = useMemo(
     () =>
@@ -1538,7 +1537,7 @@ export function ImageEditor() {
             showGuestOnboarding ? (
               <ImageEditorOnboarding
                 towerConfigured={towerConfigured}
-                onSignInToTower={openTowerEmailSignInPopup}
+                onSignInToTower={signInToTower}
                 onContinueAsGuest={() => {
                   markGuestWelcomeComplete();
                   navigate("/home");

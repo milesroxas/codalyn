@@ -1,5 +1,11 @@
 import { useCallback, useEffect } from "react";
 import {
+  beginBeaconTowerSignOut,
+  invalidateBeaconTowerSignOut,
+  isBeaconTowerSignOutCurrent,
+} from "@/features/auth/lib/beacon-tower-sign-out-coordination";
+import {
+  clearBeaconTowerSessionToken,
   exchangeWebflowDesignerSession,
   readBeaconTowerSessionToken,
   readSuppressDesignerSessionExchange,
@@ -7,6 +13,9 @@ import {
   writeBeaconTowerSessionToken,
 } from "@/features/auth/lib/webflow-designer-session";
 import { getTowerAuthBaseUrl, towerAuthClient } from "@/features/auth/model/tower-auth-client";
+
+/** Single-flighted across all hook instances so multiple mounted consumers don't fire duplicate exchanges. */
+let designerExchangeInFlight = false;
 
 export type BridgedTowerUser = {
   id: string;
@@ -36,6 +45,8 @@ function handleTowerMessage(event: MessageEvent, towerOrigin: string, onSessionC
   if (data.type !== "codalyn:tower-auth") {
     return;
   }
+  // A new session arrived: cancel any in-flight sign-out so its late token clear / refetch does not clobber it.
+  invalidateBeaconTowerSignOut();
   persistTowerSessionToken(data.token);
   setSuppressDesignerSessionExchange(false);
   onSessionChanged();
@@ -76,41 +87,84 @@ export function useBeaconTowerSession(): {
   isPending: boolean;
   refetch: () => Promise<void>;
   clearStoredSession: () => void;
+  signInWithDesignerSession: () => Promise<{ ok: true } | { ok: false; error: string }>;
 } {
   const { data: session, isPending, refetch } = towerAuthClient.useSession();
   const hasStoredSessionToken = Boolean(readBeaconTowerSessionToken());
 
   const clearStoredSession = useCallback(() => {
     setSuppressDesignerSessionExchange(true);
-    // Do not clear localStorage before signOut: the bearer plugin needs `Authorization` to resolve the session.
-    void towerAuthClient.signOut({ fetchOptions: { credentials: "include" } }).then(() => refetch());
+    const epoch = beginBeaconTowerSignOut();
+    // Keep the token until signOut resolves (the bearer plugin needs `Authorization` to resolve the session),
+    // then clear it and refetch — unless a newer sign-in arrived meanwhile and invalidated this sign-out.
+    void towerAuthClient.signOut({ fetchOptions: { credentials: "include" } }).then(() => {
+      if (!isBeaconTowerSignOutCurrent(epoch)) {
+        return;
+      }
+      clearBeaconTowerSessionToken();
+      void refetch();
+    });
   }, [refetch]);
 
   const towerOrigin = getTowerAuthBaseUrl();
 
-  /** Re-issue Tower bearer from Webflow Designer ID token (Tower stores OAuth; Beacon persists bearer in localStorage). */
+  /**
+   * Explicit, inline sign-in for the Designer extension: re-enable the silent exchange (in case the user had
+   * signed out), cancel any in-flight sign-out, then mint a Tower bearer from the Webflow ID token. No popup.
+   */
+  const signInWithDesignerSession = useCallback(async (): Promise<{ ok: true } | { ok: false; error: string }> => {
+    invalidateBeaconTowerSignOut();
+    setSuppressDesignerSessionExchange(false);
+    const result = await exchangeWebflowDesignerSession();
+    if (result.ok) {
+      await refetch();
+    }
+    return result;
+  }, [refetch]);
+
+  /**
+   * Re-issue Tower bearer from the Webflow Designer ID token (Tower stores OAuth; Beacon persists bearer in
+   * localStorage). Runs on mount and whenever the Designer regains focus so that completing sign-in elsewhere
+   * (e.g. requesting access or verifying email in another tab) is picked up when the user returns.
+   */
   useEffect(() => {
     if (!towerOrigin) {
       return;
     }
-    if (readBeaconTowerSessionToken()) {
-      return;
-    }
-    if (readSuppressDesignerSessionExchange()) {
-      return;
-    }
     let cancelled = false;
-    void exchangeWebflowDesignerSession()
-      .then((r) => {
-        if (!cancelled && r.ok) {
-          void refetch();
-        }
-      })
-      .catch(() => {
-        /* network errors are handled inside exchangeWebflowDesignerSession */
-      });
+    const attemptExchange = () => {
+      if (cancelled || designerExchangeInFlight) {
+        return;
+      }
+      if (readBeaconTowerSessionToken() || readSuppressDesignerSessionExchange()) {
+        return;
+      }
+      designerExchangeInFlight = true;
+      void exchangeWebflowDesignerSession()
+        .then((r) => {
+          if (!cancelled && r.ok) {
+            void refetch();
+          }
+        })
+        .catch(() => {
+          /* network errors are handled inside exchangeWebflowDesignerSession */
+        })
+        .finally(() => {
+          designerExchangeInFlight = false;
+        });
+    };
+    attemptExchange();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        attemptExchange();
+      }
+    };
+    window.addEventListener("focus", attemptExchange);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", attemptExchange);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [refetch, towerOrigin]);
 
@@ -134,5 +188,6 @@ export function useBeaconTowerSession(): {
     isPending: hasStoredSessionToken ? isPending : false,
     refetch,
     clearStoredSession,
+    signInWithDesignerSession,
   };
 }

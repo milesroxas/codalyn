@@ -4,10 +4,7 @@ import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useId, useState } from "react";
 import { resolveSignUpCardDescription, shouldShowEarlyAccessSignUpGate } from "@/features/auth/lib/auth-surface-copy";
-import {
-  syncExistingTowerSessionToBeaconIfPopup,
-  tryFinishBeaconTowerAuthPopup,
-} from "@/features/auth/lib/beacon-opener-auth";
+import { tryFinishBeaconTowerAuthPopup } from "@/features/auth/lib/beacon-opener-auth";
 import { buildTowerAuthSurfaceHref } from "@/features/auth/lib/build-tower-auth-surface-href";
 import { resolveTowerEmailVerificationAppCallbackUrl } from "@/features/auth/lib/email-verification";
 import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/auth/lib/operator-invite-client";
@@ -15,6 +12,7 @@ import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/featur
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { submitTowerEmailSignUp } from "@/features/auth/lib/submit-tower-email-sign-up";
 import { useAuthInviteSignUpPrefill } from "@/features/auth/model/use-auth-invite-sign-up-prefill";
+import { useBeaconPopupSessionHandoff } from "@/features/auth/model/use-beacon-popup-session-handoff";
 import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
 import { EarlyAccessSignUpGate } from "@/features/auth/ui/early-access-sign-up-gate";
 import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
@@ -103,12 +101,7 @@ function SignUpForm() {
     }
   }, [invitePrefill.prefill]);
 
-  useEffect(() => {
-    if (!beaconOrigin) {
-      return;
-    }
-    void syncExistingTowerSessionToBeaconIfPopup(beaconOrigin);
-  }, [beaconOrigin]);
+  useBeaconPopupSessionHandoff(beaconOrigin);
 
   async function finishSignUp(data: Parameters<typeof resolveUserAndTokenAfterEmailAuth>[0]) {
     const { user: u, token } = await resolveUserAndTokenAfterEmailAuth(data);

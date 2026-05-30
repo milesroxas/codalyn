@@ -6,10 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { resolveSignInCardDescription } from "@/features/auth/lib/auth-surface-copy";
-import {
-  syncExistingTowerSessionToBeaconIfPopup,
-  tryFinishBeaconTowerAuthPopup,
-} from "@/features/auth/lib/beacon-opener-auth";
+import { tryFinishBeaconTowerAuthPopup } from "@/features/auth/lib/beacon-opener-auth";
 import { buildTowerAuthSurfaceHref } from "@/features/auth/lib/build-tower-auth-surface-href";
 import {
   isEmailNotVerifiedAuthError,
@@ -26,6 +23,7 @@ import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/featur
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { resolveTowerEmailLinkAuthFetchOptions } from "@/features/auth/lib/team-invitation-auth-fetch-options";
 import { authClient } from "@/features/auth/model/auth-client";
+import { useBeaconPopupSessionHandoff } from "@/features/auth/model/use-beacon-popup-session-handoff";
 import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
 import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
@@ -150,12 +148,7 @@ function SignInForm() {
     };
   }, [operatorInviteParam, beaconOrigin]);
 
-  useEffect(() => {
-    if (!beaconOrigin) {
-      return;
-    }
-    void syncExistingTowerSessionToBeaconIfPopup(beaconOrigin);
-  }, [beaconOrigin]);
+  useBeaconPopupSessionHandoff(beaconOrigin);
 
   const authBusy = sessionPending || redirectingSignedInUser;
   const showAuthSkeleton = useDeferredLoadingIndicator(authBusy);

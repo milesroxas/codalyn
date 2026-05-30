@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { isTowerConfigured, openTowerAppHome, openTowerAuthPopup } from "@/features/auth/model/tower-auth-client";
+import { isTowerConfigured, openTowerAppHome } from "@/features/auth/model/tower-auth-client";
+import { useBeaconTowerInlineSignIn } from "@/features/auth/model/use-beacon-tower-inline-sign-in";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
@@ -157,7 +158,7 @@ type BeaconAppMenuProps = {
   towerConfigured: boolean;
   user: BridgedTowerUser | undefined;
   sessionPending: boolean;
-  onOpenTowerEmailPopup: () => void;
+  onSignIn: () => void;
   onSignOut: () => void;
 };
 
@@ -208,10 +209,10 @@ function BeaconMenuSettingsGroup(props: { pathname: string }) {
 function BeaconMenuAccountGroup(props: {
   user: BridgedTowerUser | undefined;
   sessionPending: boolean;
-  onOpenTowerEmailPopup: () => void;
+  onSignIn: () => void;
   onOpenTowerActions: () => void;
 }) {
-  const { user, sessionPending, onOpenTowerEmailPopup, onOpenTowerActions } = props;
+  const { user, sessionPending, onSignIn, onOpenTowerActions } = props;
   const showSessionPending = useDeferredLoadingIndicator(sessionPending);
 
   return (
@@ -231,7 +232,7 @@ function BeaconMenuAccountGroup(props: {
           <p className="rounded-sm bg-muted/50 px-2.5 py-2 text-muted-foreground text-xs leading-relaxed">
             Sign in with Tower to sync presets and workspace settings across devices.
           </p>
-          <DropdownMenuItem className="font-medium text-foreground" onSelect={() => onOpenTowerEmailPopup()}>
+          <DropdownMenuItem className="font-medium text-foreground" onSelect={() => onSignIn()}>
             <LogIn aria-hidden />
             Sign in to Tower
           </DropdownMenuItem>
@@ -295,13 +296,7 @@ function BeaconMenuWorkspaceSection() {
   );
 }
 
-function BeaconAppMenu({
-  towerConfigured,
-  user,
-  sessionPending,
-  onOpenTowerEmailPopup,
-  onSignOut,
-}: BeaconAppMenuProps) {
+function BeaconAppMenu({ towerConfigured, user, sessionPending, onSignIn, onSignOut }: BeaconAppMenuProps) {
   const { pathname } = useLocation();
   const [towerActionsOpen, setTowerActionsOpen] = useState(false);
 
@@ -343,7 +338,7 @@ function BeaconAppMenu({
             <BeaconMenuAccountGroup
               user={user}
               sessionPending={sessionPending}
-              onOpenTowerEmailPopup={onOpenTowerEmailPopup}
+              onSignIn={onSignIn}
               onOpenTowerActions={() => setTowerActionsOpen(true)}
             />
             {user ? (
@@ -378,17 +373,14 @@ function HeaderShell(props: BeaconAppMenuProps) {
 
 function HeaderWithTower() {
   const { user, isPending, clearStoredSession } = useBeaconTowerSession();
-
-  const openTowerEmailSignInPopup = useCallback(() => {
-    openTowerAuthPopup("/sign-in");
-  }, []);
+  const { signIn } = useBeaconTowerInlineSignIn();
 
   return (
     <HeaderShell
       towerConfigured
       user={user}
       sessionPending={isPending}
-      onOpenTowerEmailPopup={openTowerEmailSignInPopup}
+      onSignIn={signIn}
       onSignOut={clearStoredSession}
     />
   );
@@ -401,7 +393,7 @@ export default function Header() {
         towerConfigured={false}
         user={undefined}
         sessionPending={false}
-        onOpenTowerEmailPopup={() => {}}
+        onSignIn={() => {}}
         onSignOut={() => {}}
       />
     );

@@ -1,8 +1,5 @@
 import { createAuthClient } from "better-auth/react";
-import {
-  clearBeaconTowerSessionToken,
-  readBeaconTowerSessionToken,
-} from "@/features/auth/lib/beacon-tower-session-token";
+import { readBeaconTowerSessionToken } from "@/features/auth/lib/beacon-tower-session-token";
 import { isBeaconTowerOriginConfigured, readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
 
 const baseURL = readBeaconTowerOrigin();
@@ -20,12 +17,8 @@ export const towerAuthClient = createAuthClient({
         context.headers.set("Authorization", `Bearer ${t}`);
       }
     },
-    onResponse(context) {
-      const path = String(context.request.url);
-      if (path.includes("/sign-out")) {
-        clearBeaconTowerSessionToken();
-      }
-    },
+    // The stored token is cleared by `clearStoredSession` after sign-out resolves, guarded by the
+    // sign-out coordination epoch so a sign-in that lands mid-sign-out is not clobbered.
   },
 });
 

@@ -9,7 +9,6 @@ import {
   CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SLOT_LIST_LABEL,
   CMS_SLOTS_COMPOSER_EDITING_CONTEXT_STATIC_PAGE,
   CMS_SLOTS_COMPOSER_EDITING_CONTEXT_UNAVAILABLE,
-  CMS_SLOTS_EDITING_CONTEXT_ENTRY_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import {
   SurfaceSummaryCardEmpty,
@@ -35,11 +34,6 @@ function formatCollectionMeta(collectionName: string): string {
   return `${CMS_SLOTS_COMPOSER_EDITING_CONTEXT_COLLECTION_LABEL} · ${collectionName}`;
 }
 
-function formatEntryMeta(entryTitle: string | null): string {
-  const title = entryTitle ?? CMS_SLOTS_COMPOSER_EDITING_CONTEXT_NO_ENTRY;
-  return `${CMS_SLOTS_EDITING_CONTEXT_ENTRY_LABEL} · ${title}`;
-}
-
 function formatSlotListMeta(slotListLabel: string): string {
   return `${CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SLOT_LIST_LABEL} · ${slotListLabel}`;
 }
@@ -63,8 +57,7 @@ function ComposerEditingContextReadyBody(props: {
 
   const primaryText =
     primaryField === "collection" ? collectionName : (entryTitle ?? CMS_SLOTS_COMPOSER_EDITING_CONTEXT_NO_ENTRY);
-  const secondaryMeta =
-    primaryField === "collection" ? formatEntryMeta(entryTitle) : formatCollectionMeta(collectionName);
+  const secondaryMeta = primaryField === "collection" ? null : formatCollectionMeta(collectionName);
   const showSlotListMeta = trimmedSlotListLabel !== "";
   const ContextIcon = editingContextIcon(primaryField);
 
@@ -75,7 +68,7 @@ function ComposerEditingContextReadyBody(props: {
       </SurfaceSummaryCardIconBox>
       <SurfaceSummaryCardIconRowCopy>
         <SurfaceSummaryCardTitle>{primaryText}</SurfaceSummaryCardTitle>
-        <SurfaceSummaryCardMeta>{secondaryMeta}</SurfaceSummaryCardMeta>
+        {secondaryMeta ? <SurfaceSummaryCardMeta>{secondaryMeta}</SurfaceSummaryCardMeta> : null}
         {showSlotListMeta ? (
           <SurfaceSummaryCardMeta emphasis="hint">{formatSlotListMeta(trimmedSlotListLabel)}</SurfaceSummaryCardMeta>
         ) : null}

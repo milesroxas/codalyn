@@ -3,13 +3,10 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { type FormEvent, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
+import { AccountChangeEmailSection } from "@/features/account/ui/account-change-email-section";
 import { AccountDeleteSection } from "@/features/account/ui/account-delete-section";
 import { AccountSettingsSkeleton } from "@/features/account/ui/account-settings-skeleton";
 import { TowerEmailChangeToast } from "@/features/account/ui/tower-email-change-toast";
-import {
-  CHANGE_EMAIL_ACCOUNT_COPY,
-  resolveTowerEmailChangePendingAppCallbackUrl,
-} from "@/features/auth/lib/change-email";
 import { authClient } from "@/features/auth/model/auth-client";
 import { useRequireTowerSession } from "@/features/auth/model/use-require-tower-session";
 import { Button } from "@/shared/ui/button";
@@ -24,7 +21,6 @@ export function AccountSettingsScreen() {
 
   const firstNameId = useId();
   const lastNameId = useId();
-  const emailNewId = useId();
   const curPassId = useId();
   const newPassId = useId();
   const confirmPassId = useId();
@@ -34,11 +30,6 @@ export function AccountSettingsScreen() {
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
   const [profileErr, setProfileErr] = useState<string | null>(null);
-
-  const [newEmail, setNewEmail] = useState("");
-  const [emailBusy, setEmailBusy] = useState(false);
-  const [emailMsg, setEmailMsg] = useState<string | null>(null);
-  const [emailErr, setEmailErr] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -87,30 +78,6 @@ export function AccountSettingsScreen() {
     const msg = "Profile updated.";
     setProfileMsg(msg);
     toast.success(msg);
-    void refetchSession();
-  }
-
-  async function onChangeEmail(e: FormEvent) {
-    e.preventDefault();
-    setEmailErr(null);
-    setEmailMsg(null);
-    setEmailBusy(true);
-    const { error } = await authClient.changeEmail({
-      newEmail: newEmail.trim(),
-      callbackURL: resolveTowerEmailChangePendingAppCallbackUrl("/account"),
-      fetchOptions: { credentials: "include" },
-    });
-    setEmailBusy(false);
-    if (error) {
-      const msg = error.message ?? "Could not start email change";
-      setEmailErr(msg);
-      toast.error(msg);
-      return;
-    }
-    const msg = CHANGE_EMAIL_ACCOUNT_COPY.submitSuccess;
-    setEmailMsg(msg);
-    toast.success(msg);
-    setNewEmail("");
     void refetchSession();
   }
 
@@ -208,41 +175,12 @@ export function AccountSettingsScreen() {
         </Card>
 
         <Card className="border-border/80">
-          <CardHeader>
-            <CardTitle className="text-lg">Email</CardTitle>
-            <CardDescription>{CHANGE_EMAIL_ACCOUNT_COPY.cardDescription}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={onChangeEmail} className="flex flex-col gap-4">
-              <p className="text-sm text-muted-foreground">
-                Current: <span className="font-medium text-foreground">{u.email}</span>
-              </p>
-              <FormField>
-                <Label htmlFor={emailNewId}>New email</Label>
-                <Input
-                  id={emailNewId}
-                  type="email"
-                  autoComplete="email"
-                  value={newEmail}
-                  onChange={(ev) => setNewEmail(ev.target.value)}
-                  required
-                />
-              </FormField>
-              {emailErr ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {emailErr}
-                </p>
-              ) : null}
-              {emailMsg ? (
-                <p className="text-sm text-muted-foreground" role="status">
-                  {emailMsg}
-                </p>
-              ) : null}
-              <Button type="submit" width="fit" disabled={emailBusy}>
-                {emailBusy ? "Sending…" : "Change email"}
-              </Button>
-            </form>
-          </CardContent>
+          <AccountChangeEmailSection
+            currentEmail={u.email}
+            onEmailChangeStarted={() => {
+              void refetchSession();
+            }}
+          />
         </Card>
 
         <Card className="border-border/80">

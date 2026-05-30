@@ -60,19 +60,12 @@ function ComposerEditingContextReadyBody(props: {
 }) {
   const { collectionName, entryTitle, slotListLabel, primaryField } = props;
   const trimmedSlotListLabel = slotListLabel?.trim() ?? "";
-  const editingEngineSlot = primaryField === "collection" && trimmedSlotListLabel !== "";
 
-  const primaryText = editingEngineSlot
-    ? trimmedSlotListLabel
-    : primaryField === "collection"
-      ? collectionName
-      : (entryTitle ?? CMS_SLOTS_COMPOSER_EDITING_CONTEXT_NO_ENTRY);
-  const secondaryMeta = editingEngineSlot
-    ? formatCollectionMeta(collectionName)
-    : primaryField === "collection"
-      ? formatEntryMeta(entryTitle)
-      : formatCollectionMeta(collectionName);
-  const showSlotListMeta = !editingEngineSlot && trimmedSlotListLabel !== "";
+  const primaryText =
+    primaryField === "collection" ? collectionName : (entryTitle ?? CMS_SLOTS_COMPOSER_EDITING_CONTEXT_NO_ENTRY);
+  const secondaryMeta =
+    primaryField === "collection" ? formatEntryMeta(entryTitle) : formatCollectionMeta(collectionName);
+  const showSlotListMeta = trimmedSlotListLabel !== "";
   const ContextIcon = editingContextIcon(primaryField);
 
   return (

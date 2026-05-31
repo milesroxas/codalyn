@@ -478,9 +478,11 @@ export function stripEngineCodalynAttrsFromComponentInstance(
  * component definitions only when `getProps()` shows their props are wired to an exposed parent prop. Seeds publish
  * placeholders on every conditional element's controller prop so conditionally visible nodes survive publish.
  *
- * `foreignExposedIds` are the exposed prop ids of the **other** Engine components in this list. When a nested
- * component definition is shared across multiple Engine components (e.g. an Image used by both Hero and Card), their
- * `data-cb-c` segments are preserved so each row resolves its own prop at runtime instead of last-write-wins.
+ * `foreignExposedIds` are the exposed prop ids of the **other** Engine components that may share a definition with
+ * this one — both the other components in this list and the components in other CMS slots on the page. When a nested
+ * component definition is shared across multiple Engine components (e.g. an Image used by both Hero and Card, or by
+ * slots on two different lists), their `data-cb-c` segments are preserved so each row resolves its own prop at
+ * runtime instead of last-write-wins.
  */
 export function syncEngineCodalynSlotPropAttributes(
   instance: ComponentElement,

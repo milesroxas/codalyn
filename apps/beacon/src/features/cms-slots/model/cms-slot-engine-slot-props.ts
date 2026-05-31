@@ -84,6 +84,44 @@ export function serializeSlotPropsFile(f: CmsSlotEngineSlotPropsFile): string {
   return JSON.stringify(f satisfies CmsSlotEngineSlotPropsFile);
 }
 
+/**
+ * Every exposed prop id stored in a slot-props file string, across **all** slots (no slot-count trimming).
+ * Used to gather a CMS slot's owned `data-cb-c` prop ids so a shared nested component definition keeps that
+ * slot's segments when a **different** slot on the same page re-tags it.
+ */
+export function collectExposedPropIdsFromSlotFileRaw(raw: string | null | undefined): string[] {
+  const t = (raw ?? "").trim();
+  if (t.length === 0) {
+    return [];
+  }
+  let u: unknown;
+  try {
+    u = JSON.parse(t) as unknown;
+  } catch {
+    return [];
+  }
+  if (!isRecord(u) || u.v !== FILE_VERSION || !Array.isArray(u.slots)) {
+    return [];
+  }
+  const out = new Set<string>();
+  for (const s of u.slots) {
+    if (!isRecord(s) || !Array.isArray(s.exposed)) {
+      continue;
+    }
+    for (const m of s.exposed) {
+      if (isComposableMeta(m)) {
+        out.add(m.propId);
+      }
+    }
+  }
+  return [...out];
+}
+
+/** Reads {@link collectExposedPropIdsFromSlotFileRaw} for one CMS slot container. */
+export async function readAllExposedPropIdsForContainer(container: BlockElement): Promise<string[]> {
+  return collectExposedPropIdsFromSlotFileRaw(await container.getCustomAttribute(ATTR));
+}
+
 function findOldPoolIndexForRow(
   oldPool: readonly { componentId: string; exposed: ComposableInstancePropMeta[] }[],
   componentId: string,

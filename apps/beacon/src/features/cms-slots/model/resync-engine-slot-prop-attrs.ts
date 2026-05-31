@@ -4,9 +4,15 @@ import {
   type EngineCodalynAttrSyncResult,
   syncEngineCodalynSlotPropAttributes,
 } from "@/features/cms-slots/model/cms-slot-engine-codalyn-attr-sync";
-import { readCmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
 import {
+  type CmsSlotEngineSlotPropsFile,
+  readAllExposedPropIdsForContainer,
+  readCmsSlotEngineSlotPropsFile,
+} from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+import {
+  cmsSlotListKey,
   filterHydratedCmsSlotRowsByComponentIds,
+  findCmsSlotListsOnPage,
   type HydratedCmsSlotRow,
   listInstancesInSlotListContainer,
   resolveCmsSlotEngineConfiguredComponentIds,
@@ -44,6 +50,40 @@ function mergeScopedIntoSelected(prev: HydratedCmsSlotRow[], scoped: HydratedCms
   }));
 }
 
+/**
+ * Exposed prop ids whose `data-cb-c` segments must be preserved while re-tagging slot `slotIndex`:
+ * the **other** Engine components in this slot, plus every Engine component in **other CMS slots on the page**.
+ * The cross-slot ids stop a shared nested component definition (e.g. an Image used by slot A and slot B) from
+ * losing one slot's segments when the other slot re-tags it (last-write-wins).
+ */
+async function collectForeignExposedIdsAcrossPage(
+  container: BlockElement,
+  sameSlotFile: CmsSlotEngineSlotPropsFile,
+  slotIndex: number
+): Promise<Set<string>> {
+  const ids = new Set<string>();
+  sameSlotFile.slots.forEach((slot, i) => {
+    if (i === slotIndex) {
+      return;
+    }
+    for (const e of slot.exposed) {
+      ids.add(e.propId);
+    }
+  });
+
+  const currentKey = cmsSlotListKey(container);
+  const lists = await findCmsSlotListsOnPage();
+  for (const list of lists) {
+    if (cmsSlotListKey(list.container) === currentKey) {
+      continue;
+    }
+    for (const pid of await readAllExposedPropIdsForContainer(list.container)) {
+      ids.add(pid);
+    }
+  }
+  return ids;
+}
+
 export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
   slotIndex: number;
   selected: HydratedCmsSlotRow[];
@@ -78,15 +118,7 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
 
     const f = await readCmsSlotEngineSlotPropsFile(container, scoped.length);
     const exposed = f.slots[slotIndex]?.exposed ?? [];
-    const foreignExposedIds = new Set<string>();
-    f.slots.forEach((slot, i) => {
-      if (i === slotIndex) {
-        return;
-      }
-      for (const e of slot.exposed) {
-        foreignExposedIds.add(e.propId);
-      }
-    });
+    const foreignExposedIds = await collectForeignExposedIdsAcrossPage(container, f, slotIndex);
 
     const r = await syncEngineCodalynSlotPropAttributes(row.instance, exposed, foreignExposedIds, onProgress);
 

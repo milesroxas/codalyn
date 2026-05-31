@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   CMS_SLOT_COND_ATTR,
   CMS_SLOT_CONTENT_ATTR,
@@ -651,5 +651,49 @@ describe("cms slot beacon runtime (published DOM)", () => {
     expect(imgs?.length).toBe(2);
     expect(imgs?.[0]?.getAttribute("src")).toBe(url);
     expect(imgs?.[1]?.getAttribute("src")).toBe(url);
+  });
+
+  it("reveals every list target when several slots render on one page (deferred reveal)", () => {
+    const doc = document;
+
+    function mountSlot(listKey: string): { target: HTMLDivElement } {
+      const source = doc.createElement("div");
+      source.setAttribute("data-target", "beacons");
+      source.setAttribute("data-list", listKey);
+      const row = doc.createElement("div");
+      const title = doc.createElement("h2");
+      title.setAttribute(CMS_SLOT_CONTENT_ATTR, "title");
+      title.textContent = "default";
+      row.appendChild(title);
+      source.appendChild(row);
+
+      const target = doc.createElement("div");
+      target.setAttribute("data-beacon-target", "list");
+      target.setAttribute("data-list", listKey);
+      target.textContent = JSON.stringify({ v: 3, i: [0], p: [{ title: `value-${listKey}` }] });
+      doc.body.append(source, target);
+      return { target };
+    }
+
+    vi.useFakeTimers();
+    try {
+      const { target: targetA } = mountSlot("beacon-multi-a");
+      const { target: targetB } = mountSlot("beacon-multi-b");
+
+      runCmsSlotBeaconRuntime(doc);
+      vi.runAllTimers();
+
+      // Both slots clone their own row and apply their own Composer value.
+      expect(targetA.children.length).toBe(1);
+      expect(targetB.children.length).toBe(1);
+      expect(targetA.querySelector(`[${CMS_SLOT_CONTENT_ATTR}='title']`)?.textContent).toBe("value-beacon-multi-a");
+      expect(targetB.querySelector(`[${CMS_SLOT_CONTENT_ATTR}='title']`)?.textContent).toBe("value-beacon-multi-b");
+
+      // The deferred reveal must run for every target, not just the last one in the loop.
+      expect(targetA.style.visibility).not.toBe("hidden");
+      expect(targetB.style.visibility).not.toBe("hidden");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

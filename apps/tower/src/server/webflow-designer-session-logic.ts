@@ -11,6 +11,15 @@ import { account, user } from "@/shared/lib/db/auth-schema";
 
 type UserRow = typeof user.$inferSelect;
 
+/** Re-sync the Designer credential password to its deterministic derived value (idempotent; survives secret rotation). */
+async function syncDesignerCredentialPassword(userId: string, password: string): Promise<void> {
+  const hashed = await hashPassword(password);
+  await db
+    .update(account)
+    .set({ password: hashed })
+    .where(and(eq(account.userId, userId), eq(account.providerId, "credential")));
+}
+
 async function findOrLinkRow(
   resolved: WebflowResolvedDesignerUser,
   password: string
@@ -28,11 +37,7 @@ async function findOrLinkRow(
     return "conflict";
   }
   if (!byEmail.webflowAuthorizedUserId) {
-    const hashed = await hashPassword(password);
-    await db
-      .update(account)
-      .set({ password: hashed })
-      .where(and(eq(account.userId, byEmail.id), eq(account.providerId, "credential")));
+    await syncDesignerCredentialPassword(byEmail.id, password);
     await db.update(user).set({ webflowAuthorizedUserId: resolved.id }).where(eq(user.id, byEmail.id));
     return { ...byEmail, webflowAuthorizedUserId: resolved.id };
   }
@@ -111,7 +116,8 @@ async function signUpNewDesignerUser(
 async function signInExistingDesignerUser(
   request: Request,
   resolved: WebflowResolvedDesignerUser,
-  password: string
+  password: string,
+  row: UserRow
 ): Promise<DesignerSessionResult> {
   try {
     await assertUserMaySignInByEmail(resolved.email);
@@ -119,6 +125,7 @@ async function signInExistingDesignerUser(
     return { ok: false, status: 403, message: "early_access_required" };
   }
   await markEmailVerifiedForWebflowDesigner(resolved.email);
+  await syncDesignerCredentialPassword(row.id, password);
   try {
     const signedIn = await auth.api.signInEmail({
       body: {
@@ -152,5 +159,5 @@ export async function establishDesignerBetterAuthSession(
     return signUpNewDesignerUser(request, resolved, password);
   }
 
-  return signInExistingDesignerUser(request, resolved, password);
+  return signInExistingDesignerUser(request, resolved, password, row);
 }

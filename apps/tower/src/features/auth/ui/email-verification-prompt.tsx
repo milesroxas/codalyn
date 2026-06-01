@@ -18,23 +18,19 @@ type CheckEmailPromptProps = {
   email: string;
   callbackPath?: string;
   footerHref?: string;
-  /** @deprecated Use footerHref */
-  signInHref?: string;
   context?: EmailVerificationPromptContext;
 };
 
 export function CheckEmailPrompt({
   email,
   callbackPath = "/",
-  footerHref,
-  signInHref = "/sign-in",
+  footerHref = "/sign-in",
   context = "signIn",
 }: CheckEmailPromptProps) {
   const copy = resolveCheckEmailPromptCopy(context);
-  const resolvedFooterHref = footerHref ?? signInHref;
   const onResend = useCallback(() => sendTowerVerificationEmail(email, callbackPath), [callbackPath, email]);
 
-  return <AuthCheckEmailCard email={email} copy={copy} footerHref={resolvedFooterHref} onResend={onResend} />;
+  return <AuthCheckEmailCard email={email} copy={copy} footerHref={footerHref} onResend={onResend} />;
 }
 
 type EmailVerificationResendButtonProps = {

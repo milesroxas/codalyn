@@ -1,6 +1,6 @@
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import {
-  isOrganizationProEntitled,
+  isOrganizationTeamEntitled,
   type OrganizationBillingRow,
   organizationBillingPlanLabel,
 } from "@/server/billing/organization-billing";
@@ -26,7 +26,7 @@ export function resolveOperatorWorkspaceBillingMode(row: OrganizationBillingRow)
   if (isOperatorBillingManagedByStripe(row.stripeSubscriptionId)) {
     return "stripe_team";
   }
-  if (isOrganizationProEntitled(row)) {
+  if (isOrganizationTeamEntitled(row)) {
     return "legacy_paid";
   }
   return "free";
@@ -52,7 +52,7 @@ export function buildOperatorOrgBillingSnapshot(row: OrganizationBillingRow): Op
   return {
     billingMode,
     billingManagedByStripe,
-    isProEntitled: isOrganizationProEntitled(row),
+    isProEntitled: isOrganizationTeamEntitled(row),
     displayBillingPlan,
     planLabel: formatOperatorWorkspacePlanLabel(billingMode, displayBillingPlan),
     canOperatorEditBilling: !billingManagedByStripe,

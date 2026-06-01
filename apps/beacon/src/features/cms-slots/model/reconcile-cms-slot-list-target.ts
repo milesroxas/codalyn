@@ -7,7 +7,7 @@ import {
   cmsSlotListTargetNeedsSync,
   getCmsSlotListTargetComponentOrNull,
 } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
-import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
+import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 
 function formatReconcileError(err: unknown): string {
   if (err && typeof err === "object" && "message" in err && typeof (err as { message: unknown }).message === "string") {
@@ -30,7 +30,7 @@ export async function reconcileCmsSlotListTarget(
   dataList: string,
   listContainer: BlockElement
 ): Promise<ReconcileCmsSlotListTargetResult> {
-  const opResult = await runExclusiveDesignerStyleOp(async (): Promise<ReconcileCmsSlotListTargetResult> => {
+  const opResult = await runExclusiveDesignerOp(async (): Promise<ReconcileCmsSlotListTargetResult> => {
     const comp = await getCmsSlotListTargetComponentOrNull(dataList, listContainer);
     if (comp == null) {
       return { type: "absent" };

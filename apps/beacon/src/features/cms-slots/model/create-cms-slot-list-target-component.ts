@@ -8,7 +8,7 @@ import {
   ensureCmsSlotListTargetSlotStyle,
 } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
 import { tryAddCmsSlotListTargetTextPropDirectToDefinition } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
-import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
+import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-error";
 
 /** Components panel group for Beacon utility definitions. */
@@ -223,7 +223,7 @@ export async function applyCmsSlotListTargetSync(
   dataList: string,
   listContainer: BlockElement
 ): Promise<void> {
-  await runExclusiveDesignerStyleOp(async () => {
+  await runExclusiveDesignerOp(async () => {
     const desiredName = uniqueCmsSlotListTargetComponentName(dataList, listContainer);
     if ((await component.getName()) !== desiredName) {
       await component.setName(desiredName);
@@ -278,7 +278,7 @@ export async function createCmsSlotListTargetComponent(input: {
   const name = uniqueCmsSlotListTargetComponentName(dataList, listContainer);
   const attrs = cmsSlotListTargetDataAttributes(dataList, listContainer);
 
-  const { component: comp, definitionId } = await runExclusiveDesignerStyleOp(async () => {
+  const { component: comp, definitionId } = await runExclusiveDesignerOp(async () => {
     const root = webflow.elementBuilder(webflow.elementPresets.DOM);
     root.setTag(CMS_SLOT_LIST_RENDER_TAG);
     for (const [k, v] of Object.entries(attrs)) {

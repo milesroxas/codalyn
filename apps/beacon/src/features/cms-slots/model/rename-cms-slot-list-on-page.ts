@@ -5,7 +5,7 @@ import {
   getCmsSlotListTargetComponentOrNull,
 } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { dataListValueForCmsSlotName } from "@/features/cms-slots/model/create-cms-slot-target";
-import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
+import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 import { reconcileCmsSlotListTarget } from "@/features/cms-slots/model/reconcile-cms-slot-list-target";
 
 export async function renameCmsSlotListOnPage(input: {
@@ -39,7 +39,7 @@ export async function renameCmsSlotListOnPage(input: {
   await writeCmsSlotListDisplayName(container, nextDisplayName);
 
   if (listTarget != null) {
-    await runExclusiveDesignerStyleOp(async () => {
+    await runExclusiveDesignerOp(async () => {
       await applyCmsSlotListTargetSync(listTarget, toDataList, container);
     });
     const reconciled = await reconcileCmsSlotListTarget(toDataList, container);

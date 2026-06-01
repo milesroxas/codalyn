@@ -6,17 +6,7 @@ export const BEACON_TOWER_SESSION_TOKEN_KEY = "codalyn:beacon-tower-session-toke
 
 export function readBeaconTowerSessionToken(): string | undefined {
   try {
-    const fromLocal = localStorage.getItem(BEACON_TOWER_SESSION_TOKEN_KEY)?.trim();
-    if (fromLocal) {
-      return fromLocal;
-    }
-    const legacy = sessionStorage.getItem(BEACON_TOWER_SESSION_TOKEN_KEY)?.trim();
-    if (legacy) {
-      localStorage.setItem(BEACON_TOWER_SESSION_TOKEN_KEY, legacy);
-      sessionStorage.removeItem(BEACON_TOWER_SESSION_TOKEN_KEY);
-      return legacy;
-    }
-    return undefined;
+    return localStorage.getItem(BEACON_TOWER_SESSION_TOKEN_KEY)?.trim() || undefined;
   } catch {
     return undefined;
   }
@@ -29,7 +19,6 @@ export function writeBeaconTowerSessionToken(token: string): void {
   }
   try {
     localStorage.setItem(BEACON_TOWER_SESSION_TOKEN_KEY, t);
-    sessionStorage.removeItem(BEACON_TOWER_SESSION_TOKEN_KEY);
   } catch {
     /* ignore */
   }
@@ -38,7 +27,6 @@ export function writeBeaconTowerSessionToken(token: string): void {
 export function clearBeaconTowerSessionToken(): void {
   try {
     localStorage.removeItem(BEACON_TOWER_SESSION_TOKEN_KEY);
-    sessionStorage.removeItem(BEACON_TOWER_SESSION_TOKEN_KEY);
   } catch {
     /* ignore */
   }

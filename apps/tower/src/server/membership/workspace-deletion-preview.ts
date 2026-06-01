@@ -1,5 +1,5 @@
 import { and, count, eq, isNull } from "drizzle-orm";
-import { isOrganizationProEntitled } from "@/server/billing/organization-billing";
+import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
 import { assertUserIsWorkspaceOwner } from "@/server/membership/workspace-ownership";
 import { db } from "@/shared/lib/db";
 import { invitation, member, organization, organizationWebflowOAuthToken } from "@/shared/lib/db/auth-schema";
@@ -58,7 +58,7 @@ export async function loadWorkspaceDeletionPreview(
       .limit(1),
   ]);
 
-  const hasTeamSubscription = isOrganizationProEntitled({
+  const hasTeamSubscription = isOrganizationTeamEntitled({
     subscriptionStatus: orgRow.subscriptionStatus,
     billingPlan: orgRow.billingPlan,
     stripeSubscriptionId: orgRow.stripeSubscriptionId,

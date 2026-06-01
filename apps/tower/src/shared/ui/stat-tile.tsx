@@ -49,8 +49,6 @@ type StatTileProps = {
   valueVariant?: StatTileValueVariant;
   detail?: string;
   caption?: string;
-  /** @deprecated Prefer `caption`. Kept for existing call sites. */
-  hint?: string;
   icon: React.ComponentType<{ className?: string }>;
   tone?: StatTileTone;
   href?: string;
@@ -63,17 +61,7 @@ function resolveValueVariant(value: string | number, valueVariant?: StatTileValu
   return typeof value === "number" ? "metric" : "status";
 }
 
-function StatTileContent({
-  label,
-  value,
-  valueVariant,
-  detail,
-  caption,
-  hint,
-  icon: Icon,
-  tone = "default",
-}: StatTileProps) {
-  const resolvedCaption = caption ?? hint;
+function StatTileContent({ label, value, valueVariant, detail, caption, icon: Icon, tone = "default" }: StatTileProps) {
   const kind = resolveValueVariant(value, valueVariant);
 
   return (
@@ -90,12 +78,10 @@ function StatTileContent({
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <p className={statTileValueVariants({ kind, tone })}>{value}</p>
-        {detail || resolvedCaption ? (
+        {detail || caption ? (
           <div className="flex flex-col gap-1">
             {detail ? <p className="text-sm font-medium leading-snug text-foreground/90">{detail}</p> : null}
-            {resolvedCaption ? (
-              <p className="text-xs leading-relaxed text-muted-foreground">{resolvedCaption}</p>
-            ) : null}
+            {caption ? <p className="text-xs leading-relaxed text-muted-foreground">{caption}</p> : null}
           </div>
         ) : null}
       </CardContent>

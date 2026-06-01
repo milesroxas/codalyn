@@ -11,7 +11,7 @@ import {
   resolveCmsSlotEngineConfiguredComponentIds,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
-import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
+import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 
 /**
  * In **Preview** mode the site runs the beacon inline script; list targets are filled at runtime from the
@@ -86,7 +86,7 @@ export async function syncCmsSlotListTargetDesignerPreview(
   const configuredComponentIds = await resolveCmsSlotEngineConfiguredComponentIds(listContainer, allRows);
   const sourceRows = filterHydratedCmsSlotRowsByComponentIds(allRows, configuredComponentIds);
   let mirrored = false;
-  await runExclusiveDesignerStyleOp(async () => {
+  await runExclusiveDesignerOp(async () => {
     for (const inst of instances) {
       if (await applyListTargetInstancePreview(inst, sourceRows, dataList, listContainer)) {
         mirrored = true;
@@ -101,7 +101,7 @@ export async function syncCmsSlotListTargetDesignerPreview(
  * Restores the published-style **empty** list target (script fills at runtime) for every beacon on the current page.
  */
 export async function clearAllCmsSlotListTargetDesignerPreviewsOnPage(): Promise<void> {
-  return runExclusiveDesignerStyleOp(async () => {
+  return runExclusiveDesignerOp(async () => {
     const beacons = await findCmsSlotListsOnPage();
     for (const b of beacons) {
       if ((await getCmsSlotListTargetComponentOrNull(b.dataList, b.container)) == null) {
@@ -123,7 +123,7 @@ export async function resyncAllCmsSlotListTargetDesignerPreviewsOnPage(): Promis
     return;
   }
   const beacons = await findCmsSlotListsOnPage();
-  return runExclusiveDesignerStyleOp(async () => {
+  return runExclusiveDesignerOp(async () => {
     for (const b of beacons) {
       if ((await getCmsSlotListTargetComponentOrNull(b.dataList, b.container)) == null) {
         continue;

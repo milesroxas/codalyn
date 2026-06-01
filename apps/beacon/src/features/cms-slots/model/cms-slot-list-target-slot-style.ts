@@ -1,5 +1,5 @@
 import { CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
-import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
+import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 
 /**
  * Class removed on live reveal: backup chrome when inline placeholder styles are absent. Prefer
@@ -56,7 +56,7 @@ async function applyBeaconListTargetLayoutStyleProperties(style: Style): Promise
  * Ensures **`beacon_list_render`** exists (Designer-only list-target chrome).
  */
 export function ensureCmsSlotListTargetSlotStyle(): Promise<Style> {
-  return runExclusiveDesignerStyleOp(async () => {
+  return runExclusiveDesignerOp(async () => {
     const all = await webflow.getAllStyles();
     for (const s of all) {
       if ((await s.getName()) === CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME) {
@@ -80,7 +80,7 @@ export function cmsSlotListTargetRuntimeLayoutRevealSource(): string {
  * class in the Designer — the runtime adds it on reveal.
  */
 export function ensureCmsSlotListTargetLayoutStyle(): Promise<Style> {
-  return runExclusiveDesignerStyleOp(async () => {
+  return runExclusiveDesignerOp(async () => {
     const all = await webflow.getAllStyles();
     for (const s of all) {
       if ((await s.getName()) === CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME) {

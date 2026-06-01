@@ -31,10 +31,6 @@ export function isOrganizationTeamEntitled(row: OrganizationBillingRow): boolean
   const plan = row.billingPlan?.trim().toLowerCase() ?? "";
   return LEGACY_OPERATOR_TEAM_PLANS.has(plan);
 }
-
-/** @deprecated Use {@link isOrganizationTeamEntitled}. */
-export const isOrganizationProEntitled = isOrganizationTeamEntitled;
-
 export function organizationBillingPlanLabel(row: OrganizationBillingRow): string | null {
   if (orgRowHasStripeTeam(row)) {
     return TEAM_BILLING_PLAN;

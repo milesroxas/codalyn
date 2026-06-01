@@ -26,7 +26,7 @@ export async function getCmsSlotListTargetTextProp(component: Component): Promis
   return found != null ? { id: found.id, valueType: found.valueType } : null;
 }
 
-/** Back-compat shorthand for callers that only need the prop id. */
+/** Shorthand for callers that only need the prop id. */
 export async function getCmsSlotListTargetTextPropId(component: Component): Promise<string | null> {
   return (await getCmsSlotListTargetTextProp(component))?.id ?? null;
 }

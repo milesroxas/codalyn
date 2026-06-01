@@ -134,26 +134,26 @@ function PrimaryStats({
           <StatTile
             label="Customers"
             value={nf.format(totals.users)}
-            hint={`${nf.format(activity?.signupsLast30d ?? 0)} new in 30d`}
+            caption={`${nf.format(activity?.signupsLast30d ?? 0)} new in 30d`}
             icon={IconUsers}
           />
           <StatTile
             label="Workspaces"
             value={nf.format(totals.workspaces)}
-            hint={`${nf.format(activity?.workspacesLast30d ?? 0)} new in 30d`}
+            caption={`${nf.format(activity?.workspacesLast30d ?? 0)} new in 30d`}
             icon={IconBuilding}
           />
           <StatTile
             label="Webflow connected"
             value={nf.format(totals.webflowConnected)}
-            hint={`${totals.users === 0 ? 0 : Math.round((totals.webflowConnected / totals.users) * 100)}% of customers`}
+            caption={`${totals.users === 0 ? 0 : Math.round((totals.webflowConnected / totals.users) * 100)}% of customers`}
             icon={IconKey}
             tone="positive"
           />
           <StatTile
             label="Active sessions"
             value={nf.format(activity?.activeSessions ?? 0)}
-            hint="Valid, unexpired"
+            caption="Valid, unexpired"
             icon={IconUserCheck}
           />
         </>
@@ -168,27 +168,27 @@ function SecondaryStatTiles({ totals, nf }: { totals: OperatorMetrics["totals"];
       <StatTile
         label="Eligible to create workspace"
         value={nf.format(totals.eligibleForWorkspace)}
-        hint="canCreateOrganization = true"
+        caption="canCreateOrganization = true"
         icon={IconCircleCheck}
       />
       <StatTile
         label="Banned accounts"
         value={nf.format(totals.banned)}
-        hint={totals.banned === 0 ? "Nothing to review" : "Review under Customers"}
+        caption={totals.banned === 0 ? "Nothing to review" : "Review under Customers"}
         icon={IconAlertTriangle}
         tone={totals.banned > 0 ? "warn" : "default"}
       />
       <StatTile
         label="Early access requests"
         value={nf.format(totals.pendingEarlyAccessRequests)}
-        hint="Review under Access requests"
+        caption="Review under Access requests"
         icon={IconKey}
         tone={totals.pendingEarlyAccessRequests > 0 ? "warn" : "default"}
       />
       <StatTile
         label="Support requests"
         value={nf.format(totals.pendingSupportRequests)}
-        hint="Review under Support requests"
+        caption="Review under Support requests"
         icon={IconLifebuoy}
         tone={totals.pendingSupportRequests > 0 ? "warn" : "default"}
       />

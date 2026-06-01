@@ -44,11 +44,6 @@ export function meteringStatusLabel(opts: {
   return "Metered";
 }
 
-/** @deprecated Use {@link usageTierLabel}. */
-export function usageTierBadgeLabel(tier: TowerUsageTier): string {
-  return usageTierLabel(tier);
-}
-
 /** Individual Stripe Pro on the signed-in user (`user` row), not workspace Team billing. */
 export function accountSubscriptionPlanLabel(entitlement: TowerEntitlementLike): "Free" | "Pro" {
   return entitlement.source === "user_stripe" ? "Pro" : "Free";

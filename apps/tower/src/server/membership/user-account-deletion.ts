@@ -1,6 +1,6 @@
 import { APIError } from "better-auth/api";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import { isOrganizationProEntitled } from "@/server/billing/organization-billing";
+import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { db } from "@/shared/lib/db";
 import { invitation, member, organization, user } from "@/shared/lib/db/auth-schema";
@@ -16,15 +16,11 @@ import {
 
 export {
   ACCOUNT_DELETION_BLOCKED_CODE,
-  ACCOUNT_DELETION_BLOCKED_CODE as SOLE_ADMIN_WORKSPACES_CODE,
   type OrganizationOwnershipSnapshot,
   type UserAccountDeletionPlan,
 } from "@/shared/lib/membership/workspace-ownership";
 
 export type AccountDeletionBlocker = import("@/shared/lib/membership/workspace-ownership").AccountDeletionBlocker;
-
-/** @deprecated Use AccountDeletionBlocker */
-export type WorkspaceDeletionBlocker = AccountDeletionBlocker;
 
 export class UserAccountDeletionBlockedError extends Error {
   readonly code = ACCOUNT_DELETION_BLOCKED_CODE;
@@ -82,7 +78,7 @@ async function loadOrganizationOwnershipSnapshotsForUser(userId: string): Promis
     organizationSlug: orgRow.slug,
     ownerUserId: orgRow.ownerUserId,
     billingOwnerUserId: orgRow.billingOwnerUserId,
-    hasTeamSubscription: isOrganizationProEntitled({
+    hasTeamSubscription: isOrganizationTeamEntitled({
       subscriptionStatus: orgRow.subscriptionStatus,
       billingPlan: orgRow.billingPlan,
       stripeSubscriptionId: orgRow.stripeSubscriptionId,

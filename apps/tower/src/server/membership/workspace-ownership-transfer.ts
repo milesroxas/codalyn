@@ -1,5 +1,5 @@
 import { and, eq, inArray, lte } from "drizzle-orm";
-import { isOrganizationProEntitled } from "@/server/billing/organization-billing";
+import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { sendWorkspaceOwnershipTransferEmail } from "@/server/email/workspace-ownership-transfer-email";
 import {
@@ -146,7 +146,7 @@ export function createWorkspaceOwnershipTransferService() {
         .limit(1);
 
       const hasTeamSubscription = billingRow
-        ? isOrganizationProEntitled({
+        ? isOrganizationTeamEntitled({
             subscriptionStatus: billingRow.subscriptionStatus,
             billingPlan: billingRow.billingPlan,
             stripeSubscriptionId: billingRow.stripeSubscriptionId,

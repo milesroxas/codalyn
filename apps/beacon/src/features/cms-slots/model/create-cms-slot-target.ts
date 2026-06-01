@@ -1,5 +1,5 @@
 import { writeCmsSlotListDisplayName } from "@/features/cms-slots/model/cms-slot-data-list-display";
-import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
+import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 import { findCmsSlotsWrapperOnPage } from "@/features/cms-slots/model/install-cms-slots-wrapper";
 
 type ParentWithPrepend = AnyElement & {
@@ -27,7 +27,7 @@ export function dataListValueForCmsSlotName(name: string): string {
 const BEACON_WRAPPER_LIST_BLOCK_STYLE_NAME = "beacon_list";
 
 function ensureBeaconWrapperListBlockHiddenStyle(): Promise<Style> {
-  return runExclusiveDesignerStyleOp(async () => {
+  return runExclusiveDesignerOp(async () => {
     const all = await webflow.getAllStyles();
     for (const s of all) {
       if ((await s.getName()) === BEACON_WRAPPER_LIST_BLOCK_STYLE_NAME) {
@@ -58,7 +58,7 @@ export async function createCmsSlotListOnPage(name: string): Promise<{ container
   const el = (await (parent as ParentWithPrepend).prepend(webflow.elementPresets.DivBlock)) as BlockElement;
   await el.setTag("div");
 
-  await runExclusiveDesignerStyleOp(async () => {
+  await runExclusiveDesignerOp(async () => {
     const hidden = await ensureBeaconWrapperListBlockHiddenStyle();
     await el.setStyles([hidden]);
   });

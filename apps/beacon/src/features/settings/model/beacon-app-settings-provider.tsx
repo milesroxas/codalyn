@@ -19,8 +19,6 @@ import { towerFetch } from "@/shared/lib/tower-client";
 import { ThemeProvider } from "@/shared/providers/theme-provider";
 
 const STORAGE_KEY = "beacon:app-settings-v1";
-const LEGACY_THEME_KEY = "beacon-ui-theme";
-const LEGACY_FORMAT_KEY = "beacon:image-export-format";
 
 export type { BeaconSettingsSyncState } from "@/features/settings/lib/beacon-settings-sync";
 
@@ -79,22 +77,7 @@ function readLocal(): BeaconAppSettings {
   } catch {
     /* ignore */
   }
-  const base = getDefaultBeaconAppSettings();
-  try {
-    const merged: Partial<BeaconAppSettings> = {};
-    const legacyTheme = localStorage.getItem(LEGACY_THEME_KEY);
-    if (legacyTheme === "light" || legacyTheme === "dark" || legacyTheme === "system") {
-      merged.theme = legacyTheme;
-    }
-    const legacyFormat = localStorage.getItem(LEGACY_FORMAT_KEY);
-    if (legacyFormat === "webp" || legacyFormat === "avif") {
-      merged.defaultExportFormat = legacyFormat;
-    }
-    return mergeBeaconAppSettings(base, merged);
-  } catch {
-    /* ignore */
-  }
-  return base;
+  return getDefaultBeaconAppSettings();
 }
 
 function writeLocal(settings: BeaconAppSettings) {

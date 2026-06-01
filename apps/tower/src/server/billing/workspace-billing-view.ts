@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
-import { isOrganizationProEntitled, organizationBillingPlanLabel } from "@/server/billing/organization-billing";
+import { isOrganizationTeamEntitled, organizationBillingPlanLabel } from "@/server/billing/organization-billing";
 import { countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
 import { shouldBumpStripeTeamQuantityToMinimum } from "@/server/billing/organization-seat-override";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
@@ -65,7 +65,7 @@ export async function fetchWorkspaceBillingView(
   };
 
   if (
-    isOrganizationProEntitled(billingRow) &&
+    isOrganizationTeamEntitled(billingRow) &&
     org.stripeSubscriptionId &&
     shouldBumpStripeTeamQuantityToMinimum(true, org, org.stripeSeatQuantity ?? null)
   ) {
@@ -92,7 +92,7 @@ export async function fetchWorkspaceBillingView(
     billingEnabled: isTowerBillingEnabled(),
     teamCheckoutConfigured: isTeamBillingCheckoutConfigured(),
     canManageBilling: isTowerTeamAdminRole(memberRow.role),
-    isPaid: isOrganizationProEntitled(billingRow),
+    isPaid: isOrganizationTeamEntitled(billingRow),
     billingPlan: organizationBillingPlanLabel(billingRow),
     subscriptionStatus: org.subscriptionStatus,
     seatLimit: seatUsage.seatLimit,

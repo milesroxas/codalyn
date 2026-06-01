@@ -1,9 +1,8 @@
 import { useEffect } from "react";
-import { HashRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { BeaconAppShell } from "@/app/beacon-app-shell";
 import { BeaconHomeScreen } from "@/app/ui/beacon-home-screen";
 import { CmsSlotsAccessGate, CmsSlotsScreen } from "@/features/cms-slots";
-import { type CmsSlotsRouteSegment, resolveAllowedCmsSlotsSegment } from "@/features/cms-slots/model/cms-slots-access";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { ImageEditor } from "@/features/image-editor";
 import { BeaconAppSettingsProvider, BeaconSettingsScreen } from "@/features/settings";
@@ -25,14 +24,6 @@ function BeaconImagesPage() {
 function CmsSlotsIndexRedirect() {
   const { defaultSegment } = useCmsSlotsAccess();
   return <Navigate to={`/cms-slots/${defaultSegment}`} replace />;
-}
-
-function LegacyBeaconsSegmentRedirect() {
-  const { segment } = useParams();
-  const { defaultSegment, editorExperience } = useCmsSlotsAccess();
-  const raw: CmsSlotsRouteSegment | undefined = segment === "engine" || segment === "composer" ? segment : undefined;
-  const next = raw != null ? resolveAllowedCmsSlotsSegment(raw, editorExperience) : defaultSegment;
-  return <Navigate to={`/cms-slots/${next}`} replace />;
 }
 
 function CmsSlotsRoutePage() {
@@ -65,8 +56,6 @@ export function App() {
                   <Route path="settings" element={<BeaconSettingsPage />} />
                   <Route path="cms-slots/:segment" element={<CmsSlotsRoutePage />} />
                   <Route path="cms-slots" element={<CmsSlotsIndexRedirect />} />
-                  <Route path="beacons/:segment" element={<LegacyBeaconsSegmentRedirect />} />
-                  <Route path="beacons" element={<CmsSlotsIndexRedirect />} />
                   <Route path="*" element={<Navigate to="/home" replace />} />
                 </Route>
               </Routes>

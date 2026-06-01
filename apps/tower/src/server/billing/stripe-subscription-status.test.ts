@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOrganizationProEntitled } from "@/server/billing/organization-billing";
+import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
 import {
   isStripeSubscriptionProEntitled,
   orgRowHasStripeTeam,
@@ -82,10 +82,10 @@ describe("orgRowHasStripeTeam", () => {
   });
 });
 
-describe("isOrganizationProEntitled", () => {
+describe("isOrganizationTeamEntitled", () => {
   it("grants pro for stripe team subscription", () => {
     expect(
-      isOrganizationProEntitled({
+      isOrganizationTeamEntitled({
         billingPlan: TEAM_BILLING_PLAN,
         subscriptionStatus: "active",
         stripeSubscriptionId: "sub_team_1",
@@ -93,9 +93,9 @@ describe("isOrganizationProEntitled", () => {
     ).toBe(true);
   });
 
-  it("grants pro for legacy operator plan without stripe id", () => {
+  it("grants pro for operator-granted plan without stripe id", () => {
     expect(
-      isOrganizationProEntitled({
+      isOrganizationTeamEntitled({
         billingPlan: "pro team",
         subscriptionStatus: "active",
         stripeSubscriptionId: null,
@@ -105,7 +105,7 @@ describe("isOrganizationProEntitled", () => {
 
   it("rejects canceled subscription", () => {
     expect(
-      isOrganizationProEntitled({
+      isOrganizationTeamEntitled({
         billingPlan: TEAM_BILLING_PLAN,
         subscriptionStatus: "canceled",
         stripeSubscriptionId: "sub_team_1",

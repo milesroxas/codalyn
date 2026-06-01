@@ -3,7 +3,6 @@ import {
   beaconPropPickRuntimeSource,
   CMS_SLOT_COND_ATTR,
   CMS_SLOT_CONTENT_ATTR,
-  CMS_SLOT_LEGACY_BIND_ATTR,
   canonicalPropIdFromContentAttrSegment,
   formatContentAttrSegmentsForBindings,
   mergeContentAttrSegments,
@@ -32,11 +31,10 @@ describe("formatContentAttrSegmentsForBindings", () => {
 });
 
 describe("removeCmsSlotTagAttrsIfPresent", () => {
-  it("removes content, conditional, and legacy bind attrs when present", async () => {
+  it("removes content and conditional attrs when present", async () => {
     const store = new Map<string, string>([
       [CMS_SLOT_CONTENT_ATTR, "hero-image@1"],
       [CMS_SLOT_COND_ATTR, "1"],
-      [CMS_SLOT_LEGACY_BIND_ATTR, "cmp|a"],
     ]);
     const attr = {
       get: async (n: string) => store.get(n) ?? null,
@@ -45,7 +43,7 @@ describe("removeCmsSlotTagAttrsIfPresent", () => {
         return null;
       },
     };
-    await expect(removeCmsSlotTagAttrsIfPresent(attr)).resolves.toBe(3);
+    await expect(removeCmsSlotTagAttrsIfPresent(attr)).resolves.toBe(2);
     expect(store.size).toBe(0);
   });
 
@@ -128,41 +126,38 @@ describe("removeOwnedCmsSlotTagAttrs", () => {
     };
   }
 
-  it("rewrites data-cb-c to the remaining components and keeps cond/legacy bind when segments survive", async () => {
+  it("rewrites data-cb-c to the remaining components and keeps cond when segments survive", async () => {
     const { store, ops } = attrStore({
       [CMS_SLOT_CONTENT_ATTR]: "hero-image|card-image",
-      [CMS_SLOT_LEGACY_BIND_ATTR]: "cmp|img",
       [CMS_SLOT_COND_ATTR]: "1",
     });
     const changed = await removeOwnedCmsSlotTagAttrs(ops, new Set(["hero-image"]));
     expect(changed).toBe(1);
     expect(store.get(CMS_SLOT_CONTENT_ATTR)).toBe("card-image");
-    expect(store.get(CMS_SLOT_LEGACY_BIND_ATTR)).toBe("cmp|img");
     expect(store.get(CMS_SLOT_COND_ATTR)).toBe("1");
   });
 
-  it("removes all tags (incl. legacy bind) when the owner held the only segment", async () => {
+  it("removes all tags when the owner held the only segment", async () => {
     const { store, ops } = attrStore({
       [CMS_SLOT_CONTENT_ATTR]: "hero-image",
-      [CMS_SLOT_LEGACY_BIND_ATTR]: "cmp|img",
       [CMS_SLOT_COND_ATTR]: "1",
     });
     const changed = await removeOwnedCmsSlotTagAttrs(ops, new Set(["hero-image"]));
-    expect(changed).toBe(3);
+    expect(changed).toBe(2);
     expect(store.size).toBe(0);
   });
 
   it("leaves a shared element untouched when the owner has no segment here", async () => {
-    const { store, ops } = attrStore({ [CMS_SLOT_CONTENT_ATTR]: "card-image", [CMS_SLOT_LEGACY_BIND_ATTR]: "cmp|img" });
+    const { store, ops } = attrStore({ [CMS_SLOT_CONTENT_ATTR]: "card-image" });
     const changed = await removeOwnedCmsSlotTagAttrs(ops, new Set(["hero-image"]));
     expect(changed).toBe(0);
     expect(store.get(CMS_SLOT_CONTENT_ATTR)).toBe("card-image");
   });
 
-  it("removes everything when owner ids are empty (legacy single-owner)", async () => {
+  it("removes everything when owner ids are empty (single-owner)", async () => {
     const { store, ops } = attrStore({
       [CMS_SLOT_CONTENT_ATTR]: "hero-image|card-image",
-      [CMS_SLOT_LEGACY_BIND_ATTR]: "cmp|img",
+      [CMS_SLOT_COND_ATTR]: "1",
     });
     const changed = await removeOwnedCmsSlotTagAttrs(ops, new Set());
     expect(changed).toBe(2);
@@ -171,7 +166,7 @@ describe("removeOwnedCmsSlotTagAttrs", () => {
 });
 
 describe("beaconPropPickRuntimeSource", () => {
-  it("resolves @-suffixed segments via base prop id (new ordinal + legacy formats)", () => {
+  it("resolves @-suffixed segments via base prop id", () => {
     const pickP = new Function(`${beaconPropPickRuntimeSource()}; return pickP;`)() as (
       ps: Record<string, string>,
       k: string

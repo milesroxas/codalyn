@@ -25,6 +25,3 @@ export function runExclusiveDesignerOp<T>(fn: () => Promise<T>): Promise<T> {
   );
   return run;
 }
-
-/** @deprecated Prefer {@link runExclusiveDesignerOp}. */
-export const runExclusiveDesignerStyleOp = runExclusiveDesignerOp;

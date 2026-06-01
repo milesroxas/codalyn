@@ -13,18 +13,8 @@ export const CMS_SLOT_CONTENT_ATTR = "data-cb-c";
  */
 export const CMS_SLOT_COND_ATTR = "data-cb-v";
 
-/**
- * Legacy per-element identity attribute (`component|element`) written by older Engine versions. No longer written —
- * duplicate-binding disambiguation now lives in the `propId@N` ordinal suffix on `data-cb-c`, and the footer runtime
- * never read it. Retained only so cleanup/stripping removes it from elements tagged by older versions.
- */
-export const CMS_SLOT_LEGACY_BIND_ATTR = "data-cb-id";
-
-/** Tag attributes the Engine currently writes onto bound elements. */
+/** Tag attributes the Engine writes onto bound elements (and that cleanup removes). */
 export const CMS_SLOT_WRITTEN_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR] as const;
-
-/** All CMS slot tag attributes cleanup removes — current attrs plus the legacy `data-cb-id`. */
-export const CMS_SLOT_TAG_ATTRS = [...CMS_SLOT_WRITTEN_TAG_ATTRS, CMS_SLOT_LEGACY_BIND_ATTR] as const;
 
 /** Canonical exposed prop id from a `data-cb-c` segment (strips the `@N` / `@…` suffix). */
 export function canonicalPropIdFromContentAttrSegment(segment: string): string {
@@ -65,7 +55,7 @@ export type BeaconCmsSlotAttrOps = BeaconCmsSlotAttrRemoveOps & {
 /** Removes all CMS slot tag attrs when present; returns how many attrs were removed. */
 export async function removeCmsSlotTagAttrsIfPresent(attr: BeaconCmsSlotAttrRemoveOps): Promise<number> {
   let removed = 0;
-  for (const key of CMS_SLOT_TAG_ATTRS) {
+  for (const key of CMS_SLOT_WRITTEN_TAG_ATTRS) {
     const cur = await attr.get(key);
     if (cur != null && cur.length > 0) {
       await attr.remove(key);
@@ -149,7 +139,7 @@ export function removeOwnedContentAttrSegments(
 
 /**
  * Strips one Engine component's tags from a (possibly shared) element. Rewrites `data-cb-c` to the segments owned by
- * other components; when none remain also removes `data-cb-v` (and any legacy `data-cb-id`). `ownerExposedIds` empty
+ * other components; when none remain also removes `data-cb-v`. `ownerExposedIds` empty
  * ⇒ removes all tags (single-owner / legacy). Returns the number of attributes changed.
  */
 export async function removeOwnedCmsSlotTagAttrs(

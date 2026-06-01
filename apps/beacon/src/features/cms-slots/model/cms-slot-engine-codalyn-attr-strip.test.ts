@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  CMS_SLOT_CONTENT_ATTR,
-  CMS_SLOT_LEGACY_BIND_ATTR,
-} from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
+import { CMS_SLOT_CONTENT_ATTR } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import { stripEngineCodalynAttrsFromComponentInstance } from "@/features/cms-slots/model/cms-slot-engine-codalyn-attr-sync";
 
 function domWithCodalynAttrs(attrs: Record<string, string>, children: AnyElement[] = []): AnyElement {
@@ -46,7 +43,6 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
   it("removes codalyn attrs from the definition tree and nested component definitions", async () => {
     const nestedRoot = domWithCodalynAttrs({
       [CMS_SLOT_CONTENT_ATTR]: "nested-title",
-      [CMS_SLOT_LEGACY_BIND_ATTR]: "cmp-nested|title",
     });
     const nestedInstance = {
       type: "ComponentInstance",
@@ -59,7 +55,6 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
     const root = domWithCodalynAttrs(
       {
         [CMS_SLOT_CONTENT_ATTR]: "hero-title",
-        [CMS_SLOT_LEGACY_BIND_ATTR]: "cmp-root|hero",
       },
       [nestedInstance]
     );
@@ -71,7 +66,7 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
 
     const result = await stripEngineCodalynAttrsFromComponentInstance(instance);
 
-    expect(result.removed).toBe(4);
+    expect(result.removed).toBe(2);
     expect(result.errors).toEqual([]);
     expect(enterComponent).toHaveBeenCalledWith(instance);
     expect(enterComponent).toHaveBeenCalledWith(nestedInstance);
@@ -82,16 +77,13 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
       removeAttribute: ReturnType<typeof vi.fn>;
     };
     expect(rootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_CONTENT_ATTR);
-    expect(rootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_LEGACY_BIND_ATTR);
     expect(nestedRootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_CONTENT_ATTR);
-    expect(nestedRootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_LEGACY_BIND_ATTR);
   });
 
   it("keeps other Engine components' segments on a shared definition when ownerExposedIds is scoped", async () => {
     // Shared Image <img> is exposed by Hero (`hero-image`) and Card (`card-image`); deleting Hero must keep Card.
     const sharedImg = domWithCodalynAttrs({
       [CMS_SLOT_CONTENT_ATTR]: "hero-image|card-image",
-      [CMS_SLOT_LEGACY_BIND_ATTR]: "cmp-img|img",
     });
     const root = domWithCodalynAttrs({}, [sharedImg]);
 
@@ -108,7 +100,6 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
       removeAttribute: ReturnType<typeof vi.fn>;
     };
     expect(sharedDom.setAttribute).toHaveBeenCalledWith(CMS_SLOT_CONTENT_ATTR, "card-image");
-    expect(sharedDom.removeAttribute).not.toHaveBeenCalledWith(CMS_SLOT_LEGACY_BIND_ATTR);
   });
 
   it("returns a non-fatal error when the component definition cannot be opened", async () => {

@@ -5,8 +5,6 @@ import { webflowDesignerErrorCauseTag } from "@/shared/lib/webflow-designer-erro
 
 const LOG_PREFIX = "[CMS slot CMS]";
 
-/** Pre-rename Webflow Plain Text field display name; still matched when resolving existing fields. */
-const LEGACY_CMS_SLOT_LIST_PLAIN_TEXT_FIELD_PREFIX = "Beacon list target text · ";
 const MAX_EXIT_COMPONENT_STEPS = 4;
 const FIELD_VISIBILITY_ATTEMPTS = 10;
 const FIELD_VISIBILITY_DELAY_MS = 400;
@@ -36,10 +34,6 @@ export type CmsSlotListCmsTextFieldEnsureResult = {
 
 export function cmsSlotListCmsPlainTextFieldDisplayName(dataList: string): string {
   return `CMS slot target text · ${dataList}`;
-}
-
-function legacyCmsSlotListCmsPlainTextFieldDisplayName(dataList: string): string {
-  return `${LEGACY_CMS_SLOT_LIST_PLAIN_TEXT_FIELD_PREFIX}${dataList}`;
 }
 
 /**
@@ -109,10 +103,7 @@ function parseCollectionFields(data: unknown): ParsedField[] {
 }
 
 function findBeaconListTargetField(fields: readonly ParsedField[], dataList: string): ParsedField | null {
-  const wantNames = [
-    cmsSlotListCmsPlainTextFieldDisplayName(dataList),
-    legacyCmsSlotListCmsPlainTextFieldDisplayName(dataList),
-  ];
+  const wantNames = [cmsSlotListCmsPlainTextFieldDisplayName(dataList)];
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").replace(/[·•]/g, "·");
   const wantNorms = new Set(wantNames.map(norm));
   for (const f of fields) {

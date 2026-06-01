@@ -4,10 +4,11 @@ import {
   syncCmsSlotPageInlineScript,
 } from "@/features/cms-slots/model/cms-slot-page-inline-script";
 import { type CmsSlotListOnPage, findCmsSlotListsOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
-import { runExclusiveDesignerStyleOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
+import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 import {
   purgeCmsSlotListTargetDefinitionsForDataList,
   purgeCmsSlotRuntimeForDataList,
+  stripEngineCodalynAttrsForSlotListContainer,
 } from "@/features/cms-slots/model/site-components";
 import {
   CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
@@ -52,7 +53,7 @@ export async function findCmsSlotsWrapperOnPage(): Promise<BlockElement | null> 
 }
 
 function ensureBeaconsWrapperHiddenStyle(): Promise<Style> {
-  return runExclusiveDesignerStyleOp(async () => {
+  return runExclusiveDesignerOp(async () => {
     const all = await webflow.getAllStyles();
     for (const s of all) {
       if ((await s.getName()) === BEACON_WRAPPER_STYLE_NAME) {
@@ -113,7 +114,7 @@ export async function installCmsSlotsWrapperOnPage(options?: { onProgress?: (mes
   report?.(CMS_SLOTS_ROUTE_TASK_CREATING_INSTALL);
   const wrapper = (await body.append(webflow.elementPresets.DivBlock)) as BlockElement;
   await wrapper.setTag("div");
-  await runExclusiveDesignerStyleOp(async () => {
+  await runExclusiveDesignerOp(async () => {
     const hidden = await ensureBeaconsWrapperHiddenStyle();
     await wrapper.setStyles([hidden]);
   });
@@ -174,6 +175,7 @@ export async function uninstallCmsSlotsPageInstall(
   const dataLists = new Set(options?.dataLists ?? []);
   for (const beacon of await findCmsSlotListsOnPage()) {
     dataLists.add(beacon.dataList);
+    await stripEngineCodalynAttrsForSlotListContainer(beacon.container);
     await purgeCmsSlotRuntimeForDataList(beacon.dataList, beacon.container);
   }
   for (const dataList of dataLists) {

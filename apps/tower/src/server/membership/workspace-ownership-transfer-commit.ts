@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { isOrganizationProEntitled } from "@/server/billing/organization-billing";
+import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
 import { getStripe } from "@/server/billing/stripe-client";
 import { ensureStripeCustomerForOrganization } from "@/server/billing/stripe-customer-org";
 import type { WorkspaceOwnerRow } from "@/server/membership/workspace-ownership";
@@ -84,7 +84,7 @@ export function readOrganizationBillingEntitlement(billingRow: OrganizationBilli
   if (!billingRow) {
     return false;
   }
-  return isOrganizationProEntitled({
+  return isOrganizationTeamEntitled({
     subscriptionStatus: billingRow.subscriptionStatus,
     billingPlan: billingRow.billingPlan,
     stripeSubscriptionId: billingRow.stripeSubscriptionId,

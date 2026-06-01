@@ -286,14 +286,3 @@ export async function purgeExpiredSoftDeletedWorkspaces(now = new Date()): Promi
 
   return ids.length;
 }
-
-/** @deprecated Account deletion no longer deletes workspaces. Kept for operator tooling compatibility. */
-export async function deleteWorkspacesForAccountCleanup(organizationIds: string[]): Promise<void> {
-  if (organizationIds.length === 0) {
-    return;
-  }
-  throw new WorkspaceDeletionError(
-    "forbidden",
-    "Workspaces must be deleted through the dedicated workspace deletion flow."
-  );
-}

@@ -1,5 +1,5 @@
 import { towerPlanBillingScope, type WebflowProxyUsageCategory } from "@codalyn/webflow-kit";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, type SQL, sql } from "drizzle-orm";
 import type { TowerEntitlement, TowerTier } from "@/server/billing/entitlements";
 import {
   capForMeterKind,
@@ -14,17 +14,30 @@ import { getTeamMinSeats } from "@/server/billing/team-billing-config";
 import { getTowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 import { resolvePooledSeatCount } from "@/shared/lib/billing/organization-seat-cap";
 import { db } from "@/shared/lib/db";
-import { member, organization, towerUsageMonth, towerWorkspaceUsageMonth, user } from "@/shared/lib/db/auth-schema";
+import {
+  member,
+  organization,
+  towerUsageMonth,
+  towerWorkspaceMemberUsageMonth,
+  towerWorkspaceUsageMonth,
+  user,
+} from "@/shared/lib/db/auth-schema";
 
 type TowerDbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/** Where a meter is keyed: per individual user, or pooled across a paid Team workspace. */
-export type UsageScope = { kind: "user"; userId: string } | { kind: "workspace"; organizationId: string };
+/**
+ * Where a meter is keyed: per individual user, or pooled across a paid Team workspace. Workspace scope
+ * also carries the acting `memberUserId` so pooled consumption can be attributed per member for display
+ * (the pool itself — keyed by `organizationId` — remains the enforcement source of truth).
+ */
+export type UsageScope =
+  | { kind: "user"; userId: string }
+  | { kind: "workspace"; organizationId: string; memberUserId: string };
 
 /** Resolves whether a meter is enforced per-user or pooled across the active paid Team workspace. */
 export function resolveUsageScope(tier: TowerTier, userId: string, activeOrganizationId: string | null): UsageScope {
   if (towerPlanBillingScope(tier) === "workspace" && activeOrganizationId) {
-    return { kind: "workspace", organizationId: activeOrganizationId };
+    return { kind: "workspace", organizationId: activeOrganizationId, memberUserId: userId };
   }
   return { kind: "user", userId };
 }
@@ -74,6 +87,14 @@ const USAGE_COUNT_COLUMNS_WORKSPACE = {
   webflowProxyImageUploadCmsCount: towerWorkspaceUsageMonth.webflowProxyImageUploadCmsCount,
   cmsWriteCount: towerWorkspaceUsageMonth.cmsWriteCount,
   imageOptimizeCount: towerWorkspaceUsageMonth.imageOptimizeCount,
+} as const;
+
+const USAGE_COUNT_COLUMNS_MEMBER = {
+  webflowProxyRequestCount: towerWorkspaceMemberUsageMonth.webflowProxyRequestCount,
+  webflowProxyCmsSlotsCount: towerWorkspaceMemberUsageMonth.webflowProxyCmsSlotsCount,
+  webflowProxyImageUploadCmsCount: towerWorkspaceMemberUsageMonth.webflowProxyImageUploadCmsCount,
+  cmsWriteCount: towerWorkspaceMemberUsageMonth.cmsWriteCount,
+  imageOptimizeCount: towerWorkspaceMemberUsageMonth.imageOptimizeCount,
 } as const;
 
 export type MeteringContext = {
@@ -245,7 +266,44 @@ async function reserveMonthlyCount(
   };
 
   await writeUsageCounts(tx, scope, ym, Boolean(row), patch, insertCounts);
+  if (scope.kind === "workspace") {
+    // Attribute the same reserved amount to the acting member so admins can see pool contributors.
+    // Serialized by the same advisory lock as the pool write above, so a plain upsert is race-safe.
+    await incrementMemberAttribution(tx, scope.organizationId, scope.memberUserId, ym, insertCounts);
+  }
   return { blocked: false, used: next, limit: cap };
+}
+
+/**
+ * Adds the per-event meter deltas (`insertCounts`) to the acting member's attribution row, creating it
+ * on first write. Increment-on-conflict keeps it consistent under the pool's advisory lock.
+ */
+async function incrementMemberAttribution(
+  tx: TowerDbTransaction,
+  organizationId: string,
+  userId: string,
+  ym: string,
+  insertCounts: UsageCountPatch
+): Promise<void> {
+  const incrementSet: Partial<Record<keyof UsageCountPatch, SQL>> = {};
+  for (const field of Object.keys(USAGE_COUNT_COLUMNS_MEMBER) as Array<keyof UsageCountPatch>) {
+    const delta = insertCounts[field];
+    if (typeof delta === "number" && delta > 0) {
+      incrementSet[field] = sql`${USAGE_COUNT_COLUMNS_MEMBER[field]} + ${delta}`;
+    }
+  }
+
+  await tx
+    .insert(towerWorkspaceMemberUsageMonth)
+    .values({ organizationId, userId, yearMonth: ym, ...insertCounts })
+    .onConflictDoUpdate({
+      target: [
+        towerWorkspaceMemberUsageMonth.organizationId,
+        towerWorkspaceMemberUsageMonth.userId,
+        towerWorkspaceMemberUsageMonth.yearMonth,
+      ],
+      set: incrementSet,
+    });
 }
 
 async function selectUsageCountsForUpdate(
@@ -333,6 +391,7 @@ async function runConsume(
           kind,
           used: res.used,
           limit: res.limit,
+          usageScope: scope.kind,
         },
         { status: 402, headers: { "Cache-Control": "no-store" } }
       ),
@@ -415,21 +474,31 @@ export async function resetUsageForOrganizationMembers(
   ]);
 }
 
-/** Resets the pooled monthly usage for a paid Team workspace. */
+/** Resets the pooled monthly usage for a paid Team workspace, plus its per-member attribution rows. */
 export async function resetUsageForWorkspace(organizationId: string, yearMonth = utcYearMonth()): Promise<void> {
-  await db
-    .update(towerWorkspaceUsageMonth)
-    .set({
-      webflowProxyRequestCount: 0,
-      webflowProxyCmsSlotsCount: 0,
-      webflowProxyImageUploadCmsCount: 0,
-      cmsWriteCount: 0,
-      imageOptimizeCount: 0,
-    })
-    .where(
-      and(
-        eq(towerWorkspaceUsageMonth.organizationId, organizationId),
-        eq(towerWorkspaceUsageMonth.yearMonth, yearMonth)
-      )
-    );
+  await Promise.all([
+    db
+      .update(towerWorkspaceUsageMonth)
+      .set({
+        webflowProxyRequestCount: 0,
+        webflowProxyCmsSlotsCount: 0,
+        webflowProxyImageUploadCmsCount: 0,
+        cmsWriteCount: 0,
+        imageOptimizeCount: 0,
+      })
+      .where(
+        and(
+          eq(towerWorkspaceUsageMonth.organizationId, organizationId),
+          eq(towerWorkspaceUsageMonth.yearMonth, yearMonth)
+        )
+      ),
+    db
+      .delete(towerWorkspaceMemberUsageMonth)
+      .where(
+        and(
+          eq(towerWorkspaceMemberUsageMonth.organizationId, organizationId),
+          eq(towerWorkspaceMemberUsageMonth.yearMonth, yearMonth)
+        )
+      ),
+  ]);
 }

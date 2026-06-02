@@ -8,17 +8,29 @@ export const TOWER_USAGE_APPROACHING_ALERT_TITLE = "Approaching monthly usage li
 /**
  * One-line explanation of how the reported usage is scoped, so UIs never imply Team is just higher
  * per-user caps. Workspace scope is a shared pool; user scope follows the individual across workspaces.
+ * When known, `pooledSeatCount` is surfaced so Team users understand the pool scales with paid seats.
  */
-export function towerUsageScopeSummary(usageScope: TowerUsageScope): string {
+export function towerUsageScopeSummary(usageScope: TowerUsageScope, pooledSeatCount?: number | null): string {
+  if (usageScope !== "workspace") {
+    return "Applies to you across your solo and unpaid workspaces.";
+  }
+  const seats = typeof pooledSeatCount === "number" && pooledSeatCount > 0 ? pooledSeatCount : null;
+  return seats
+    ? `Pooled across this workspace and shared by everyone on it. The pool scales with paid seats (currently ${seats.toLocaleString()}).`
+    : "Pooled across this workspace and shared by everyone on it. The pool scales with paid seats.";
+}
+
+/** Scope-aware card subtitle, so Team usage is never framed as a single person's account usage. */
+export function towerUsageScopeDescription(usageScope: TowerUsageScope): string {
   return usageScope === "workspace"
-    ? "Pooled across this workspace and shared by everyone on it. The pool scales with paid seats."
-    : "Applies to you across your solo and unpaid workspaces.";
+    ? "Usage by Beacon feature for this workspace, shared across everyone on it."
+    : "Usage by Beacon feature for your account.";
 }
 
 export function towerUsageMeterLabel(kind: TowerUsageMeterKind): string {
   switch (kind) {
     case "webflowProxy":
-      return "Designer API requests";
+      return "Webflow updates";
     case "cmsWrite":
       return "Layout saves";
     case "image":
@@ -139,7 +151,7 @@ export function towerUsageMeterTooltipContent(kind: TowerUsageMeterKind): TowerU
         actionGroups,
         footnoteHeading: TOWER_USAGE_METER_TOOLTIP_FOOTNOTE_HEADING,
         footnote:
-          "Layout saves and image optimization credits have their own monthly limits. One action may use more than one Webflow request.",
+          "Image optimization credits have their own monthly limit. One action may use more than one Webflow request.",
       };
     case "cmsWrite":
       return {
@@ -150,7 +162,7 @@ export function towerUsageMeterTooltipContent(kind: TowerUsageMeterKind): TowerU
         actionGroups,
         footnoteHeading: TOWER_USAGE_METER_TOOLTIP_FOOTNOTE_HEADING,
         footnote:
-          "Designer API requests and image optimization credits have their own monthly limits. Saving slot order to a CMS text field counts toward Designer API requests instead. Loading layouts does not count.",
+          "Webflow updates and image optimization credits have their own monthly limits. Saving slot order to a CMS text field counts toward Webflow updates instead. Loading layouts does not count.",
       };
     case "image":
       return {
@@ -160,8 +172,7 @@ export function towerUsageMeterTooltipContent(kind: TowerUsageMeterKind): TowerU
         sectionHeading: TOWER_USAGE_METER_TOOLTIP_SECTION_HEADING,
         actionGroups,
         footnoteHeading: TOWER_USAGE_METER_TOOLTIP_FOOTNOTE_HEADING,
-        footnote:
-          "Designer API requests and layout saves have their own monthly limits. WebP exports in the Designer do not use credits.",
+        footnote: "Webflow updates have their own monthly limit. WebP exports in the Designer do not use credits.",
       };
   }
 }
@@ -183,14 +194,21 @@ export function towerUsageMeterTooltip(kind: TowerUsageMeterKind): string {
 }
 
 export function towerUsageApproachingAlertDescription(
-  meters: ReadonlyArray<{ kind: TowerUsageMeterKind; used: number; limit: number }>
+  meters: ReadonlyArray<{ kind: TowerUsageMeterKind; used: number; limit: number }>,
+  usageScope: TowerUsageScope = "user"
 ): string {
+  const pooled = usageScope === "workspace";
   if (meters.length === 0) {
-    return "You have used at least 80% of a monthly limit on your plan.";
+    return pooled
+      ? "Your workspace has used at least 80% of a monthly limit on its shared Team pool."
+      : "You have used at least 80% of a monthly limit on your plan.";
   }
   const lines = meters.map(
     (meter) => `${towerUsageMeterLabel(meter.kind)}: ${formatTowerUsageRatio(meter.used, meter.limit)}`
   );
+  if (pooled) {
+    return `Your workspace has used at least 80% of its monthly Team pool for ${lines.join("; ")}. This pool is shared by everyone on the workspace and resets at the start of next month.`;
+  }
   return `You have used at least 80% of your monthly allowance for ${lines.join("; ")}. These limits reset at the start of next month.`;
 }
 
@@ -208,20 +226,26 @@ export function towerUsageLimitDialogTitle(kind: TowerUsageMeterKind): string {
   return TOWER_USAGE_LIMIT_DIALOG_TITLE;
 }
 
-export function towerUsageLimitDialogDescription(kind: TowerUsageMeterKind): string {
-  const scope = uniqueMeterFeatureNames(kind);
+export function towerUsageLimitDialogDescription(
+  kind: TowerUsageMeterKind,
+  usageScope: TowerUsageScope = "user"
+): string {
+  const featureScope = uniqueMeterFeatureNames(kind);
+  const pooled = usageScope === "workspace";
   if (kind === "image") {
-    return `${TOWER_AVIF_LIMIT_FALLBACK_DESCRIPTION} Applies to ${scope}.`;
+    const poolNote = pooled ? " This is your workspace's shared Team pool." : "";
+    return `${TOWER_AVIF_LIMIT_FALLBACK_DESCRIPTION} Applies to ${featureScope}.${poolNote}`;
   }
+  const subject = pooled ? "Your workspace has reached its" : "You've reached your";
   if (kind === "cmsWrite") {
-    return `You've reached your monthly limit for CMS layout saves through Tower this month. Applies to ${scope}. Composer text-field saves count toward Designer API requests instead.`;
+    return `${subject} monthly limit for CMS layout saves through Tower this month. Applies to ${featureScope}. Composer text-field saves count toward Webflow updates instead.`;
   }
-  return `You've reached your monthly limit for Designer API requests through Tower this month. Applies to ${scope}.`;
+  return `${subject} monthly limit for Webflow updates through Tower this month. Applies to ${featureScope}.`;
 }
 
 export function towerUsageLimitDialogUsageLine(used: number, limit: number, kind: TowerUsageMeterKind): string {
   const label =
-    kind === "image" ? "image optimization credits" : kind === "cmsWrite" ? "layout saves" : "Designer API requests";
+    kind === "image" ? "image optimization credits" : kind === "cmsWrite" ? "layout saves" : "Webflow updates";
   return `${used.toLocaleString()} / ${limit.toLocaleString()} ${label} used this month.`;
 }
 

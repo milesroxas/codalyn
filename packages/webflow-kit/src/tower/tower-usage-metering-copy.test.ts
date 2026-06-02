@@ -11,7 +11,7 @@ import { towerUsageProductFeatureLabel } from "./tower-usage-product-feature.js"
 describe("image meter copy", () => {
   it("labels the image meter as optimization credits", () => {
     expect(towerUsageMeterLabel("image")).toBe("Image optimization credits");
-    expect(towerUsageMeterLabel("webflowProxy")).toBe("Designer API requests");
+    expect(towerUsageMeterLabel("webflowProxy")).toBe("Webflow updates");
     expect(towerUsageMeterLabel("cmsWrite")).toBe("Layout saves");
   });
 
@@ -42,7 +42,7 @@ describe("towerUsageMeterTooltipContent", () => {
       ],
     });
     expect(content.footnoteHeading).toBe("Separate limits");
-    expect(content.footnote).toContain("image optimization credits");
+    expect(content.footnote).toContain("Image optimization credits");
   });
 
   it("groups repeated products into one badge section", () => {

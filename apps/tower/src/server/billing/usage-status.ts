@@ -7,6 +7,7 @@ import {
   towerPlanBillingScope,
   towerPlanName,
 } from "@codalyn/webflow-kit";
+import { cache } from "react";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import {
   capForMeterKind,
@@ -18,7 +19,11 @@ import {
 import { getTowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 import { getUsageSnapshotForScope, loadMeteringOverrideFields, resolveUsageScope } from "@/server/billing/usage-gate";
 
-export async function fetchEndUserUsageStatus(
+/**
+ * Request-memoized via `cache()`: the Tower layout banner, dashboard, and billing page all read the
+ * same snapshot for one render, so this resolves once per (user, active workspace) instead of per call.
+ */
+export const fetchEndUserUsageStatus = cache(async function fetchEndUserUsageStatus(
   userId: string,
   activeOrganizationId: string | null
 ): Promise<TowerUsageStatusSnapshot> {
@@ -67,6 +72,7 @@ export async function fetchEndUserUsageStatus(
       billingScope: towerPlanBillingScope(entitlement.tier),
     },
     usageScope: policy.usageScope,
+    pooledSeatCount: policy.usageScope === "workspace" ? policy.paidSeatCount : null,
     // Pooled (workspace) caps ignore per-member user overrides, so they must not flag "custom" limits.
     limitsKind: resolveUsageLimitsKind(
       policy,
@@ -78,4 +84,4 @@ export async function fetchEndUserUsageStatus(
     approachingMeters: pickApproachingUsageMeters(meters),
     designerApiBreakdown: hasTowerUsageDesignerApiBreakdown(designerApiBreakdown) ? designerApiBreakdown : null,
   };
-}
+});

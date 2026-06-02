@@ -7,13 +7,20 @@ import {
   utcYearMonth,
 } from "@/server/billing/metering-policy";
 import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
+import { resolveUserIndividualPlan } from "@/server/billing/stripe-individual-pro";
 import { getTeamMinSeats } from "@/server/billing/team-billing-config";
 import { getTowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 import { getUsageSnapshot, resetUsageForOrganizationMembers, resetUsageForUser } from "@/server/billing/usage-gate";
 import type { OperatorUsageLimitsPatch, OperatorUsageLimitsView } from "@/server/operator/types";
 import { resolvePooledSeatCount } from "@/shared/lib/billing/organization-seat-cap";
 import { db } from "@/shared/lib/db";
-import { member, organization, towerUsageMonth, towerWorkspaceUsageMonth, user } from "@/shared/lib/db/auth-schema";
+import {
+  member,
+  organization,
+  towerWorkspaceMemberUsageMonth,
+  towerWorkspaceUsageMonth,
+  user,
+} from "@/shared/lib/db/auth-schema";
 
 type WorkspacePoolCounts = { webflowProxyRequestCount: number; cmsWriteCount: number; imageOptimizeCount: number };
 
@@ -34,6 +41,9 @@ export async function fetchOperatorUserUsageLimits(userId: string): Promise<Oper
       webflowProxyLimitOverride: user.webflowProxyLimitOverride,
       cmsWriteLimitOverride: user.cmsWriteLimitOverride,
       imageOptimizeLimitOverride: user.imageOptimizeLimitOverride,
+      subscriptionPlan: user.subscriptionPlan,
+      subscriptionStatus: user.subscriptionStatus,
+      stripeSubscriptionId: user.stripeSubscriptionId,
     })
     .from(user)
     .where(eq(user.id, userId))
@@ -51,8 +61,16 @@ export async function fetchOperatorUserUsageLimits(userId: string): Promise<Oper
     cmsWriteLimitOverride: row.cmsWriteLimitOverride ?? null,
     imageOptimizeLimitOverride: row.imageOptimizeLimitOverride ?? null,
   };
+  // Operator user view reflects the individual account (no active-workspace context), so the
+  // effective caps must follow the user's own Pro/Studio subscription, matching enforcement.
+  const individualPlan = await resolveUserIndividualPlan({
+    subscriptionPlan: row.subscriptionPlan,
+    subscriptionStatus: row.subscriptionStatus,
+    stripeSubscriptionId: row.stripeSubscriptionId,
+  });
+  const userTier = individualPlan ?? "free";
   const policy = resolveMeteringPolicy({
-    tier: "free",
+    tier: userTier,
     user: userFields,
     organization: null,
     limits,
@@ -60,7 +78,7 @@ export async function fetchOperatorUserUsageLimits(userId: string): Promise<Oper
 
   return mapUsageLimitsView({
     scope: "user",
-    tier: "free",
+    tier: userTier,
     meteringEnabled: userFields.meteringEnabled,
     globalMeteringDisabled: policy.globalMeteringDisabled,
     webflowProxyLimitOverride: userFields.webflowProxyLimitOverride,
@@ -100,12 +118,19 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
   const ym = utcYearMonth();
   const [memberUsage] = await db
     .select({
-      webflowProxyRequestCount: sql<number>`COALESCE(SUM(${towerUsageMonth.webflowProxyRequestCount}), 0)`,
-      cmsWriteCount: sql<number>`COALESCE(SUM(${towerUsageMonth.cmsWriteCount}), 0)`,
-      imageOptimizeCount: sql<number>`COALESCE(SUM(${towerUsageMonth.imageOptimizeCount}), 0)`,
+      webflowProxyRequestCount: sql<number>`COALESCE(SUM(${towerWorkspaceMemberUsageMonth.webflowProxyRequestCount}), 0)`,
+      cmsWriteCount: sql<number>`COALESCE(SUM(${towerWorkspaceMemberUsageMonth.cmsWriteCount}), 0)`,
+      imageOptimizeCount: sql<number>`COALESCE(SUM(${towerWorkspaceMemberUsageMonth.imageOptimizeCount}), 0)`,
     })
     .from(member)
-    .leftJoin(towerUsageMonth, and(eq(towerUsageMonth.userId, member.userId), eq(towerUsageMonth.yearMonth, ym)))
+    .leftJoin(
+      towerWorkspaceMemberUsageMonth,
+      and(
+        eq(towerWorkspaceMemberUsageMonth.organizationId, member.organizationId),
+        eq(towerWorkspaceMemberUsageMonth.userId, member.userId),
+        eq(towerWorkspaceMemberUsageMonth.yearMonth, ym)
+      )
+    )
     .where(eq(member.organizationId, orgId));
 
   const orgFields = {
@@ -207,12 +232,19 @@ export async function fetchOperatorWorkspaceUsageLimitsBatch(
     db
       .select({
         organizationId: member.organizationId,
-        webflowProxyRequestCount: sql<number>`COALESCE(SUM(${towerUsageMonth.webflowProxyRequestCount}), 0)`,
-        cmsWriteCount: sql<number>`COALESCE(SUM(${towerUsageMonth.cmsWriteCount}), 0)`,
-        imageOptimizeCount: sql<number>`COALESCE(SUM(${towerUsageMonth.imageOptimizeCount}), 0)`,
+        webflowProxyRequestCount: sql<number>`COALESCE(SUM(${towerWorkspaceMemberUsageMonth.webflowProxyRequestCount}), 0)`,
+        cmsWriteCount: sql<number>`COALESCE(SUM(${towerWorkspaceMemberUsageMonth.cmsWriteCount}), 0)`,
+        imageOptimizeCount: sql<number>`COALESCE(SUM(${towerWorkspaceMemberUsageMonth.imageOptimizeCount}), 0)`,
       })
       .from(member)
-      .leftJoin(towerUsageMonth, and(eq(towerUsageMonth.userId, member.userId), eq(towerUsageMonth.yearMonth, ym)))
+      .leftJoin(
+        towerWorkspaceMemberUsageMonth,
+        and(
+          eq(towerWorkspaceMemberUsageMonth.organizationId, member.organizationId),
+          eq(towerWorkspaceMemberUsageMonth.userId, member.userId),
+          eq(towerWorkspaceMemberUsageMonth.yearMonth, ym)
+        )
+      )
       .where(inArray(member.organizationId, orgIds))
       .groupBy(member.organizationId),
     db

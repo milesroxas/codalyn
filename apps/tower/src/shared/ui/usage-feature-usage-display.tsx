@@ -25,12 +25,6 @@ export function UsageFeatureUsageDisplay(props: UsageFeatureUsageDisplayProps) {
                 designerApiBreakdown={meter.kind === "webflowProxy" ? status.designerApiBreakdown : null}
               />
             ))}
-            {group.feature === "imageUpload" ? (
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Publishing images to CMS collection fields uses Designer API requests in CMS Slots above, not image
-                optimization credits.
-              </p>
-            ) : null}
           </div>
         </section>
       ))}

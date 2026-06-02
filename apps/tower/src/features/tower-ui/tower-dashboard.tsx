@@ -202,10 +202,28 @@ function DashboardQuickActions({
   );
 }
 
+function usageBillingActionLabel(
+  usage: TowerUsageStatusSnapshot,
+  summary: TowerDashboardSummary,
+  billingEnabled: boolean
+): string | null {
+  if (!billingEnabled) {
+    return null;
+  }
+  if (usage.tier === "free") {
+    return "Upgrade plan";
+  }
+  if (usage.usageScope === "workspace" && summary.activeOrgTeamAdmin) {
+    return "Manage team billing";
+  }
+  return null;
+}
+
 export function TowerDashboard({ summary, usage, billingEnabled }: TowerDashboardProps) {
   const approachingMeters = usage.approachingMeters.flatMap((meter) =>
     meter.limit === null ? [] : [{ kind: meter.kind, used: meter.used, limit: meter.limit }]
   );
+  const usageActionLabel = usageBillingActionLabel(usage, summary, billingEnabled);
 
   return (
     <TowerPageMain>
@@ -228,10 +246,11 @@ export function TowerDashboard({ summary, usage, billingEnabled }: TowerDashboar
         <div className="mb-8">
           <UsageApproachingLimitAlert
             meters={approachingMeters}
+            usageScope={usage.usageScope}
             upgradeAction={
-              billingEnabled && usage.tier === "free" ? (
+              usageActionLabel ? (
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/billing">Upgrade plan</Link>
+                  <Link href="/billing">{usageActionLabel}</Link>
                 </Button>
               ) : null
             }
@@ -245,9 +264,9 @@ export function TowerDashboard({ summary, usage, billingEnabled }: TowerDashboar
           status={usage}
           billingEnabled={billingEnabled}
           showBillingLink
+          canManageWorkspaceBilling={summary.activeOrgTeamAdmin}
           fillHeight
           title="Usage this month"
-          description="Usage by Beacon feature for your month."
         />
       </TowerDashboardGrid>
 

@@ -16,12 +16,16 @@ export function BeaconUsageApproachingBanner() {
     meter.limit === null ? [] : [{ kind: meter.kind, used: meter.used, limit: meter.limit }]
   );
 
+  // Free upgrades and Team seat changes are both managed in Tower; pro/studio individuals have no in-app lever.
+  const showBillingLever = status.tier === "free" || status.tier === "team";
+
   return (
     <div className="px-2 pb-2">
       <UsageApproachingLimitAlert
         meters={meters}
+        usageScope={status.usageScope}
         upgradeAction={
-          status.tier === "free" ? (
+          showBillingLever ? (
             <Button
               type="button"
               variant="outline"

@@ -48,6 +48,11 @@ export type TowerUsageStatusSnapshot = {
    * across the active paid Team workspace; `user` means they are scoped to the signed-in user.
    */
   usageScope: TowerUsageScope;
+  /**
+   * Paid seats backing a pooled (`workspace`) cap, so the UI can explain that the shared pool scales
+   * with seats. `null` for per-user scope (or when seat count is unknown).
+   */
+  pooledSeatCount: number | null;
   /** `custom` = operator-set caps; `unmetered` = metering disabled by operator or platform. */
   limitsKind: TowerUsageLimitsKind;
   metered: boolean;
@@ -117,6 +122,7 @@ type TowerUsageLimitPayload = {
   kind?: string;
   used?: number;
   limit?: number;
+  usageScope?: string;
 };
 
 function parseUsageCount(raw: unknown): number | null {
@@ -199,6 +205,7 @@ export function normalizeTowerUsageStatusSnapshot(raw: unknown): TowerUsageStatu
   const tier = normalizeTowerPlanKey(value.tier) ?? "free";
   const plan = normalizeUsagePlanContext(value.plan, tier);
   const usageScope: TowerUsageScope = value.usageScope === "workspace" ? "workspace" : "user";
+  const pooledSeatCount = usageScope === "workspace" ? normalizeNonNegativeInt(value.pooledSeatCount) : null;
   const limitsKind =
     typeof value.limitsKind === "string" && (TOWER_USAGE_LIMITS_KINDS as readonly string[]).includes(value.limitsKind)
       ? (value.limitsKind as TowerUsageLimitsKind)
@@ -224,6 +231,7 @@ export function normalizeTowerUsageStatusSnapshot(raw: unknown): TowerUsageStatu
     tier,
     plan,
     usageScope,
+    pooledSeatCount,
     limitsKind,
     metered: typeof value.metered === "boolean" ? value.metered : true,
     meters,
@@ -237,6 +245,8 @@ export function parseTowerUsageLimitBody(body: string): {
   kind: TowerUsageMeterKind;
   used: number;
   limit: number;
+  /** Enforcement scope of the breached meter (`workspace` = pooled Team pool). Absent on legacy bodies. */
+  usageScope?: TowerUsageScope;
 } | null {
   try {
     const payload = JSON.parse(body) as TowerUsageLimitPayload;
@@ -249,7 +259,9 @@ export function parseTowerUsageLimitBody(body: string): {
     if (kind == null || used == null || limit == null) {
       return null;
     }
-    return { kind, used, limit };
+    const usageScope =
+      payload.usageScope === "workspace" ? "workspace" : payload.usageScope === "user" ? "user" : undefined;
+    return { kind, used, limit, usageScope };
   } catch {
     return null;
   }

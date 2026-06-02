@@ -1,4 +1,4 @@
-import type { TowerUsageMeterKind } from "@codalyn/webflow-kit";
+import type { TowerUsageMeterKind, TowerUsageScope } from "@codalyn/webflow-kit";
 import {
   formatTowerUsageRatio,
   TOWER_USAGE_APPROACHING_ALERT_TITLE,
@@ -11,11 +11,12 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/al
 
 type UsageApproachingLimitAlertProps = {
   meters: ReadonlyArray<{ kind: TowerUsageMeterKind; used: number; limit: number }>;
+  usageScope?: TowerUsageScope;
   upgradeAction?: ReactNode;
 };
 
 export function UsageApproachingLimitAlert(props: UsageApproachingLimitAlertProps) {
-  const { meters, upgradeAction } = props;
+  const { meters, usageScope = "user", upgradeAction } = props;
   if (meters.length === 0) {
     return null;
   }
@@ -25,7 +26,7 @@ export function UsageApproachingLimitAlert(props: UsageApproachingLimitAlertProp
       <TriangleAlert aria-hidden />
       <AlertTitle>{TOWER_USAGE_APPROACHING_ALERT_TITLE}</AlertTitle>
       <AlertDescription>
-        <p>{towerUsageApproachingAlertDescription(meters)}</p>
+        <p>{towerUsageApproachingAlertDescription(meters, usageScope)}</p>
         <ul>
           {meters.map((meter) => (
             <li key={meter.kind}>

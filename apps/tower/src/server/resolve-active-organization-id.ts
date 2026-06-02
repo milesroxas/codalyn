@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, isNull } from "drizzle-orm";
+import { cache } from "react";
 import { db } from "@/shared/lib/db";
 import { member, organization, session as sessionTable, user } from "@/shared/lib/db/auth-schema";
 
@@ -15,8 +16,14 @@ async function isActiveOrganizationId(organizationId: string): Promise<boolean> 
  * Single source of truth for active Tower workspace on a session.
  * Used by dashboard summary, Beacon membership APIs, billing/Webflow routes (`getActiveOrganizationIdForAuthHeaders`).
  * Falls back to preferred org, then first membership, and persists on the current session when possible.
+ *
+ * Request-memoized via `cache()` (keyed by user + session) so the layout, dashboard, and billing
+ * surfaces share one resolution per render instead of repeating these queries (and the fallback write).
  */
-export async function resolveActiveOrganizationId(userId: string, rawSessionId?: string): Promise<string | null> {
+export const resolveActiveOrganizationId = cache(async function resolveActiveOrganizationId(
+  userId: string,
+  rawSessionId?: string
+): Promise<string | null> {
   if (rawSessionId) {
     const rows = await db
       .select({ activeOrganizationId: sessionTable.activeOrganizationId })
@@ -58,4 +65,4 @@ export async function resolveActiveOrganizationId(userId: string, rawSessionId?:
     await db.update(sessionTable).set({ activeOrganizationId: fallbackOrgId }).where(eq(sessionTable.id, rawSessionId));
   }
   return fallbackOrgId;
-}
+});

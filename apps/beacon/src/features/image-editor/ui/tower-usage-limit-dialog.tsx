@@ -44,7 +44,9 @@ export function TowerUsageLimitDialog(props: TowerUsageLimitDialogProps) {
           {details ? (
             <>
               <AlertDialogTitle>{towerUsageLimitDialogTitle(details.kind)}</AlertDialogTitle>
-              <AlertDialogDescription>{towerUsageLimitDialogDescription(details.kind)}</AlertDialogDescription>
+              <AlertDialogDescription>
+                {towerUsageLimitDialogDescription(details.kind, details.usageScope)}
+              </AlertDialogDescription>
             </>
           ) : null}
         </AlertDialogHeader>

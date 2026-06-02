@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { cache } from "react";
 import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
 import { resolveUserIndividualPlan } from "@/server/billing/stripe-individual-pro";
 import { db } from "@/shared/lib/db";
@@ -16,8 +17,11 @@ export type TowerEntitlement = {
 /**
  * Usage limits follow the **active workspace** first, then the user's individual Pro subscription.
  * Membership in other paid workspaces does not apply until that workspace is active.
+ *
+ * Request-memoized via `cache()` so the layout, page, and inner usage-status reads share one
+ * resolution per render (keyed by user + active workspace).
  */
-export async function resolveTowerEntitlement(
+export const resolveTowerEntitlement = cache(async function resolveTowerEntitlement(
   userId: string,
   activeOrganizationId: string | null
 ): Promise<TowerEntitlement> {
@@ -52,4 +56,4 @@ export async function resolveTowerEntitlement(
   }
 
   return { tier: "free", source: "none" };
-}
+});

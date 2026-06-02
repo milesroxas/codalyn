@@ -12,6 +12,10 @@ import { getStripe } from "@/server/billing/stripe-client";
 import { resolveUserIndividualPlan } from "@/server/billing/stripe-individual-pro";
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { fetchWorkspaceBillingView } from "@/server/billing/workspace-billing-view";
+import {
+  fetchWorkspaceUsageContributors,
+  type WorkspaceUsageContributor,
+} from "@/server/billing/workspace-usage-contributors";
 import { db } from "@/shared/lib/db";
 import { organization, user } from "@/shared/lib/db/auth-schema";
 
@@ -81,6 +85,12 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       ])
     : [null, null];
 
+  // Per-member pool attribution is sensitive, so only surface it to Team-pool admins who manage billing.
+  const usageContributors: WorkspaceUsageContributor[] | null =
+    activeOrg && usageStatus.usageScope === "workspace" && workspaceBilling?.canManageBilling
+      ? await fetchWorkspaceUsageContributors(activeOrg)
+      : null;
+
   return (
     <TowerBillingScreen
       email={row?.email}
@@ -94,6 +104,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       activeOrganizationId={activeOrg}
       activeOrganizationName={activeOrganizationName}
       workspaceBilling={workspaceBilling}
+      usageContributors={usageContributors}
     />
   );
 }

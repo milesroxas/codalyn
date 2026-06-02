@@ -428,6 +428,41 @@ export const towerWorkspaceUsageMonth = pgTable(
   (table) => [uniqueIndex("tower_workspace_usage_month_org_ym").on(table.organizationId, table.yearMonth)]
 );
 
+/**
+ * Per-member attribution of pooled Team usage, written alongside `tower_workspace_usage_month` on each
+ * team consume so workspace admins can see who is contributing to the shared pool. NOT used for
+ * enforcement — the pool in `tower_workspace_usage_month` remains the single source of truth for caps.
+ */
+export const towerWorkspaceMemberUsageMonth = pgTable(
+  "tower_workspace_member_usage_month",
+  {
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** `YYYY-MM` (UTC) */
+    yearMonth: text("year_month").notNull(),
+    webflowProxyRequestCount: integer("webflow_proxy_request_count").notNull().default(0),
+    webflowProxyCmsSlotsCount: integer("webflow_proxy_cms_slots_count").notNull().default(0),
+    webflowProxyImageUploadCmsCount: integer("webflow_proxy_image_upload_cms_count").notNull().default(0),
+    cmsWriteCount: integer("cms_write_count").notNull().default(0),
+    imageOptimizeCount: integer("image_optimize_count").notNull().default(0),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("tower_workspace_member_usage_month_org_user_ym").on(
+      table.organizationId,
+      table.userId,
+      table.yearMonth
+    ),
+  ]
+);
+
 /** Singleton platform defaults for monthly usage metering (Operator-managed). */
 export const towerPlatformMetering = pgTable("tower_platform_metering", {
   id: text("id").primaryKey(),

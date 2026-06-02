@@ -3,11 +3,13 @@ import { towerPlanName } from "@codalyn/webflow-kit";
 import { IconBuilding, IconExternalLink, IconUser } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
+import { UsageBreakdownSection } from "@/features/billing/ui/usage-breakdown-section";
 import { WorkspaceSeatUsageBlock } from "@/features/billing/ui/workspace-seat-usage-block";
 import { WorkspaceTeamCheckoutForm } from "@/features/team/ui/workspace-team-checkout-form";
 import type { TowerEntitlement } from "@/server/billing/entitlements";
 import type { IndividualPaidPlan } from "@/server/billing/stripe-subscription-status";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
+import type { WorkspaceUsageContributor } from "@/server/billing/workspace-usage-contributors";
 import { usageLimitsKindBadgeLabel, usageLimitsKindDetailLine, usagePlanBadgeLabel } from "@/shared/lib/usage-display";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
@@ -35,6 +37,8 @@ type TowerBillingScreenProps = {
   activeOrganizationId: string | null;
   activeOrganizationName: string | null;
   workspaceBilling: WorkspaceBillingView | null;
+  /** Per-member pool contributors for Team admins; null for individual scope or non-admins. */
+  usageContributors: WorkspaceUsageContributor[] | null;
 };
 
 type BillingMetadataItem = {
@@ -348,6 +352,7 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
     activeOrganizationId,
     activeOrganizationName,
     workspaceBilling,
+    usageContributors,
   } = props;
 
   const teamWorkspaceActive = entitlement.source === "workspace_team";
@@ -389,11 +394,14 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
         </div>
       </TowerPageSection>
 
-      <TowerUsageSection
-        status={usageStatus}
+      <TowerPageSection
         title="This month"
         description={`Measured against ${usagePlanBadgeLabel(usageStatus.tier).toLowerCase()} limits for your active workspace.`}
-      />
+      >
+        <TowerUsageSection status={usageStatus} title={null} description={null} />
+      </TowerPageSection>
+
+      <UsageBreakdownSection status={usageStatus} contributors={usageContributors} />
     </TowerPageMain>
   );
 }

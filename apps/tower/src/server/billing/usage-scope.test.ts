@@ -4,7 +4,11 @@ import { resolvePooledSeatCount } from "@/shared/lib/billing/organization-seat-c
 
 describe("resolveUsageScope", () => {
   it("pools usage on the active paid Team workspace", () => {
-    expect(resolveUsageScope("team", "user-1", "org-1")).toEqual({ kind: "workspace", organizationId: "org-1" });
+    expect(resolveUsageScope("team", "user-1", "org-1")).toEqual({
+      kind: "workspace",
+      organizationId: "org-1",
+      memberUserId: "user-1",
+    });
   });
 
   it("falls back to user scope for Team with no active workspace", () => {

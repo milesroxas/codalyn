@@ -1,11 +1,18 @@
-import { parseTowerUsageLimitBody, TOWER_USAGE_LIMIT_CODE, type TowerUsageMeterKind } from "@codalyn/webflow-kit";
+import {
+  parseTowerUsageLimitBody,
+  TOWER_USAGE_LIMIT_CODE,
+  type TowerUsageMeterKind,
+  type TowerUsageScope,
+} from "@codalyn/webflow-kit";
 
-export type { TowerUsageMeterKind };
+export type { TowerUsageMeterKind, TowerUsageScope };
 
 export type TowerUsageLimitDetails = {
   kind: TowerUsageMeterKind;
   used: number;
   limit: number;
+  /** Enforcement scope of the breached meter (`workspace` = pooled Team pool). Absent on legacy bodies. */
+  usageScope?: TowerUsageScope;
 };
 
 export class TowerUsageLimitError extends Error {

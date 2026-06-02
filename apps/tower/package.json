@@ -6,6 +6,7 @@
   "description": "Tower — Codalyn backend + dashboard (Next.js on Vercel). Webflow Data API proxy for Beacon; image pipeline.",
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "dev:neon": "node scripts/dev.mjs dev",
     "build": "next build",
     "start": "next start",
     "lint": "biome check .",

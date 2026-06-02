@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     return jsonWithCors(request, { error: "id_token_resolve_failed" }, { status: 401 });
   }
 
-  const session = await establishDesignerBetterAuthSession(request, resolved);
+  const session = await establishDesignerBetterAuthSession(resolved);
   if (!session.ok) {
     console.warn(
       `[tower/webflow-designer] establish session failed for ${resolved.email}: ${session.status} ${session.message}`

@@ -17,6 +17,8 @@ describe("resolveWorkspaceCreationUiEligibility", () => {
     vi.mocked(resolveUserWorkspaceCreationEligibility).mockResolvedValue({
       canCreate: true,
       ownedWorkspaceCount: 0,
+      individualPlan: "free",
+      ownedWorkspaceAllowance: 1,
       hasIndividualPro: false,
     });
     vi.mocked(resolveTowerEntitlement).mockResolvedValue({ tier: "team", source: "workspace_team" });
@@ -30,6 +32,8 @@ describe("resolveWorkspaceCreationUiEligibility", () => {
     vi.mocked(resolveUserWorkspaceCreationEligibility).mockResolvedValue({
       canCreate: false,
       ownedWorkspaceCount: 1,
+      individualPlan: "free",
+      ownedWorkspaceAllowance: 1,
       hasIndividualPro: false,
     });
     vi.mocked(resolveTowerEntitlement).mockResolvedValue({ tier: "team", source: "workspace_team" });
@@ -43,6 +47,8 @@ describe("resolveWorkspaceCreationUiEligibility", () => {
     vi.mocked(resolveUserWorkspaceCreationEligibility).mockResolvedValue({
       canCreate: true,
       ownedWorkspaceCount: 2,
+      individualPlan: "pro",
+      ownedWorkspaceAllowance: 3,
       hasIndividualPro: true,
     });
     vi.mocked(resolveTowerEntitlement).mockResolvedValue({ tier: "team", source: "workspace_team" });

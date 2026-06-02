@@ -1,8 +1,12 @@
+import type { TowerPlanBillingScope } from "@codalyn/webflow-kit";
 import type { TowerEntitlement, TowerTier } from "@/server/billing/entitlements";
 import type { TowerLimitsSnapshot, TowerTierLimits } from "@/server/billing/tower-limits-config";
 import { isGlobalMeteringDisabled, tierLimitsFromSnapshot } from "@/server/billing/tower-limits-config";
 
 export type MeterKind = "webflowProxy" | "cmsWrite" | "image";
+
+/** Where a monthly meter is keyed and enforced: per individual user, or pooled across a paid workspace. */
+export type TowerUsageScopeKind = "user" | "workspace";
 
 export type MeteringOverrideFields = {
   meteringEnabled: boolean;
@@ -16,6 +20,10 @@ export type MeteringPolicyInput = {
   user: MeteringOverrideFields;
   organization: MeteringOverrideFields | null;
   limits: TowerLimitsSnapshot;
+  /** Defaults to `user`. `workspace` pools the cap across paid seats (Team). */
+  billingScope?: TowerPlanBillingScope;
+  /** Paid seats backing a pooled (`workspace`) cap. Ignored for `user` scope. Defaults to 1. */
+  paidSeatCount?: number;
 };
 
 export type MeteringPolicy = {
@@ -25,6 +33,10 @@ export type MeteringPolicy = {
   imageCap: number | null;
   tier: TowerTier;
   globalMeteringDisabled: boolean;
+  /** `workspace` when the resolved caps are pooled across the active paid Team workspace. */
+  usageScope: TowerUsageScopeKind;
+  /** Paid seats applied to pooled caps (1 for user scope). */
+  paidSeatCount: number;
 };
 
 export function utcYearMonth(date = new Date()): string {
@@ -60,7 +72,7 @@ function overrideField(fields: MeteringOverrideFields, kind: MeterKind): number 
   }
 }
 
-function resolveCap(
+function resolveUserScopeCap(
   kind: MeterKind,
   tier: TowerTier,
   user: MeteringOverrideFields,
@@ -78,22 +90,59 @@ function resolveCap(
   return tierDefaultCap(kind, tier, limits);
 }
 
+/**
+ * Pooled (Team) cap: an operator override on the workspace is treated as the absolute pool cap; otherwise
+ * the per-seat tier default is multiplied by paid seats. Individual (per-user) overrides do not apply to a
+ * shared pool.
+ */
+function resolveWorkspaceScopeCap(
+  kind: MeterKind,
+  tier: TowerTier,
+  organization: MeteringOverrideFields | null,
+  paidSeatCount: number,
+  limits: TowerLimitsSnapshot
+): number | null {
+  const orgOverride = organization === null ? null : overrideField(organization, kind);
+  if (orgOverride !== null) {
+    return orgOverride;
+  }
+  const perSeatCap = tierDefaultCap(kind, tier, limits);
+  return perSeatCap * Math.max(1, Math.trunc(paidSeatCount));
+}
+
+function resolveCap(
+  kind: MeterKind,
+  input: MeteringPolicyInput,
+  usageScope: TowerUsageScopeKind,
+  paidSeatCount: number
+): number | null {
+  if (usageScope === "workspace") {
+    return resolveWorkspaceScopeCap(kind, input.tier, input.organization, paidSeatCount, input.limits);
+  }
+  return resolveUserScopeCap(kind, input.tier, input.user, input.organization, input.limits);
+}
+
 export function resolveMeteringPolicy(input: MeteringPolicyInput): MeteringPolicy {
   const globalMeteringDisabled = isGlobalMeteringDisabled(input.limits);
+  const usageScope: TowerUsageScopeKind = input.billingScope === "workspace" ? "workspace" : "user";
+  const paidSeatCount = usageScope === "workspace" ? Math.max(1, Math.trunc(input.paidSeatCount ?? 1)) : 1;
+
+  // Pooled (workspace) metering is governed by the workspace toggle; per-member toggles are individual.
   const skipMetering =
     globalMeteringDisabled ||
-    !input.user.meteringEnabled ||
-    (input.organization !== null && !input.organization.meteringEnabled);
+    (usageScope === "workspace"
+      ? input.organization !== null && !input.organization.meteringEnabled
+      : !input.user.meteringEnabled || (input.organization !== null && !input.organization.meteringEnabled));
 
   return {
     skipMetering,
-    webflowProxyCap: skipMetering
-      ? null
-      : resolveCap("webflowProxy", input.tier, input.user, input.organization, input.limits),
-    cmsWriteCap: skipMetering ? null : resolveCap("cmsWrite", input.tier, input.user, input.organization, input.limits),
-    imageCap: skipMetering ? null : resolveCap("image", input.tier, input.user, input.organization, input.limits),
+    webflowProxyCap: skipMetering ? null : resolveCap("webflowProxy", input, usageScope, paidSeatCount),
+    cmsWriteCap: skipMetering ? null : resolveCap("cmsWrite", input, usageScope, paidSeatCount),
+    imageCap: skipMetering ? null : resolveCap("image", input, usageScope, paidSeatCount),
     tier: input.tier,
     globalMeteringDisabled,
+    usageScope,
+    paidSeatCount,
   };
 }
 
@@ -101,14 +150,32 @@ export function resolveMeteringPolicyFromEntitlement(
   entitlement: TowerEntitlement,
   user: MeteringOverrideFields,
   organization: MeteringOverrideFields | null,
-  limits: TowerLimitsSnapshot
+  limits: TowerLimitsSnapshot,
+  opts?: { billingScope?: TowerPlanBillingScope; paidSeatCount?: number }
 ): MeteringPolicy {
   return resolveMeteringPolicy({
     tier: entitlement.tier,
     user,
     organization,
     limits,
+    billingScope: opts?.billingScope,
+    paidSeatCount: opts?.paidSeatCount,
   });
+}
+
+export type ReservationDecision = { blocked: boolean; used: number };
+
+/**
+ * Pure reservation decision for a monthly meter: reserve `units` (≥1) only when the whole amount
+ * fits under `cap`. A single request whose cost exceeds the remaining allowance is blocked (we never
+ * partially reserve). Returns the post-reserve `used` count, or the unchanged count when blocked.
+ */
+export function reserveUnits(current: number, cap: number, units: number): ReservationDecision {
+  const amount = Math.max(1, Math.trunc(units));
+  if (current + amount > cap) {
+    return { blocked: true, used: current };
+  }
+  return { blocked: false, used: current + amount };
 }
 
 export function capForMeterKind(policy: MeteringPolicy, kind: MeterKind): number | null {
@@ -122,9 +189,17 @@ export function capForMeterKind(policy: MeteringPolicy, kind: MeterKind): number
   }
 }
 
-/** Tier default cap for progress bar scale when metering is skipped (`limit` is null). */
-export function referenceCapForMeterKind(tier: TowerTier, kind: MeterKind, limits: TowerLimitsSnapshot): number {
-  return tierDefaultCap(kind, tier, limits);
+/**
+ * Tier default cap for progress bar scale when metering is skipped (`limit` is null). For pooled
+ * (workspace) scope, the reference is multiplied by paid seats to match the enforced pool size.
+ */
+export function referenceCapForMeterKind(
+  tier: TowerTier,
+  kind: MeterKind,
+  limits: TowerLimitsSnapshot,
+  paidSeatCount = 1
+): number {
+  return tierDefaultCap(kind, tier, limits) * Math.max(1, Math.trunc(paidSeatCount));
 }
 
 export function parseLimitOverrideField(raw: unknown): number | null | "invalid" {

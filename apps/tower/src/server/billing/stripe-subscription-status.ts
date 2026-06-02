@@ -16,18 +16,39 @@ export function subscriptionPlanForStatus(stripeStatus: Stripe.Subscription.Stat
   return isStripeSubscriptionProEntitled(stripeStatus) ? "pro" : "free";
 }
 
-/** True when persisted user row reflects an active individual Stripe Pro subscription. */
-export function userRowHasStripePro(u: {
+/** Individual (user-scoped) paid plans stored on `user.subscription_plan`. Team is workspace-scoped. */
+export const INDIVIDUAL_PAID_PLANS = ["pro", "studio"] as const;
+
+export type IndividualPaidPlan = (typeof INDIVIDUAL_PAID_PLANS)[number];
+
+export function isIndividualPaidPlan(raw: string | null | undefined): raw is IndividualPaidPlan {
+  return raw === "pro" || raw === "studio";
+}
+
+/** The active individual paid plan reflected by a persisted user row, or null when none applies. */
+export function userRowIndividualPlan(u: {
+  subscriptionPlan: string | null;
+  subscriptionStatus: string | null;
+  stripeSubscriptionId: string | null;
+}): IndividualPaidPlan | null {
+  if (
+    isIndividualPaidPlan(u.subscriptionPlan) &&
+    Boolean(u.stripeSubscriptionId) &&
+    typeof u.subscriptionStatus === "string" &&
+    STRIPE_PRO_ENTITLED_STATUSES.has(u.subscriptionStatus as Stripe.Subscription.Status)
+  ) {
+    return u.subscriptionPlan;
+  }
+  return null;
+}
+
+/** True when persisted user row reflects an active individual paid subscription (Pro or Studio). */
+export function userRowHasIndividualPaidPlan(u: {
   subscriptionPlan: string | null;
   subscriptionStatus: string | null;
   stripeSubscriptionId: string | null;
 }): boolean {
-  return (
-    u.subscriptionPlan === "pro" &&
-    Boolean(u.stripeSubscriptionId) &&
-    typeof u.subscriptionStatus === "string" &&
-    STRIPE_PRO_ENTITLED_STATUSES.has(u.subscriptionStatus as Stripe.Subscription.Status)
-  );
+  return userRowIndividualPlan(u) !== null;
 }
 
 /** True when persisted organization row reflects an active self-serve Stripe team subscription. */

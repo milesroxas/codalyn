@@ -1,9 +1,14 @@
+import { towerIndividualOwnedWorkspaceAllowance } from "@codalyn/webflow-kit";
 import { describe, expect, it } from "vitest";
 import {
   FREE_TIER_OWNED_WORKSPACE_LIMIT,
   resolveUserWorkspaceCreationEligibilityFromRow,
   userMayCreateAnotherWorkspace,
 } from "@/server/membership/user-workspace-creation-eligibility";
+
+const FREE_ALLOWANCE = towerIndividualOwnedWorkspaceAllowance("free");
+const PRO_ALLOWANCE = towerIndividualOwnedWorkspaceAllowance("pro");
+const STUDIO_ALLOWANCE = towerIndividualOwnedWorkspaceAllowance("studio");
 
 const baseRow = {
   id: "user-1",
@@ -15,81 +20,102 @@ const baseRow = {
 };
 
 describe("userMayCreateAnotherWorkspace", () => {
-  it("allows first owned workspace on free plan", () => {
+  it("allows the first owned workspace on the free allowance", () => {
     expect(
       userMayCreateAnotherWorkspace(0, {
         isProductAdmin: false,
         canCreateOrganizationOverride: false,
-        hasIndividualPro: false,
+        ownedWorkspaceAllowance: FREE_ALLOWANCE,
       })
     ).toBe(true);
   });
 
-  it("blocks second owned workspace on free plan", () => {
+  it("blocks a second owned workspace on the free allowance", () => {
     expect(
-      userMayCreateAnotherWorkspace(FREE_TIER_OWNED_WORKSPACE_LIMIT, {
+      userMayCreateAnotherWorkspace(FREE_ALLOWANCE, {
         isProductAdmin: false,
         canCreateOrganizationOverride: false,
-        hasIndividualPro: false,
+        ownedWorkspaceAllowance: FREE_ALLOWANCE,
       })
     ).toBe(false);
   });
 
-  it("allows additional workspaces with individual Pro", () => {
+  it("allows Pro users up to their owned-workspace allowance", () => {
     expect(
-      userMayCreateAnotherWorkspace(2, {
+      userMayCreateAnotherWorkspace(PRO_ALLOWANCE - 1, {
         isProductAdmin: false,
         canCreateOrganizationOverride: false,
-        hasIndividualPro: true,
+        ownedWorkspaceAllowance: PRO_ALLOWANCE,
       })
     ).toBe(true);
+  });
+
+  it("blocks Pro users once they reach their owned-workspace allowance", () => {
+    expect(
+      userMayCreateAnotherWorkspace(PRO_ALLOWANCE, {
+        isProductAdmin: false,
+        canCreateOrganizationOverride: false,
+        ownedWorkspaceAllowance: PRO_ALLOWANCE,
+      })
+    ).toBe(false);
+  });
+
+  it("allows Studio users their larger owned-workspace allowance", () => {
+    expect(
+      userMayCreateAnotherWorkspace(STUDIO_ALLOWANCE - 1, {
+        isProductAdmin: false,
+        canCreateOrganizationOverride: false,
+        ownedWorkspaceAllowance: STUDIO_ALLOWANCE,
+      })
+    ).toBe(true);
+    expect(
+      userMayCreateAnotherWorkspace(STUDIO_ALLOWANCE, {
+        isProductAdmin: false,
+        canCreateOrganizationOverride: false,
+        ownedWorkspaceAllowance: STUDIO_ALLOWANCE,
+      })
+    ).toBe(false);
+  });
+
+  it("does not let Team membership grant extra owned workspaces (allowance stays the free allowance)", () => {
+    // A free user who only collaborates in a paid Team workspace still resolves the free allowance.
+    expect(
+      userMayCreateAnotherWorkspace(FREE_ALLOWANCE, {
+        isProductAdmin: false,
+        canCreateOrganizationOverride: false,
+        ownedWorkspaceAllowance: FREE_ALLOWANCE,
+      })
+    ).toBe(false);
   });
 
   it("allows product admins regardless of count", () => {
     expect(
-      userMayCreateAnotherWorkspace(5, {
+      userMayCreateAnotherWorkspace(STUDIO_ALLOWANCE + 5, {
         isProductAdmin: true,
         canCreateOrganizationOverride: false,
-        hasIndividualPro: false,
+        ownedWorkspaceAllowance: FREE_ALLOWANCE,
       })
     ).toBe(true);
   });
 
-  it("allows ops override for additional owned workspaces without Pro", () => {
+  it("allows the operator override beyond the plan allowance", () => {
     expect(
-      userMayCreateAnotherWorkspace(FREE_TIER_OWNED_WORKSPACE_LIMIT, {
+      userMayCreateAnotherWorkspace(PRO_ALLOWANCE, {
         isProductAdmin: false,
         canCreateOrganizationOverride: true,
-        hasIndividualPro: false,
+        ownedWorkspaceAllowance: PRO_ALLOWANCE,
       })
     ).toBe(true);
-  });
-
-  it("does not use ops override to skip the first free workspace slot", () => {
-    expect(
-      userMayCreateAnotherWorkspace(0, {
-        isProductAdmin: false,
-        canCreateOrganizationOverride: true,
-        hasIndividualPro: false,
-      })
-    ).toBe(true);
-  });
-
-  it("blocks second owned workspace when override is false and not Pro", () => {
-    expect(
-      userMayCreateAnotherWorkspace(FREE_TIER_OWNED_WORKSPACE_LIMIT, {
-        isProductAdmin: false,
-        canCreateOrganizationOverride: false,
-        hasIndividualPro: false,
-      })
-    ).toBe(false);
   });
 });
 
 describe("resolveUserWorkspaceCreationEligibilityFromRow", () => {
-  it("does not count toward limit when user only has non-admin memberships elsewhere", async () => {
+  it("resolves the free allowance for a user with only non-admin memberships elsewhere", async () => {
     const result = await resolveUserWorkspaceCreationEligibilityFromRow(baseRow, 0);
     expect(result.canCreate).toBe(true);
     expect(result.ownedWorkspaceCount).toBe(0);
+    expect(result.individualPlan).toBe("free");
+    expect(result.ownedWorkspaceAllowance).toBe(FREE_TIER_OWNED_WORKSPACE_LIMIT);
+    expect(result.hasIndividualPro).toBe(false);
   });
 });

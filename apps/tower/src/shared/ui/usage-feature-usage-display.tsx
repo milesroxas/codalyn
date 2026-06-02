@@ -27,8 +27,8 @@ export function UsageFeatureUsageDisplay(props: UsageFeatureUsageDisplayProps) {
             ))}
             {group.feature === "imageUpload" ? (
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Publishing images to CMS collection fields uses Designer API requests in CMS Slots above, not AVIF
-                exports.
+                Publishing images to CMS collection fields uses Designer API requests in CMS Slots above, not image
+                optimization credits.
               </p>
             ) : null}
           </div>

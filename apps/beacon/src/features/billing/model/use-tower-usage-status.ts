@@ -1,4 +1,5 @@
 import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
+import { normalizeTowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
 import { useCallback, useEffect, useState } from "react";
 import { towerFetch } from "@/shared/lib/tower-client";
 
@@ -22,7 +23,8 @@ export function useTowerUsageStatus(enabled: boolean): {
           setStatus(null);
           return;
         }
-        setStatus((await res.json()) as TowerUsageStatusSnapshot);
+        const raw: unknown = await res.json();
+        setStatus(normalizeTowerUsageStatusSnapshot(raw));
       })
       .catch(() => {
         setStatus(null);

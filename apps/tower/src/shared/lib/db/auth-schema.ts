@@ -403,6 +403,31 @@ export const towerUsageMonth = pgTable(
   (table) => [uniqueIndex("tower_usage_month_user_ym").on(table.userId, table.yearMonth)]
 );
 
+/**
+ * Monthly pooled usage for a paid Team workspace; resets by calendar month. Team metering is enforced
+ * against this shared pool (per-seat cap × paid seats), not each member's individual `tower_usage_month`.
+ */
+export const towerWorkspaceUsageMonth = pgTable(
+  "tower_workspace_usage_month",
+  {
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    /** `YYYY-MM` (UTC) */
+    yearMonth: text("year_month").notNull(),
+    webflowProxyRequestCount: integer("webflow_proxy_request_count").notNull().default(0),
+    webflowProxyCmsSlotsCount: integer("webflow_proxy_cms_slots_count").notNull().default(0),
+    webflowProxyImageUploadCmsCount: integer("webflow_proxy_image_upload_cms_count").notNull().default(0),
+    cmsWriteCount: integer("cms_write_count").notNull().default(0),
+    imageOptimizeCount: integer("image_optimize_count").notNull().default(0),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [uniqueIndex("tower_workspace_usage_month_org_ym").on(table.organizationId, table.yearMonth)]
+);
+
 /** Singleton platform defaults for monthly usage metering (Operator-managed). */
 export const towerPlatformMetering = pgTable("tower_platform_metering", {
   id: text("id").primaryKey(),
@@ -413,6 +438,9 @@ export const towerPlatformMetering = pgTable("tower_platform_metering", {
   proWebflowProxyRequestsPerMonth: integer("pro_webflow_proxy_requests_per_month").notNull(),
   proCmsWritesPerMonth: integer("pro_cms_writes_per_month").notNull(),
   proImageOptimizesPerMonth: integer("pro_image_optimizes_per_month").notNull(),
+  studioWebflowProxyRequestsPerMonth: integer("studio_webflow_proxy_requests_per_month").notNull().default(60_000),
+  studioCmsWritesPerMonth: integer("studio_cms_writes_per_month").notNull().default(12_000),
+  studioImageOptimizesPerMonth: integer("studio_image_optimizes_per_month").notNull().default(3_000),
   teamWebflowProxyRequestsPerMonth: integer("team_webflow_proxy_requests_per_month").notNull(),
   teamCmsWritesPerMonth: integer("team_cms_writes_per_month").notNull(),
   teamImageOptimizesPerMonth: integer("team_image_optimizes_per_month").notNull(),

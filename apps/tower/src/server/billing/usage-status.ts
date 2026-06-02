@@ -4,16 +4,19 @@ import {
   buildTowerUsageMeterSnapshot,
   hasTowerUsageDesignerApiBreakdown,
   pickApproachingUsageMeters,
+  towerPlanBillingScope,
+  towerPlanName,
 } from "@codalyn/webflow-kit";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import {
   capForMeterKind,
+  EMPTY_METERING_OVERRIDES,
   referenceCapForMeterKind,
   resolveMeteringPolicyFromEntitlement,
   resolveUsageLimitsKind,
 } from "@/server/billing/metering-policy";
 import { getTowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
-import { getUsageSnapshot, loadMeteringOverrideFields } from "@/server/billing/usage-gate";
+import { getUsageSnapshotForScope, loadMeteringOverrideFields, resolveUsageScope } from "@/server/billing/usage-gate";
 
 export async function fetchEndUserUsageStatus(
   userId: string,
@@ -21,28 +24,32 @@ export async function fetchEndUserUsageStatus(
 ): Promise<TowerUsageStatusSnapshot> {
   const overrides = await loadMeteringOverrideFields(userId, activeOrganizationId);
   const entitlement = await resolveTowerEntitlement(userId, activeOrganizationId);
-  const usage = await getUsageSnapshot(userId);
   const limits = await getTowerLimitsSnapshot();
-  const policy = resolveMeteringPolicyFromEntitlement(entitlement, overrides.user, overrides.organization, limits);
+  const policy = resolveMeteringPolicyFromEntitlement(entitlement, overrides.user, overrides.organization, limits, {
+    billingScope: towerPlanBillingScope(entitlement.tier),
+    paidSeatCount: overrides.paidSeatCount,
+  });
+  const scope = resolveUsageScope(entitlement.tier, userId, activeOrganizationId);
+  const usage = await getUsageSnapshotForScope(scope);
 
   const meters = [
     buildTowerUsageMeterSnapshot(
       "webflowProxy",
       usage.webflowProxyRequestCount,
       capForMeterKind(policy, "webflowProxy"),
-      referenceCapForMeterKind(policy.tier, "webflowProxy", limits)
+      referenceCapForMeterKind(policy.tier, "webflowProxy", limits, policy.paidSeatCount)
     ),
     buildTowerUsageMeterSnapshot(
       "cmsWrite",
       usage.cmsWriteCount,
       capForMeterKind(policy, "cmsWrite"),
-      referenceCapForMeterKind(policy.tier, "cmsWrite", limits)
+      referenceCapForMeterKind(policy.tier, "cmsWrite", limits, policy.paidSeatCount)
     ),
     buildTowerUsageMeterSnapshot(
       "image",
       usage.imageOptimizeCount,
       capForMeterKind(policy, "image"),
-      referenceCapForMeterKind(policy.tier, "image", limits)
+      referenceCapForMeterKind(policy.tier, "image", limits, policy.paidSeatCount)
     ),
   ];
 
@@ -54,7 +61,18 @@ export async function fetchEndUserUsageStatus(
   return {
     yearMonth: usage.yearMonth,
     tier: entitlement.tier,
-    limitsKind: resolveUsageLimitsKind(policy, overrides.user, overrides.organization),
+    plan: {
+      key: entitlement.tier,
+      name: towerPlanName(entitlement.tier),
+      billingScope: towerPlanBillingScope(entitlement.tier),
+    },
+    usageScope: policy.usageScope,
+    // Pooled (workspace) caps ignore per-member user overrides, so they must not flag "custom" limits.
+    limitsKind: resolveUsageLimitsKind(
+      policy,
+      policy.usageScope === "workspace" ? EMPTY_METERING_OVERRIDES : overrides.user,
+      overrides.organization
+    ),
     metered: !policy.skipMetering,
     meters,
     approachingMeters: pickApproachingUsageMeters(meters),

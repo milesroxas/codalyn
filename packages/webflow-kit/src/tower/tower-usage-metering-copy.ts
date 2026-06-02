@@ -1,9 +1,19 @@
-import type { TowerUsageMeterKind } from "./tower-usage-metering.js";
+import type { TowerUsageMeterKind, TowerUsageScope } from "./tower-usage-metering.js";
 import { formatTowerUsageRatio } from "./tower-usage-metering.js";
 import type { TowerUsageProductFeature } from "./tower-usage-product-feature.js";
 import { parseTowerUsageProductFeature, towerUsageProductFeatureLabel } from "./tower-usage-product-feature.js";
 
 export const TOWER_USAGE_APPROACHING_ALERT_TITLE = "Approaching monthly usage limit";
+
+/**
+ * One-line explanation of how the reported usage is scoped, so UIs never imply Team is just higher
+ * per-user caps. Workspace scope is a shared pool; user scope follows the individual across workspaces.
+ */
+export function towerUsageScopeSummary(usageScope: TowerUsageScope): string {
+  return usageScope === "workspace"
+    ? "Pooled across this workspace and shared by everyone on it. The pool scales with paid seats."
+    : "Applies to you across your solo and unpaid workspaces.";
+}
 
 export function towerUsageMeterLabel(kind: TowerUsageMeterKind): string {
   switch (kind) {
@@ -12,7 +22,7 @@ export function towerUsageMeterLabel(kind: TowerUsageMeterKind): string {
     case "cmsWrite":
       return "Layout saves";
     case "image":
-      return "AVIF exports";
+      return "Image optimization credits";
   }
 }
 
@@ -27,8 +37,8 @@ export const TOWER_USAGE_METER_CONTRIBUTING_ACTIONS: Record<TowerUsageMeterKind,
   ],
   cmsWrite: ["CMS Slots — Saving a block-based layout composition in Composer"],
   image: [
-    "Image Upload — Exporting an image as AVIF",
-    "Image Upload — Previewing AVIF size estimates while adjusting crop, size, or quality",
+    "Image Upload — Optimizing an AVIF image export through Tower",
+    "Image Upload — Previewing optimized size estimates while adjusting crop, size, or quality",
   ],
 };
 
@@ -129,7 +139,7 @@ export function towerUsageMeterTooltipContent(kind: TowerUsageMeterKind): TowerU
         actionGroups,
         footnoteHeading: TOWER_USAGE_METER_TOOLTIP_FOOTNOTE_HEADING,
         footnote:
-          "Layout saves and AVIF exports have their own monthly limits. One action may use more than one Webflow request.",
+          "Layout saves and image optimization credits have their own monthly limits. One action may use more than one Webflow request.",
       };
     case "cmsWrite":
       return {
@@ -140,18 +150,18 @@ export function towerUsageMeterTooltipContent(kind: TowerUsageMeterKind): TowerU
         actionGroups,
         footnoteHeading: TOWER_USAGE_METER_TOOLTIP_FOOTNOTE_HEADING,
         footnote:
-          "Designer API requests and AVIF exports have their own monthly limits. Saving slot order to a CMS text field counts toward Designer API requests instead. Loading layouts does not count.",
+          "Designer API requests and image optimization credits have their own monthly limits. Saving slot order to a CMS text field counts toward Designer API requests instead. Loading layouts does not count.",
       };
     case "image":
       return {
-        title: "AVIF export limit",
+        title: "Image optimization credit limit",
         summary:
-          "Beacon uses this limit when Image Upload optimizes images through Tower. Each AVIF optimize request counts as one.",
+          "Beacon uses these credits when Image Upload optimizes images through Tower. Larger or higher-effort optimizations use more credits.",
         sectionHeading: TOWER_USAGE_METER_TOOLTIP_SECTION_HEADING,
         actionGroups,
         footnoteHeading: TOWER_USAGE_METER_TOOLTIP_FOOTNOTE_HEADING,
         footnote:
-          "Designer API requests and layout saves have their own monthly limits. WebP exports in the Designer do not count toward this limit.",
+          "Designer API requests and layout saves have their own monthly limits. WebP exports in the Designer do not use credits.",
       };
   }
 }
@@ -181,15 +191,15 @@ export function towerUsageApproachingAlertDescription(
   const lines = meters.map(
     (meter) => `${towerUsageMeterLabel(meter.kind)}: ${formatTowerUsageRatio(meter.used, meter.limit)}`
   );
-  return `You have used at least 80% of your monthly allowance for ${lines.join("; ")}. Upgrade to Pro or wait until the month resets.`;
+  return `You have used at least 80% of your monthly allowance for ${lines.join("; ")}. These limits reset at the start of next month.`;
 }
 
 export const TOWER_USAGE_LIMIT_DIALOG_TITLE = "Monthly limit reached";
 
-export const TOWER_AVIF_LIMIT_FALLBACK_TITLE = "Monthly AVIF limit reached";
+export const TOWER_AVIF_LIMIT_FALLBACK_TITLE = "Image optimization credits used up";
 
 export const TOWER_AVIF_LIMIT_FALLBACK_DESCRIPTION =
-  "You've reached your AVIF export limit for this preview period. This preset will export as WebP until your limit resets.";
+  "You've used all your image optimization credits for this period. AVIF presets will export as WebP until your credits reset.";
 
 export function towerUsageLimitDialogTitle(kind: TowerUsageMeterKind): string {
   if (kind === "image") {
@@ -204,13 +214,14 @@ export function towerUsageLimitDialogDescription(kind: TowerUsageMeterKind): str
     return `${TOWER_AVIF_LIMIT_FALLBACK_DESCRIPTION} Applies to ${scope}.`;
   }
   if (kind === "cmsWrite") {
-    return `You've used your free plan allowance for CMS layout saves through Tower this month. Applies to ${scope}. Composer text-field saves count toward Designer API requests instead.`;
+    return `You've reached your monthly limit for CMS layout saves through Tower this month. Applies to ${scope}. Composer text-field saves count toward Designer API requests instead.`;
   }
-  return `You've used your free plan allowance for Designer API requests through Tower this month. Applies to ${scope}.`;
+  return `You've reached your monthly limit for Designer API requests through Tower this month. Applies to ${scope}.`;
 }
 
 export function towerUsageLimitDialogUsageLine(used: number, limit: number, kind: TowerUsageMeterKind): string {
-  const label = kind === "image" ? "AVIF exports" : kind === "cmsWrite" ? "layout saves" : "Designer API requests";
+  const label =
+    kind === "image" ? "image optimization credits" : kind === "cmsWrite" ? "layout saves" : "Designer API requests";
   return `${used.toLocaleString()} / ${limit.toLocaleString()} ${label} used this month.`;
 }
 

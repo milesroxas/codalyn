@@ -20,14 +20,34 @@ export type TowerUsageMeterSnapshot = {
 /** How monthly caps are determined for the signed-in account (operator overrides vs tier defaults). */
 export type TowerUsageLimitsKind = "standard" | "custom" | "unmetered";
 
-/** Monthly usage cap tier for the signed-in user in the active workspace context. */
-export type TowerUsageTier = "free" | "pro" | "team";
+/** Monthly usage cap tier for the signed-in user in the active workspace context (1:1 with plan key). */
+export type TowerUsageTier = TowerPlanKey;
 
+import type { TowerPlanBillingScope, TowerPlanKey } from "./tower-plan-catalog.js";
+import { normalizeTowerPlanKey, towerPlanName } from "./tower-plan-catalog.js";
 import type { TowerUsageDesignerApiBreakdown } from "./webflow-proxy-usage-category.js";
+
+/** Plan context for rendering accurate labels in Tower and Beacon. */
+export type TowerUsagePlanContext = {
+  key: TowerPlanKey;
+  /** Customer-facing marketing name (e.g. "Studio"). */
+  name: string;
+  billingScope: TowerPlanBillingScope;
+};
+
+/** Whether the reported meters are enforced per individual user or pooled across the paid workspace. */
+export type TowerUsageScope = "user" | "workspace";
 
 export type TowerUsageStatusSnapshot = {
   yearMonth: string;
   tier: TowerUsageTier;
+  /** Plan-aware context (key/name/billing scope) for accurate Tower + Beacon labels. */
+  plan: TowerUsagePlanContext;
+  /**
+   * Actual enforcement scope for the reported meters. `workspace` means the counts and caps are pooled
+   * across the active paid Team workspace; `user` means they are scoped to the signed-in user.
+   */
+  usageScope: TowerUsageScope;
   /** `custom` = operator-set caps; `unmetered` = metering disabled by operator or platform. */
   limitsKind: TowerUsageLimitsKind;
   metered: boolean;
@@ -104,6 +124,112 @@ function parseUsageCount(raw: unknown): number | null {
     return null;
   }
   return Math.trunc(raw);
+}
+
+const TOWER_USAGE_LIMITS_KINDS: readonly TowerUsageLimitsKind[] = ["standard", "custom", "unmetered"];
+const TOWER_USAGE_METER_LEVELS: readonly UsageMeterLevel[] = ["unmetered", "ok", "approaching", "exceeded"];
+
+function normalizeNonNegativeInt(raw: unknown): number | null {
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) {
+    return null;
+  }
+  return Math.trunc(raw);
+}
+
+function normalizeLimit(raw: unknown): number | null {
+  if (raw === null) {
+    return null;
+  }
+  return normalizeNonNegativeInt(raw);
+}
+
+function normalizeUsageMeterSnapshot(raw: unknown): TowerUsageMeterSnapshot | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const value = raw as Record<string, unknown>;
+  const kind = normalizeTowerUsageMeterKind(typeof value.kind === "string" ? value.kind : undefined);
+  const used = normalizeNonNegativeInt(value.used);
+  if (kind == null || used == null) {
+    return null;
+  }
+  const limit = "limit" in value ? normalizeLimit(value.limit) : null;
+  const progressMax = normalizeNonNegativeInt(value.progressMax) ?? limit ?? Math.max(used, 1);
+  const level =
+    typeof value.level === "string" && (TOWER_USAGE_METER_LEVELS as readonly string[]).includes(value.level)
+      ? (value.level as UsageMeterLevel)
+      : classifyUsageMeter(used, limit);
+  return { kind, used, limit, progressMax, level };
+}
+
+function normalizeUsagePlanContext(raw: unknown, fallbackTier: TowerUsageTier): TowerUsagePlanContext {
+  const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const key = normalizeTowerPlanKey(value.key) ?? fallbackTier;
+  const name = typeof value.name === "string" && value.name.length > 0 ? value.name : towerPlanName(key);
+  const billingScope = value.billingScope === "workspace" ? "workspace" : "user";
+  return { key, name, billingScope };
+}
+
+function normalizeDesignerApiBreakdown(raw: unknown): TowerUsageDesignerApiBreakdown | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const value = raw as Record<string, unknown>;
+  const cmsSlots = normalizeNonNegativeInt(value.cmsSlots);
+  const imageUploadCms = normalizeNonNegativeInt(value.imageUploadCms);
+  if (cmsSlots == null || imageUploadCms == null) {
+    return null;
+  }
+  return { cmsSlots, imageUploadCms };
+}
+
+/**
+ * Runtime-safe parse of a Tower usage status payload (Beacon receives this over the wire).
+ * Validates known fields and degrades gracefully on unknown/new shapes; returns null only when
+ * the payload is fundamentally unusable (missing year-month or no parseable meters).
+ */
+export function normalizeTowerUsageStatusSnapshot(raw: unknown): TowerUsageStatusSnapshot | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const value = raw as Record<string, unknown>;
+  if (typeof value.yearMonth !== "string" || value.yearMonth.length === 0) {
+    return null;
+  }
+  const tier = normalizeTowerPlanKey(value.tier) ?? "free";
+  const plan = normalizeUsagePlanContext(value.plan, tier);
+  const usageScope: TowerUsageScope = value.usageScope === "workspace" ? "workspace" : "user";
+  const limitsKind =
+    typeof value.limitsKind === "string" && (TOWER_USAGE_LIMITS_KINDS as readonly string[]).includes(value.limitsKind)
+      ? (value.limitsKind as TowerUsageLimitsKind)
+      : "standard";
+  const meters = Array.isArray(value.meters)
+    ? value.meters.flatMap((meter) => {
+        const normalized = normalizeUsageMeterSnapshot(meter);
+        return normalized ? [normalized] : [];
+      })
+    : [];
+  if (meters.length === 0) {
+    return null;
+  }
+  const approachingMeters = Array.isArray(value.approachingMeters)
+    ? value.approachingMeters.flatMap((meter) => {
+        const normalized = normalizeUsageMeterSnapshot(meter);
+        return normalized ? [normalized] : [];
+      })
+    : pickApproachingUsageMeters(meters);
+
+  return {
+    yearMonth: value.yearMonth,
+    tier,
+    plan,
+    usageScope,
+    limitsKind,
+    metered: typeof value.metered === "boolean" ? value.metered : true,
+    meters,
+    approachingMeters,
+    designerApiBreakdown: normalizeDesignerApiBreakdown(value.designerApiBreakdown),
+  };
 }
 
 /** Parses Tower `/api/v1/*` and `/api/v2/*` 402 JSON bodies (`TOWER_USAGE_LIMIT`). */

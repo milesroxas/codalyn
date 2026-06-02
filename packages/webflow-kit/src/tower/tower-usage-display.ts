@@ -17,7 +17,7 @@ const TOWER_USAGE_FEATURE_LABELS: Record<TowerUsageFeatureKey, { label: string; 
   },
   imageUpload: {
     label: towerUsageProductFeatureLabel("imageUpload"),
-    description: "AVIF exports and publishing images to CMS collection fields.",
+    description: "Image optimization credits and publishing images to CMS collection fields.",
   },
 };
 

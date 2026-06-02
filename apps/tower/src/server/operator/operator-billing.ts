@@ -4,7 +4,7 @@ import {
   type OrganizationBillingRow,
   organizationBillingPlanLabel,
 } from "@/server/billing/organization-billing";
-import { userRowHasStripePro } from "@/server/billing/stripe-subscription-status";
+import { userRowHasIndividualPaidPlan } from "@/server/billing/stripe-subscription-status";
 import type { OperatorWorkspaceBillingMode, OperatorWorkspacePatch } from "@/server/operator/types";
 
 /** Stripe subscription id on a row means webhook-synced billing fields must not be operator-patched. */
@@ -76,7 +76,7 @@ export function buildOperatorUserBillingSnapshot(row: OperatorUserBillingRow): O
     billingManagedByStripe: isOperatorBillingManagedByStripe(row.stripeSubscriptionId),
     hasStripePro:
       isTowerBillingEnabled() &&
-      userRowHasStripePro({
+      userRowHasIndividualPaidPlan({
         subscriptionPlan: row.subscriptionPlan,
         subscriptionStatus: row.subscriptionStatus,
         stripeSubscriptionId: row.stripeSubscriptionId,

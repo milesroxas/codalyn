@@ -1,10 +1,12 @@
 import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
+import { towerPlanName } from "@codalyn/webflow-kit";
 import { IconBuilding, IconExternalLink, IconUser } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
 import { WorkspaceSeatUsageBlock } from "@/features/billing/ui/workspace-seat-usage-block";
 import { WorkspaceTeamCheckoutForm } from "@/features/team/ui/workspace-team-checkout-form";
 import type { TowerEntitlement } from "@/server/billing/entitlements";
+import type { IndividualPaidPlan } from "@/server/billing/stripe-subscription-status";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import { usageLimitsKindBadgeLabel, usageLimitsKindDetailLine, usagePlanBadgeLabel } from "@/shared/lib/usage-display";
 import { cn } from "@/shared/lib/utils";
@@ -21,12 +23,14 @@ import { UsageLimitsTable } from "@/shared/ui/usage-limits-table";
 
 type TowerBillingScreenProps = {
   email: string | null | undefined;
-  hasIndividualPro: boolean;
+  /** Active individual paid plan (Pro or Studio) on the `user` row, or null when on Free. */
+  individualPlan: IndividualPaidPlan | null;
   entitlement: TowerEntitlement;
   usageStatus: TowerUsageStatusSnapshot;
-  /** Individual Pro subscription status from `user` row; omit when the user has no individual Pro. */
+  /** Individual subscription status from `user` row; omit when the user has no individual subscription. */
   individualSubscriptionStatus?: string | null;
   checkoutAvailable: boolean;
+  studioCheckoutAvailable: boolean;
   showIndividualPortal: boolean;
   activeOrganizationId: string | null;
   activeOrganizationName: string | null;
@@ -95,56 +99,91 @@ function BillingMetadataGrid(props: { items: BillingMetadataItem[] }) {
   );
 }
 
+function IndividualPlanCheckoutButton(props: { plan: IndividualPaidPlan; variant?: "default" | "outline" }) {
+  const { plan, variant = "default" } = props;
+  return (
+    <form action="/api/billing/checkout" method="post">
+      <input type="hidden" name="plan" value={plan} />
+      <Button type="submit" variant={variant}>
+        Subscribe to {towerPlanName(plan)}
+      </Button>
+    </form>
+  );
+}
+
+function individualPlanCaption(planLabel: string, hasIndividualPlan: boolean, teamWorkspaceActive: boolean): string {
+  if (!hasIndividualPlan) {
+    return "Higher limits on workspaces you own, plus the ability to create additional workspaces.";
+  }
+  if (teamWorkspaceActive) {
+    return "Active on this account. Team workspace limits take precedence while that workspace is selected.";
+  }
+  return `${planLabel} limits apply on workspaces you own.`;
+}
+
+function IndividualSubscriptionActions(props: {
+  showUpgrade: boolean;
+  checkoutAvailable: boolean;
+  studioCheckoutAvailable: boolean;
+  showIndividualPortal: boolean;
+}) {
+  const { showUpgrade, checkoutAvailable, studioCheckoutAvailable, showIndividualPortal } = props;
+  if (!(showUpgrade || showIndividualPortal)) {
+    return null;
+  }
+  return (
+    <CardAction align="center" group>
+      {showUpgrade && checkoutAvailable ? <IndividualPlanCheckoutButton plan="pro" /> : null}
+      {showUpgrade && studioCheckoutAvailable ? <IndividualPlanCheckoutButton plan="studio" variant="outline" /> : null}
+      {showIndividualPortal ? (
+        <Button asChild variant="outline">
+          <a href="/api/billing/portal">Manage subscription</a>
+        </Button>
+      ) : null}
+    </CardAction>
+  );
+}
+
 function IndividualSubscriptionCard(props: {
-  hasIndividualPro: boolean;
+  individualPlan: IndividualPaidPlan | null;
   individualSubscriptionStatus?: string | null;
   checkoutAvailable: boolean;
+  studioCheckoutAvailable: boolean;
   showIndividualPortal: boolean;
   teamWorkspaceActive: boolean;
 }) {
   const {
-    hasIndividualPro,
+    individualPlan,
     individualSubscriptionStatus,
     checkoutAvailable,
+    studioCheckoutAvailable,
     showIndividualPortal,
     teamWorkspaceActive,
   } = props;
 
-  const planLabel = hasIndividualPro ? "Pro" : "Free";
-  const statusLine = hasIndividualPro ? formatSubscriptionStatus(individualSubscriptionStatus) : null;
-  const showUpgrade = !hasIndividualPro && checkoutAvailable;
-  const showActions = showUpgrade || showIndividualPortal;
-
-  const planCaption = hasIndividualPro
-    ? teamWorkspaceActive
-      ? "Active on this account. Team workspace limits take precedence while that workspace is selected."
-      : "Pro limits apply on workspaces you own."
-    : "Higher limits on workspaces you own, plus the ability to create additional workspaces.";
-
+  const hasIndividualPlan = individualPlan !== null;
+  const planLabel = individualPlan ? towerPlanName(individualPlan) : "Free";
+  const statusLine = hasIndividualPlan ? formatSubscriptionStatus(individualSubscriptionStatus) : null;
+  const showUpgrade = !hasIndividualPlan && (checkoutAvailable || studioCheckoutAvailable);
   const metadata: BillingMetadataItem[] = statusLine ? [{ label: "Subscription status", value: statusLine }] : [];
 
   return (
     <Card>
       <CardHeader>
         <BillingCardTitle icon={<IconUser className="size-4" />} title="Individual subscription" />
-        <CardDescription>Personal Pro billing on your Codalyn account.</CardDescription>
-        {showActions ? (
-          <CardAction align="center" group>
-            {showUpgrade ? (
-              <form action="/api/billing/checkout" method="post">
-                <Button type="submit">Subscribe to Pro</Button>
-              </form>
-            ) : null}
-            {showIndividualPortal ? (
-              <Button asChild variant="outline">
-                <a href="/api/billing/portal">Manage Pro subscription</a>
-              </Button>
-            ) : null}
-          </CardAction>
-        ) : null}
+        <CardDescription>Personal Pro or Studio billing on your Codalyn account.</CardDescription>
+        <IndividualSubscriptionActions
+          showUpgrade={showUpgrade}
+          checkoutAvailable={checkoutAvailable}
+          studioCheckoutAvailable={studioCheckoutAvailable}
+          showIndividualPortal={showIndividualPortal}
+        />
       </CardHeader>
       <CardContent className="space-y-4">
-        <BillingPlanHero plan={planLabel} caption={planCaption} />
+        <BillingPlanHero
+          plan={planLabel}
+          caption={individualPlanCaption(planLabel, hasIndividualPlan, teamWorkspaceActive)}
+        />
         {metadata.length > 0 ? (
           <>
             <Separator />
@@ -299,10 +338,11 @@ function ActiveWorkspaceBillingCard(props: {
 export function TowerBillingScreen(props: TowerBillingScreenProps) {
   const {
     email,
-    hasIndividualPro,
+    individualPlan,
     entitlement,
     usageStatus,
     checkoutAvailable,
+    studioCheckoutAvailable,
     showIndividualPortal,
     individualSubscriptionStatus,
     activeOrganizationId,
@@ -333,9 +373,10 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
       >
         <div className="grid gap-4 lg:grid-cols-2">
           <IndividualSubscriptionCard
-            hasIndividualPro={hasIndividualPro}
+            individualPlan={individualPlan}
             individualSubscriptionStatus={individualSubscriptionStatus}
             checkoutAvailable={checkoutAvailable}
+            studioCheckoutAvailable={studioCheckoutAvailable}
             showIndividualPortal={showIndividualPortal}
             teamWorkspaceActive={teamWorkspaceActive}
           />

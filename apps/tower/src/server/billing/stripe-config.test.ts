@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   assertStripeSecretKeyMatchesDeployEnvironment,
   getStripePricePro,
+  getStripePriceStudio,
   stripeKeyMode,
 } from "@/server/billing/stripe-config";
 
@@ -11,6 +12,7 @@ describe("stripe-config", () => {
     "VERCEL_ENV",
     "STRIPE_SECRET_KEY",
     "STRIPE_PRICE_PRO",
+    "STRIPE_PRICE_STUDIO",
     "TOWER_STRIPE_REQUIRE_LIVE_IN_PRODUCTION",
   ] as const;
   const prev: Partial<Record<(typeof envKeys)[number], string | undefined>> = {};
@@ -64,5 +66,15 @@ describe("stripe-config", () => {
   it("getStripePricePro trims env value", () => {
     stubEnv("STRIPE_PRICE_PRO", "  price_123  ");
     expect(getStripePricePro()).toBe("price_123");
+  });
+
+  it("getStripePriceStudio reads STRIPE_PRICE_STUDIO", () => {
+    stubEnv("STRIPE_PRICE_STUDIO", "  price_studio  ");
+    expect(getStripePriceStudio()).toBe("price_studio");
+  });
+
+  it("getStripePriceStudio is null when unset", () => {
+    stubEnv("STRIPE_PRICE_STUDIO", undefined);
+    expect(getStripePriceStudio()).toBeNull();
   });
 });

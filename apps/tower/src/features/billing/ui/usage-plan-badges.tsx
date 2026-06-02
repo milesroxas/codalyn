@@ -1,4 +1,4 @@
-import type { TowerUsageLimitsKind } from "@codalyn/webflow-kit";
+import type { TowerUsageLimitsKind, TowerUsageTier } from "@codalyn/webflow-kit";
 import type { TowerEntitlement } from "@/server/billing/entitlements";
 import {
   accountSubscriptionPlanLabel,
@@ -11,7 +11,7 @@ import { Badge } from "@/shared/ui/badge";
 import { UsageLimitsHeaderMeta } from "@/shared/ui/usage-limits-reset-label";
 
 type UsagePlanBadgesProps = {
-  tier: "free" | "pro" | "team";
+  tier: TowerUsageTier;
   limitsKind: TowerUsageLimitsKind;
   entitlementSource?: TowerEntitlement["source"];
   /** When false, omits individual subscription badge (e.g. dashboard usage card). */
@@ -47,7 +47,7 @@ export function UsageLimitsBadges(
 
 type UsageLimitsPlanHeaderProps = {
   resetLine: string;
-  tier: "free" | "pro" | "team";
+  tier: TowerUsageTier;
   limitsKind: TowerUsageLimitsKind;
 };
 

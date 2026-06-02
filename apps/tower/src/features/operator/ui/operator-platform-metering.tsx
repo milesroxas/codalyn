@@ -27,6 +27,9 @@ type DraftState = {
   proWebflowProxy: string;
   proCmsWrites: string;
   proImage: string;
+  studioWebflowProxy: string;
+  studioCmsWrites: string;
+  studioImage: string;
   teamWebflowProxy: string;
   teamCmsWrites: string;
   teamImage: string;
@@ -41,6 +44,9 @@ function configToDraft(config: OperatorPlatformMeteringConfig): DraftState {
     proWebflowProxy: limitIntegerToDraft(config.pro.webflowProxyRequestsPerMonth),
     proCmsWrites: limitIntegerToDraft(config.pro.cmsWritesPerMonth),
     proImage: limitIntegerToDraft(config.pro.imageOptimizesPerMonth),
+    studioWebflowProxy: limitIntegerToDraft(config.studio.webflowProxyRequestsPerMonth),
+    studioCmsWrites: limitIntegerToDraft(config.studio.cmsWritesPerMonth),
+    studioImage: limitIntegerToDraft(config.studio.imageOptimizesPerMonth),
     teamWebflowProxy: limitIntegerToDraft(config.team.webflowProxyRequestsPerMonth),
     teamCmsWrites: limitIntegerToDraft(config.team.cmsWritesPerMonth),
     teamImage: limitIntegerToDraft(config.team.imageOptimizesPerMonth),
@@ -106,7 +112,7 @@ function TierLimitFields({
         </FormField>
         <FormField>
           <Label htmlFor={imageId}>
-            <UsageMeterLabel kind="image" label="Image optimize (AVIF) / month" />
+            <UsageMeterLabel kind="image" label="Image optimization credits / month" />
           </Label>
           <Input
             id={imageId}
@@ -135,6 +141,11 @@ type DraftPatch = {
     cmsWritesPerMonth: number;
     imageOptimizesPerMonth: number;
   };
+  studio: {
+    webflowProxyRequestsPerMonth: number;
+    cmsWritesPerMonth: number;
+    imageOptimizesPerMonth: number;
+  };
   team: {
     webflowProxyRequestsPerMonth: number;
     cmsWritesPerMonth: number;
@@ -149,6 +160,9 @@ function parseDraftPatch(draft: DraftState): DraftPatch | "invalid" {
   const proWebflowProxy = parseRequiredLimitInteger(draft.proWebflowProxy);
   const proCmsWrites = parseRequiredLimitInteger(draft.proCmsWrites);
   const proImage = parseRequiredLimitInteger(draft.proImage);
+  const studioWebflowProxy = parseRequiredLimitInteger(draft.studioWebflowProxy);
+  const studioCmsWrites = parseRequiredLimitInteger(draft.studioCmsWrites);
+  const studioImage = parseRequiredLimitInteger(draft.studioImage);
   const teamWebflowProxy = parseRequiredLimitInteger(draft.teamWebflowProxy);
   const teamCmsWrites = parseRequiredLimitInteger(draft.teamCmsWrites);
   const teamImage = parseRequiredLimitInteger(draft.teamImage);
@@ -159,6 +173,9 @@ function parseDraftPatch(draft: DraftState): DraftPatch | "invalid" {
     proWebflowProxy === "invalid" ||
     proCmsWrites === "invalid" ||
     proImage === "invalid" ||
+    studioWebflowProxy === "invalid" ||
+    studioCmsWrites === "invalid" ||
+    studioImage === "invalid" ||
     teamWebflowProxy === "invalid" ||
     teamCmsWrites === "invalid" ||
     teamImage === "invalid"
@@ -176,6 +193,11 @@ function parseDraftPatch(draft: DraftState): DraftPatch | "invalid" {
       webflowProxyRequestsPerMonth: proWebflowProxy,
       cmsWritesPerMonth: proCmsWrites,
       imageOptimizesPerMonth: proImage,
+    },
+    studio: {
+      webflowProxyRequestsPerMonth: studioWebflowProxy,
+      cmsWritesPerMonth: studioCmsWrites,
+      imageOptimizesPerMonth: studioImage,
     },
     team: {
       webflowProxyRequestsPerMonth: teamWebflowProxy,
@@ -198,6 +220,9 @@ function isDraftDirty(config: OperatorPlatformMeteringConfig, draft: DraftState)
     parsed.pro.webflowProxyRequestsPerMonth !== config.pro.webflowProxyRequestsPerMonth ||
     parsed.pro.cmsWritesPerMonth !== config.pro.cmsWritesPerMonth ||
     parsed.pro.imageOptimizesPerMonth !== config.pro.imageOptimizesPerMonth ||
+    parsed.studio.webflowProxyRequestsPerMonth !== config.studio.webflowProxyRequestsPerMonth ||
+    parsed.studio.cmsWritesPerMonth !== config.studio.cmsWritesPerMonth ||
+    parsed.studio.imageOptimizesPerMonth !== config.studio.imageOptimizesPerMonth ||
     parsed.team.webflowProxyRequestsPerMonth !== config.team.webflowProxyRequestsPerMonth ||
     parsed.team.cmsWritesPerMonth !== config.team.cmsWritesPerMonth ||
     parsed.team.imageOptimizesPerMonth !== config.team.imageOptimizesPerMonth
@@ -290,7 +315,23 @@ function PlatformMeteringFormBody({
       <Separator />
 
       <TierLimitFields
-        tierLabel="Team tier defaults (paid workspace)"
+        tierLabel="Studio tier defaults (individual subscription)"
+        webflowProxyId="platform-studio-webflow-proxy"
+        cmsWritesId="platform-studio-cms-writes"
+        imageId="platform-studio-image"
+        webflowProxyValue={draft.studioWebflowProxy}
+        cmsWritesValue={draft.studioCmsWrites}
+        imageValue={draft.studioImage}
+        onWebflowProxyChange={(next) => onDraftChange({ ...draft, studioWebflowProxy: next })}
+        onCmsWritesChange={(next) => onDraftChange({ ...draft, studioCmsWrites: next })}
+        onImageChange={(next) => onDraftChange({ ...draft, studioImage: next })}
+        disabled={disabled}
+      />
+
+      <Separator />
+
+      <TierLimitFields
+        tierLabel="Team tier defaults (per seat — pooled cap = per-seat × paid seats)"
         webflowProxyId="platform-team-webflow-proxy"
         cmsWritesId="platform-team-cms-writes"
         imageId="platform-team-image"
@@ -377,8 +418,9 @@ export function OperatorPlatformMeteringCard() {
           <CardTitle className="text-base">Global tier limits</CardTitle>
         </div>
         <CardDescription>
-          Default monthly caps for every account and workspace. Per-customer overrides still apply on top of these
-          values.
+          Default monthly caps for every account and workspace. Free/Pro/Studio caps apply per individual user; Team
+          caps are per seat and pooled across the workspace (pooled cap = per-seat cap × paid seats). Per-customer
+          overrides still apply on top of these values.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

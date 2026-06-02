@@ -1,5 +1,5 @@
 import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
-import { towerUsageLimitResetDetailLine } from "@codalyn/webflow-kit";
+import { towerUsageLimitResetDetailLine, towerUsageScopeSummary } from "@codalyn/webflow-kit";
 import Link from "next/link";
 import { UsageLimitsPlanHeader } from "@/features/billing/ui/usage-plan-badges";
 import { usageLimitsKindDetailLine } from "@/shared/lib/usage-display";
@@ -28,6 +28,7 @@ export function TowerUsageSection(props: TowerUsageSectionProps) {
 
   const resetLine = towerUsageLimitResetDetailLine();
   const limitsDetail = usageLimitsKindDetailLine(status.limitsKind, status.tier);
+  const scopeSummary = towerUsageScopeSummary(status.usageScope);
 
   return (
     <Card layout={fillHeight ? "fill" : "default"}>
@@ -36,6 +37,7 @@ export function TowerUsageSection(props: TowerUsageSectionProps) {
           <div className="space-y-1">
             <CardTitle>{title}</CardTitle>
             <CardDescription>{description}</CardDescription>
+            <p className="text-xs text-muted-foreground">{scopeSummary}</p>
             {limitsDetail ? <p className="text-xs text-muted-foreground">{limitsDetail}</p> : null}
           </div>
           <UsageLimitsPlanHeader resetLine={resetLine} tier={status.tier} limitsKind={status.limitsKind} />

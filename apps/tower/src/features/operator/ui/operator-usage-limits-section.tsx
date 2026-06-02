@@ -87,7 +87,7 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
     setActionBusy(true);
     try {
       await onReset();
-      toast.success(scope === "workspace" ? "Member usage reset" : "Usage reset");
+      toast.success(scope === "workspace" ? "Workspace pool and member usage reset" : "Usage reset");
     } catch (err) {
       toast.error(err instanceof OperatorApiError ? err.message : "Reset failed");
     } finally {
@@ -144,27 +144,32 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
           <dl className="grid gap-2 text-xs sm:grid-cols-3">
             <div>
               <dt className="text-muted-foreground">
-                <UsageMeterLabel kind="webflowProxy" label="Member Webflow proxy (sum)" />
+                <UsageMeterLabel kind="webflowProxy" label="Workspace pool" />
               </dt>
               <dd className="font-mono text-foreground">
-                {formatUsageRatio(usage.memberWebflowProxyRequestCount ?? 0, usage.effectiveWebflowProxyLimit)}
+                {formatUsageRatio(usage.webflowProxyRequestCount, usage.effectiveWebflowProxyLimit)}
               </dd>
+              <p className="text-[10px] text-muted-foreground">
+                Members (sum): {usage.memberWebflowProxyRequestCount ?? 0}
+              </p>
             </div>
             <div>
               <dt className="text-muted-foreground">
-                <UsageMeterLabel kind="cmsWrite" label="Member CMS writes (sum)" />
+                <UsageMeterLabel kind="cmsWrite" label="Workspace pool" />
               </dt>
               <dd className="font-mono text-foreground">
-                {formatUsageRatio(usage.memberCmsWriteCount ?? 0, usage.effectiveCmsWriteLimit)}
+                {formatUsageRatio(usage.cmsWriteCount, usage.effectiveCmsWriteLimit)}
               </dd>
+              <p className="text-[10px] text-muted-foreground">Members (sum): {usage.memberCmsWriteCount ?? 0}</p>
             </div>
             <div>
               <dt className="text-muted-foreground">
-                <UsageMeterLabel kind="image" label="Member image usage (sum)" />
+                <UsageMeterLabel kind="image" label="Workspace pool" />
               </dt>
               <dd className="font-mono text-foreground">
-                {formatUsageRatio(usage.memberImageOptimizeCount ?? 0, usage.effectiveImageLimit)}
+                {formatUsageRatio(usage.imageOptimizeCount, usage.effectiveImageLimit)}
               </dd>
+              <p className="text-[10px] text-muted-foreground">Members (sum): {usage.memberImageOptimizeCount ?? 0}</p>
             </div>
           </dl>
         )}
@@ -237,7 +242,9 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
-            Blank overrides inherit tier defaults. User overrides win over workspace overrides.
+            {scope === "workspace"
+              ? "Blank overrides inherit the pooled tier default (per-seat cap × paid seats). A workspace override sets the absolute pooled cap."
+              : "Blank overrides inherit tier defaults. User overrides win over workspace overrides."}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -283,10 +290,10 @@ export function OperatorUsageLimitsTableCell({ usage }: { usage: OperatorUsageLi
     globalMeteringDisabled: usage.globalMeteringDisabled,
     tier: usage.tier,
   });
-  const webflowProxyUsed =
-    usage.scope === "workspace" ? (usage.memberWebflowProxyRequestCount ?? 0) : usage.webflowProxyRequestCount;
-  const cmsWriteUsed = usage.scope === "workspace" ? (usage.memberCmsWriteCount ?? 0) : usage.cmsWriteCount;
-  const imageUsed = usage.scope === "workspace" ? (usage.memberImageOptimizeCount ?? 0) : usage.imageOptimizeCount;
+  // Workspace rows show the enforced pooled count (per-seat cap × seats); user rows show the individual count.
+  const webflowProxyUsed = usage.webflowProxyRequestCount;
+  const cmsWriteUsed = usage.cmsWriteCount;
+  const imageUsed = usage.imageOptimizeCount;
 
   return (
     <div className="space-y-1 text-xs">

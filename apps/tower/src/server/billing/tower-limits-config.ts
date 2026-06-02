@@ -8,6 +8,10 @@ export const TOWER_PLATFORM_METERING_ID = "default";
 export type TowerTierLimits = {
   webflowProxyRequestsPerMonth: number;
   cmsWritesPerMonth: number;
+  /**
+   * Monthly image optimization **credits** (not export count). Larger/more expensive optimizations
+   * consume multiple credits — see `calculateImageOptimizationCredits` in `@codalyn/webflow-kit`.
+   */
   imageOptimizesPerMonth: number;
 };
 
@@ -16,6 +20,7 @@ export type TowerLimitsSnapshot = {
   envEmergencyMeteringDisabled: boolean;
   free: TowerTierLimits;
   pro: TowerTierLimits;
+  studio: TowerTierLimits;
   team: TowerTierLimits;
   updatedAt: string | null;
 };
@@ -24,27 +29,38 @@ export type TowerLimitsPatch = {
   globalMeteringEnabled?: boolean;
   free?: Partial<TowerTierLimits>;
   pro?: Partial<TowerTierLimits>;
+  studio?: Partial<TowerTierLimits>;
   team?: Partial<TowerTierLimits>;
 };
 
+/**
+ * Early-access protective caps. Paid plans intentionally stay well below historical
+ * "generous" defaults so MVP usage is observable and profitable before limits are raised.
+ * Operator overrides and env seeds still take precedence (see resolve order below).
+ */
 const CODE_DEFAULTS = {
   globalMeteringEnabled: true,
   free: {
     webflowProxyRequestsPerMonth: 2_500,
     cmsWritesPerMonth: 500,
-    imageOptimizesPerMonth: 50,
+    imageOptimizesPerMonth: 25,
   },
   pro: {
-    webflowProxyRequestsPerMonth: 150_000,
-    cmsWritesPerMonth: 50_000,
-    imageOptimizesPerMonth: 10_000,
+    webflowProxyRequestsPerMonth: 25_000,
+    cmsWritesPerMonth: 5_000,
+    imageOptimizesPerMonth: 500,
+  },
+  studio: {
+    webflowProxyRequestsPerMonth: 60_000,
+    cmsWritesPerMonth: 12_000,
+    imageOptimizesPerMonth: 1_500,
   },
   team: {
-    webflowProxyRequestsPerMonth: 150_000,
-    cmsWritesPerMonth: 50_000,
-    imageOptimizesPerMonth: 10_000,
+    webflowProxyRequestsPerMonth: 120_000,
+    cmsWritesPerMonth: 25_000,
+    imageOptimizesPerMonth: 3_000,
   },
-} as const satisfies Pick<TowerLimitsSnapshot, "globalMeteringEnabled" | "free" | "pro" | "team">;
+} as const satisfies Pick<TowerLimitsSnapshot, "globalMeteringEnabled" | "free" | "pro" | "studio" | "team">;
 
 const envNum = (name: string, fallback: number): number => {
   const v = process.env[name]?.trim();
@@ -61,7 +77,12 @@ function envEmergencyMeteringDisabled(): boolean {
   return process.env.TOWER_METERING_DISABLED === "1" || process.env.TOWER_METERING_DISABLED === "true";
 }
 
-function seedTierLimitsFromEnv(): { free: TowerTierLimits; pro: TowerTierLimits; team: TowerTierLimits } {
+function seedTierLimitsFromEnv(): {
+  free: TowerTierLimits;
+  pro: TowerTierLimits;
+  studio: TowerTierLimits;
+  team: TowerTierLimits;
+} {
   const pro = {
     webflowProxyRequestsPerMonth: envNum(
       "TOWER_PRO_WEBFLOW_PROXY_REQUESTS_PER_MONTH",
@@ -80,19 +101,24 @@ function seedTierLimitsFromEnv(): { free: TowerTierLimits; pro: TowerTierLimits;
       imageOptimizesPerMonth: envNum("TOWER_FREE_IMAGE_OPTIMIZES_PER_MONTH", CODE_DEFAULTS.free.imageOptimizesPerMonth),
     },
     pro,
+    studio: {
+      webflowProxyRequestsPerMonth: envNum(
+        "TOWER_STUDIO_WEBFLOW_PROXY_REQUESTS_PER_MONTH",
+        CODE_DEFAULTS.studio.webflowProxyRequestsPerMonth
+      ),
+      cmsWritesPerMonth: envNum("TOWER_STUDIO_CMS_WRITES_PER_MONTH", CODE_DEFAULTS.studio.cmsWritesPerMonth),
+      imageOptimizesPerMonth: envNum(
+        "TOWER_STUDIO_IMAGE_OPTIMIZES_PER_MONTH",
+        CODE_DEFAULTS.studio.imageOptimizesPerMonth
+      ),
+    },
     team: {
       webflowProxyRequestsPerMonth: envNum(
         "TOWER_TEAM_WEBFLOW_PROXY_REQUESTS_PER_MONTH",
-        envNum("TOWER_PRO_WEBFLOW_PROXY_REQUESTS_PER_MONTH", CODE_DEFAULTS.team.webflowProxyRequestsPerMonth)
+        CODE_DEFAULTS.team.webflowProxyRequestsPerMonth
       ),
-      cmsWritesPerMonth: envNum(
-        "TOWER_TEAM_CMS_WRITES_PER_MONTH",
-        envNum("TOWER_PRO_CMS_WRITES_PER_MONTH", CODE_DEFAULTS.team.cmsWritesPerMonth)
-      ),
-      imageOptimizesPerMonth: envNum(
-        "TOWER_TEAM_IMAGE_OPTIMIZES_PER_MONTH",
-        envNum("TOWER_PRO_IMAGE_OPTIMIZES_PER_MONTH", CODE_DEFAULTS.team.imageOptimizesPerMonth)
-      ),
+      cmsWritesPerMonth: envNum("TOWER_TEAM_CMS_WRITES_PER_MONTH", CODE_DEFAULTS.team.cmsWritesPerMonth),
+      imageOptimizesPerMonth: envNum("TOWER_TEAM_IMAGE_OPTIMIZES_PER_MONTH", CODE_DEFAULTS.team.imageOptimizesPerMonth),
     },
   };
 }
@@ -118,6 +144,11 @@ function rowToSnapshot(row: typeof towerPlatformMetering.$inferSelect): TowerLim
       cmsWritesPerMonth: row.proCmsWritesPerMonth,
       imageOptimizesPerMonth: row.proImageOptimizesPerMonth,
     },
+    studio: {
+      webflowProxyRequestsPerMonth: row.studioWebflowProxyRequestsPerMonth,
+      cmsWritesPerMonth: row.studioCmsWritesPerMonth,
+      imageOptimizesPerMonth: row.studioImageOptimizesPerMonth,
+    },
     team: {
       webflowProxyRequestsPerMonth: row.teamWebflowProxyRequestsPerMonth,
       cmsWritesPerMonth: row.teamCmsWritesPerMonth,
@@ -134,6 +165,7 @@ function bootstrapSnapshot(): TowerLimitsSnapshot {
     envEmergencyMeteringDisabled: envEmergencyMeteringDisabled(),
     free: seeded.free,
     pro: seeded.pro,
+    studio: seeded.studio,
     team: seeded.team,
     updatedAt: null,
   };
@@ -150,13 +182,16 @@ export function isGlobalMeteringDisabled(snapshot: TowerLimitsSnapshot): boolean
 }
 
 export function tierLimitsFromSnapshot(snapshot: TowerLimitsSnapshot, tier: TowerTier): TowerTierLimits {
-  if (tier === "team") {
-    return snapshot.team;
+  switch (tier) {
+    case "team":
+      return snapshot.team;
+    case "studio":
+      return snapshot.studio;
+    case "pro":
+      return snapshot.pro;
+    default:
+      return snapshot.free;
   }
-  if (tier === "pro") {
-    return snapshot.pro;
-  }
-  return snapshot.free;
 }
 
 export async function getTowerLimitsSnapshot(): Promise<TowerLimitsSnapshot> {
@@ -187,6 +222,9 @@ export async function getTowerLimitsSnapshot(): Promise<TowerLimitsSnapshot> {
       proWebflowProxyRequestsPerMonth: seeded.pro.webflowProxyRequestsPerMonth,
       proCmsWritesPerMonth: seeded.pro.cmsWritesPerMonth,
       proImageOptimizesPerMonth: seeded.pro.imageOptimizesPerMonth,
+      studioWebflowProxyRequestsPerMonth: seeded.studio.webflowProxyRequestsPerMonth,
+      studioCmsWritesPerMonth: seeded.studio.cmsWritesPerMonth,
+      studioImageOptimizesPerMonth: seeded.studio.imageOptimizesPerMonth,
       teamWebflowProxyRequestsPerMonth: seeded.team.webflowProxyRequestsPerMonth,
       teamCmsWritesPerMonth: seeded.team.cmsWritesPerMonth,
       teamImageOptimizesPerMonth: seeded.team.imageOptimizesPerMonth,
@@ -217,7 +255,7 @@ export function parseRequiredPlatformLimitField(raw: unknown): number | "invalid
 }
 
 function parseTierLimitsPatch(
-  tier: "free" | "pro" | "team",
+  tier: "free" | "pro" | "studio" | "team",
   tierRaw: unknown
 ): Partial<TowerTierLimits> | { error: string } {
   if (!tierRaw || typeof tierRaw !== "object") {
@@ -267,7 +305,7 @@ export function sanitizeTowerLimitsPatch(raw: unknown): TowerLimitsPatch | { err
     patch.globalMeteringEnabled = body.globalMeteringEnabled;
   }
 
-  for (const tier of ["free", "pro", "team"] as const) {
+  for (const tier of ["free", "pro", "studio", "team"] as const) {
     if (!(tier in body)) {
       continue;
     }
@@ -307,6 +345,15 @@ export async function saveTowerLimitsSnapshot(patch: TowerLimitsPatch): Promise<
   }
   if (patch.pro?.imageOptimizesPerMonth !== undefined) {
     updates.proImageOptimizesPerMonth = patch.pro.imageOptimizesPerMonth;
+  }
+  if (patch.studio?.webflowProxyRequestsPerMonth !== undefined) {
+    updates.studioWebflowProxyRequestsPerMonth = patch.studio.webflowProxyRequestsPerMonth;
+  }
+  if (patch.studio?.cmsWritesPerMonth !== undefined) {
+    updates.studioCmsWritesPerMonth = patch.studio.cmsWritesPerMonth;
+  }
+  if (patch.studio?.imageOptimizesPerMonth !== undefined) {
+    updates.studioImageOptimizesPerMonth = patch.studio.imageOptimizesPerMonth;
   }
   if (patch.team?.webflowProxyRequestsPerMonth !== undefined) {
     updates.teamWebflowProxyRequestsPerMonth = patch.team.webflowProxyRequestsPerMonth;

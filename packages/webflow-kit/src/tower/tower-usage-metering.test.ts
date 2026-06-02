@@ -3,6 +3,7 @@ import {
   buildTowerUsageMeterSnapshot,
   classifyUsageMeter,
   normalizeTowerUsageMeterKind,
+  normalizeTowerUsageStatusSnapshot,
   parseTowerUsageLimitBody,
   pickApproachingUsageMeters,
   TOWER_USAGE_APPROACHING_LIMIT_RATIO,
@@ -95,5 +96,77 @@ describe("normalizeTowerUsageMeterKind", () => {
   it("accepts cmsWrite and image", () => {
     expect(normalizeTowerUsageMeterKind("cmsWrite")).toBe("cmsWrite");
     expect(normalizeTowerUsageMeterKind("image")).toBe("image");
+  });
+});
+
+describe("normalizeTowerUsageStatusSnapshot", () => {
+  const validPayload = {
+    yearMonth: "2026-06",
+    tier: "studio",
+    plan: { key: "studio", name: "Studio", billingScope: "user" },
+    limitsKind: "standard",
+    metered: true,
+    meters: [{ kind: "webflowProxy", used: 10, limit: 100, progressMax: 100, level: "ok" }],
+    approachingMeters: [],
+    designerApiBreakdown: null,
+  };
+
+  it("parses a canonical payload", () => {
+    const result = normalizeTowerUsageStatusSnapshot(validPayload);
+    expect(result?.tier).toBe("studio");
+    expect(result?.plan).toEqual({ key: "studio", name: "Studio", billingScope: "user" });
+    expect(result?.meters).toHaveLength(1);
+  });
+
+  it("defaults usage scope to user and preserves an explicit workspace scope", () => {
+    expect(normalizeTowerUsageStatusSnapshot(validPayload)?.usageScope).toBe("user");
+    expect(
+      normalizeTowerUsageStatusSnapshot({
+        ...validPayload,
+        tier: "team",
+        plan: { key: "team", name: "Team", billingScope: "workspace" },
+        usageScope: "workspace",
+      })?.usageScope
+    ).toBe("workspace");
+  });
+
+  it("falls back to user scope for an unknown usageScope value (Beacon-safe)", () => {
+    expect(normalizeTowerUsageStatusSnapshot({ ...validPayload, usageScope: "bogus" })?.usageScope).toBe("user");
+  });
+
+  it("preserves the image (credits) meter shape", () => {
+    const result = normalizeTowerUsageStatusSnapshot({
+      ...validPayload,
+      meters: [
+        { kind: "webflowProxy", used: 10, limit: 100, progressMax: 100, level: "ok" },
+        { kind: "image", used: 120, limit: 1500, progressMax: 1500, level: "ok" },
+      ],
+    });
+    const imageMeter = result?.meters.find((meter) => meter.kind === "image");
+    expect(imageMeter).toEqual({ kind: "image", used: 120, limit: 1500, progressMax: 1500, level: "ok" });
+  });
+
+  it("derives plan context from tier when plan is missing", () => {
+    const { plan: _omitted, ...withoutPlan } = validPayload;
+    const result = normalizeTowerUsageStatusSnapshot(withoutPlan);
+    expect(result?.plan).toEqual({ key: "studio", name: "Studio", billingScope: "user" });
+  });
+
+  it("degrades unknown tier to free and drops malformed meters", () => {
+    const result = normalizeTowerUsageStatusSnapshot({
+      ...validPayload,
+      tier: "enterprise",
+      plan: undefined,
+      meters: [{ kind: "webflowProxy", used: 5, limit: 50 }, { kind: "bogus", used: 1 }, { used: 2 }],
+    });
+    expect(result?.tier).toBe("free");
+    expect(result?.plan.name).toBe("Free");
+    expect(result?.meters).toHaveLength(1);
+  });
+
+  it("returns null when the payload is unusable", () => {
+    expect(normalizeTowerUsageStatusSnapshot(null)).toBeNull();
+    expect(normalizeTowerUsageStatusSnapshot({ tier: "pro" })).toBeNull();
+    expect(normalizeTowerUsageStatusSnapshot({ yearMonth: "2026-06", meters: [] })).toBeNull();
   });
 });

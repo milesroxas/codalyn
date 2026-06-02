@@ -44,3 +44,26 @@ export function buildOrganizationSeatSnapshot(
 export function resolveOrganizationInvitationLimit(seatsUsed: number, org: OrganizationSeatCapOrg): number {
   return Math.max(0, resolveMembershipSeatCapFromOrg(org) - seatsUsed);
 }
+
+export type OrganizationPooledSeatOrg = {
+  /** Last known per-seat quantity on the Stripe subscription (paid seats). */
+  stripeSeatQuantity?: number | null;
+  /** Operator-granted or Stripe-synced member cap. */
+  seatLimit?: number | null;
+};
+
+/**
+ * Paid seat count used to size the Team pooled monthly cap (`per-seat cap × seats`). Prefers the
+ * Stripe-synced quantity, then the stored seat cap, and never drops below the team minimum so a paid
+ * workspace's pool is at least the floor it is billed for.
+ */
+export function resolvePooledSeatCount(org: OrganizationPooledSeatOrg, minSeats: number): number {
+  const floor = Math.max(1, Math.trunc(minSeats));
+  const candidates = [org.stripeSeatQuantity, org.seatLimit];
+  for (const candidate of candidates) {
+    if (typeof candidate === "number" && Number.isFinite(candidate) && candidate >= 1) {
+      return Math.max(floor, Math.trunc(candidate));
+    }
+  }
+  return floor;
+}

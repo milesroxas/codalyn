@@ -56,6 +56,11 @@ export function getStripePricePro(): string | null {
   return readEnvNonEmpty("STRIPE_PRICE_PRO");
 }
 
+/** Recurring Price id for individual Studio checkout. */
+export function getStripePriceStudio(): string | null {
+  return readEnvNonEmpty("STRIPE_PRICE_STUDIO");
+}
+
 /** Per-seat recurring Price id for workspace (team) billing. */
 export function getStripePriceTeamSeat(): string | null {
   return readEnvNonEmpty("STRIPE_PRICE_TEAM_SEAT");

@@ -1,3 +1,4 @@
+import { towerPlanBillingScope } from "@codalyn/webflow-kit";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   EMPTY_METERING_OVERRIDES,
@@ -6,11 +7,21 @@ import {
   utcYearMonth,
 } from "@/server/billing/metering-policy";
 import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
+import { getTeamMinSeats } from "@/server/billing/team-billing-config";
 import { getTowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 import { getUsageSnapshot, resetUsageForOrganizationMembers, resetUsageForUser } from "@/server/billing/usage-gate";
 import type { OperatorUsageLimitsPatch, OperatorUsageLimitsView } from "@/server/operator/types";
+import { resolvePooledSeatCount } from "@/shared/lib/billing/organization-seat-cap";
 import { db } from "@/shared/lib/db";
-import { member, organization, towerUsageMonth, user } from "@/shared/lib/db/auth-schema";
+import { member, organization, towerUsageMonth, towerWorkspaceUsageMonth, user } from "@/shared/lib/db/auth-schema";
+
+type WorkspacePoolCounts = { webflowProxyRequestCount: number; cmsWriteCount: number; imageOptimizeCount: number };
+
+const EMPTY_WORKSPACE_POOL: WorkspacePoolCounts = {
+  webflowProxyRequestCount: 0,
+  cmsWriteCount: 0,
+  imageOptimizeCount: 0,
+};
 
 function mapUsageLimitsView(input: OperatorUsageLimitsView): OperatorUsageLimitsView {
   return input;
@@ -75,6 +86,8 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
       subscriptionStatus: organization.subscriptionStatus,
       billingPlan: organization.billingPlan,
       stripeSubscriptionId: organization.stripeSubscriptionId,
+      stripeSeatQuantity: organization.stripeSeatQuantity,
+      seatLimit: organization.seatLimit,
     })
     .from(organization)
     .where(eq(organization.id, orgId))
@@ -108,13 +121,23 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
   })
     ? ("team" as const)
     : ("free" as const);
+  const paidSeatCount =
+    workspaceTier === "team"
+      ? resolvePooledSeatCount(
+          { stripeSeatQuantity: row.stripeSeatQuantity, seatLimit: row.seatLimit },
+          getTeamMinSeats()
+        )
+      : 1;
   const limits = await getTowerLimitsSnapshot();
   const policy = resolveMeteringPolicy({
     tier: workspaceTier,
     user: EMPTY_METERING_OVERRIDES,
     organization: orgFields,
     limits,
+    billingScope: towerPlanBillingScope(workspaceTier),
+    paidSeatCount,
   });
+  const pool = workspaceTier === "team" ? await fetchWorkspacePoolCounts(orgId, ym) : EMPTY_WORKSPACE_POOL;
 
   return mapUsageLimitsView({
     scope: "workspace",
@@ -125,9 +148,9 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
     cmsWriteLimitOverride: orgFields.cmsWriteLimitOverride,
     imageOptimizeLimitOverride: orgFields.imageOptimizeLimitOverride,
     yearMonth: ym,
-    webflowProxyRequestCount: 0,
-    cmsWriteCount: 0,
-    imageOptimizeCount: 0,
+    webflowProxyRequestCount: pool.webflowProxyRequestCount,
+    cmsWriteCount: pool.cmsWriteCount,
+    imageOptimizeCount: pool.imageOptimizeCount,
     effectiveWebflowProxyLimit: policy.webflowProxyCap,
     effectiveCmsWriteLimit: policy.cmsWriteCap,
     effectiveImageLimit: policy.imageCap,
@@ -135,6 +158,24 @@ export async function fetchOperatorWorkspaceUsageLimits(orgId: string): Promise<
     memberCmsWriteCount: Number(memberUsage?.cmsWriteCount ?? 0),
     memberImageOptimizeCount: Number(memberUsage?.imageOptimizeCount ?? 0),
   });
+}
+
+/** Pooled Team usage counts for a single workspace this month (0 when no pool row exists yet). */
+async function fetchWorkspacePoolCounts(orgId: string, ym: string): Promise<WorkspacePoolCounts> {
+  const [poolRow] = await db
+    .select({
+      webflowProxyRequestCount: towerWorkspaceUsageMonth.webflowProxyRequestCount,
+      cmsWriteCount: towerWorkspaceUsageMonth.cmsWriteCount,
+      imageOptimizeCount: towerWorkspaceUsageMonth.imageOptimizeCount,
+    })
+    .from(towerWorkspaceUsageMonth)
+    .where(and(eq(towerWorkspaceUsageMonth.organizationId, orgId), eq(towerWorkspaceUsageMonth.yearMonth, ym)))
+    .limit(1);
+  return {
+    webflowProxyRequestCount: poolRow?.webflowProxyRequestCount ?? 0,
+    cmsWriteCount: poolRow?.cmsWriteCount ?? 0,
+    imageOptimizeCount: poolRow?.imageOptimizeCount ?? 0,
+  };
 }
 
 /** Batch workspace usage for operator lists (one org query + one aggregated usage query). */
@@ -147,7 +188,7 @@ export async function fetchOperatorWorkspaceUsageLimitsBatch(
   }
 
   const ym = utcYearMonth();
-  const [orgRows, memberUsageRows] = await Promise.all([
+  const [orgRows, memberUsageRows, poolRows] = await Promise.all([
     db
       .select({
         id: organization.id,
@@ -158,6 +199,8 @@ export async function fetchOperatorWorkspaceUsageLimitsBatch(
         subscriptionStatus: organization.subscriptionStatus,
         billingPlan: organization.billingPlan,
         stripeSubscriptionId: organization.stripeSubscriptionId,
+        stripeSeatQuantity: organization.stripeSeatQuantity,
+        seatLimit: organization.seatLimit,
       })
       .from(organization)
       .where(inArray(organization.id, orgIds)),
@@ -172,6 +215,15 @@ export async function fetchOperatorWorkspaceUsageLimitsBatch(
       .leftJoin(towerUsageMonth, and(eq(towerUsageMonth.userId, member.userId), eq(towerUsageMonth.yearMonth, ym)))
       .where(inArray(member.organizationId, orgIds))
       .groupBy(member.organizationId),
+    db
+      .select({
+        organizationId: towerWorkspaceUsageMonth.organizationId,
+        webflowProxyRequestCount: towerWorkspaceUsageMonth.webflowProxyRequestCount,
+        cmsWriteCount: towerWorkspaceUsageMonth.cmsWriteCount,
+        imageOptimizeCount: towerWorkspaceUsageMonth.imageOptimizeCount,
+      })
+      .from(towerWorkspaceUsageMonth)
+      .where(and(inArray(towerWorkspaceUsageMonth.organizationId, orgIds), eq(towerWorkspaceUsageMonth.yearMonth, ym))),
   ]);
 
   const usageByOrgId = new Map(
@@ -181,6 +233,16 @@ export async function fetchOperatorWorkspaceUsageLimitsBatch(
         webflowProxyRequestCount: Number(row.webflowProxyRequestCount ?? 0),
         cmsWriteCount: Number(row.cmsWriteCount ?? 0),
         imageOptimizeCount: Number(row.imageOptimizeCount ?? 0),
+      },
+    ])
+  );
+  const poolByOrgId = new Map<string, WorkspacePoolCounts>(
+    poolRows.map((row) => [
+      row.organizationId,
+      {
+        webflowProxyRequestCount: row.webflowProxyRequestCount ?? 0,
+        cmsWriteCount: row.cmsWriteCount ?? 0,
+        imageOptimizeCount: row.imageOptimizeCount ?? 0,
       },
     ])
   );
@@ -201,13 +263,23 @@ export async function fetchOperatorWorkspaceUsageLimitsBatch(
     })
       ? ("team" as const)
       : ("free" as const);
+    const paidSeatCount =
+      workspaceTier === "team"
+        ? resolvePooledSeatCount(
+            { stripeSeatQuantity: row.stripeSeatQuantity, seatLimit: row.seatLimit },
+            getTeamMinSeats()
+          )
+        : 1;
     const policy = resolveMeteringPolicy({
       tier: workspaceTier,
       user: EMPTY_METERING_OVERRIDES,
       organization: orgFields,
       limits,
+      billingScope: towerPlanBillingScope(workspaceTier),
+      paidSeatCount,
     });
     const memberUsage = usageByOrgId.get(row.id);
+    const pool = workspaceTier === "team" ? (poolByOrgId.get(row.id) ?? EMPTY_WORKSPACE_POOL) : EMPTY_WORKSPACE_POOL;
 
     result.set(
       row.id,
@@ -220,9 +292,9 @@ export async function fetchOperatorWorkspaceUsageLimitsBatch(
         cmsWriteLimitOverride: orgFields.cmsWriteLimitOverride,
         imageOptimizeLimitOverride: orgFields.imageOptimizeLimitOverride,
         yearMonth: ym,
-        webflowProxyRequestCount: 0,
-        cmsWriteCount: 0,
-        imageOptimizeCount: 0,
+        webflowProxyRequestCount: pool.webflowProxyRequestCount,
+        cmsWriteCount: pool.cmsWriteCount,
+        imageOptimizeCount: pool.imageOptimizeCount,
         effectiveWebflowProxyLimit: policy.webflowProxyCap,
         effectiveCmsWriteLimit: policy.cmsWriteCap,
         effectiveImageLimit: policy.imageCap,

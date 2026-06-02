@@ -1,6 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { towerUsageMeterTooltip, towerUsageMeterTooltipContent } from "./tower-usage-metering-copy.js";
+import {
+  TOWER_AVIF_LIMIT_FALLBACK_TITLE,
+  towerUsageLimitDialogUsageLine,
+  towerUsageMeterLabel,
+  towerUsageMeterTooltip,
+  towerUsageMeterTooltipContent,
+} from "./tower-usage-metering-copy.js";
 import { towerUsageProductFeatureLabel } from "./tower-usage-product-feature.js";
+
+describe("image meter copy", () => {
+  it("labels the image meter as optimization credits", () => {
+    expect(towerUsageMeterLabel("image")).toBe("Image optimization credits");
+    expect(towerUsageMeterLabel("webflowProxy")).toBe("Designer API requests");
+    expect(towerUsageMeterLabel("cmsWrite")).toBe("Layout saves");
+  });
+
+  it("describes image usage as credits in the limit dialog line", () => {
+    expect(towerUsageLimitDialogUsageLine(8, 25, "image")).toBe("8 / 25 image optimization credits used this month.");
+  });
+
+  it("frames the AVIF fallback as exhausted credits", () => {
+    expect(TOWER_AVIF_LIMIT_FALLBACK_TITLE).toBe("Image optimization credits used up");
+  });
+});
 
 describe("towerUsageMeterTooltipContent", () => {
   it("returns structured sections for each meter kind", () => {
@@ -20,21 +42,21 @@ describe("towerUsageMeterTooltipContent", () => {
       ],
     });
     expect(content.footnoteHeading).toBe("Separate limits");
-    expect(content.footnote).toContain("AVIF exports");
+    expect(content.footnote).toContain("image optimization credits");
   });
 
   it("groups repeated products into one badge section", () => {
     const content = towerUsageMeterTooltipContent("image");
 
-    expect(content.title).toBe("AVIF export limit");
+    expect(content.title).toBe("Image optimization credit limit");
     expect(content.sectionHeading).toBe("Actions that use this limit");
     expect(content.footnoteHeading).toBe("Separate limits");
     expect(content.actionGroups).toEqual([
       {
         product: "imageUpload",
         details: [
-          "Exporting an image as AVIF",
-          "Previewing AVIF size estimates while adjusting crop, size, or quality",
+          "Optimizing an AVIF image export through Tower",
+          "Previewing optimized size estimates while adjusting crop, size, or quality",
         ],
       },
     ]);

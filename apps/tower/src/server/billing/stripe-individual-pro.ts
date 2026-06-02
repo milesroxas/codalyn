@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
-import { userRowHasStripePro } from "@/server/billing/stripe-subscription-status";
+import { type IndividualPaidPlan, userRowIndividualPlan } from "@/server/billing/stripe-subscription-status";
 import { db } from "@/shared/lib/db";
 import { organization } from "@/shared/lib/db/auth-schema";
 
@@ -11,21 +11,30 @@ export type UserStripeProRow = {
 };
 
 /**
- * True when the user row reflects an individual Pro subscription, not a workspace Team sub
- * that was mistakenly persisted on `user` (same `stripe_subscription_id` on `organization`).
+ * The individual paid plan (Pro or Studio) reflected by a user row, or null. Excludes a workspace
+ * Team sub mistakenly persisted on `user` (same `stripe_subscription_id` exists on `organization`).
  */
-export async function userHasIndividualStripePro(row: UserStripeProRow): Promise<boolean> {
-  if (!isTowerBillingEnabled() || !userRowHasStripePro(row)) {
-    return false;
+export async function resolveUserIndividualPlan(row: UserStripeProRow): Promise<IndividualPaidPlan | null> {
+  if (!isTowerBillingEnabled()) {
+    return null;
+  }
+  const plan = userRowIndividualPlan(row);
+  if (!plan) {
+    return null;
   }
   const subId = row.stripeSubscriptionId;
   if (!subId) {
-    return false;
+    return null;
   }
   const [orgWithSameSub] = await db
     .select({ id: organization.id })
     .from(organization)
     .where(eq(organization.stripeSubscriptionId, subId))
     .limit(1);
-  return !orgWithSameSub;
+  return orgWithSameSub ? null : plan;
+}
+
+/** True when the user row reflects any individual paid subscription (Pro or Studio). */
+export async function userHasIndividualStripePro(row: UserStripeProRow): Promise<boolean> {
+  return (await resolveUserIndividualPlan(row)) !== null;
 }

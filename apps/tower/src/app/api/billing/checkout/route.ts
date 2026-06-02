@@ -1,17 +1,39 @@
+import { towerPlanName } from "@codalyn/webflow-kit";
 import { eq } from "drizzle-orm";
-import { getStripePricePro, requireStripeBillingSession } from "@/server/billing/stripe-billing-routes";
+import { requireStripeBillingSession } from "@/server/billing/stripe-billing-routes";
 import { ensureStripeCustomerForUser } from "@/server/billing/stripe-customer";
+import { stripePriceIdForIndividualPlan } from "@/server/billing/stripe-individual-plan";
 import { STRIPE_BILLING_SCOPE_USER } from "@/server/billing/stripe-metadata";
-import { userRowHasStripePro } from "@/server/billing/stripe-subscription-status";
+import { type IndividualPaidPlan, userRowHasIndividualPaidPlan } from "@/server/billing/stripe-subscription-status";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { db } from "@/shared/lib/db";
 import { user } from "@/shared/lib/db/auth-schema";
 
 export const runtime = "nodejs";
 
+/** Reads the requested user-scoped paid plan from a JSON or form POST body. Defaults to Pro. */
+async function readRequestedPlan(request: Request): Promise<IndividualPaidPlan | "invalid"> {
+  const contentType = request.headers.get("content-type") ?? "";
+  let raw: unknown;
+  if (contentType.includes("application/json")) {
+    const body = (await request.json().catch(() => null)) as { plan?: unknown } | null;
+    raw = body?.plan;
+  } else {
+    const form = await request.formData().catch(() => null);
+    raw = form?.get("plan") ?? undefined;
+  }
+  if (raw === undefined || raw === null || raw === "") {
+    return "pro";
+  }
+  if (raw === "pro" || raw === "studio") {
+    return raw;
+  }
+  return "invalid";
+}
+
 /**
- * Start Stripe Checkout for individual Pro. Requires a signed-in Tower user (POST only).
- * Configure `STRIPE_SECRET_KEY` and `STRIPE_PRICE_PRO` (recurring price id) in the environment.
+ * Start Stripe Checkout for an individual paid plan (Pro or Studio). Requires a signed-in Tower user (POST only).
+ * Configure `STRIPE_SECRET_KEY` and `STRIPE_PRICE_PRO` / `STRIPE_PRICE_STUDIO` in the environment.
  */
 export async function POST(request: Request) {
   const gate = await requireStripeBillingSession(request);
@@ -20,11 +42,17 @@ export async function POST(request: Request) {
   }
   const { stripe, userId } = gate;
 
-  const price = getStripePricePro();
+  const plan = await readRequestedPlan(request);
+  if (plan === "invalid") {
+    return Response.json({ error: "Unsupported plan. Choose an individual plan (pro or studio)." }, { status: 400 });
+  }
+
+  const price = stripePriceIdForIndividualPlan(plan);
   if (!price) {
+    const envVar = plan === "studio" ? "STRIPE_PRICE_STUDIO" : "STRIPE_PRICE_PRO";
     return Response.json(
       {
-        error: "STRIPE_PRICE_PRO is not set. Add your Stripe Price id (Pro subscription) to the environment.",
+        error: `${envVar} is not set. Add your Stripe Price id (${towerPlanName(plan)} subscription) to the environment.`,
       },
       { status: 501 }
     );
@@ -47,8 +75,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "User not found" }, { status: 404 });
   }
 
-  if (userRowHasStripePro(u)) {
-    return Response.json({ error: "You already have an active Pro subscription." }, { status: 409 });
+  if (userRowHasIndividualPaidPlan(u)) {
+    return Response.json({ error: "You already have an active individual subscription." }, { status: 409 });
   }
 
   const customerId = await ensureStripeCustomerForUser(stripe, u);

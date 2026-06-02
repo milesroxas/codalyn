@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
 import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
-import { userHasIndividualStripePro } from "@/server/billing/stripe-individual-pro";
+import { resolveUserIndividualPlan } from "@/server/billing/stripe-individual-pro";
 import { db } from "@/shared/lib/db";
 import { organization, user } from "@/shared/lib/db/auth-schema";
 
-export type TowerTier = "free" | "pro" | "team";
+export type TowerTier = "free" | "pro" | "studio" | "team";
 
 export type TowerEntitlementSource = "none" | "user_stripe" | "workspace_team";
 
@@ -46,8 +46,9 @@ export async function resolveTowerEntitlement(
     .where(eq(user.id, userId))
     .limit(1);
 
-  if (u && (await userHasIndividualStripePro(u))) {
-    return { tier: "pro", source: "user_stripe" };
+  const individualPlan = u ? await resolveUserIndividualPlan(u) : null;
+  if (individualPlan) {
+    return { tier: individualPlan, source: "user_stripe" };
   }
 
   return { tier: "free", source: "none" };

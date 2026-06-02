@@ -6,10 +6,10 @@ import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
-import { isStripeCheckoutConfigured } from "@/server/billing/stripe-billing-routes";
+import { isStripeCheckoutConfigured, isStudioCheckoutConfigured } from "@/server/billing/stripe-billing-routes";
 import { syncStripeCheckoutSessionForUser } from "@/server/billing/stripe-checkout-sync";
 import { getStripe } from "@/server/billing/stripe-client";
-import { userHasIndividualStripePro } from "@/server/billing/stripe-individual-pro";
+import { resolveUserIndividualPlan } from "@/server/billing/stripe-individual-pro";
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { fetchWorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import { db } from "@/shared/lib/db";
@@ -66,7 +66,8 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
     .where(eq(user.id, userId))
     .limit(1);
 
-  const hasIndividualPro = row ? await userHasIndividualStripePro(row) : false;
+  const individualPlan = row ? await resolveUserIndividualPlan(row) : null;
+  const hasIndividualPro = individualPlan !== null;
 
   const [activeOrganizationName, workspaceBilling] = activeOrg
     ? await Promise.all([
@@ -83,11 +84,12 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   return (
     <TowerBillingScreen
       email={row?.email}
-      hasIndividualPro={hasIndividualPro}
+      individualPlan={individualPlan}
       entitlement={ent}
       usageStatus={usageStatus}
       individualSubscriptionStatus={hasIndividualPro ? row?.subscriptionStatus : null}
       checkoutAvailable={isStripeCheckoutConfigured()}
+      studioCheckoutAvailable={isStudioCheckoutConfigured()}
       showIndividualPortal={hasIndividualPro && Boolean(row?.stripeCustomerId)}
       activeOrganizationId={activeOrg}
       activeOrganizationName={activeOrganizationName}

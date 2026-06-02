@@ -2,12 +2,17 @@ import type Stripe from "stripe";
 import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getStripe } from "@/server/billing/stripe-client";
-import { getStripePricePro } from "@/server/billing/stripe-config";
+import { getStripePricePro, getStripePriceStudio } from "@/server/billing/stripe-config";
 
-export { getStripePricePro } from "@/server/billing/stripe-config";
+export { getStripePricePro, getStripePriceStudio } from "@/server/billing/stripe-config";
 
 export function isStripeCheckoutConfigured(): boolean {
   return Boolean(getStripe() && getStripePricePro());
+}
+
+/** True when individual Studio checkout can be started (Stripe configured + STRIPE_PRICE_STUDIO set). */
+export function isStudioCheckoutConfigured(): boolean {
+  return Boolean(getStripe() && getStripePriceStudio());
 }
 
 type BillingRouteFailure = { ok: false; response: Response };

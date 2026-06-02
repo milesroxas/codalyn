@@ -85,7 +85,6 @@ export const beaconAppSettingsSchema = z.object({
   defaultExportFormat: WEBP_AVIF,
   /** Encoder quality, 0–1 (matches image editor slider). */
   defaultExportQuality: z.number().min(0).max(1),
-  defaultAspectPreset: beaconAspectPresetSchema,
   imagePresetStorage: beaconPresetStorageSchema.default({
     siteDefault: null,
     byTargetKey: {},
@@ -186,7 +185,6 @@ export function getDefaultBeaconAppSettings(): BeaconAppSettings {
     theme: "dark",
     defaultExportFormat: DEFAULT_IMAGE_EXPORT_FORMAT,
     defaultExportQuality: 0.75,
-    defaultAspectPreset: "free",
     imagePresetStorage: {
       siteDefault: null,
       byTargetKey: {},

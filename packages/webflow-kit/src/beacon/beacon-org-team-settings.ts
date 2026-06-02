@@ -5,7 +5,6 @@ import { type BeaconAppSettings, beaconAppSettingsSchema, mergeBeaconAppSettings
 const beaconOrgTeamFieldsSchema = beaconAppSettingsSchema.pick({
   imagePresetStorage: true,
   hiddenBuiltinAspectPresets: true,
-  defaultAspectPreset: true,
   defaultExportFormat: true,
   defaultExportQuality: true,
   limitCropZoomToNativeResolution: true,
@@ -35,9 +34,6 @@ export function mergeOrgTeamSettingsIntoUser(
   if (org.hiddenBuiltinAspectPresets !== undefined) {
     patch.hiddenBuiltinAspectPresets = org.hiddenBuiltinAspectPresets;
   }
-  if (org.defaultAspectPreset !== undefined) {
-    patch.defaultAspectPreset = org.defaultAspectPreset;
-  }
   if (org.defaultExportFormat !== undefined) {
     patch.defaultExportFormat = org.defaultExportFormat;
   }
@@ -56,7 +52,6 @@ export function mergeOrgTeamSettingsIntoUser(
 const PRESET_KEYS = new Set<keyof BeaconAppSettings>([
   "imagePresetStorage",
   "hiddenBuiltinAspectPresets",
-  "defaultAspectPreset",
   "defaultExportFormat",
   "defaultExportQuality",
   "limitCropZoomToNativeResolution",

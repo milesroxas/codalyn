@@ -948,17 +948,16 @@ export function ImageEditor() {
 
   const cropAspect = useMemo(() => {
     if (cropFrameMode === "custom") {
-      const h = effectiveOutputH;
-      if (h <= 0) {
+      if (parsedOutputW <= 0 || parsedOutputH <= 0) {
         return undefined;
       }
-      return effectiveOutputW / h;
+      return parsedOutputW / parsedOutputH;
     }
     if (aspectPreset === "unset") {
       return undefined;
     }
     return aspectValue(aspectPreset);
-  }, [cropFrameMode, effectiveOutputW, effectiveOutputH, aspectPreset]);
+  }, [cropFrameMode, parsedOutputW, parsedOutputH, aspectPreset]);
 
   const { estimatedBytes, estimatePending, estimateNonce, onQualityCommit } = useExportByteEstimate({
     imageSrc,

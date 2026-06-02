@@ -41,7 +41,7 @@ describe("getBeaconSettingsTowerPutRejection", () => {
   it("allows team preset patches for designers with manage permission", () => {
     expect(
       getBeaconSettingsTowerPutRejection(
-        { defaultAspectPreset: "16-9" },
+        { limitCropZoomToNativeResolution: true },
         { editorExperience: false, canManageTeamBeaconSettings: true }
       )
     ).toBeNull();

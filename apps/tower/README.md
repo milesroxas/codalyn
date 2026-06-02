@@ -144,9 +144,11 @@ Webflow’s [Working with the Data API](https://developers.webflow.com/data/docs
 
 **Images:** `POST /api/v1/images/optimize?format=webp` (default) or `format=avif` (WebP stays default for Designer-safe pipelines).
 
-## Stripe billing (optional)
+## Pricing, billing, accounts & metering
 
-**[docs/stripe.md](docs/stripe.md)** — Pro (individual) vs Team (per-seat workspace) products, entitlements, workspace-creation rules, Checkout/Portal, webhooks, env vars, and local testing with the Stripe CLI. **Disabled by default** until you set the flag and keys.
+**[docs/pricing-and-billing.md](docs/pricing-and-billing.md)** — single source of truth for the pricing model: the four plans (Free/Pro/Studio/Team), accounts and team roles, entitlement resolution, seats, and usage metering (caps, credits, pooled Team usage).
+
+**[docs/stripe.md](docs/stripe.md)** — Stripe operations: products/price ids, Checkout/Portal, webhooks, env vars, deploy guards, and local testing with the Stripe CLI. **Disabled by default** until you set the flag and keys.
 
 ## Regenerating Better Auth Drizzle schema
 

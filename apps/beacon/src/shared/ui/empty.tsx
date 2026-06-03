@@ -4,36 +4,87 @@ import type * as React from "react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 
-const emptyVariants = cva("flex min-w-0 flex-1 flex-col text-balance", {
+const emptyVariants = cva("group/empty flex min-w-0 flex-1 text-balance", {
   variants: {
     tone: {
-      default: "items-center justify-center gap-4 rounded-sm border border-dashed p-6 text-center",
-      plain: "w-full items-stretch gap-4 border-0 bg-transparent p-0 text-left",
+      default: "",
+      plain: "",
       /** Inset panel empty state (CMS Slots Engine / Composer sections). */
-      insetPanel:
-        "items-center justify-center gap-3 rounded-[10px] border border-border bg-muted/10 px-6 py-8 text-center min-h-28",
+      insetPanel: "rounded-[10px] border border-border bg-muted/10",
+    },
+    layout: {
+      vertical: "flex-col",
+      /** Icon left, title/description beside, action on the right. */
+      horizontal: "flex-row items-center",
+      /** Compact left-aligned stack: title, description, then action below. */
+      horizontalStacked: "flex-col items-stretch",
     },
   },
+  compoundVariants: [
+    {
+      tone: "default",
+      layout: "vertical",
+      class: "items-center justify-center gap-4 rounded-sm border border-dashed p-6 text-center",
+    },
+    {
+      tone: "plain",
+      layout: "vertical",
+      class: "w-full items-stretch gap-4 border-0 bg-transparent p-0 text-left",
+    },
+    {
+      tone: "insetPanel",
+      layout: "vertical",
+      class: "items-center justify-center gap-3 px-6 py-8 text-center min-h-28",
+    },
+    {
+      tone: "insetPanel",
+      layout: "horizontal",
+      class: "gap-3 px-4 py-3 text-left",
+    },
+    {
+      tone: "insetPanel",
+      layout: "horizontalStacked",
+      class: "gap-2.5 px-4 py-3 text-left",
+    },
+  ],
   defaultVariants: {
     tone: "default",
+    layout: "vertical",
   },
 });
 
-function Empty({ className, tone, ...props }: React.ComponentProps<"div"> & VariantProps<typeof emptyVariants>) {
-  return <div data-slot="empty" className={cn(emptyVariants({ tone }), className)} {...props} />;
+function Empty({
+  className,
+  tone,
+  layout,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof emptyVariants>) {
+  const resolvedLayout = layout ?? "vertical";
+  return (
+    <div
+      data-slot="empty"
+      data-layout={resolvedLayout}
+      className={cn(emptyVariants({ tone, layout: resolvedLayout }), className)}
+      {...props}
+    />
+  );
 }
 
-const emptyHeaderVariants = cva("flex flex-col gap-2", {
-  variants: {
-    width: {
-      default: "max-w-sm items-center",
-      full: "w-full max-w-none items-center",
+const emptyHeaderVariants = cva(
+  "flex flex-col gap-2 group-data-[layout=horizontal]/empty:grid group-data-[layout=horizontal]/empty:min-w-0 group-data-[layout=horizontal]/empty:flex-1 group-data-[layout=horizontal]/empty:grid-cols-[auto_minmax(0,1fr)] group-data-[layout=horizontal]/empty:grid-rows-[auto_auto] group-data-[layout=horizontal]/empty:items-center group-data-[layout=horizontal]/empty:gap-x-3 group-data-[layout=horizontal]/empty:gap-y-0.5 group-data-[layout=horizontal]/empty:text-left group-data-[layout=horizontalStacked]/empty:w-full group-data-[layout=horizontalStacked]/empty:max-w-none group-data-[layout=horizontalStacked]/empty:items-start group-data-[layout=horizontalStacked]/empty:gap-1 group-data-[layout=horizontalStacked]/empty:text-left",
+  {
+    variants: {
+      width: {
+        default:
+          "max-w-sm items-center group-data-[layout=horizontal]/empty:max-w-none group-data-[layout=horizontal]/empty:items-start group-data-[layout=horizontalStacked]/empty:max-w-none group-data-[layout=horizontalStacked]/empty:items-start",
+        full: "w-full max-w-none items-center group-data-[layout=horizontal]/empty:items-start group-data-[layout=horizontalStacked]/empty:items-start",
+      },
     },
-  },
-  defaultVariants: {
-    width: "default",
-  },
-});
+    defaultVariants: {
+      width: "default",
+    },
+  }
+);
 
 function EmptyHeader({
   className,
@@ -44,7 +95,7 @@ function EmptyHeader({
 }
 
 const emptyMediaVariants = cva(
-  "mb-2 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "mb-2 flex shrink-0 items-center justify-center group-data-[layout=horizontal]/empty:col-start-1 group-data-[layout=horizontal]/empty:row-span-2 group-data-[layout=horizontal]/empty:row-start-1 group-data-[layout=horizontal]/empty:mb-0 group-data-[layout=horizontal]/empty:self-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -77,7 +128,10 @@ function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="empty-title"
-      className={cn("font-heading text-sm font-medium tracking-tight", className)}
+      className={cn(
+        "font-heading text-sm font-medium tracking-tight group-data-[layout=horizontal]/empty:col-start-2 group-data-[layout=horizontal]/empty:row-start-1",
+        className
+      )}
       {...props}
     />
   );
@@ -89,7 +143,8 @@ const emptyDescriptionVariants = cva(
     variants: {
       size: {
         default: "text-sm/relaxed",
-        compact: "max-w-56 text-xs leading-relaxed",
+        compact:
+          "max-w-56 text-xs leading-relaxed group-data-[layout=horizontal]/empty:max-w-none group-data-[layout=horizontalStacked]/empty:max-w-none",
       },
     },
     defaultVariants: {
@@ -103,7 +158,17 @@ function EmptyDescription({
   size,
   ...props
 }: React.ComponentProps<"p"> & VariantProps<typeof emptyDescriptionVariants>) {
-  return <div data-slot="empty-description" className={cn(emptyDescriptionVariants({ size }), className)} {...props} />;
+  return (
+    <div
+      data-slot="empty-description"
+      className={cn(
+        emptyDescriptionVariants({ size }),
+        "group-data-[layout=horizontal]/empty:col-start-2 group-data-[layout=horizontal]/empty:row-start-2",
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 const emptyContentVariants = cva("flex w-full min-w-0 flex-col text-sm text-balance", {
@@ -111,7 +176,8 @@ const emptyContentVariants = cva("flex w-full min-w-0 flex-col text-sm text-bala
     layout: {
       default: "max-w-sm items-center gap-2.5",
       hint: "max-w-none items-stretch gap-2.5 text-left",
-      actions: "max-w-sm items-center gap-2",
+      actions:
+        "max-w-sm items-center gap-2 group-data-[layout=horizontal]/empty:w-auto group-data-[layout=horizontal]/empty:max-w-none group-data-[layout=horizontal]/empty:shrink-0 group-data-[layout=horizontalStacked]/empty:w-full group-data-[layout=horizontalStacked]/empty:max-w-none group-data-[layout=horizontalStacked]/empty:items-stretch",
     },
   },
   defaultVariants: {

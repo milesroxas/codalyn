@@ -44,15 +44,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shared/ui/dialog";
-import {
-  Empty,
-  EmptyAction,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/shared/ui/empty";
+import { Empty, EmptyAction, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/shared/ui/empty";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
@@ -1158,6 +1150,14 @@ type AssetFolderToolbarProps = {
   onCreateAssetFolder: (name: string, parentFolderId: string | null) => Promise<boolean>;
 };
 
+function AssetFolderFieldLabel({ folderFieldId }: { folderFieldId: string }) {
+  return (
+    <Label className="text-xs font-medium" htmlFor={folderFieldId}>
+      Folder
+    </Label>
+  );
+}
+
 function AssetFolderToolbar(p: AssetFolderToolbarProps) {
   const {
     baseId,
@@ -1216,36 +1216,29 @@ function AssetFolderToolbar(p: AssetFolderToolbarProps) {
       }}
     >
       <div className="flex flex-col gap-2.5">
-        <Label className="text-xs font-medium" htmlFor={folderFieldId}>
-          Folder
-        </Label>
         {showFoldersLoading ? (
-          <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
-            <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
-            Loading folders…
-          </p>
+          <>
+            <AssetFolderFieldLabel folderFieldId={folderFieldId} />
+            <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+              <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
+              Loading folders…
+            </p>
+          </>
         ) : showEmptyFolderState ? (
-          <Empty tone="insetPanel">
+          <Empty tone="insetPanel" layout="horizontalStacked">
             <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <FolderPlus aria-hidden strokeWidth={1.75} />
-              </EmptyMedia>
               <EmptyTitle>No folders yet</EmptyTitle>
-              <EmptyDescription size="compact">
-                Create a folder in your Webflow Assets to file this image.
-              </EmptyDescription>
+              <EmptyDescription size="compact">Create a folder to continue.</EmptyDescription>
             </EmptyHeader>
             <EmptyContent layout="actions">
               <DialogTrigger asChild>
-                <EmptyAction width="fit" disabled={newFolderButtonDisabled}>
-                  <FolderPlus data-icon="inline-start" aria-hidden strokeWidth={1.75} />
-                  <span>Create folder</span>
-                </EmptyAction>
+                <EmptyAction disabled={newFolderButtonDisabled}>Create folder</EmptyAction>
               </DialogTrigger>
             </EmptyContent>
           </Empty>
         ) : (
           <>
+            <AssetFolderFieldLabel folderFieldId={folderFieldId} />
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
                 <Select
@@ -1288,40 +1281,36 @@ function AssetFolderToolbar(p: AssetFolderToolbarProps) {
       <DialogContent className="sm:max-w-sm" showCloseButton>
         <DialogHeader>
           <DialogTitle>New folder</DialogTitle>
-          <DialogDescription>Name and location.</DialogDescription>
+          <DialogDescription>Choose where this folder should live, then give it a name.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 py-1">
-          <RadioGroup
-            className="flex flex-col gap-2"
-            value={newFolderParent}
-            onValueChange={(v) => {
-              const nextParent = v as "root" | "child";
-              setNewFolderParent(nextParent);
-              if (nextParent === "child" && !newFolderParentFolderId && hasAvailableParentFolders) {
-                setNewFolderParentFolderId(selectedAssetFolderId ?? assetFolders[0]?.id ?? null);
-              }
-            }}
-          >
-            <label
-              htmlFor={newFolderRootId}
-              className="flex cursor-pointer items-center gap-2.5 rounded-sm border border-transparent p-2 hover:bg-muted/50"
+          {hasAvailableParentFolders ? (
+            <RadioGroup
+              className="flex flex-col gap-2"
+              value={newFolderParent}
+              onValueChange={(v) => {
+                const nextParent = v as "root" | "child";
+                setNewFolderParent(nextParent);
+                if (nextParent === "child" && !newFolderParentFolderId) {
+                  setNewFolderParentFolderId(selectedAssetFolderId ?? assetFolders[0]?.id ?? null);
+                }
+              }}
             >
-              <RadioGroupItem value="root" id={newFolderRootId} />
-              <span className="text-sm">Top level</span>
-            </label>
-            <label
-              htmlFor={newFolderChildId}
-              className={cn(
-                "flex items-center gap-2.5 rounded-sm border border-transparent p-2",
-                hasAvailableParentFolders ? "cursor-pointer hover:bg-muted/50" : "cursor-not-allowed opacity-60"
-              )}
-            >
-              <RadioGroupItem value="child" id={newFolderChildId} disabled={!hasAvailableParentFolders} />
-              <span className="text-sm">Inside folder</span>
-            </label>
-          </RadioGroup>
-          {!hasAvailableParentFolders ? (
-            <p className="text-muted-foreground text-xs">No folders yet. Create a top-level folder first.</p>
+              <label
+                htmlFor={newFolderRootId}
+                className="flex cursor-pointer items-center gap-2.5 rounded-sm border border-transparent p-2 hover:bg-muted/50"
+              >
+                <RadioGroupItem value="root" id={newFolderRootId} />
+                <span className="text-sm">Top level</span>
+              </label>
+              <label
+                htmlFor={newFolderChildId}
+                className="flex cursor-pointer items-center gap-2.5 rounded-sm border border-transparent p-2 hover:bg-muted/50"
+              >
+                <RadioGroupItem value="child" id={newFolderChildId} />
+                <span className="text-sm">Inside folder</span>
+              </label>
+            </RadioGroup>
           ) : null}
           {newFolderParent === "child" && hasAvailableParentFolders ? (
             <div className="grid gap-2">

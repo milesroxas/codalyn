@@ -1,4 +1,7 @@
-/** Organization row shape from Better Auth `organizationClient` (includes soft-delete metadata). */
+/**
+ * Runtime filter for Better Auth organization rows (includes `deletedAt` from tower org schema).
+ * Server routes must enforce separately via `activeOrganizationCondition()` / `resolveActiveOrganizationId`.
+ */
 export type TowerOrganizationListRow = {
   id: string;
   deletedAt?: Date | string | null;

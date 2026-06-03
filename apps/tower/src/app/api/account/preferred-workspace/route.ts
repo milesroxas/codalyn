@@ -1,9 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
+import { userHasActiveMembershipInOrganization } from "@/server/membership/workspace-ownership";
 import { db } from "@/shared/lib/db";
-import { member, user } from "@/shared/lib/db/auth-schema";
+import { user } from "@/shared/lib/db/auth-schema";
 
 export async function PATCH(req: Request) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -30,12 +31,8 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ preferredOrganizationId: null });
   }
 
-  const membership = await db
-    .select({ id: member.id })
-    .from(member)
-    .where(and(eq(member.userId, session.user.id), eq(member.organizationId, organizationId)))
-    .limit(1);
-  if (!membership[0]) {
+  const isMember = await userHasActiveMembershipInOrganization(session.user.id, organizationId);
+  if (!isMember) {
     return NextResponse.json({ error: "not_member" }, { status: 403 });
   }
 

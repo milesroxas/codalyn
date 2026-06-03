@@ -10,25 +10,23 @@ import {
   type AccountDeletionBlocker,
   formatAccountDeletionBlockedMessage,
 } from "@/shared/lib/membership/user-account-deletion";
-import {
-  isTowerPostSignOutExternalUrl,
-  resolveTowerPostSignOutUrl,
-} from "@/shared/lib/navigation/resolve-tower-post-sign-out-url";
+import { resolveTowerPostSignOutUrl } from "@/shared/lib/navigation/resolve-tower-post-sign-out-url";
 import { Button } from "@/shared/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { TypedConfirmAlertDialog } from "@/shared/ui/typed-confirm-alert-dialog";
 
-type DeleteEligibility = {
-  blockers: AccountDeletionBlocker[];
-};
+type DeleteEligibilityResult = { ok: true; blockers: AccountDeletionBlocker[] } | { ok: false; error: string };
 
-async function fetchDeleteEligibility(): Promise<DeleteEligibility> {
+async function fetchDeleteEligibility(): Promise<DeleteEligibilityResult> {
   const res = await fetch("/api/account/delete-eligibility", { credentials: "include" });
   if (!res.ok) {
-    return { blockers: [] };
+    if (res.status === 401) {
+      return { ok: false, error: "Your session expired. Sign in again, then retry." };
+    }
+    return { ok: false, error: "Could not verify whether this account can be deleted. Try again." };
   }
   const body = (await res.json()) as { blockers?: AccountDeletionBlocker[] };
-  return { blockers: body.blockers ?? [] };
+  return { ok: true, blockers: body.blockers ?? [] };
 }
 
 export function AccountDeleteSection(props: { sessionReady: boolean }) {
@@ -41,12 +39,19 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [deleteBlockers, setDeleteBlockers] = useState<AccountDeletionBlocker[]>([]);
+  const [deleteEligibilityError, setDeleteEligibilityError] = useState<string | null>(null);
   const [deleteEligibilityPending, setDeleteEligibilityPending] = useState(true);
 
   const refreshDeleteEligibility = useCallback(async () => {
     setDeleteEligibilityPending(true);
+    setDeleteEligibilityError(null);
     try {
       const eligibility = await fetchDeleteEligibility();
+      if (!eligibility.ok) {
+        setDeleteBlockers([]);
+        setDeleteEligibilityError(eligibility.error);
+        return;
+      }
       setDeleteBlockers(eligibility.blockers);
     } finally {
       setDeleteEligibilityPending(false);
@@ -83,19 +88,18 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
       }
       toast.success("Account deleted");
       await authClient.signOut({ fetchOptions: { credentials: "include" } });
-      const destination = resolveTowerPostSignOutUrl();
-      if (isTowerPostSignOutExternalUrl(destination)) {
-        window.location.assign(destination);
-        return;
-      }
-      window.location.assign(destination);
+      window.location.assign(resolveTowerPostSignOutUrl());
     } finally {
       setDeleteBusy(false);
     }
   }
 
-  const deleteBlocked = deleteBlockers.length > 0;
-  const deleteBlockedMessage = deleteBlocked ? formatAccountDeletionBlockedMessage(deleteBlockers) : null;
+  const deleteBlocked = deleteBlockers.length > 0 || deleteEligibilityError !== null;
+  const deleteBlockedMessage = deleteEligibilityError
+    ? deleteEligibilityError
+    : deleteBlockers.length > 0
+      ? formatAccountDeletionBlockedMessage(deleteBlockers)
+      : null;
 
   return (
     <Card tone="destructive">

@@ -3,6 +3,7 @@ import {
   findOrganizationIdBySlug,
   readOrganizationIdFromCreateResponse,
 } from "@/features/team/lib/create-workspace-response";
+import { filterActiveTowerOrganizations } from "@/shared/lib/membership/filter-active-tower-organizations";
 import { slugifyWorkspaceName } from "@/shared/lib/membership/workspace-slug";
 
 export type CreateWorkspaceOrganizationResult =
@@ -19,7 +20,7 @@ async function resolveCreatedOrganizationId(slug: string, createData: unknown): 
   if (list.error) {
     return null;
   }
-  return findOrganizationIdBySlug(list.data, slug);
+  return findOrganizationIdBySlug(filterActiveTowerOrganizations(list.data), slug);
 }
 
 export async function createWorkspaceOrganization(name: string): Promise<CreateWorkspaceOrganizationResult> {

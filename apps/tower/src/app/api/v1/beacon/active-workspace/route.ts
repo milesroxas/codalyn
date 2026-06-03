@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { auth } from "@/server/auth";
+import { userHasActiveMembershipInOrganization } from "@/server/membership/workspace-ownership";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { db } from "@/shared/lib/db";
-import { member, session as sessionTable } from "@/shared/lib/db/auth-schema";
+import { session as sessionTable } from "@/shared/lib/db/auth-schema";
 
 export const runtime = "nodejs";
 
@@ -31,12 +32,8 @@ export async function POST(req: Request) {
     return Response.json({ error: "organizationId required" }, { status: 400 });
   }
 
-  const memberOk = await db
-    .select({ id: member.id })
-    .from(member)
-    .where(and(eq(member.userId, verified.userId), eq(member.organizationId, organizationId)))
-    .limit(1);
-  if (!memberOk[0]) {
+  const memberOk = await userHasActiveMembershipInOrganization(verified.userId, organizationId);
+  if (!memberOk) {
     return Response.json({ error: "Not a member of this workspace" }, { status: 403 });
   }
 

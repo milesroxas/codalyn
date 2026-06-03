@@ -51,15 +51,13 @@ export function formatOperatorUserDeleteError(error: OperatorApiError): string {
   if (error.message === "confirm_mismatch") {
     return "Email does not match.";
   }
-  if (error.message === "account_deletion_blocked") {
-    return "Customer still owns or bills a workspace. Resolve ownership in Operator or have them delete the workspace first.";
-  }
   if (error.message === "delete_failed") {
     return "Delete failed. Check server logs and workspace ownership.";
   }
   if (error.message === "cannot_delete_self") {
     return "You cannot delete your own operator account from this panel.";
   }
+  // 409 responses include a human-readable `message` from UserAccountDeletionBlockedError.
   return error.message;
 }
 

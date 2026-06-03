@@ -48,22 +48,25 @@ export function computeAccountDeletionBlockers(
   const blockers: AccountDeletionBlocker[] = [];
 
   for (const org of orgs) {
+    if (org.deletedAt != null) {
+      if (org.ownerUserId === userId) {
+        const otherMemberCount = Math.max(0, org.memberCount - 1);
+        blockers.push({
+          organizationId: org.organizationId,
+          organizationName: org.organizationName,
+          organizationSlug: org.organizationSlug,
+          reason: "workspace_pending_deletion",
+          memberCount: org.memberCount,
+          otherMemberCount,
+          hasTeamSubscription: org.hasTeamSubscription,
+        });
+      }
+      continue;
+    }
+
     const otherMemberCount = Math.max(0, org.memberCount - 1);
     const isOwner = org.ownerUserId === userId;
     const isBillingOwner = org.billingOwnerUserId === userId && org.hasTeamSubscription;
-
-    if (isOwner && org.deletedAt != null) {
-      blockers.push({
-        organizationId: org.organizationId,
-        organizationName: org.organizationName,
-        organizationSlug: org.organizationSlug,
-        reason: "workspace_pending_deletion",
-        memberCount: org.memberCount,
-        otherMemberCount,
-        hasTeamSubscription: org.hasTeamSubscription,
-      });
-      continue;
-    }
 
     if (isOwner && isSharedWorkspace(org.memberCount)) {
       blockers.push({

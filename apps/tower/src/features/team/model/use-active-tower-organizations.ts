@@ -8,7 +8,9 @@ import {
 } from "@/shared/lib/membership/filter-active-tower-organizations";
 
 /**
- * Better Auth organization list/active hooks without soft-deleted workspaces.
+ * Better Auth organization list/active hooks with soft-deleted workspaces removed for UI.
+ * Authorization and active-org resolution on the server use `resolveActiveOrganizationId` and
+ * `userHasActiveMembershipInOrganization` — do not rely on this hook alone for access control.
  */
 export function useActiveTowerOrganizations() {
   const listQuery = authClient.useListOrganizations();

@@ -26,8 +26,10 @@ import {
 import type { ImageEditorPresetFileLimitBlocker } from "@/features/image-editor/lib/image-editor-preset-file-limit-blocker";
 import { resolveImageEditorPlacement } from "@/features/image-editor/lib/image-editor-resolved-placement";
 import { sanitizeAssetBaseName } from "@/features/image-editor/lib/sanitize-asset-base-name";
+import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { AvifTowerLimitFallbackNotice } from "@/features/image-editor/ui/avif-tower-limit-fallback-notice";
 import { ExportEncodeSizeFootnote, ExportPresetLimitBar } from "@/features/image-editor/ui/export-size-estimate";
+import { ImagePageTargetSurfaceSummary } from "@/features/image-editor/ui/image-editor-page-target-surface-summary";
 import { QualityComparePreview } from "@/features/image-editor/ui/quality-compare-preview";
 import { beaconPanelContainClass } from "@/shared/lib/beacon-app-route-surface";
 import { cn } from "@/shared/lib/utils";
@@ -211,6 +213,8 @@ export type ImageEditorCropExportPanelProps = {
   avifPresetOverriddenByTowerLimit?: boolean;
   /** When true, show aspect ratio and export dimension controls (manual override). */
   showExportSizeControls?: boolean;
+  /** Auto path: show selected image/component on the position step for context. */
+  positionPageTarget?: ImagePageTarget | null;
 };
 
 /** Fade controls below the crop preview; opacity-only so layout width stays stable in the extension iframe. */
@@ -1647,6 +1651,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     exportFormatLocked = false,
     avifPresetOverriddenByTowerLimit = false,
     showExportSizeControls = false,
+    positionPageTarget = null,
   } = props;
 
   const defaultFolderPathLabel = assetFolders[0]?.pathLabel ?? null;
@@ -1712,6 +1717,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
   if (flowPhase === "position") {
     return (
       <div className={cn(beaconPanelContainClass, "flex flex-col gap-3")}>
+        {positionPageTarget ? <ImagePageTargetSurfaceSummary target={positionPageTarget} /> : null}
         {uploadPresetPickerVisible ? (
           <UploadPresetPickerCard
             uploadPresetPickerValue={uploadPresetPickerValue}

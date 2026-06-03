@@ -26,6 +26,10 @@ import {
 import { dimensionsFromMaxWidthAndAspect } from "@/features/image-editor/lib/export-dimensions-from-aspect";
 import { resolveDisplayedSurfaceTarget } from "@/features/image-editor/lib/image-editor-display-surface-target";
 import {
+  resolveEffectiveExportConstraints,
+  resolveExportDimensionsReady,
+} from "@/features/image-editor/lib/image-editor-export-dimensions-ready";
+import {
   getImageEditorNavSteps,
   type ImageEditorFlowStep,
   type ImageEditorPathMode,
@@ -50,6 +54,7 @@ import {
   isManualUploadPresetOptionId,
   isUploadPresetExportFormatLocked,
   resolveAutoUploadPresetOptionId,
+  resolveShowExportSizeControls,
 } from "@/features/image-editor/lib/image-editor-upload-preset-picker";
 import { loadImage } from "@/features/image-editor/lib/load-image";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
@@ -372,6 +377,7 @@ export function ImageEditor() {
   const lastUploadPresetTargetInputKeyRef = useRef<string | null>(null);
   const userPickedUploadPresetRef = useRef(false);
   const lastAppliedUploadPresetOptionIdRef = useRef<string | null>(null);
+  const lastAppliedResolverConstraintsKeyRef = useRef<string | null>(null);
   const skipNextPersistExportDefaultsRef = useRef(false);
   const [uploadPresetOptionId, setUploadPresetOptionId] = useState<string>("");
   const {
@@ -569,17 +575,32 @@ export function ImageEditor() {
     [uploadPresetOptionId]
   );
 
-  const showExportSizeControls = useMemo(
-    () => uploadPresetPickerVisible && uploadPresetManualOverride,
-    [uploadPresetPickerVisible, uploadPresetManualOverride]
+  const effectiveTaggedDimensionsActive = autoTargetHasDesignerExportTag && !uploadPresetManualOverride;
+
+  const effectiveExportConstraints = useMemo(
+    () =>
+      resolveEffectiveExportConstraints({
+        uploadPresetManualOverride,
+        selectedPresetConstraints: selectedUploadPresetConstraints,
+        resolvedReadout: resolvedConstraintsReadout,
+      }),
+    [uploadPresetManualOverride, selectedUploadPresetConstraints, resolvedConstraintsReadout]
   );
 
-  const effectiveTaggedDimensionsActive = autoTargetHasDesignerExportTag && !uploadPresetManualOverride;
+  const showExportSizeControls = useMemo(
+    () =>
+      resolveShowExportSizeControls({
+        effectiveTaggedDimensionsActive,
+        effectiveExportConstraints,
+      }),
+    [effectiveTaggedDimensionsActive, effectiveExportConstraints]
+  );
 
   useEffect(() => {
     if (imageSrc == null) {
       setUploadPresetOptionId("");
       lastAppliedUploadPresetOptionIdRef.current = null;
+      lastAppliedResolverConstraintsKeyRef.current = null;
       userPickedUploadPresetRef.current = false;
       lastUploadPresetTargetInputKeyRef.current = null;
       return;
@@ -719,6 +740,54 @@ export function ImageEditor() {
   useEffect(() => {
     setAutoTargetHasDesignerExportTag(sessionConstraintApplication.taggedDimensionsActive);
   }, [sessionConstraintApplication.taggedDimensionsActive]);
+
+  useEffect(() => {
+    if (imageSrc == null) {
+      return;
+    }
+    if (!sessionConstraintApplication.shouldApply || uploadPresetManualOverride) {
+      return;
+    }
+    const constraints = sessionConstraintApplication.constraints;
+    if (constraints == null) {
+      return;
+    }
+    const applyKey = JSON.stringify({
+      target: resolvedUploadTarget,
+      source: sessionConstraintApplication.source,
+      presetId: resolvedConstraintsReadout?.presetId ?? null,
+      constraints,
+      imageSrc,
+    });
+    if (lastAppliedResolverConstraintsKeyRef.current === applyKey) {
+      return;
+    }
+    lastAppliedResolverConstraintsKeyRef.current = applyKey;
+    skipNextPersistExportDefaultsRef.current = true;
+    applySessionConstraintsFromPickerSelection(
+      {
+        ...constraints,
+        exportFormat: resolveEffectiveExportFormat(constraints.exportFormat, imageOptimizeLimitReached),
+      },
+      {
+        setOutputWidth,
+        setOutputHeight,
+        setWidthStr,
+        setHeightStr,
+        setExportFormat,
+        setQuality,
+        setCropFrameMode,
+        setAspectPreset,
+      }
+    );
+  }, [
+    imageSrc,
+    sessionConstraintApplication,
+    uploadPresetManualOverride,
+    resolvedUploadTarget,
+    resolvedConstraintsReadout,
+    imageOptimizeLimitReached,
+  ]);
 
   useEffect(() => {
     const selectedOption = uploadPresetPickerOptionMap.get(uploadPresetOptionId) ?? null;
@@ -909,38 +978,18 @@ export function ImageEditor() {
     setAspectPreset(next.aspectPreset);
   }, [naturalSizeAdvisory]);
 
-  const exportDimensionsReady = useMemo((): boolean => {
-    if (uploadPresetPickerVisible && !uploadPresetManualOverride) {
-      const selectedOption = uploadPresetPickerOptionMap.get(uploadPresetOptionId);
-      const constraints = selectedOption?.constraints;
-      return constraints != null && constraints.width > 0 && constraints.height > 0;
-    }
-    if (effectiveTaggedDimensionsActive) {
-      return true;
-    }
-    if (cropFrameMode === "custom") {
-      return parseOutputDimensionStrict(widthStr) != null && parseOutputDimensionStrict(heightStr) != null;
-    }
-    if (aspectPreset === "unset") {
-      return false;
-    }
-    const w = parseOutputDimensionStrict(widthStr);
-    const r = aspectValue(aspectPreset);
-    if (r == null || w == null || w < 1) {
-      return false;
-    }
-    return true;
-  }, [
-    uploadPresetPickerVisible,
-    uploadPresetManualOverride,
-    uploadPresetPickerOptionMap,
-    uploadPresetOptionId,
-    effectiveTaggedDimensionsActive,
-    cropFrameMode,
-    widthStr,
-    heightStr,
-    aspectPreset,
-  ]);
+  const exportDimensionsReady = useMemo(
+    () =>
+      resolveExportDimensionsReady({
+        effectiveTaggedDimensionsActive,
+        effectiveExportConstraints,
+        cropFrameMode,
+        widthStr,
+        heightStr,
+        aspectPreset,
+      }),
+    [effectiveTaggedDimensionsActive, effectiveExportConstraints, cropFrameMode, widthStr, heightStr, aspectPreset]
+  );
 
   const exportDimensionsBlockedMessage: string | null = exportDimensionsReady
     ? null
@@ -1481,6 +1530,7 @@ export function ImageEditor() {
         hidePlacementCard: pathMode === "auto",
         frameSummary,
         showResolvedReadout: true,
+        positionPageTarget: pathMode === "auto" ? autoDisplaySurfaceTarget : null,
         resolvedUploadTarget,
         resolvedConstraintsReadout,
         sessionMaxFileSizeBytes,

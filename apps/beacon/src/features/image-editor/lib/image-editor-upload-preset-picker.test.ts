@@ -9,9 +9,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildUploadPresetPickerOptions,
   getDefaultUploadPresetOptionId,
+  hasValidExportConstraints,
   isManualUploadPresetOptionId,
   isUploadPresetExportFormatLocked,
   resolveAutoUploadPresetOptionId,
+  resolveShowExportSizeControls,
 } from "./image-editor-upload-preset-picker";
 
 function makeSettings(patch: Partial<BeaconAppSettings>): BeaconAppSettings {
@@ -321,6 +323,70 @@ describe("resolveAutoUploadPresetOptionId", () => {
         targetResolutionSettled: true,
       })
     ).toBe("manual-override");
+  });
+});
+
+describe("hasValidExportConstraints", () => {
+  it("accepts positive width and height", () => {
+    expect(
+      hasValidExportConstraints({
+        width: 1200,
+        height: 800,
+        exportFormat: "webp",
+        maxFileSizeBytes: 90_000,
+        quality: 0.75,
+      })
+    ).toBe(true);
+  });
+
+  it("rejects null or non-positive dimensions", () => {
+    expect(hasValidExportConstraints(null)).toBe(false);
+    expect(
+      hasValidExportConstraints({
+        width: 0,
+        height: 800,
+        exportFormat: "webp",
+        maxFileSizeBytes: 90_000,
+        quality: 0.75,
+      })
+    ).toBe(false);
+  });
+});
+
+describe("resolveShowExportSizeControls", () => {
+  const constraints = {
+    width: 1200,
+    height: 800,
+    exportFormat: "webp" as const,
+    maxFileSizeBytes: 90_000,
+    quality: 0.75,
+  };
+
+  it("hides controls when tagged designer dimensions are active", () => {
+    expect(
+      resolveShowExportSizeControls({
+        effectiveTaggedDimensionsActive: true,
+        effectiveExportConstraints: null,
+      })
+    ).toBe(false);
+  });
+
+  it("shows controls when no effective export constraints exist", () => {
+    expect(
+      resolveShowExportSizeControls({
+        effectiveTaggedDimensionsActive: false,
+        effectiveExportConstraints: null,
+      })
+    ).toBe(true);
+  });
+
+  it("hides controls when effective constraints include site default sizing", () => {
+    expect(
+      resolveShowExportSizeControls({
+        effectiveTaggedDimensionsActive: false,
+        effectiveExportConstraints: constraints,
+      })
+    ).toBe(false);
   });
 });
 

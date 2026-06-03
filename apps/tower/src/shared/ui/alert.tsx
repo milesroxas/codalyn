@@ -30,8 +30,21 @@ const alertVariants = cva(
   }
 );
 
-function Alert({ className, variant, ...props }: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
-  return <div data-slot="alert" role="alert" className={cn(alertVariants({ variant }), className)} {...props} />;
+function Alert({
+  className,
+  variant,
+  actionAlign,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
+  return (
+    <div
+      data-slot="alert"
+      data-action-align={actionAlign ?? "center"}
+      role="alert"
+      className={cn(alertVariants({ variant, actionAlign }), className)}
+      {...props}
+    />
+  );
 }
 
 function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
@@ -60,17 +73,12 @@ function AlertDescription({ className, ...props }: React.ComponentProps<"div">) 
   );
 }
 
+const alertActionVariants = cva(
+  "mt-2 flex w-fit shrink-0 flex-wrap items-center gap-2 group-has-[>svg]/alert:col-start-2 md:col-start-2 md:mt-0 group-has-[>svg]/alert:md:col-start-3 group-data-[action-align=center]/alert:md:row-start-1 group-data-[action-align=center]/alert:md:row-span-2 group-data-[action-align=center]/alert:md:self-center group-data-[action-align=start]/alert:md:row-start-2 group-data-[action-align=start]/alert:md:row-span-1 group-data-[action-align=start]/alert:md:self-start"
+);
+
 function AlertAction({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="alert-action"
-      className={cn(
-        "mt-2 flex w-fit shrink-0 flex-wrap items-center gap-2 group-has-[>svg]/alert:col-start-2 md:col-start-2 md:row-start-1 md:row-span-2 md:mt-0 group-has-[>svg]/alert:md:col-start-3",
-        className
-      )}
-      {...props}
-    />
-  );
+  return <div data-slot="alert-action" className={cn(alertActionVariants(), className)} {...props} />;
 }
 
 export { Alert, AlertAction, AlertDescription, AlertTitle };

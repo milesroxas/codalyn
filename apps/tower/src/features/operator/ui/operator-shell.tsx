@@ -30,6 +30,7 @@ import { operatorPendingCountForHref } from "@/features/operator/model/operator-
 import { OperatorCommandPalette } from "@/features/operator/ui/operator-command-palette";
 import { OperatorNavCountBadge } from "@/features/operator/ui/operator-nav-count-badge";
 import { OperatorPendingReviewAlert } from "@/features/operator/ui/operator-pending-review-alert";
+import { OperatorSidebarUser } from "@/features/operator/ui/operator-sidebar-user";
 import { TowerAccountMenu } from "@/features/tower-ui/tower-account-menu";
 import { cn } from "@/shared/lib/utils";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
@@ -146,18 +147,8 @@ function OperatorShellContent({ userEmail, userName, children }: OperatorShellPr
   );
 
   const SidebarFooter = (
-    <div className="mt-auto flex flex-col gap-2 border-t border-border px-3 py-3">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
-        asChild
-      >
-        <Link href="/">
-          <IconArrowLeft className="size-4" aria-hidden />
-          Tenant workspace
-        </Link>
-      </Button>
+    <div className="mt-auto border-t border-border px-2 py-3">
+      <OperatorSidebarUser />
     </div>
   );
 
@@ -223,7 +214,7 @@ function OperatorShellContent({ userEmail, userName, children }: OperatorShellPr
             displayName={userName || userEmail}
             email={userEmail}
             showOperatorBadge
-            links={[{ href: "/", label: "Switch to tenant", icon: IconArrowLeft }]}
+            links={[{ href: "/", label: "Tenant workspace", icon: IconArrowLeft }]}
             signingOut={signingOut}
             onSignOut={onSignOut}
             trigger={

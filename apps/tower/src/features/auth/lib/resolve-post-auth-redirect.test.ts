@@ -6,8 +6,14 @@ describe("resolvePostAuthRedirectTarget", () => {
     expect(resolvePostAuthRedirectTarget({ role: "user" }, "/team")).toBe("/team");
   });
 
-  it("sends product admins home to the operator console", () => {
+  it("sends product admins to the operator console from default landing paths", () => {
     expect(resolvePostAuthRedirectTarget({ role: "product_admin" }, "/")).toBe("/console");
+    expect(resolvePostAuthRedirectTarget({ role: "product_admin" }, "/sign-in")).toBe("/console");
+  });
+
+  it("keeps explicit callback paths for product admins", () => {
+    expect(resolvePostAuthRedirectTarget({ role: "product_admin" }, "/account")).toBe("/account");
+    expect(resolvePostAuthRedirectTarget({ role: "product_admin" }, "/console/customers")).toBe("/console/customers");
   });
 
   it("rejects unsafe callback targets", () => {

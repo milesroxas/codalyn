@@ -1,5 +1,14 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { utcYearMonth } from "@/server/billing/metering-policy";
+import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
+import { userRowIndividualPlan } from "@/server/billing/stripe-subscription-status";
+import { getTeamMinSeats } from "@/server/billing/team-billing-config";
+import {
+  getTowerLimitsSnapshot,
+  type TowerTierLimits,
+  tierLimitsFromSnapshot,
+} from "@/server/billing/tower-limits-config";
 import type {
   OperatorUsageConsumer,
   OperatorUsageCostSegment,
@@ -9,10 +18,13 @@ import type {
   OperatorUsageMeterTotals,
   OperatorUsageMetrics,
   OperatorUsageSegmentTotals,
+  OperatorUsageTierEconomics,
+  OperatorUsageTierKey,
   OperatorUsageTrendPoint,
   OperatorUsageUtilizationMeter,
 } from "@/server/operator/types";
 import { fetchOperatorUserUsageLimits, fetchOperatorWorkspaceUsageLimits } from "@/server/operator/usage-limits";
+import { resolvePooledSeatCount } from "@/shared/lib/billing/organization-seat-cap";
 import { db } from "@/shared/lib/db";
 import { organization, towerUsageMonth, towerWorkspaceUsageMonth, user } from "@/shared/lib/db/auth-schema";
 import { meterCostUsd } from "@/shared/lib/infra-cost-model";
@@ -349,6 +361,172 @@ async function resolvePeakLabels(
   return labels;
 }
 
+/** Current-month usage counts + measured cost drivers for one account (user or workspace pool). */
+type TierUsageRow = OperatorUsageMeterTotals & MeterCostDrivers & { id: string };
+
+/** Per-plan running totals accumulated while classifying every account. */
+type TierAccumulator = {
+  population: number;
+  activeCount: number;
+  totals: OperatorUsageMeterTotals;
+  cost: OperatorUsageMeterCost;
+  /** Cap multiplier: account count (user tiers) or summed paid seats (team pool). */
+  capMultiplier: number;
+};
+
+function newTierAccumulator(): TierAccumulator {
+  return { population: 0, activeCount: 0, totals: { ...EMPTY_TOTALS }, cost: { ...EMPTY_COST }, capMultiplier: 0 };
+}
+
+function applyUsageToAccumulator(accum: TierAccumulator, usage: TierUsageRow): void {
+  if (usage.webflowProxyRequestCount + usage.cmsWriteCount + usage.imageOptimizeCount > 0) {
+    accum.activeCount += 1;
+  }
+  accum.totals.webflowProxyRequestCount += usage.webflowProxyRequestCount;
+  accum.totals.cmsWriteCount += usage.cmsWriteCount;
+  accum.totals.imageOptimizeCount += usage.imageOptimizeCount;
+  accum.cost = addCost(accum.cost, costFromDrivers(usage));
+}
+
+function capTotalsForTier(limits: TowerTierLimits, multiplier: number): OperatorUsageMeterTotals {
+  return {
+    webflowProxyRequestCount: limits.webflowProxyRequestsPerMonth * multiplier,
+    cmsWriteCount: limits.cmsWritesPerMonth * multiplier,
+    imageOptimizeCount: limits.imageOptimizesPerMonth * multiplier,
+  };
+}
+
+/**
+ * Current-month economics grouped by plan (Free / Pro / Studio / Team) — the lever for pricing and
+ * limits. Classifies every account with the same pure helpers enforcement uses (`userRowIndividualPlan`
+ * plus org-sub dedup for individuals, `isOrganizationTeamEntitled` for pools), and prices measured
+ * drivers with the shared cost model. Caps use standard tier defaults (per-account overrides excluded),
+ * so figures describe the plan as designed.
+ *
+ * Cost note: scans the full `user` and `organization` tables to size each tier's population. Acceptable
+ * for this force-dynamic operator endpoint; not a hot request path.
+ */
+async function fetchTierEconomics(currentMonth: string): Promise<OperatorUsageTierEconomics[]> {
+  const billingEnabled = isTowerBillingEnabled();
+  const [limits, users, orgs, orgSubRows, userUsageRows, workspaceUsageRows] = await Promise.all([
+    getTowerLimitsSnapshot(),
+    db
+      .select({
+        id: user.id,
+        subscriptionPlan: user.subscriptionPlan,
+        subscriptionStatus: user.subscriptionStatus,
+        stripeSubscriptionId: user.stripeSubscriptionId,
+      })
+      .from(user),
+    db
+      .select({
+        id: organization.id,
+        billingPlan: organization.billingPlan,
+        subscriptionStatus: organization.subscriptionStatus,
+        stripeSubscriptionId: organization.stripeSubscriptionId,
+        stripeSeatQuantity: organization.stripeSeatQuantity,
+        seatLimit: organization.seatLimit,
+      })
+      .from(organization),
+    db
+      .select({ stripeSubscriptionId: organization.stripeSubscriptionId })
+      .from(organization)
+      .where(isNotNull(organization.stripeSubscriptionId)),
+    db
+      .select({
+        id: towerUsageMonth.userId,
+        webflowProxyRequestCount: towerUsageMonth.webflowProxyRequestCount,
+        cmsWriteCount: towerUsageMonth.cmsWriteCount,
+        imageOptimizeCount: towerUsageMonth.imageOptimizeCount,
+        webflowProxyComputeMs: towerUsageMonth.webflowProxyComputeMs,
+        webflowProxyEgressBytes: towerUsageMonth.webflowProxyEgressBytes,
+        cmsWriteComputeMs: towerUsageMonth.cmsWriteComputeMs,
+        cmsWriteEgressBytes: towerUsageMonth.cmsWriteEgressBytes,
+        imageComputeMs: towerUsageMonth.imageComputeMs,
+        imageEgressBytes: towerUsageMonth.imageEgressBytes,
+      })
+      .from(towerUsageMonth)
+      .where(eq(towerUsageMonth.yearMonth, currentMonth)),
+    db
+      .select({
+        id: towerWorkspaceUsageMonth.organizationId,
+        webflowProxyRequestCount: towerWorkspaceUsageMonth.webflowProxyRequestCount,
+        cmsWriteCount: towerWorkspaceUsageMonth.cmsWriteCount,
+        imageOptimizeCount: towerWorkspaceUsageMonth.imageOptimizeCount,
+        webflowProxyComputeMs: towerWorkspaceUsageMonth.webflowProxyComputeMs,
+        webflowProxyEgressBytes: towerWorkspaceUsageMonth.webflowProxyEgressBytes,
+        cmsWriteComputeMs: towerWorkspaceUsageMonth.cmsWriteComputeMs,
+        cmsWriteEgressBytes: towerWorkspaceUsageMonth.cmsWriteEgressBytes,
+        imageComputeMs: towerWorkspaceUsageMonth.imageComputeMs,
+        imageEgressBytes: towerWorkspaceUsageMonth.imageEgressBytes,
+      })
+      .from(towerWorkspaceUsageMonth)
+      .where(eq(towerWorkspaceUsageMonth.yearMonth, currentMonth)),
+  ]);
+
+  const orgSubIds = new Set(orgSubRows.flatMap((row) => (row.stripeSubscriptionId ? [row.stripeSubscriptionId] : [])));
+  const userUsageById = new Map(userUsageRows.map((row) => [row.id, row]));
+  const workspaceUsageById = new Map(workspaceUsageRows.map((row) => [row.id, row]));
+
+  const accumulators: Record<OperatorUsageTierKey, TierAccumulator> = {
+    free: newTierAccumulator(),
+    pro: newTierAccumulator(),
+    studio: newTierAccumulator(),
+    team: newTierAccumulator(),
+  };
+
+  for (const u of users) {
+    const plan = billingEnabled ? userRowIndividualPlan(u) : null;
+    // A sub also present on an organization row is a Team sub, not individual entitlement (mirrors
+    // resolveUserIndividualPlan), so it must not promote the user out of Free.
+    const tier: OperatorUsageTierKey =
+      plan && !(u.stripeSubscriptionId && orgSubIds.has(u.stripeSubscriptionId)) ? plan : "free";
+    const accum = accumulators[tier];
+    accum.population += 1;
+    accum.capMultiplier += 1;
+    const usage = userUsageById.get(u.id);
+    if (usage) {
+      applyUsageToAccumulator(accum, usage);
+    }
+  }
+
+  const minSeats = getTeamMinSeats();
+  for (const o of orgs) {
+    if (
+      !isOrganizationTeamEntitled({
+        subscriptionStatus: o.subscriptionStatus,
+        billingPlan: o.billingPlan,
+        stripeSubscriptionId: o.stripeSubscriptionId,
+      })
+    ) {
+      continue;
+    }
+    const accum = accumulators.team;
+    accum.population += 1;
+    accum.capMultiplier += resolvePooledSeatCount(
+      { stripeSeatQuantity: o.stripeSeatQuantity, seatLimit: o.seatLimit },
+      minSeats
+    );
+    const usage = workspaceUsageById.get(o.id);
+    if (usage) {
+      applyUsageToAccumulator(accum, usage);
+    }
+  }
+
+  return (["free", "pro", "studio", "team"] as const).map((tier) => {
+    const accum = accumulators[tier];
+    return {
+      tier,
+      scope: tier === "team" ? ("workspace" as const) : ("user" as const),
+      population: accum.population,
+      activeCount: accum.activeCount,
+      totals: accum.totals,
+      cost: accum.cost,
+      capTotals: capTotalsForTier(tierLimitsFromSnapshot(limits, tier), accum.capMultiplier),
+    };
+  });
+}
+
 export async function fetchOperatorUsageMetrics(): Promise<OperatorUsageMetrics> {
   const months = recentYearMonths(TREND_MONTHS);
   const currentMonth = months[months.length - 1];
@@ -362,6 +540,7 @@ export async function fetchOperatorUsageMetrics(): Promise<OperatorUsageMetrics>
     userConsumers,
     workspaceConsumers,
     utilization,
+    tiers,
   ] = await Promise.all([
     aggregateMonthlyTotals(towerUsageMonth, months),
     aggregateMonthlyTotals(towerWorkspaceUsageMonth, months),
@@ -371,6 +550,7 @@ export async function fetchOperatorUsageMetrics(): Promise<OperatorUsageMetrics>
     fetchTopUserConsumers(currentMonth),
     fetchTopWorkspaceConsumers(currentMonth),
     fetchUtilization(currentMonth),
+    fetchTierEconomics(currentMonth),
   ]);
 
   const trend: OperatorUsageTrendPoint[] = months.map((yearMonth) => {
@@ -429,6 +609,7 @@ export async function fetchOperatorUsageMetrics(): Promise<OperatorUsageMetrics>
     costSegments,
     topConsumers,
     utilization,
+    tiers,
   };
 }
 

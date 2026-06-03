@@ -1,5 +1,6 @@
 "use client";
 
+import { towerPlanName } from "@codalyn/webflow-kit";
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { IconBolt, IconCoin, IconDeviceFloppy, IconPhoto, IconRefresh } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
@@ -10,6 +11,7 @@ import type {
   OperatorUsageMeterTotals,
   OperatorUsageMetrics,
   OperatorUsageSegmentTotals,
+  OperatorUsageTierEconomics,
 } from "@/server/operator/types";
 import { formatUsd, formatUsdCompact, RATE_ANCHORS } from "@/shared/lib/infra-cost-model";
 import {
@@ -25,6 +27,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/sha
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { StatTile } from "@/shared/ui/stat-tile";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group";
 import { UsageCompositionChart } from "@/shared/ui/usage-composition-chart";
 import { UsageRankedBarChart } from "@/shared/ui/usage-ranked-bar-chart";
@@ -52,6 +55,12 @@ function costToMeterKeyed(cost: OperatorUsageMeterCost): OperatorUsageMeterTotal
 
 function sumCost(cost: OperatorUsageMeterCost): number {
   return cost.webflowProxy + cost.cmsWrite + cost.image;
+}
+
+const PERCENT_FORMAT = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 });
+
+function formatRatio(value: number): string {
+  return PERCENT_FORMAT.format(Number.isFinite(value) ? value : 0);
 }
 
 type UsageCardProps = {
@@ -131,6 +140,7 @@ export function OperatorUsage() {
 
       <CurrentMonthStats metrics={metrics} loading={loading} unit={unit} />
       <TrendCard metrics={metrics} loading={loading} unit={unit} />
+      <TierEconomicsCard metrics={metrics} loading={loading} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {unit === "cost" ? (
@@ -325,6 +335,97 @@ function UnitEconomicsCard({ metrics, loading }: UsageCardProps) {
             </p>
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Average cost to serve one account in a tier this month. */
+function avgCostPerAccount(tier: OperatorUsageTierEconomics): number {
+  return tier.population > 0 ? sumCost(tier.cost) / tier.population : 0;
+}
+
+/** Tier usage relative to the standard plan cap for one meter (avg used ÷ cap), or null when unmetered. */
+function tierMeterUtilization(
+  tier: OperatorUsageTierEconomics,
+  kind: (typeof USAGE_METER_KINDS)[number]
+): number | null {
+  const countKey = USAGE_METER_COUNT_KEY[kind];
+  const cap = tier.capTotals[countKey];
+  return cap > 0 ? tier.totals[countKey] / cap : null;
+}
+
+function TierEconomicsCard({ metrics, loading }: { metrics: OperatorUsageMetrics | null; loading: boolean }) {
+  const showPlaceholder = useDeferredLoadingIndicator(loading);
+  const totalCost = useMemo(
+    () => (metrics ? metrics.tiers.reduce((sum, tier) => sum + sumCost(tier.cost), 0) : 0),
+    [metrics]
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Economics by plan</CardTitle>
+        <CardDescription>
+          Population, estimated infra cost to serve, and usage against each plan&apos;s standard cap — the basis for
+          pricing and limit decisions.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {showPlaceholder || !metrics ? (
+          <ChartSkeleton height={220} />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Plan</TableHead>
+                <TableHead className="text-right">Accounts</TableHead>
+                <TableHead className="text-right">Active</TableHead>
+                <TableHead className="text-right">Cost / account</TableHead>
+                <TableHead className="text-right">Total cost</TableHead>
+                <TableHead className="text-right">Share</TableHead>
+                {USAGE_METER_KINDS.map((kind) => (
+                  <TableHead key={kind} className="text-right">
+                    {usageMeterLabel(kind)}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {metrics.tiers.map((tier) => {
+                const cost = sumCost(tier.cost);
+                return (
+                  <TableRow key={tier.tier}>
+                    <TableCell className="font-medium text-foreground">{towerPlanName(tier.tier)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatUsageFull(tier.population)}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {formatUsageFull(tier.activeCount)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {formatUsd(avgCostPerAccount(tier))}
+                    </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">{formatUsd(cost)}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {totalCost > 0 ? formatRatio(cost / totalCost) : "—"}
+                    </TableCell>
+                    {USAGE_METER_KINDS.map((kind) => {
+                      const util = tierMeterUtilization(tier, kind);
+                      return (
+                        <TableCell key={kind} className="text-right tabular-nums">
+                          {util === null ? <span className="text-muted-foreground">—</span> : formatRatio(util)}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          Cost is the measured infra estimate attributed to each plan. Meter columns show average usage against the
+          standard cap (operator per-account overrides excluded). Team caps are pooled (per-seat cap × paid seats).
+        </p>
       </CardContent>
     </Card>
   );

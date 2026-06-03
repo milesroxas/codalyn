@@ -154,12 +154,18 @@ export type OperatorUsageSegmentTotals = OperatorUsageMeterTotals & {
   segment: "individual" | "workspace";
 };
 
-/** Aggregate used vs effective cap for one meter across all metered entities consuming this month. */
+/**
+ * Peak single-account utilization for one meter: `used`/`limit` belong to the most-utilized metered
+ * entity this month (highest used/cap ratio), not a platform-wide sum. `meteredEntityCount` is how many
+ * accounts that meter is enforced against this month.
+ */
 export type OperatorUsageUtilizationMeter = {
   kind: "webflowProxy" | "cmsWrite" | "image";
   used: number;
   limit: number;
   meteredEntityCount: number;
+  /** Display label (user email / workspace name) of the peak account, or null when none is metered. */
+  peakLabel: string | null;
 };
 
 export type OperatorUsageMetrics = {

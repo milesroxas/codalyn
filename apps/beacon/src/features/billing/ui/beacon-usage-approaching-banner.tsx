@@ -2,7 +2,7 @@ import { openTowerAppPath } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { useTowerUsageStatus } from "@/features/billing/model/use-tower-usage-status";
 import { Button } from "@/shared/ui/button";
-import { UsageApproachingLimitAlert } from "@/shared/ui/usage-approaching-limit-alert";
+import { UsageApproachingLimitCompactBanner } from "@/shared/ui/usage-approaching-limit-compact-banner";
 
 export function BeaconUsageApproachingBanner() {
   const { user } = useBeaconTowerSession();
@@ -20,8 +20,8 @@ export function BeaconUsageApproachingBanner() {
   const showBillingLever = status.tier === "free" || status.tier === "team";
 
   return (
-    <div className="px-3 pt-3">
-      <UsageApproachingLimitAlert
+    <div className="px-3 pt-2">
+      <UsageApproachingLimitCompactBanner
         meters={meters}
         usageScope={status.usageScope}
         upgradeAction={

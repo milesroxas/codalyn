@@ -337,7 +337,9 @@ function UtilizationCard({ metrics, loading }: UsageCardProps) {
     <Card>
       <CardHeader>
         <CardTitle className="text-sm">Capacity utilization</CardTitle>
-        <CardDescription>Used vs effective monthly caps across metered accounts.</CardDescription>
+        <CardDescription>
+          Busiest account per meter — how close the most-utilized account is to its cap.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {showPlaceholder || !metrics ? (

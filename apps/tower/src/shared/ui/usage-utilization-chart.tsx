@@ -22,6 +22,7 @@ type UtilizationRow = {
   used: number;
   limit: number;
   fill: string;
+  peakLabel: string | null;
 };
 
 export function UsageUtilizationChart({ data }: UsageUtilizationChartProps) {
@@ -37,22 +38,15 @@ export function UsageUtilizationChart({ data }: UsageUtilizationChartProps) {
           used: meter.used,
           limit: meter.limit,
           fill: `var(--color-${key})`,
+          peakLabel: meter.peakLabel,
         };
       }),
     [data]
   );
 
   return (
-    <ChartContainer config={USAGE_METER_CHART_CONFIG} className="aspect-auto h-[240px] w-full">
-      <RadialBarChart
-        data={rows}
-        cx="50%"
-        cy="50%"
-        innerRadius="35%"
-        outerRadius="100%"
-        startAngle={90}
-        endAngle={-270}
-      >
+    <ChartContainer config={USAGE_METER_CHART_CONFIG} className="aspect-auto h-[280px] w-full">
+      <RadialBarChart data={rows} cx="50%" cy="46%" innerRadius="32%" outerRadius="78%" startAngle={90} endAngle={-270}>
         <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
         <ChartTooltip
           cursor={false}
@@ -74,6 +68,9 @@ export function UsageUtilizationChart({ data }: UsageUtilizationChartProps) {
                     <span className="font-mono font-medium tabular-nums text-foreground">
                       {payload.pct}% · {formatUsageFull(payload.used)} / {formatUsageFull(payload.limit)}
                     </span>
+                    {payload.peakLabel ? (
+                      <span className="text-[11px] text-muted-foreground/80">Busiest: {payload.peakLabel}</span>
+                    ) : null}
                   </div>
                 );
               }}

@@ -20,6 +20,10 @@ const dbTarget = process.argv
   .slice(2)
   .find((a) => !a.startsWith("--"))
   ?.toLowerCase();
+if (dbTarget === "prod" || dbTarget === "production") {
+  console.error("Refusing dev against prod database. Use db:migrate:prod with --confirm for migrations only.");
+  process.exit(1);
+}
 if (dbTarget && dbTarget !== "local") {
   const url = resolveDatabaseUrl(dbTarget, {});
   if (!url) {

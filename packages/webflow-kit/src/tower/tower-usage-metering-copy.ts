@@ -5,6 +5,8 @@ import { parseTowerUsageProductFeature, towerUsageProductFeatureLabel } from "./
 
 export const TOWER_USAGE_APPROACHING_ALERT_TITLE = "Approaching monthly usage limit";
 
+export const TOWER_USAGE_APPROACHING_DETAILS_ACTION_LABEL = "View details";
+
 /**
  * One-line explanation of how the reported usage is scoped, so UIs never imply Team is just higher
  * per-user caps. Workspace scope is a shared pool; user scope follows the individual across workspaces.

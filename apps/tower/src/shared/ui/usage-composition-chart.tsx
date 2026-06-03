@@ -35,7 +35,7 @@ export function UsageCompositionChart({
   const total = React.useMemo(() => data.reduce((sum, slice) => sum + slice.value, 0), [data]);
 
   return (
-    <ChartContainer config={config} className="aspect-auto h-[240px] w-full">
+    <ChartContainer config={config} className="aspect-auto h-[280px] w-full">
       <PieChart>
         <ChartTooltip
           cursor={false}
@@ -74,15 +74,15 @@ export function UsageCompositionChart({
                 return null;
               }
               return (
-                <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="central">
                   <tspan
                     x={viewBox.cx}
-                    y={(viewBox.cy ?? 0) - 8}
+                    y={(viewBox.cy ?? 0) - 10}
                     className="fill-foreground text-2xl font-semibold tabular-nums"
                   >
                     {valueFormatter(total)}
                   </tspan>
-                  <tspan x={viewBox.cx} y={(viewBox.cy ?? 0) + 14} className="fill-muted-foreground text-xs">
+                  <tspan x={viewBox.cx} y={(viewBox.cy ?? 0) + 13} className="fill-muted-foreground text-xs">
                     {centerLabel}
                   </tspan>
                 </text>

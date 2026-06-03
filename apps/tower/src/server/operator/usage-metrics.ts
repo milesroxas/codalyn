@@ -244,9 +244,11 @@ const UTILIZATION_METERS = [
 ] as const;
 
 /**
- * Aggregate utilization (used vs effective cap) per meter across the entities that actually consumed this
- * month. Caps come from the same per-entity policy resolver used elsewhere, so the gauge reflects real
- * enforcement. Unmetered entities (null cap) are excluded so the ratio stays meaningful.
+ * Peak single-account utilization per meter: the most-utilized metered entity (highest used/cap ratio)
+ * among the accounts that consumed this month. This is the actionable capacity signal — "how close is
+ * the busiest account to its cap?" — rather than a platform-wide sum, which stays ~0% until huge scale.
+ * Caps come from the same per-entity policy resolver used for enforcement. Unmetered entities (null or
+ * non-positive cap) are excluded so the ratio stays meaningful.
  */
 async function fetchUtilization(yearMonth: string): Promise<OperatorUsageUtilizationMeter[]> {
   const activeTotal = (table: MeterTotalsTable) =>
@@ -264,29 +266,87 @@ async function fetchUtilization(yearMonth: string): Promise<OperatorUsageUtiliza
   ]);
 
   const [userViews, workspaceViews] = await Promise.all([
-    Promise.all(userIdRows.map((row) => fetchOperatorUserUsageLimits(row.id))),
-    Promise.all(orgIdRows.map((row) => fetchOperatorWorkspaceUsageLimits(row.id))),
+    Promise.all(
+      userIdRows.map(async (row) => ({
+        id: row.id,
+        scope: "user" as const,
+        view: await fetchOperatorUserUsageLimits(row.id),
+      }))
+    ),
+    Promise.all(
+      orgIdRows.map(async (row) => ({
+        id: row.id,
+        scope: "workspace" as const,
+        view: await fetchOperatorWorkspaceUsageLimits(row.id),
+      }))
+    ),
   ]);
 
-  const views: OperatorUsageLimitsView[] = [...userViews, ...workspaceViews].filter(
-    (view): view is OperatorUsageLimitsView => view !== null
+  const entities: UtilizationEntity[] = [...userViews, ...workspaceViews].flatMap((entry) =>
+    entry.view ? [{ id: entry.id, scope: entry.scope, view: entry.view }] : []
   );
 
-  return UTILIZATION_METERS.map((meter) => {
+  const peaks = UTILIZATION_METERS.map((meter) => {
     let used = 0;
     let limit = 0;
+    let peakRatio = -1;
     let meteredEntityCount = 0;
-    for (const view of views) {
-      const cap = view[meter.cap];
-      if (cap === null) {
+    let peak: UtilizationEntity | null = null;
+    for (const entity of entities) {
+      const cap = entity.view[meter.cap];
+      if (cap === null || cap <= 0) {
         continue;
       }
-      used += view[meter.count];
-      limit += cap;
       meteredEntityCount += 1;
+      const entityUsed = entity.view[meter.count];
+      const ratio = entityUsed / cap;
+      if (ratio > peakRatio) {
+        peakRatio = ratio;
+        used = entityUsed;
+        limit = cap;
+        peak = entity;
+      }
     }
-    return { kind: meter.kind, used, limit, meteredEntityCount };
+    return { kind: meter.kind, used, limit, meteredEntityCount, peak };
   });
+
+  const peakLabels = await resolvePeakLabels(peaks);
+  return peaks.map(({ peak, ...meter }) => ({
+    ...meter,
+    peakLabel: peak ? (peakLabels.get(`${peak.scope}:${peak.id}`) ?? null) : null,
+  }));
+}
+
+/** A metered entity (individual user or pooled workspace) paired with its resolved limits view. */
+type UtilizationEntity = { id: string; scope: "user" | "workspace"; view: OperatorUsageLimitsView };
+
+/** Resolves a display label (user email / workspace name) for each meter's peak entity, in one batch. */
+async function resolvePeakLabels(
+  peaks: ReadonlyArray<{ peak: { id: string; scope: "user" | "workspace" } | null }>
+): Promise<Map<string, string>> {
+  const userIds = [...new Set(peaks.flatMap((entry) => (entry.peak?.scope === "user" ? [entry.peak.id] : [])))];
+  const orgIds = [...new Set(peaks.flatMap((entry) => (entry.peak?.scope === "workspace" ? [entry.peak.id] : [])))];
+
+  const [userRows, orgRows] = await Promise.all([
+    userIds.length > 0
+      ? db.select({ id: user.id, email: user.email, name: user.name }).from(user).where(inArray(user.id, userIds))
+      : Promise.resolve([]),
+    orgIds.length > 0
+      ? db
+          .select({ id: organization.id, name: organization.name })
+          .from(organization)
+          .where(inArray(organization.id, orgIds))
+      : Promise.resolve([]),
+  ]);
+
+  const labels = new Map<string, string>();
+  for (const row of userRows) {
+    labels.set(`user:${row.id}`, row.email || row.name || row.id);
+  }
+  for (const row of orgRows) {
+    labels.set(`workspace:${row.id}`, row.name || row.id);
+  }
+  return labels;
 }
 
 export async function fetchOperatorUsageMetrics(): Promise<OperatorUsageMetrics> {

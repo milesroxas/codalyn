@@ -10,6 +10,7 @@ import {
   MAX_SIZE_UNIT_OPTIONS,
   maxBytesToDraft,
   parsePresetOutputDimension,
+  resolveBeaconPresetPreviewLayout,
 } from "./beacon-preset-dimensions.js";
 
 describe("parsePresetOutputDimension", () => {
@@ -45,6 +46,24 @@ describe("max size draft helpers", () => {
   it("formats max file size labels", () => {
     expect(formatBeaconPresetMax(102_400)).toBe("100 KB");
     expect(formatBeaconPresetMax(2 * 1024 * 1024)).toBe("2.0 MB");
+  });
+});
+
+describe("resolveBeaconPresetPreviewLayout", () => {
+  it("derives aspect ratio and label from preset dimensions", () => {
+    expect(resolveBeaconPresetPreviewLayout({ width: 1920, height: 1080 })).toEqual({
+      width: 1920,
+      height: 1080,
+      aspectRatio: 1920 / 1080,
+      dimensionsLabel: "1920×1080px",
+    });
+  });
+
+  it("clamps invalid edges before computing ratio", () => {
+    const layout = resolveBeaconPresetPreviewLayout({ width: 0, height: -4 });
+    expect(layout.width).toBe(1);
+    expect(layout.height).toBe(1);
+    expect(layout.aspectRatio).toBe(1);
   });
 });
 

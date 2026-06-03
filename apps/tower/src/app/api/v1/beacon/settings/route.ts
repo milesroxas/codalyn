@@ -136,25 +136,29 @@ async function loadEffectiveSettings(
 }
 
 export async function GET(req: Request) {
-  const auth = await verifyTowerApiRequest(req);
-  if (!auth.ok) {
-    return auth.response;
-  }
-  if (!auth.userId) {
-    return jsonError(401, "Session required");
-  }
+  try {
+    const auth = await verifyTowerApiRequest(req);
+    if (!auth.ok) {
+      return auth.response;
+    }
+    if (!auth.userId) {
+      return jsonError(401, "Session required");
+    }
 
-  const ctx = await resolveBeaconMembershipContext(req);
-  if (!ctx) {
-    return jsonError(401, "Session required");
+    const ctx = await resolveBeaconMembershipContext(req);
+    if (!ctx) {
+      return jsonError(401, "Session required");
+    }
+
+    const payload = await loadEffectiveSettings(auth.userId, ctx, req.headers);
+
+    return Response.json(payload, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return jsonError(500, "Could not load Beacon settings");
   }
-
-  const payload = await loadEffectiveSettings(auth.userId, ctx, req.headers);
-
-  return Response.json(payload, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function PUT(req: Request) {
+async function putBeaconSettings(req: Request): Promise<Response> {
   const auth = await verifyTowerApiRequest(req);
   if (!auth.ok) {
     return auth.response;
@@ -228,4 +232,12 @@ export async function PUT(req: Request) {
   const payload = await loadEffectiveSettings(auth.userId, nextCtx, req.headers);
 
   return Response.json(payload, { headers: { "Cache-Control": "no-store" } });
+}
+
+export async function PUT(req: Request) {
+  try {
+    return await putBeaconSettings(req);
+  } catch {
+    return jsonError(500, "Could not save Beacon settings");
+  }
 }

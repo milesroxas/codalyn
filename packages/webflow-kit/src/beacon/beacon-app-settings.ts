@@ -227,7 +227,7 @@ export function mergeBeaconAppSettings(base: BeaconAppSettings, patch: Partial<B
   const clean = Object.fromEntries(
     Object.entries(patch).filter(([, v]) => v !== undefined)
   ) as Partial<BeaconAppSettings>;
-  return beaconAppSettingsSchema.parse({
+  return parseBeaconAppSettings({
     ...base,
     ...clean,
     imagePresetStorage: clean.imagePresetStorage ?? base.imagePresetStorage,

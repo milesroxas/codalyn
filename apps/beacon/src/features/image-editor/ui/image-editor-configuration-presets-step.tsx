@@ -1,5 +1,4 @@
 import {
-  applySiteDefaultPresetPatch,
   BEACON_PRESET_DEFAULT_MAX_FILE_BYTES,
   formatBeaconPresetDisplayName,
   formatBeaconPresetInstanceLocationLabel,
@@ -8,7 +7,7 @@ import {
   type MaxSizeUnit,
   maxBytesToDraft,
   type PresetCrudScope,
-  readSiteIdFromPresetTargetKey,
+  removeBeaconPresetRowById,
 } from "@codalyn/webflow-kit";
 import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -222,26 +221,9 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   const onDeletePreset = useCallback(
     async (id: string) => {
       const entry = presetEntriesById.get(id) ?? null;
-      const result = await updateSettings((prev) => {
-        if (entry?.scope === "site-default") {
-          return {
-            imagePresetStorage: applySiteDefaultPresetPatch(
-              prev.imagePresetStorage,
-              readSiteIdFromPresetTargetKey(entry.row.targetKey),
-              null
-            ),
-          };
-        }
-        const nextByTargetKey = Object.fromEntries(
-          Object.entries(prev.imagePresetStorage.byTargetKey).filter(([, row]) => row.id !== id)
-        );
-        return {
-          imagePresetStorage: {
-            siteDefault: prev.imagePresetStorage.siteDefault?.id === id ? null : prev.imagePresetStorage.siteDefault,
-            byTargetKey: nextByTargetKey,
-          },
-        };
-      });
+      const result = await updateSettings((prev) => ({
+        imagePresetStorage: removeBeaconPresetRowById(prev.imagePresetStorage, id),
+      }));
       if (!result.ok) {
         void webflow.notify({ type: "Error", message: result.error });
         return;

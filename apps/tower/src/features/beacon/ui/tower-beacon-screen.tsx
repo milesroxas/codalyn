@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  applyBeaconPresetRowUpsert,
   applySiteDefaultPresetPatch,
   BEACON_IMAGE_ERROR_CODES,
   type BeaconAppSettings,
   type BeaconPresetRow,
   buildBeaconPresetSiteGroups,
+  removeBeaconPresetRowById,
 } from "@codalyn/webflow-kit";
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
@@ -188,6 +190,31 @@ function TowerBeaconScreenLoaded(props: {
     [applyPatch, canEditSiteDefault, settings]
   );
 
+  const upsertPresetRow = useCallback(
+    (row: BeaconPresetRow) => {
+      if (!canEditSiteDefault || !settings) {
+        toast.error("You do not have permission to edit workspace presets.");
+        return;
+      }
+      void applyPatch({
+        imagePresetStorage: applyBeaconPresetRowUpsert(settings.imagePresetStorage, row),
+      });
+    },
+    [applyPatch, canEditSiteDefault, settings]
+  );
+
+  const removePresetById = useCallback(
+    (presetId: string) => {
+      if (!canEditSiteDefault || !settings) {
+        return;
+      }
+      void applyPatch({
+        imagePresetStorage: removeBeaconPresetRowById(settings.imagePresetStorage, presetId),
+      });
+    },
+    [applyPatch, canEditSiteDefault, settings]
+  );
+
   const showPayloadSkeleton = useDeferredLoadingIndicator(loading && !payload);
 
   return (
@@ -236,6 +263,8 @@ function TowerBeaconScreenLoaded(props: {
           canEditSiteDefault={canEditSiteDefault}
           upsertSiteDefaultPresetAction={upsertSiteDefaultPreset}
           clearSiteDefaultPresetAction={clearSiteDefaultPreset}
+          upsertPresetRowAction={upsertPresetRow}
+          removePresetByIdAction={removePresetById}
         />
       ) : null}
     </TowerPageMain>

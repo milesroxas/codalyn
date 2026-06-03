@@ -70,6 +70,27 @@ export function formatBeaconPresetDimensionsLabel(row: Pick<BeaconPresetRow, "wi
   return `${row.width}×${row.height}px`;
 }
 
+export type BeaconPresetPreviewLayout = {
+  width: number;
+  height: number;
+  aspectRatio: number;
+  dimensionsLabel: string;
+};
+
+/** Normalized export frame used for preset preview placeholders (Tower, dashboards). */
+export function resolveBeaconPresetPreviewLayout(
+  row: Pick<BeaconPresetRow, "width" | "height">
+): BeaconPresetPreviewLayout {
+  const width = clampPresetEdge(row.width);
+  const height = clampPresetEdge(row.height);
+  return {
+    width,
+    height,
+    aspectRatio: width / height,
+    dimensionsLabel: `${width}×${height}px`,
+  };
+}
+
 export function formatBeaconPresetExportSummary(
   row: Pick<BeaconPresetRow, "width" | "height" | "exportFormat">,
   defaultExportFormat?: ImageExportFormat

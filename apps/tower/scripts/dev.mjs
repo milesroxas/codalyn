@@ -3,6 +3,7 @@
  * Default dev port when `PORT` is unset — keep in sync with Beacon `vite.config.ts` (`resolveTowerOrigin` fallback).
  * Override: `PORT=4000 pnpm app tower dev`
  */
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runDevWithWorkspacePackages } from "../../../scripts/workspace-package-watch.mjs";
@@ -11,6 +12,15 @@ import { describeDatabaseHost, resolveDatabaseUrl } from "./db-env.mjs";
 const towerRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 if (!process.env.PORT?.trim()) {
   process.env.PORT = "3100";
+}
+
+const devPort = process.env.PORT.trim();
+const portCheck = spawnSync("lsof", ["-ti", `:${devPort}`], { encoding: "utf8" });
+if (portCheck.stdout?.trim()) {
+  console.error(
+    `Port ${devPort} is already in use (Tower dev). Stop the other process or run with PORT=<free-port> pnpm app tower dev:neon`
+  );
+  process.exit(1);
 }
 
 // Optional DB target (default: local DATABASE_URL from .env.local). Non-local targets

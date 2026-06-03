@@ -14,7 +14,10 @@
       "esbuild",
       "sharp",
       "simple-git-hooks"
-    ]
+    ],
+    "overrides": {
+      "import-in-the-middle": "3.0.1"
+    }
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm exec lint-staged"

@@ -1,15 +1,11 @@
 "use client";
 
-import {
-  type BeaconAppSettings,
-  buildBeaconPresetSiteGroups,
-  formatBeaconPresetDisplayName,
-  formatBeaconPresetStorageSummary,
-} from "@codalyn/webflow-kit";
+import { type BeaconAppSettings, buildBeaconPresetSiteGroups } from "@codalyn/webflow-kit";
 import { IconRefresh } from "@tabler/icons-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
+import { countBeaconSitePresets, TowerBeaconPresetRowsList } from "@/features/beacon/ui/tower-beacon-preset-list";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -21,11 +17,6 @@ type BeaconApiPayload = {
   webflowSites?: Array<{ id: string; displayName?: string }> | null;
 };
 
-function dedupePresetLabel(label: string): string {
-  const match = label.match(/^(.+) \((.+)\)$/);
-  return match && match[1] === match[2] ? match[1] : label;
-}
-
 function WorkspacePresetsCardContent(props: {
   error: string | null;
   siteGroups: ReturnType<typeof buildBeaconPresetSiteGroups>;
@@ -35,10 +26,7 @@ function WorkspacePresetsCardContent(props: {
   if (error) {
     return <p className="text-xs text-destructive">{error}</p>;
   }
-  const presetCount = siteGroups.reduce(
-    (total, group) => total + group.scopedPresets.length + (group.siteDefault ? 1 : 0),
-    0
-  );
+  const presetCount = siteGroups.reduce((total, group) => total + countBeaconSitePresets(group), 0);
   if (presetCount === 0) {
     return (
       <p className="text-xs text-muted-foreground">
@@ -52,31 +40,13 @@ function WorkspacePresetsCardContent(props: {
   return (
     <div className="max-h-48 space-y-3 overflow-auto text-xs">
       {siteGroups.map((group) => {
-        const rows = [
-          ...(group.siteDefault ? [{ row: group.siteDefault, scope: "site-default" as const }] : []),
-          ...group.scopedPresets,
-        ];
-        if (rows.length === 0) {
+        if (countBeaconSitePresets(group) === 0) {
           return null;
         }
         return (
           <div key={group.siteId} className="space-y-2">
             <p className="font-medium text-foreground">{group.displayName}</p>
-            <ul className="space-y-2">
-              {rows.map(({ row, scope }) => (
-                <li
-                  key={row.id}
-                  className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 border-b border-border/60 pb-2 last:border-0 last:pb-0"
-                >
-                  <span className="min-w-0 font-medium text-foreground">
-                    {dedupePresetLabel(formatBeaconPresetDisplayName(row, scope))}
-                  </span>
-                  <span className="shrink-0 font-mono text-muted-foreground">
-                    {formatBeaconPresetStorageSummary(row, defaultExportFormat)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <TowerBeaconPresetRowsList group={group} defaultExportFormat={defaultExportFormat} />
           </div>
         );
       })}
@@ -134,10 +104,7 @@ export function BeaconDashboardActivity() {
     return buildBeaconPresetSiteGroups(payload.settings.imagePresetStorage, payload.webflowSites ?? []);
   }, [payload?.settings, payload?.webflowSites]);
 
-  const presetCount = siteGroups.reduce(
-    (total, group) => total + group.scopedPresets.length + (group.siteDefault ? 1 : 0),
-    0
-  );
+  const presetCount = siteGroups.reduce((total, group) => total + countBeaconSitePresets(group), 0);
 
   if (sessionPending || !session?.user) {
     return null;
@@ -154,7 +121,7 @@ export function BeaconDashboardActivity() {
     <Card className="h-full">
       <CardHeader>
         <CardTitle>Export presets</CardTitle>
-        <CardDescription>Grouped by site. Edit defaults here; manage scoped presets in Beacon.</CardDescription>
+        <CardDescription>Grouped by site. Edit in Tower or Beacon; changes stay in sync.</CardDescription>
         <CardAction>
           <Button
             type="button"

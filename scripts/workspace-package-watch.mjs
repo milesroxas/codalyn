@@ -4,13 +4,27 @@
  * Keeps `@codalyn/webflow-kit` / `@codalyn/observability` `dist/` in sync with `src/`
  * while Tower or Beacon dev is running.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const WORKSPACE_PACKAGES = ["@codalyn/webflow-kit", "@codalyn/observability"];
+
+function buildWorkspacePackagesOnce() {
+  for (const pkg of WORKSPACE_PACKAGES) {
+    const result = spawnSync("pnpm", ["--filter", pkg, "build"], {
+      cwd: repoRoot,
+      stdio: "inherit",
+      shell: true,
+      env: process.env,
+    });
+    if (result.status !== 0) {
+      process.exit(result.status ?? 1);
+    }
+  }
+}
 
 /**
  * @param {{
@@ -21,6 +35,8 @@ const WORKSPACE_PACKAGES = ["@codalyn/webflow-kit", "@codalyn/observability"];
  * }} options
  */
 export function runDevWithWorkspacePackages(options) {
+  buildWorkspacePackagesOnce();
+
   const { cwd, command, args = [], env = {} } = options;
   /** @type {import("node:child_process").ChildProcess[]} */
   const children = [];

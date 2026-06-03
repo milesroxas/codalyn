@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getDefaultBeaconAppSettings,
+  mergeBeaconAppSettings,
   parseBeaconAppSettings,
   validateBeaconPresetStoragePatch,
 } from "./beacon-app-settings.js";
@@ -86,6 +87,31 @@ describe("beacon app settings preset storage", () => {
     }
     expect(parsed.imagePresetStorage.byTargetKey[serializePresetTargetKey(siteDefault.targetKey)]).toEqual(siteDefault);
     expect(parsed.imagePresetStorage.byTargetKey[serializePresetTargetKey(instanceTargetKey)]).toEqual(instanceRow);
+  });
+
+  it("mergeBeaconAppSettings does not throw on invalid team preset storage", () => {
+    const base = getDefaultBeaconAppSettings();
+    const merged = mergeBeaconAppSettings(base, {
+      imagePresetStorage: {
+        siteDefault: null,
+        byTargetKey: {
+          bad: {
+            id: "bad_1",
+            name: "Bad",
+            width: 1000,
+            height: 1000,
+            maxFileSizeBytes: 100_000,
+            targetKey: {
+              kind: "bare-image-instance",
+              pageId: "page_1",
+              elementId: "img_1",
+            },
+          },
+        },
+      },
+    });
+    expect(merged.imagePresetStorage.siteDefault).toBeNull();
+    expect(merged.imagePresetStorage.byTargetKey).toEqual({});
   });
 
   it("re-parses coalesced site-default storage idempotently", () => {

@@ -25,18 +25,14 @@ export function UsageApproachingLimitCompactBanner(props: UsageApproachingLimitC
 
   return (
     <Dialog>
-      <Alert variant="warning" size="compact">
+      <Alert variant="warning" size="compact" frame="flush">
         <TriangleAlert aria-hidden />
         <AlertTitle>{TOWER_USAGE_APPROACHING_ALERT_TITLE}</AlertTitle>
         <AlertAction placement="corner">
           <DialogTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label={TOWER_USAGE_APPROACHING_DETAILS_ACTION_LABEL}
-            >
-              <ChevronRight aria-hidden />
+            <Button type="button" variant="outline" size="2xs">
+              {TOWER_USAGE_APPROACHING_DETAILS_ACTION_LABEL}
+              <ChevronRight data-icon="inline-end" aria-hidden />
             </Button>
           </DialogTrigger>
         </AlertAction>

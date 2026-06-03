@@ -1,12 +1,6 @@
 import { WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
 import { searchComponentInstanceImageProps } from "@/features/image-editor/lib/search-component-instance-image-props";
-import { webflowTreeNodeKey } from "@/features/image-editor/lib/webflow-element-id-key";
-import { enqueueWebflowStructureChildren } from "@/features/image-editor/lib/webflow-element-structure-walk";
-
-/** Descendants to traverse from a component: main children + each slot’s children. */
-async function collectComponentInstanceDescendantsToQueue(instance: ComponentElement, queue: AnyElement[]) {
-  await enqueueWebflowStructureChildren(instance, queue);
-}
+import { collectWebflowStructureNodesInCanvasOrder } from "@/features/image-editor/lib/webflow-element-structure-walk";
 
 export type ImagePageTarget = {
   id: string;
@@ -69,34 +63,11 @@ async function tryPushScannedImageTarget(el: AnyElement, out: ImagePageTarget[])
 
 /**
  * Every canvas node we should consider for image targets, including **nested** component
- * instances and **slot** content — those are not always present in
- * {@link webflow.getAllElements} alone (see parent-graph notes in
- * `webflow-page-parent-map.ts`).
+ * instances and **slot** content — in **canvas / DOM order** (see
+ * {@link collectWebflowStructureNodesInCanvasOrder}).
  */
 export async function collectAllPageElementsForImageScan(): Promise<AnyElement[]> {
-  const seed = await webflow.getAllElements();
-  const seen = new Set<string>();
-  const out: AnyElement[] = [];
-  const queue: AnyElement[] = [...seed];
-
-  while (queue.length > 0) {
-    const el = queue.pop();
-    if (el == null) {
-      continue;
-    }
-    const k = webflowTreeNodeKey(el as { id: object });
-    if (seen.has(k)) {
-      continue;
-    }
-    seen.add(k);
-    out.push(el);
-
-    if (el.type === "ComponentInstance") {
-      await collectComponentInstanceDescendantsToQueue(el as ComponentElement, queue);
-    }
-  }
-
-  return out;
+  return collectWebflowStructureNodesInCanvasOrder();
 }
 
 /**

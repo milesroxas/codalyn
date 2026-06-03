@@ -5,7 +5,7 @@ import { parseTowerUsageProductFeature, towerUsageProductFeatureLabel } from "./
 
 export const TOWER_USAGE_APPROACHING_ALERT_TITLE = "Approaching monthly limit";
 
-export const TOWER_USAGE_APPROACHING_DETAILS_ACTION_LABEL = "View details";
+export const TOWER_USAGE_APPROACHING_DETAILS_ACTION_LABEL = "View";
 
 export const TOWER_USAGE_APPROACHING_ALERT_DISMISS_LABEL = "Dismiss";
 

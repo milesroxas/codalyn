@@ -20,25 +20,23 @@ export function BeaconUsageApproachingBanner() {
   const showBillingLever = status.tier === "free" || status.tier === "team";
 
   return (
-    <div className="px-3 pt-2">
-      <UsageApproachingLimitCompactBanner
-        meters={meters}
-        usageScope={status.usageScope}
-        upgradeAction={
-          showBillingLever ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                openTowerAppPath("/billing");
-              }}
-            >
-              Open Tower billing
-            </Button>
-          ) : undefined
-        }
-      />
-    </div>
+    <UsageApproachingLimitCompactBanner
+      meters={meters}
+      usageScope={status.usageScope}
+      upgradeAction={
+        showBillingLever ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              openTowerAppPath("/billing");
+            }}
+          >
+            Open Tower billing
+          </Button>
+        ) : undefined
+      }
+    />
   );
 }

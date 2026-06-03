@@ -1,4 +1,4 @@
-import { webflowElementIdKey } from "@/features/image-editor/lib/webflow-element-id-key";
+import { webflowElementIdKey, webflowTreeNodeKey } from "@/features/image-editor/lib/webflow-element-id-key";
 
 export type WebflowStructureChildSource = {
   getChildren?: () => Promise<AnyElement[] | null>;
@@ -54,4 +54,82 @@ export async function walkWebflowStructureBfs(
     }
     await enqueueWebflowStructureChildren(node, queue);
   }
+}
+
+async function readWebflowPageStructureStart(): Promise<AnyElement | null> {
+  const all = await webflow.getAllElements();
+  return (
+    all.find((e) => e.type === "Body") ??
+    (await (webflow as { getRootElement?: () => Promise<AnyElement | null> }).getRootElement?.().catch(() => null)) ??
+    null
+  );
+}
+
+async function visitWebflowStructureNodeCanvasOrder(
+  el: AnyElement,
+  seen: Set<string>,
+  out: AnyElement[]
+): Promise<void> {
+  const key = webflowTreeNodeKey(el);
+  if (seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  out.push(el);
+
+  for (const child of await readWebflowElementChildren(el)) {
+    await visitWebflowStructureNodeCanvasOrder(child, seen, out);
+  }
+  if (el.type !== "ComponentInstance") {
+    return;
+  }
+  const slots = await (el as ComponentElement)
+    .getSlots()
+    .catch(() => [] as Awaited<ReturnType<ComponentElement["getSlots"]>>);
+  for (const slot of slots) {
+    for (const child of await readWebflowElementChildren(slot as unknown as WebflowStructureChildSource)) {
+      await visitWebflowStructureNodeCanvasOrder(child, seen, out);
+    }
+  }
+}
+
+async function visitComponentInstanceInteriorCanvasOrder(
+  inst: ComponentElement,
+  seen: Set<string>,
+  out: AnyElement[]
+): Promise<void> {
+  for (const child of await readWebflowElementChildren(inst)) {
+    await visitWebflowStructureNodeCanvasOrder(child, seen, out);
+  }
+  const slots = await inst.getSlots().catch(() => [] as Awaited<ReturnType<ComponentElement["getSlots"]>>);
+  for (const slot of slots) {
+    for (const child of await readWebflowElementChildren(slot as unknown as WebflowStructureChildSource)) {
+      await visitWebflowStructureNodeCanvasOrder(child, seen, out);
+    }
+  }
+}
+
+/**
+ * Every page node in **canvas / DOM order** (depth-first preorder from `Body`), including
+ * nested component instances and **slot** content — same reachability as BFS collection,
+ * but ordered top-to-bottom as in the Designer navigator.
+ */
+export async function collectWebflowStructureNodesInCanvasOrder(): Promise<AnyElement[]> {
+  const all = await webflow.getAllElements();
+  const start = await readWebflowPageStructureStart();
+  if (start == null) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const out: AnyElement[] = [];
+  await visitWebflowStructureNodeCanvasOrder(start, seen, out);
+
+  for (const el of all) {
+    if (el.type === "ComponentInstance") {
+      await visitComponentInstanceInteriorCanvasOrder(el as ComponentElement, seen, out);
+    }
+  }
+
+  return out;
 }

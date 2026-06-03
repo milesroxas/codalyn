@@ -1,5 +1,6 @@
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
+import { deriveMarketingOriginFromTowerAppUrl } from "@/shared/lib/tower-hosts/derive-marketing-origin-from-app";
 
 export { sanitizeRelativePath };
 
@@ -64,6 +65,10 @@ function resolveMarketingOriginFromEnv(): string {
   const explicit = process.env.TOWER_MARKETING_URL?.trim();
   if (explicit) {
     return explicit.replace(/\/$/, "");
+  }
+  const derived = deriveMarketingOriginFromTowerAppUrl(resolveTowerPublicBaseUrl());
+  if (derived) {
+    return derived;
   }
   return DEFAULT_MARKETING_ORIGIN;
 }

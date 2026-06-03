@@ -95,6 +95,12 @@ describe("tower-hosts", () => {
     expect(buildMarketingUrl("/")).toBe("https://codalyn.app/");
   });
 
+  it("derives marketing origin from tower app URL when TOWER_MARKETING_URL is unset", () => {
+    snapshotEnv();
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    expect(buildMarketingUrl("/")).toBe("https://preview.codalyn.app/");
+  });
+
   it("derives parent cookie domain from app host", () => {
     expect(parentDomainForCookie("tower.codalyn.app")).toBe("codalyn.app");
     expect(parentDomainForCookie("localhost")).toBe(null);

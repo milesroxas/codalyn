@@ -44,6 +44,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shared/ui/dialog";
+import {
+  Empty,
+  EmptyAction,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/shared/ui/empty";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
@@ -1175,6 +1184,7 @@ function AssetFolderToolbar(p: AssetFolderToolbarProps) {
   const folderSelectDisabled = folderActionBusy || busy || foldersLoading;
   const newFolderButtonDisabled = folderActionBusy || busy;
   const hasAvailableParentFolders = assetFolders.length > 0;
+  const showEmptyFolderState = !showFoldersLoading && assetFolders.length === 0;
   const folderStatusText = getFolderStatusText(assetFolders, selectedAssetFolderId);
 
   const submitNewFolder = async () => {
@@ -1194,163 +1204,185 @@ function AssetFolderToolbar(p: AssetFolderToolbarProps) {
   };
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <Label className="text-xs font-medium" htmlFor={folderFieldId}>
-        Folder
-      </Label>
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <Select
-            value={selectedAssetFolderId ?? undefined}
-            onValueChange={(v) => {
-              setSelectedAssetFolderId(v);
-            }}
-            disabled={folderSelectDisabled}
-          >
-            <SelectTrigger id={folderFieldId} size="full">
-              <SelectValue placeholder="Choose a folder" />
-            </SelectTrigger>
-            <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
-              {assetFolders.map((f) => (
-                <SelectItem key={f.id} value={f.id}>
-                  {f.pathLabel}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Dialog
-          open={newFolderDialogOpen}
-          onOpenChange={(open) => {
-            setNewFolderDialogOpen(open);
-            if (open) {
-              setNewFolderName("");
-              setNewFolderParent(selectedAssetFolderId ? "child" : "root");
-              setNewFolderParentFolderId(selectedAssetFolderId);
-            }
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              className="shrink-0"
-              aria-label="Create folder"
-              disabled={newFolderButtonDisabled}
-            >
-              <FolderPlus aria-hidden className="size-3.5" />
-              <span className="sr-only">Create folder</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-sm" showCloseButton>
-            <DialogHeader>
-              <DialogTitle>New folder</DialogTitle>
-              <DialogDescription>Name and location.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-3 py-1">
-              <RadioGroup
-                className="flex flex-col gap-2"
-                value={newFolderParent}
-                onValueChange={(v) => {
-                  const nextParent = v as "root" | "child";
-                  setNewFolderParent(nextParent);
-                  if (nextParent === "child" && !newFolderParentFolderId && hasAvailableParentFolders) {
-                    setNewFolderParentFolderId(selectedAssetFolderId ?? assetFolders[0]?.id ?? null);
-                  }
-                }}
-              >
-                <label
-                  htmlFor={newFolderRootId}
-                  className="flex cursor-pointer items-center gap-2.5 rounded-sm border border-transparent p-2 hover:bg-muted/50"
-                >
-                  <RadioGroupItem value="root" id={newFolderRootId} />
-                  <span className="text-sm">Top level</span>
-                </label>
-                <label
-                  htmlFor={newFolderChildId}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-sm border border-transparent p-2",
-                    hasAvailableParentFolders ? "cursor-pointer hover:bg-muted/50" : "cursor-not-allowed opacity-60"
-                  )}
-                >
-                  <RadioGroupItem value="child" id={newFolderChildId} disabled={!hasAvailableParentFolders} />
-                  <span className="text-sm">Inside folder</span>
-                </label>
-              </RadioGroup>
-              {!hasAvailableParentFolders ? (
-                <p className="text-muted-foreground text-xs">No folders yet. Create a top-level folder first.</p>
-              ) : null}
-              {newFolderParent === "child" && hasAvailableParentFolders ? (
-                <div className="grid gap-2">
-                  <Label className="text-xs" htmlFor={newFolderParentFieldId}>
-                    Parent folder
-                  </Label>
-                  <Select
-                    value={newFolderParentFolderId ?? undefined}
-                    onValueChange={(v) => setNewFolderParentFolderId(v)}
-                    disabled={folderActionBusy}
-                  >
-                    <SelectTrigger id={newFolderParentFieldId} size="full">
-                      <SelectValue placeholder="Choose a parent folder" />
-                    </SelectTrigger>
-                    <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
-                      {assetFolders.map((folder) => (
-                        <SelectItem key={folder.id} value={folder.id}>
-                          {folder.pathLabel}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-              <div className="grid gap-2">
-                <Label className="text-xs" htmlFor={newFolderFieldId}>
-                  Name
-                </Label>
-                <Input
-                  id={newFolderFieldId}
-                  placeholder="e.g. Campaign images"
-                  value={newFolderName}
-                  disabled={folderActionBusy}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void submitNewFolder();
-                    }
+    <Dialog
+      open={newFolderDialogOpen}
+      onOpenChange={(open) => {
+        setNewFolderDialogOpen(open);
+        if (open) {
+          setNewFolderName("");
+          setNewFolderParent(selectedAssetFolderId ? "child" : "root");
+          setNewFolderParentFolderId(selectedAssetFolderId);
+        }
+      }}
+    >
+      <div className="flex flex-col gap-2.5">
+        <Label className="text-xs font-medium" htmlFor={folderFieldId}>
+          Folder
+        </Label>
+        {showFoldersLoading ? (
+          <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
+            Loading folders…
+          </p>
+        ) : showEmptyFolderState ? (
+          <Empty tone="insetPanel">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <FolderPlus aria-hidden strokeWidth={1.75} />
+              </EmptyMedia>
+              <EmptyTitle>No folders yet</EmptyTitle>
+              <EmptyDescription size="compact">
+                Create a folder in your Webflow Assets to file this image.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent layout="actions">
+              <DialogTrigger asChild>
+                <EmptyAction width="fit" disabled={newFolderButtonDisabled}>
+                  <FolderPlus data-icon="inline-start" aria-hidden strokeWidth={1.75} />
+                  <span>Create folder</span>
+                </EmptyAction>
+              </DialogTrigger>
+            </EmptyContent>
+          </Empty>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <Select
+                  value={selectedAssetFolderId ?? undefined}
+                  onValueChange={(v) => {
+                    setSelectedAssetFolderId(v);
                   }}
-                />
+                  disabled={folderSelectDisabled}
+                >
+                  <SelectTrigger id={folderFieldId} size="full">
+                    <SelectValue placeholder="Choose a folder" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
+                    {assetFolders.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.pathLabel}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-            <DialogFooter className="flex-row justify-end">
-              <DialogClose asChild>
-                <Button type="button" variant="outline">
-                  Cancel
+              <DialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className="shrink-0"
+                  aria-label="Create folder"
+                  disabled={newFolderButtonDisabled}
+                >
+                  <FolderPlus aria-hidden className="size-3.5" />
+                  <span className="sr-only">Create folder</span>
                 </Button>
-              </DialogClose>
-              <Button
-                type="button"
-                disabled={
-                  folderActionBusy || !newFolderName.trim() || (newFolderParent === "child" && !newFolderParentFolderId)
-                }
-                onClick={() => void submitNewFolder()}
-              >
-                {folderActionBusy ? <Loader2 aria-hidden className="size-4 animate-spin" /> : "Create"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              </DialogTrigger>
+            </div>
+            <p className="text-muted-foreground text-xs tabular-nums">{folderStatusText}</p>
+          </>
+        )}
       </div>
-      {showFoldersLoading ? (
-        <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
-          <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
-          Loading folders…
-        </p>
-      ) : (
-        <p className="text-muted-foreground text-xs tabular-nums">{folderStatusText}</p>
-      )}
-    </div>
+      <DialogContent className="sm:max-w-sm" showCloseButton>
+        <DialogHeader>
+          <DialogTitle>New folder</DialogTitle>
+          <DialogDescription>Name and location.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 py-1">
+          <RadioGroup
+            className="flex flex-col gap-2"
+            value={newFolderParent}
+            onValueChange={(v) => {
+              const nextParent = v as "root" | "child";
+              setNewFolderParent(nextParent);
+              if (nextParent === "child" && !newFolderParentFolderId && hasAvailableParentFolders) {
+                setNewFolderParentFolderId(selectedAssetFolderId ?? assetFolders[0]?.id ?? null);
+              }
+            }}
+          >
+            <label
+              htmlFor={newFolderRootId}
+              className="flex cursor-pointer items-center gap-2.5 rounded-sm border border-transparent p-2 hover:bg-muted/50"
+            >
+              <RadioGroupItem value="root" id={newFolderRootId} />
+              <span className="text-sm">Top level</span>
+            </label>
+            <label
+              htmlFor={newFolderChildId}
+              className={cn(
+                "flex items-center gap-2.5 rounded-sm border border-transparent p-2",
+                hasAvailableParentFolders ? "cursor-pointer hover:bg-muted/50" : "cursor-not-allowed opacity-60"
+              )}
+            >
+              <RadioGroupItem value="child" id={newFolderChildId} disabled={!hasAvailableParentFolders} />
+              <span className="text-sm">Inside folder</span>
+            </label>
+          </RadioGroup>
+          {!hasAvailableParentFolders ? (
+            <p className="text-muted-foreground text-xs">No folders yet. Create a top-level folder first.</p>
+          ) : null}
+          {newFolderParent === "child" && hasAvailableParentFolders ? (
+            <div className="grid gap-2">
+              <Label className="text-xs" htmlFor={newFolderParentFieldId}>
+                Parent folder
+              </Label>
+              <Select
+                value={newFolderParentFolderId ?? undefined}
+                onValueChange={(v) => setNewFolderParentFolderId(v)}
+                disabled={folderActionBusy}
+              >
+                <SelectTrigger id={newFolderParentFieldId} size="full">
+                  <SelectValue placeholder="Choose a parent folder" />
+                </SelectTrigger>
+                <SelectContent position="popper" align="start" className="w-(--radix-select-trigger-width)">
+                  {assetFolders.map((folder) => (
+                    <SelectItem key={folder.id} value={folder.id}>
+                      {folder.pathLabel}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+          <div className="grid gap-2">
+            <Label className="text-xs" htmlFor={newFolderFieldId}>
+              Name
+            </Label>
+            <Input
+              id={newFolderFieldId}
+              placeholder="e.g. Campaign images"
+              value={newFolderName}
+              disabled={folderActionBusy}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void submitNewFolder();
+                }
+              }}
+            />
+          </div>
+        </div>
+        <DialogFooter className="flex-row justify-end">
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button
+            type="button"
+            disabled={
+              folderActionBusy || !newFolderName.trim() || (newFolderParent === "child" && !newFolderParentFolderId)
+            }
+            onClick={() => void submitNewFolder()}
+          >
+            {folderActionBusy ? <Loader2 aria-hidden className="size-4 animate-spin" /> : "Create"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

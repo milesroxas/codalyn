@@ -57,7 +57,10 @@ export function ImageEditorWorkspace(props: ImageEditorWorkspaceProps) {
         className="sr-only"
         type="file"
         accept="image/*"
-        onChange={(e) => queueFile(e.target.files?.[0])}
+        onChange={(e) => {
+          queueFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
       />
       {dissolving ? (
         <ImageEditorDissolveBranch

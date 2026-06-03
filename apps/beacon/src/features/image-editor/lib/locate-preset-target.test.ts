@@ -15,6 +15,18 @@ function installWebflow(overrides: Record<string, unknown>) {
   });
 }
 
+function installWebflowPage(children: unknown[], overrides: Record<string, unknown> = {}) {
+  const body = {
+    type: "Body",
+    id: { component: "page_1", element: "body_1" },
+    getChildren: vi.fn().mockResolvedValue(children),
+  };
+  installWebflow({
+    getAllElements: vi.fn().mockResolvedValue([body, ...children]),
+    ...overrides,
+  });
+}
+
 describe("getPresetLocateAction", () => {
   it("returns find-on-canvas for component-scoped keys", () => {
     const action = getPresetLocateAction({
@@ -54,9 +66,7 @@ describe("findImagePageTargetForPresetOnCurrentPage", () => {
       type: WEBFLOW_IMAGE_ELEMENT_TYPE,
       id: { component: "page_1", element: "img_1" },
     };
-    installWebflow({
-      getAllElements: vi.fn().mockResolvedValue([image]),
-    });
+    installWebflowPage([image]);
 
     const target = await findImagePageTargetForPresetOnCurrentPage({
       kind: "bare-image-instance",
@@ -89,9 +99,7 @@ describe("findImagePageTargetForPresetOnCurrentPage", () => {
       getChildren: vi.fn().mockResolvedValue([]),
       getSlots: vi.fn().mockResolvedValue([]),
     };
-    installWebflow({
-      getAllElements: vi.fn().mockResolvedValue([instance]),
-    });
+    installWebflowPage([instance]);
 
     const target = await findImagePageTargetForPresetOnCurrentPage({
       kind: "component-image-instance",
@@ -126,9 +134,7 @@ describe("findImagePageTargetForPresetOnCurrentPage", () => {
       getChildren: vi.fn().mockResolvedValue([]),
       getSlots: vi.fn().mockResolvedValue([]),
     };
-    installWebflow({
-      getAllElements: vi.fn().mockResolvedValue([instance]),
-    });
+    installWebflowPage([instance]);
 
     const target = await findImagePageTargetForPresetOnCurrentPage({
       kind: "component-image",
@@ -165,9 +171,8 @@ describe("locatePresetTarget", () => {
     };
     const openCanvas = vi.fn().mockResolvedValue(undefined);
     const setSelectedElement = vi.fn().mockResolvedValue(undefined);
-    installWebflow({
+    installWebflowPage([instance], {
       getCurrentPage: vi.fn().mockRejectedValue(new Error("Missing current page!")),
-      getAllElements: vi.fn().mockResolvedValue([instance]),
       openCanvas,
       setSelectedElement,
     });
@@ -269,9 +274,8 @@ describe("locatePresetTarget", () => {
     };
     const openCanvas = vi.fn().mockResolvedValue(undefined);
     const setSelectedElement = vi.fn().mockResolvedValue(undefined);
-    installWebflow({
+    installWebflowPage([instance], {
       getCurrentPage: vi.fn().mockRejectedValue(new Error("Missing current page!")),
-      getAllElements: vi.fn().mockResolvedValue([instance]),
       openCanvas,
       setSelectedElement,
     });
@@ -304,9 +308,8 @@ describe("locatePresetTarget", () => {
     };
     const openCanvas = vi.fn().mockResolvedValue(undefined);
     const setSelectedElement = vi.fn().mockResolvedValue(undefined);
-    installWebflow({
+    installWebflowPage([image], {
       getCurrentPage: vi.fn().mockRejectedValue(new Error("Missing current page!")),
-      getAllElements: vi.fn().mockResolvedValue([image]),
       openCanvas,
       setSelectedElement,
     });
@@ -334,9 +337,8 @@ describe("locatePresetTarget", () => {
     };
     const openCanvas = vi.fn().mockResolvedValue(undefined);
     const setSelectedElement = vi.fn().mockResolvedValue(undefined);
-    installWebflow({
+    installWebflowPage([image], {
       getCurrentPage: vi.fn().mockResolvedValue({ id: "page_1" }),
-      getAllElements: vi.fn().mockResolvedValue([image]),
       openCanvas,
       setSelectedElement,
     });

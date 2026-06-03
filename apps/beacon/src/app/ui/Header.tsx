@@ -16,6 +16,10 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { isTowerConfigured, openTowerAppHome } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerInlineSignIn } from "@/features/auth/model/use-beacon-tower-inline-sign-in";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import {
+  BeaconTowerConnectionIndicator,
+  type BeaconTowerConnectionStatus,
+} from "@/features/auth/ui/beacon-tower-connection-indicator";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { BeaconWorkspaceMenuGroup } from "@/features/settings/ui/beacon-workspace-control";
@@ -355,13 +359,32 @@ function BeaconAppMenu({ towerConfigured, user, sessionPending, onSignIn, onSign
   );
 }
 
+function resolveTowerConnectionStatus(props: {
+  towerConfigured: boolean;
+  user: BridgedTowerUser | undefined;
+  sessionPending: boolean;
+}): BeaconTowerConnectionStatus | null {
+  if (!props.towerConfigured) {
+    return null;
+  }
+  if (props.sessionPending) {
+    return "connecting";
+  }
+  return props.user ? "connected" : "disconnected";
+}
+
 function HeaderShell(props: BeaconAppMenuProps) {
+  const towerConnectionStatus = resolveTowerConnectionStatus(props);
+
   return (
     <div className="shrink-0">
       <header data-slot="beacon-app-header" className="border-border/65 border-b bg-background px-4 py-2.5">
         <div className="flex items-center justify-between gap-4">
           <HeaderLogo to="/home" />
-          <BeaconAppMenu {...props} />
+          <div className="flex shrink-0 items-center gap-2">
+            {towerConnectionStatus ? <BeaconTowerConnectionIndicator status={towerConnectionStatus} /> : null}
+            <BeaconAppMenu {...props} />
+          </div>
         </div>
       </header>
     </div>

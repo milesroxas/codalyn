@@ -1,4 +1,5 @@
 import { Check, Sparkles } from "lucide-react";
+import { openTowerAppPath } from "@/features/auth/model/tower-auth-client";
 import { BeaconTowerSignInButton } from "@/features/auth/ui/beacon-tower-sign-in-button";
 import { Button } from "@/shared/ui/button";
 
@@ -48,8 +49,16 @@ export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
         </ul>
 
         {towerConfigured ? (
-          <div className="mt-4">
+          <div className="mt-4 flex flex-col gap-2">
             <BeaconTowerSignInButton />
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => openTowerAppPath("/request-access")}
+            >
+              Request early access
+            </Button>
           </div>
         ) : (
           <p className="mt-4 rounded-sm bg-muted/50 px-3 py-2 text-xs leading-snug text-muted-foreground">

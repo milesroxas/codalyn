@@ -4,7 +4,7 @@ import type * as React from "react";
 import { cn } from "@/shared/lib/utils";
 
 const alertVariants = cva(
-  "group/alert relative grid w-full gap-0.5 rounded-sm border px-2.5 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
+  "group/alert relative grid w-full gap-0.5 rounded-sm border px-2.5 py-2 text-left text-sm has-data-[alert-action-placement=corner]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -52,8 +52,34 @@ function AlertDescription({ className, ...props }: React.ComponentProps<"div">) 
   );
 }
 
-function AlertAction({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="alert-action" className={cn("absolute top-2 right-2", className)} {...props} />;
+const alertActionVariants = cva("", {
+  variants: {
+    // `corner` floats a compact action top-right (reserves `pr-18` on the alert);
+    // `block` keeps the action in the text column for wide actions / narrow panels where a
+    // floated label would overlap the title.
+    placement: {
+      corner: "absolute top-2 right-2",
+      block: "col-start-2 mt-2.5 flex flex-wrap items-center gap-2",
+    },
+  },
+  defaultVariants: {
+    placement: "corner",
+  },
+});
+
+function AlertAction({
+  className,
+  placement = "corner",
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof alertActionVariants>) {
+  return (
+    <div
+      data-slot="alert-action"
+      data-alert-action-placement={placement ?? "corner"}
+      className={cn(alertActionVariants({ placement }), className)}
+      {...props}
+    />
+  );
 }
 
 export { Alert, AlertAction, AlertDescription, AlertTitle };

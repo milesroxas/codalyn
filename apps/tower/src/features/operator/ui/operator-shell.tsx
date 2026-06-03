@@ -3,6 +3,7 @@
 import {
   IconArrowLeft,
   IconBuilding,
+  IconChartHistogram,
   IconChevronDown,
   IconDashboard,
   IconKey,
@@ -41,6 +42,7 @@ const nav = [
   { href: "/console/support-requests", label: "Support requests", icon: IconLifebuoy },
   { href: "/console/customers", label: "Customers", icon: IconUsers },
   { href: "/console/workspaces", label: "Workspaces", icon: IconBuilding },
+  { href: "/console/usage", label: "Usage", icon: IconChartHistogram },
   { href: "/console/platform", label: "Platform", icon: IconPlug },
 ] as const;
 

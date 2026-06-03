@@ -2,6 +2,7 @@ import type { BeaconAppSettings, BeaconOrgTeamSettings } from "@codalyn/webflow-
 import { relations } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  bigint,
   boolean,
   index,
   integer,
@@ -395,6 +396,15 @@ export const towerUsageMonth = pgTable(
     webflowProxyImageUploadCmsCount: integer("webflow_proxy_image_upload_cms_count").notNull().default(0),
     cmsWriteCount: integer("cms_write_count").notNull().default(0),
     imageOptimizeCount: integer("image_optimize_count").notNull().default(0),
+    // Measured infra cost drivers, accumulated per meter for operator profitability analysis: active
+    // compute (Vercel CPU) milliseconds and egress (Fast Data Transfer) bytes. bigint to survive a busy
+    // month without overflow.
+    webflowProxyComputeMs: bigint("webflow_proxy_compute_ms", { mode: "number" }).notNull().default(0),
+    webflowProxyEgressBytes: bigint("webflow_proxy_egress_bytes", { mode: "number" }).notNull().default(0),
+    cmsWriteComputeMs: bigint("cms_write_compute_ms", { mode: "number" }).notNull().default(0),
+    cmsWriteEgressBytes: bigint("cms_write_egress_bytes", { mode: "number" }).notNull().default(0),
+    imageComputeMs: bigint("image_compute_ms", { mode: "number" }).notNull().default(0),
+    imageEgressBytes: bigint("image_egress_bytes", { mode: "number" }).notNull().default(0),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
@@ -420,6 +430,13 @@ export const towerWorkspaceUsageMonth = pgTable(
     webflowProxyImageUploadCmsCount: integer("webflow_proxy_image_upload_cms_count").notNull().default(0),
     cmsWriteCount: integer("cms_write_count").notNull().default(0),
     imageOptimizeCount: integer("image_optimize_count").notNull().default(0),
+    // Measured infra cost drivers (pooled across the workspace), mirroring `tower_usage_month`.
+    webflowProxyComputeMs: bigint("webflow_proxy_compute_ms", { mode: "number" }).notNull().default(0),
+    webflowProxyEgressBytes: bigint("webflow_proxy_egress_bytes", { mode: "number" }).notNull().default(0),
+    cmsWriteComputeMs: bigint("cms_write_compute_ms", { mode: "number" }).notNull().default(0),
+    cmsWriteEgressBytes: bigint("cms_write_egress_bytes", { mode: "number" }).notNull().default(0),
+    imageComputeMs: bigint("image_compute_ms", { mode: "number" }).notNull().default(0),
+    imageEgressBytes: bigint("image_egress_bytes", { mode: "number" }).notNull().default(0),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())

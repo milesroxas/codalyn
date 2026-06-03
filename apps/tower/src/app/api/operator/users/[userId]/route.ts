@@ -12,6 +12,7 @@ import {
   sanitizeUsageLimitsPatch,
   usageLimitsPatchToDbUpdates,
 } from "@/server/operator/usage-limits";
+import { fetchOperatorUsageTrend } from "@/server/operator/usage-metrics";
 import { db } from "@/shared/lib/db";
 import {
   member,
@@ -59,7 +60,7 @@ async function fetchUserDetail(userId: string): Promise<OperatorUserDetail | nul
     return null;
   }
 
-  const [memberRows, sessionRows, webflowConnected] = await Promise.all([
+  const [memberRows, sessionRows, webflowConnected, usageTrend] = await Promise.all([
     db
       .select({
         memberId: member.id,
@@ -91,6 +92,7 @@ async function fetchUserDetail(userId: string): Promise<OperatorUserDetail | nul
       .innerJoin(organizationWebflowOAuthToken, eq(organizationWebflowOAuthToken.organizationId, member.organizationId))
       .where(eq(member.userId, userId))
       .limit(1),
+    fetchOperatorUsageTrend("user", userId),
   ]);
 
   return {
@@ -114,6 +116,7 @@ async function fetchUserDetail(userId: string): Promise<OperatorUserDetail | nul
     webflowConnected: webflowConnected.length > 0,
     memberships: memberRows.length,
     usage: (await fetchOperatorUserUsageLimits(userId)) ?? (await defaultOperatorUserUsageLimits()),
+    usageTrend,
     createdAt: toIso(row.createdAt) ?? new Date(0).toISOString(),
     updatedAt: toIso(row.updatedAt) ?? new Date(0).toISOString(),
     memberOf: memberRows.map((m) => ({

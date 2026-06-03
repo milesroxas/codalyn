@@ -21,6 +21,7 @@ import {
   OperatorUsageLimitsSection,
   reloadWorkspaceUsageLimits,
 } from "@/features/operator/ui/operator-usage-limits-section";
+import { OperatorUsageTrendSection } from "@/features/operator/ui/operator-usage-trend-section";
 import { OperatorWorkspaceBillingSection } from "@/features/operator/ui/operator-workspace-billing-section";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch, OperatorWorkspaceRow } from "@/server/operator/types";
 import {
@@ -434,6 +435,7 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
           }}
         />
 
+        <OperatorUsageTrendSection trend={detail.usageTrend} />
         <MembersSection members={detail.members} onCloseSheet={() => onOpenChange(false)} />
         <InvitationsSection invitations={detail.invitations} />
 

@@ -42,8 +42,27 @@ export function resolveUsageScope(tier: TowerTier, userId: string, activeOrganiz
   return { kind: "user", userId };
 }
 
-type GateOk = { ok: true; used: number; limit: number | null; tier: TowerEntitlement["tier"] };
+/**
+ * `scope` is the enforcement scope the request was counted against (per-user or pooled workspace), or
+ * `null` when metering was skipped (operator-disabled / kill switch). Callers use it to attribute measured
+ * infra cost back to the same row via `recordMeterCost` after the work completes.
+ */
+type GateOk = {
+  ok: true;
+  used: number;
+  limit: number | null;
+  tier: TowerEntitlement["tier"];
+  scope: UsageScope | null;
+};
 type GateNo = { ok: false; used: number; limit: number; tier: TowerEntitlement["tier"]; response: Response };
+
+/** Measured, request-attributable infra cost drivers for one metered operation. */
+export type MeterCostMetrics = {
+  /** Active compute (Vercel CPU) milliseconds attributable to this operation. */
+  computeMs: number;
+  /** Egress (Fast Data Transfer) bytes returned to the client for this operation. */
+  egressBytes: number;
+};
 
 type UsageCountPatch = Pick<
   typeof towerUsageMonth.$inferInsert,
@@ -183,7 +202,7 @@ async function consumeMeter(
   });
   const cap = capForMeterKind(policy, kind);
   if (policy.skipMetering || cap === null) {
-    return { ok: true, used: 0, limit: null, tier: entitlement.tier };
+    return { ok: true, used: 0, limit: null, tier: entitlement.tier, scope: null };
   }
   const scope = resolveUsageScope(entitlement.tier, userId, activeOrganizationId);
   return runConsume(scope, kind, entitlement.tier, cap, units, webflowProxyCategory);
@@ -397,7 +416,79 @@ async function runConsume(
       ),
     };
   }
-  return { ok: true, used: res.used, limit: res.limit, tier };
+  return { ok: true, used: res.used, limit: res.limit, tier, scope };
+}
+
+/** Measured infra cost driver columns, per meter (parallel to `UsageCountPatch`). */
+type UsageCostPatch = Pick<
+  typeof towerUsageMonth.$inferInsert,
+  | "webflowProxyComputeMs"
+  | "webflowProxyEgressBytes"
+  | "cmsWriteComputeMs"
+  | "cmsWriteEgressBytes"
+  | "imageComputeMs"
+  | "imageEgressBytes"
+>;
+
+const METER_COST_FIELDS: Record<MeterKind, { computeMs: keyof UsageCostPatch; egressBytes: keyof UsageCostPatch }> = {
+  webflowProxy: { computeMs: "webflowProxyComputeMs", egressBytes: "webflowProxyEgressBytes" },
+  cmsWrite: { computeMs: "cmsWriteComputeMs", egressBytes: "cmsWriteEgressBytes" },
+  image: { computeMs: "imageComputeMs", egressBytes: "imageEgressBytes" },
+};
+
+const USAGE_COST_COLUMNS_USER = {
+  webflowProxyComputeMs: towerUsageMonth.webflowProxyComputeMs,
+  webflowProxyEgressBytes: towerUsageMonth.webflowProxyEgressBytes,
+  cmsWriteComputeMs: towerUsageMonth.cmsWriteComputeMs,
+  cmsWriteEgressBytes: towerUsageMonth.cmsWriteEgressBytes,
+  imageComputeMs: towerUsageMonth.imageComputeMs,
+  imageEgressBytes: towerUsageMonth.imageEgressBytes,
+} as const;
+
+const USAGE_COST_COLUMNS_WORKSPACE = {
+  webflowProxyComputeMs: towerWorkspaceUsageMonth.webflowProxyComputeMs,
+  webflowProxyEgressBytes: towerWorkspaceUsageMonth.webflowProxyEgressBytes,
+  cmsWriteComputeMs: towerWorkspaceUsageMonth.cmsWriteComputeMs,
+  cmsWriteEgressBytes: towerWorkspaceUsageMonth.cmsWriteEgressBytes,
+  imageComputeMs: towerWorkspaceUsageMonth.imageComputeMs,
+  imageEgressBytes: towerWorkspaceUsageMonth.imageEgressBytes,
+} as const;
+
+/**
+ * Accumulates measured infra cost drivers (active compute ms + egress bytes) for one metered operation
+ * onto the same monthly row the count was reserved against. Additive: it is a pure increment
+ * (`column + delta`), so it is concurrency-safe without the reservation's advisory lock. Counts are
+ * enforced (capped) before the work; cost is recorded after, so it never affects gating.
+ */
+export async function recordMeterCost(scope: UsageScope, kind: MeterKind, metrics: MeterCostMetrics): Promise<void> {
+  const computeMs = Math.max(0, Math.round(metrics.computeMs));
+  const egressBytes = Math.max(0, Math.round(metrics.egressBytes));
+  if (computeMs === 0 && egressBytes === 0) {
+    return;
+  }
+  const fields = METER_COST_FIELDS[kind];
+  const ym = utcYearMonth();
+  const columns = scope.kind === "user" ? USAGE_COST_COLUMNS_USER : USAGE_COST_COLUMNS_WORKSPACE;
+
+  const values: Partial<UsageCostPatch> = {};
+  values[fields.computeMs] = computeMs;
+  values[fields.egressBytes] = egressBytes;
+
+  const set: Partial<Record<keyof UsageCostPatch, SQL>> = {};
+  set[fields.computeMs] = sql`${columns[fields.computeMs]} + ${computeMs}`;
+  set[fields.egressBytes] = sql`${columns[fields.egressBytes]} + ${egressBytes}`;
+
+  if (scope.kind === "user") {
+    await db
+      .insert(towerUsageMonth)
+      .values({ userId: scope.userId, yearMonth: ym, ...values })
+      .onConflictDoUpdate({ target: [towerUsageMonth.userId, towerUsageMonth.yearMonth], set });
+    return;
+  }
+  await db
+    .insert(towerWorkspaceUsageMonth)
+    .values({ organizationId: scope.organizationId, yearMonth: ym, ...values })
+    .onConflictDoUpdate({ target: [towerWorkspaceUsageMonth.organizationId, towerWorkspaceUsageMonth.yearMonth], set });
 }
 
 export type UsageSnapshot = {
@@ -455,6 +546,12 @@ export async function resetUsageForUser(userId: string, yearMonth = utcYearMonth
       webflowProxyImageUploadCmsCount: 0,
       cmsWriteCount: 0,
       imageOptimizeCount: 0,
+      webflowProxyComputeMs: 0,
+      webflowProxyEgressBytes: 0,
+      cmsWriteComputeMs: 0,
+      cmsWriteEgressBytes: 0,
+      imageComputeMs: 0,
+      imageEgressBytes: 0,
     })
     .where(and(eq(towerUsageMonth.userId, userId), eq(towerUsageMonth.yearMonth, yearMonth)));
 }
@@ -485,6 +582,12 @@ export async function resetUsageForWorkspace(organizationId: string, yearMonth =
         webflowProxyImageUploadCmsCount: 0,
         cmsWriteCount: 0,
         imageOptimizeCount: 0,
+        webflowProxyComputeMs: 0,
+        webflowProxyEgressBytes: 0,
+        cmsWriteComputeMs: 0,
+        cmsWriteEgressBytes: 0,
+        imageComputeMs: 0,
+        imageEgressBytes: 0,
       })
       .where(
         and(

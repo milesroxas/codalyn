@@ -1,6 +1,14 @@
 "use client";
 
-import { IconBuilding, IconChecks, IconDashboard, IconPlug, IconUser, IconUsers } from "@tabler/icons-react";
+import {
+  IconBuilding,
+  IconChartHistogram,
+  IconChecks,
+  IconDashboard,
+  IconPlug,
+  IconUser,
+  IconUsers,
+} from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import { operatorApi } from "@/features/operator/api/client";
@@ -25,6 +33,7 @@ const pages = [
   { path: "/console", label: "Overview", icon: IconDashboard, hint: "g o" },
   { path: "/console/customers", label: "Customers", icon: IconUsers, hint: "g c" },
   { path: "/console/workspaces", label: "Workspaces", icon: IconBuilding, hint: "g w" },
+  { path: "/console/usage", label: "Usage", icon: IconChartHistogram, hint: "g u" },
   { path: "/console/platform", label: "Platform", icon: IconPlug, hint: "g p" },
 ];
 

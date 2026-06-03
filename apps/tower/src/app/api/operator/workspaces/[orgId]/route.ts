@@ -15,6 +15,7 @@ import {
   fetchOperatorWorkspaceUsageLimits,
   sanitizeUsageLimitsPatch,
 } from "@/server/operator/usage-limits";
+import { fetchOperatorUsageTrend } from "@/server/operator/usage-metrics";
 import { assertWorkspaceDeleteRateLimit } from "@/server/security/destructive-action-rate-limit";
 import { buildWorkspaceSeatUsage } from "@/shared/lib/billing/workspace-seat-usage";
 import { db } from "@/shared/lib/db";
@@ -118,6 +119,7 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
     memberCount,
     pendingInvitations,
     usage: (await fetchOperatorWorkspaceUsageLimits(orgId)) ?? (await defaultOperatorWorkspaceUsageLimits()),
+    usageTrend: await fetchOperatorUsageTrend("workspace", orgId),
     createdAt: toIso(row.createdAt),
     members: memberRows.map((m) => ({
       memberId: m.memberId,

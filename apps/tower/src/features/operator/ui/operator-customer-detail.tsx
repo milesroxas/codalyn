@@ -32,6 +32,7 @@ import {
   OperatorUsageLimitsSection,
   reloadUserUsageLimits,
 } from "@/features/operator/ui/operator-usage-limits-section";
+import { OperatorUsageTrendSection } from "@/features/operator/ui/operator-usage-trend-section";
 import type { OperatorUserDetail, OperatorUserPatch, OperatorUserRow } from "@/server/operator/types";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Badge } from "@/shared/ui/badge";
@@ -380,6 +381,7 @@ function OperatorCustomerDetailSheetBody(props: OperatorCustomerDetailSheetBodyP
             return usage;
           }}
         />
+        <OperatorUsageTrendSection trend={detail.usageTrend} />
         <WorkspacesSection detail={detail} onCloseSheet={() => onOpenChange(false)} />
         <SessionsSection detail={detail} />
         <MetadataSection detail={detail} />

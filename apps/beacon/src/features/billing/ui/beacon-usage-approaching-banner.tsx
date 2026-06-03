@@ -20,7 +20,7 @@ export function BeaconUsageApproachingBanner() {
   const showBillingLever = status.tier === "free" || status.tier === "team";
 
   return (
-    <div className="px-2 pb-2">
+    <div className="px-3 pt-3">
       <UsageApproachingLimitAlert
         meters={meters}
         usageScope={status.usageScope}

@@ -109,6 +109,75 @@ export type OperatorUsageLimitsView = {
   memberImageOptimizeCount?: number;
 };
 
+/** Meter counts shared by every usage-metrics shape (one calendar month, UTC). */
+export type OperatorUsageMeterTotals = {
+  webflowProxyRequestCount: number;
+  cmsWriteCount: number;
+  imageOptimizeCount: number;
+};
+
+/** A single month in a usage time series (platform-wide or per entity). */
+export type OperatorUsageTrendPoint = OperatorUsageMeterTotals & {
+  yearMonth: string;
+};
+
+/** Estimated infra cost (USD) attributable to each meter for one month / entity. */
+export type OperatorUsageMeterCost = {
+  webflowProxy: number;
+  cmsWrite: number;
+  image: number;
+};
+
+/** A single month of estimated infra cost per meter (platform-wide). */
+export type OperatorUsageCostTrendPoint = OperatorUsageMeterCost & {
+  yearMonth: string;
+};
+
+/** Current-month estimated cost split by where it is metered: per individual vs pooled across a workspace. */
+export type OperatorUsageCostSegment = OperatorUsageMeterCost & {
+  segment: "individual" | "workspace";
+};
+
+/** A top consumer (individual user or pooled workspace) for the current month. */
+export type OperatorUsageConsumer = OperatorUsageMeterTotals & {
+  id: string;
+  scope: "user" | "workspace";
+  label: string;
+  sublabel: string;
+  total: number;
+  /** Estimated infra cost (USD) per meter for this consumer this month. */
+  cost: OperatorUsageMeterCost;
+};
+
+/** Current-month usage split by where it is metered: per individual vs pooled across a workspace. */
+export type OperatorUsageSegmentTotals = OperatorUsageMeterTotals & {
+  segment: "individual" | "workspace";
+};
+
+/** Aggregate used vs effective cap for one meter across all metered entities consuming this month. */
+export type OperatorUsageUtilizationMeter = {
+  kind: "webflowProxy" | "cmsWrite" | "image";
+  used: number;
+  limit: number;
+  meteredEntityCount: number;
+};
+
+export type OperatorUsageMetrics = {
+  yearMonth: string;
+  currentMonthTotals: OperatorUsageMeterTotals;
+  /** Estimated infra cost (USD) per meter for the current month, platform-wide. */
+  currentMonthCost: OperatorUsageMeterCost;
+  designerApiBreakdown: { cmsSlots: number; imageUploadCms: number };
+  trend: OperatorUsageTrendPoint[];
+  /** Estimated infra cost (USD) per meter over the same window as `trend`. */
+  costTrend: OperatorUsageCostTrendPoint[];
+  segments: OperatorUsageSegmentTotals[];
+  /** Current-month estimated cost split individual vs pooled workspace. */
+  costSegments: OperatorUsageCostSegment[];
+  topConsumers: OperatorUsageConsumer[];
+  utilization: OperatorUsageUtilizationMeter[];
+};
+
 export type OperatorUserRow = {
   id: string;
   email: string;
@@ -162,6 +231,7 @@ export type OperatorUserDetail = OperatorUserRow & {
   webflowAuthorizedUserId: string | null;
   memberOf: OperatorUserMembership[];
   activeSessions: OperatorUserSession[];
+  usageTrend: OperatorUsageTrendPoint[];
 };
 
 export type OperatorWorkspaceBillingMode = "free" | "stripe_team" | "legacy_paid";
@@ -225,6 +295,7 @@ export type OperatorWorkspaceDetail = OperatorWorkspaceRow & {
   metadata: string | null;
   members: OperatorWorkspaceMember[];
   invitations: OperatorWorkspaceInvitation[];
+  usageTrend: OperatorUsageTrendPoint[];
 };
 
 export type OperatorUserPatch = OperatorUsageLimitsPatch & {

@@ -2,6 +2,7 @@ import type {
   OperatorMetrics,
   OperatorPlatformMeteringConfig,
   OperatorPlatformMeteringPatch,
+  OperatorUsageMetrics,
   OperatorUserDetail,
   OperatorUserListResponse,
   OperatorUserPatch,
@@ -101,6 +102,8 @@ function toSearchParams(query: Record<string, unknown>): string {
 
 export const operatorApi = {
   metrics: async (): Promise<OperatorMetrics> => requestJson<OperatorMetrics>("/api/operator/metrics"),
+  usageMetrics: async (): Promise<OperatorUsageMetrics> =>
+    requestJson<OperatorUsageMetrics>("/api/operator/usage-metrics"),
   listUsers: async (query: OperatorUserListQuery = {}): Promise<OperatorUserListResponse> =>
     requestJson<OperatorUserListResponse>(`/api/operator/users${toSearchParams(query)}`),
   getUser: async (userId: string): Promise<OperatorUserDetail> =>

@@ -2,7 +2,9 @@ import type { TowerUsageMeterKind, TowerUsageScope } from "@codalyn/webflow-kit"
 import {
   formatTowerUsageRatio,
   TOWER_USAGE_APPROACHING_ALERT_TITLE,
+  TOWER_USAGE_LIMIT_RESET_LABEL,
   towerUsageApproachingAlertDescription,
+  towerUsageLimitResetDetailLine,
 } from "@codalyn/webflow-kit";
 import { UsageMeterLabel } from "@codalyn/webflow-kit/react";
 import { TriangleAlert } from "lucide-react";
@@ -21,21 +23,33 @@ export function UsageApproachingLimitAlert(props: UsageApproachingLimitAlertProp
     return null;
   }
 
+  // Meters are rendered once as their own rows below, so the lead line stays scope-only
+  // (the empty-meters copy) to avoid repeating each ratio in prose.
+  const scopeDescription = towerUsageApproachingAlertDescription([], usageScope);
+
   return (
     <Alert variant="warning">
       <TriangleAlert aria-hidden />
       <AlertTitle>{TOWER_USAGE_APPROACHING_ALERT_TITLE}</AlertTitle>
       <AlertDescription>
-        <p>{towerUsageApproachingAlertDescription(meters, usageScope)}</p>
-        <ul>
-          {meters.map((meter) => (
-            <li key={meter.kind}>
-              <UsageMeterLabel kind={meter.kind} />: {formatTowerUsageRatio(meter.used, meter.limit)}
-            </li>
-          ))}
-        </ul>
+        <div className="grid gap-2">
+          <div>{scopeDescription}</div>
+          <ul className="grid gap-1">
+            {meters.map((meter) => (
+              <li key={meter.kind} className="flex items-center justify-between gap-3">
+                <UsageMeterLabel kind={meter.kind} />
+                <span className="shrink-0 font-medium text-foreground tabular-nums">
+                  {formatTowerUsageRatio(meter.used, meter.limit)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="text-muted-foreground/80 text-xs">
+            {TOWER_USAGE_LIMIT_RESET_LABEL} {towerUsageLimitResetDetailLine()}
+          </div>
+        </div>
       </AlertDescription>
-      {upgradeAction ? <AlertAction>{upgradeAction}</AlertAction> : null}
+      {upgradeAction ? <AlertAction placement="block">{upgradeAction}</AlertAction> : null}
     </Alert>
   );
 }

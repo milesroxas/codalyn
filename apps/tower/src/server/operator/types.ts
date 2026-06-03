@@ -173,7 +173,7 @@ export type OperatorUsageTierKey = "free" | "pro" | "studio" | "team";
 /**
  * Per-plan economics for the current month — the lever for pricing and limit decisions. Caps use the
  * standard tier defaults (operator per-account overrides excluded), so figures describe the plan as
- * designed. `capTotals` are summed across the tier population (team = per-seat cap × paid seats), and
+ * designed. `capTotals` sum allocated capacity (team = per-seat cap × paid seats across workspaces).
  * `cost` is the measured infra cost (same model as the rest of the page) attributable to the tier.
  */
 export type OperatorUsageTierEconomics = {

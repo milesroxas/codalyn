@@ -19,9 +19,7 @@ export default async function TowerLayout({ children }: { children: React.ReactN
   const activeOrg = userId ? await getActiveOrganizationIdForAuthHeaders(requestHeaders) : null;
   const onboardingCtx = userId ? await getTowerSessionOnboardingContext() : null;
 
-  const usageBanner = userId ? (
-    <TowerUsageApproachingBanner userId={userId} activeOrganizationId={activeOrg} billingEnabled={billingEnabled} />
-  ) : null;
+  const usageBanner = userId ? <TowerUsageApproachingBanner userId={userId} activeOrganizationId={activeOrg} /> : null;
   const emailVerificationBanner =
     userId && session?.user && !session.user.emailVerified ? <TowerEmailVerificationBanner /> : null;
   const workspaceOnboarding = userId ? <TowerWorkspaceOnboardingShell /> : null;

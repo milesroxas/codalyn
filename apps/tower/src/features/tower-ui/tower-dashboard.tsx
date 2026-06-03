@@ -16,7 +16,6 @@ import {
   TowerPageMain,
   TowerPageSection,
 } from "@/shared/ui/tower-page-shell";
-import { UsageApproachingLimitAlert } from "@/shared/ui/usage-approaching-limit-alert";
 
 type TowerDashboardProps = {
   summary: TowerDashboardSummary;
@@ -202,29 +201,7 @@ function DashboardQuickActions({
   );
 }
 
-function usageBillingActionLabel(
-  usage: TowerUsageStatusSnapshot,
-  summary: TowerDashboardSummary,
-  billingEnabled: boolean
-): string | null {
-  if (!billingEnabled) {
-    return null;
-  }
-  if (usage.tier === "free") {
-    return "Upgrade plan";
-  }
-  if (usage.usageScope === "workspace" && summary.activeOrgTeamAdmin) {
-    return "Manage team billing";
-  }
-  return null;
-}
-
 export function TowerDashboard({ summary, usage, billingEnabled }: TowerDashboardProps) {
-  const approachingMeters = usage.approachingMeters.flatMap((meter) =>
-    meter.limit === null ? [] : [{ kind: meter.kind, used: meter.used, limit: meter.limit }]
-  );
-  const usageActionLabel = usageBillingActionLabel(usage, summary, billingEnabled);
-
   return (
     <TowerPageMain>
       <TowerPageHeader
@@ -241,22 +218,6 @@ export function TowerDashboard({ summary, usage, billingEnabled }: TowerDashboar
         }
         meta={<DashboardHeaderMeta summary={summary} />}
       />
-
-      {approachingMeters.length > 0 ? (
-        <div className="mb-8">
-          <UsageApproachingLimitAlert
-            meters={approachingMeters}
-            usageScope={usage.usageScope}
-            upgradeAction={
-              usageActionLabel ? (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/billing">{usageActionLabel}</Link>
-                </Button>
-              ) : null
-            }
-          />
-        </div>
-      ) : null}
 
       <TowerDashboardGrid>
         <DashboardSignalsColumn summary={summary} />

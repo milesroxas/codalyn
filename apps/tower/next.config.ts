@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@codalyn/webflow-kit", "@codalyn/observability"],
   /** Trace files from the monorepo root so Docker `standalone` bundles workspace deps correctly. */
   outputFileTracingRoot: monorepoRoot,
+  turbopack: {
+    /** Watch linked workspace packages under `packages/*` during dev. */
+    root: monorepoRoot,
+  },
   output: "standalone",
 };
 

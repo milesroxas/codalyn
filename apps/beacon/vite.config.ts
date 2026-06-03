@@ -130,10 +130,14 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    exclude: ["@codalyn/webflow-kit", "@codalyn/webflow-kit/react", "@codalyn/observability"],
+  },
   server: {
     port: 1337,
     watch: {
       usePolling: true,
+      ignored: ["**/node_modules/**", "!**/node_modules/@codalyn/**"],
     },
   },
   build: {

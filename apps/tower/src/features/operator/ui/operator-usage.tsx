@@ -17,6 +17,7 @@ import { formatUsd, formatUsdCompact, RATE_ANCHORS } from "@/shared/lib/infra-co
 import {
   DESIGNER_API_CHART_CONFIG,
   formatUsageFull,
+  formatYearMonthLong,
   USAGE_METER_COUNT_KEY,
   USAGE_METER_KINDS,
   usageMeterColor,
@@ -100,6 +101,11 @@ export function OperatorUsage() {
           <p className="max-w-2xl text-sm text-muted-foreground">
             Platform-wide metered consumption and the estimated Vercel + Neon cost it drives. Switch to Cost to see unit
             economics and which accounts are most expensive to serve.
+            {metrics ? (
+              <span className="mt-1 block text-xs text-muted-foreground/90">
+                Reporting period: {formatYearMonthLong(metrics.yearMonth)} (UTC)
+              </span>
+            ) : null}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -345,14 +351,31 @@ function avgCostPerAccount(tier: OperatorUsageTierEconomics): number {
   return tier.population > 0 ? sumCost(tier.cost) / tier.population : 0;
 }
 
-/** Tier usage relative to the standard plan cap for one meter (avg used ÷ cap), or null when unmetered. */
+/**
+ * Tier usage vs the standard plan cap for one meter. Team rows use pooled capacity (total used ÷ total
+ * allocated). Individual plans use average utilization among accounts that consumed this month so
+ * inactive accounts do not dilute the signal.
+ */
 function tierMeterUtilization(
   tier: OperatorUsageTierEconomics,
   kind: (typeof USAGE_METER_KINDS)[number]
 ): number | null {
   const countKey = USAGE_METER_COUNT_KEY[kind];
-  const cap = tier.capTotals[countKey];
-  return cap > 0 ? tier.totals[countKey] / cap : null;
+  const capTotal = tier.capTotals[countKey];
+  if (capTotal <= 0) {
+    return null;
+  }
+  if (tier.scope === "workspace") {
+    return tier.totals[countKey] / capTotal;
+  }
+  if (tier.activeCount <= 0 || tier.population <= 0) {
+    return null;
+  }
+  const perAccountCap = capTotal / tier.population;
+  if (perAccountCap <= 0) {
+    return null;
+  }
+  return tier.totals[countKey] / tier.activeCount / perAccountCap;
 }
 
 function TierEconomicsCard({ metrics, loading }: { metrics: OperatorUsageMetrics | null; loading: boolean }) {
@@ -409,10 +432,17 @@ function TierEconomicsCard({ metrics, loading }: { metrics: OperatorUsageMetrics
                       {totalCost > 0 ? formatRatio(cost / totalCost) : "—"}
                     </TableCell>
                     {USAGE_METER_KINDS.map((kind) => {
+                      const countKey = USAGE_METER_COUNT_KEY[kind];
+                      const used = tier.totals[countKey];
                       const util = tierMeterUtilization(tier, kind);
                       return (
-                        <TableCell key={kind} className="text-right tabular-nums">
-                          {util === null ? <span className="text-muted-foreground">—</span> : formatRatio(util)}
+                        <TableCell key={kind} className="text-right">
+                          <div className="font-mono tabular-nums text-foreground">{formatUsageFull(used)}</div>
+                          {util === null ? (
+                            <div className="text-xs text-muted-foreground">—</div>
+                          ) : (
+                            <div className="text-xs tabular-nums text-muted-foreground">{formatRatio(util)} of cap</div>
+                          )}
                         </TableCell>
                       );
                     })}
@@ -423,8 +453,9 @@ function TierEconomicsCard({ metrics, loading }: { metrics: OperatorUsageMetrics
           </Table>
         )}
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          Cost is the measured infra estimate attributed to each plan. Meter columns show average usage against the
-          standard cap (operator per-account overrides excluded). Team caps are pooled (per-seat cap × paid seats).
+          Cost is the measured infra estimate attributed to each plan. Meter columns show platform totals this month;
+          the percentage is active-account average vs the standard per-account cap for Free/Pro/Studio, or total pooled
+          usage vs allocated Team capacity (per-seat cap × paid seats). Operator overrides are excluded.
         </p>
       </CardContent>
     </Card>

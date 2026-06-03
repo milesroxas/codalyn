@@ -3,9 +3,9 @@
  * Default dev port when `PORT` is unset — keep in sync with Beacon `vite.config.ts` (`resolveTowerOrigin` fallback).
  * Override: `PORT=4000 pnpm app tower dev`
  */
-import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runDevWithWorkspacePackages } from "../../../scripts/workspace-package-watch.mjs";
 import { describeDatabaseHost, resolveDatabaseUrl } from "./db-env.mjs";
 
 const towerRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,13 +36,8 @@ if (dbTarget && dbTarget !== "local") {
   console.log(`Tower dev using ${dbTarget} database: ${describeDatabaseHost(url)}`);
 }
 
-const child = spawn("npx", ["next", "dev", "--turbopack"], {
-  stdio: "inherit",
+runDevWithWorkspacePackages({
   cwd: towerRoot,
-  env: process.env,
-  shell: true,
-});
-child.on("exit", (code, signal) => {
-  if (signal) process.kill(process.pid, signal);
-  process.exit(code ?? 1);
+  command: "npx",
+  args: ["next", "dev", "--turbopack"],
 });

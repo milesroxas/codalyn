@@ -4,7 +4,7 @@ import type * as React from "react";
 import { cn } from "@/shared/lib/utils";
 
 const alertVariants = cva(
-  "group/alert grid w-full gap-1 rounded-lg border px-4 py-3 text-sm has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-3 has-data-[slot=alert-action]:md:grid-cols-[1fr_auto] has-[>svg]:has-data-[slot=alert-action]:md:grid-cols-[auto_1fr_auto] has-data-[slot=alert-action]:md:gap-x-4 *:[svg]:row-span-2 *:[svg]:self-start *:[svg:not([class*='size-'])]:size-4",
+  "group/alert grid w-full gap-1 rounded-lg border px-4 py-3 text-sm has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-3 has-data-[slot=alert-action]:md:grid-cols-[1fr_auto] has-[>svg]:has-data-[slot=alert-action]:md:grid-cols-[auto_1fr_auto] has-data-[slot=alert-action]:md:items-center has-data-[slot=alert-action]:md:gap-x-4 *:[svg]:row-span-2 *:[svg]:self-start *:[svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -12,39 +12,20 @@ const alertVariants = cva(
         info: "border-border/80 bg-muted/35 text-foreground *:data-[slot=alert-description]:text-muted-foreground *:[svg]:text-muted-foreground",
         warning:
           "border-amber-500/35 bg-amber-500/10 text-foreground *:data-[slot=alert-description]:text-muted-foreground *:[svg]:text-amber-600 dark:*:[svg]:text-amber-400",
+        approaching:
+          "border-chart-4/55 bg-chart-4/22 text-foreground *:data-[slot=alert-title]:text-chart-4 *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-chart-4",
         destructive:
           "border-destructive/35 bg-destructive/10 text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current",
-      },
-      // Controls vertical alignment of the action against the content on md+.
-      // `center` suits short alerts; `start` keeps the action with the title
-      // when the content spans several rows (e.g. usage meters).
-      actionAlign: {
-        center: "has-data-[slot=alert-action]:md:items-center",
-        start: "has-data-[slot=alert-action]:md:items-start",
       },
     },
     defaultVariants: {
       variant: "default",
-      actionAlign: "center",
     },
   }
 );
 
-function Alert({
-  className,
-  variant,
-  actionAlign,
-  ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
-  return (
-    <div
-      data-slot="alert"
-      data-action-align={actionAlign ?? "center"}
-      role="alert"
-      className={cn(alertVariants({ variant, actionAlign }), className)}
-      {...props}
-    />
-  );
+function Alert({ className, variant, ...props }: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
+  return <div data-slot="alert" role="alert" className={cn(alertVariants({ variant }), className)} {...props} />;
 }
 
 function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
@@ -74,7 +55,7 @@ function AlertDescription({ className, ...props }: React.ComponentProps<"div">) 
 }
 
 const alertActionVariants = cva(
-  "mt-2 flex w-fit shrink-0 flex-wrap items-center gap-2 group-has-[>svg]/alert:col-start-2 md:col-start-2 md:mt-0 group-has-[>svg]/alert:md:col-start-3 group-data-[action-align=center]/alert:md:row-start-1 group-data-[action-align=center]/alert:md:row-span-2 group-data-[action-align=center]/alert:md:self-center group-data-[action-align=start]/alert:md:row-start-2 group-data-[action-align=start]/alert:md:row-span-1 group-data-[action-align=start]/alert:md:self-start"
+  "mt-2 flex w-fit shrink-0 flex-wrap items-center gap-2 group-has-[>svg]/alert:col-start-2 md:col-start-2 md:mt-0 group-has-[>svg]/alert:md:col-start-3 md:row-start-1 md:row-span-2 md:self-center"
 );
 
 function AlertAction({ className, ...props }: React.ComponentProps<"div">) {

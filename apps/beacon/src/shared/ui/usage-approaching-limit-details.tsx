@@ -16,10 +16,11 @@ export type UsageApproachingLimitMeter = {
 type UsageApproachingLimitDetailsProps = {
   meters: ReadonlyArray<UsageApproachingLimitMeter>;
   usageScope?: TowerUsageScope;
+  showMeterInfoTooltip?: boolean;
 };
 
 export function UsageApproachingLimitDetails(props: UsageApproachingLimitDetailsProps) {
-  const { meters, usageScope = "user" } = props;
+  const { meters, usageScope = "user", showMeterInfoTooltip = true } = props;
   if (meters.length === 0) {
     return null;
   }
@@ -32,7 +33,7 @@ export function UsageApproachingLimitDetails(props: UsageApproachingLimitDetails
       <ul className="grid gap-1">
         {meters.map((meter) => (
           <li key={meter.kind} className="flex items-center justify-between gap-3">
-            <UsageMeterLabel kind={meter.kind} />
+            <UsageMeterLabel kind={meter.kind} showInfoTooltip={showMeterInfoTooltip} />
             <span className="shrink-0 font-medium text-foreground tabular-nums">
               {formatTowerUsageRatio(meter.used, meter.limit)}
             </span>

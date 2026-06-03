@@ -3,9 +3,8 @@ import {
   TOWER_USAGE_APPROACHING_ALERT_TITLE,
   TOWER_USAGE_APPROACHING_DETAILS_ACTION_LABEL,
 } from "@codalyn/webflow-kit";
-import { TriangleAlert } from "lucide-react";
+import { ChevronRight, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
-import { cn } from "@/shared/lib/utils";
 import { Alert, AlertAction, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/shared/ui/dialog";
@@ -26,22 +25,32 @@ export function UsageApproachingLimitCompactBanner(props: UsageApproachingLimitC
 
   return (
     <Dialog>
-      <Alert variant="warning" className={cn("items-center py-1.5")}>
+      <Alert variant="warning" size="compact">
         <TriangleAlert aria-hidden />
-        <AlertTitle className="min-w-0 truncate">{TOWER_USAGE_APPROACHING_ALERT_TITLE}</AlertTitle>
+        <AlertTitle>{TOWER_USAGE_APPROACHING_ALERT_TITLE}</AlertTitle>
         <AlertAction placement="corner">
           <DialogTrigger asChild>
-            <Button type="button" variant="outline" size="sm">
-              {TOWER_USAGE_APPROACHING_DETAILS_ACTION_LABEL}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={TOWER_USAGE_APPROACHING_DETAILS_ACTION_LABEL}
+            >
+              <ChevronRight aria-hidden />
             </Button>
           </DialogTrigger>
         </AlertAction>
       </Alert>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent
+        className="sm:max-w-sm"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{TOWER_USAGE_APPROACHING_ALERT_TITLE}</DialogTitle>
         </DialogHeader>
-        <UsageApproachingLimitDetails meters={meters} usageScope={usageScope} />
+        <UsageApproachingLimitDetails meters={meters} usageScope={usageScope} showMeterInfoTooltip={false} />
         {upgradeAction ? <DialogFooter className="flex-row justify-end gap-2">{upgradeAction}</DialogFooter> : null}
       </DialogContent>
     </Dialog>

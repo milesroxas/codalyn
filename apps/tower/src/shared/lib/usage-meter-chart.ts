@@ -17,6 +17,13 @@ export const USAGE_METER_COUNT_KEY: Record<TowerUsageMeterKind, keyof OperatorUs
   image: "imageOptimizeCount",
 };
 
+/** Resolved monthly cap on `OperatorUsageLimitsView` for each meter kind. */
+export const USAGE_METER_EFFECTIVE_LIMIT_KEY = {
+  webflowProxy: "effectiveWebflowProxyLimit",
+  cmsWrite: "effectiveCmsWriteLimit",
+  image: "effectiveImageLimit",
+} as const satisfies Record<TowerUsageMeterKind, string>;
+
 const USAGE_METER_COLOR: Record<TowerUsageMeterKind, string> = {
   webflowProxy: "var(--chart-1)",
   cmsWrite: "var(--chart-2)",

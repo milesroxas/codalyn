@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
     "build": "node ../../scripts/build-cli.mjs --app beacon",
     "build:prod": "node ../../scripts/build-cli.mjs --app beacon --channel production",
     "build:dev": "node ../../scripts/build-cli.mjs --app beacon --channel development",

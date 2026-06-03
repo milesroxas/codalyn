@@ -44,6 +44,7 @@ type TypedConfirmAlertDialogProps = {
   busyLabel?: string;
   busy?: boolean;
   onConfirm: () => void;
+  onOpenChange?: (open: boolean) => void;
 };
 
 function TypedConfirmAlertDialog({
@@ -63,12 +64,13 @@ function TypedConfirmAlertDialog({
   busyLabel = "Deleting…",
   busy = false,
   onConfirm,
+  onOpenChange,
 }: TypedConfirmAlertDialogProps) {
   const matches = confirmTextMatches(confirmValue, expectedValue);
   const passwordReady = !passwordFieldId || passwordValue.trim().length > 0;
 
   return (
-    <AlertDialog>
+    <AlertDialog onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>
         <Button type="button" variant="destructive" size="sm" disabled={triggerDisabled}>
           <IconTrash data-icon="inline-start" />
@@ -118,7 +120,10 @@ function TypedConfirmAlertDialog({
             type="button"
             variant="destructive"
             disabled={busy || !matches || !passwordReady}
-            onClick={onConfirm}
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
           >
             {busy ? busyLabel : actionLabel}
           </AlertDialogAction>

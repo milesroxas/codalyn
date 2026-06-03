@@ -1,5 +1,5 @@
 import { APIError } from "better-auth/api";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { db } from "@/shared/lib/db";
@@ -55,9 +55,10 @@ async function loadOrganizationOwnershipSnapshotsForUser(userId: string): Promis
         subscriptionStatus: organization.subscriptionStatus,
         billingPlan: organization.billingPlan,
         stripeSubscriptionId: organization.stripeSubscriptionId,
+        deletedAt: organization.deletedAt,
       })
       .from(organization)
-      .where(and(inArray(organization.id, orgIds), isNull(organization.deletedAt))),
+      .where(inArray(organization.id, orgIds)),
     db
       .select({
         organizationId: member.organizationId,
@@ -84,6 +85,7 @@ async function loadOrganizationOwnershipSnapshotsForUser(userId: string): Promis
       stripeSubscriptionId: orgRow.stripeSubscriptionId,
     }),
     memberCount: memberCountByOrg.get(orgRow.id) ?? 0,
+    deletedAt: orgRow.deletedAt ?? null,
   }));
 }
 
@@ -155,7 +157,9 @@ export async function prepareUserAccountDeletion(userId: string): Promise<UserAc
   const plan = await assertUserMayDeleteAccount(userId);
 
   const snapshots = await loadOrganizationOwnershipSnapshotsForUser(userId);
-  const ownedOrganizationIds = snapshots.filter((org) => org.ownerUserId === userId).map((org) => org.organizationId);
+  const ownedOrganizationIds = snapshots
+    .filter((org) => org.ownerUserId === userId && org.deletedAt == null)
+    .map((org) => org.organizationId);
 
   await releaseSharedTeamMembershipsForAccountDeletion(userId, ownedOrganizationIds);
   return plan;

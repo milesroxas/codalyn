@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { authClient } from "@/features/auth/model/auth-client";
 import { createWorkspaceOrganization } from "@/features/team/api/create-workspace-organization";
+import { useActiveTowerOrganizations } from "@/features/team/model/use-active-tower-organizations";
 import { useWorkspaceCreationEligibility } from "@/features/team/model/use-workspace-creation-eligibility";
 import { CreateWorkspaceDialog } from "@/features/team/ui/create-workspace-dialog";
 import { effectiveWorkspaceMembershipCount } from "@/features/tower-ui/lib/effective-workspace-membership-count";
@@ -127,8 +127,7 @@ function TowerWorkspaceCreateWorkspacePanel({
   onWebflowConnectSuccess: () => void;
 }) {
   const router = useRouter();
-  const { refetch: refetchOrgs } = authClient.useListOrganizations();
-  const { refetch: refetchActiveOrg } = authClient.useActiveOrganization();
+  const { refetchOrgs, refetchActiveOrg } = useActiveTowerOrganizations();
   const [createOpen, setCreateOpen] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -226,8 +225,7 @@ function TowerWorkspaceOnboardingBannerInner({
 }: TowerWorkspaceOnboardingBannerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: orgs, isPending: orgsPending } = authClient.useListOrganizations();
-  const { data: activeOrg } = authClient.useActiveOrganization();
+  const { orgs, activeOrg, orgsPending } = useActiveTowerOrganizations();
   const membershipCount = effectiveWorkspaceMembershipCount(
     summary.workspaceMembershipCount,
     orgs?.length,

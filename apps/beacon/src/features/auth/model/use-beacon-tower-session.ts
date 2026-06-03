@@ -192,6 +192,14 @@ export function useBeaconTowerSession(): {
 
   const user = toBridgedTowerUser(session);
 
+  useEffect(() => {
+    if (isPending || !hasStoredSessionToken || user) {
+      return;
+    }
+    clearBeaconTowerSessionToken();
+    setSuppressDesignerSessionExchange(true);
+  }, [isPending, hasStoredSessionToken, user]);
+
   return {
     user,
     isPending: hasStoredSessionToken ? isPending : false,

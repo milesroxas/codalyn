@@ -5,6 +5,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from "sonner";
 import { authClient } from "@/features/auth/model/auth-client";
 import { createWorkspaceOrganization } from "@/features/team/api/create-workspace-organization";
+import { useActiveTowerOrganizations } from "@/features/team/model/use-active-tower-organizations";
 import { useWorkspaceCreationEligibility } from "@/features/team/model/use-workspace-creation-eligibility";
 import { TeamWorkspaceSwitcher } from "@/features/team/ui/team-workspace-switcher";
 
@@ -28,12 +29,8 @@ function pickAutoWorkspaceId(orgList: { id: string }[], preferred: string | null
 export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; canCreateWorkspace: boolean }) {
   const router = useRouter();
   const { data: session, isPending: sessionPending, refetch: refetchSession } = authClient.useSession();
-  const { data: orgs, isPending: orgsPending, refetch: refetchOrgs } = authClient.useListOrganizations();
-  const {
-    data: activeOrg,
-    isPending: activeOrgPending,
-    refetch: refetchActiveOrg,
-  } = authClient.useActiveOrganization();
+  const { orgs, activeOrg, orgsPending, activeOrgPending, refetchOrgs, refetchActiveOrg } =
+    useActiveTowerOrganizations();
 
   const [orgName, setOrgName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,7 +43,7 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
   }, [refetchOrgs, refetchActiveOrg, router]);
 
   const preferredOrgId = (session?.user as SessionUserWithPreferred | undefined)?.preferredOrganizationId ?? undefined;
-  const orgList = orgs ?? [];
+  const orgList = orgs;
   const { canCreateWorkspace, showUpgradeForAnotherWorkspace } = useWorkspaceCreationEligibility({
     serverCanCreate: props.canCreateWorkspace,
     refetchKey: `${session?.user?.id ?? ""}:${activeOrg?.id ?? ""}:${orgList.length}`,
@@ -64,7 +61,6 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
     if (activeOrg) {
       return;
     }
-    const orgList = orgs ?? [];
     if (orgList.length === 0 || autoWorkspaceAttemptedRef.current) {
       return;
     }
@@ -89,7 +85,7 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
       }
       await refreshTeam();
     })();
-  }, [sessionPending, orgsPending, activeOrgPending, session?.user, orgs, activeOrg, refreshTeam]);
+  }, [sessionPending, orgsPending, activeOrgPending, session?.user, orgList, activeOrg, refreshTeam]);
 
   const onCreateOrg = async (e: FormEvent): Promise<boolean> => {
     e.preventDefault();
@@ -131,7 +127,6 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
     if (!uid) {
       return;
     }
-    const orgList = orgs ?? [];
     if (!orgList.some((o) => o.id === organizationId)) {
       return;
     }
@@ -169,7 +164,6 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
   };
 
   const workspaceTriggerLabel = useMemo(() => {
-    const orgList = orgs ?? [];
     if (orgList.length === 0) {
       return "No workspace";
     }
@@ -177,7 +171,7 @@ export function TowerHeaderWorkspaceSwitcher(props: { billingEnabled: boolean; c
       return activeOrg.name;
     }
     return "Select workspace";
-  }, [orgs, activeOrg?.name]);
+  }, [orgList, activeOrg?.name]);
 
   if (sessionPending || !session?.user) {
     return null;

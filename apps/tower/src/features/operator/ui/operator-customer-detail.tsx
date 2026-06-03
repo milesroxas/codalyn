@@ -15,7 +15,7 @@ import {
 import Link from "next/link";
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
+import { formatOperatorUserDeleteError, OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import {
   appRoleLabel,
   formatDateTime,
@@ -199,12 +199,7 @@ export function OperatorCustomerDetail(props: OperatorCustomerDetailProps) {
       onDeleted?.(state.detail.id);
       onOpenChange(false);
     } catch (err) {
-      const msg =
-        err instanceof OperatorApiError
-          ? err.message === "confirm_mismatch"
-            ? "Email does not match."
-            : err.message
-          : "Delete failed";
+      const msg = err instanceof OperatorApiError ? formatOperatorUserDeleteError(err) : "Delete failed";
       toast.error(msg);
       setState((s) => ({
         ...s,

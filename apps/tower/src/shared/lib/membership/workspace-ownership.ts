@@ -6,7 +6,11 @@ export const WORKSPACE_OWNERSHIP_TRANSFER_EXPIRY_DAYS = 14;
 
 export const ACCOUNT_DELETION_BLOCKED_CODE = "account_deletion_blocked";
 
-export type AccountDeletionBlockReason = "workspace_owner" | "sole_owner_workspace" | "billing_owner";
+export type AccountDeletionBlockReason =
+  | "workspace_owner"
+  | "sole_owner_workspace"
+  | "billing_owner"
+  | "workspace_pending_deletion";
 
 export type AccountDeletionBlocker = {
   organizationId: string;
@@ -30,6 +34,7 @@ export type OrganizationOwnershipSnapshot = {
   billingOwnerUserId: string | null;
   hasTeamSubscription: boolean;
   memberCount: number;
+  deletedAt: Date | null;
 };
 
 export function isSharedWorkspace(memberCount: number): boolean {
@@ -46,6 +51,19 @@ export function computeAccountDeletionBlockers(
     const otherMemberCount = Math.max(0, org.memberCount - 1);
     const isOwner = org.ownerUserId === userId;
     const isBillingOwner = org.billingOwnerUserId === userId && org.hasTeamSubscription;
+
+    if (isOwner && org.deletedAt != null) {
+      blockers.push({
+        organizationId: org.organizationId,
+        organizationName: org.organizationName,
+        organizationSlug: org.organizationSlug,
+        reason: "workspace_pending_deletion",
+        memberCount: org.memberCount,
+        otherMemberCount,
+        hasTeamSubscription: org.hasTeamSubscription,
+      });
+      continue;
+    }
 
     if (isOwner && isSharedWorkspace(org.memberCount)) {
       blockers.push({
@@ -99,6 +117,8 @@ function formatBlockerResolution(blocker: AccountDeletionBlocker): string {
       return `“${blocker.organizationName}” is your personal workspace. Delete it through Team settings before deleting your account.`;
     case "billing_owner":
       return `“${blocker.organizationName}” has an active Team subscription billed to you. Transfer billing ownership, cancel billing in Team settings, or delete the workspace.`;
+    case "workspace_pending_deletion":
+      return `“${blocker.organizationName}” is scheduled for deletion. Wait until it is fully removed (${WORKSPACE_SOFT_DELETE_RECOVERY_DAYS} days) before deleting your account.`;
   }
 }
 

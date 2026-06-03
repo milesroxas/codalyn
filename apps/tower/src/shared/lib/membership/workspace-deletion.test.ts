@@ -1,25 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
-  assertWorkspaceSlugConfirmation,
-  workspaceSlugConfirmationMatches,
+  OPERATOR_WORKSPACE_PURGE_CONFIRM_PHRASE,
+  operatorWorkspacePurgePhraseMatches,
 } from "@/shared/lib/membership/workspace-deletion";
 
-describe("workspaceSlugConfirmationMatches", () => {
-  it("matches slug case-insensitively with surrounding whitespace", () => {
-    expect(workspaceSlugConfirmationMatches("  AcMe  ", "acme")).toBe(true);
+describe("operatorWorkspacePurgePhraseMatches", () => {
+  it("accepts PURGE case-insensitively with surrounding whitespace", () => {
+    expect(operatorWorkspacePurgePhraseMatches("purge")).toBe(true);
+    expect(operatorWorkspacePurgePhraseMatches(`  ${OPERATOR_WORKSPACE_PURGE_CONFIRM_PHRASE}  `)).toBe(true);
   });
 
-  it("rejects mismatched slug", () => {
-    expect(workspaceSlugConfirmationMatches("other", "acme")).toBe(false);
-  });
-});
-
-describe("assertWorkspaceSlugConfirmation", () => {
-  it("returns confirm_mismatch when slug does not match", () => {
-    expect(assertWorkspaceSlugConfirmation("wrong", "acme")).toEqual({ ok: false, code: "confirm_mismatch" });
-  });
-
-  it("accepts matching slug", () => {
-    expect(assertWorkspaceSlugConfirmation("acme", "acme")).toEqual({ ok: true });
+  it("rejects missing or wrong phrase", () => {
+    expect(operatorWorkspacePurgePhraseMatches("")).toBe(false);
+    expect(operatorWorkspacePurgePhraseMatches("DELETE")).toBe(false);
   });
 });

@@ -12,6 +12,7 @@ import { db } from "@/shared/lib/db";
 import { member, organization, session as sessionTable, user } from "@/shared/lib/db/auth-schema";
 import {
   assertWorkspaceSlugConfirmation,
+  operatorWorkspacePurgePhraseMatches,
   type WorkspaceDeletionErrorCode,
 } from "@/shared/lib/membership/workspace-deletion";
 import { WORKSPACE_SOFT_DELETE_RECOVERY_DAYS } from "@/shared/lib/membership/workspace-ownership";
@@ -30,6 +31,8 @@ export type DeleteWorkspaceInput = {
   actorUserId?: string;
   /** Product-admin operator deletes bypass password and ownership checks. */
   operatorInitiated?: boolean;
+  /** When purging a soft-deleted workspace, must be `PURGE` (validated server-side). */
+  operatorPurgePhrase?: string;
   /** Notify members after deletion is scheduled. Defaults to true. */
   notifyMembers?: boolean;
   /** Optional pre-deletion notice for paid workspaces. Defaults to true when Team billing is active. */
@@ -103,6 +106,13 @@ async function removeWorkspaceRecordsWithRetry(organizationIds: string[]): Promi
     }
   }
   throw lastError;
+}
+
+/** Product-admin routes: read workspace row for delete/purge confirmation (includes soft-deleted). */
+export async function loadWorkspaceDeletionTargetForOperator(
+  organizationId: string
+): Promise<WorkspaceDeletionTarget | null> {
+  return loadWorkspaceDeletionTarget(organizationId);
 }
 
 async function loadWorkspaceDeletionTarget(organizationId: string): Promise<WorkspaceDeletionTarget | null> {
@@ -211,6 +221,31 @@ async function softDeleteWorkspaceTarget(
   }
 }
 
+/** Product-admin: hard-delete active workspaces or permanently purge soft-deleted ones. */
+async function deleteWorkspaceAsOperator(
+  organizationId: string,
+  confirmSlug: string,
+  operatorPurgePhrase?: string
+): Promise<void> {
+  const target = await loadWorkspaceDeletionTarget(organizationId);
+  if (!target) {
+    throw new WorkspaceDeletionError("not_found");
+  }
+  const confirmResult = assertWorkspaceSlugConfirmation(confirmSlug, target.slug);
+  if (!confirmResult.ok) {
+    throw new WorkspaceDeletionError(confirmResult.code);
+  }
+  if (target.deletedAt) {
+    if (!operatorWorkspacePurgePhraseMatches(operatorPurgePhrase ?? "")) {
+      throw new WorkspaceDeletionError("confirm_phrase_mismatch");
+    }
+    await removeWorkspaceRecordsWithRetry([target.id]);
+    return;
+  }
+  await cancelWorkspaceStripeSubscription(target.stripeSubscriptionId);
+  await removeWorkspaceRecordsWithRetry([target.id]);
+}
+
 /**
  * Soft-deletes a workspace after slug confirmation and password re-authentication.
  * Members lose access immediately; rows are permanently purged after the recovery window.
@@ -222,16 +257,7 @@ export async function deleteWorkspace(input: DeleteWorkspaceInput): Promise<void
   }
 
   if (input.operatorInitiated) {
-    const target = await loadWorkspaceDeletionTarget(organizationId);
-    if (!target || target.deletedAt) {
-      throw new WorkspaceDeletionError("not_found");
-    }
-    const confirmResult = assertWorkspaceSlugConfirmation(input.confirmSlug, target.slug);
-    if (!confirmResult.ok) {
-      throw new WorkspaceDeletionError(confirmResult.code);
-    }
-    await cancelWorkspaceStripeSubscription(target.stripeSubscriptionId);
-    await removeWorkspaceRecordsWithRetry([target.id]);
+    await deleteWorkspaceAsOperator(organizationId, input.confirmSlug, input.operatorPurgePhrase);
     return;
   }
 

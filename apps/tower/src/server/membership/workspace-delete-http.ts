@@ -5,6 +5,8 @@ import type { WorkspaceDeletionErrorCode } from "@/shared/lib/membership/workspa
 
 export type WorkspaceDeleteConfirmBody = {
   confirmSlug?: unknown;
+  /** Required when operator purges a soft-deleted workspace (`PURGE`). */
+  confirmPhrase?: unknown;
 };
 
 export function parseWorkspaceDeleteConfirmBody(raw: unknown): { confirmSlug: string } | { error: string } {
@@ -17,6 +19,24 @@ export function parseWorkspaceDeleteConfirmBody(raw: unknown): { confirmSlug: st
     return { error: "confirmSlug required" };
   }
   return { confirmSlug };
+}
+
+export function parseOperatorWorkspacePurgePhrase(
+  raw: unknown
+): { confirmSlug: string; confirmPhrase: string } | { error: string } {
+  const slugParsed = parseWorkspaceDeleteConfirmBody(raw);
+  if ("error" in slugParsed) {
+    return slugParsed;
+  }
+  if (!raw || typeof raw !== "object") {
+    return { error: "invalid_body" };
+  }
+  const body = raw as WorkspaceDeleteConfirmBody;
+  const confirmPhrase = typeof body.confirmPhrase === "string" ? body.confirmPhrase : "";
+  if (!confirmPhrase.trim()) {
+    return { error: "confirmPhrase required" };
+  }
+  return { confirmSlug: slugParsed.confirmSlug, confirmPhrase };
 }
 
 export function workspaceDeletionErrorStatus(code: WorkspaceDeletionErrorCode): number {

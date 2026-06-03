@@ -77,12 +77,22 @@ export async function applyOperatorWorkspacePatch(
   parsed: OperatorWorkspacePatch
 ): Promise<OperatorWorkspacePatchApplyResult> {
   const [orgRow] = await db
-    .select({ stripeSubscriptionId: organization.stripeSubscriptionId })
+    .select({
+      stripeSubscriptionId: organization.stripeSubscriptionId,
+      deletedAt: organization.deletedAt,
+    })
     .from(organization)
     .where(eq(organization.id, orgId))
     .limit(1);
 
-  const stripeSubscriptionId = orgRow?.stripeSubscriptionId ?? null;
+  if (!orgRow) {
+    return { ok: false, status: 404, error: "not_found" };
+  }
+  if (orgRow.deletedAt) {
+    return { ok: false, status: 409, error: "workspace_scheduled_for_deletion" };
+  }
+
+  const stripeSubscriptionId = orgRow.stripeSubscriptionId ?? null;
 
   if ("billingPlan" in parsed || "subscriptionStatus" in parsed) {
     const conflict = resolveOperatorStripeManagedPatchConflict(stripeSubscriptionId, parsed);

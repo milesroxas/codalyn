@@ -288,6 +288,10 @@ export type OperatorWorkspaceRow = {
   pendingInvitations: number;
   usage: OperatorUsageLimitsView;
   createdAt: string;
+  /** Set when a member scheduled deletion from Team settings; null while active. */
+  deletedAt: string | null;
+  /** When the workspace row is permanently removed after soft delete. */
+  purgeScheduledAt: string | null;
 };
 
 export type OperatorWorkspaceListResponse = {

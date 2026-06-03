@@ -347,6 +347,7 @@ function WorkspaceRow({
       </TableCell>
       <TableCell>
         <div className="flex flex-wrap gap-1">
+          {workspace.deletedAt ? <Badge variant="destructive">Scheduled deletion</Badge> : null}
           {workspace.isOverSeatCap ? (
             <Badge variant="destructive">Over limit</Badge>
           ) : (

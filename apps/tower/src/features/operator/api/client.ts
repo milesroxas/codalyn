@@ -65,6 +65,9 @@ export function formatOperatorWorkspaceDeleteError(error: OperatorApiError): str
   if (error.message === "confirm_mismatch") {
     return "Slug does not match.";
   }
+  if (error.message === "confirm_phrase_mismatch" || error.message === "confirmPhrase required") {
+    return "Type PURGE to confirm permanent removal.";
+  }
   if (error.message === "rate_limited") {
     return "Too many delete attempts. Wait a few minutes and try again.";
   }
@@ -75,6 +78,9 @@ export function formatOperatorWorkspaceDeleteError(error: OperatorApiError): str
 }
 
 export function formatOperatorWorkspacePatchError(error: OperatorApiError): string {
+  if (error.message === "workspace_scheduled_for_deletion") {
+    return "This workspace is scheduled for deletion. Purge it or wait for the recovery window to end before editing.";
+  }
   if (error.message === "billing_managed_by_stripe") {
     return "Plan and subscription status are managed by Stripe for this workspace.";
   }
@@ -225,9 +231,16 @@ export const operatorApi = {
       method: "PATCH",
       body: JSON.stringify(patch),
     }),
-  deleteWorkspace: async (orgId: string, confirmSlug: string): Promise<{ ok: true }> =>
+  deleteWorkspace: async (
+    orgId: string,
+    confirmSlug: string,
+    options?: { confirmPhrase?: string }
+  ): Promise<{ ok: true }> =>
     requestJson<{ ok: true }>(`/api/operator/workspaces/${encodeURIComponent(orgId)}`, {
       method: "DELETE",
-      body: JSON.stringify({ confirmSlug }),
+      body: JSON.stringify({
+        confirmSlug,
+        ...(options?.confirmPhrase ? { confirmPhrase: options.confirmPhrase } : {}),
+      }),
     }),
 };

@@ -28,7 +28,7 @@ export function UsageApproachingLimitAlert(props: UsageApproachingLimitAlertProp
   const scopeDescription = towerUsageApproachingAlertDescription([], usageScope);
 
   return (
-    <Alert variant="warning">
+    <Alert variant="warning" actionAlign="start">
       <IconAlertTriangle aria-hidden />
       <AlertTitle>{TOWER_USAGE_APPROACHING_ALERT_TITLE}</AlertTitle>
       <AlertDescription>

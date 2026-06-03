@@ -43,8 +43,16 @@ export function UsageUtilizationChart({ data }: UsageUtilizationChartProps) {
   );
 
   return (
-    <ChartContainer config={USAGE_METER_CHART_CONFIG} className="mx-auto aspect-square h-[220px] w-full">
-      <RadialBarChart data={rows} innerRadius={30} outerRadius={110} startAngle={90} endAngle={-270}>
+    <ChartContainer config={USAGE_METER_CHART_CONFIG} className="aspect-auto h-[240px] w-full">
+      <RadialBarChart
+        data={rows}
+        cx="50%"
+        cy="50%"
+        innerRadius="35%"
+        outerRadius="100%"
+        startAngle={90}
+        endAngle={-270}
+      >
         <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
         <ChartTooltip
           cursor={false}

@@ -4,6 +4,7 @@ import {
   contentAttrSegmentOwnedBy,
   formatContentAttrSegmentsForBindings,
   mergeContentAttrSegments,
+  removeCmsSlotTagAttrsIfPresent,
   removeOwnedCmsSlotTagAttrs,
 } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
@@ -245,7 +246,10 @@ async function applyMergedCmsSlotAttrsForElement(
     });
 
     if (merged.length === 0) {
-      acc.out.removed += await removeOwnedCmsSlotTagAttrs(attr, exposedIds);
+      // An empty merge means no foreign-owned segment survived and this sync added none, so nothing on this
+      // element should stay tagged. Strip every Engine tag (covers a just-deselected prop whose stale segment is
+      // no longer in `exposedIds`); ownership-scoped removal would wrongly preserve that orphaned segment.
+      acc.out.removed += await removeCmsSlotTagAttrsIfPresent(attr);
       return;
     }
     if (newSegments.length > 0) {

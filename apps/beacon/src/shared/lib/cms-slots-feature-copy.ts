@@ -321,15 +321,15 @@ export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL = "Composer props";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_OPEN_LABEL = "Open";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL = "Tag data attributes";
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL = "Make editable";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL = "Tagging…";
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL = "Applying…";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE = "Tag data attributes first?";
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE = "Make editable first?";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION =
-  "You picked new props—close after tagging so the canvas gets matching data attributes, or discard changes to restore the props you entered with.";
+  "You picked new fields—make them editable so editors can fill them in Composer, or discard changes to restore the fields you entered with.";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL = "Continue editing";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL = "Discard prop changes";
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL = "Discard changes";

@@ -1,11 +1,11 @@
 export const WORKSPACE_SLUG_MAX_LENGTH = 80;
 
 /** Lowercase letters, digits, and single hyphens between segments. */
-export const WORKSPACE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const WORKSPACE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export const WORKSPACE_SLUG_HINT = "Lowercase letters, numbers, and hyphens only (1–80 characters).";
 
-export const RESERVED_WORKSPACE_SLUGS = new Set([
+const RESERVED_WORKSPACE_SLUGS = new Set([
   "account",
   "api",
   "auth",
@@ -52,11 +52,11 @@ export function slugifyWorkspaceName(name: string): string {
   return "workspace-ws";
 }
 
-export function isValidWorkspaceSlugFormat(slug: string): boolean {
+function isValidWorkspaceSlugFormat(slug: string): boolean {
   return slug.length >= 1 && slug.length <= WORKSPACE_SLUG_MAX_LENGTH && WORKSPACE_SLUG_PATTERN.test(slug);
 }
 
-export function isReservedWorkspaceSlug(slug: string): boolean {
+function isReservedWorkspaceSlug(slug: string): boolean {
   return RESERVED_WORKSPACE_SLUGS.has(slug);
 }
 

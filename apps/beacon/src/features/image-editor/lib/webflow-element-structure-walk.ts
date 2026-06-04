@@ -17,7 +17,7 @@ export async function readWebflowElementChildren(node: unknown): Promise<AnyElem
 }
 
 /** Public children plus each slot’s children for a component instance. */
-export async function enqueueWebflowStructureChildren(node: AnyElement, queue: AnyElement[]): Promise<void> {
+async function enqueueWebflowStructureChildren(node: AnyElement, queue: AnyElement[]): Promise<void> {
   for (const child of await readWebflowElementChildren(node)) {
     queue.push(child);
   }

@@ -71,4 +71,4 @@ function CheckboxField(props: CheckboxFieldProps) {
   );
 }
 
-export { CheckboxField, CheckboxFieldItem, CheckboxFieldList, CheckboxFieldMeta };
+export { CheckboxField, CheckboxFieldItem, CheckboxFieldList };

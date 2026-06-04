@@ -20,18 +20,6 @@ function filterValidElements(elements: any[]): any[] {
   });
 }
 
-export async function scanCurrentPage(elements: any[], options?: PageLintOptions): Promise<RuleResult[]> {
-  ensureLinterInitialized();
-  const { styleService, analyzer, pageLintService } = getLinterServices();
-
-  const allStyles = await styleService.getAllStylesWithProperties();
-  analyzer.buildPropertyMaps(allStyles);
-
-  const valid = filterValidElements(elements);
-  const { results } = await pageLintService.lintCurrentPage(valid as any, options);
-  return results;
-}
-
 export async function scanCurrentPageWithMeta(
   elements: any[],
   options?: PageLintOptions

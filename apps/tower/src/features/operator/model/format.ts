@@ -49,17 +49,6 @@ export function formatDateTime(iso: string | null | undefined): string {
   });
 }
 
-export function formatDate(iso: string | null | undefined): string {
-  if (!iso) {
-    return "—";
-  }
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    return "—";
-  }
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
 export function formatRelative(iso: string | null | undefined): string {
   if (!iso) {
     return "—";
@@ -98,10 +87,6 @@ export function appRoleLabel(role: string | null | undefined): string {
     return "Operator";
   }
   return "User";
-}
-
-export function appRoleTone(role: string | null | undefined): "operator" | "user" {
-  return role === "product_admin" ? "operator" : "user";
 }
 
 export function userAgentSummary(ua: string | null | undefined): string {

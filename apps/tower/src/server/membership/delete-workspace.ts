@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, lte } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import Stripe from "stripe";
 import { getStripe } from "@/server/billing/stripe-client";
 import {
@@ -287,28 +287,4 @@ export async function deleteWorkspace(input: DeleteWorkspaceInput): Promise<void
   }
 
   await softDeleteWorkspaceTarget(target, input.actorUserId, input);
-}
-
-/** Permanently removes workspaces whose recovery window has elapsed. */
-export async function purgeExpiredSoftDeletedWorkspaces(now = new Date()): Promise<number> {
-  const dueRows = await db
-    .select({ id: organization.id })
-    .from(organization)
-    .where(and(isNotNull(organization.deletedAt), lte(organization.purgeScheduledAt, now)));
-
-  const ids = dueRows.map((row) => row.id);
-  if (ids.length === 0) {
-    return 0;
-  }
-
-  try {
-    await removeWorkspaceRecordsWithRetry(ids);
-  } catch {
-    throw new WorkspaceDeletionError(
-      "deletion_incomplete",
-      "Scheduled purge did not finish. Retry the purge operation."
-    );
-  }
-
-  return ids.length;
 }

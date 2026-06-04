@@ -146,7 +146,7 @@ function findOldPoolIndexForRow(
 /**
  * @param poolComponentIds — component id per hidden list slot, in child order; used to realign on rebuild.
  */
-export function realignExposedByPoolOrder(
+function realignExposedByPoolOrder(
   oldPool: readonly { componentId: string; exposed: ComposableInstancePropMeta[] }[],
   newPool: readonly { componentId: string }[]
 ): CmsSlotEngineSlotEntry[] {

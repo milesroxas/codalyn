@@ -2,9 +2,6 @@ import type { TransitionEvent } from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-/** Shared duration for step exit/enter (Target → Add, Position → Save). */
-export const IMAGE_EDITOR_STEP_TRANSITION_MS = 280;
-
 const stepTransitionMotionClass = cn(
   "motion-reduce:transition-none motion-reduce:transform-none",
   "motion-safe:transition-[opacity,transform] motion-safe:duration-[280ms] motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]"

@@ -15,14 +15,14 @@ import {
 import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
 
 /** Matches `attributes` on the applied page script so we can replace it on sync. */
-export const CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR = "data-codalyn-beacon";
-export const CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE = "runtime";
+const CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR = "data-codalyn-beacon";
+const CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE = "runtime";
 
 /** Fingerprint of {@link getCmsSlotPageInlineScriptSource} so we can detect drift vs the page footer script. */
-export const CMS_SLOT_PAGE_SCRIPT_HASH_ATTR = "data-codalyn-beacon-src-hash";
+const CMS_SLOT_PAGE_SCRIPT_HASH_ATTR = "data-codalyn-beacon-src-hash";
 
 /** 32-bit FNV-1a → 8 hex chars (stable across browsers for the same source string). */
-export function hashCmsSlotRuntimeSource(source: string): string {
+function hashCmsSlotRuntimeSource(source: string): string {
   let h = 2166136261;
   for (let i = 0; i < source.length; i++) {
     h ^= source.charCodeAt(i);
@@ -34,7 +34,7 @@ export function hashCmsSlotRuntimeSource(source: string): string {
 const REGISTER_DISPLAY_NAME = "CodalynBeaconRuntime";
 
 /** Uploaded JS files for the hosted beacon runtime (`registerHostedRuntimeScript`). */
-export const CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX = "codalyn-beacon-runtime-";
+const CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX = "codalyn-beacon-runtime-";
 
 const LOG_PREFIX = "[codalyn-beacon-runtime-cleanup]";
 

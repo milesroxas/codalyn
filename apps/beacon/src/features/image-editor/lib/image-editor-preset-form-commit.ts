@@ -72,7 +72,7 @@ export type ParsedPresetDraft = {
   maxFileSizeBytes: number;
 };
 
-export function parsePresetDraft(input: {
+function parsePresetDraft(input: {
   nameDraft: string;
   wStr: string;
   hStr: string;

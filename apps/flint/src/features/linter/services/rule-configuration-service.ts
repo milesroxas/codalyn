@@ -13,7 +13,7 @@ export interface StorageAdapter {
   write(value: string): void;
 }
 
-export const createLocalStorageAdapter = (key: string): StorageAdapter => ({
+const createLocalStorageAdapter = (key: string): StorageAdapter => ({
   read: () => {
     try {
       return typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
@@ -29,16 +29,6 @@ export const createLocalStorageAdapter = (key: string): StorageAdapter => ({
     }
   },
 });
-
-export const createMemoryStorageAdapter = (): StorageAdapter => {
-  let buf: string | null = null;
-  return {
-    read: () => buf,
-    write: (v: string) => {
-      buf = v;
-    },
-  };
-};
 
 /* ---------- File format (v1) ---------- */
 type SerializedConfigFileV1 = {

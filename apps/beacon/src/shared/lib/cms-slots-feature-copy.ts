@@ -40,8 +40,6 @@ export const CMS_SLOTS_COMPOSER_ENGINE_NOT_READY_TITLE = "Not ready";
 export const CMS_SLOTS_COMPOSER_ENGINE_NOT_READY_DESCRIPTION =
   "Configure, expose, and sync at least one component in Engine to compose slot content.";
 
-export const CMS_SLOTS_INSTALL_ARIA_LABEL = `Installing ${CMS_SLOTS_FEATURE_NAME}`;
-
 export const CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL = "Checking install…";
 
 export const CMS_SLOTS_ROUTE_TASK_CREATING_INSTALL = "Creating install…";
@@ -98,8 +96,6 @@ export const CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION = "Applying composition�
 
 export const CMS_SLOTS_ROUTE_TASK_SAVING_CMS_LAYOUT = "Saving layout to CMS…";
 
-export const CMS_SLOTS_ROUTE_TASK_LOADING_COMPOSER_LISTS = "Loading lists…";
-
 export const CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD = "Linking CMS field…";
 
 export const CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP = `Install ${CMS_SLOTS_FEATURE_NAME} on this page first.`;
@@ -114,8 +110,6 @@ export const CMS_SLOTS_TOAST_LIST_TARGET_NOT_ON_CANVAS =
 export const CMS_SLOTS_TOAST_LIST_CREATED = "CMS slot list created.";
 
 export const CMS_SLOTS_TOAST_LIST_REMOVED = "CMS slot list removed.";
-
-export const CMS_SLOTS_TOAST_LIST_REMOVED_PAGE_CLEARED = "CMS slot list removed. CMS Slots page install cleared.";
 
 export const CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_REMOVED =
   "CMS slot list removed. Page install cleared and footer beacon script removed. Publish the site to apply on the live site.";
@@ -192,8 +186,6 @@ export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SECTION_LABEL = "Collection Entr
 
 export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_COLLECTION_LABEL = "Collection";
 
-export const CMS_SLOTS_EDITING_CONTEXT_ENTRY_LABEL = "Entry";
-
 export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_SLOT_LIST_LABEL = "Slot list";
 
 export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_LOADING = "Loading CMS context…";
@@ -238,10 +230,6 @@ export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LIST_ARIA_LABEL = "Components";
 
 export const CMS_SLOTS_ENGINE_SELECTED_COMPONENTS_ARIA_LABEL = "Selected components";
 
-export const CMS_SLOTS_ENGINE_FOCUS_ON_CANVAS_HINT = "Jump to the list target on the canvas.";
-
-export const CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_HINT = "Place the list target on the canvas.";
-
 export const CMS_SLOTS_ENGINE_SLOT_COMPONENT_PLACE_TITLE = "Not on canvas";
 
 export const CMS_SLOTS_ENGINE_SLOT_COMPONENT_PLACE_GUIDE = "Place the slot on the page to continue setup.";
@@ -253,8 +241,6 @@ export const CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_LABEL = "Select";
 export const CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_SELECTED_LABEL = "Selected";
 
 export const CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_PENDING_LABEL = "Selecting…";
-
-export const CMS_SLOTS_ENGINE_CREATE_TARGET_HINT = "Add the hidden list target block to this page.";
 
 export const CMS_SLOTS_ENGINE_LIST_TARGET_ABSENT_TITLE = "Not set up";
 
@@ -269,10 +255,6 @@ export const CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_DESCRIPTION =
 export const CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_TITLE = "Updating";
 
 export const CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_DESCRIPTION = "Syncing slot component changes on this page.";
-
-export const CMS_SLOTS_ENGINE_FOCUS_ON_CANVAS_LABEL = "Focus on canvas";
-
-export const CMS_SLOTS_ENGINE_FOCUS_ON_CANVAS_PENDING_LABEL = "Focusing…";
 
 export const CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_LABEL = "Place on canvas";
 

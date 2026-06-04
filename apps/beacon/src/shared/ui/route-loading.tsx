@@ -4,7 +4,7 @@ import { beaconAppRouteSurfaceClass } from "@/shared/lib/beacon-app-route-surfac
 import { cn } from "@/shared/lib/utils";
 
 /** Canonical layout surfaces for Beacon route loading chrome (shell, overlay, full-route). */
-export const routeLoadingSurfaceVariants = cva("flex flex-col items-center justify-center", {
+const routeLoadingSurfaceVariants = cva("flex flex-col items-center justify-center", {
   variants: {
     layout: {
       /** In-scroll loader that grows to fill the route viewport. */

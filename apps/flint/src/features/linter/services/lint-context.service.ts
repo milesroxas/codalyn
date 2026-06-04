@@ -10,36 +10,18 @@ import type { RoleDetector } from "@/features/linter/model/preset.types";
 import { resolvePresetOrFallback } from "@/features/linter/presets";
 import { createRoleDetectionService } from "@/features/linter/services/role-detection.service";
 
-// Cache for page lint context to improve performance for page mode
-let cachedPageContext: LintContext | null = null;
-
 /**
- * createContext() memo: signature → last built LintContext. Must be cleared together with
- * cachedPageContext when the canvas changes; previously only cachedPageContext was nulled
- * and stale graphs could be reused after deleting elements (e.g. components).
+ * createContext() memo: signature → last built LintContext. Must be cleared when the canvas
+ * changes; previously only page context was nulled and stale graphs could be reused after
+ * deleting elements (e.g. components).
  */
 let cachedLintContext: LintContext | null = null;
 let lastLintContextSignature: string | null = null;
 
 /**
- * Set page context cache for page mode performance
- */
-export function setPageContextCache(context: LintContext): void {
-  cachedPageContext = context;
-}
-
-/**
- * Get cached page context if available (for page mode performance)
- */
-export function getPageContextCache(): LintContext | null {
-  return cachedPageContext;
-}
-
-/**
  * Invalidate all lint context caches when the page/canvas changes or before a fresh scan.
  */
 export function invalidatePageContextCache(): void {
-  cachedPageContext = null;
   cachedLintContext = null;
   lastLintContextSignature = null;
   resetVariableNameMapCache();
@@ -385,8 +367,6 @@ export function createLintContextService(deps: { styleService: StyleService }): 
     cachedLintContext = context;
     lastLintContextSignature = signature;
 
-    // Also set in lightweight context cache for page mode performance
-    setPageContextCache(context);
     debug.log("createContext: context created signature", signature);
 
     return context;

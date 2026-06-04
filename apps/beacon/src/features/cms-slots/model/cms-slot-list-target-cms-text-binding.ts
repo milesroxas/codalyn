@@ -32,7 +32,7 @@ export type CmsSlotListCmsTextFieldEnsureResult = {
   fieldWasCreated: boolean;
 };
 
-export function cmsSlotListCmsPlainTextFieldDisplayName(dataList: string): string {
+function cmsSlotListCmsPlainTextFieldDisplayName(dataList: string): string {
   return `CMS slot target text · ${dataList}`;
 }
 

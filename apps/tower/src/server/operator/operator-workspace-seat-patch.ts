@@ -1,5 +1,4 @@
 import { countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
-import type { OperatorWorkspacePatch } from "@/server/operator/types";
 
 export type OperatorWorkspaceSeatPatchInput = {
   seatLimit?: number | null;
@@ -45,21 +44,4 @@ export async function planOperatorWorkspaceSeatPatch(
   }
 
   return { plan };
-}
-
-export function mergeOperatorWorkspaceSeatPatch(
-  parsed: OperatorWorkspacePatch,
-  seatPlan: OperatorWorkspaceSeatPatchPlan
-): OperatorWorkspacePatch {
-  const merged: OperatorWorkspacePatch = { ...parsed };
-  if ("seatLimit" in seatPlan) {
-    merged.seatLimit = seatPlan.seatLimit;
-  }
-  if (seatPlan.operatorSeatLimitOverride !== undefined) {
-    merged.operatorSeatLimitOverride = seatPlan.operatorSeatLimitOverride;
-  }
-  if (seatPlan.clearOperatorSeatOverride) {
-    merged.clearOperatorSeatOverride = true;
-  }
-  return merged;
 }

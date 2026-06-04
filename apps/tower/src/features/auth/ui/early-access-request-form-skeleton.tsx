@@ -38,4 +38,4 @@ function EarlyAccessRequestFormSkeletonPage() {
   );
 }
 
-export { EarlyAccessRequestFormSkeleton, EarlyAccessRequestFormSkeletonPage };
+export { EarlyAccessRequestFormSkeletonPage };

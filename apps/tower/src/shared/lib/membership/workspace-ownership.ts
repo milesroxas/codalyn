@@ -37,7 +37,7 @@ export type OrganizationOwnershipSnapshot = {
   deletedAt: Date | null;
 };
 
-export function isSharedWorkspace(memberCount: number): boolean {
+function isSharedWorkspace(memberCount: number): boolean {
   return memberCount > 1;
 }
 

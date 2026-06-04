@@ -94,7 +94,7 @@ export async function planUserAccountDeletion(userId: string): Promise<UserAccou
   return { blockers: computeAccountDeletionBlockers(userId, orgs) };
 }
 
-export async function assertUserMayDeleteAccount(userId: string): Promise<UserAccountDeletionPlan> {
+async function assertUserMayDeleteAccount(userId: string): Promise<UserAccountDeletionPlan> {
   const plan = await planUserAccountDeletion(userId);
   if (plan.blockers.length > 0) {
     throw new UserAccountDeletionBlockedError(plan.blockers);

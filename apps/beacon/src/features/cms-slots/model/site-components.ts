@@ -104,7 +104,7 @@ export async function stripEngineCodalynAttrsForSlotListContainer(container: Blo
 /**
  * Removes the beacon target **Block** (and any child component instances) from the page.
  */
-export async function removeCmsSlotListFromPage(container: BlockElement): Promise<void> {
+async function removeCmsSlotListFromPage(container: BlockElement): Promise<void> {
   await container.remove();
 }
 

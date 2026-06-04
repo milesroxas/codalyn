@@ -14,7 +14,7 @@ export const WINDOW_PRESETS: Record<WindowPreset, { label: string; height: numbe
   medium: { label: "Medium", height: 560 },
 };
 
-export const HeightSwitcher: React.FC = () => {
+const HeightSwitcher: React.FC = () => {
   const [open, setOpen] = useState(false);
   const { windowPreset, setWindowPreset } = useLinterSettings();
 

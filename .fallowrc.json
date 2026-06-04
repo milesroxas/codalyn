@@ -1,0 +1,49 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": ["src/index.{js,jsx,mjs}", "src/main.{js,jsx,mjs}"],
+  "workspaces": {
+    "packages": ["apps/*", "packages/*"]
+  },
+  "duplicates": {
+    "minOccurrences": 3
+  },
+  "rules": {},
+  "ignoreExports": [
+    {
+      "file": "apps/flint/src/features/linter/model/rule.types.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "apps/flint/src/features/linter/store/expandedView.store.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "apps/flint/src/features/linter/services/executors/naming-rule-executor.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "apps/tower/src/server/billing/organization-billing.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "apps/tower/src/server/membership/workspace-ownership-transfer-commit.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "apps/beacon/src/features/image-editor/lib/image-editor-upload-preset-picker.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "apps/beacon/src/features/image-editor/ui/image-editor-crop-export-panel.tsx",
+      "exports": ["*"]
+    },
+    {
+      "file": "apps/flint/src/entities/style/services/style-cache.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "apps/flint/src/entities/style/services/style-service-cache.ts",
+      "exports": ["*"]
+    }
+  ]
+}

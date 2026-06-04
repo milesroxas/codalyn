@@ -14,28 +14,6 @@ export function isTowerNavActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function towerPageTitleFromPathname(pathname: string): string {
-  if (pathname === "/" || pathname === "") {
-    return "Dashboard";
-  }
-  if (pathname.startsWith("/team")) {
-    return "Team";
-  }
-  if (pathname.startsWith("/beacon")) {
-    return "Beacon";
-  }
-  if (pathname.startsWith("/connection") || pathname.startsWith("/webflow")) {
-    return "Connection";
-  }
-  if (pathname.startsWith("/billing")) {
-    return "Billing";
-  }
-  if (pathname.startsWith("/account")) {
-    return "Account";
-  }
-  return "Tower";
-}
-
 export function buildTowerMainNav(billingEnabled: boolean): TowerNavItem[] {
   const items: TowerNavItem[] = [
     { title: "Dashboard", href: "/", icon: LayoutDashboardIcon },

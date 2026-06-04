@@ -345,7 +345,7 @@ function TowerWebflowQueryBannerInner({ webflowOAuthConnected }: TowerWebflowQue
   return <OnboardingBlockerAlert copy={copy} actions={null} icon={Icon} />;
 }
 
-export function TowerWebflowQueryBanner(props: TowerWebflowQueryBannerProps) {
+function TowerWebflowQueryBanner(props: TowerWebflowQueryBannerProps) {
   return (
     <Suspense fallback={null}>
       <TowerWebflowQueryBannerInner {...props} />

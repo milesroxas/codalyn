@@ -15,16 +15,7 @@ function placeholderPngFile(): File {
   return new File([PLACEHOLDER_PNG_BYTES], CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME, { type: "image/png" });
 }
 
-/** Cached Codalyn publish-placeholder asset id for the current site (after {@link ensurePublishPlaceholderImageAssetId}). */
-export function getCachedPublishPlaceholderImageAssetId(siteId?: string): string | null {
-  if (siteId != null) {
-    return cachedAssetIdBySite.get(siteId) ?? null;
-  }
-  const only = [...cachedAssetIdBySite.values()];
-  return only.length === 1 ? (only[0] ?? null) : null;
-}
-
-/** True when a string is the Codalyn image publish placeholder (asset id or hosted URL containing the fixed filename). */
+/** True when a value is the Codalyn image publish placeholder (asset id or URL containing the fixed filename). */
 export function isPublishPlaceholderImageReference(v: unknown): boolean {
   if (v == null) {
     return false;

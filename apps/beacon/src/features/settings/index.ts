@@ -1,8 +1,4 @@
-export {
-  DEFAULT_SETTINGS_SECTION,
-  SETTINGS_SCREEN_TITLE,
-  type SettingsSectionId,
-} from "@/features/settings/lib/settings-sections";
+export { SETTINGS_SCREEN_TITLE, type SettingsSectionId } from "@/features/settings/lib/settings-sections";
 export {
   BeaconAppSettingsProvider,
   useBeaconAppSettings,

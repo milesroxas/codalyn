@@ -77,7 +77,7 @@ import { Separator } from "@/shared/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 
-export const schema = z.object({
+const schema = z.object({
   id: z.number(),
   header: z.string(),
   type: z.string(),

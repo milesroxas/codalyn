@@ -16,7 +16,7 @@ function mergeAuthFetchHeaders(
   return Object.keys(headers).length > 0 ? { headers } : undefined;
 }
 
-export function buildTeamInvitationAuthFetchOptions(
+function buildTeamInvitationAuthFetchOptions(
   invitationId: string | null,
   opts?: { skipVerificationEmail?: boolean }
 ): { headers: Record<string, string> } | undefined {
@@ -32,7 +32,7 @@ export function buildTeamInvitationAuthFetchOptions(
   return { headers };
 }
 
-export function buildOperatorInviteAuthFetchOptions(
+function buildOperatorInviteAuthFetchOptions(
   operatorInviteToken: string | null,
   opts?: { skipVerificationEmail?: boolean }
 ): { headers: Record<string, string> } | undefined {

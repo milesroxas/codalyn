@@ -10,10 +10,6 @@ export const IMAGE_TARGET_STEP_ON_PAGE = "On this page";
 
 export const IMAGE_TARGET_STEP_USE_SELECTION = "Use selection";
 
-/** Shown below the Use selection action when nothing image-capable is selected. */
-export const IMAGE_TARGET_STEP_USE_SELECTION_DISABLED_HINT =
-  "Select an image or a component with an image field on the canvas.";
-
 export const IMAGE_TARGET_STEP_SELECTED_SURFACE_LABEL = "Selected surface";
 
 export const IMAGE_TARGET_STEP_NO_SURFACE_SELECTED =

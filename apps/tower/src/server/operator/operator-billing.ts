@@ -22,7 +22,7 @@ export type OperatorOrgBillingSnapshot = {
   canOperatorEditSeatLimit: boolean;
 };
 
-export function resolveOperatorWorkspaceBillingMode(row: OrganizationBillingRow): OperatorWorkspaceBillingMode {
+function resolveOperatorWorkspaceBillingMode(row: OrganizationBillingRow): OperatorWorkspaceBillingMode {
   if (isOperatorBillingManagedByStripe(row.stripeSubscriptionId)) {
     return "stripe_team";
   }
@@ -32,7 +32,7 @@ export function resolveOperatorWorkspaceBillingMode(row: OrganizationBillingRow)
   return "free";
 }
 
-export function formatOperatorWorkspacePlanLabel(
+function formatOperatorWorkspacePlanLabel(
   mode: OperatorWorkspaceBillingMode,
   displayBillingPlan: string | null
 ): string {

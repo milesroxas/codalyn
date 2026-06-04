@@ -58,11 +58,6 @@ export async function applyCmsSlotListTargetDesignerPlaceholderToDom(dom: DOMEle
   await dom.setAttribute("aria-label", CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL);
 }
 
-export async function clearCmsSlotListTargetDesignerPlaceholderFromDom(dom: DOMElement): Promise<void> {
-  await dom.setAttribute("style", "");
-  await dom.removeAttribute("aria-label");
-}
-
 async function applyDesignerPlaceholderToListTargetInstance(
   instance: ComponentElement,
   dataList: string,

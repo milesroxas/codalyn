@@ -12,7 +12,7 @@ export function operatorWorkspacePurgePhraseMatches(phrase: string): boolean {
   return phrase.trim().toUpperCase() === OPERATOR_WORKSPACE_PURGE_CONFIRM_PHRASE;
 }
 
-export function workspaceSlugConfirmationMatches(confirmSlug: string, expectedSlug: string): boolean {
+function workspaceSlugConfirmationMatches(confirmSlug: string, expectedSlug: string): boolean {
   return confirmSlug.trim().toLowerCase() === expectedSlug.trim().toLowerCase();
 }
 

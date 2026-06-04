@@ -34,7 +34,7 @@ const VERCEL_COMPUTE_USD_PER_SECOND =
 const BYTES_PER_GB = 1_000_000_000;
 
 /** Estimated USD for measured active compute (Vercel CPU + memory). */
-export function computeCostUsd(computeMs: number): number {
+function computeCostUsd(computeMs: number): number {
   if (!Number.isFinite(computeMs) || computeMs <= 0) {
     return 0;
   }
@@ -42,7 +42,7 @@ export function computeCostUsd(computeMs: number): number {
 }
 
 /** Estimated USD for measured egress (Vercel Fast Data Transfer). */
-export function transferCostUsd(egressBytes: number): number {
+function transferCostUsd(egressBytes: number): number {
   if (!Number.isFinite(egressBytes) || egressBytes <= 0) {
     return 0;
   }

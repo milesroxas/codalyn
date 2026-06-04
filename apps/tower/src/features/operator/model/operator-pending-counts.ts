@@ -2,7 +2,7 @@ import type { OperatorMetrics } from "@/server/operator/types";
 
 export type OperatorPendingCountKey = "pendingEarlyAccessRequests" | "pendingSupportRequests";
 
-export const OPERATOR_NAV_PENDING_COUNT_KEYS: Partial<Record<string, OperatorPendingCountKey>> = {
+const OPERATOR_NAV_PENDING_COUNT_KEYS: Partial<Record<string, OperatorPendingCountKey>> = {
   "/console/access-requests": "pendingEarlyAccessRequests",
   "/console/support-requests": "pendingSupportRequests",
 };

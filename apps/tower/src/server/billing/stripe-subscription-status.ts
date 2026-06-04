@@ -2,7 +2,7 @@ import type Stripe from "stripe";
 import { TEAM_BILLING_PLAN } from "@/server/billing/team-billing-config";
 
 /** Stripe subscription statuses that grant individual Pro entitlements (grace for `past_due`). */
-export const STRIPE_PRO_ENTITLED_STATUSES: ReadonlySet<Stripe.Subscription.Status> = new Set([
+const STRIPE_PRO_ENTITLED_STATUSES: ReadonlySet<Stripe.Subscription.Status> = new Set([
   "active",
   "trialing",
   "past_due",
@@ -17,11 +17,11 @@ export function subscriptionPlanForStatus(stripeStatus: Stripe.Subscription.Stat
 }
 
 /** Individual (user-scoped) paid plans stored on `user.subscription_plan`. Team is workspace-scoped. */
-export const INDIVIDUAL_PAID_PLANS = ["pro", "studio"] as const;
+const INDIVIDUAL_PAID_PLANS = ["pro", "studio"] as const;
 
 export type IndividualPaidPlan = (typeof INDIVIDUAL_PAID_PLANS)[number];
 
-export function isIndividualPaidPlan(raw: string | null | undefined): raw is IndividualPaidPlan {
+function isIndividualPaidPlan(raw: string | null | undefined): raw is IndividualPaidPlan {
   return raw === "pro" || raw === "studio";
 }
 

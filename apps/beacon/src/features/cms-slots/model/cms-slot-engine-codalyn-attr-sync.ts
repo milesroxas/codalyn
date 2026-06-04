@@ -50,8 +50,6 @@ export type EngineTagWalkResult = {
   conditionalControllerPropIds: Set<string>;
 };
 
-export { mapNestedPropsToExposedIds } from "@/features/cms-slots/model/cms-slot-nested-prop-alias";
-
 function hasChildren(el: AnyElement): el is AnyElement & { getChildren: () => Promise<AnyElement[]> } {
   return "children" in el && (el as { children?: boolean }).children === true;
 }

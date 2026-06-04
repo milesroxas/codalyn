@@ -8,7 +8,7 @@ type UsageLimitsResetLabelProps = {
   resetLine: string;
 };
 
-export function UsageLimitsResetLabel(props: UsageLimitsResetLabelProps) {
+function UsageLimitsResetLabel(props: UsageLimitsResetLabelProps) {
   const { resetLine } = props;
 
   return (

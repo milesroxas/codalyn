@@ -20,7 +20,7 @@ type UsagePlanBadgesProps = {
   tierBadgeStyle?: "limits" | "plan";
 };
 
-export function UsagePlanBadges(props: UsagePlanBadgesProps) {
+function UsagePlanBadges(props: UsagePlanBadgesProps) {
   const { tier, limitsKind, entitlementSource, showAccountBadge = true, tierBadgeStyle = "limits" } = props;
   const limitsLabel = usageLimitsKindBadgeLabel(limitsKind, tier);
   const source = entitlementSource ?? "none";
@@ -39,7 +39,7 @@ export function UsagePlanBadges(props: UsagePlanBadgesProps) {
 }
 
 /** Plan badges for usage meters — active workspace tier only. */
-export function UsageLimitsBadges(
+function UsageLimitsBadges(
   props: Omit<UsagePlanBadgesProps, "showAccountBadge" | "entitlementSource" | "tierBadgeStyle">
 ) {
   return <UsagePlanBadges {...props} showAccountBadge={false} tierBadgeStyle="plan" />;

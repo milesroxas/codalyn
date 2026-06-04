@@ -13,7 +13,7 @@ import { placeImageOnCanvasAtBody, placeImageOnCanvasWithAsset } from "./insert-
 import { searchComponentInstanceImageProps } from "./search-component-instance-image-props";
 
 export const MAX_EDGE = 8192;
-export const MIN_EDGE = 1;
+const MIN_EDGE = 1;
 
 export function clampEdge(n: number): number {
   if (Number.isNaN(n)) {

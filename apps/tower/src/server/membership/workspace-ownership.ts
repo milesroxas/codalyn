@@ -11,7 +11,7 @@ export type WorkspaceOwnerRow = {
   deletedAt: Date | null;
 };
 
-export function activeOrganizationCondition() {
+function activeOrganizationCondition() {
   return isNull(organization.deletedAt);
 }
 

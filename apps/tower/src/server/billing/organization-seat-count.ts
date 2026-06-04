@@ -10,7 +10,6 @@ import { db } from "@/shared/lib/db";
 import { invitation, member, organization } from "@/shared/lib/db/auth-schema";
 
 export type { OrganizationSeatSnapshot } from "@/shared/lib/billing/organization-seat-cap";
-export { buildOrganizationSeatSnapshot } from "@/shared/lib/billing/organization-seat-cap";
 
 /** Members plus pending invitations (each consumes a seat). */
 export async function countOrganizationSeatsUsed(organizationId: string): Promise<number> {

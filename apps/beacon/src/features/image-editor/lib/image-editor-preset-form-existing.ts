@@ -18,7 +18,7 @@ export type PresetFormExistingMatch = {
 };
 
 /** Surface add/edit preset form scopes. Site default is a global fallback shown when no surface preset exists. */
-export function isSurfaceTargetPresetScope(scope: PresetCrudScope): scope is Exclude<PresetCrudScope, "site-default"> {
+function isSurfaceTargetPresetScope(scope: PresetCrudScope): scope is Exclude<PresetCrudScope, "site-default"> {
   return scope !== "site-default";
 }
 

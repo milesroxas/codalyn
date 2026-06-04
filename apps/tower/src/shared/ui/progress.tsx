@@ -43,4 +43,4 @@ function Progress({
   );
 }
 
-export { Progress, progressIndicatorVariants };
+export { Progress };

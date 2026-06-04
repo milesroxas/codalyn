@@ -13,7 +13,7 @@ const WRAP_SUFFIX_RE = /(?:^|[_-])(wrap|wrapper)$/i;
 const splitTokens = (name: string) => name.split(/[_-]+/).filter(Boolean);
 
 /** Check if a class name ends with wrap/wrapper */
-export const endsWithWrap = (name: string) => WRAP_SUFFIX_RE.test(name);
+const endsWithWrap = (name: string) => WRAP_SUFFIX_RE.test(name);
 
 /** Tokens that often indicate a child group wrapper rather than the component root */
 export const SUBPART_HINTS = new Set([

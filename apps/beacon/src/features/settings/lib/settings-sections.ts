@@ -27,8 +27,6 @@ export const SETTINGS_SECTIONS: SettingsSectionConfig[] = [
   },
 ];
 
-export const DEFAULT_SETTINGS_SECTION: SettingsSectionId = SETTINGS_SECTIONS[0].id;
-
 export function getSettingsSection(id: SettingsSectionId): SettingsSectionConfig {
   const section = SETTINGS_SECTIONS.find((entry) => entry.id === id);
   if (section == null) {

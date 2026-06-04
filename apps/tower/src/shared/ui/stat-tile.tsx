@@ -108,4 +108,4 @@ function StatTile(props: StatTileProps) {
   );
 }
 
-export { StatTile, type StatTileTone, type StatTileValueVariant, statTileIconVariants, statTileValueVariants };
+export { StatTile, type StatTileTone, type StatTileValueVariant };

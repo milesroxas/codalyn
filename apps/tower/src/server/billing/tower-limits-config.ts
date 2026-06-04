@@ -3,7 +3,7 @@ import type { TowerTier } from "@/server/billing/entitlements";
 import { db } from "@/shared/lib/db";
 import { towerPlatformMetering } from "@/shared/lib/db/auth-schema";
 
-export const TOWER_PLATFORM_METERING_ID = "default";
+const TOWER_PLATFORM_METERING_ID = "default";
 
 export type TowerTierLimits = {
   webflowProxyRequestsPerMonth: number;
@@ -247,7 +247,7 @@ export async function getTowerLimitsSnapshot(): Promise<TowerLimitsSnapshot> {
   return cached;
 }
 
-export function parseRequiredPlatformLimitField(raw: unknown): number | "invalid" {
+function parseRequiredPlatformLimitField(raw: unknown): number | "invalid" {
   if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0 || raw > 10_000_000 || !Number.isInteger(raw)) {
     return "invalid";
   }

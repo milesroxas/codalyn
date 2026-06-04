@@ -1,9 +1,8 @@
-import { readCmsSlotListDisplayName } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import {
   removeCmsSlotPageRuntimeFromPage,
   syncCmsSlotPageInlineScript,
 } from "@/features/cms-slots/model/cms-slot-page-inline-script";
-import { type CmsSlotListOnPage, findCmsSlotListsOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
+import { findCmsSlotListsOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 import {
   purgeCmsSlotListTargetDefinitionsForDataList,
@@ -237,26 +236,4 @@ export async function removeCmsSlotsWrapperIfNoSlotListsOnPage(): Promise<void> 
   if (wrapper != null) {
     await wrapper.remove();
   }
-}
-
-export async function listCmsSlotListsOrphanedOnBody(): Promise<CmsSlotListOnPage[]> {
-  const bodyRow = (await webflow.getAllElements()).find((e) => e.type === "Body");
-  if (!bodyRow) {
-    return [];
-  }
-  const wrapper = await findCmsSlotsWrapperOnPage();
-  const out: CmsSlotListOnPage[] = [];
-  for (const ch of await bodyRow.getChildren()) {
-    if (wrapper && ch === wrapper) continue;
-    if (ch.type !== "Block") continue;
-    const block = ch as BlockElement;
-    const target = await block.getCustomAttribute("data-target");
-    const list = await block.getCustomAttribute("data-list");
-    if (target === "beacons" && list != null && list.startsWith("beacon-")) {
-      const key = `${block.id.component}:${block.id.element}`;
-      const displayName = await readCmsSlotListDisplayName(block);
-      out.push({ dataList: list, displayName, container: block, key });
-    }
-  }
-  return out;
 }

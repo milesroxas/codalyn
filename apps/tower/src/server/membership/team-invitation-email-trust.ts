@@ -5,7 +5,7 @@ import { TOWER_TEAM_INVITATION_HEADER } from "@/shared/lib/membership/team-invit
 
 export { markEmailVerifiedForUserId } from "@/server/membership/email-verification-trust";
 
-export function readTeamInvitationIdFromHeaders(headers: Headers): string | null {
+function readTeamInvitationIdFromHeaders(headers: Headers): string | null {
   const value = headers.get(TOWER_TEAM_INVITATION_HEADER)?.trim();
   return value || null;
 }

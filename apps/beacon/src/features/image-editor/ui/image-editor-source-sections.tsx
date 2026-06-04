@@ -1,12 +1,8 @@
-import { IconPhoto } from "@tabler/icons-react";
-import { Upload } from "lucide-react";
-import type { DragEvent, RefObject } from "react";
+import type { DragEvent } from "react";
 
-import { BeaconRouteSubheader } from "@/app/ui/beacon-feature-route-chrome";
 import { ImageEditorDropzone } from "@/features/image-editor/ui/image-editor-dropzone";
 import { beaconPanelContainClass } from "@/shared/lib/beacon-app-route-surface";
 import { cn } from "@/shared/lib/utils";
-import { Button } from "@/shared/ui/button";
 
 const OUTGOING_FADE_CLASS = "transition-opacity duration-[380ms] ease-out";
 
@@ -70,31 +66,5 @@ export function EmptyImageSourceSection(props: {
       onDragOver={handleDrag}
       onDrop={handleDrop}
     />
-  );
-}
-
-export function LoadedImageSourceSection(props: {
-  fileBaseName: string;
-  busy: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
-}) {
-  const { fileBaseName, busy, fileInputRef } = props;
-  return (
-    <BeaconRouteSubheader>
-      <IconPhoto aria-hidden className="size-3.5 shrink-0 text-muted-foreground" stroke={1.5} />
-      <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={fileBaseName}>
-        {fileBaseName}
-      </p>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        disabled={busy}
-        aria-label="Change image"
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <Upload aria-hidden className="size-3.5" />
-      </Button>
-    </BeaconRouteSubheader>
   );
 }

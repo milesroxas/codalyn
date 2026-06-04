@@ -5,7 +5,7 @@ import type * as React from "react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 
-export const tileVariants = cva("min-w-0 border", {
+const tileVariants = cva("min-w-0 border", {
   variants: {
     variant: {
       cmsUpload:

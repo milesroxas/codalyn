@@ -522,7 +522,7 @@ export async function getUsageSnapshot(userId: string): Promise<UsageSnapshot> {
 }
 
 /** Pooled monthly usage for a paid Team workspace (the shared pool enforced for all members). */
-export async function getWorkspaceUsageSnapshot(organizationId: string): Promise<UsageSnapshot> {
+async function getWorkspaceUsageSnapshot(organizationId: string): Promise<UsageSnapshot> {
   const ym = utcYearMonth();
   const [row] = await db
     .select(USAGE_COUNT_COLUMNS_WORKSPACE)
@@ -572,7 +572,7 @@ export async function resetUsageForOrganizationMembers(
 }
 
 /** Resets the pooled monthly usage for a paid Team workspace, plus its per-member attribution rows. */
-export async function resetUsageForWorkspace(organizationId: string, yearMonth = utcYearMonth()): Promise<void> {
+async function resetUsageForWorkspace(organizationId: string, yearMonth = utcYearMonth()): Promise<void> {
   await Promise.all([
     db
       .update(towerWorkspaceUsageMonth)

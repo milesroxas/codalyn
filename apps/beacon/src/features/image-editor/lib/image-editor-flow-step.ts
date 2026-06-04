@@ -52,7 +52,7 @@ export function shouldShowImageEditorStepNav(pathMode: ImageEditorPathMode): boo
   return getImageEditorNavSteps(pathMode).length > 0;
 }
 
-export const IMAGE_EDITOR_STEP_RESTART_HINT = "Restarts this step — you will add your image file again.";
+const IMAGE_EDITOR_STEP_RESTART_HINT = "Restarts this step — you will add your image file again.";
 
 export function imageEditorStepRestartHint(stepId: ImageEditorFlowStep, hasImage: boolean): string | undefined {
   if (!hasImage) {
@@ -65,7 +65,7 @@ export function imageEditorStepRestartHint(stepId: ImageEditorFlowStep, hasImage
 }
 
 /** Linear step order for a path (used for back navigation and step index). */
-export function getImageEditorStepOrder(
+function getImageEditorStepOrder(
   pathMode: ImageEditorPathMode,
   orderOpts: ImageEditorStepOrderOptions
 ): ImageEditorFlowStep[] {
@@ -79,27 +79,6 @@ export function getImageEditorStepOrder(
     return ["entry", "configurePresets"];
   }
   return [];
-}
-
-export function imageEditorStepIndex(
-  step: ImageEditorFlowStep,
-  pathMode: ImageEditorPathMode,
-  orderOpts: ImageEditorStepOrderOptions
-): number {
-  return getImageEditorStepOrder(pathMode, orderOpts).indexOf(step);
-}
-
-/** Whether `target` is strictly before the current step (back navigation). */
-export function isImageEditorBackStep(
-  from: ImageEditorFlowStep,
-  to: ImageEditorFlowStep,
-  pathMode: ImageEditorPathMode,
-  orderOpts: ImageEditorStepOrderOptions
-): boolean {
-  return (
-    imageEditorStepIndex(to, pathMode, orderOpts) < imageEditorStepIndex(from, pathMode, orderOpts) &&
-    imageEditorStepIndex(to, pathMode, orderOpts) >= 0
-  );
 }
 
 type ImageEditorBackNavigationInput = {
@@ -149,10 +128,7 @@ export function applyImageEditorBackNavigation(input: ImageEditorBackNavigationI
 }
 
 /** `entry` appears in the step strip when designers can return to the start screen. */
-export function imageEditorIncludeEntryInStepOrder(
-  pathMode: ImageEditorPathMode,
-  isWorkspaceDesigner: boolean
-): boolean {
+function imageEditorIncludeEntryInStepOrder(pathMode: ImageEditorPathMode, isWorkspaceDesigner: boolean): boolean {
   if (pathMode === "configurations") {
     return true;
   }

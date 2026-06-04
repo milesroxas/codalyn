@@ -56,6 +56,7 @@ function notifyPresetChanged(): void {
 
 export function ensureLinterInitialized(mode: OpinionMode = "balanced", preset: string = currentPreset): void {
   if (isInitialized && mode === currentMode && preset === currentPreset) return;
+  const presetChanged = preset !== currentPreset;
   initializeRuleRegistry(mode, preset);
   isInitialized = true;
   currentMode = mode;
@@ -63,6 +64,9 @@ export function ensureLinterInitialized(mode: OpinionMode = "balanced", preset: 
   // Persist selected preset so subsequent UI states (e.g., mode switches) keep it
   safeWriteStorage(PRESET_STORAGE_KEY, currentPreset);
   registerFrameworkPreset(currentPreset);
+  if (presetChanged) {
+    notifyPresetChanged();
+  }
   void (async () => {
     try {
       const styleCacheMod = await import("@/entities/style/services/style-cache");
@@ -87,15 +91,6 @@ export function ensureLinterInitialized(mode: OpinionMode = "balanced", preset: 
 
 export function getRuleRegistry() {
   return ruleRegistry;
-}
-
-export function setPreset(preset: string) {
-  currentPreset = preset;
-  // Reinitialize with existing mode but new preset
-  ensureLinterInitialized(currentMode, currentPreset);
-  // Persist selection as well
-  safeWriteStorage(PRESET_STORAGE_KEY, currentPreset);
-  notifyPresetChanged();
 }
 
 export function getCurrentPreset(): string {

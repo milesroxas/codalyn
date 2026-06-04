@@ -98,7 +98,7 @@ export async function fetchCmsSlotListCmsTextForItem(options: {
  * Reads the JSON string the footer runtime consumes from the list target **Text** prop on non–collection-template
  * pages (same surface {@link setCmsSlotListTargetInstancesStaticRuntimeText} writes).
  */
-export async function readCmsSlotListStaticListTargetRuntimeText(options: {
+async function readCmsSlotListStaticListTargetRuntimeText(options: {
   dataList: string;
   listContainer: BlockElement;
   preferredDefinitionId: string | null;

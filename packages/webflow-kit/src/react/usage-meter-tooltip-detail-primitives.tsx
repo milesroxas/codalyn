@@ -1,37 +1,35 @@
 import { cva } from "class-variance-authority";
 import type { ComponentProps } from "react";
 
-export const usageMeterTooltipDetailVariants = cva(
+const usageMeterTooltipDetailVariants = cva(
   "flex w-full min-w-0 flex-col gap-3 text-left text-xs leading-relaxed text-inherit"
 );
 
-export const usageMeterTooltipSummaryVariants = cva("opacity-90");
+const usageMeterTooltipSummaryVariants = cva("opacity-90");
 
-export const usageMeterTooltipTitleVariants = cva("font-semibold leading-snug");
+const usageMeterTooltipTitleVariants = cva("font-semibold leading-snug");
 
-export const usageMeterTooltipSectionVariants = cva("flex flex-col gap-2");
+const usageMeterTooltipSectionVariants = cva("flex flex-col gap-2");
 
-export const usageMeterTooltipHeadingVariants = cva(
-  "text-[0.6875rem] font-semibold uppercase tracking-[0.08em] opacity-55"
-);
+const usageMeterTooltipHeadingVariants = cva("text-[0.6875rem] font-semibold uppercase tracking-[0.08em] opacity-55");
 
-export const usageMeterTooltipListVariants = cva("flex list-none flex-col gap-3 p-0");
+const usageMeterTooltipListVariants = cva("flex list-none flex-col gap-3 p-0");
 
-export const usageMeterTooltipProductGroupVariants = cva("flex flex-col items-start gap-1.5");
+const usageMeterTooltipProductGroupVariants = cva("flex flex-col items-start gap-1.5");
 
-export const usageMeterTooltipProductGroupDetailListVariants = cva("flex list-none flex-col gap-1 p-0");
+const usageMeterTooltipProductGroupDetailListVariants = cva("flex list-none flex-col gap-1 p-0");
 
-export const usageMeterTooltipProductGroupDetailVariants = cva("flex gap-1.5 leading-snug opacity-80");
+const usageMeterTooltipProductGroupDetailVariants = cva("flex gap-1.5 leading-snug opacity-80");
 
-export const usageMeterTooltipProductGroupDetailBulletVariants = cva("select-none opacity-60");
+const usageMeterTooltipProductGroupDetailBulletVariants = cva("select-none opacity-60");
 
-export const usageMeterTooltipProductGroupDetailTextVariants = cva("min-w-0 flex-1");
+const usageMeterTooltipProductGroupDetailTextVariants = cva("min-w-0 flex-1");
 
-export const usageMeterTooltipListItemVariants = cva("flex items-center gap-2");
+const usageMeterTooltipListItemVariants = cva("flex items-center gap-2");
 
-export const usageMeterTooltipListItemDetailVariants = cva("min-w-0 flex-1 leading-snug opacity-80");
+const usageMeterTooltipListItemDetailVariants = cva("min-w-0 flex-1 leading-snug opacity-80");
 
-export const usageMeterTooltipFootnoteVariants = cva(
+const usageMeterTooltipFootnoteVariants = cva(
   "flex flex-col gap-2 border-t border-current/15 pt-2.5 text-[0.6875rem] leading-relaxed opacity-60"
 );
 

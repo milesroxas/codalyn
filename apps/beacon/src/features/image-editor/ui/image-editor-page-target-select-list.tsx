@@ -36,7 +36,7 @@ type ImagePageTargetSelectListProps = {
   onSelectTarget: (target: ImagePageTarget) => void;
 };
 
-export function ImagePageTargetSelectList(props: ImagePageTargetSelectListProps) {
+function ImagePageTargetSelectList(props: ImagePageTargetSelectListProps) {
   const { idPrefix, targets, selectedTarget, onSelectTarget } = props;
 
   return (

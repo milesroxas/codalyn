@@ -23,8 +23,3 @@ export function subscribeBeaconTowerDesignerExchangePhase(listener: () => void):
     listeners.delete(listener);
   };
 }
-
-export function resetBeaconTowerDesignerExchangePhaseForTests(): void {
-  phase = "idle";
-  listeners.clear();
-}

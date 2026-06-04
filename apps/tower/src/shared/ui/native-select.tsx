@@ -35,4 +35,4 @@ function NativeSelect({
   );
 }
 
-export { NativeSelect, nativeSelectVariants };
+export { NativeSelect };

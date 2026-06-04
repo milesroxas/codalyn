@@ -152,14 +152,6 @@ function joinOriginPath(origin: string, pathname: string, search = ""): string {
   return `${origin.replace(/\/$/, "")}${sanitizeRelativePath(pathname, search)}`;
 }
 
-export function resolveMarketingHosts(): readonly string[] {
-  return [...getTowerHostConfig().marketingHosts];
-}
-
-export function resolveAppHost(): string {
-  return getTowerHostConfig().appHost;
-}
-
 export function resolveMarketingOrigin(): string {
   return getTowerHostConfig().marketingOrigin;
 }

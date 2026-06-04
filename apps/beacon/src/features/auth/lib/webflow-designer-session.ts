@@ -5,7 +5,7 @@ import { writeBeaconTowerSessionToken } from "./beacon-tower-session-token";
 export * from "./beacon-tower-session-token";
 
 /** When set, skip silent hybrid re-auth so explicit sign-out is not undone by `exchangeWebflowDesignerSession`. */
-export const BEACON_TOWER_SUPPRESS_DESIGNER_EXCHANGE_KEY = "codalyn:beacon-tower-suppress-designer-exchange";
+const BEACON_TOWER_SUPPRESS_DESIGNER_EXCHANGE_KEY = "codalyn:beacon-tower-suppress-designer-exchange";
 
 export function readSuppressDesignerSessionExchange(): boolean {
   try {

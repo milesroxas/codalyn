@@ -221,10 +221,7 @@ export const EMPTY_METERING_OVERRIDES: MeteringOverrideFields = {
 
 export type TowerUsageLimitsKind = "standard" | "custom" | "unmetered";
 
-export function hasMeteringLimitOverrides(
-  user: MeteringOverrideFields,
-  organization: MeteringOverrideFields | null
-): boolean {
+function hasMeteringLimitOverrides(user: MeteringOverrideFields, organization: MeteringOverrideFields | null): boolean {
   const scopes = organization === null ? [user] : [user, organization];
   return scopes.some(
     (fields) =>

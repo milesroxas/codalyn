@@ -1,4 +1,7 @@
-import { CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME } from "@/features/cms-slots/model/cms-slot-publish-placeholder-image-asset";
+import {
+  CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME,
+  isPublishPlaceholderImageReference,
+} from "@/features/cms-slots/model/cms-slot-publish-placeholder-image-asset";
 
 /**
  * Content tag on a prop-bound element; footer runtime swaps this element's content with the Composer value.
@@ -14,7 +17,7 @@ export const CMS_SLOT_CONTENT_ATTR = "data-cb-c";
 export const CMS_SLOT_COND_ATTR = "data-cb-v";
 
 /** Tag attributes the Engine writes onto bound elements (and that cleanup removes). */
-export const CMS_SLOT_WRITTEN_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR] as const;
+const CMS_SLOT_WRITTEN_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR] as const;
 
 /** Canonical exposed prop id from a `data-cb-c` segment (strips the `@N` / `@…` suffix). */
 export function canonicalPropIdFromContentAttrSegment(segment: string): string {
@@ -66,7 +69,7 @@ export async function removeCmsSlotTagAttrsIfPresent(attr: BeaconCmsSlotAttrRemo
 }
 
 /** Split a `data-cb-c` value into trimmed, non-empty segments. */
-export function parseContentAttrSegments(value: string | null | undefined): string[] {
+function parseContentAttrSegments(value: string | null | undefined): string[] {
   if (value == null) {
     return [];
   }
@@ -176,12 +179,6 @@ export const CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL = "placeholder@codalyn.invalid";
 /** Non-breaking space used as a minimal text publish placeholder. */
 export const CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT = "\u00a0";
 
-export {
-  CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME,
-  getCachedPublishPlaceholderImageAssetId,
-  isPublishPlaceholderImageReference,
-} from "@/features/cms-slots/model/cms-slot-publish-placeholder-image-asset";
-
 /** True when a value is a Designer/publish seed sentinel — not real Composer content. */
 export function isBeaconPublishPlaceholderValue(v: unknown): boolean {
   if (v == null) {
@@ -195,7 +192,7 @@ export function isBeaconPublishPlaceholderValue(v: unknown): boolean {
   if (s === CMS_SLOT_PUBLISH_PLACEHOLDER_URL || s === CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL) {
     return true;
   }
-  return s.includes(CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME);
+  return isPublishPlaceholderImageReference(v);
 }
 
 /** True when a Composer field is unset (Designer empty checks). */

@@ -46,7 +46,7 @@ function BeaconPresetSelectField(props: {
   );
 }
 
-export function BeaconPresetOutputDimensionFields(props: {
+function BeaconPresetOutputDimensionFields(props: {
   baseId: string;
   disabled?: boolean;
   width: string;
@@ -90,7 +90,7 @@ export function BeaconPresetOutputDimensionFields(props: {
   );
 }
 
-export function BeaconPresetExportFormatField(props: {
+function BeaconPresetExportFormatField(props: {
   baseId: string;
   disabled?: boolean;
   value: ImageExportFormat;
@@ -114,7 +114,7 @@ export function BeaconPresetExportFormatField(props: {
   );
 }
 
-export function BeaconPresetMaxEncodedSizeField(props: {
+function BeaconPresetMaxEncodedSizeField(props: {
   baseId: string;
   disabled?: boolean;
   maxStr: string;
@@ -164,7 +164,7 @@ export function BeaconPresetMaxEncodedSizeField(props: {
   );
 }
 
-export function BeaconPresetNameField(props: {
+function BeaconPresetNameField(props: {
   baseId: string;
   disabled?: boolean;
   name: string;

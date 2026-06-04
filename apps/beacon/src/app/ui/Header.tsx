@@ -126,7 +126,7 @@ type HeaderLogoProps = {
   to?: string;
 };
 
-export function HeaderLogo({ asHeading = true, to }: HeaderLogoProps) {
+function HeaderLogo({ asHeading = true, to }: HeaderLogoProps) {
   const className = "m-0 flex shrink-0 items-center justify-center text-lg font-medium leading-widest";
   const inner = (
     <>

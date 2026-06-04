@@ -2,7 +2,7 @@
 export const CMS_SLOT_WEBFLOW_IMAGE_ELEMENT_TYPE = "Image" as const;
 
 /** Webflow element setting key that holds conditional visibility (a binding when conditional). */
-export const CMS_SLOT_VISIBILITY_SETTING_KEY = "visibility";
+const CMS_SLOT_VISIBILITY_SETTING_KEY = "visibility";
 
 const IMAGE_SEARCH_VALUE_TYPES = ["image", "imageAsset", "cmsImage", "imageSet"] as const;
 

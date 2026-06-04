@@ -2,18 +2,6 @@ import type { GrammarAdapter, ParsedClass } from "@/features/linter/model/linter
 import type { ClassType } from "@/features/linter/model/rule.types";
 
 /**
- * Core structure class names that are global/structural in Client-First.
- * These use dashes only and are NOT custom-folder classes.
- */
-export const CF_CORE_STRUCTURE_CLASSES = new Set([
-  "page-wrapper",
-  "main-wrapper",
-  "padding-global",
-  "global-styles",
-  "spacing-clean",
-]);
-
-/**
  * All utility classes that ship with the standard Client-First template.
  * These should be excluded from duplicate-property checks since users did not
  * create them — they are premade by the template and may intentionally share
@@ -45,12 +33,7 @@ export function isPageWrapperClass(cls: string): boolean {
 }
 
 /** Client-First `container-[size]` utilities (padding-global → container chain). */
-export const CF_CONTAINER_CLASS_PREFIX = "container-" as const;
-
-/**
- * Prefixes for core structure utility systems in Client-First.
- */
-export const CF_CORE_STRUCTURE_PREFIXES = [CF_CONTAINER_CLASS_PREFIX, "padding-section-"] as const;
+const CF_CONTAINER_CLASS_PREFIX = "container-" as const;
 
 /** True if the class is a Client-First container utility (e.g. container-large). */
 export function isContainerUtilityClass(name: string): boolean {

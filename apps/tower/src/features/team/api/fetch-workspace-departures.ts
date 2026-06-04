@@ -1,6 +1,6 @@
 import type { MemberDepartureRow } from "@/features/team/model/workspace-types";
 
-export class TeamWorkspaceDeparturesApiError extends Error {
+class TeamWorkspaceDeparturesApiError extends Error {
   readonly status: number;
 
   constructor(message: string, status: number) {

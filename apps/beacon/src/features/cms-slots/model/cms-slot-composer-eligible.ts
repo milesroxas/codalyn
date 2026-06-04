@@ -34,7 +34,7 @@ export function cmsSlotHasComposerReadyEngineComponent(input: {
   return input.slotProps.slots.some((slot) => slot.exposed.length > 0);
 }
 
-export async function hasComposerReadyEngineSlot(container: BlockElement): Promise<boolean> {
+async function hasComposerReadyEngineSlot(container: BlockElement): Promise<boolean> {
   const configuredComponentIds = await readCmsSlotEngineConfiguredComponentIds(container);
   const rows = await listInstancesInSlotListContainer(container);
   const scopedRows = filterHydratedCmsSlotRowsByComponentIds(rows, configuredComponentIds ?? []);

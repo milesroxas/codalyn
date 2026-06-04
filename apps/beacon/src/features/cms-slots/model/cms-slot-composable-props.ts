@@ -143,7 +143,7 @@ function headingLevelFromOptionLabel(label: string): string | undefined {
 /**
  * Stabilize labels for “same” props when Webflow renames the label slightly (extra spaces, etc.).
  */
-export function normalizeLabelForCmsSlotPropMatch(label: string): string {
+function normalizeLabelForCmsSlotPropMatch(label: string): string {
   return label.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
@@ -305,9 +305,7 @@ export async function listComposableMetaByInstanceKey(
 /**
  * All bindable instance props (full `InstanceProp` from `searchProps`), for Engine “Expose to Composer”.
  */
-export async function listComposablePropsForInstance(
-  instance: ComponentElement
-): Promise<ComposableInstancePropMeta[]> {
+async function listComposablePropsForInstance(instance: ComponentElement): Promise<ComposableInstancePropMeta[]> {
   let rows: InstanceProp[];
   try {
     rows = await instance.searchProps();

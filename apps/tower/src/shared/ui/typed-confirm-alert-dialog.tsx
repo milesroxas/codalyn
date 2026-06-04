@@ -186,4 +186,4 @@ function DangerZoneTypedDelete({
   );
 }
 
-export { ConfirmPromptValue, confirmTextMatches, DangerZoneTypedDelete, TypedConfirmAlertDialog };
+export { DangerZoneTypedDelete, TypedConfirmAlertDialog };

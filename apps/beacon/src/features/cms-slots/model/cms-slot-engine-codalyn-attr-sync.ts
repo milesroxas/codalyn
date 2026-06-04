@@ -17,7 +17,8 @@ import { seedConditionalControllerPlaceholders } from "@/features/cms-slots/mode
 import {
   bindingPropIdFromSettingValue,
   canonicalExposedPropId,
-  nestedAliasForComponentInstance,
+  hasParentPropWiring,
+  mapNestedPropsToExposedIds,
 } from "@/features/cms-slots/model/cms-slot-nested-prop-alias";
 import {
   CMS_SLOTS_ROUTE_TASK_ENTERING_COMPONENT,
@@ -269,7 +270,7 @@ async function applyMergedCmsSlotAttrsForElement(
   }
 }
 
-async function enterNestedDefinitionIfLinked(
+async function enterNestedDefinitionIfWired(
   inst: ComponentElement,
   exposedIds: ReadonlySet<string>,
   upstreamAlias: ReadonlyMap<string, string>,
@@ -279,10 +280,16 @@ async function enterNestedDefinitionIfLinked(
   if (nestedDepth > MAX_DESIGNER_COMPONENT_NESTING) {
     return;
   }
-  const link = await nestedAliasForComponentInstance(inst, exposedIds, upstreamAlias);
-  if (link.size === 0) {
+  const props = await inst.getProps().catch(() => [] as InstancePropSummary[]);
+  // Descend whenever the instance is wired to a parent prop — not only when that prop is *currently* exposed.
+  // The wiring outlives a deselect, so a definition tagged on an earlier run still holds the orphaned segment;
+  // re-entering it is the only way to strip that tag, because the root-level strip-on-empty-merge never reaches
+  // an element behind an unlinked instance. Foreign-owned segments are still preserved by the per-element merge,
+  // so this stays multi-slot safe.
+  if (!hasParentPropWiring(props)) {
     return;
   }
+  const link = mapNestedPropsToExposedIds(props, exposedIds, upstreamAlias);
   const merged = new Map(upstreamAlias);
   for (const [k, v] of link) {
     merged.set(k, v);
@@ -337,7 +344,7 @@ async function walkTree(
         await walkTree(ch, exposedIds, nestedAlias, acc, nestedDepth);
       }
     }
-    await enterNestedDefinitionIfLinked(inst, exposedIds, nestedAlias, acc, nestedDepth);
+    await enterNestedDefinitionIfWired(inst, exposedIds, nestedAlias, acc, nestedDepth);
     return;
   }
   if (hasChildren(el)) {

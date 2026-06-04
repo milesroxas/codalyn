@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { mapNestedPropsToExposedIds } from "@/features/cms-slots/model/cms-slot-nested-prop-alias";
+import { hasParentPropWiring, mapNestedPropsToExposedIds } from "@/features/cms-slots/model/cms-slot-nested-prop-alias";
+
+describe("hasParentPropWiring", () => {
+  it("is true when an instance prop is wired to a parent prop, even one no longer exposed", () => {
+    // The wiring is independent of exposure — this is what lets cleanup re-enter a deselected definition.
+    expect(hasParentPropWiring([{ value: { sourceType: "prop", propId: "parent-title" } }])).toBe(true);
+  });
+
+  it("is false when no prop is wired to a parent prop", () => {
+    expect(hasParentPropWiring([{ value: { sourceType: "value", value: "static" } }, { value: null }])).toBe(false);
+    expect(hasParentPropWiring([])).toBe(false);
+  });
+});
 
 describe("mapNestedPropsToExposedIds", () => {
   const exposed = new Set(["parent-title", "parent-img"]);

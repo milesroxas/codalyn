@@ -40,6 +40,19 @@ function instanceForRoot(root: AnyElement): ComponentElement {
   } as unknown as ComponentElement;
 }
 
+/** A nested component instance placed in a tree: its `getProps()` wiring + the root of its own definition. */
+function nestedInstance(
+  innerRoot: AnyElement,
+  props: ReadonlyArray<{ propId: string; value: unknown }>
+): ComponentElement {
+  return {
+    type: "ComponentInstance",
+    getProps: vi.fn(async () => props),
+    getSlots: vi.fn(async () => []),
+    getComponent: vi.fn(async () => ({ getRootElement: vi.fn(async () => innerRoot) })),
+  } as unknown as ComponentElement;
+}
+
 describe("syncEngineCodalynSlotPropAttributes (re-tag after deselect)", () => {
   beforeEach(() => {
     vi.stubGlobal("webflow", {
@@ -78,5 +91,40 @@ describe("syncEngineCodalynSlotPropAttributes (re-tag after deselect)", () => {
 
     expect(result.errors).toEqual([]);
     expect((sharedImg as BoundDom).store.get(CMS_SLOT_CONTENT_ATTR)).toBe("hero-image");
+  });
+
+  it("strips a stale tag inside a nested component definition after its parent prop is deselected", async () => {
+    // Card exposes `hero-image` through a nested Image instance (instance prop `np-img` ← `hero-image`). The user
+    // deselects `hero-image` (exposed = []). The np-img→hero-image wiring still exists, so the alias is now empty
+    // and the old gating ("enter only when linked to an exposed prop") would skip the definition, orphaning the
+    // `data-cb-c="hero-image"` segment on the inner element. Cleanup must re-enter on the wiring alone.
+    const innerImg = boundDom({ [CMS_SLOT_CONTENT_ATTR]: "hero-image" }, "np-img");
+    const innerRoot = boundDom({}, null, [innerImg]);
+    const nested = nestedInstance(innerRoot, [
+      { propId: "np-img", value: { sourceType: "prop", propId: "hero-image" } },
+    ]);
+    const root = boundDom({}, null, [nested]);
+
+    const result = await syncEngineCodalynSlotPropAttributes(instanceForRoot(root), []);
+
+    expect(result.errors).toEqual([]);
+    expect((innerImg as BoundDom).store.has(CMS_SLOT_CONTENT_ATTR)).toBe(false);
+    expect(result.removed).toBe(1);
+  });
+
+  it("preserves a foreign component's segment inside a shared nested definition when this prop is deselected", async () => {
+    // Same nested Image, but it is also tagged by another CMS slot (`card-image`, foreign here). Deselecting this
+    // slot's `hero-image` must re-enter the definition, drop `hero-image`, and keep the foreign `card-image`.
+    const innerImg = boundDom({ [CMS_SLOT_CONTENT_ATTR]: "hero-image|card-image" }, "np-img");
+    const innerRoot = boundDom({}, null, [innerImg]);
+    const nested = nestedInstance(innerRoot, [
+      { propId: "np-img", value: { sourceType: "prop", propId: "hero-image" } },
+    ]);
+    const root = boundDom({}, null, [nested]);
+
+    const result = await syncEngineCodalynSlotPropAttributes(instanceForRoot(root), [], new Set(["card-image"]));
+
+    expect(result.errors).toEqual([]);
+    expect((innerImg as BoundDom).store.get(CMS_SLOT_CONTENT_ATTR)).toBe("card-image");
   });
 });

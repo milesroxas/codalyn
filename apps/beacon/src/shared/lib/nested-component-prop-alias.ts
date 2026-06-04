@@ -38,6 +38,16 @@ export function canonicalExposedPropId(
 }
 
 /**
+ * True when any of this instance's props is wired to a parent prop, regardless of whether that parent prop is
+ * currently exposed. A definition entered on an earlier tag run keeps this wiring after a prop is deselected, so
+ * cleanup must still re-enter it to strip the now-orphaned Engine segment — `mapNestedPropsToExposedIds` alone
+ * would report "not linked" and skip it. Pairs with {@link mapNestedPropsToExposedIds} for alias translation.
+ */
+export function hasParentPropWiring(props: ReadonlyArray<{ value: unknown }>): boolean {
+  return props.some((p) => bindingPropIdFromSettingValue(p.value) != null);
+}
+
+/**
  * Which nested instance props receive an exposed parent prop (directly or via an upstream nested alias).
  * Used to decide whether to `enterComponent` this instance and how to translate inner element bindings.
  */

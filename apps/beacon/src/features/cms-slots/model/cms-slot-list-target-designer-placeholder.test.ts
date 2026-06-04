@@ -6,12 +6,15 @@ import {
 } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
 
 describe("cms-slot-list-target-designer-placeholder", () => {
-  it("serializes inline placeholder styles that hide CMS JSON text", () => {
+  it("serializes inline placeholder styles that hide CMS JSON text and fill the parent", () => {
     const style = cmsSlotListTargetDesignerPlaceholderInlineStyle();
     expect(style).toContain("color:transparent");
     expect(style).toContain("font-size:0");
     expect(style).toContain("display:block");
-    expect(style).toContain("min-height:3rem");
+    expect(style).toContain("width:100%");
+    expect(style).toContain("height:100%");
+    expect(style).toContain("min-height:max(3rem, 100%)");
+    expect(style).toContain("align-self:stretch");
   });
 
   it("embeds runtime removal for every inline key", () => {

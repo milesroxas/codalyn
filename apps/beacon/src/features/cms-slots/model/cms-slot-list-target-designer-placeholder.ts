@@ -6,16 +6,38 @@ import { CMS_SLOTS_LIST_TARGET_DESIGNER_LABEL } from "@/shared/lib/cms-slots-fea
 export const CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL = CMS_SLOTS_LIST_TARGET_DESIGNER_LABEL;
 
 /**
+ * Designer-only list-target chrome tuned for legibility on light and dark section backgrounds. Shared by inline
+ * placeholder styles and the `beacon_list_render` class.
+ */
+export const CMS_SLOT_LIST_TARGET_DESIGNER_CHROME = {
+  rootBorder: "1px dashed rgba(99, 102, 241, 0.8)",
+  rootBackground: "rgba(99, 102, 241, 0.14)",
+  rootBoxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.45)",
+  rootWidth: "100%",
+  rootHeight: "100%",
+  rootMinHeight: "max(3rem, 100%)",
+  rootAlignSelf: "stretch",
+  labelColor: "#312e81",
+  labelBackground: "rgba(255, 255, 255, 0.96)",
+  labelBorder: "1px solid rgba(99, 102, 241, 0.35)",
+  labelBoxShadow: "0 1px 6px rgba(15, 23, 42, 0.18)",
+} as const;
+
+/**
  * Inline style keys applied to list-target roots in the Designer. The footer runtime removes each property in
  * {@link cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource}.
  */
 export const CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_INLINE_KEYS = [
   "box-sizing",
   "display",
+  "width",
+  "height",
   "min-height",
+  "align-self",
   "padding",
   "border",
   "background-color",
+  "box-shadow",
   "color",
   "font-size",
   "line-height",
@@ -29,10 +51,14 @@ const CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_INLINE_MAP: Record<
 > = {
   "box-sizing": "border-box",
   display: "block",
-  "min-height": "3rem",
+  width: CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootWidth,
+  height: CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootHeight,
+  "min-height": CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootMinHeight,
+  "align-self": CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootAlignSelf,
   padding: "0.75rem 1rem",
-  border: "1px dashed rgba(0, 0, 0, 0.25)",
-  "background-color": "rgba(0, 0, 0, 0.04)",
+  border: CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootBorder,
+  "background-color": CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootBackground,
+  "box-shadow": CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootBoxShadow,
   color: "transparent",
   "font-size": "0",
   "line-height": "0",

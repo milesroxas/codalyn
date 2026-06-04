@@ -1,4 +1,7 @@
-import { CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
+import {
+  CMS_SLOT_LIST_TARGET_DESIGNER_CHROME,
+  CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL,
+} from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
 import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 
 /**
@@ -17,12 +20,17 @@ export const CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME = "beacon_list_layout";
 async function applyBeaconListTargetChromeStyleProperties(style: Style): Promise<void> {
   await style.setProperties({
     "box-sizing": "border-box",
+    width: CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootWidth,
+    height: CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootHeight,
+    "min-height": CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootMinHeight,
+    "align-self": CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootAlignSelf,
     color: "transparent",
     "font-size": "0",
     "line-height": "0",
     overflow: "hidden",
-    border: "1px dashed rgba(0, 0, 0, 0.25)",
-    "background-color": "rgba(0, 0, 0, 0.04)",
+    border: CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootBorder,
+    "background-color": CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootBackground,
+    "box-shadow": CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.rootBoxShadow,
   });
   try {
     await style.setProperties(
@@ -32,9 +40,15 @@ async function applyBeaconListTargetChromeStyleProperties(style: Style): Promise
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
-        "font-size": "12px",
-        "line-height": "1.2",
-        color: "rgba(0, 0, 0, 0.45)",
+        "font-size": "11px",
+        "font-weight": "600",
+        "line-height": "1.3",
+        color: CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.labelColor,
+        "background-color": CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.labelBackground,
+        border: CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.labelBorder,
+        "border-radius": "4px",
+        padding: "3px 10px",
+        "box-shadow": CMS_SLOT_LIST_TARGET_DESIGNER_CHROME.labelBoxShadow,
         "pointer-events": "none",
         "white-space": "nowrap",
       },

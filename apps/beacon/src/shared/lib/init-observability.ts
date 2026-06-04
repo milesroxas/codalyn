@@ -33,6 +33,7 @@ export function initObservability(): void {
     posthog.register({
       app: "beacon",
       app_version: buildInfo.version,
+      release_stage: buildInfo.releaseStage,
       build_channel: buildInfo.channel,
       build_time: buildInfo.buildTime,
       bundle_recipient: buildInfo.recipient,

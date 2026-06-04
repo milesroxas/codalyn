@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
-import { admin, bearer } from "better-auth/plugins";
+import { admin, bearer, oneTimeToken } from "better-auth/plugins";
 import { adminAc, userAc } from "better-auth/plugins/admin/access";
 import {
   assertEmailMaySignUp,
@@ -221,6 +221,16 @@ export const auth = betterAuth({
   plugins: [
     nextCookies(),
     bearer(),
+    /**
+     * Single-use session handoff for the Beacon Designer extension: Beacon authenticates Tower with
+     * a cross-origin bearer token, so it mints a one-time token to bootstrap a first-party cookie
+     * session when opening Tower in a browser tab (see `/api/beacon-handoff`). Tokens are hashed at
+     * rest, single-use, and expire in one minute; they never carry the session value.
+     */
+    oneTimeToken({
+      storeToken: "hashed",
+      expiresIn: 1,
+    }),
     towerOrganization,
     admin({
       defaultRole: "user",

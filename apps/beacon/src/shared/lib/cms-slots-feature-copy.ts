@@ -321,14 +321,20 @@ export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL = "Composer props";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_OPEN_LABEL = "Open";
 
+/** First-time label: this slot has no editable fields yet. */
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL = "Make editable";
+
+/** Update label: this slot already has editable fields and the selection changed. */
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_LABEL = "Apply changes";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL = "Applying…";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE = "Make editable first?";
 
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_DISCARD_DIALOG_TITLE = "Apply changes first?";
+
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION =
-  "You picked new fields—make them editable so editors can fill them in Composer, or discard changes to restore the fields you entered with.";
+  "Apply your changes so editors can fill these fields in Composer, or discard to restore the fields you started with.";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL = "Continue editing";
 

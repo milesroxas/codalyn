@@ -3,4 +3,4 @@ export {
   type TowerSupportRequestConfig,
   type TowerSupportRequestKind,
   type TowerSupportTopicOption,
-} from "@/shared/lib/support/tower-support-request";
+} from "@codalyn/webflow-kit";

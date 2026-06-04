@@ -11,6 +11,8 @@ import {
   useCmsSlotsRouteInteractionBlocked,
 } from "@/features/cms-slots/ui/cms-slots-route-interaction-context";
 import {
+  CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_DISCARD_DIALOG_TITLE,
+  CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_LABEL,
   CMS_SLOTS_ENGINE_EXPOSE_PROPS_DESCRIPTION,
   CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL,
   CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION,
@@ -109,6 +111,8 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
   const [propsDrawerOpen, setPropsDrawerOpen] = useState(false);
   const [closeBeforeTagDialogOpen, setCloseBeforeTagDialogOpen] = useState(false);
   const [tagAttrsPending, setTagAttrsPending] = useState(false);
+  // Captured when the drawer opens: a slot that already has exposed props is being updated, not set up.
+  const [editingExistingSelection, setEditingExistingSelection] = useState(false);
   const tagAttrsPendingRef = useRef(false);
   const exposeBaselineRef = useRef<ComposableInstancePropMeta[]>([]);
   const exposedCount = slotExposed.length;
@@ -120,8 +124,16 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
 
   const openExposeDrawer = useCallback(() => {
     exposeBaselineRef.current = snapshotExposed(slotExposed);
+    setEditingExistingSelection(slotExposed.length > 0);
     setPropsDrawerOpen(true);
   }, [slotExposed]);
+
+  const applyActionLabel = editingExistingSelection
+    ? CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_LABEL
+    : CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL;
+  const discardDialogTitle = editingExistingSelection
+    ? CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_DISCARD_DIALOG_TITLE
+    : CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE;
 
   useEffect(() => {
     if (autoOpenExposeDrawerRowKey !== row.key) {
@@ -276,7 +288,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
               aria-busy={tagAttrsBusy}
               onClick={() => void applyTagAttrsAndCloseDrawer()}
             >
-              {tagAttrsBusy ? CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL : CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL}
+              {tagAttrsBusy ? CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL : applyActionLabel}
             </Button>
           </DrawerFooter>
         </DrawerContent>
@@ -292,7 +304,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE}</AlertDialogTitle>
+            <AlertDialogTitle>{discardDialogTitle}</AlertDialogTitle>
             <AlertDialogDescription>{CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -316,7 +328,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
                 void applyTagAttrsAndCloseDrawer();
               }}
             >
-              {CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL}
+              {applyActionLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

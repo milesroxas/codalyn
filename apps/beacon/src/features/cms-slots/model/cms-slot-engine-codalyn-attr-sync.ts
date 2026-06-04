@@ -4,6 +4,7 @@ import {
   contentAttrSegmentOwnedBy,
   formatContentAttrSegmentsForBindings,
   mergeContentAttrSegments,
+  removeCmsSlotTagAttrsIfPresent,
   removeOwnedCmsSlotTagAttrs,
 } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
@@ -16,7 +17,8 @@ import { seedConditionalControllerPlaceholders } from "@/features/cms-slots/mode
 import {
   bindingPropIdFromSettingValue,
   canonicalExposedPropId,
-  nestedAliasForComponentInstance,
+  hasParentPropWiring,
+  mapNestedPropsToExposedIds,
 } from "@/features/cms-slots/model/cms-slot-nested-prop-alias";
 import {
   CMS_SLOTS_ROUTE_TASK_ENTERING_COMPONENT,
@@ -32,6 +34,12 @@ import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
 export type EngineCodalynAttrSyncResult = {
   tagged: number;
   removed: number;
+  /**
+   * Distinct exposed prop ids that have at least one bound element in the definition — i.e. how many fields are
+   * actually wired up, regardless of whether their attrs changed this run. Lets callers tell "already up to date"
+   * (`matchedPropCount > 0`, nothing changed) apart from "nothing is wired" (`matchedPropCount === 0`).
+   */
+  matchedPropCount: number;
   variantsWalked: number;
   /** Conditional controller props seeded so Webflow conditional visibility includes tagged nodes at publish. */
   publishPlaceholdersSeeded: number;
@@ -245,7 +253,10 @@ async function applyMergedCmsSlotAttrsForElement(
     });
 
     if (merged.length === 0) {
-      acc.out.removed += await removeOwnedCmsSlotTagAttrs(attr, exposedIds);
+      // An empty merge means no foreign-owned segment survived and this sync added none, so nothing on this
+      // element should stay tagged. Strip every Engine tag (covers a just-deselected prop whose stale segment is
+      // no longer in `exposedIds`); ownership-scoped removal would wrongly preserve that orphaned segment.
+      acc.out.removed += await removeCmsSlotTagAttrsIfPresent(attr);
       return;
     }
     if (newSegments.length > 0) {
@@ -259,7 +270,7 @@ async function applyMergedCmsSlotAttrsForElement(
   }
 }
 
-async function enterNestedDefinitionIfLinked(
+async function enterNestedDefinitionIfWired(
   inst: ComponentElement,
   exposedIds: ReadonlySet<string>,
   upstreamAlias: ReadonlyMap<string, string>,
@@ -269,10 +280,16 @@ async function enterNestedDefinitionIfLinked(
   if (nestedDepth > MAX_DESIGNER_COMPONENT_NESTING) {
     return;
   }
-  const link = await nestedAliasForComponentInstance(inst, exposedIds, upstreamAlias);
-  if (link.size === 0) {
+  const props = await inst.getProps().catch(() => [] as InstancePropSummary[]);
+  // Descend whenever the instance is wired to a parent prop — not only when that prop is *currently* exposed.
+  // The wiring outlives a deselect, so a definition tagged on an earlier run still holds the orphaned segment;
+  // re-entering it is the only way to strip that tag, because the root-level strip-on-empty-merge never reaches
+  // an element behind an unlinked instance. Foreign-owned segments are still preserved by the per-element merge,
+  // so this stays multi-slot safe.
+  if (!hasParentPropWiring(props)) {
     return;
   }
+  const link = mapNestedPropsToExposedIds(props, exposedIds, upstreamAlias);
   const merged = new Map(upstreamAlias);
   for (const [k, v] of link) {
     merged.set(k, v);
@@ -327,7 +344,7 @@ async function walkTree(
         await walkTree(ch, exposedIds, nestedAlias, acc, nestedDepth);
       }
     }
-    await enterNestedDefinitionIfLinked(inst, exposedIds, nestedAlias, acc, nestedDepth);
+    await enterNestedDefinitionIfWired(inst, exposedIds, nestedAlias, acc, nestedDepth);
     return;
   }
   if (hasChildren(el)) {
@@ -492,6 +509,7 @@ export function syncEngineCodalynSlotPropAttributes(
     const out: EngineCodalynAttrSyncResult = {
       tagged: 0,
       removed: 0,
+      matchedPropCount: 0,
       variantsWalked: 0,
       publishPlaceholdersSeeded: 0,
       errors: [],
@@ -499,8 +517,9 @@ export function syncEngineCodalynSlotPropAttributes(
     const comp = await instance.getComponent();
     const gate: TagSyncEnteredGate = { entered: false };
     let conditionalControllerPropIds = new Set<string>();
+    let taggedPropIds = new Set<string>();
     try {
-      ({ conditionalControllerPropIds } = await enterComponentDefinitionsAndWalk(
+      ({ conditionalControllerPropIds, taggedPropIds } = await enterComponentDefinitionsAndWalk(
         instance,
         comp,
         exposed,
@@ -514,6 +533,7 @@ export function syncEngineCodalynSlotPropAttributes(
         await webflow.exitComponent().catch(() => undefined);
       }
     }
+    out.matchedPropCount = taggedPropIds.size;
     try {
       out.publishPlaceholdersSeeded = await seedConditionalControllerPlaceholders(
         instance,

@@ -321,15 +321,34 @@ export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL = "Composer props";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_OPEN_LABEL = "Open";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL = "Tag data attributes";
+/** First-time label: this slot has no editable fields yet. */
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL = "Make editable";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL = "Tagging…";
+/** Update label: this slot already has editable fields and the selection changed. */
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_LABEL = "Apply changes";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE = "Tag data attributes first?";
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL = "Applying…";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE = "Make editable first?";
+
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_DISCARD_DIALOG_TITLE = "Apply changes first?";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION =
-  "You picked new props—close after tagging so the canvas gets matching data attributes, or discard changes to restore the props you entered with.";
+  "Apply your changes so editors can fill these fields in Composer, or discard to restore the fields you started with.";
+
+/** Apply outcome — something changed on the canvas. */
+export const CMS_SLOTS_ENGINE_RESYNC_UPDATED = "Editable fields updated. Publish your site to update the live page.";
+
+/** Apply outcome — fields are wired but already matched the canvas (idempotent re-apply); not an error. */
+export const CMS_SLOTS_ENGINE_RESYNC_UP_TO_DATE = "Already up to date — these fields are editable in Composer.";
+
+/** Apply outcome — fields are selected but no element in the component is connected to them yet. */
+export const CMS_SLOTS_ENGINE_RESYNC_NOTHING_BOUND =
+  "No elements are connected to these fields yet. Inside the component, connect an element to each prop (or wire a nested instance to it), then Apply changes.";
+
+/** Apply outcome — no editable fields are selected and nothing needed changing. */
+export const CMS_SLOTS_ENGINE_RESYNC_NO_FIELDS = "No editable fields selected for this slot.";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL = "Continue editing";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL = "Discard prop changes";
+export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL = "Discard changes";

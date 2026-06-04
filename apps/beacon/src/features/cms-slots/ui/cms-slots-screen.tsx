@@ -826,7 +826,7 @@ export function CmsSlotsScreen() {
   pageRuntimeSyncReasonRef.current = pageRuntimeSyncReason;
   /**
    * True when Engine slot composition metadata changed before canvas attrs / footer script reflect it.
-   * Cleared after successful “Tag data attributes” or footer Sync.
+   * Cleared after a successful “Make editable” apply or footer Sync.
    */
   const [engineListCompositionStale, setEngineListCompositionStale] = useState(false);
 
@@ -871,8 +871,8 @@ export function CmsSlotsScreen() {
   selectedRef.current = selected;
 
   /**
-   * Serializes `data-beacon-engine-slot-props` writes so “Tag data attributes” reads the same exposed props the UI
-   * just persisted (no read-before-write race on rapid checkbox + Tag).
+   * Serializes `data-beacon-engine-slot-props` writes so “Make editable” reads the same exposed props the UI
+   * just persisted (no read-before-write race on rapid checkbox + apply).
    */
   const slotPropsWriteTailRef = useRef(Promise.resolve<void>(undefined));
   const withSlotPropsWriteExclusive = useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {

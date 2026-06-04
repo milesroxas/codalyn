@@ -164,12 +164,14 @@ export function useBeaconTowerSession(): {
     designerExchangeBlockedAfterFailure = false;
     setBeaconTowerDesignerExchangePhase("running");
     const result = await runSilentDesignerExchangeWithRetries();
-    setBeaconTowerDesignerExchangePhase("settled");
     if (result.ok) {
+      // Populate the session before leaving the "running" phase so the stale-token reaper never
+      // observes a freshly minted token without its user and clears it (logging the user back out).
       await refetch();
     } else if (isPermanentDesignerExchangeFailure(result.error)) {
       designerExchangeBlockedAfterFailure = true;
     }
+    setBeaconTowerDesignerExchangePhase("settled");
     return result;
   }, [refetch]);
 
@@ -199,11 +201,13 @@ export function useBeaconTowerSession(): {
       designerExchangeInFlight = true;
       setBeaconTowerDesignerExchangePhase("running");
       void runSilentDesignerExchangeWithRetries()
-        .then((r) => {
+        .then(async (r) => {
           if (r.ok) {
             designerExchangeBlockedAfterFailure = false;
             if (!cancelled) {
-              void refetch();
+              // Await the refetch so the phase only settles once `user` is populated; otherwise the
+              // reaper effect would clear the just-written token before the session resolves.
+              await refetch();
             }
           } else if (isPermanentDesignerExchangeFailure(r.error)) {
             designerExchangeBlockedAfterFailure = true;
@@ -250,13 +254,16 @@ export function useBeaconTowerSession(): {
   const user = toBridgedTowerUser(session);
 
   useEffect(() => {
-    if (authSessionPending || !hasStoredSessionToken || user) {
+    // Only reap a stored token once an exchange has settled: while it is "running" a fresh token is
+    // written before the session refetch completes, so "token present, no user yet" is expected and
+    // must not be treated as stale (doing so would clobber a successful sign-in).
+    if (authSessionPending || designerExchangePhase === "running" || !hasStoredSessionToken || user) {
       return;
     }
     clearBeaconTowerSessionToken();
     setSuppressDesignerSessionExchange(true);
     setBeaconTowerDesignerExchangePhase("settled");
-  }, [authSessionPending, hasStoredSessionToken, user]);
+  }, [authSessionPending, designerExchangePhase, hasStoredSessionToken, user]);
 
   const bootstrapPending =
     Boolean(towerOrigin) && !hasStoredSessionToken && !suppressDesignerExchange && designerExchangePhase !== "settled";

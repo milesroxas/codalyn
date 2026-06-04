@@ -33,6 +33,12 @@ import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
 export type EngineCodalynAttrSyncResult = {
   tagged: number;
   removed: number;
+  /**
+   * Distinct exposed prop ids that have at least one bound element in the definition — i.e. how many fields are
+   * actually wired up, regardless of whether their attrs changed this run. Lets callers tell "already up to date"
+   * (`matchedPropCount > 0`, nothing changed) apart from "nothing is wired" (`matchedPropCount === 0`).
+   */
+  matchedPropCount: number;
   variantsWalked: number;
   /** Conditional controller props seeded so Webflow conditional visibility includes tagged nodes at publish. */
   publishPlaceholdersSeeded: number;
@@ -496,6 +502,7 @@ export function syncEngineCodalynSlotPropAttributes(
     const out: EngineCodalynAttrSyncResult = {
       tagged: 0,
       removed: 0,
+      matchedPropCount: 0,
       variantsWalked: 0,
       publishPlaceholdersSeeded: 0,
       errors: [],
@@ -503,8 +510,9 @@ export function syncEngineCodalynSlotPropAttributes(
     const comp = await instance.getComponent();
     const gate: TagSyncEnteredGate = { entered: false };
     let conditionalControllerPropIds = new Set<string>();
+    let taggedPropIds = new Set<string>();
     try {
-      ({ conditionalControllerPropIds } = await enterComponentDefinitionsAndWalk(
+      ({ conditionalControllerPropIds, taggedPropIds } = await enterComponentDefinitionsAndWalk(
         instance,
         comp,
         exposed,
@@ -518,6 +526,7 @@ export function syncEngineCodalynSlotPropAttributes(
         await webflow.exitComponent().catch(() => undefined);
       }
     }
+    out.matchedPropCount = taggedPropIds.size;
     try {
       out.publishPlaceholdersSeeded = await seedConditionalControllerPlaceholders(
         instance,

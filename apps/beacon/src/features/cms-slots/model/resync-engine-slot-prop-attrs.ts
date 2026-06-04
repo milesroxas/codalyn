@@ -17,27 +17,42 @@ import {
   listInstancesInSlotListContainer,
   resolveCmsSlotEngineConfiguredComponentIds,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
+import {
+  CMS_SLOTS_ENGINE_RESYNC_NO_FIELDS,
+  CMS_SLOTS_ENGINE_RESYNC_NOTHING_BOUND,
+  CMS_SLOTS_ENGINE_RESYNC_UP_TO_DATE,
+  CMS_SLOTS_ENGINE_RESYNC_UPDATED,
+} from "@/shared/lib/cms-slots-feature-copy";
 import { formatWebflowDesignerError } from "@/shared/lib/webflow-designer-error";
 
-function notifyResyncOutcome(r: EngineCodalynAttrSyncResult, exposed: ComposableInstancePropMeta[]): void {
+export type ResyncNotice = { type: "Warning" | "Success" | "Info"; message: string };
+
+/**
+ * Decides the user-facing notice for an Apply run. Pure so the branch logic is unit-tested without the Designer.
+ *
+ * The key affordance: a run that changes nothing is **not** a failure when fields are already wired
+ * (`matchedPropCount > 0`) — it's "already up to date". The "connect your elements" guidance is reserved for the
+ * genuine case where fields are selected but nothing in the component is bound to them.
+ */
+export function resolveResyncNotice(r: EngineCodalynAttrSyncResult, exposedCount: number): ResyncNotice {
   if (r.errors.length > 0) {
-    void webflow.notify({ type: "Warning", message: r.errors[0] });
-    return;
+    return { type: "Warning", message: r.errors[0] };
   }
-  if (r.tagged === 0 && r.removed === 0 && exposed.length > 0) {
-    void webflow.notify({
-      type: "Info",
-      message:
-        "No elements were tagged. Bind elements to component props, wire nested instances to exposed parent props, then try again.",
-    });
-    return;
+  if (r.tagged > 0 || r.removed > 0) {
+    return { type: "Success", message: CMS_SLOTS_ENGINE_RESYNC_UPDATED };
   }
-  void webflow.notify({
-    type: "Success",
-    message: `Updated ${r.tagged} data attribute(s), removed ${r.removed} stale${
-      r.publishPlaceholdersSeeded > 0 ? `, seeded ${r.publishPlaceholdersSeeded} publish placeholder(s)` : ""
-    }. Publish the site for the live page.`,
-  });
+  if (r.matchedPropCount > 0) {
+    return { type: "Success", message: CMS_SLOTS_ENGINE_RESYNC_UP_TO_DATE };
+  }
+  if (exposedCount > 0) {
+    return { type: "Info", message: CMS_SLOTS_ENGINE_RESYNC_NOTHING_BOUND };
+  }
+  return { type: "Success", message: CMS_SLOTS_ENGINE_RESYNC_NO_FIELDS };
+}
+
+function notifyResyncOutcome(r: EngineCodalynAttrSyncResult, exposed: ComposableInstancePropMeta[]): void {
+  const notice = resolveResyncNotice(r, exposed.length);
+  void webflow.notify(notice);
 }
 
 function mergeScopedIntoSelected(prev: HydratedCmsSlotRow[], scoped: HydratedCmsSlotRow[]): HydratedCmsSlotRow[] {

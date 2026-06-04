@@ -336,6 +336,19 @@ export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_DISCARD_DIALOG_TITLE = "Apply c
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION =
   "Apply your changes so editors can fill these fields in Composer, or discard to restore the fields you started with.";
 
+/** Apply outcome — something changed on the canvas. */
+export const CMS_SLOTS_ENGINE_RESYNC_UPDATED = "Editable fields updated. Publish your site to update the live page.";
+
+/** Apply outcome — fields are wired but already matched the canvas (idempotent re-apply); not an error. */
+export const CMS_SLOTS_ENGINE_RESYNC_UP_TO_DATE = "Already up to date — these fields are editable in Composer.";
+
+/** Apply outcome — fields are selected but no element in the component is connected to them yet. */
+export const CMS_SLOTS_ENGINE_RESYNC_NOTHING_BOUND =
+  "No elements are connected to these fields yet. Inside the component, connect an element to each prop (or wire a nested instance to it), then Apply changes.";
+
+/** Apply outcome — no editable fields are selected and nothing needed changing. */
+export const CMS_SLOTS_ENGINE_RESYNC_NO_FIELDS = "No editable fields selected for this slot.";
+
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL = "Continue editing";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL = "Discard changes";

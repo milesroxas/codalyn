@@ -63,7 +63,7 @@ A `pre-commit` hook (simple-git-hooks + lint-staged) runs `biome check --write` 
 
 ### Webflow extension builds (flint, beacon)
 
-Each Webflow Designer Extension app shares a single interactive build CLI at `scripts/build-cli.mjs`. It typechecks, runs `vite build`, calls `webflow extension bundle`, and writes a versioned zip to `apps/<app>/bundle/<channel>/<recipient>/`.
+Each Webflow Designer Extension app shares a single interactive build CLI at `scripts/build-cli.mjs`. It typechecks, cleans `dist/`, runs `vite build`, calls `webflow extension bundle`, and moves `bundle.zip` into `apps/<app>/bundle/<channel>/<recipient>/v<version>_<recipient>_<timestamp>.zip` (upload that file to Webflow).
 
 ```bash
 pnpm app <app> build           # interactive: prompts for channel + recipient

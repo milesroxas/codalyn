@@ -1,15 +1,20 @@
 /// <reference types="vitest/config" />
-import fs from "node:fs";
-import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig, loadEnv, type Plugin } from "vite";
+import { defineConfig, loadEnv } from "vite";
+// Shared JS module (see scripts/vite-wf-designer-extension-plugin.mjs)
+// @ts-expect-error — no .mjs typings; plugin is JS-only at repo root
+import { createWebflowDesignerExtensionPlugin } from "../../scripts/vite-wf-designer-extension-plugin.mjs";
 import pkg from "./package.json";
 import { resolveBeaconTowerOriginForBuild } from "./src/shared/lib/resolve-beacon-tower-origin-for-build";
 
-const beaconRoot = __dirname;
+const beaconRoot = path.dirname(fileURLToPath(import.meta.url));
 const towerRoot = path.join(beaconRoot, "../tower");
+
+/** Vitest loads this config; skip Webflow dev plugins so the process can exit cleanly. */
+const isVitest = Boolean(process.env.VITEST);
 
 /**
  * Tower base URL baked into the bundle.
@@ -35,99 +40,22 @@ function resolveTowerOrigin(mode: string): string {
   });
 }
 
-/** CORS for `/__webflow` when the Designer is HTTPS and the dev server is http://localhost (Chrome PNA). */
-function resolveWebflowDevCorsHeaders(req: IncomingMessage): Record<string, string> {
-  const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
-  const acrh = req.headers["access-control-request-headers"] as string | string[] | undefined;
-  const allowHeaders = Array.isArray(acrh) ? acrh.join(", ") : (acrh ?? "*");
-  const headers: Record<string, string> = {
-    "Access-Control-Allow-Origin": origin ?? "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": allowHeaders,
-    "Access-Control-Allow-Private-Network": "true",
-    "Access-Control-Max-Age": "86400",
-  };
-  if (origin) {
-    headers.Vary = "Origin";
-  }
-  return headers;
-}
-
-function webflowJsonDevMiddleware(configPath: string) {
-  return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    const pathOnly = req.url?.split("?")[0]?.split("#")[0]?.replace(/\/$/, "") ?? "";
-    if (pathOnly !== "/__webflow") {
-      next();
-      return;
-    }
-    const cors = resolveWebflowDevCorsHeaders(req);
-    if (req.method === "OPTIONS") {
-      res.writeHead(204, cors);
-      res.end();
-      return;
-    }
-    if (req.method === "GET") {
-      res.writeHead(200, { ...cors, "Content-Type": "application/json" });
-      res.end(fs.readFileSync(configPath, "utf-8"));
-      return;
-    }
-    res.statusCode = 405;
-    res.end();
-  };
-}
-
-const wfDesignerExtensionPlugin = (): Plugin => {
-  let webflowHTML = "";
-  const configPath = path.join("./webflow.json");
-  const configContent = fs.readFileSync(configPath, "utf-8");
-  const webflowConfig = JSON.parse(configContent);
-
-  return {
-    name: "wf-vite-extension-plugin",
-    transformIndexHtml: {
-      order: "pre",
-      handler: async (html: string, ctx) => {
-        if (ctx.server) {
-          console.log("\x1b[36m%s\x1b[0m", "Development mode");
-          if (!webflowHTML) {
-            const { name, apiVersion } = webflowConfig;
-            const template = apiVersion === "2" ? "/template/v2" : "/template";
-            const url = `https://webflow-ext.com${template}?name=${name}`;
-            webflowHTML = await fetch(url).then((res) => res.text());
-          }
-
-          const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
-          let scripts = "";
-          let match: RegExpExecArray | null = scriptRegex.exec(webflowHTML);
-          while (match !== null) {
-            scripts += `${match[0]}\n`;
-            match = scriptRegex.exec(webflowHTML);
-          }
-
-          const finalHTML = html.replace("</head>", `${scripts}</head>`);
-          return finalHTML;
-        }
-      },
-    },
-
-    configureServer(server) {
-      server.middlewares.use(webflowJsonDevMiddleware(configPath));
-    },
-  };
-};
-
 export default defineConfig(({ mode }) => ({
   base: "./",
-  plugins: [tailwindcss(), react(), wfDesignerExtensionPlugin()],
+  plugins: [
+    tailwindcss(),
+    react(),
+    ...(isVitest ? [] : [createWebflowDesignerExtensionPlugin({ appRoot: beaconRoot })]),
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_CHANNEL__: JSON.stringify(mode),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
-    "import.meta.env.VITE_TOWER_ORIGIN": JSON.stringify(resolveTowerOrigin(mode)),
+    __BEACON_TOWER_ORIGIN__: JSON.stringify(isVitest ? "" : resolveTowerOrigin(mode)),
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(beaconRoot, "./src"),
     },
   },
   optimizeDeps: {
@@ -142,6 +70,7 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     outDir: "dist",
+    emptyOutDir: true,
     cssCodeSplit: false,
     rollupOptions: {
       output: {

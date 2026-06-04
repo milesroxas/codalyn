@@ -4,6 +4,7 @@
 declare const __APP_VERSION__: string;
 declare const __BUILD_CHANNEL__: string;
 declare const __BUILD_TIME__: string;
+declare const __BEACON_TOWER_ORIGIN__: string;
 
 interface ImportMetaEnv {
   readonly VITE_BUNDLE_RECIPIENT?: string;

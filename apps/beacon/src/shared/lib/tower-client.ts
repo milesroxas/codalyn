@@ -1,12 +1,11 @@
 import { readBeaconTowerSessionToken } from "@/features/auth/lib/webflow-designer-session";
 import { readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
 
-const towerOrigin = readBeaconTowerOrigin();
 const beaconApiKey = import.meta.env.VITE_BEACON_API_KEY ?? "";
 
 /** Base URL for Tower (e.g. `http://localhost:3100` when using Docker Compose). */
 export function getTowerOrigin(): string {
-  return towerOrigin;
+  return readBeaconTowerOrigin();
 }
 
 /**
@@ -15,7 +14,8 @@ export function getTowerOrigin(): string {
  */
 export function towerFetch(path: string, init?: RequestInit): Promise<Response> {
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  const url = towerOrigin ? `${towerOrigin}${normalized}` : normalized;
+  const origin = readBeaconTowerOrigin();
+  const url = origin ? `${origin}${normalized}` : normalized;
   const headers = new Headers(init?.headers);
   const sessionToken = readBeaconTowerSessionToken();
   if (sessionToken) {

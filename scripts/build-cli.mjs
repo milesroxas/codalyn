@@ -7,21 +7,27 @@
  * Extension bundles across apps. Handles channel selection, recipient
  * targeting, and versioned output. Invoked from app package scripts.
  *
+ * Pipeline: clean dist → tsc → vite build → webflow extension bundle → move
+ * bundle.zip into bundle/<channel>/<recipient>/v<version>_<recipient>_<timestamp>.zip
+ *
  * Usage:
  *   node scripts/build-cli.mjs --app <name> [--channel production|development]
  */
 
-import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync } from "node:fs";
+import { execSync, spawn } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as p from "@clack/prompts";
 import color from "picocolors";
+import { WEBFLOW_EXTENSION_BUNDLE_FILENAME, assertBundleOutputMatchesBuild } from "./extension-build.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, "..");
 const isNonInteractive = process.env.CI === "true" || !process.stdin.isTTY || !process.stdout.isTTY;
+
+const BEACON_PRODUCTION_TOWER_ORIGIN = "https://tower.codalyn.app";
 
 function parseArgs(argv) {
   const args = { app: null, channel: null };
@@ -144,11 +150,83 @@ async function resolveRecipientName(appPath, channelDir) {
   return newName.trim();
 }
 
-async function runBuildPipeline({ appPath, pkg, channel, recipient }) {
+function buildViteEnv({ appName, channel, recipient }) {
+  const env = { VITE_BUNDLE_RECIPIENT: recipient };
+  if (channel === "production") {
+    env.VITE_BEACON_API_KEY = "";
+    if (appName === "beacon") {
+      env.VITE_TOWER_ORIGIN = BEACON_PRODUCTION_TOWER_ORIGIN;
+      env.BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION = "";
+    }
+  }
+  return env;
+}
+
+function cleanDist(appPath) {
+  const distDir = resolve(appPath, "dist");
+  if (existsSync(distDir)) {
+    rmSync(distDir, { recursive: true, force: true });
+  }
+}
+
+function readAllDistJs(appPath) {
+  const distDir = resolve(appPath, "dist");
+  if (!existsSync(distDir)) {
+    throw new Error(`Missing ${distDir} after Vite build`);
+  }
+  const parts = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.name.endsWith(".js")) {
+        parts.push(readFileSync(full, "utf-8"));
+      }
+    }
+  };
+  walk(distDir);
+  if (parts.length === 0) {
+    throw new Error(`No JavaScript files under ${distDir}`);
+  }
+  return parts.join("\n");
+}
+
+function verifyArchivedZipContains(archivePath, markers) {
+  const needles = [markers.version, markers.recipient, markers.towerOrigin].filter(Boolean);
+  for (const needle of needles) {
+    try {
+      execSync(`zipgrep -q ${JSON.stringify(needle)} ${JSON.stringify(archivePath)}`, {
+        stdio: "ignore",
+        maxBuffer: 10 * 1024 * 1024,
+      });
+    } catch {
+      throw new Error(`Archived zip does not contain expected build marker "${needle}"`);
+    }
+  }
+}
+
+function expectedBundleMarkers({ appName, channel, recipient, pkg }) {
+  const expected = { version: pkg.version, recipient };
+  if (appName === "beacon" && channel === "production") {
+    expected.towerOrigin = BEACON_PRODUCTION_TOWER_ORIGIN;
+  }
+  return expected;
+}
+
+function verifyDistBundle(appPath, markers) {
+  assertBundleOutputMatchesBuild(readAllDistJs(appPath), markers);
+}
+
+function verifyArchivedZipBundle(archivePath, markers) {
+  verifyArchivedZipContains(archivePath, markers);
+}
+
+async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
   const channelDir = channel === "production" ? "prod" : "development";
   const viteMode = channel === "production" ? "production" : "development";
   const s = p.spinner();
-  const env = { VITE_BUNDLE_RECIPIENT: recipient };
+  const viteEnv = buildViteEnv({ appName, channel, recipient });
 
   s.start(`${progressBar(STEPS[0].pct)}  ${STEPS[0].label}…`);
   const tscResult = await run("pnpm", ["exec", "tsc", "--noEmit"], { cwd: appPath });
@@ -159,15 +237,30 @@ async function runBuildPipeline({ appPath, pkg, channel, recipient }) {
   }
 
   s.message(`${progressBar(STEPS[1].pct)}  ${STEPS[1].label}…`);
-  const viteResult = await run("pnpm", ["exec", "vite", "build", "--mode", viteMode], { cwd: appPath, env });
+  cleanDist(appPath);
+  const markers = expectedBundleMarkers({ appName, channel, recipient, pkg });
+  const viteResult = await run("pnpm", ["exec", "vite", "build", "--mode", viteMode], {
+    cwd: appPath,
+    env: viteEnv,
+  });
   if (viteResult.status !== 0) {
     s.stop(color.red("Vite build failed"));
     p.log.error(viteResult.stdout || viteResult.stderr || "Unknown error");
     process.exit(1);
   }
 
+  try {
+    verifyDistBundle(appPath, markers);
+  } catch (err) {
+    s.stop(color.red("Build output verification failed"));
+    p.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+
   s.message(`${progressBar(STEPS[2].pct)}  ${STEPS[2].label}…`);
-  const bundleResult = await run("pnpm", ["exec", "webflow", "extension", "bundle"], { cwd: appPath });
+  const bundleResult = await run("pnpm", ["exec", "webflow", "extension", "bundle", "--no-input"], {
+    cwd: appPath,
+  });
   if (bundleResult.status !== 0) {
     s.stop(color.red("Webflow bundle failed"));
     p.log.error(bundleResult.stdout || bundleResult.stderr || "Unknown error");
@@ -175,13 +268,29 @@ async function runBuildPipeline({ appPath, pkg, channel, recipient }) {
   }
 
   s.message(`${progressBar(STEPS[3].pct)}  ${STEPS[3].label}…`);
+  const uploadBundlePath = resolve(appPath, WEBFLOW_EXTENSION_BUNDLE_FILENAME);
+  if (!existsSync(uploadBundlePath)) {
+    s.stop(color.red("Webflow bundle missing"));
+    p.log.error(`Expected ${WEBFLOW_EXTENSION_BUNDLE_FILENAME} in apps/${appName}/ after webflow extension bundle`);
+    process.exit(1);
+  }
+
   const outDir = resolve(appPath, "bundle", channelDir, recipient);
-  const filename = `v${pkg.version}_${recipient}_${buildTimestamp()}.zip`;
+  const archiveFilename = `v${pkg.version}_${recipient}_${buildTimestamp()}.zip`;
+  const archivePath = resolve(outDir, archiveFilename);
   mkdirSync(outDir, { recursive: true });
-  renameSync(resolve(appPath, "bundle.zip"), resolve(outDir, filename));
+  renameSync(uploadBundlePath, archivePath);
+
+  try {
+    verifyArchivedZipBundle(archivePath, markers);
+  } catch (err) {
+    s.stop(color.red("Archived bundle verification failed"));
+    p.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
 
   s.stop(`${progressBar(100)}  ${color.green("Build complete")}`);
-  return { channelDir, filename };
+  return { channelDir, archiveFilename, archivePath };
 }
 
 async function main() {
@@ -228,14 +337,17 @@ async function main() {
     process.exit(0);
   }
 
-  const { channelDir: outChannelDir, filename } = await runBuildPipeline({
+  const { channelDir: outChannelDir, archiveFilename } = await runBuildPipeline({
     appPath,
+    appName: appArg,
     pkg,
     channel,
     recipient,
   });
 
-  p.outro(`${color.green("✓")} ${color.cyan(`apps/${appArg}/bundle/${outChannelDir}/${recipient}/${filename}`)}`);
+  p.outro(
+    `${color.green("✓")} ${color.cyan(`apps/${appArg}/bundle/${outChannelDir}/${recipient}/${archiveFilename}`)}`
+  );
 }
 
 main().catch((err) => {

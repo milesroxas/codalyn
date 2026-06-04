@@ -23,6 +23,8 @@ export type CmsSlotComposerPanelProps = {
   rowMeta: CmsSlotComposerRowMeta[];
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
   onRenameSlot: (rowKey: string, name: string) => void;
+  autoOpenEditDrawerRowKey?: string | null;
+  onAutoOpenEditDrawerConsumed?: () => void;
   /** Editor-style Composer: Save lives in the app footer; header shows Back to List only. */
   composerOnly?: boolean;
 };
@@ -44,6 +46,8 @@ export function CmsSlotComposerPanel(props: CmsSlotComposerPanelProps) {
     rowMeta,
     onChangePropValue,
     onRenameSlot,
+    autoOpenEditDrawerRowKey = null,
+    onAutoOpenEditDrawerConsumed,
     composerOnly = false,
   } = props;
 
@@ -76,6 +80,8 @@ export function CmsSlotComposerPanel(props: CmsSlotComposerPanelProps) {
         busy={busy}
         onReorder={onReorder}
         onRemove={onRemove}
+        autoOpenEditDrawerRowKey={autoOpenEditDrawerRowKey}
+        onAutoOpenEditDrawerConsumed={onAutoOpenEditDrawerConsumed}
       />
     </div>
   );

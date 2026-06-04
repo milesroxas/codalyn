@@ -34,10 +34,22 @@ type ComposerOrderSectionProps = {
   onReorder: (fromIndex: number, toIndex: number) => void;
   onRenameSlot: (rowKey: string, name: string) => void;
   onRemove: (key: string) => void;
+  autoOpenEditDrawerRowKey?: string | null;
+  onAutoOpenEditDrawerConsumed?: () => void;
 };
 
 export function ComposerOrderSection(props: ComposerOrderSectionProps) {
-  const { draft, rowMeta, onChangePropValue, busy, onReorder, onRenameSlot, onRemove } = props;
+  const {
+    draft,
+    rowMeta,
+    onChangePropValue,
+    busy,
+    onReorder,
+    onRenameSlot,
+    onRemove,
+    autoOpenEditDrawerRowKey = null,
+    onAutoOpenEditDrawerConsumed,
+  } = props;
 
   const [removeConfirmKey, setRemoveConfirmKey] = useState<string | null>(null);
   const removeConfirmRow = draft.find((row) => row.key === removeConfirmKey) ?? null;
@@ -115,6 +127,8 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
                           onChangePropValue={onChangePropValue}
                           onRenameSlot={onRenameSlot}
                           onRemove={handleRequestRemove}
+                          autoOpenEditDrawerRowKey={autoOpenEditDrawerRowKey}
+                          onAutoOpenEditDrawerConsumed={onAutoOpenEditDrawerConsumed}
                         />
                       );
                     })}

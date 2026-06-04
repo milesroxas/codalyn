@@ -15,10 +15,21 @@ export type ComposerOrderSortableRowProps = {
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
   onRenameSlot: (rowKey: string, name: string) => void;
   onRemove: (key: string) => void;
+  autoOpenEditDrawerRowKey?: string | null;
+  onAutoOpenEditDrawerConsumed?: () => void;
 };
 
 export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
-  const { row, meta, busy, onChangePropValue, onRenameSlot, onRemove } = props;
+  const {
+    row,
+    meta,
+    busy,
+    onChangePropValue,
+    onRenameSlot,
+    onRemove,
+    autoOpenEditDrawerRowKey = null,
+    onAutoOpenEditDrawerConsumed,
+  } = props;
   const exposed = meta?.exposed ?? [];
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.key,
@@ -58,6 +69,8 @@ export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
           disabled={busy}
           onRename={onRenameSlot}
           onChangePropValue={onChangePropValue}
+          requestAutoOpen={autoOpenEditDrawerRowKey === row.key}
+          onAutoOpenConsumed={onAutoOpenEditDrawerConsumed}
         />
         <Button
           type="button"

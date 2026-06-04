@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import { CMS_SLOT_ROW_NAME_MAX } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
@@ -34,6 +34,9 @@ export type ComposerSlotNameDrawerProps = {
   slotNameFieldLabel?: string;
   onRename: (rowKey: string, nextName: string) => void;
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
+  /** When true once (e.g. right after adding the row), opens this edit drawer. */
+  requestAutoOpen?: boolean;
+  onAutoOpenConsumed?: () => void;
 };
 
 function savedComposerSlotDisplayName(rawDraft: string, nameFallbackRow: string): string {
@@ -64,6 +67,8 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
     slotNameFieldLabel = "Slot name",
     onRename,
     onChangePropValue,
+    requestAutoOpen = false,
+    onAutoOpenConsumed,
   } = props;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(row.name);
@@ -79,6 +84,21 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
     flushComposerSlotDisplayName(draft, row, onRename);
     setOpen(false);
   }, [draft, onRename, renameCommit, row]);
+
+  useEffect(() => {
+    if (!requestAutoOpen || disabled) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      doneCommittedRef.current = false;
+      setDraft(row.name);
+      setOpen(true);
+      onAutoOpenConsumed?.();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [disabled, onAutoOpenConsumed, requestAutoOpen, row.name]);
 
   const handleComposerDrawerOpenChange = useCallback(
     (nextOpen: boolean) => {

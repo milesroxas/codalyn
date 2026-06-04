@@ -1478,6 +1478,7 @@ export function CmsSlotsScreen() {
     setComposerSlotProps(null);
     setComposerAllowedPalette([]);
     setComposerLeaveDialogOpen(false);
+    setAutoOpenExposeDrawerRowKey(null);
   }, []);
 
   const handleEditorNoSlotsBack = useCallback(() => {
@@ -1591,10 +1592,9 @@ export function CmsSlotsScreen() {
   }, [finishComposerLeave, handleComposerSave]);
 
   const handleComposerAddFromPalette = useCallback((c: CmsSlotPaletteEntry) => {
-    setComposerDraft((prev) => [
-      ...prev,
-      { key: crypto.randomUUID(), componentId: c.id, name: c.name, propValues: {} },
-    ]);
+    const rowKey = crypto.randomUUID();
+    setComposerDraft((prev) => [...prev, { key: rowKey, componentId: c.id, name: c.name, propValues: {} }]);
+    setAutoOpenExposeDrawerRowKey(rowKey);
   }, []);
 
   const handleComposerSetPropValue = useCallback((rowKey: string, propId: string, value: string) => {

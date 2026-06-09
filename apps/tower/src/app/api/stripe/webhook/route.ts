@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import type Stripe from "stripe";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getStripe } from "@/server/billing/stripe-client";
@@ -35,7 +36,10 @@ export async function POST(request: Request) {
   try {
     await applyStripeWebhookEvent(stripe, event);
   } catch (e) {
-    console.error("stripe webhook handler", e);
+    Sentry.captureException(e, {
+      tags: { area: "stripe-webhook" },
+      extra: { eventId: event.id, eventType: event.type },
+    });
     return Response.json({ error: "Webhook handler failed" }, { status: 500 });
   }
 

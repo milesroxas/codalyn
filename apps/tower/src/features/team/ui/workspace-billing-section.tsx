@@ -15,13 +15,20 @@ function WorkspaceBillingActions(props: { organizationId: string; billing: Works
     return null;
   }
 
+  const canOpenPortal = billing.hasStripeCustomer && (!billing.isPaid || billing.canManagePaidBilling);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        {!billing.isPaid && billing.teamCheckoutConfigured && !billing.isOverSeatCap ? (
-          <WorkspaceTeamCheckoutForm organizationId={organizationId} />
+        {!billing.isPaid && billing.teamCheckoutConfigured ? (
+          <WorkspaceTeamCheckoutForm
+            organizationId={organizationId}
+            seatFloor={billing.checkoutSeatFloor}
+            seatMax={billing.checkoutSeatMax}
+            seatPrice={billing.teamSeatPrice}
+          />
         ) : null}
-        {billing.hasStripeCustomer ? (
+        {canOpenPortal ? (
           <Button asChild variant="outline">
             <a href={`/api/billing/workspace/portal?organizationId=${encodeURIComponent(organizationId)}`}>
               Manage subscription
@@ -29,6 +36,12 @@ function WorkspaceBillingActions(props: { organizationId: string; billing: Works
           </Button>
         ) : null}
       </div>
+      {billing.isPaid && !billing.canManagePaidBilling ? (
+        <p className="text-xs text-muted-foreground">
+          Only the billing owner (the admin who started this subscription) or the workspace owner can manage the
+          subscription.
+        </p>
+      ) : null}
       {!billing.teamCheckoutConfigured && !billing.isPaid ? (
         <p className="text-xs text-muted-foreground">
           Team checkout is disabled until <code className="font-mono">STRIPE_PRICE_TEAM_SEAT</code> is configured.

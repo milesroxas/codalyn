@@ -56,6 +56,10 @@ export const formFieldVariants = cva(formFieldSharedClass, {
       default: "",
       filter: "w-36",
     },
+    stepperHidden: {
+      true: "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+      false: "",
+    },
   },
   defaultVariants: {
     fieldSize: "default",
@@ -64,6 +68,7 @@ export const formFieldVariants = cva(formFieldSharedClass, {
     mono: false,
     leadingIcon: false,
     width: "default",
+    stepperHidden: false,
   },
 });
 

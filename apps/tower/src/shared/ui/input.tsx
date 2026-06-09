@@ -16,6 +16,7 @@ function Input({
   mono,
   leadingIcon,
   width,
+  stepperHidden,
   ...props
 }: Omit<React.ComponentProps<"input">, "size"> & VariantProps<typeof formFieldVariants>) {
   return (
@@ -23,7 +24,7 @@ function Input({
       type={type}
       data-slot="input"
       className={cn(
-        formFieldVariants({ fieldSize, surface, numeric, mono, leadingIcon, width }),
+        formFieldVariants({ fieldSize, surface, numeric, mono, leadingIcon, width, stepperHidden }),
         inputSpecificClass,
         className
       )}

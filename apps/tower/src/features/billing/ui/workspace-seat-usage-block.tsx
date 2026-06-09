@@ -2,30 +2,34 @@ import {
   formatWorkspaceSeatUsageLabel,
   shouldShowWorkspaceSeatBillingBreakdown,
   type WorkspaceSeatUsage,
+  workspacePaidSeatsAvailable,
+  workspacePaidSeatsAvailableLabel,
   workspaceSeatBillingBreakdownLines,
 } from "@/shared/lib/billing/workspace-seat-usage";
+import { FormFieldHint } from "@/shared/ui/form-field";
 
 export type WorkspaceSeatUsageBlockProps = {
   usage: Pick<
     WorkspaceSeatUsage,
     "seatsUsed" | "effectiveSeatLimit" | "stripeSeatQuantity" | "operatorSeatLimitOverride"
   >;
-  className?: string;
 };
 
 /** Canonical seat usage line + optional billed vs effective breakdown. */
 export function WorkspaceSeatUsageBlock(props: WorkspaceSeatUsageBlockProps) {
-  const { usage, className } = props;
+  const { usage } = props;
   const breakdown = workspaceSeatBillingBreakdownLines(usage);
+  const paidSeatsAvailableLabel = workspacePaidSeatsAvailableLabel(workspacePaidSeatsAvailable(usage));
 
   return (
-    <div className={className ?? "space-y-1"}>
-      <p className="text-sm text-muted-foreground">{formatWorkspaceSeatUsageLabel(usage)}</p>
+    <div data-slot="workspace-seat-usage" className="space-y-1">
+      <FormFieldHint size="md">{formatWorkspaceSeatUsageLabel(usage)}</FormFieldHint>
       {shouldShowWorkspaceSeatBillingBreakdown(usage) && breakdown ? (
-        <p className="text-xs text-muted-foreground">
+        <FormFieldHint>
           {breakdown.billedLabel}; {breakdown.effectiveLabel}.
-        </p>
+        </FormFieldHint>
       ) : null}
+      {paidSeatsAvailableLabel ? <FormFieldHint>{paidSeatsAvailableLabel}</FormFieldHint> : null}
     </div>
   );
 }

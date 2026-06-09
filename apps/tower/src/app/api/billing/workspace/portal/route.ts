@@ -1,3 +1,4 @@
+import { getStripeWorkspacePortalConfigurationId } from "@/server/billing/stripe-config";
 import { requireStripeWorkspaceBillingAdmin } from "@/server/billing/workspace-billing-routes";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 
@@ -24,9 +25,11 @@ export async function GET(request: Request) {
   }
 
   const base = resolveTowerPublicBaseUrl();
+  const portalConfigurationId = getStripeWorkspacePortalConfigurationId();
   const portal = await stripe.billingPortal.sessions.create({
     customer: org.stripeCustomerId,
     return_url: `${base}/team`,
+    ...(portalConfigurationId ? { configuration: portalConfigurationId } : {}),
   });
   if (!portal.url) {
     return Response.json({ error: "No portal URL from Stripe" }, { status: 500 });

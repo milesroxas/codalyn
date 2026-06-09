@@ -509,6 +509,13 @@ export const towerDestructiveActionRateLimit = pgTable("tower_destructive_action
   attemptCount: integer("attempt_count").notNull(),
 });
 
+/** Processed Stripe webhook event ids — dedupes at-least-once delivery so handlers never re-run. */
+export const stripeWebhookEvent = pgTable("stripe_webhook_event", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+});
+
 export const userRelations = relations(user, ({ many, one }) => ({
   sessions: many(session),
   accounts: many(account),

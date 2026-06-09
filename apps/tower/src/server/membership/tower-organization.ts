@@ -5,6 +5,7 @@ import { grantEarlyAccess } from "@/server/access/early-access";
 import {
   assertOrganizationNotOverSeatCap,
   assertOrganizationSeatAvailable,
+  assertSeatCapNotExceededAfterCreate,
   resolveOrganizationInvitationLimitForOrg,
 } from "@/server/billing/organization-seat-count";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
@@ -114,7 +115,8 @@ export const towerOrganization = organization({
     beforeCreateInvitation: async ({ organization: org }) => {
       await assertOrganizationSeatAvailable(org.id, org as { seatLimit?: number | null });
     },
-    afterCreateInvitation: async ({ organization: org }) => {
+    afterCreateInvitation: async ({ invitation, organization: org }) => {
+      await assertSeatCapNotExceededAfterCreate(org.id, { kind: "invitation", id: invitation.id });
       await syncOrganizationSeatQuantityWithStripe(org.id);
     },
     beforeAcceptInvitation: async ({ invitation, user, organization: org }) => {
@@ -130,7 +132,8 @@ export const towerOrganization = organization({
       await grantEarlyAccess(user.id);
       await syncOrganizationSeatQuantityWithStripe(org.id);
     },
-    afterAddMember: async ({ user, organization: org }) => {
+    afterAddMember: async ({ member, user, organization: org }) => {
+      await assertSeatCapNotExceededAfterCreate(org.id, { kind: "member", id: member.id });
       await grantEarlyAccess(user.id);
       await syncOrganizationSeatQuantityWithStripe(org.id);
     },

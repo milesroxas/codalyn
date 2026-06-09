@@ -1,4 +1,4 @@
-import { TOWER_TEAM_DEFAULT_SEAT_MINIMUM } from "@codalyn/webflow-kit";
+import { TOWER_TEAM_DEFAULT_SEAT_MAXIMUM, TOWER_TEAM_DEFAULT_SEAT_MINIMUM } from "@codalyn/webflow-kit";
 
 /** Canonical `organization.billing_plan` value for self-serve Stripe team subscriptions. */
 export const TEAM_BILLING_PLAN = "team" as const;
@@ -28,4 +28,9 @@ export {
 /** Minimum seats billed on team checkout (and floor when syncing subscription quantity). */
 export function getTeamMinSeats(): number {
   return envInt("TOWER_TEAM_MIN_SEATS", TOWER_TEAM_DEFAULT_SEAT_MINIMUM);
+}
+
+/** Upper bound on seats a single team checkout may request — guards against fat-finger / abuse. */
+export function getTeamMaxSeats(): number {
+  return envInt("TOWER_TEAM_MAX_SEATS", TOWER_TEAM_DEFAULT_SEAT_MAXIMUM);
 }

@@ -12,6 +12,9 @@ function billingView(overrides: Partial<WorkspaceBillingView> = {}): WorkspaceBi
     effectiveSeatLimit: 1,
     seatLimit: null,
     seatsUsed: 1,
+    checkoutSeatFloor: 6,
+    checkoutSeatMax: 500,
+    teamSeatPrice: null,
     seatsRemaining: 0,
     stripeSeatQuantity: null,
     operatorSeatLimitOverride: false,
@@ -19,6 +22,7 @@ function billingView(overrides: Partial<WorkspaceBillingView> = {}): WorkspaceBi
     hasStripeCustomer: false,
     billingPlan: null,
     subscriptionStatus: null,
+    canManagePaidBilling: true,
     ...overrides,
   };
 }
@@ -38,6 +42,9 @@ describe("resolveWorkspaceSeatState", () => {
       isPaid: false,
       billingEnabled: true,
       teamCheckoutConfigured: true,
+      checkoutSeatFloor: 6,
+      checkoutSeatMax: 500,
+      teamSeatPrice: null,
     });
   });
 
@@ -56,6 +63,9 @@ describe("resolveWorkspaceSeatState", () => {
       isPaid: false,
       billingEnabled: false,
       teamCheckoutConfigured: false,
+      checkoutSeatFloor: 6,
+      checkoutSeatMax: 500,
+      teamSeatPrice: null,
     });
   });
 });

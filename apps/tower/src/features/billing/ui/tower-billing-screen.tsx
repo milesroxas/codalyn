@@ -284,7 +284,20 @@ function WorkspaceSubscriptionCardAction(props: { organizationId: string; billin
     return null;
   }
 
-  if (billing.hasStripeCustomer) {
+  // Unpaid (including a canceled, over-cap workspace) re-subscribes inline; re-subscribing purchases
+  // enough seats to clear the over-cap state, so it must not be gated on `isOverSeatCap`.
+  if (!billing.isPaid && billing.teamCheckoutConfigured) {
+    return (
+      <WorkspaceTeamCheckoutForm
+        organizationId={organizationId}
+        seatFloor={billing.checkoutSeatFloor}
+        seatMax={billing.checkoutSeatMax}
+        seatPrice={billing.teamSeatPrice}
+      />
+    );
+  }
+
+  if (billing.hasStripeCustomer && billing.canManagePaidBilling) {
     return (
       <Button asChild variant="outline">
         <a href={`/api/billing/workspace/portal?organizationId=${encodeURIComponent(organizationId)}`}>
@@ -293,10 +306,6 @@ function WorkspaceSubscriptionCardAction(props: { organizationId: string; billin
         </a>
       </Button>
     );
-  }
-
-  if (!billing.isPaid && billing.teamCheckoutConfigured && !billing.isOverSeatCap) {
-    return <WorkspaceTeamCheckoutForm organizationId={organizationId} />;
   }
 
   return null;

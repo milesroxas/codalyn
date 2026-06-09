@@ -35,6 +35,29 @@ export function formatWorkspaceSeatUsageLabel(
   return `${usage.seatsUsed} of ${usage.effectiveSeatLimit} ${seatWord} used`;
 }
 
+/**
+ * Purchased Stripe seats not currently occupied — the admin is billed for these empty seats. Seat sync
+ * is grow-only, so vacated seats keep billing until the admin reduces quantity in the Stripe Customer
+ * Portal. Returns 0 for operator-granted caps (not Stripe-billed) and when no paid quantity is known.
+ */
+export function workspacePaidSeatsAvailable(
+  usage: Pick<WorkspaceSeatUsage, "seatsUsed" | "stripeSeatQuantity" | "operatorSeatLimitOverride">
+): number {
+  if (usage.operatorSeatLimitOverride || usage.stripeSeatQuantity == null) {
+    return 0;
+  }
+  return Math.max(0, usage.stripeSeatQuantity - usage.seatsUsed);
+}
+
+/** Copy nudging the admin to release empty paid seats, or null when none are unused. */
+export function workspacePaidSeatsAvailableLabel(seatsAvailable: number): string | null {
+  if (seatsAvailable <= 0) {
+    return null;
+  }
+  const seatWord = seatsAvailable === 1 ? "seat" : "seats";
+  return `${seatsAvailable} paid ${seatWord} available — reduce seats in the billing portal to stop paying for empty seats.`;
+}
+
 /** When billed Stripe quantity differs from the effective cap (operator grant or transitional sync). */
 export function shouldShowWorkspaceSeatBillingBreakdown(
   usage: Pick<WorkspaceSeatUsage, "operatorSeatLimitOverride" | "stripeSeatQuantity" | "effectiveSeatLimit">

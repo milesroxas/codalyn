@@ -1,5 +1,7 @@
+import { TOWER_TEAM_DEFAULT_SEAT_MAXIMUM, TOWER_TEAM_DEFAULT_SEAT_MINIMUM } from "@codalyn/webflow-kit";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import { buildOrganizationSeatSnapshot } from "@/shared/lib/billing/organization-seat-cap";
+import type { TeamSeatPrice } from "@/shared/lib/billing/team-seat-price";
 
 export type WorkspaceSeatState = {
   isAtSeatCap: boolean;
@@ -8,6 +10,12 @@ export type WorkspaceSeatState = {
   isPaid: boolean;
   billingEnabled: boolean;
   teamCheckoutConfigured: boolean;
+  /** Minimum seats a Team checkout must purchase for this workspace. */
+  checkoutSeatFloor: number;
+  /** Upper bound on seats a single Team checkout may request. */
+  checkoutSeatMax: number;
+  /** Per-seat price for the checkout cost preview, or null when unavailable. */
+  teamSeatPrice: TeamSeatPrice | null;
 };
 
 export function resolveWorkspaceSeatState(input: {
@@ -25,6 +33,9 @@ export function resolveWorkspaceSeatState(input: {
       isPaid: workspaceBilling.isPaid,
       billingEnabled: workspaceBilling.billingEnabled,
       teamCheckoutConfigured: workspaceBilling.teamCheckoutConfigured,
+      checkoutSeatFloor: workspaceBilling.checkoutSeatFloor,
+      checkoutSeatMax: workspaceBilling.checkoutSeatMax,
+      teamSeatPrice: workspaceBilling.teamSeatPrice,
     };
   }
   const snapshot = buildOrganizationSeatSnapshot(membersCount + pendingInviteCount, {
@@ -37,6 +48,9 @@ export function resolveWorkspaceSeatState(input: {
     isPaid: false,
     billingEnabled: false,
     teamCheckoutConfigured: false,
+    checkoutSeatFloor: TOWER_TEAM_DEFAULT_SEAT_MINIMUM,
+    checkoutSeatMax: TOWER_TEAM_DEFAULT_SEAT_MAXIMUM,
+    teamSeatPrice: null,
   };
 }
 

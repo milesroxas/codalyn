@@ -1,6 +1,7 @@
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
+import { MarketingPageScroll } from "@/shared/ui/marketing-page-scroll";
 import { TowerPublicFooter } from "@/shared/ui/tower-public-footer";
 import { TowerPublicHeader, TowerPublicHeaderSpacer } from "@/shared/ui/tower-public-header";
 
@@ -12,7 +13,10 @@ type MarketingProductHeroProps = {
 
 function MarketingProductHero({ title, description, className }: MarketingProductHeroProps) {
   return (
-    <header data-slot="marketing-product-hero" className={cn("flex flex-col gap-4 pb-8", className)}>
+    <header
+      data-slot="marketing-product-hero"
+      className={cn("tl-marketing-enter flex flex-col gap-4 pb-8 [--tl-enter-delay:40ms]", className)}
+    >
       <h1 className="text-5xl font-semibold tracking-tight text-neutral-50">{title}</h1>
       <p className="max-w-4xl text-[32px] font-light leading-10 text-neutral-400">{description}</p>
     </header>
@@ -52,17 +56,22 @@ function MarketingPageShell({
         towerHref={towerHref}
       />
       <TowerPublicHeaderSpacer />
-      <main className="mx-auto flex w-full max-w-[90rem] flex-col gap-20 px-6 py-16 sm:px-12 lg:gap-28 lg:px-20 lg:py-24">
-        {children}
-      </main>
-      <TowerPublicFooter variant="marketing" />
+      <MarketingPageScroll>
+        <main className="mx-auto flex w-full max-w-[90rem] flex-col gap-20 px-6 py-16 sm:px-12 lg:gap-28 lg:px-20 lg:py-24">
+          {children}
+        </main>
+        <TowerPublicFooter variant="marketing" />
+      </MarketingPageScroll>
     </div>
   );
 }
 
 function MarketingFeatureList({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div data-slot="marketing-feature-list" className={cn("flex flex-col gap-16 lg:gap-20", className)}>
+    <div
+      data-slot="marketing-feature-list"
+      className={cn("tl-marketing-stagger flex flex-col gap-16 lg:gap-20", className)}
+    >
       {children}
     </div>
   );

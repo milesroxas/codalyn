@@ -5,12 +5,14 @@ import { towerCorsHeadersFor } from "@/server/tower-cors";
 import {
   buildTowerAppUrl,
   isAppHost,
+  isFlintMarketingHost,
   isHostSplitEnabled,
   isMarketingHost,
   normalizeHostname,
   sanitizeRelativePath,
 } from "@/server/tower-hosts";
 import { TOWER_AUTH_SURFACE_PATHS } from "@/shared/lib/navigation/tower-auth-surfaces";
+import { isTowerMarketingPublicPath } from "@/shared/lib/navigation/tower-marketing-paths";
 
 function needsCors(pathname: string): boolean {
   return (
@@ -25,12 +27,24 @@ function needsCors(pathname: string): boolean {
 const PUBLIC_PREFIXES = [
   "/",
   ...TOWER_AUTH_SURFACE_PATHS,
+  "/terms",
+  "/privacy",
   "/integrations/webflow/success",
   "/integrations/webflow/error",
   "/integrations/beacon-popup-done",
 ] as const;
 
-function isPublicPath(pathname: string): boolean {
+const FLINT_MARKETING_PUBLIC_PATHS = ["/", "/flint", "/terms", "/privacy"] as const;
+
+function isFlintMarketingPublicPath(pathname: string, hostname: string): boolean {
+  return isFlintMarketingHost(hostname) && FLINT_MARKETING_PUBLIC_PATHS.some((path) => pathname === path);
+}
+
+function isUnifiedMarketingProductPath(pathname: string): boolean {
+  return !isHostSplitEnabled() && (pathname === "/tower" || pathname === "/beacon" || pathname === "/flint");
+}
+
+function matchesPublicPrefix(pathname: string): boolean {
   for (const prefix of PUBLIC_PREFIXES) {
     if (prefix === "/") {
       if (pathname === "/") {
@@ -45,8 +59,31 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
+function isPublicPath(pathname: string, hostname: string): boolean {
+  if (isFlintMarketingPublicPath(pathname, hostname)) {
+    return true;
+  }
+  if (isMarketingHost(hostname) && isTowerMarketingPublicPath(pathname)) {
+    return true;
+  }
+  if (isUnifiedMarketingProductPath(pathname)) {
+    return true;
+  }
+  return matchesPublicPrefix(pathname);
+}
+
 function shouldSkipSessionGate(pathname: string): boolean {
   return pathname.startsWith("/_next") || pathname === "/favicon.ico" || pathname.startsWith("/api/");
+}
+
+function applyFlintMarketingHostRouting(request: NextRequest, pathname: string): NextResponse | null {
+  if (pathname === "/") {
+    return NextResponse.rewrite(new URL("/flint", request.url));
+  }
+  if (pathname === "/flint" || pathname === "/terms" || pathname === "/privacy") {
+    return null;
+  }
+  return NextResponse.redirect(buildTowerAppUrl(pathname, request.nextUrl.search));
 }
 
 function applyHostSplitRouting(request: NextRequest, pathname: string): NextResponse | null {
@@ -57,11 +94,15 @@ function applyHostSplitRouting(request: NextRequest, pathname: string): NextResp
   const hostname = normalizeHostname(request.headers.get("host") ?? request.nextUrl.hostname);
   const sessionCookie = getSessionCookie(request);
 
+  if (isFlintMarketingHost(hostname)) {
+    return applyFlintMarketingHostRouting(request, pathname);
+  }
+
   if (isMarketingHost(hostname)) {
-    if (pathname !== "/") {
+    if (!isTowerMarketingPublicPath(pathname)) {
       return NextResponse.redirect(buildTowerAppUrl(pathname, request.nextUrl.search));
     }
-    if (sessionCookie) {
+    if (pathname === "/" && sessionCookie) {
       return NextResponse.redirect(buildTowerAppUrl("/auth/continue", request.nextUrl.search));
     }
     return null;
@@ -103,7 +144,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!isPublicPath(pathname)) {
+  const hostname = normalizeHostname(request.headers.get("host") ?? request.nextUrl.hostname);
+
+  if (!isPublicPath(pathname, hostname)) {
     const sessionCookie = getSessionCookie(request);
     if (!sessionCookie) {
       const url = request.nextUrl.clone();

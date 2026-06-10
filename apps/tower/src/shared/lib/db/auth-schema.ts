@@ -382,6 +382,27 @@ export const earlyAccessRequest = pgTable(
   (table) => [index("early_access_request_status_idx").on(table.status)]
 );
 
+/** Inbound Flint marketing beta group signups from the public landing page. */
+export const flintBetaGroupRequest = pgTable(
+  "flint_beta_group_request",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull().unique(),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    /** `pending` · `resolved` · `dismissed` */
+    status: text("status").notNull().default("pending"),
+    operatorNote: text("operator_note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at"),
+    resolvedByUserId: text("resolved_by_user_id").references(() => user.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    index("flint_beta_group_request_status_idx").on(table.status),
+    index("flint_beta_group_request_created_at_idx").on(table.createdAt),
+  ]
+);
+
 /** Monthly Vercel-side usage for metering (Beacon API + proxy); resets by calendar month. */
 export const towerUsageMonth = pgTable(
   "tower_usage_month",

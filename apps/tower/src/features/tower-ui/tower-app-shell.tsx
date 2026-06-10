@@ -4,9 +4,11 @@ import { usePathname } from "next/navigation";
 import type * as React from "react";
 import { authClient } from "@/features/auth/model/auth-client";
 import { TowerAppSidebar } from "@/features/tower-ui/tower-app-sidebar";
+import type { TowerLandingAppLinks } from "@/features/tower-ui/tower-landing";
 import { TowerLoggedOutHeader } from "@/features/tower-ui/tower-logged-out-header";
 import { TowerSiteHeader } from "@/features/tower-ui/tower-site-header";
 import { isTowerAuthSurfacePath } from "@/shared/lib/navigation/tower-auth-surfaces";
+import { isTowerMarketingSelfContainedPath } from "@/shared/lib/navigation/tower-marketing-paths";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import { SidebarInset, SidebarProvider } from "@/shared/ui/sidebar";
 
@@ -23,6 +25,7 @@ type TowerAppShellProps = {
   usageBanner?: React.ReactNode;
   emailVerificationBanner?: React.ReactNode;
   workspaceOnboarding?: React.ReactNode;
+  publicHeaderLinks?: Pick<TowerLandingAppLinks, "beacon" | "flint" | "signIn" | "tower">;
   children: React.ReactNode;
 };
 
@@ -74,6 +77,7 @@ export function TowerAppShell({
   usageBanner,
   emailVerificationBanner,
   workspaceOnboarding,
+  publicHeaderLinks,
   children,
 }: TowerAppShellProps) {
   const pathname = usePathname();
@@ -85,14 +89,14 @@ export function TowerAppShell({
     return children;
   }
 
-  if (!authenticated && (pathname === "/" || pathname === "")) {
+  if (isTowerMarketingSelfContainedPath(pathname)) {
     return children;
   }
 
   if (!authenticated) {
     return (
       <div className="flex min-h-dvh flex-col">
-        <TowerLoggedOutHeader />
+        <TowerLoggedOutHeader publicHeaderLinks={publicHeaderLinks} />
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>
     );

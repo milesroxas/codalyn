@@ -207,6 +207,30 @@ export const operatorApi = {
       method: "PATCH",
       body: JSON.stringify({ operatorNote }),
     }),
+  listFlintBetaGroupRequests: async (
+    status: "pending" | "resolved" | "dismissed" | "all" = "pending"
+  ): Promise<{
+    rows: Array<{
+      id: string;
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+      status: "pending" | "resolved" | "dismissed";
+      operatorNote: string | null;
+      createdAt: string;
+      resolvedAt: string | null;
+      resolvedByUserId: string | null;
+    }>;
+  }> => requestJson(`/api/operator/flint-beta-group-requests?status=${encodeURIComponent(status)}`),
+  resolveFlintBetaGroupRequest: async (
+    id: string,
+    action: "resolve" | "dismiss",
+    operatorNote?: string | null
+  ): Promise<{ ok: true }> =>
+    requestJson(`/api/operator/flint-beta-group-requests/${encodeURIComponent(id)}`, {
+      method: "POST",
+      body: JSON.stringify({ action, operatorNote: operatorNote ?? null }),
+    }),
   listWorkspaces: async (query: OperatorWorkspaceListQuery = {}): Promise<OperatorWorkspaceListResponse> =>
     requestJson<OperatorWorkspaceListResponse>(`/api/operator/workspaces${toSearchParams(query)}`),
   getWorkspace: async (orgId: string): Promise<OperatorWorkspaceDetail> =>

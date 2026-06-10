@@ -58,6 +58,7 @@ export type OperatorMetrics = {
     pendingInvitations: number;
     pendingEarlyAccessRequests: number;
     pendingSupportRequests: number;
+    pendingFlintBetaGroupRequests: number;
     webflowConnected: number;
   };
   activity: {

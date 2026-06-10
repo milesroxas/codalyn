@@ -39,7 +39,7 @@ export function TowerLandingEntrance({ children, main }: { children: React.React
   }, []);
 
   return (
-    <div className="relative min-h-dvh w-full min-w-0">
+    <div className="relative h-dvh w-full min-w-0 overflow-hidden">
       <div
         aria-hidden
         className={cn("tl-landing-veil fixed inset-0 z-20 bg-background", veilDone && "tl-landing-veil--skip")}

@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gt, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { countPendingEarlyAccessRequests } from "@/server/access/early-access-request";
+import { countPendingFlintBetaGroupRequests } from "@/server/marketing/flint-beta-group-request";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorMetrics } from "@/server/operator/types";
 import { countPendingSupportRequests } from "@/server/support/support-request";
@@ -48,6 +49,7 @@ export async function GET(): Promise<NextResponse<OperatorMetrics | { error: str
     [{ total: workspaces30 = 0 } = { total: 0 }],
     pendingEarlyAccessRequests,
     pendingSupportRequests,
+    pendingFlintBetaGroupRequests,
     recentUsers,
     recentWorkspacesRaw,
   ] = await Promise.all([
@@ -64,6 +66,7 @@ export async function GET(): Promise<NextResponse<OperatorMetrics | { error: str
     db.select({ total: count() }).from(organization).where(gt(organization.createdAt, days30)),
     countPendingEarlyAccessRequests(),
     countPendingSupportRequests(),
+    countPendingFlintBetaGroupRequests(),
     db
       .select({
         id: user.id,
@@ -101,6 +104,7 @@ export async function GET(): Promise<NextResponse<OperatorMetrics | { error: str
       pendingInvitations: Number(totalInvitations),
       pendingEarlyAccessRequests: Number(pendingEarlyAccessRequests),
       pendingSupportRequests: Number(pendingSupportRequests),
+      pendingFlintBetaGroupRequests: Number(pendingFlintBetaGroupRequests),
       webflowConnected: Number(totalWebflowConnected),
     },
     activity: {

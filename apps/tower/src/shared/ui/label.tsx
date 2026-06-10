@@ -14,9 +14,14 @@ const labelVariants = cva(
         default: "text-sm",
         sm: "text-xs",
       },
+      tone: {
+        default: "",
+        marketing: "text-neutral-300",
+      },
     },
     defaultVariants: {
       size: "default",
+      tone: "default",
     },
   }
 );
@@ -24,9 +29,10 @@ const labelVariants = cva(
 function Label({
   className,
   size,
+  tone,
   ...props
 }: React.ComponentProps<typeof LabelPrimitive.Root> & VariantProps<typeof labelVariants>) {
-  return <LabelPrimitive.Root data-slot="label" className={cn(labelVariants({ size }), className)} {...props} />;
+  return <LabelPrimitive.Root data-slot="label" className={cn(labelVariants({ size, tone }), className)} {...props} />;
 }
 
 export { Label };

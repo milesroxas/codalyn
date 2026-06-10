@@ -19,6 +19,8 @@ const formFieldDisabledClass =
 export const formFieldSurfaceClass = {
   default: "bg-transparent dark:bg-input/30",
   elevated: "bg-background/80 shadow-xs dark:bg-input/40",
+  marketing:
+    "border-white/15 bg-white/5 text-neutral-50 placeholder:text-neutral-500 focus-visible:border-white/30 focus-visible:ring-white/15",
 } as const;
 
 export const formFieldSharedClass = cn(
@@ -39,6 +41,7 @@ export const formFieldVariants = cva(formFieldSharedClass, {
     surface: {
       default: formFieldSurfaceClass.default,
       elevated: formFieldSurfaceClass.elevated,
+      marketing: formFieldSurfaceClass.marketing,
     },
     numeric: {
       true: "tabular-nums",

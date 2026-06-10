@@ -7,6 +7,7 @@ import { TowerWorkspaceOnboardingShell } from "@/features/tower-ui/tower-workspa
 import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
+import { buildTowerLandingAppLinks, normalizeHostname } from "@/server/tower-hosts";
 import { getTowerSessionOnboardingContext } from "@/server/tower-onboarding-context";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,9 @@ export default async function TowerLayout({ children }: { children: React.ReactN
     userId && session?.user && !session.user.emailVerified ? <TowerEmailVerificationBanner /> : null;
   const workspaceOnboarding = userId ? <TowerWorkspaceOnboardingShell /> : null;
 
+  const host = normalizeHostname(requestHeaders.get("host") ?? "");
+  const publicHeaderLinks = buildTowerLandingAppLinks(host);
+
   return (
     <TowerAppShell
       billingEnabled={billingEnabled}
@@ -32,6 +36,7 @@ export default async function TowerLayout({ children }: { children: React.ReactN
       usageBanner={usageBanner}
       emailVerificationBanner={emailVerificationBanner}
       workspaceOnboarding={workspaceOnboarding}
+      publicHeaderLinks={publicHeaderLinks}
     >
       {children}
     </TowerAppShell>

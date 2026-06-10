@@ -7,6 +7,7 @@ import {
   IconBuilding,
   IconCircleCheck,
   IconExternalLink,
+  IconFlame,
   IconKey,
   IconLifebuoy,
   IconRefresh,
@@ -184,6 +185,13 @@ function SecondaryStatTiles({ totals, nf }: { totals: OperatorMetrics["totals"];
         caption="Review under Access requests"
         icon={IconKey}
         tone={totals.pendingEarlyAccessRequests > 0 ? "warn" : "default"}
+      />
+      <StatTile
+        label="Flint requests"
+        value={nf.format(totals.pendingFlintBetaGroupRequests)}
+        caption="Review under Flint requests"
+        icon={IconFlame}
+        tone={totals.pendingFlintBetaGroupRequests > 0 ? "warn" : "default"}
       />
       <StatTile
         label="Support requests"

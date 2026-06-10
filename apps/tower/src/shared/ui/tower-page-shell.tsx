@@ -17,6 +17,16 @@ function towerAppShellContentClassName(width: TowerAppShellContentWidth = "defau
   return cn("mx-auto w-full px-4 sm:px-6", towerAppShellContentWidths[width], className);
 }
 
+/** Main inset for logged-out pages below `TowerLoggedOutHeader`. */
+function towerLoggedOutMainClassName(className?: string) {
+  return cn("flex min-h-0 flex-1 flex-col px-4 pt-6 pb-8 lg:px-6 md:pt-8 md:pb-10", className);
+}
+
+/** Extra top inset for legal pages rendered inside authenticated app chrome. */
+function towerAuthenticatedLegalInsetClassName(className?: string) {
+  return cn("pt-4 md:pt-6", className);
+}
+
 function towerPageMainClassName(width: TowerAppShellContentWidth = "full", className?: string) {
   const maxWidth = towerAppShellContentWidths[width];
   return cn("w-full", maxWidth ? cn("mx-auto", maxWidth) : null, className);
@@ -115,5 +125,7 @@ export {
   TowerPageMain,
   TowerPageSection,
   towerAppShellContentClassName,
+  towerAuthenticatedLegalInsetClassName,
+  towerLoggedOutMainClassName,
   towerPageMainClassName,
 };

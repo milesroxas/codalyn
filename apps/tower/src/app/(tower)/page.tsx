@@ -9,18 +9,24 @@ import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { getTowerDashboardSummary } from "@/server/dashboard-summary";
+import { createMarketingPageMetadata } from "@/server/marketing/marketing-seo";
 import { buildTowerLandingAppLinks, isMarketingHost, normalizeHostname } from "@/server/tower-hosts";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
+
+export const dynamic = "force-dynamic";
+
+export const metadata = createMarketingPageMetadata("home");
 
 export default async function HomePage() {
   const host = normalizeHostname((await headers()).get("host") ?? "");
   const earlyAccessRequired = isTowerEarlyAccessGateEnabled();
+  const appLinks = buildTowerLandingAppLinks(host);
 
   if (isMarketingHost(host)) {
     return (
       <>
         <TowerLandingAuthSync serverSignedIn={false} />
-        <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={buildTowerLandingAppLinks()} />
+        <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={appLinks} />
       </>
     );
   }
@@ -38,7 +44,7 @@ export default async function HomePage() {
       return (
         <>
           <TowerLandingAuthSync serverSignedIn={false} />
-          <TowerLanding earlyAccessRequired={earlyAccessRequired} />
+          <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={appLinks} />
         </>
       );
     }
@@ -52,7 +58,7 @@ export default async function HomePage() {
   return (
     <>
       <TowerLandingAuthSync serverSignedIn={false} />
-      <TowerLanding earlyAccessRequired={earlyAccessRequired} />
+      <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={appLinks} />
     </>
   );
 }

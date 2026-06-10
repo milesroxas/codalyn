@@ -1,10 +1,11 @@
 import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
 import { towerPlanName } from "@codalyn/webflow-kit";
-import { IconBuilding, IconExternalLink, IconUser } from "@tabler/icons-react";
+import { IconBuilding, IconUser } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
 import { UsageBreakdownSection } from "@/features/billing/ui/usage-breakdown-section";
 import { WorkspaceSeatUsageBlock } from "@/features/billing/ui/workspace-seat-usage-block";
+import { WorkspaceManageSubscriptionButton } from "@/features/team/ui/workspace-manage-subscription-button";
 import { WorkspaceTeamCheckoutForm } from "@/features/team/ui/workspace-team-checkout-form";
 import type { TowerEntitlement } from "@/server/billing/entitlements";
 import type { IndividualPaidPlan } from "@/server/billing/stripe-subscription-status";
@@ -217,10 +218,11 @@ function NoActiveWorkspaceBillingCard() {
 }
 
 function ActiveWorkspaceBillingDetails(props: {
+  organizationId: string;
   usageStatus: TowerUsageStatusSnapshot;
   workspaceBilling: WorkspaceBillingView | null;
 }) {
-  const { usageStatus, workspaceBilling } = props;
+  const { organizationId, usageStatus, workspaceBilling } = props;
   const limitsDetail = usageLimitsKindDetailLine(usageStatus.limitsKind, usageStatus.tier);
   const limitsBadge = usageLimitsKindBadgeLabel(usageStatus.limitsKind, usageStatus.tier);
   const workspacePlanLabel = workspaceBilling?.isPaid ? "Team" : "Free";
@@ -263,6 +265,21 @@ function ActiveWorkspaceBillingDetails(props: {
         meters={usageStatus.meters}
       />
 
+      {workspaceBilling?.billingEnabled &&
+      workspaceBilling.canManageBilling &&
+      !workspaceBilling.isPaid &&
+      workspaceBilling.teamCheckoutConfigured ? (
+        <>
+          <Separator />
+          <WorkspaceTeamCheckoutForm
+            organizationId={organizationId}
+            seatFloor={workspaceBilling.checkoutSeatFloor}
+            seatMax={workspaceBilling.checkoutSeatMax}
+            seatPrice={workspaceBilling.teamSeatPrice}
+          />
+        </>
+      ) : null}
+
       {workspaceBilling?.isOverSeatCap ? (
         <p className="text-sm text-destructive">
           Over seat limit ({workspaceBilling.seatsUsed}/{workspaceBilling.effectiveSeatLimit}). Open Team billing to
@@ -273,6 +290,17 @@ function ActiveWorkspaceBillingDetails(props: {
       {workspaceBilling && !workspaceBilling.canManageBilling && workspaceBilling.billingEnabled ? (
         <p className="text-sm text-muted-foreground">Only workspace admins can change Team billing and seats.</p>
       ) : null}
+
+      {workspaceBilling?.billingEnabled &&
+      workspaceBilling.canManageBilling &&
+      !workspaceBilling.isPaid &&
+      workspaceBilling.hasStripeCustomer &&
+      workspaceBilling.canManagePaidBilling ? (
+        <p className="text-xs text-muted-foreground">
+          Need invoices or a past subscription? Open the{" "}
+          <WorkspaceManageSubscriptionButton organizationId={organizationId} variant="link" />.
+        </p>
+      ) : null}
     </CardContent>
   );
 }
@@ -280,35 +308,17 @@ function ActiveWorkspaceBillingDetails(props: {
 function WorkspaceSubscriptionCardAction(props: { organizationId: string; billing: WorkspaceBillingView | null }) {
   const { organizationId, billing } = props;
 
-  if (!billing?.billingEnabled || !billing.canManageBilling) {
+  if (
+    !billing?.billingEnabled ||
+    !billing.canManageBilling ||
+    !billing.isPaid ||
+    !billing.hasStripeCustomer ||
+    !billing.canManagePaidBilling
+  ) {
     return null;
   }
 
-  // Unpaid (including a canceled, over-cap workspace) re-subscribes inline; re-subscribing purchases
-  // enough seats to clear the over-cap state, so it must not be gated on `isOverSeatCap`.
-  if (!billing.isPaid && billing.teamCheckoutConfigured) {
-    return (
-      <WorkspaceTeamCheckoutForm
-        organizationId={organizationId}
-        seatFloor={billing.checkoutSeatFloor}
-        seatMax={billing.checkoutSeatMax}
-        seatPrice={billing.teamSeatPrice}
-      />
-    );
-  }
-
-  if (billing.hasStripeCustomer && billing.canManagePaidBilling) {
-    return (
-      <Button asChild variant="outline">
-        <a href={`/api/billing/workspace/portal?organizationId=${encodeURIComponent(organizationId)}`}>
-          Manage subscription
-          <IconExternalLink aria-hidden data-icon="inline-end" stroke={1.75} />
-        </a>
-      </Button>
-    );
-  }
-
-  return null;
+  return <WorkspaceManageSubscriptionButton organizationId={organizationId} />;
 }
 
 function ActiveWorkspaceBillingCard(props: {
@@ -329,8 +339,9 @@ function ActiveWorkspaceBillingCard(props: {
   const showWorkspaceAction =
     workspaceBilling?.billingEnabled &&
     workspaceBilling.canManageBilling &&
-    (workspaceBilling.hasStripeCustomer ||
-      (!workspaceBilling.isPaid && workspaceBilling.teamCheckoutConfigured && !workspaceBilling.isOverSeatCap));
+    workspaceBilling.isPaid &&
+    workspaceBilling.hasStripeCustomer &&
+    workspaceBilling.canManagePaidBilling;
 
   return (
     <Card>
@@ -343,7 +354,11 @@ function ActiveWorkspaceBillingCard(props: {
           </CardAction>
         ) : null}
       </CardHeader>
-      <ActiveWorkspaceBillingDetails usageStatus={usageStatus} workspaceBilling={workspaceBilling} />
+      <ActiveWorkspaceBillingDetails
+        organizationId={activeOrganizationId}
+        usageStatus={usageStatus}
+        workspaceBilling={workspaceBilling}
+      />
     </Card>
   );
 }

@@ -50,7 +50,7 @@ export function QuantityField(props: QuantityFieldProps) {
     <ButtonGroup layout="quantity">
       <Button
         type="button"
-        variant="outline"
+        variant="secondary"
         size="icon-sm"
         disabled={disabled || effective <= min}
         aria-label="Decrease quantity"
@@ -79,7 +79,7 @@ export function QuantityField(props: QuantityFieldProps) {
       />
       <Button
         type="button"
-        variant="outline"
+        variant="secondary"
         size="icon-sm"
         disabled={disabled || effective >= max}
         aria-label="Increase quantity"

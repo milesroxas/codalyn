@@ -4,7 +4,7 @@ import { cn } from "@/shared/lib/utils";
 
 export function AuthPageFrame({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("relative h-dvh overflow-hidden", className)}>
+    <div className={cn("relative min-h-0 flex-1 overflow-hidden", className)}>
       <AuthPageBackdrop />
       {children}
     </div>

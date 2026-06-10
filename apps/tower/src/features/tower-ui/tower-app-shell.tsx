@@ -85,21 +85,21 @@ export function TowerAppShell({
 
   const authenticated = isPending ? signedIn : Boolean(session?.user);
 
-  if (isTowerAuthSurfacePath(pathname)) {
-    return children;
-  }
-
   if (isTowerMarketingSelfContainedPath(pathname)) {
     return children;
   }
 
   if (!authenticated) {
     return (
-      <div className="flex min-h-dvh flex-col">
+      <div className="relative flex min-h-dvh flex-col bg-background">
         <TowerLoggedOutHeader publicHeaderLinks={publicHeaderLinks} />
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>
     );
+  }
+
+  if (isTowerAuthSurfacePath(pathname)) {
+    return children;
   }
 
   return (

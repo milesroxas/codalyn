@@ -4,7 +4,8 @@ import { useState } from "react";
 import { formatTeamSeatCostPreview, type TeamSeatPrice } from "@/shared/lib/billing/team-seat-price";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
-import { FormField, FormFieldHint, FormFieldInset, FormSubmitRow } from "@/shared/ui/form-field";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { FormField, FormFieldHint, FormFieldInset } from "@/shared/ui/form-field";
 import { Label } from "@/shared/ui/label";
 import { QuantityField } from "@/shared/ui/quantity-field";
 
@@ -58,15 +59,17 @@ function TeamCheckoutSeatField(props: {
   );
 }
 
-export function WorkspaceTeamCheckoutForm(props: {
+type WorkspaceTeamCheckoutFormProps = {
   organizationId: string;
   seatFloor: number;
   seatMax: number;
   seatPrice: TeamSeatPrice | null;
-  /** `inset` groups the upgrade flow; `centered` is for empty-state cards without extra chrome. */
-  presentation?: "inset" | "centered";
-}) {
-  const { organizationId, seatFloor, seatMax, seatPrice, presentation = "inset" } = props;
+  /** `dialog` is the seat configuration form inside the subscribe dialog. */
+  layout?: "dialog" | "centered";
+};
+
+export function WorkspaceTeamCheckoutForm(props: WorkspaceTeamCheckoutFormProps) {
+  const { organizationId, seatFloor, seatMax, seatPrice, layout = "centered" } = props;
   const { max, seatsInput, setSeatsInput, billedSeats } = useTeamCheckoutSeats(seatFloor, seatMax);
   const costPreview = formatTeamSeatCostPreview(seatPrice, billedSeats);
 
@@ -81,36 +84,69 @@ export function WorkspaceTeamCheckoutForm(props: {
   );
 
   const submitButton = (
-    <div className="w-full shrink-0 @[28rem]/form-inset:w-auto">
-      <Button type="submit" width="full">
-        Continue to checkout
-      </Button>
-    </div>
+    <Button type="submit" width={layout === "dialog" ? undefined : "full"}>
+      Continue to checkout
+    </Button>
   );
 
+  if (layout === "dialog") {
+    return (
+      <form action={WORKSPACE_CHECKOUT_ACTION} method="post" className="space-y-4">
+        <input type="hidden" name="organizationId" value={organizationId} />
+        {seatField}
+        <DialogFooter>{submitButton}</DialogFooter>
+      </form>
+    );
+  }
+
   return (
-    <form
-      action={WORKSPACE_CHECKOUT_ACTION}
-      method="post"
-      className={cn(presentation === "centered" && "w-full max-w-xs")}
-    >
+    <form action={WORKSPACE_CHECKOUT_ACTION} method="post" className={cn("w-full max-w-xs")}>
       <input type="hidden" name="organizationId" value={organizationId} />
-      {presentation === "inset" ? (
-        <FormFieldInset>
-          <div className="grid gap-4 @[28rem]/form-inset:grid-cols-[minmax(0,1fr)_auto] @[28rem]/form-inset:items-end @[28rem]/form-inset:gap-6">
-            <TeamCheckoutIntro />
-            <FormSubmitRow className="w-full min-w-0 @[28rem]/form-inset:min-w-[17.5rem]">
-              {seatField}
-              {submitButton}
-            </FormSubmitRow>
-          </div>
-        </FormFieldInset>
-      ) : (
-        <div className="space-y-4">
-          {seatField}
-          {submitButton}
-        </div>
-      )}
+      <div className="space-y-4">
+        {seatField}
+        {submitButton}
+      </div>
     </form>
+  );
+}
+
+export function WorkspaceTeamSubscribeUpsell(props: {
+  organizationId: string;
+  seatFloor: number;
+  seatMax: number;
+  seatPrice: TeamSeatPrice | null;
+}) {
+  const { organizationId, seatFloor, seatMax, seatPrice } = props;
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <FormFieldInset>
+        <div className="flex items-center justify-between gap-6">
+          <TeamCheckoutIntro />
+          <Button type="button" onClick={() => setOpen(true)}>
+            Subscribe
+          </Button>
+        </div>
+      </FormFieldInset>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent size="form">
+          <DialogHeader>
+            <DialogTitle>Subscribe to Team</DialogTitle>
+            <DialogDescription>
+              Choose how many seats to bill. You can invite teammates after checkout.
+            </DialogDescription>
+          </DialogHeader>
+          <WorkspaceTeamCheckoutForm
+            organizationId={organizationId}
+            seatFloor={seatFloor}
+            seatMax={seatMax}
+            seatPrice={seatPrice}
+            layout="dialog"
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

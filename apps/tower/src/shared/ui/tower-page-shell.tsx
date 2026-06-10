@@ -1,6 +1,7 @@
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
+import { Badge } from "@/shared/ui/badge";
 
 const towerAppShellContentWidths = {
   full: "",
@@ -63,10 +64,10 @@ function TowerCurrentWorkspaceMeta({ name, className }: { name: string | null | 
   }
 
   return (
-    <p className={cn("max-w-full text-sm", className)}>
-      <span className="text-muted-foreground">Current workspace:</span>{" "}
-      <span className="font-semibold text-foreground">{name}</span>
-    </p>
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      <span className="text-xs font-medium text-muted-foreground">Current workspace:</span>
+      <Badge variant="secondary">{name}</Badge>
+    </div>
   );
 }
 

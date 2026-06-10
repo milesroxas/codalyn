@@ -2,19 +2,20 @@ import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
 import { towerPlanName } from "@codalyn/webflow-kit";
 import { IconBuilding, IconUser } from "@tabler/icons-react";
 import type { ReactNode } from "react";
+import { BillingPlanHero, BillingPlanHeroRow } from "@/features/billing/ui/billing-plan-hero";
+import { BillingPlanOption, BillingPlanOptionsList } from "@/features/billing/ui/billing-plan-option";
 import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
 import { UsageBreakdownSection } from "@/features/billing/ui/usage-breakdown-section";
 import { WorkspaceSeatUsageBlock } from "@/features/billing/ui/workspace-seat-usage-block";
 import { WorkspaceManageSubscriptionButton } from "@/features/team/ui/workspace-manage-subscription-button";
-import { WorkspaceTeamCheckoutForm } from "@/features/team/ui/workspace-team-checkout-form";
+import { WorkspaceTeamSubscribeUpsell } from "@/features/team/ui/workspace-team-checkout-form";
 import type { TowerEntitlement } from "@/server/billing/entitlements";
 import type { IndividualPaidPlan } from "@/server/billing/stripe-subscription-status";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import type { WorkspaceUsageContributor } from "@/server/billing/workspace-usage-contributors";
 import { usageLimitsKindBadgeLabel, usageLimitsKindDetailLine, usagePlanBadgeLabel } from "@/shared/lib/usage-display";
-import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Separator } from "@/shared/ui/separator";
 import {
   TowerCurrentWorkspaceMeta,
@@ -54,10 +55,6 @@ function formatSubscriptionStatus(status: string | null | undefined): string | n
   return status.replaceAll("_", " ");
 }
 
-function billingPlanTone(plan: string): "default" | "positive" {
-  return plan === "Free" || plan === "Not selected" ? "default" : "positive";
-}
-
 function BillingCardTitle(props: { icon: ReactNode; title: string }) {
   const { icon, title } = props;
   return (
@@ -66,22 +63,6 @@ function BillingCardTitle(props: { icon: ReactNode; title: string }) {
         {icon}
       </span>
       <CardTitle>{title}</CardTitle>
-    </div>
-  );
-}
-
-function BillingPlanHero(props: { plan: string; caption: string }) {
-  const { plan, caption } = props;
-  const tone = billingPlanTone(plan);
-
-  return (
-    <div className="space-y-1">
-      <p
-        className={cn("text-xl font-semibold tracking-tight", tone === "positive" ? "text-primary" : "text-foreground")}
-      >
-        {plan}
-      </p>
-      <p className="text-sm leading-relaxed text-muted-foreground">{caption}</p>
     </div>
   );
 }
@@ -110,15 +91,18 @@ function IndividualPlanCheckoutButton(props: { plan: IndividualPaidPlan; variant
     <form action="/api/billing/checkout" method="post">
       <input type="hidden" name="plan" value={plan} />
       <Button type="submit" variant={variant}>
-        Subscribe to {towerPlanName(plan)}
+        Subscribe
       </Button>
     </form>
   );
 }
 
+const INDIVIDUAL_UPGRADE_CAPTION =
+  "Higher limits on workspaces you own, plus the ability to create additional workspaces.";
+
 function individualPlanCaption(planLabel: string, hasIndividualPlan: boolean, teamWorkspaceActive: boolean): string {
   if (!hasIndividualPlan) {
-    return "Higher limits on workspaces you own, plus the ability to create additional workspaces.";
+    return INDIVIDUAL_UPGRADE_CAPTION;
   }
   if (teamWorkspaceActive) {
     return "Active on this account. Team workspace limits take precedence while that workspace is selected.";
@@ -126,27 +110,37 @@ function individualPlanCaption(planLabel: string, hasIndividualPlan: boolean, te
   return `${planLabel} limits apply on workspaces you own.`;
 }
 
-function IndividualSubscriptionActions(props: {
-  showUpgrade: boolean;
-  checkoutAvailable: boolean;
-  studioCheckoutAvailable: boolean;
-  showIndividualPortal: boolean;
-}) {
-  const { showUpgrade, checkoutAvailable, studioCheckoutAvailable, showIndividualPortal } = props;
-  if (!(showUpgrade || showIndividualPortal)) {
+function IndividualSubscriptionActions(props: { showIndividualPortal: boolean }) {
+  const { showIndividualPortal } = props;
+  if (!showIndividualPortal) {
     return null;
   }
   return (
     <CardAction align="center" group>
-      {showUpgrade && checkoutAvailable ? <IndividualPlanCheckoutButton plan="pro" /> : null}
-      {showUpgrade && studioCheckoutAvailable ? <IndividualPlanCheckoutButton plan="studio" variant="outline" /> : null}
-      {showIndividualPortal ? (
-        <Button asChild variant="outline">
-          <a href="/api/billing/portal">Manage subscription</a>
-        </Button>
-      ) : null}
+      <Button asChild variant="outline">
+        <a href="/api/billing/portal">Manage subscription</a>
+      </Button>
     </CardAction>
   );
+}
+
+function individualUpgradePlans(
+  individualPlan: IndividualPaidPlan | null,
+  checkoutAvailable: boolean,
+  studioCheckoutAvailable: boolean
+): IndividualPaidPlan[] {
+  if (individualPlan === "studio") {
+    return [];
+  }
+
+  const plans: IndividualPaidPlan[] = [];
+  if (individualPlan === null && checkoutAvailable) {
+    plans.push("pro");
+  }
+  if (studioCheckoutAvailable) {
+    plans.push("studio");
+  }
+  return plans;
 }
 
 function IndividualSubscriptionCard(props: {
@@ -167,34 +161,31 @@ function IndividualSubscriptionCard(props: {
   } = props;
 
   const hasIndividualPlan = individualPlan !== null;
-  const planLabel = individualPlan ? towerPlanName(individualPlan) : "Free";
+  const currentPlanLabel = individualPlan ? towerPlanName(individualPlan) : "Free";
   const statusLine = hasIndividualPlan ? formatSubscriptionStatus(individualSubscriptionStatus) : null;
-  const showUpgrade = !hasIndividualPlan && (checkoutAvailable || studioCheckoutAvailable);
-  const metadata: BillingMetadataItem[] = statusLine ? [{ label: "Subscription status", value: statusLine }] : [];
+  const currentCaption = individualPlanCaption(currentPlanLabel, hasIndividualPlan, teamWorkspaceActive);
+  const currentCaptionWithStatus = statusLine ? `${currentCaption} Status: ${statusLine}.` : currentCaption;
+  const upgradePlans = individualUpgradePlans(individualPlan, checkoutAvailable, studioCheckoutAvailable);
 
   return (
     <Card>
       <CardHeader>
         <BillingCardTitle icon={<IconUser className="size-4" />} title="Individual subscription" />
-        <CardDescription>Personal Pro or Studio billing on your Codalyn account.</CardDescription>
-        <IndividualSubscriptionActions
-          showUpgrade={showUpgrade}
-          checkoutAvailable={checkoutAvailable}
-          studioCheckoutAvailable={studioCheckoutAvailable}
-          showIndividualPortal={showIndividualPortal}
-        />
+        <IndividualSubscriptionActions showIndividualPortal={showIndividualPortal} />
       </CardHeader>
-      <CardContent className="space-y-4">
-        <BillingPlanHero
-          plan={planLabel}
-          caption={individualPlanCaption(planLabel, hasIndividualPlan, teamWorkspaceActive)}
-        />
-        {metadata.length > 0 ? (
-          <>
-            <Separator />
-            <BillingMetadataGrid items={metadata} />
-          </>
-        ) : null}
+      <CardContent>
+        <BillingPlanOptionsList>
+          <BillingPlanOption plan={currentPlanLabel} caption={currentCaptionWithStatus} state="current" />
+          {upgradePlans.map((plan) => (
+            <BillingPlanOption
+              key={plan}
+              plan={towerPlanName(plan)}
+              caption={INDIVIDUAL_UPGRADE_CAPTION}
+              state="upgrade"
+              action={<IndividualPlanCheckoutButton plan={plan} variant={plan === "studio" ? "outline" : "default"} />}
+            />
+          ))}
+        </BillingPlanOptionsList>
       </CardContent>
     </Card>
   );
@@ -205,7 +196,6 @@ function NoActiveWorkspaceBillingCard() {
     <Card>
       <CardHeader>
         <BillingCardTitle icon={<IconBuilding className="size-4" />} title="Workspace subscription" />
-        <CardDescription>Team billing and seats for the workspace selected in the header.</CardDescription>
       </CardHeader>
       <CardContent>
         <BillingPlanHero
@@ -219,27 +209,31 @@ function NoActiveWorkspaceBillingCard() {
 
 function ActiveWorkspaceBillingDetails(props: {
   organizationId: string;
+  activeOrganizationName: string | null;
   usageStatus: TowerUsageStatusSnapshot;
   workspaceBilling: WorkspaceBillingView | null;
 }) {
-  const { organizationId, usageStatus, workspaceBilling } = props;
+  const { organizationId, activeOrganizationName, usageStatus, workspaceBilling } = props;
   const limitsDetail = usageLimitsKindDetailLine(usageStatus.limitsKind, usageStatus.tier);
   const limitsBadge = usageLimitsKindBadgeLabel(usageStatus.limitsKind, usageStatus.tier);
   const workspacePlanLabel = workspaceBilling?.isPaid ? "Team" : "Free";
   const workspacePlanCaption = workspaceBilling?.isPaid
     ? "Paid Team billing covers seats and Team usage limits for this workspace."
-    : "Free workspace. Add Team billing for seats and Team limits.";
+    : "Add Team billing for seats and Team limits.";
   const subscriptionStatus = workspaceBilling?.subscriptionStatus
     ? formatSubscriptionStatus(workspaceBilling.subscriptionStatus)
     : null;
 
-  const metadata: BillingMetadataItem[] = [
-    ...(subscriptionStatus ? [{ label: "Subscription status", value: subscriptionStatus }] : []),
-  ];
+  const metadata: BillingMetadataItem[] =
+    workspaceBilling?.isPaid && subscriptionStatus ? [{ label: "Subscription status", value: subscriptionStatus }] : [];
 
   return (
     <CardContent className="space-y-4">
-      <BillingPlanHero plan={workspacePlanLabel} caption={workspacePlanCaption} />
+      <BillingPlanHeroRow
+        plan={workspacePlanLabel}
+        caption={workspacePlanCaption}
+        trailing={<TowerCurrentWorkspaceMeta name={activeOrganizationName} />}
+      />
 
       {metadata.length > 0 ? (
         <>
@@ -271,7 +265,7 @@ function ActiveWorkspaceBillingDetails(props: {
       workspaceBilling.teamCheckoutConfigured ? (
         <>
           <Separator />
-          <WorkspaceTeamCheckoutForm
+          <WorkspaceTeamSubscribeUpsell
             organizationId={organizationId}
             seatFloor={workspaceBilling.checkoutSeatFloor}
             seatMax={workspaceBilling.checkoutSeatMax}
@@ -333,9 +327,6 @@ function ActiveWorkspaceBillingCard(props: {
     return <NoActiveWorkspaceBillingCard />;
   }
 
-  const workspaceDescription = activeOrganizationName
-    ? `Team billing and seats for ${activeOrganizationName}.`
-    : "Team billing and seats for your selected workspace.";
   const showWorkspaceAction =
     workspaceBilling?.billingEnabled &&
     workspaceBilling.canManageBilling &&
@@ -347,7 +338,6 @@ function ActiveWorkspaceBillingCard(props: {
     <Card>
       <CardHeader>
         <BillingCardTitle icon={<IconBuilding className="size-4" />} title="Workspace subscription" />
-        <CardDescription>{workspaceDescription}</CardDescription>
         {showWorkspaceAction ? (
           <CardAction align="center" group>
             <WorkspaceSubscriptionCardAction organizationId={activeOrganizationId} billing={workspaceBilling} />
@@ -356,6 +346,7 @@ function ActiveWorkspaceBillingCard(props: {
       </CardHeader>
       <ActiveWorkspaceBillingDetails
         organizationId={activeOrganizationId}
+        activeOrganizationName={activeOrganizationName}
         usageStatus={usageStatus}
         workspaceBilling={workspaceBilling}
       />
@@ -386,7 +377,6 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
       <TowerPageHeader
         title="Billing & usage"
         description="Personal Pro and workspace Team billing are billed separately. Usage follows your active workspace."
-        context={<TowerCurrentWorkspaceMeta name={activeOrganizationName} />}
         meta={
           email ? (
             <span>

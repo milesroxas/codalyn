@@ -1,7 +1,7 @@
 import { IconCreditCard } from "@tabler/icons-react";
 import { WorkspaceSeatUsageBlock } from "@/features/billing/ui/workspace-seat-usage-block";
 import { WorkspaceManageSubscriptionButton } from "@/features/team/ui/workspace-manage-subscription-button";
-import { WorkspaceTeamCheckoutForm } from "@/features/team/ui/workspace-team-checkout-form";
+import { WorkspaceTeamSubscribeUpsell } from "@/features/team/ui/workspace-team-checkout-form";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import { cn } from "@/shared/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -61,7 +61,7 @@ function WorkspaceBillingActions(props: { organizationId: string; billing: Works
     <div className="space-y-4">
       {showPaidPortal ? <WorkspaceManageSubscriptionButton organizationId={organizationId} /> : null}
       {showCheckout ? (
-        <WorkspaceTeamCheckoutForm
+        <WorkspaceTeamSubscribeUpsell
           organizationId={organizationId}
           seatFloor={billing.checkoutSeatFloor}
           seatMax={billing.checkoutSeatMax}

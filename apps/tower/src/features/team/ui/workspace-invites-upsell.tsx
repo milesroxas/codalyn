@@ -34,7 +34,6 @@ export function WorkspaceInvitesUpsellState(props: {
               seatFloor={seatFloor}
               seatMax={seatMax}
               seatPrice={seatPrice}
-              presentation="centered"
             />
           ) : (
             <p className="text-xs text-muted-foreground">Ask a workspace admin to subscribe.</p>

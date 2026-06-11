@@ -9,9 +9,9 @@ const tileVariants = cva("min-w-0 border", {
   variants: {
     variant: {
       cmsUpload:
-        "relative flex min-h-[6.75rem] w-full flex-col rounded-xl border-border/80 bg-card text-left shadow-sm outline-none transition-[border-color,background-color,opacity] hover:border-border hover:bg-muted/25 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
+        "relative flex min-h-[6.75rem] w-full cursor-pointer flex-col rounded-xl border-border/80 bg-card text-left shadow-sm outline-none transition-[border-color,background-color,opacity] hover:border-border hover:bg-muted/25 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed",
       presetListInteractive:
-        "relative flex min-h-[6.75rem] w-full flex-col items-start justify-end gap-0.5 rounded-xl border-border/80 bg-card p-3.5 text-left shadow-sm outline-none transition-[border-color,background-color,opacity] hover:border-border hover:bg-muted/25 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
+        "relative flex min-h-[6.75rem] w-full cursor-pointer flex-col items-start justify-end gap-0.5 rounded-xl border-border/80 bg-card p-3.5 text-left shadow-sm outline-none transition-[border-color,background-color,opacity] hover:border-border hover:bg-muted/25 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed",
       presetListReadonly:
         "relative flex min-h-[6.75rem] w-full flex-col items-start justify-end gap-0.5 rounded-xl border-border/80 bg-card p-3.5 text-left text-muted-foreground shadow-sm",
     },

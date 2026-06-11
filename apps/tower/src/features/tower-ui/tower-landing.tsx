@@ -12,6 +12,7 @@ import {
 } from "@/shared/ui/tower-public-header";
 
 export type TowerLandingAppLinks = {
+  home?: string;
   signIn: string;
   signUp: string;
   requestAccess: string;
@@ -22,6 +23,7 @@ export type TowerLandingAppLinks = {
 
 export function TowerLanding(props: { earlyAccessRequired?: boolean; appLinks?: TowerLandingAppLinks }) {
   const { earlyAccessRequired = false, appLinks } = props;
+  const homeHref = appLinks?.home ?? "/";
   const signInHref = appLinks?.signIn ?? "/sign-in";
   const signUpHref = appLinks?.signUp ?? "/sign-up";
   const requestAccessHref = appLinks?.requestAccess ?? "/request-access";
@@ -36,6 +38,7 @@ export function TowerLanding(props: { earlyAccessRequired?: boolean; appLinks?: 
       main={
         <>
           <TowerPublicHeader
+            homeHref={homeHref}
             beaconHref={beaconHref}
             flintHref={flintHref}
             signInHref={signInHref}

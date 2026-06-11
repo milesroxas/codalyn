@@ -265,6 +265,20 @@ export const webflowOauthAuthorizeState = pgTable("webflow_oauth_authorize_state
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+/**
+ * Short-lived authorization `code` from Webflow-initiated OAuth (dashboard Install / marketplace install URL).
+ * Tower-initiated OAuth binds `state` before redirect; Webflow-initiated flows may omit `state` per OAuth docs.
+ * @see https://developers.webflow.com/data/v2.0.0/reference/oauth-app
+ */
+export const webflowOauthInstallCode = pgTable("webflow_oauth_install_code", {
+  id: text("id").primaryKey(),
+  authorizationCode: text("authorization_code").notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  /** Optional `state` echoed by Webflow when the install URL included one. */
+  externalState: text("external_state"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const member = pgTable(
   "member",
   {

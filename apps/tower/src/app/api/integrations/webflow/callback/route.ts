@@ -2,16 +2,27 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
+import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
+import {
+  buildWebflowOAuthFinishSignInUrl,
+  completeWebflowOAuthForOrganization,
+  resolveWebflowOAuthCallbackKind,
+  stageWebflowInitiatedInstallFromCallback,
+} from "@/server/webflow-oauth-completion";
 import {
   resolveWebflowOAuthAppUrl,
   resolveWebflowOAuthRedirectUri,
+  WEBFLOW_OAUTH_FINISH_PATH,
+  WEBFLOW_OAUTH_INSTALL_PENDING_COOKIE,
   WEBFLOW_OAUTH_ORG_COOKIE,
   WEBFLOW_OAUTH_STATE_COOKIE,
+  webflowOAuthInstallPendingCookieOptions,
 } from "@/server/webflow-oauth-config";
 import { exchangeWebflowAuthorizationCode, type WebflowOAuthTokenResponse } from "@/server/webflow-oauth-exchange";
+import { persistOrganizationWebflowOAuthToken } from "@/server/webflow-oauth-persist";
 import { db } from "@/shared/lib/db";
-import { organizationWebflowOAuthToken, webflowOauthAuthorizeState } from "@/shared/lib/db/auth-schema";
+import { webflowOauthAuthorizeState } from "@/shared/lib/db/auth-schema";
 import { towerConnectionPathWithStatus } from "@/shared/lib/navigation/tower-app-paths";
 
 type CookieStore = Awaited<ReturnType<typeof cookies>>;
@@ -29,50 +40,24 @@ function oauthErrorRedirect(
   return NextResponse.redirect(`${appUrl}/integrations/webflow/error?${q.toString()}`);
 }
 
+function oauthSuccessRedirect(appUrl: string, { popup }: { popup: boolean }): NextResponse {
+  if (popup) {
+    return NextResponse.redirect(`${appUrl}/integrations/webflow/success?popup=1`);
+  }
+  return NextResponse.redirect(`${appUrl}${towerConnectionPathWithStatus("connected")}`);
+}
+
 function clearWebflowOauthCookies(cookieStore: CookieStore): void {
   cookieStore.delete(WEBFLOW_OAUTH_STATE_COOKIE);
   cookieStore.delete(WEBFLOW_OAUTH_ORG_COOKIE);
 }
-
-/**
- * Persists Webflow OAuth access (and optional refresh) token server-side on the workspace (`organizationId`) only.
- * Matches the Data Client flow: exchange `code` for tokens, store in your app DB — never ship the access token to the client.
- * @see https://developers.webflow.com/apps/docs/data-clients/build-a-data-client#oauth-authentication
- */
-async function persistOrganizationWebflowOAuthToken(organizationId: string, tokenResponse: WebflowOAuthTokenResponse) {
-  const expiresIn = tokenResponse.expires_in;
-  const expiresAt =
-    typeof expiresIn === "number" && Number.isFinite(expiresIn) ? new Date(Date.now() + expiresIn * 1000) : null;
-
-  await db
-    .insert(organizationWebflowOAuthToken)
-    .values({
-      organizationId,
-      accessToken: tokenResponse.access_token,
-      refreshToken: tokenResponse.refresh_token ?? null,
-      expiresAt,
-      scope: tokenResponse.scope ?? null,
-    })
-    .onConflictDoUpdate({
-      target: organizationWebflowOAuthToken.organizationId,
-      set: {
-        accessToken: tokenResponse.access_token,
-        refreshToken: tokenResponse.refresh_token ?? null,
-        expiresAt,
-        scope: tokenResponse.scope ?? null,
-        updatedAt: new Date(),
-      },
-    });
-}
-
-type ResolvedOrg = { organizationId: string } | { error: NextResponse };
 
 async function resolveOrganizationFromCookieFlow(
   request: Request,
   cookieStore: CookieStore,
   appUrl: string,
   isPopupFlow: boolean
-): Promise<ResolvedOrg> {
+): Promise<{ organizationId: string } | { error: NextResponse }> {
   cookieStore.delete(WEBFLOW_OAUTH_STATE_COOKIE);
   const orgFromCookie = cookieStore.get(WEBFLOW_OAUTH_ORG_COOKIE)?.value?.trim();
   cookieStore.delete(WEBFLOW_OAUTH_ORG_COOKIE);
@@ -93,7 +78,7 @@ async function resolveOrganizationFromDbStateFlow(
   state: string,
   appUrl: string,
   isPopupFlow: boolean
-): Promise<ResolvedOrg> {
+): Promise<{ organizationId: string } | { error: NextResponse }> {
   const rows = await db
     .select({
       userId: webflowOauthAuthorizeState.userId,
@@ -117,6 +102,64 @@ async function resolveOrganizationFromDbStateFlow(
   return { organizationId: row.organizationId };
 }
 
+async function tryCompleteWebflowInitiatedInstallInSession(
+  request: Request,
+  authorizationCode: string,
+  redirectUri: string,
+  appUrl: string,
+  isPopupFlow: boolean
+): Promise<NextResponse | null> {
+  const session = await auth.api.getSession({ headers: request.headers });
+  const sessionUserId = session?.user?.id;
+  if (!sessionUserId) {
+    return null;
+  }
+
+  const activeOrganizationId = await getActiveOrganizationIdForAuthHeaders(request.headers);
+  if (!activeOrganizationId) {
+    return null;
+  }
+
+  const admin = await isTowerTeamAdminMemberOfOrg(sessionUserId, activeOrganizationId);
+  if (!admin) {
+    return null;
+  }
+
+  const result = await completeWebflowOAuthForOrganization({
+    organizationId: activeOrganizationId,
+    authorizationCode,
+    redirectUri,
+  });
+  if (!result.ok) {
+    return oauthErrorRedirect(appUrl, { error: result.error }, { popup: isPopupFlow });
+  }
+
+  return oauthSuccessRedirect(appUrl, { popup: isPopupFlow });
+}
+
+async function redirectToFinishStagedWebflowInstall(input: {
+  authorizationCode: string;
+  redirectUri: string;
+  externalState: string | null;
+  appUrl: string;
+  cookieStore: CookieStore;
+  request: Request;
+}): Promise<NextResponse> {
+  const pendingId = await stageWebflowInitiatedInstallFromCallback({
+    authorizationCode: input.authorizationCode,
+    redirectUri: input.redirectUri,
+    externalState: input.externalState,
+  });
+  input.cookieStore.set(WEBFLOW_OAUTH_INSTALL_PENDING_COOKIE, pendingId, webflowOAuthInstallPendingCookieOptions);
+
+  const session = await auth.api.getSession({ headers: input.request.headers });
+  if (session?.user?.id) {
+    return NextResponse.redirect(`${input.appUrl}${WEBFLOW_OAUTH_FINISH_PATH}`);
+  }
+
+  return NextResponse.redirect(buildWebflowOAuthFinishSignInUrl(input.appUrl));
+}
+
 export async function GET(request: Request) {
   const appUrl = resolveWebflowOAuthAppUrl();
   const redirectUri = resolveWebflowOAuthRedirectUri();
@@ -125,26 +168,58 @@ export async function GET(request: Request) {
   const cookieExpected = cookieStore.get(WEBFLOW_OAUTH_STATE_COOKIE)?.value;
   const isPopupFlow = !cookieExpected;
 
-  const oauthError = searchParams.get("error");
-  if (oauthError) {
+  const { query, kind } = resolveWebflowOAuthCallbackKind(searchParams, cookieExpected);
+
+  if (kind === "oauth_error") {
     clearWebflowOauthCookies(cookieStore);
-    const oauthDesc = searchParams.get("error_description");
-    const errParams: Record<string, string> = { error: oauthError };
-    if (oauthDesc) {
-      errParams.error_description = oauthDesc;
+    const errParams: Record<string, string> = { error: query.oauthError ?? "oauth_error" };
+    if (query.oauthErrorDescription) {
+      errParams.error_description = query.oauthErrorDescription;
     }
     return oauthErrorRedirect(appUrl, errParams, { popup: isPopupFlow });
   }
 
-  const code = searchParams.get("code");
-  const state = searchParams.get("state");
-  if (!code || !state) {
+  if (kind === "missing_code") {
+    clearWebflowOauthCookies(cookieStore);
+    return oauthErrorRedirect(appUrl, { error: "missing_code" }, { popup: isPopupFlow });
+  }
+
+  const code = query.code;
+  if (!code) {
+    clearWebflowOauthCookies(cookieStore);
+    return oauthErrorRedirect(appUrl, { error: "missing_code" }, { popup: isPopupFlow });
+  }
+
+  if (kind === "webflow_initiated_install") {
+    clearWebflowOauthCookies(cookieStore);
+    const immediate = await tryCompleteWebflowInitiatedInstallInSession(
+      request,
+      code,
+      redirectUri,
+      appUrl,
+      isPopupFlow
+    );
+    if (immediate) {
+      return immediate;
+    }
+    return redirectToFinishStagedWebflowInstall({
+      authorizationCode: code,
+      redirectUri,
+      externalState: query.state,
+      appUrl,
+      cookieStore,
+      request,
+    });
+  }
+
+  const state = query.state?.trim();
+  if (!state) {
     clearWebflowOauthCookies(cookieStore);
     return oauthErrorRedirect(appUrl, { error: "missing_code" }, { popup: isPopupFlow });
   }
 
   const resolved =
-    cookieExpected && cookieExpected === state
+    kind === "tower_cookie_state"
       ? await resolveOrganizationFromCookieFlow(request, cookieStore, appUrl, isPopupFlow)
       : await resolveOrganizationFromDbStateFlow(cookieStore, state, appUrl, isPopupFlow);
 
@@ -161,8 +236,5 @@ export async function GET(request: Request) {
   }
 
   await persistOrganizationWebflowOAuthToken(organizationId, tokenResponse);
-  if (isPopupFlow) {
-    return NextResponse.redirect(`${appUrl}/integrations/webflow/success?popup=1`);
-  }
-  return NextResponse.redirect(`${appUrl}${towerConnectionPathWithStatus("connected")}`);
+  return oauthSuccessRedirect(appUrl, { popup: isPopupFlow });
 }

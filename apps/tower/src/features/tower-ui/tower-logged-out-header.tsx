@@ -9,7 +9,7 @@ import { TowerPublicHeader, TowerPublicHeaderSpacer } from "@/shared/ui/tower-pu
 import { TowerPublicHeaderAuthActionsSkeleton } from "@/shared/ui/tower-public-header-auth-actions";
 
 type TowerLoggedOutHeaderProps = {
-  publicHeaderLinks?: Pick<TowerLandingAppLinks, "beacon" | "flint" | "signIn" | "tower">;
+  publicHeaderLinks?: Pick<TowerLandingAppLinks, "beacon" | "flint" | "home" | "signIn" | "tower">;
 };
 
 export function TowerLoggedOutHeader({ publicHeaderLinks }: TowerLoggedOutHeaderProps) {
@@ -39,6 +39,7 @@ export function TowerLoggedOutHeader({ publicHeaderLinks }: TowerLoggedOutHeader
   const primaryCtaHref = earlyAccessRequired ? "/request-access" : "/sign-up";
   const primaryCtaLabel = earlyAccessRequired ? "Early Access" : "Sign up";
 
+  const homeHref = publicHeaderLinks?.home ?? "/";
   const signInHref = publicHeaderLinks?.signIn ?? "/sign-in";
   const beaconHref = publicHeaderLinks?.beacon ?? "/beacon";
   const flintHref = publicHeaderLinks?.flint ?? "/flint";
@@ -47,6 +48,7 @@ export function TowerLoggedOutHeader({ publicHeaderLinks }: TowerLoggedOutHeader
   return (
     <>
       <TowerPublicHeader
+        homeHref={homeHref}
         beaconHref={beaconHref}
         flintHref={flintHref}
         signInHref={signInHref}

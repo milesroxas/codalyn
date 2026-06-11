@@ -252,6 +252,18 @@ export function buildFlintMarketingUrl(pathname: string, search = ""): string {
   return joinOriginPath(getTowerHostConfig().flintMarketingOrigin, pathname, search);
 }
 
+/** Marketing homepage — same-origin on the marketing host, absolute on the app host when split. */
+export function resolveTowerPublicHomeHref(hostname: string): string {
+  const normalized = normalizeHostname(hostname);
+  if (normalized && isMarketingHost(normalized)) {
+    return "/";
+  }
+  if (isHostSplitEnabled() && normalized && isAppHost(normalized)) {
+    return buildMarketingUrl("/");
+  }
+  return "/";
+}
+
 /** Product marketing page for Tower — `/tower` on marketing/unified hosts, app origin when split on the app host. */
 export function resolveTowerPublicTowerHref(hostname: string): string {
   const normalized = normalizeHostname(hostname);
@@ -302,6 +314,7 @@ export function resolveTowerPublicFlintHref(hostname: string): string {
 }
 
 export function buildTowerLandingAppLinks(hostname?: string): {
+  home: string;
   signIn: string;
   signUp: string;
   requestAccess: string;
@@ -311,6 +324,7 @@ export function buildTowerLandingAppLinks(hostname?: string): {
 } {
   const resolvedHost = hostname ? normalizeHostname(hostname) : "";
   return {
+    home: resolveTowerPublicHomeHref(resolvedHost),
     signIn: buildTowerAppUrl("/sign-in"),
     signUp: buildTowerAppUrl("/sign-up"),
     requestAccess: buildTowerAppUrl("/request-access"),

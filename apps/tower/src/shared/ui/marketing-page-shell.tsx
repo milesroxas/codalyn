@@ -25,6 +25,7 @@ function MarketingProductHero({ title, description, className }: MarketingProduc
 
 type MarketingPageShellProps = {
   activeProduct?: "beacon" | "tower" | "flint";
+  homeHref?: string;
   beaconHref?: string;
   flintHref?: string;
   signInHref: string;
@@ -36,6 +37,7 @@ type MarketingPageShellProps = {
 
 function MarketingPageShell({
   activeProduct,
+  homeHref = "/",
   beaconHref,
   flintHref,
   signInHref,
@@ -47,6 +49,7 @@ function MarketingPageShell({
   return (
     <div className="min-h-dvh bg-black text-foreground antialiased">
       <TowerPublicHeader
+        homeHref={homeHref}
         activeProduct={activeProduct}
         beaconHref={beaconHref}
         flintHref={flintHref}

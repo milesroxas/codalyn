@@ -9,7 +9,7 @@ export type TowerWorkspaceOnboardingBlocker =
   | "webflow_admin_only"
   | "needs_webflow_connect";
 
-export type TowerWebflowQueryStatus = "connected" | "no_active_workspace" | "team_admin_required";
+export type TowerWebflowQueryStatus = "connected" | "no_active_workspace" | "team_admin_required" | "pending_expired";
 
 export type TowerOnboardingAlertCopy = {
   title: string;
@@ -60,7 +60,12 @@ export function shouldShowPageHeaderWebflowAction(
 }
 
 export function parseTowerWebflowQueryStatus(value: string | null): TowerWebflowQueryStatus | null {
-  if (value === "connected" || value === "no_active_workspace" || value === "team_admin_required") {
+  if (
+    value === "connected" ||
+    value === "no_active_workspace" ||
+    value === "team_admin_required" ||
+    value === "pending_expired"
+  ) {
     return value;
   }
   return null;
@@ -115,6 +120,13 @@ export function towerWebflowQueryStatusCopy(status: TowerWebflowQueryStatus): To
         title: "Admin access required",
         description: "Only a workspace admin can connect Webflow. Ask an admin to finish setup.",
       };
+    case "pending_expired":
+      return {
+        variant: "warning",
+        title: "Authorization expired",
+        description:
+          "Webflow authorization codes expire after 15 minutes. Install or connect again from Webflow or Tower.",
+      };
   }
 }
 
@@ -154,6 +166,8 @@ export function messageForWebflowOAuthCallbackError(error?: string | null): stri
       return messageForWebflowOAuthAuthorizeError("team_admin_required");
     case "missing_code":
       return "Webflow authorization did not finish. Try connecting again.";
+    case "pending_expired":
+      return "This Webflow authorization expired. Install or connect again from Webflow or Tower.";
     case "token_exchange":
     case "token_exchange_failed":
       return "Could not complete Webflow connection. Try again.";

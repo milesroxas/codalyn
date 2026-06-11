@@ -25,7 +25,7 @@ type TowerAppShellProps = {
   usageBanner?: React.ReactNode;
   emailVerificationBanner?: React.ReactNode;
   workspaceOnboarding?: React.ReactNode;
-  publicHeaderLinks?: Pick<TowerLandingAppLinks, "beacon" | "flint" | "signIn" | "tower">;
+  publicHeaderLinks?: Pick<TowerLandingAppLinks, "beacon" | "flint" | "home" | "signIn" | "tower">;
   children: React.ReactNode;
 };
 

@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { towerCorsHeadersFor } from "@/server/tower-cors";
 import {
+  buildMarketingUrl,
   buildTowerAppUrl,
   isAppHost,
   isFlintMarketingHost,
@@ -109,10 +110,7 @@ function applyHostSplitRouting(request: NextRequest, pathname: string): NextResp
   }
 
   if (isAppHost(hostname) && pathname === "/" && !sessionCookie) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/sign-in";
-    url.search = "";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(buildMarketingUrl("/"));
   }
 
   return null;

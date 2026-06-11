@@ -100,9 +100,11 @@ describe("tower-hosts", () => {
     expect(buildTowerAppUrl("/sign-in")).toBe("https://tower.codalyn.app/sign-in");
     expect(buildMarketingUrl("/")).toBe("https://codalyn.app/");
     expect(buildFlintMarketingUrl("/")).toBe("https://flint.codalyn.app/");
+    expect(buildTowerLandingAppLinks("tower.codalyn.app").home).toBe("https://codalyn.app/");
     expect(buildTowerLandingAppLinks("tower.codalyn.app").tower).toBe("https://tower.codalyn.app/");
     expect(buildTowerLandingAppLinks("tower.codalyn.app").beacon).toBe("https://codalyn.app/beacon");
     expect(buildTowerLandingAppLinks("tower.codalyn.app").flint).toBe("https://flint.codalyn.app/");
+    expect(buildTowerLandingAppLinks("codalyn.app").home).toBe("/");
     expect(buildTowerLandingAppLinks("codalyn.app").tower).toBe("/tower");
     expect(buildTowerLandingAppLinks("codalyn.app").beacon).toBe("/beacon");
     expect(buildTowerLandingAppLinks("codalyn.app").flint).toBe("/flint");

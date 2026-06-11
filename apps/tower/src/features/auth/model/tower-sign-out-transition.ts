@@ -5,9 +5,10 @@ import {
   resolveTowerPostSignOutUrl,
   resolveTowerSignOutNavigationHref,
 } from "@/shared/lib/navigation/resolve-tower-post-sign-out-url";
+import { TOWER_PUBLIC_PAGE_EXIT_MS } from "@/shared/ui/tower-public-page-scroll";
 
-/** Matches marketing page exit timing (`MarketingPageScroll`). */
-export const TOWER_SIGN_OUT_EXIT_MS = 280;
+/** Matches public page route exit timing (`TowerPublicPageScroll`). */
+export const TOWER_SIGN_OUT_EXIT_MS = TOWER_PUBLIC_PAGE_EXIT_MS;
 
 let signingOut = false;
 const listeners = new Set<() => void>();

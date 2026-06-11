@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePrefersReducedMotion } from "@/shared/lib/use-prefers-reduced-motion";
 import { cn } from "@/shared/lib/utils";
+import { TowerLenisRoot } from "@/shared/ui/tower-lenis-root";
 
 /** After feature cards finish fading in (last delay + duration). 4150ms + 750ms + buffer */
 const INTRO_INTERACTIVE_MS = 5000;
@@ -10,6 +12,7 @@ const INTRO_VEIL_MS = 720;
 const INTRO_LAYOUT_KICK_AFTER_VEIL_MS = 740;
 
 export function TowerLandingEntrance({ children, main }: { children: React.ReactNode; main: React.ReactNode }) {
+  const reduceMotion = usePrefersReducedMotion();
   const [interactive, setInteractive] = useState(false);
   const [veilDone, setVeilDone] = useState(false);
 
@@ -40,6 +43,7 @@ export function TowerLandingEntrance({ children, main }: { children: React.React
 
   return (
     <div className="relative h-dvh w-full min-w-0 overflow-hidden">
+      <TowerLenisRoot enabled={!reduceMotion} />
       <div
         aria-hidden
         className={cn("tl-landing-veil fixed inset-0 z-20 bg-background", veilDone && "tl-landing-veil--skip")}

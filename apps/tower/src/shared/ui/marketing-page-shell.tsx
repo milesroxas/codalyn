@@ -1,9 +1,7 @@
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
-import { MarketingPageScroll } from "@/shared/ui/marketing-page-scroll";
-import { TowerMarketingPublicPageBody } from "@/shared/ui/tower-marketing-public-page-body";
-import { TowerPublicHeader, TowerPublicHeaderSpacer } from "@/shared/ui/tower-public-header";
+import { TowerPublicMarketingPageShell } from "@/shared/ui/tower-public-marketing-page-shell";
 
 type MarketingProductHeroProps = {
   title: string;
@@ -47,24 +45,19 @@ function MarketingPageShell({
   children,
 }: MarketingPageShellProps) {
   return (
-    <div className="min-h-dvh bg-black text-foreground antialiased">
-      <TowerPublicHeader
-        homeHref={homeHref}
-        activeProduct={activeProduct}
-        beaconHref={beaconHref}
-        flintHref={flintHref}
-        signInHref={signInHref}
-        primaryCtaHref={primaryCtaHref}
-        primaryCtaLabel={primaryCtaLabel}
-        towerHref={towerHref}
-      />
-      <TowerPublicHeaderSpacer />
-      <MarketingPageScroll>
-        <TowerMarketingPublicPageBody contentAs="main" contentClassName="gap-20 lg:gap-28">
-          {children}
-        </TowerMarketingPublicPageBody>
-      </MarketingPageScroll>
-    </div>
+    <TowerPublicMarketingPageShell
+      activeProduct={activeProduct}
+      homeHref={homeHref}
+      beaconHref={beaconHref}
+      flintHref={flintHref}
+      signInHref={signInHref}
+      primaryCtaHref={primaryCtaHref}
+      primaryCtaLabel={primaryCtaLabel}
+      towerHref={towerHref}
+      contentClassName="gap-20 lg:gap-28"
+    >
+      {children}
+    </TowerPublicMarketingPageShell>
   );
 }
 

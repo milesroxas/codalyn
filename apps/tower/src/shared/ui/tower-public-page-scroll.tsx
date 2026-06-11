@@ -1,40 +1,20 @@
 "use client";
 
-import { ReactLenis, useLenis } from "lenis/react";
-import "lenis/dist/lenis.css";
+import { useLenis } from "lenis/react";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
+import { usePrefersReducedMotion } from "@/shared/lib/use-prefers-reduced-motion";
 import { cn } from "@/shared/lib/utils";
+import { TowerLenisRoot } from "@/shared/ui/tower-lenis-root";
 
-const PAGE_EXIT_MS = 280;
-const PAGE_ENTER_MS = 520;
+/** Public page route transition — keep in sync with sign-out exit timing. */
+export const TOWER_PUBLIC_PAGE_EXIT_MS = 280;
+export const TOWER_PUBLIC_PAGE_ENTER_MS = 520;
 
 type TransitionPhase = "idle" | "exiting" | "entering";
 
-function usePrefersReducedMotion(): boolean {
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setReduceMotion(media.matches);
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
-
-  return reduceMotion;
-}
-
-function MarketingPageLenis({ enabled }: { enabled: boolean }) {
-  if (!enabled) {
-    return null;
-  }
-
-  return <ReactLenis root options={{ autoRaf: true, lerp: 0.085, wheelMultiplier: 0.9 }} />;
-}
-
-function MarketingPageScrollReset({ phase }: { phase: TransitionPhase }) {
+function TowerPublicPageScrollReset({ phase }: { phase: TransitionPhase }) {
   const lenis = useLenis();
 
   useEffect(() => {
@@ -53,7 +33,11 @@ function MarketingPageScrollReset({ phase }: { phase: TransitionPhase }) {
   return null;
 }
 
-export function MarketingPageScroll({ children }: { children: ReactNode }) {
+type TowerPublicPageScrollProps = {
+  children: ReactNode;
+};
+
+function TowerPublicPageScroll({ children }: TowerPublicPageScrollProps) {
   const pathname = usePathname();
   const reduceMotion = usePrefersReducedMotion();
   const [phase, setPhase] = useState<TransitionPhase>("entering");
@@ -74,7 +58,7 @@ export function MarketingPageScroll({ children }: { children: ReactNode }) {
         return;
       }
 
-      enterTimer = window.setTimeout(() => setPhase("idle"), PAGE_ENTER_MS);
+      enterTimer = window.setTimeout(() => setPhase("idle"), TOWER_PUBLIC_PAGE_ENTER_MS);
       return () => {
         if (enterTimer !== undefined) {
           window.clearTimeout(enterTimer);
@@ -100,8 +84,8 @@ export function MarketingPageScroll({ children }: { children: ReactNode }) {
       frozenContent.current = children;
       frozenPath.current = pathname;
       setPhase("entering");
-      enterTimer = window.setTimeout(() => setPhase("idle"), PAGE_ENTER_MS);
-    }, PAGE_EXIT_MS);
+      enterTimer = window.setTimeout(() => setPhase("idle"), TOWER_PUBLIC_PAGE_ENTER_MS);
+    }, TOWER_PUBLIC_PAGE_EXIT_MS);
 
     return () => {
       window.clearTimeout(exitTimer);
@@ -116,8 +100,8 @@ export function MarketingPageScroll({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <MarketingPageLenis enabled={!reduceMotion} />
-      <MarketingPageScrollReset phase={phase} />
+      <TowerLenisRoot enabled={!reduceMotion} />
+      <TowerPublicPageScrollReset phase={phase} />
       <div
         key={contentKey}
         className={cn(
@@ -130,3 +114,5 @@ export function MarketingPageScroll({ children }: { children: ReactNode }) {
     </>
   );
 }
+
+export { TowerPublicPageScroll };

@@ -16,6 +16,7 @@ import {
 import { cn } from "@/shared/lib/utils";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import { SidebarInset, SidebarProvider } from "@/shared/ui/sidebar";
+import { TowerPublicPageScroll } from "@/shared/ui/tower-public-page-scroll";
 
 const shellStyle = {
   "--sidebar-width": "calc(var(--spacing) * 72)",
@@ -116,7 +117,13 @@ export function TowerAppShell({
         )}
       >
         <TowerLoggedOutHeader publicHeaderLinks={publicHeaderLinks} />
-        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        <div className="flex min-h-0 flex-1 flex-col">
+          {isTowerMarketingInnerPagePath(pathname) ? (
+            <TowerPublicPageScroll>{children}</TowerPublicPageScroll>
+          ) : (
+            children
+          )}
+        </div>
       </div>
     );
   }

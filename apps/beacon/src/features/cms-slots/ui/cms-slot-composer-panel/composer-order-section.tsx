@@ -34,8 +34,8 @@ type ComposerOrderSectionProps = {
   onReorder: (fromIndex: number, toIndex: number) => void;
   onRenameSlot: (rowKey: string, name: string) => void;
   onRemove: (key: string) => void;
-  autoOpenEditDrawerRowKey?: string | null;
-  onAutoOpenEditDrawerConsumed?: () => void;
+  autoOpenEditDialogRowKey?: string | null;
+  onAutoOpenEditDialogConsumed?: () => void;
 };
 
 export function ComposerOrderSection(props: ComposerOrderSectionProps) {
@@ -47,8 +47,8 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
     onReorder,
     onRenameSlot,
     onRemove,
-    autoOpenEditDrawerRowKey = null,
-    onAutoOpenEditDrawerConsumed,
+    autoOpenEditDialogRowKey = null,
+    onAutoOpenEditDialogConsumed,
   } = props;
 
   const [removeConfirmKey, setRemoveConfirmKey] = useState<string | null>(null);
@@ -127,8 +127,8 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
                           onChangePropValue={onChangePropValue}
                           onRenameSlot={onRenameSlot}
                           onRemove={handleRequestRemove}
-                          autoOpenEditDrawerRowKey={autoOpenEditDrawerRowKey}
-                          onAutoOpenEditDrawerConsumed={onAutoOpenEditDrawerConsumed}
+                          autoOpenEditDialogRowKey={autoOpenEditDialogRowKey}
+                          onAutoOpenEditDialogConsumed={onAutoOpenEditDialogConsumed}
                         />
                       );
                     })}

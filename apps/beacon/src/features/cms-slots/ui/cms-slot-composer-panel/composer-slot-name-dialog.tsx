@@ -2,24 +2,32 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import { CMS_SLOT_ROW_NAME_MAX } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
-import { CMS_SLOTS_COMPOSER_SLOT_EDIT_DONE } from "@/shared/lib/cms-slots-feature-copy";
-import { Button } from "@/shared/ui/button";
+import { CmsSlotDisplayNameField } from "@/features/cms-slots/ui/cms-slot-display-name-field";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/shared/ui/drawer";
-import { Input } from "@/shared/ui/input";
-import { Label } from "@/shared/ui/label";
+  CMS_SLOTS_COMPOSER_SLOT_EDIT_DONE,
+  CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_LABEL,
+  CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_TOOLTIP,
+} from "@/shared/lib/cms-slots-feature-copy";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogFormField,
+  AlertDialogHeader,
+  AlertDialogScrollBody,
+  AlertDialogScrollSection,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+  alertDialogScrollContentDefaults,
+} from "@/shared/ui/alert-dialog";
+import { Button } from "@/shared/ui/button";
 import { ComposerPropValueField } from "./composer-prop-value-field";
 
-export type ComposerSlotNameDrawerRenameCommit = "draft" | "persist";
+export type ComposerSlotNameDialogRenameCommit = "draft" | "persist";
 
-export type ComposerSlotNameDrawerProps = {
+export type ComposerSlotNameDialogProps = {
   row: CmsSlotCompositionDraftRow;
   exposed: ComposableInstancePropMeta[];
   disabled?: boolean;
@@ -27,14 +35,13 @@ export type ComposerSlotNameDrawerProps = {
    * `draft` (Composer): flush display name into the local composition on Done or dismiss.
    * `persist` (Engine published rename): call {@link onRename} only on Done; dismiss reverts the field.
    */
-  renameCommit?: ComposerSlotNameDrawerRenameCommit;
-  /** Optional className for the row title trigger (e.g. contrast on dark Engine chrome). */
-  triggerClassName?: string;
-  drawerTitle?: string;
+  renameCommit?: ComposerSlotNameDialogRenameCommit;
+  dialogTitle?: string;
   slotNameFieldLabel?: string;
+  slotNameFieldTooltip?: string;
   onRename: (rowKey: string, nextName: string) => void;
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
-  /** When true once (e.g. right after adding the row), opens this edit drawer. */
+  /** When true once (e.g. right after adding the row), opens this edit dialog. */
   requestAutoOpen?: boolean;
   onAutoOpenConsumed?: () => void;
 };
@@ -56,15 +63,15 @@ function flushComposerSlotDisplayName(
   }
 }
 
-export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
+export function ComposerSlotNameDialog(props: ComposerSlotNameDialogProps) {
   const {
     row,
     exposed,
     disabled,
     renameCommit = "draft",
-    triggerClassName,
-    drawerTitle = "Edit Content",
-    slotNameFieldLabel = "Slot name",
+    dialogTitle = "Edit Content",
+    slotNameFieldLabel = CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_LABEL,
+    slotNameFieldTooltip = CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_TOOLTIP,
     onRename,
     onChangePropValue,
     requestAutoOpen = false,
@@ -100,7 +107,7 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
     };
   }, [disabled, onAutoOpenConsumed, requestAutoOpen, row.name]);
 
-  const handleComposerDrawerOpenChange = useCallback(
+  const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (nextOpen) {
         doneCommittedRef.current = false;
@@ -123,50 +130,37 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
   );
 
   const fieldId = useId();
-  const len = draft.length > CMS_SLOT_ROW_NAME_MAX ? CMS_SLOT_ROW_NAME_MAX : draft.length;
 
   return (
-    <Drawer open={open} onOpenChange={handleComposerDrawerOpenChange}>
-      <DrawerTrigger asChild>
-        <Button type="button" variant="composerSlotTitle" disabled={disabled} className={triggerClassName}>
+    <AlertDialog open={open} onOpenChange={handleDialogOpenChange}>
+      <AlertDialogTrigger asChild>
+        <Button type="button" variant="composerSlotTitle" disabled={disabled}>
           <span className="min-w-0 truncate">{row.name}</span>
         </Button>
-      </DrawerTrigger>
-      <DrawerContent stickyFooter>
-        <DrawerHeader>
-          <DrawerTitle>{drawerTitle}</DrawerTitle>
-          <DrawerDescription className="sr-only">Change the slot display name shown in Composer.</DrawerDescription>
-        </DrawerHeader>
-        <div className="space-y-4 pb-2">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor={fieldId} className="text-xs text-muted-foreground">
-                {slotNameFieldLabel}
-              </Label>
-              <span className="text-xs tabular-nums text-muted-foreground">
-                {len}/{CMS_SLOT_ROW_NAME_MAX}
-              </span>
-            </div>
-            <Input
-              id={fieldId}
-              value={draft}
-              maxLength={CMS_SLOT_ROW_NAME_MAX}
-              onChange={(e) => setDraft(e.target.value)}
-              autoComplete="off"
-              name="composer-slot-display-name"
-              onPointerDown={(e) => e.stopPropagation()}
-            />
-          </div>
+      </AlertDialogTrigger>
+      <AlertDialogContent {...alertDialogScrollContentDefaults}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{dialogTitle}</AlertDialogTitle>
+          <AlertDialogDescription className="sr-only">
+            Change the slot display name shown in Composer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogScrollBody spacing="form">
+          <CmsSlotDisplayNameField
+            fieldId={fieldId}
+            fieldLabel={slotNameFieldLabel}
+            fieldLabelTooltip={slotNameFieldTooltip}
+            value={draft}
+            onValueChange={setDraft}
+            inputName="composer-slot-display-name"
+          />
           {exposed.length > 0 ? (
-            <div className="space-y-3 border-t border-border/50 pt-3" data-slot="cms_slot_composer_prop_fields">
+            <AlertDialogScrollSection divider data-slot="cms_slot_composer_prop_fields">
               {exposed.map((ep) => {
                 const v = row.propValues?.[ep.propId] ?? "";
                 const propFieldId = `cms-slot-composer-${row.key}-${ep.propId}`;
                 return (
-                  <div key={ep.propId} className="space-y-0.5">
-                    <Label className="text-xs text-muted-foreground" htmlFor={propFieldId}>
-                      {ep.label}
-                    </Label>
+                  <AlertDialogFormField key={ep.propId} label={ep.label} labelHtmlFor={propFieldId}>
                     <ComposerPropValueField
                       inputId={propFieldId}
                       ep={ep}
@@ -174,18 +168,27 @@ export function ComposerSlotNameDrawer(props: ComposerSlotNameDrawerProps) {
                       busy={Boolean(disabled)}
                       onChange={(next) => onChangePropValue(row.key, ep.propId, next)}
                     />
-                  </div>
+                  </AlertDialogFormField>
                 );
               })}
-            </div>
+            </AlertDialogScrollSection>
           ) : null}
-        </div>
-        <DrawerFooter>
-          <Button type="button" className="w-full" disabled={disabled} onClick={handleDone}>
+        </AlertDialogScrollBody>
+        <AlertDialogFooter layout="sticky">
+          <AlertDialogAction
+            type="button"
+            variant="secondary"
+            size="drawerAction"
+            disabled={disabled}
+            onClick={(event) => {
+              event.preventDefault();
+              handleDone();
+            }}
+          >
             {CMS_SLOTS_COMPOSER_SLOT_EDIT_DONE}
-          </Button>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

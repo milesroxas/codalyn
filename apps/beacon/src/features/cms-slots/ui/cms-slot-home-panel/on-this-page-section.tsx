@@ -3,13 +3,13 @@ import { Plus } from "lucide-react";
 import { useId, useState } from "react";
 import { displayLabelForCmsSlotList } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import type { CmsSlotListOnPage } from "@/features/cms-slots/model/cms-slot-page-targets";
-import { CmsSlotDisplayNameDrawer } from "@/features/cms-slots/ui/cms-slot-display-name-drawer";
+import { CmsSlotDisplayNameDialog } from "@/features/cms-slots/ui/cms-slot-display-name-dialog";
 import { CmsSlotPublishedSlotTile } from "@/features/cms-slots/ui/cms-slot-list-tile";
 import {
   CMS_SLOTS_ADD_SLOT_LABEL,
   CMS_SLOTS_PAGE_LIST_ARIA_LABEL,
   CMS_SLOTS_PUBLISHED_SECTION_LABEL,
-  CMS_SLOTS_RENAME_SLOT_DRAWER_TITLE,
+  CMS_SLOTS_RENAME_SLOT_DIALOG_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
 import { SurfaceSummaryCardPanelSectionLabel } from "@/shared/ui/surface-summary-card";
@@ -62,26 +62,26 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
     renameDraftTrimmed === "" ||
     (renameBaseline !== "" && renameDraftTrimmed.toLowerCase() === renameBaseline.toLowerCase());
 
-  const openRenameDrawer = (beacon: CmsSlotListOnPage) => {
+  const openRenameDialog = (beacon: CmsSlotListOnPage) => {
     setRenameTarget(beacon);
     setRenameDraft(displayLabelForCmsSlotList(beacon));
   };
 
-  const closeRenameDrawer = () => {
+  const closeRenameDialog = () => {
     setRenameTarget(null);
     setRenameDraft("");
   };
 
   return (
     <div className="space-y-3" data-slot="cms_slots_on_page">
-      <CmsSlotDisplayNameDrawer
+      <CmsSlotDisplayNameDialog
         open={renameTarget != null}
         onOpenChange={(open) => {
           if (!open) {
-            closeRenameDrawer();
+            closeRenameDialog();
           }
         }}
-        title={CMS_SLOTS_RENAME_SLOT_DRAWER_TITLE}
+        title={CMS_SLOTS_RENAME_SLOT_DIALOG_TITLE}
         fieldId={renameFieldId}
         value={renameDraft}
         onValueChange={setRenameDraft}
@@ -95,13 +95,13 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
           void (async () => {
             const ok = await onRenameBeacon(renameTarget, renameDraft);
             if (ok) {
-              closeRenameDrawer();
+              closeRenameDialog();
             }
           })();
         }}
         secondaryLabel="Cancel"
         secondaryDisabled={renamePendingKey != null}
-        onSecondary={closeRenameDrawer}
+        onSecondary={closeRenameDialog}
       />
 
       {hasBeacons ? (
@@ -119,14 +119,14 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
                 renaming={renamePendingKey === b.key}
                 onOpen={() => void onOpenBeacon(b)}
                 onRequestDelete={() => onRequestDelete(b)}
-                onRequestRename={() => openRenameDrawer(b)}
+                onRequestRename={() => openRenameDialog(b)}
               />
             ))}
           </ul>
         </div>
       ) : null}
 
-      <CmsSlotDisplayNameDrawer
+      <CmsSlotDisplayNameDialog
         open={createFormOpen}
         onOpenChange={setCreateFormOpen}
         title={CMS_SLOTS_ADD_SLOT_LABEL}

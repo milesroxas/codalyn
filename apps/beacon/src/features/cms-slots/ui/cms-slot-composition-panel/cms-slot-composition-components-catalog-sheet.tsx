@@ -7,7 +7,15 @@ import {
   CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/shared/ui/drawer";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+  drawerListSheetContentDefaults,
+} from "@/shared/ui/drawer";
 import {
   CmsSlotCompositionComponentsCatalogList,
   type CmsSlotCompositionComponentsCatalogProps,
@@ -27,7 +35,7 @@ export function CmsSlotCompositionComponentsCatalogSheet(props: CmsSlotCompositi
           <span>{CMS_SLOTS_ENGINE_ADD_COMPONENT_LABEL}</span>
         </Button>
       </DrawerTrigger>
-      <DrawerContent stickyFooter showCloseButton>
+      <DrawerContent {...drawerListSheetContentDefaults}>
         <DrawerHeader align="start">
           <DrawerTitle>{CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_TITLE}</DrawerTitle>
           <DrawerDescription>{CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_DESCRIPTION}</DrawerDescription>

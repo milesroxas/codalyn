@@ -10,6 +10,7 @@ import {
   dateInputValue,
   parseBoolString,
 } from "@/features/cms-slots/model/cms-slot-composer-prop-input-normalize";
+import { CMS_SLOTS_COMPOSER_IMAGE_PROP_HINT } from "@/shared/lib/cms-slots-feature-copy";
 import { cn } from "@/shared/lib/utils";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Input } from "@/shared/ui/input";
@@ -138,9 +139,7 @@ const COMPOSER_PROP_VALUE_BY_KIND: Record<
           onChange={(e) => onChange(e.target.value)}
         />
         {imageHint ? (
-          <p className="text-[0.65rem] leading-snug text-muted-foreground">
-            Paste the image link URL from Webflow Assets — not the asset id.
-          </p>
+          <p className="text-[0.65rem] leading-snug text-muted-foreground">{CMS_SLOTS_COMPOSER_IMAGE_PROP_HINT}</p>
         ) : null}
       </div>
     );

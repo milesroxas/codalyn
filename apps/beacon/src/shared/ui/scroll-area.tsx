@@ -20,7 +20,6 @@ function patchScrollAreaViewportContent(viewport: HTMLDivElement | null) {
   inner.style.width = "100%";
   inner.style.maxWidth = "100%";
   inner.style.minWidth = "0";
-  inner.style.minHeight = "100%";
 }
 
 function assignRef<T>(ref: React.Ref<T> | undefined, value: T | null) {

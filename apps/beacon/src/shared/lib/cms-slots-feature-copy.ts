@@ -11,7 +11,7 @@ export const CMS_SLOTS_ADD_SLOT_LABEL = "Add Slot";
 
 export const CMS_SLOTS_RENAME_SLOT_MENU_LABEL = "Rename";
 
-export const CMS_SLOTS_RENAME_SLOT_DRAWER_TITLE = "Rename slot";
+export const CMS_SLOTS_RENAME_SLOT_DIALOG_TITLE = "Rename slot";
 
 export const CMS_SLOTS_TOAST_LIST_RENAMED = "CMS slot renamed.";
 
@@ -310,6 +310,13 @@ export const CMS_SLOTS_COMPOSER_LEAVE_UNSAVED_DIALOG_DISCARD = "Discard changes"
 export const CMS_SLOTS_COMPOSER_LEAVE_UNSAVED_DIALOG_SAVE = "Save changes";
 
 export const CMS_SLOTS_COMPOSER_SLOT_EDIT_DONE = "Done";
+
+export const CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_LABEL = "Name";
+
+export const CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_TOOLTIP =
+  "Helps you identify this item in Composer. Doesn't affect site content.";
+
+export const CMS_SLOTS_COMPOSER_IMAGE_PROP_HINT = "Copy image link from Webflow Assets.";
 
 export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DESCRIPTION = "Choose which props to include for this slot.";
 

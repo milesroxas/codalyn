@@ -6,7 +6,7 @@ import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
-import { ComposerSlotNameDrawer } from "./composer-slot-name-drawer";
+import { ComposerSlotNameDialog } from "./composer-slot-name-dialog";
 
 export type ComposerOrderSortableRowProps = {
   row: CmsSlotCompositionDraftRow;
@@ -15,8 +15,8 @@ export type ComposerOrderSortableRowProps = {
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
   onRenameSlot: (rowKey: string, name: string) => void;
   onRemove: (key: string) => void;
-  autoOpenEditDrawerRowKey?: string | null;
-  onAutoOpenEditDrawerConsumed?: () => void;
+  autoOpenEditDialogRowKey?: string | null;
+  onAutoOpenEditDialogConsumed?: () => void;
 };
 
 export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
@@ -27,8 +27,8 @@ export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
     onChangePropValue,
     onRenameSlot,
     onRemove,
-    autoOpenEditDrawerRowKey = null,
-    onAutoOpenEditDrawerConsumed,
+    autoOpenEditDialogRowKey = null,
+    onAutoOpenEditDialogConsumed,
   } = props;
   const exposed = meta?.exposed ?? [];
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -63,14 +63,14 @@ export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
         >
           <GripVertical className="pointer-events-none size-4" aria-hidden />
         </button>
-        <ComposerSlotNameDrawer
+        <ComposerSlotNameDialog
           row={row}
           exposed={exposed}
           disabled={busy}
           onRename={onRenameSlot}
           onChangePropValue={onChangePropValue}
-          requestAutoOpen={autoOpenEditDrawerRowKey === row.key}
-          onAutoOpenConsumed={onAutoOpenEditDrawerConsumed}
+          requestAutoOpen={autoOpenEditDialogRowKey === row.key}
+          onAutoOpenConsumed={onAutoOpenEditDialogConsumed}
         />
         <Button
           type="button"

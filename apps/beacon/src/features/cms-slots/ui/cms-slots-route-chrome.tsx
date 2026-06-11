@@ -319,8 +319,8 @@ function CmsSlotsComposerRouteBody(
           rowMeta={p.composerRowMeta}
           onChangePropValue={p.onComposerSetPropValue}
           onRenameSlot={p.onComposerRenameSlotRow}
-          autoOpenEditDrawerRowKey={p.autoOpenExposeDrawerRowKey}
-          onAutoOpenEditDrawerConsumed={p.onAutoOpenExposeDrawerConsumed}
+          autoOpenEditDialogRowKey={p.autoOpenExposeDrawerRowKey}
+          onAutoOpenEditDialogConsumed={p.onAutoOpenExposeDrawerConsumed}
           composerOnly={composerOnly}
         />
       </div>

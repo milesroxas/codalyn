@@ -7,7 +7,15 @@ import {
   CMS_SLOTS_COMPOSER_PALETTE_SHEET_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/shared/ui/drawer";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+  drawerListSheetContentDefaults,
+} from "@/shared/ui/drawer";
 import { ComposerPaletteList, type ComposerPaletteListProps } from "./composer-palette-list";
 
 export function ComposerPaletteSheet(props: ComposerPaletteListProps) {
@@ -28,7 +36,7 @@ export function ComposerPaletteSheet(props: ComposerPaletteListProps) {
           {CMS_SLOTS_COMPOSER_ADD_COMPONENT_LABEL}
         </Button>
       </DrawerTrigger>
-      <DrawerContent stickyFooter showCloseButton>
+      <DrawerContent {...drawerListSheetContentDefaults}>
         <DrawerHeader align="start">
           <DrawerTitle>{CMS_SLOTS_COMPOSER_PALETTE_SHEET_TITLE}</DrawerTitle>
           <DrawerDescription>{CMS_SLOTS_COMPOSER_PALETTE_SHEET_DESCRIPTION}</DrawerDescription>

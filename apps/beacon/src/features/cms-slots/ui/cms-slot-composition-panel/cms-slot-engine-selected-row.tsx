@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
-import { ComposerSlotNameDrawer } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-slot-name-drawer";
+import { ComposerSlotNameDialog } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-slot-name-dialog";
 import { CmsSlotEngineExposePropsPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel/cms-slot-engine-expose-props-panel";
 import {
   useCmsSlotsDrawerDismissBlocked,
@@ -35,12 +35,12 @@ import {
 import { Button } from "@/shared/ui/button";
 import {
   Drawer,
-  DrawerBody,
   DrawerContent,
   DrawerDescription,
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
+  drawerListSheetContentDefaults,
 } from "@/shared/ui/drawer";
 
 function sameExposedPropSelection(a: ComposableInstancePropMeta[], b: ComposableInstancePropMeta[]): boolean {
@@ -228,14 +228,14 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
         >
           {removingKey === row.key ? <span className="text-xs">…</span> : <Trash2 aria-hidden className="size-3.5" />}
         </Button>
-        <ComposerSlotNameDrawer
+        <ComposerSlotNameDialog
           row={drawerRow}
           exposed={[]}
           renameCommit="persist"
           disabled={
             removingKey !== null || listTargetActionBusy || resyncingEngineSlotKey !== null || publishedRenameBusy
           }
-          drawerTitle="Rename published slot"
+          dialogTitle="Rename published slot"
           slotNameFieldLabel="Published name"
           onRename={(key, next) => onRenamePublishedDisplayName(key, next)}
           onChangePropValue={() => {}}
@@ -257,22 +257,20 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
         interactionBlocked={exposeDrawerDismissBlocked}
         onOpenChange={handlePropsDrawerOpenChange}
       >
-        <DrawerContent stickyFooter>
+        <DrawerContent {...drawerListSheetContentDefaults}>
           <DrawerHeader align="start">
             <DrawerTitle>{publishedDisplayName}</DrawerTitle>
             <DrawerDescription>{CMS_SLOTS_ENGINE_EXPOSE_PROPS_DESCRIPTION}</DrawerDescription>
           </DrawerHeader>
-          <DrawerBody data-slot="beacon_engine_exposed_props">
-            <CmsSlotEngineExposePropsPanel
-              rowKey={row.key}
-              slotIndex={slotIndex}
-              available={available}
-              slotExposed={slotExposed}
-              showComposableLoading={showComposableLoading}
-              disabled={removingKey !== null || tagAttrsBusy}
-              onSetSlotExposed={onSetSlotExposed}
-            />
-          </DrawerBody>
+          <CmsSlotEngineExposePropsPanel
+            rowKey={row.key}
+            slotIndex={slotIndex}
+            available={available}
+            slotExposed={slotExposed}
+            showComposableLoading={showComposableLoading}
+            disabled={removingKey !== null || tagAttrsBusy}
+            onSetSlotExposed={onSetSlotExposed}
+          />
           <DrawerFooter layout="sticky">
             <Button
               type="button"

@@ -1,10 +1,114 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { XIcon } from "lucide-react";
-import { Children, type ComponentProps, isValidElement, type ReactNode } from "react";
+import {
+  Children,
+  type ComponentProps,
+  createContext,
+  isValidElement,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useReducer,
+  useState,
+} from "react";
 import { Drawer as VaulDrawer } from "vaul";
 
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
+
+/** Stacked-top sheets use 2.5rem shorter heights so the sheet behind remains visible. */
+const DRAWER_BASE_Z_INDEX = 50;
+
+type DrawerStackState = {
+  stackIndex: number;
+  totalOpen: number;
+  isTopmost: boolean;
+  isStackedTop: boolean;
+  /** Vaul `NestedRoot` handles parent scale/offset; skip manual stacked-top height. */
+  useNativeNestedStacking: boolean;
+};
+
+const defaultDrawerStackState: DrawerStackState = {
+  stackIndex: 0,
+  totalOpen: 0,
+  isTopmost: true,
+  isStackedTop: false,
+  useNativeNestedStacking: false,
+};
+
+const DrawerStackContext = createContext<DrawerStackState>(defaultDrawerStackState);
+
+let openDrawerOrder: string[] = [];
+const drawerStackListeners = new Set<() => void>();
+
+function notifyDrawerStackListeners() {
+  for (const listener of drawerStackListeners) {
+    listener();
+  }
+}
+
+function registerOpenDrawer(id: string) {
+  if (openDrawerOrder.includes(id)) {
+    return;
+  }
+  openDrawerOrder = [...openDrawerOrder, id];
+  notifyDrawerStackListeners();
+}
+
+function unregisterOpenDrawer(id: string) {
+  if (!openDrawerOrder.includes(id)) {
+    return;
+  }
+  openDrawerOrder = openDrawerOrder.filter((entry) => entry !== id);
+  notifyDrawerStackListeners();
+}
+
+function getDrawerStackState(id: string): DrawerStackState {
+  const stackIndex = openDrawerOrder.indexOf(id);
+  const totalOpen = openDrawerOrder.length;
+  const isTopmost = stackIndex >= 0 && stackIndex === totalOpen - 1;
+
+  return {
+    stackIndex: stackIndex >= 0 ? stackIndex : 0,
+    totalOpen,
+    isTopmost,
+    isStackedTop: totalOpen > 1 && isTopmost,
+    useNativeNestedStacking: false,
+  };
+}
+
+function syncDrawerStackMembership(id: string, open: boolean) {
+  if (open) {
+    registerOpenDrawer(id);
+    return;
+  }
+  unregisterOpenDrawer(id);
+}
+
+function useDrawerStackState(id: string, open: boolean): DrawerStackState {
+  const [, rerender] = useReducer((count: number) => count + 1, 0);
+
+  useEffect(() => {
+    const listener = () => {
+      rerender();
+    };
+    drawerStackListeners.add(listener);
+    return () => {
+      drawerStackListeners.delete(listener);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    syncDrawerStackMembership(id, open);
+    return () => {
+      unregisterOpenDrawer(id);
+    };
+  }, [id, open]);
+
+  return getDrawerStackState(id);
+}
 
 type DrawerProps = ComponentProps<typeof VaulDrawer.Root> & {
   /** When true, backdrop swipe/click and dismiss gestures cannot close the drawer. */
@@ -12,22 +116,80 @@ type DrawerProps = ComponentProps<typeof VaulDrawer.Root> & {
 };
 
 function Drawer(props: DrawerProps) {
-  const { interactionBlocked = false, dismissible = true, onOpenChange, ...rest } = props;
+  const {
+    interactionBlocked = false,
+    dismissible = true,
+    onOpenChange,
+    open: openProp,
+    defaultOpen = false,
+    ...rest
+  } = props;
+  const drawerId = useId();
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const open = openProp ?? uncontrolledOpen;
+  const stackState = useDrawerStackState(drawerId, open);
   const effectiveDismissible = dismissible && !interactionBlocked;
 
   return (
-    <VaulDrawer.Root
-      data-slot="drawer"
-      repositionInputs={false}
-      dismissible={effectiveDismissible}
-      onOpenChange={(open) => {
-        if (!open && interactionBlocked) {
-          return;
-        }
-        onOpenChange?.(open);
-      }}
-      {...rest}
-    />
+    <DrawerStackContext.Provider value={stackState}>
+      <VaulDrawer.Root
+        data-slot="drawer"
+        repositionInputs={false}
+        dismissible={effectiveDismissible}
+        open={openProp}
+        defaultOpen={defaultOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && interactionBlocked) {
+            return;
+          }
+          syncDrawerStackMembership(drawerId, nextOpen);
+          if (openProp === undefined) {
+            setUncontrolledOpen(nextOpen);
+          }
+          onOpenChange?.(nextOpen);
+        }}
+        {...rest}
+      />
+    </DrawerStackContext.Provider>
+  );
+}
+
+function DrawerNested(props: DrawerProps) {
+  const {
+    interactionBlocked = false,
+    dismissible = true,
+    onOpenChange,
+    open: openProp,
+    defaultOpen = false,
+    ...rest
+  } = props;
+  const drawerId = useId();
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const open = openProp ?? uncontrolledOpen;
+  const stackState = useDrawerStackState(drawerId, open);
+  const effectiveDismissible = dismissible && !interactionBlocked;
+
+  return (
+    <DrawerStackContext.Provider value={{ ...stackState, useNativeNestedStacking: true }}>
+      <VaulDrawer.NestedRoot
+        data-slot="drawer"
+        repositionInputs={false}
+        dismissible={effectiveDismissible}
+        open={openProp}
+        defaultOpen={defaultOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && interactionBlocked) {
+            return;
+          }
+          syncDrawerStackMembership(drawerId, nextOpen);
+          if (openProp === undefined) {
+            setUncontrolledOpen(nextOpen);
+          }
+          onOpenChange?.(nextOpen);
+        }}
+        {...rest}
+      />
+    </DrawerStackContext.Provider>
   );
 }
 
@@ -43,16 +205,102 @@ function DrawerClose({ ...props }: ComponentProps<typeof VaulDrawer.Close>) {
   return <VaulDrawer.Close data-slot="drawer-close" {...props} />;
 }
 
-function DrawerOverlay({ className, ...props }: ComponentProps<typeof VaulDrawer.Overlay>) {
+function DrawerOverlay({ className, style, ...props }: ComponentProps<typeof VaulDrawer.Overlay>) {
+  const { stackIndex, totalOpen } = useContext(DrawerStackContext);
+  const ownsStackBackdrop = stackIndex === 0;
+
+  // Only the bottom-most drawer renders a backdrop. Stacked sheets above it stay overlay-free
+  // so closing the top sheet never leaves a lingering blur over the sheet behind.
+  if (totalOpen > 1 && !ownsStackBackdrop) {
+    return null;
+  }
+
   return (
     <VaulDrawer.Overlay
       data-slot="drawer-overlay"
+      style={{ zIndex: DRAWER_BASE_Z_INDEX + stackIndex, ...style }}
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
+        "fixed inset-0 isolate bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
         className
       )}
       {...props}
     />
+  );
+}
+
+const drawerContentVariants = cva(
+  "fixed inset-x-0 bottom-0 flex min-h-0 flex-col rounded-t-sm border-x border-t border-border bg-popover pb-[max(1rem,env(safe-area-inset-bottom))] ring-1 ring-foreground/10 outline-none duration-200",
+  {
+    variants: {
+      maxHeight: {
+        default: "max-h-[min(95vh,600px)]",
+        tall: "h-[80vh] max-h-[90vh]",
+      },
+      stackedTop: {
+        false: "",
+        true: "",
+      },
+    },
+    compoundVariants: [
+      {
+        maxHeight: "default",
+        stackedTop: true,
+        class: "max-h-[min(calc(95vh-2.5rem),calc(600px-2.5rem))]",
+      },
+      {
+        maxHeight: "tall",
+        stackedTop: true,
+        class: "h-[calc(80vh-2.5rem)] max-h-[calc(90vh-2.5rem)]",
+      },
+    ],
+    defaultVariants: {
+      maxHeight: "default",
+      stackedTop: false,
+    },
+  }
+);
+
+type DrawerStickySections = {
+  headerBlocks: ReactNode[];
+  mainBlocks: ReactNode[];
+  footerBlocks: ReactNode[];
+};
+
+function splitDrawerStickySections(children: ReactNode): DrawerStickySections {
+  const headerBlocks: ReactNode[] = [];
+  const footerBlocks: ReactNode[] = [];
+  const mainBlocks: ReactNode[] = [];
+
+  for (const node of Children.toArray(children)) {
+    if (isValidElement(node) && node.type === DrawerFooter) {
+      footerBlocks.push(node);
+    } else if (isValidElement(node) && node.type === DrawerHeader) {
+      headerBlocks.push(node);
+    } else {
+      mainBlocks.push(node);
+    }
+  }
+
+  return { headerBlocks, mainBlocks, footerBlocks };
+}
+
+function DrawerStickyFooterLayout(props: { children: ReactNode; stickyMainScroll: boolean }) {
+  const { children, stickyMainScroll } = props;
+  const { headerBlocks, mainBlocks, footerBlocks } = splitDrawerStickySections(children);
+
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
+      {headerBlocks}
+      <div
+        className={cn(
+          "min-h-0 min-w-0 flex-1",
+          stickyMainScroll ? "scrollbar-themed overflow-x-hidden overflow-y-auto px-4" : "flex flex-col overflow-hidden"
+        )}
+      >
+        {mainBlocks}
+      </div>
+      {footerBlocks}
+    </div>
   );
 }
 
@@ -62,13 +310,21 @@ function DrawerContent({
   showCloseButton = true,
   showDragHandle = true,
   stickyFooter = false,
+  stickyMainScroll = true,
+  maxHeight,
+  style,
   ...props
-}: ComponentProps<typeof VaulDrawer.Content> & {
-  showCloseButton?: boolean;
-  showDragHandle?: boolean;
-  /** When true, `DrawerHeader` and `DrawerFooter` stay fixed; other children scroll in between. */
-  stickyFooter?: boolean;
-}) {
+}: ComponentProps<typeof VaulDrawer.Content> &
+  VariantProps<typeof drawerContentVariants> & {
+    showCloseButton?: boolean;
+    showDragHandle?: boolean;
+    /** When true, `DrawerHeader` and `DrawerFooter` stay fixed; other children scroll in between. */
+    stickyFooter?: boolean;
+    /** When false with `stickyFooter`, the main slot does not scroll; use a nested `ScrollArea` instead. */
+    stickyMainScroll?: boolean;
+  }) {
+  const { isStackedTop, stackIndex, useNativeNestedStacking } = useContext(DrawerStackContext);
+  const stackedTop = isStackedTop && !useNativeNestedStacking;
   const closeControl = showCloseButton ? (
     <DrawerClose asChild>
       <Button
@@ -89,10 +345,8 @@ function DrawerContent({
       <DrawerOverlay />
       <VaulDrawer.Content
         data-slot="drawer-content"
-        className={cn(
-          "fixed inset-x-0 bottom-0 z-50 flex max-h-[min(92vh,560px)] flex-col rounded-t-sm border-x border-t border-border bg-popover pb-[max(1rem,env(safe-area-inset-bottom))] ring-1 ring-foreground/10 outline-none duration-200",
-          className
-        )}
+        style={{ zIndex: DRAWER_BASE_Z_INDEX + stackIndex, ...style }}
+        className={cn(drawerContentVariants({ maxHeight, stackedTop }), className)}
         {...props}
       >
         {showDragHandle && showCloseButton ? (
@@ -115,30 +369,7 @@ function DrawerContent({
           <div className="mt-1 shrink-0" aria-hidden />
         )}
         {stickyFooter ? (
-          (() => {
-            const nodes = Children.toArray(children);
-            const headerBlocks: ReactNode[] = [];
-            const footerBlocks: ReactNode[] = [];
-            const mainBlocks: ReactNode[] = [];
-            for (const node of nodes) {
-              if (isValidElement(node) && node.type === DrawerFooter) {
-                footerBlocks.push(node);
-              } else if (isValidElement(node) && node.type === DrawerHeader) {
-                headerBlocks.push(node);
-              } else {
-                mainBlocks.push(node);
-              }
-            }
-            return (
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4">
-                {headerBlocks}
-                <div className="scrollbar-themed min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
-                  {mainBlocks}
-                </div>
-                {footerBlocks}
-              </div>
-            );
-          })()
+          <DrawerStickyFooterLayout stickyMainScroll={stickyMainScroll}>{children}</DrawerStickyFooterLayout>
         ) : (
           <div className="scrollbar-themed flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-y-auto px-4">
             {children}
@@ -149,7 +380,7 @@ function DrawerContent({
   );
 }
 
-const drawerHeaderVariants = cva("relative flex shrink-0 flex-col gap-1.5 pb-4", {
+const drawerHeaderVariants = cva("relative flex shrink-0 flex-col gap-1.5 overflow-visible px-4 pb-3", {
   variants: {
     align: {
       center: "text-center",
@@ -169,7 +400,7 @@ function DrawerHeader({
   return <div data-slot="drawer-header" className={cn(drawerHeaderVariants({ align }), className)} {...props} />;
 }
 
-const drawerFooterVariants = cva("flex shrink-0 flex-col gap-2", {
+const drawerFooterVariants = cva("flex shrink-0 flex-col gap-2 px-4", {
   variants: {
     layout: {
       default: "mt-6",
@@ -228,6 +459,13 @@ function DrawerDescription({ className, ...props }: ComponentProps<typeof VaulDr
   );
 }
 
+const drawerListSheetContentDefaults = {
+  stickyFooter: true,
+  stickyMainScroll: false,
+  showCloseButton: true,
+  maxHeight: "tall",
+} as const;
+
 export {
   Drawer,
   DrawerBody,
@@ -236,8 +474,10 @@ export {
   DrawerDescription,
   DrawerFooter,
   DrawerHeader,
+  DrawerNested,
   DrawerOverlay,
   DrawerPortal,
   DrawerTitle,
   DrawerTrigger,
+  drawerListSheetContentDefaults,
 };

@@ -4,8 +4,13 @@ import {
   CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL,
   CMS_SLOTS_ENGINE_EXPOSE_PROPS_LOADING,
 } from "@/shared/lib/cms-slots-feature-copy";
-import { CheckboxField, CheckboxFieldItem, CheckboxFieldList } from "@/shared/ui/checkbox-field";
-import { StatusMessage } from "@/shared/ui/status-message";
+import { CheckboxField } from "@/shared/ui/checkbox-field";
+import {
+  DrawerScrollList,
+  DrawerScrollListItem,
+  DrawerScrollListRowSurface,
+  drawerScrollListRowShellVariants,
+} from "@/shared/ui/drawer-scroll-list";
 
 function toggleSlotExposedProp(
   slotExposed: ComposableInstancePropMeta[],
@@ -33,36 +38,42 @@ export type CmsSlotEngineExposePropsPanelProps = {
 
 export function CmsSlotEngineExposePropsPanel(props: CmsSlotEngineExposePropsPanelProps) {
   const { rowKey, slotIndex, available, slotExposed, showComposableLoading, disabled, onSetSlotExposed } = props;
-
-  if (showComposableLoading && available.length === 0) {
-    return <StatusMessage pending>{CMS_SLOTS_ENGINE_EXPOSE_PROPS_LOADING}</StatusMessage>;
-  }
-
-  if (available.length === 0) {
-    return <StatusMessage>{CMS_SLOTS_ENGINE_EXPOSE_PROPS_EMPTY}</StatusMessage>;
-  }
+  const loading = showComposableLoading && available.length === 0;
+  const isEmpty = available.length === 0 && !loading;
 
   return (
-    <CheckboxFieldList aria-label={CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL} data-vaul-no-drag="">
+    <DrawerScrollList
+      aria-label={CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL}
+      data-slot="beacon_engine_exposed_props"
+      loading={loading}
+      loadingAriaLabel={CMS_SLOTS_ENGINE_EXPOSE_PROPS_LOADING}
+      isEmpty={isEmpty}
+      emptyMessage={CMS_SLOTS_ENGINE_EXPOSE_PROPS_EMPTY}
+    >
       {available.map((prop) => {
         const checked = slotExposed.some((entry) => entry.propId === prop.propId);
         const fieldId = `cms-slot-expose-${rowKey}-${prop.propId}`;
 
         return (
-          <CheckboxFieldItem key={prop.propId}>
-            <CheckboxField
-              id={fieldId}
-              label={prop.label}
-              meta={prop.valueType}
-              checked={checked}
-              disabled={disabled}
-              onCheckedChange={(want) => {
-                onSetSlotExposed(slotIndex, toggleSlotExposedProp(slotExposed, prop, want));
-              }}
-            />
-          </CheckboxFieldItem>
+          <DrawerScrollListItem key={prop.propId}>
+            <div className={drawerScrollListRowShellVariants()} data-vaul-no-drag="">
+              <DrawerScrollListRowSurface className="w-full justify-start">
+                <CheckboxField
+                  id={fieldId}
+                  className="w-full"
+                  label={prop.label}
+                  meta={prop.valueType}
+                  checked={checked}
+                  disabled={disabled}
+                  onCheckedChange={(want) => {
+                    onSetSlotExposed(slotIndex, toggleSlotExposedProp(slotExposed, prop, want));
+                  }}
+                />
+              </DrawerScrollListRowSurface>
+            </div>
+          </DrawerScrollListItem>
         );
       })}
-    </CheckboxFieldList>
+    </DrawerScrollList>
   );
 }

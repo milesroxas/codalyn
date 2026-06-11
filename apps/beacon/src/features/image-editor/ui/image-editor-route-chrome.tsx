@@ -16,10 +16,13 @@ export type ImageEditorRouteChromeProps = {
   subheader?: ReactNode;
   footer?: ReactNode;
   scrollResetKey?: string | number | boolean | null;
+  /** When false, route body fills the viewport and nested regions own vertical scroll. */
+  scrollable?: boolean;
+  contentClassName?: string;
 };
 
 export function ImageEditorRouteChrome(props: ImageEditorRouteChromeProps) {
-  const { children, subheader, footer, scrollResetKey } = props;
+  const { children, subheader, footer, scrollResetKey, scrollable = true, contentClassName } = props;
   const routeSubheader = hasBeaconRouteSubheaderContent(subheader) ? (
     <BeaconFeatureRouteSubheader dataSlot="image_upload_route_subheader">{subheader}</BeaconFeatureRouteSubheader>
   ) : null;
@@ -35,7 +38,13 @@ export function ImageEditorRouteChrome(props: ImageEditorRouteChromeProps) {
         ) : null
       }
     >
-      <BeaconFeatureRouteScrollBody scrollResetKey={scrollResetKey}>{children}</BeaconFeatureRouteScrollBody>
+      <BeaconFeatureRouteScrollBody
+        contentClassName={contentClassName}
+        scrollResetKey={scrollResetKey}
+        scrollable={scrollable}
+      >
+        {children}
+      </BeaconFeatureRouteScrollBody>
     </BeaconFeatureRouteChrome>
   );
 }

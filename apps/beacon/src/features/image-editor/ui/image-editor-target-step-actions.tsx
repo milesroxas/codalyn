@@ -1,5 +1,5 @@
 import { IconRefresh } from "@tabler/icons-react";
-import { Loader2, MousePointerClick } from "lucide-react";
+import { MousePointerClick } from "lucide-react";
 
 import type {
   PresetFormAddableScope,
@@ -33,11 +33,7 @@ export function ImageEditorTargetStepScanButton(props: ImageEditorTargetStepScan
 
   return (
     <Button type="button" variant="actionCard" size="actionCard" disabled={scanPending} onClick={onScanPage}>
-      {scanPending ? (
-        <Loader2 data-icon="inline-start" className="animate-spin" aria-hidden />
-      ) : (
-        <IconRefresh data-icon="inline-start" aria-hidden stroke={1.5} />
-      )}
+      {!scanPending ? <IconRefresh data-icon="inline-start" aria-hidden stroke={1.5} /> : null}
       <span>{scanPending ? IMAGE_TARGET_STEP_SCAN_PENDING : IMAGE_TARGET_STEP_SCAN_LABEL}</span>
     </Button>
   );

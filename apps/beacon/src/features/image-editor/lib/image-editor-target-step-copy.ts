@@ -1,6 +1,10 @@
 export const IMAGE_TARGET_STEP_SCAN_LABEL = "Scan page";
 
+export const IMAGE_TARGET_STEP_RESCAN_LABEL = "Re-scan";
+
 export const IMAGE_TARGET_STEP_SCAN_PENDING = "Scanning…";
+
+export const IMAGE_TARGET_STEP_SCAN_COLLECTING = "Collecting page elements…";
 
 export const IMAGE_TARGET_STEP_DISCOVERY_PENDING = "Checking selection…";
 

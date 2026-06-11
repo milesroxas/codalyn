@@ -68,7 +68,8 @@ async function readWebflowPageStructureStart(): Promise<AnyElement | null> {
 async function visitWebflowStructureNodeCanvasOrder(
   el: AnyElement,
   seen: Set<string>,
-  out: AnyElement[]
+  out: AnyElement[],
+  onDiscovered?: (count: number) => void
 ): Promise<void> {
   const key = webflowTreeNodeKey(el);
   if (seen.has(key)) {
@@ -76,9 +77,10 @@ async function visitWebflowStructureNodeCanvasOrder(
   }
   seen.add(key);
   out.push(el);
+  onDiscovered?.(out.length);
 
   for (const child of await readWebflowElementChildren(el)) {
-    await visitWebflowStructureNodeCanvasOrder(child, seen, out);
+    await visitWebflowStructureNodeCanvasOrder(child, seen, out, onDiscovered);
   }
   if (el.type !== "ComponentInstance") {
     return;
@@ -88,7 +90,7 @@ async function visitWebflowStructureNodeCanvasOrder(
     .catch(() => [] as Awaited<ReturnType<ComponentElement["getSlots"]>>);
   for (const slot of slots) {
     for (const child of await readWebflowElementChildren(slot as unknown as WebflowStructureChildSource)) {
-      await visitWebflowStructureNodeCanvasOrder(child, seen, out);
+      await visitWebflowStructureNodeCanvasOrder(child, seen, out, onDiscovered);
     }
   }
 }
@@ -96,25 +98,33 @@ async function visitWebflowStructureNodeCanvasOrder(
 async function visitComponentInstanceInteriorCanvasOrder(
   inst: ComponentElement,
   seen: Set<string>,
-  out: AnyElement[]
+  out: AnyElement[],
+  onDiscovered?: (count: number) => void
 ): Promise<void> {
   for (const child of await readWebflowElementChildren(inst)) {
-    await visitWebflowStructureNodeCanvasOrder(child, seen, out);
+    await visitWebflowStructureNodeCanvasOrder(child, seen, out, onDiscovered);
   }
   const slots = await inst.getSlots().catch(() => [] as Awaited<ReturnType<ComponentElement["getSlots"]>>);
   for (const slot of slots) {
     for (const child of await readWebflowElementChildren(slot as unknown as WebflowStructureChildSource)) {
-      await visitWebflowStructureNodeCanvasOrder(child, seen, out);
+      await visitWebflowStructureNodeCanvasOrder(child, seen, out, onDiscovered);
     }
   }
 }
+
+export type CollectWebflowStructureNodesOptions = {
+  onDiscovered?: (count: number) => void;
+};
 
 /**
  * Every page node in **canvas / DOM order** (depth-first preorder from `Body`), including
  * nested component instances and **slot** content — same reachability as BFS collection,
  * but ordered top-to-bottom as in the Designer navigator.
  */
-export async function collectWebflowStructureNodesInCanvasOrder(): Promise<AnyElement[]> {
+export async function collectWebflowStructureNodesInCanvasOrder(
+  options?: CollectWebflowStructureNodesOptions
+): Promise<AnyElement[]> {
+  const onDiscovered = options?.onDiscovered;
   const all = await webflow.getAllElements();
   const start = await readWebflowPageStructureStart();
   if (start == null) {
@@ -123,11 +133,11 @@ export async function collectWebflowStructureNodesInCanvasOrder(): Promise<AnyEl
 
   const seen = new Set<string>();
   const out: AnyElement[] = [];
-  await visitWebflowStructureNodeCanvasOrder(start, seen, out);
+  await visitWebflowStructureNodeCanvasOrder(start, seen, out, onDiscovered);
 
   for (const el of all) {
     if (el.type === "ComponentInstance") {
-      await visitComponentInstanceInteriorCanvasOrder(el as ComponentElement, seen, out);
+      await visitComponentInstanceInteriorCanvasOrder(el as ComponentElement, seen, out, onDiscovered);
     }
   }
 

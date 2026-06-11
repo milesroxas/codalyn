@@ -1,4 +1,7 @@
-import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
+import type {
+  ImagePageTarget,
+  ImagePageTargetScanProgress,
+} from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { ImageEditorTargetStepColumn } from "@/features/image-editor/ui/image-editor-target-step-column";
 
 type ImageEditorAutoTargetColumnProps = {
@@ -6,6 +9,7 @@ type ImageEditorAutoTargetColumnProps = {
   hasCanvasImageTarget: boolean;
   targets: ImagePageTarget[];
   scanPending: boolean;
+  scanProgress: ImagePageTargetScanProgress | null;
   scanError: string | null;
   pageScanned: boolean;
   onRescan: () => void;
@@ -21,6 +25,7 @@ export function ImageEditorAutoTargetColumn(props: ImageEditorAutoTargetColumnPr
     hasCanvasImageTarget,
     targets,
     scanPending,
+    scanProgress,
     scanError,
     pageScanned,
     onRescan,
@@ -41,6 +46,7 @@ export function ImageEditorAutoTargetColumn(props: ImageEditorAutoTargetColumnPr
       pageScanned={pageScanned}
       scanError={scanError}
       scanPending={scanPending}
+      scanProgress={scanProgress}
       selectedTarget={selectedTarget}
       showUseSelection
       surface={{

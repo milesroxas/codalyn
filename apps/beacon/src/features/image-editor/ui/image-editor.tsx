@@ -98,6 +98,7 @@ import {
 } from "@/shared/lib/beacon-feature-route-copy";
 import type { TowerUsageLimitDetails } from "@/shared/lib/tower-usage-limit-error";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
+import { useDesignerCurrentPageId } from "@/shared/lib/use-designer-current-page-id";
 import { StepNav } from "@/shared/ui/step-nav";
 
 function hasAutoCanvasImageTarget(
@@ -368,7 +369,7 @@ export function ImageEditor() {
   const showGuestOnboarding = !imageSrc && guestWelcomeVisible;
   const prevShowGuestOnboarding = useRef(false);
   const [resolverSiteId, setResolverSiteId] = useState<string | null>(null);
-  const [resolverPageId, setResolverPageId] = useState<string | null>(null);
+  const { pageId: resolverPageId } = useDesignerCurrentPageId();
   const [resolvedUploadTarget, setResolvedUploadTarget] = useState<ResolvedUploadTarget | null>(null);
   const [configurePresetsFooter, setConfigurePresetsFooter] = useState<ReactNode | null>(null);
   const [configurePresetsScrollResetKey, setConfigurePresetsScrollResetKey] = useState<string | null>(null);
@@ -438,24 +439,8 @@ export function ImageEditor() {
           setResolverSiteId(null);
         }
       });
-    void webflow
-      .getCurrentPage()
-      .then((page) => {
-        if (!cancelled) {
-          setResolverPageId(page.id);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setResolverPageId(null);
-        }
-      });
-    const unsub = webflow.subscribe("currentpage", (page) => {
-      setResolverPageId(page.id);
-    });
     return () => {
       cancelled = true;
-      unsub();
     };
   }, []);
 
@@ -1145,6 +1130,7 @@ export function ImageEditor() {
   const {
     targets: autoScanTargets,
     scanPending: autoScanPending,
+    scanProgress: autoScanProgress,
     scanError: autoScanError,
     pageScanned: autoPageScanned,
     rescan: onAutoRescan,
@@ -1231,6 +1217,17 @@ export function ImageEditor() {
     setOutputWidth(0);
     setOutputHeight(0);
   }, []);
+
+  const designerPageIdRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const prev = designerPageIdRef.current;
+    designerPageIdRef.current = resolverPageId;
+    if (prev === undefined || prev === resolverPageId) {
+      return;
+    }
+    resetAutoTargetSelection();
+  }, [resolverPageId, resetAutoTargetSelection]);
 
   const onChooseAddImageEntry = useCallback(() => {
     resetAutoTargetSelection();
@@ -1570,11 +1567,13 @@ export function ImageEditor() {
   return (
     <>
       <ImageEditorRouteChrome
+        contentClassName={flowStep === "autoElement" ? "h-full min-h-0 overflow-hidden" : undefined}
         scrollResetKey={
           flowStep === "configurePresets" && configurePresetsScrollResetKey
             ? `configurePresets:${configurePresetsScrollResetKey}`
             : flowStep
         }
+        scrollable={flowStep !== "autoElement"}
         subheader={stepNavSubheader}
         footer={routeFooter}
       >
@@ -1593,6 +1592,7 @@ export function ImageEditor() {
                 autoPageScanned={autoPageScanned}
                 autoScanError={autoScanError}
                 autoScanPending={autoScanPending}
+                autoScanProgress={autoScanProgress}
                 autoSelectedTarget={autoPageTarget}
                 autoDisplaySurfaceTarget={autoDisplaySurfaceTarget}
                 autoDiscoverySettled={autoDiscoverySettled}

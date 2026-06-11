@@ -14,6 +14,36 @@ export type ImagePageTarget = {
 
 const MAX_TARGETS = 200;
 
+export type ImagePageTargetScanProgress = {
+  phase: "collecting" | "scanning";
+  scannedElements: number;
+  totalElements: number;
+  foundTargets: number;
+};
+
+export type ScanImageTargetsOnPageOptions = {
+  onProgress?: (progress: ImagePageTargetScanProgress) => void;
+};
+
+function shouldReportImageTargetScanProgress(scanned: number, total: number, lastReported: number): boolean {
+  if (scanned === 0 || scanned === total) {
+    return true;
+  }
+  if (total <= 40) {
+    return true;
+  }
+  const step = Math.max(1, Math.floor(total / 40));
+  return scanned - lastReported >= step;
+}
+
+function shouldReportImageTargetCollectionProgress(discovered: number, lastReported: number): boolean {
+  if (discovered <= 1) {
+    return true;
+  }
+  const step = Math.max(1, Math.floor(discovered / 40));
+  return discovered - lastReported >= step;
+}
+
 function shortId(n: number, prefix: string): string {
   return `${prefix}-${n}`;
 }
@@ -66,8 +96,10 @@ async function tryPushScannedImageTarget(el: AnyElement, out: ImagePageTarget[])
  * instances and **slot** content — in **canvas / DOM order** (see
  * {@link collectWebflowStructureNodesInCanvasOrder}).
  */
-export async function collectAllPageElementsForImageScan(): Promise<AnyElement[]> {
-  return collectWebflowStructureNodesInCanvasOrder();
+export async function collectAllPageElementsForImageScan(options?: {
+  onDiscovered?: (count: number) => void;
+}): Promise<AnyElement[]> {
+  return collectWebflowStructureNodesInCanvasOrder(options);
 }
 
 /**
@@ -77,15 +109,69 @@ export async function collectAllPageElementsForImageScan(): Promise<AnyElement[]
  * Merges {@link webflow.getAllElements} with each instance’s public children and **slot**
  * children so image-capable components inside slots or other instances are not skipped.
  */
-export async function scanImageTargetsOnPage(): Promise<ImagePageTarget[]> {
-  const all = await collectAllPageElementsForImageScan();
-  const out: ImagePageTarget[] = [];
+export async function scanImageTargetsOnPage(options?: ScanImageTargetsOnPageOptions): Promise<ImagePageTarget[]> {
+  const report = options?.onProgress;
+  let lastCollectionReport = 0;
+  report?.({
+    phase: "collecting",
+    scannedElements: 0,
+    totalElements: 0,
+    foundTargets: 0,
+  });
 
-  for (const el of all) {
+  const all = await collectAllPageElementsForImageScan({
+    onDiscovered: (discovered) => {
+      if (!shouldReportImageTargetCollectionProgress(discovered, lastCollectionReport)) {
+        return;
+      }
+      lastCollectionReport = discovered;
+      report?.({
+        phase: "collecting",
+        scannedElements: discovered,
+        totalElements: 0,
+        foundTargets: 0,
+      });
+    },
+  });
+  const out: ImagePageTarget[] = [];
+  const totalElements = all.length;
+  let lastReported = -1;
+
+  report?.({
+    phase: "scanning",
+    scannedElements: 0,
+    totalElements,
+    foundTargets: 0,
+  });
+
+  for (let index = 0; index < all.length; index += 1) {
     if (out.length >= MAX_TARGETS) {
+      if (shouldReportImageTargetScanProgress(totalElements, totalElements, lastReported)) {
+        report?.({
+          phase: "scanning",
+          scannedElements: totalElements,
+          totalElements,
+          foundTargets: out.length,
+        });
+      }
       break;
     }
-    await tryPushScannedImageTarget(el, out);
+
+    const el = all[index];
+    if (el) {
+      await tryPushScannedImageTarget(el, out);
+    }
+
+    const scannedElements = index + 1;
+    if (shouldReportImageTargetScanProgress(scannedElements, totalElements, lastReported)) {
+      lastReported = scannedElements;
+      report?.({
+        phase: "scanning",
+        scannedElements,
+        totalElements,
+        foundTargets: out.length,
+      });
+    }
   }
 
   return out;

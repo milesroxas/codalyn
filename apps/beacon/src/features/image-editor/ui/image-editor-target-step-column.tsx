@@ -1,4 +1,7 @@
-import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
+import type {
+  ImagePageTarget,
+  ImagePageTargetScanProgress,
+} from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { ImagePageTargetScanListSection } from "@/features/image-editor/ui/image-editor-page-target-select-list";
 import {
   ImageEditorTargetStepActions,
@@ -11,6 +14,7 @@ export type ImageEditorTargetStepColumnProps = {
   discoverySettled: boolean;
   targets: ImagePageTarget[];
   scanPending: boolean;
+  scanProgress: ImagePageTargetScanProgress | null;
   scanError: string | null;
   pageScanned: boolean;
   onRescan: () => void;
@@ -30,6 +34,7 @@ export function ImageEditorTargetStepColumn(props: ImageEditorTargetStepColumnPr
     discoverySettled,
     targets,
     scanPending,
+    scanProgress,
     scanError,
     pageScanned,
     onRescan,
@@ -43,17 +48,19 @@ export function ImageEditorTargetStepColumn(props: ImageEditorTargetStepColumnPr
   } = props;
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <ImageEditorTargetStepActions
-        hasCanvasImageTarget={hasCanvasImageTarget && discoverySettled}
-        onScanPage={onRescan}
-        onUseCanvasSelection={onUseCanvasSelection}
-        pageScanned={pageScanned}
-        scanPending={scanPending}
-        showScanButton={scanButtonPlacement === "inline"}
-        showUseSelection={showUseSelection}
-        surface={surface}
-      />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+      <div className="shrink-0">
+        <ImageEditorTargetStepActions
+          hasCanvasImageTarget={hasCanvasImageTarget && discoverySettled}
+          onScanPage={onRescan}
+          onUseCanvasSelection={onUseCanvasSelection}
+          pageScanned={pageScanned}
+          scanPending={scanPending}
+          showScanButton={scanButtonPlacement === "inline"}
+          showUseSelection={showUseSelection}
+          surface={surface}
+        />
+      </div>
       {discoverySettled ? (
         <ImagePageTargetScanListSection
           idPrefix={idPrefix}
@@ -62,12 +69,15 @@ export function ImageEditorTargetStepColumn(props: ImageEditorTargetStepColumnPr
           pageScanned={pageScanned}
           scanError={scanError}
           scanPending={scanPending}
+          scanProgress={scanProgress}
           selectedTarget={selectedTarget}
           targets={targets}
         />
       ) : null}
       {scanButtonPlacement === "trailing" ? (
-        <ImageEditorTargetStepScanButton onScanPage={onRescan} scanPending={scanPending} />
+        <div className="shrink-0">
+          <ImageEditorTargetStepScanButton onScanPage={onRescan} scanPending={scanPending} />
+        </div>
       ) : null}
     </div>
   );

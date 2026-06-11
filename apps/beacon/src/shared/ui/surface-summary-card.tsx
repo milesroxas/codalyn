@@ -1,10 +1,12 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { MoreVertical } from "lucide-react";
+import { Loader2, MoreVertical } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
+import { Progress } from "@/shared/ui/progress";
+import { ScrollArea } from "@/shared/ui/scroll-area";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 const surfaceSummaryCardVariants = cva("flex min-w-0 flex-col gap-2 rounded-sm border px-3 py-2.5 text-left", {
@@ -20,7 +22,17 @@ const surfaceSummaryCardVariants = cva("flex min-w-0 flex-col gap-2 rounded-sm b
 });
 
 const surfaceSummaryCardLabelClass = "text-[11px] font-medium text-muted-foreground";
-const surfaceSummaryCardTitleClass = "text-sm font-medium leading-snug";
+const surfaceSummaryCardTitleVariants = cva("font-medium leading-snug", {
+  variants: {
+    density: {
+      default: "text-sm",
+      compact: "text-xs",
+    },
+  },
+  defaultVariants: {
+    density: "default",
+  },
+});
 const surfaceSummaryCardMetaVariants = cva("leading-snug", {
   variants: {
     emphasis: {
@@ -65,15 +77,20 @@ const surfaceSummaryCardPanelVariants = cva("flex min-w-0 flex-col overflow-hidd
 });
 
 const surfaceSummaryCardIconBoxVariants = cva(
-  "flex size-9 shrink-0 items-center justify-center rounded-sm border bg-muted/40 text-muted-foreground [&_svg:not([class*='size-'])]:size-4",
+  "flex shrink-0 items-center justify-center rounded-sm border bg-muted/40 text-muted-foreground",
   {
     variants: {
       tone: {
         default: "border-border/70",
       },
+      density: {
+        default: "size-9 [&_svg:not([class*='size-'])]:size-4",
+        compact: "size-7 [&_svg:not([class*='size-'])]:size-3.5",
+      },
     },
     defaultVariants: {
       tone: "default",
+      density: "default",
     },
   }
 );
@@ -103,10 +120,20 @@ const surfaceSummaryCardOptionRowVariants = cva(
   }
 );
 
-const surfaceSummaryCardOptionRowChevronClass = "size-4 shrink-0 text-muted-foreground";
+const surfaceSummaryCardOptionRowChevronVariants = cva("shrink-0 text-muted-foreground", {
+  variants: {
+    density: {
+      default: "size-4 [&_svg:not([class*='size-'])]:size-4",
+      compact: "size-3.5 [&_svg:not([class*='size-'])]:size-3.5",
+    },
+  },
+  defaultVariants: {
+    density: "default",
+  },
+});
 
 const surfaceSummaryCardSelectRowVariants = cva(
-  "flex min-w-0 w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors has-focus-visible:outline-none has-focus-visible:ring-2 has-focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-50",
+  "flex min-w-0 w-full items-center rounded-sm border text-left transition-colors has-focus-visible:outline-none has-focus-visible:ring-2 has-focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       selected: {
@@ -117,10 +144,15 @@ const surfaceSummaryCardSelectRowVariants = cva(
         true: "cursor-pointer",
         false: "cursor-default",
       },
+      density: {
+        default: "gap-3 px-3 py-2.5",
+        compact: "gap-2 px-2 py-1.5",
+      },
     },
     defaultVariants: {
       selected: false,
       interactive: true,
+      density: "default",
     },
   }
 );
@@ -140,7 +172,19 @@ const surfaceSummaryCardSurfaceDisplayVariants = cva("flex min-w-0 w-full items-
 
 const surfaceSummaryCardSurfaceActionsClass = "shrink-0";
 
-const surfaceSummaryCardSelectRowListClass = "flex min-w-0 flex-col gap-2";
+const surfaceSummaryCardSelectRowControlClass = "shrink-0";
+
+const surfaceSummaryCardSelectRowListVariants = cva("flex min-w-0 flex-col", {
+  variants: {
+    density: {
+      default: "gap-2",
+      compact: "gap-1",
+    },
+  },
+  defaultVariants: {
+    density: "default",
+  },
+});
 
 const surfaceSummaryCardSurfaceSummaryClass = "flex min-w-0 flex-col gap-2";
 
@@ -163,11 +207,28 @@ const surfaceSummaryCardActionGroupVariants = cva(
 
 const surfaceSummaryCardIconActionGroupClass = "flex shrink-0 items-center gap-1";
 
-const surfaceSummaryCardScanListSectionClass = "flex w-full min-w-0 flex-col gap-2";
+const surfaceSummaryCardScanListSectionClass = "flex min-h-0 w-full min-w-0 flex-1 flex-col gap-2";
 const surfaceSummaryCardScanListSectionHeaderClass = "flex min-w-0 shrink-0 items-center justify-between gap-2";
 const surfaceSummaryCardScanListSectionLabelClass = "text-muted-foreground text-xs";
 const surfaceSummaryCardScanListStatusClass = "text-muted-foreground flex shrink-0 items-center gap-2 text-xs";
 const surfaceSummaryCardScanListErrorClass = "shrink-0 text-destructive text-xs";
+const surfaceSummaryCardScanListScrollRegionClass =
+  "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-sm border border-border/80 bg-card text-card-foreground shadow-sm";
+const surfaceSummaryCardScanListScrollAreaClass = "min-h-0 w-full flex-1 rounded-[inherit]";
+const surfaceSummaryCardScanListScrollLoaderClass =
+  "pointer-events-auto absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-card/80 px-6 backdrop-blur-[1px]";
+const surfaceSummaryCardScanListScrollInlineProgressClass =
+  "flex shrink-0 flex-col gap-1.5 border-b border-border/60 px-3 py-2";
+const surfaceSummaryCardScanListScrollInlineSpinnerClass =
+  "text-muted-foreground flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-2 text-xs";
+const surfaceSummaryCardScanListProgressPanelClass = "flex w-full min-w-0 max-w-xs flex-col gap-1.5";
+const surfaceSummaryCardScanListProgressLabelClass = "text-sm font-medium leading-none";
+const surfaceSummaryCardScanListProgressDetailClass = "text-muted-foreground text-xs leading-snug tabular-nums";
+const surfaceSummaryCardScanListScrollToolbarClass =
+  "flex shrink-0 min-w-0 items-center justify-between gap-2 border-b border-border/60 px-3 py-2";
+const surfaceSummaryCardScanListScrollTitleClass = "text-sm font-medium leading-none";
+const surfaceSummaryCardScanListScrollContentClass = "px-3 py-1.5";
+const surfaceSummaryCardScanListScrollEmptyClass = "flex min-h-16 items-center text-muted-foreground text-xs";
 
 const surfaceSummaryCardPageIntroClass = "space-y-1";
 const surfaceSummaryCardPageIntroTitleClass = "text-sm font-medium";
@@ -199,9 +260,17 @@ function SurfaceSummaryCardBody({ className, ...props }: React.ComponentProps<"d
   );
 }
 
-function SurfaceSummaryCardTitle({ className, ...props }: React.ComponentProps<"p">) {
+function SurfaceSummaryCardTitle({
+  className,
+  density,
+  ...props
+}: React.ComponentProps<"p"> & VariantProps<typeof surfaceSummaryCardTitleVariants>) {
   return (
-    <p data-slot="surface-summary-card-title" className={cn(surfaceSummaryCardTitleClass, className)} {...props} />
+    <p
+      data-slot="surface-summary-card-title"
+      className={cn(surfaceSummaryCardTitleVariants({ density }), className)}
+      {...props}
+    />
   );
 }
 
@@ -370,12 +439,13 @@ function SurfaceSummaryCardIntro({ className, ...props }: React.ComponentProps<"
 function SurfaceSummaryCardIconBox({
   className,
   tone,
+  density,
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardIconBoxVariants>) {
   return (
     <div
       data-slot="surface-summary-card-icon-box"
-      className={cn(surfaceSummaryCardIconBoxVariants({ tone }), className)}
+      className={cn(surfaceSummaryCardIconBoxVariants({ tone, density }), className)}
       {...props}
     />
   );
@@ -495,11 +565,16 @@ function SurfaceSummaryCardNestedCardList({ className, ...props }: React.Compone
   );
 }
 
-function SurfaceSummaryCardOptionRowChevron({ className, children, ...props }: React.ComponentProps<"span">) {
+function SurfaceSummaryCardOptionRowChevron({
+  className,
+  density,
+  children,
+  ...props
+}: React.ComponentProps<"span"> & VariantProps<typeof surfaceSummaryCardOptionRowChevronVariants>) {
   return (
     <span
       data-slot="surface-summary-card-option-row-chevron"
-      className={cn(surfaceSummaryCardOptionRowChevronClass, "[&_svg:not([class*='size-'])]:size-4", className)}
+      className={cn(surfaceSummaryCardOptionRowChevronVariants({ density }), className)}
       {...props}
     >
       {children}
@@ -511,6 +586,7 @@ function SurfaceSummaryCardSelectRow({
   className,
   selected = false,
   interactive = true,
+  density,
   htmlFor,
   children,
   ...props
@@ -520,11 +596,22 @@ function SurfaceSummaryCardSelectRow({
       htmlFor={htmlFor}
       data-slot="surface-summary-card-select-row"
       data-selected={selected ? "true" : "false"}
-      className={cn(surfaceSummaryCardSelectRowVariants({ selected, interactive }), className)}
+      data-density={density ?? "default"}
+      className={cn(surfaceSummaryCardSelectRowVariants({ selected, interactive, density }), className)}
       {...props}
     >
       {children}
     </label>
+  );
+}
+
+function SurfaceSummaryCardSelectRowControl({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-select-row-control"
+      className={cn(surfaceSummaryCardSelectRowControlClass, className)}
+      {...props}
+    />
   );
 }
 
@@ -578,11 +665,16 @@ function SurfaceSummaryCardSurfaceDisplaySkeleton(props: SurfaceSummaryCardSurfa
   );
 }
 
-function SurfaceSummaryCardSelectRowList({ className, ...props }: React.ComponentProps<"div">) {
+function SurfaceSummaryCardSelectRowList({
+  className,
+  density,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardSelectRowListVariants>) {
   return (
     <div
       data-slot="surface-summary-card-select-row-list"
-      className={cn(surfaceSummaryCardSelectRowListClass, className)}
+      data-density={density ?? "default"}
+      className={cn(surfaceSummaryCardSelectRowListVariants({ density }), className)}
       {...props}
     />
   );
@@ -655,6 +747,139 @@ function SurfaceSummaryCardScanListError({ className, ...props }: React.Componen
       className={cn(surfaceSummaryCardScanListErrorClass, className)}
       {...props}
     />
+  );
+}
+
+type SurfaceSummaryCardScanListLoadingProgress = {
+  value: number | null;
+  indeterminate?: boolean;
+  label: string;
+  detail?: string;
+};
+
+type SurfaceSummaryCardScanListScrollBodyProps = {
+  "data-slot": string;
+  loading?: boolean;
+  loadingAriaLabel?: string;
+  loadingProgress?: SurfaceSummaryCardScanListLoadingProgress | null;
+  inlineLoading?: boolean;
+  inlineLoadingAriaLabel?: string;
+  isEmpty?: boolean;
+  emptyMessage?: React.ReactNode;
+  toolbar?: React.ReactNode;
+  children: React.ReactNode;
+};
+
+function SurfaceSummaryCardScanListProgress(props: { progress: SurfaceSummaryCardScanListLoadingProgress }) {
+  const { progress } = props;
+  const { value, indeterminate = false, label, detail } = progress;
+  const ariaValueText = detail != null && detail.length > 0 ? `${label} ${detail}` : label;
+  const showIndeterminate = indeterminate || value == null;
+
+  return (
+    <div
+      className={surfaceSummaryCardScanListProgressPanelClass}
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={showIndeterminate ? undefined : (value ?? undefined)}
+      aria-valuetext={ariaValueText}
+      aria-label={label}
+      aria-busy={showIndeterminate}
+    >
+      <p className={surfaceSummaryCardScanListProgressLabelClass}>{label}</p>
+      {detail ? <p className={surfaceSummaryCardScanListProgressDetailClass}>{detail}</p> : null}
+      {showIndeterminate ? <Progress indeterminate /> : <Progress value={value ?? 0} />}
+    </div>
+  );
+}
+
+function SurfaceSummaryCardScanListScrollToolbar({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="surface-summary-card-scan-list-scroll-toolbar"
+      className={cn(surfaceSummaryCardScanListScrollToolbarClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardScanListScrollTitle({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="surface-summary-card-scan-list-scroll-title"
+      className={cn(surfaceSummaryCardScanListScrollTitleClass, className)}
+      {...props}
+    />
+  );
+}
+
+function SurfaceSummaryCardScanListScrollBody(props: SurfaceSummaryCardScanListScrollBodyProps) {
+  const {
+    "data-slot": dataSlot,
+    loading = false,
+    loadingAriaLabel,
+    loadingProgress = null,
+    inlineLoading = false,
+    inlineLoadingAriaLabel,
+    isEmpty = false,
+    emptyMessage,
+    toolbar,
+    children,
+  } = props;
+  const showOverlayProgress = loading && loadingProgress != null;
+  const showOverlaySpinner = loading && loadingProgress == null;
+  const showInlineProgress = loadingProgress != null && !loading;
+  const showInlineSpinner = inlineLoading && loadingProgress == null;
+  const isLoading = loading || loadingProgress != null || inlineLoading;
+
+  return (
+    <div
+      className={surfaceSummaryCardScanListScrollRegionClass}
+      data-slot={dataSlot}
+      data-state={isLoading ? "loading" : "idle"}
+    >
+      {showOverlayProgress ? (
+        <div className={surfaceSummaryCardScanListScrollLoaderClass} aria-live="polite">
+          <SurfaceSummaryCardScanListProgress progress={loadingProgress} />
+        </div>
+      ) : null}
+      {showOverlaySpinner ? (
+        <div
+          className={surfaceSummaryCardScanListScrollLoaderClass}
+          role="status"
+          aria-live="polite"
+          aria-label={loadingAriaLabel}
+        >
+          <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+        </div>
+      ) : null}
+      {toolbar}
+      {showInlineProgress ? (
+        <div className={surfaceSummaryCardScanListScrollInlineProgressClass} aria-live="polite">
+          <SurfaceSummaryCardScanListProgress progress={loadingProgress} />
+        </div>
+      ) : null}
+      {showInlineSpinner ? (
+        <div
+          className={surfaceSummaryCardScanListScrollInlineSpinnerClass}
+          role="status"
+          aria-live="polite"
+          aria-label={inlineLoadingAriaLabel}
+        >
+          <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+        </div>
+      ) : null}
+      <ScrollArea className={surfaceSummaryCardScanListScrollAreaClass} data-slot={`${dataSlot}_scroll`}>
+        {isEmpty && !loading ? (
+          <div className={cn(surfaceSummaryCardScanListScrollContentClass, surfaceSummaryCardScanListScrollEmptyClass)}>
+            {emptyMessage}
+          </div>
+        ) : (
+          <div className={surfaceSummaryCardScanListScrollContentClass}>{children}</div>
+        )}
+      </ScrollArea>
+    </div>
   );
 }
 
@@ -746,6 +971,9 @@ export {
   SurfaceSummaryCardPanelSectionLabel,
   SurfaceSummaryCardPending,
   SurfaceSummaryCardScanListError,
+  SurfaceSummaryCardScanListScrollBody,
+  SurfaceSummaryCardScanListScrollTitle,
+  SurfaceSummaryCardScanListScrollToolbar,
   SurfaceSummaryCardScanListSection,
   SurfaceSummaryCardScanListSectionHeader,
   SurfaceSummaryCardScanListSectionLabel,
@@ -753,6 +981,7 @@ export {
   SurfaceSummaryCardSection,
   SurfaceSummaryCardSectionLabel,
   SurfaceSummaryCardSelectRow,
+  SurfaceSummaryCardSelectRowControl,
   SurfaceSummaryCardSelectRowList,
   SurfaceSummaryCardSurfaceActionsMenu,
   SurfaceSummaryCardSurfaceDisplay,

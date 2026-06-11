@@ -4,8 +4,9 @@ import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { IconShieldLock } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
+import { useTowerSignOutTransition } from "@/features/auth/model/tower-sign-out-transition";
 import { OperatorShell } from "@/features/operator/ui/operator-shell";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { Button } from "@/shared/ui/button";
@@ -13,11 +14,28 @@ import { OperatorGateSkeleton } from "@/shared/ui/page-loading-skeletons";
 
 export function OperatorGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const signingOut = useTowerSignOutTransition();
   const { data: session, isPending } = authClient.useSession();
+  const lastOperatorUserRef = useRef<{ email: string; name: string } | null>(null);
   const isProductAdmin = isProductAdminAppRole(session?.user?.role);
   const operatorSignInHref = `/sign-in?callbackUrl=${encodeURIComponent(pathname || "/console")}`;
-
   const showGateLoading = useDeferredLoadingIndicator(isPending);
+
+  if (session?.user) {
+    lastOperatorUserRef.current = {
+      email: session.user.email,
+      name: session.user.name ?? "",
+    };
+  }
+
+  const lastOperatorUser = lastOperatorUserRef.current;
+  if (signingOut && lastOperatorUser) {
+    return (
+      <OperatorShell userEmail={lastOperatorUser.email} userName={lastOperatorUser.name}>
+        {children}
+      </OperatorShell>
+    );
+  }
   if (showGateLoading) {
     return <OperatorGateSkeleton />;
   }

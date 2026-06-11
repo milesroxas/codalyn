@@ -3,7 +3,9 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { ArrowLeftIcon, CircleUserRoundIcon, EllipsisVerticalIcon, LogOutIcon } from "lucide-react";
 import Link from "next/link";
+import { useRef } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
+import { useTowerSignOutTransition } from "@/features/auth/model/tower-sign-out-transition";
 import { useTowerWebSignOut } from "@/features/auth/model/use-tower-web-sign-out";
 import { avatarLetterFromUser } from "@/features/operator/model/format";
 import { userDisplayName } from "@/shared/lib/user-display-name";
@@ -21,18 +23,25 @@ import {
 import { Skeleton } from "@/shared/ui/skeleton";
 
 export function OperatorSidebarUser() {
+  const signingOut = useTowerSignOutTransition();
   const { data: session, isPending } = authClient.useSession();
-  const { signOut: onSignOut, signingOut } = useTowerWebSignOut();
+  const { signOut: onSignOut } = useTowerWebSignOut();
+  const lastUserRef = useRef(session?.user ?? null);
   const showSkeleton = useDeferredLoadingIndicator(isPending);
 
-  if (showSkeleton) {
+  if (session?.user) {
+    lastUserRef.current = session.user;
+  }
+
+  const user = session?.user ?? (signingOut ? lastUserRef.current : null);
+
+  if (showSkeleton && !user) {
     return <Skeleton className="h-12 w-full rounded-lg" aria-hidden />;
   }
-  if (isPending) {
+  if (isPending && !user) {
     return null;
   }
 
-  const user = session?.user;
   if (!user) {
     return null;
   }

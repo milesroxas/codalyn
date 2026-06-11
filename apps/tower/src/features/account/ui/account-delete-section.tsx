@@ -5,12 +5,15 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { resolveTowerAppCallbackUrl } from "@/features/auth/lib/email-verification";
 import { authClient } from "@/features/auth/model/auth-client";
+import {
+  completeTowerWebSignOutNavigation,
+  setTowerSignOutTransition,
+} from "@/features/auth/model/tower-sign-out-transition";
 import { buildTeamPageHref } from "@/features/team/lib/team-workspace-tab";
 import {
   type AccountDeletionBlocker,
   formatAccountDeletionBlockedMessage,
 } from "@/shared/lib/membership/user-account-deletion";
-import { resolveTowerPostSignOutUrl } from "@/shared/lib/navigation/resolve-tower-post-sign-out-url";
 import { Button } from "@/shared/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
 import { TypedConfirmAlertDialog } from "@/shared/ui/typed-confirm-alert-dialog";
@@ -87,8 +90,9 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
         return;
       }
       toast.success("Account deleted");
+      setTowerSignOutTransition(true);
       await authClient.signOut({ fetchOptions: { credentials: "include" } });
-      window.location.assign(resolveTowerPostSignOutUrl());
+      await completeTowerWebSignOutNavigation();
     } finally {
       setDeleteBusy(false);
     }

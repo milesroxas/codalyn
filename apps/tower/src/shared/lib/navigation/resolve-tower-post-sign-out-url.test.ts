@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resolveTowerMarketingOrigin, resolveTowerPostSignOutUrl } from "./resolve-tower-post-sign-out-url";
+import {
+  resolveTowerMarketingOrigin,
+  resolveTowerPostSignOutUrl,
+  resolveTowerSignOutNavigationHref,
+} from "./resolve-tower-post-sign-out-url";
 
 describe("resolveTowerPostSignOutUrl", () => {
   const envKeys = [
@@ -54,5 +58,17 @@ describe("resolveTowerPostSignOutUrl", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://tower.codalyn.app";
     process.env.TOWER_MARKETING_URL = "https://codalyn.app";
     expect(resolveTowerPostSignOutUrl({ hostname: "codalyn.app" })).toBe("/");
+  });
+});
+
+describe("resolveTowerSignOutNavigationHref", () => {
+  it("returns external destinations unchanged", () => {
+    expect(resolveTowerSignOutNavigationHref("https://codalyn.app/", "https://tower.codalyn.app")).toBe(
+      "https://codalyn.app/"
+    );
+  });
+
+  it("resolves same-origin paths without preserving the current query string", () => {
+    expect(resolveTowerSignOutNavigationHref("/", "https://tower.codalyn.app")).toBe("https://tower.codalyn.app/");
   });
 });

@@ -27,6 +27,11 @@ function towerAuthenticatedLegalInsetClassName(className?: string) {
   return cn("pt-4 md:pt-6", className);
 }
 
+/** Authenticated legal page shell — keeps site footer separated from document content. */
+function towerAuthenticatedLegalPageShellClassName(className?: string) {
+  return cn(towerAuthenticatedLegalInsetClassName(), "flex min-h-0 flex-1 flex-col", className);
+}
+
 function towerPageMainClassName(width: TowerAppShellContentWidth = "full", className?: string) {
   const maxWidth = towerAppShellContentWidths[width];
   return cn("w-full", maxWidth ? cn("mx-auto", maxWidth) : null, className);
@@ -126,6 +131,7 @@ export {
   TowerPageSection,
   towerAppShellContentClassName,
   towerAuthenticatedLegalInsetClassName,
+  towerAuthenticatedLegalPageShellClassName,
   towerLoggedOutMainClassName,
   towerPageMainClassName,
 };

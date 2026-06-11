@@ -2,7 +2,7 @@ import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 import { MarketingPageScroll } from "@/shared/ui/marketing-page-scroll";
-import { TowerPublicFooter } from "@/shared/ui/tower-public-footer";
+import { TowerMarketingPublicPageBody } from "@/shared/ui/tower-marketing-public-page-body";
 import { TowerPublicHeader, TowerPublicHeaderSpacer } from "@/shared/ui/tower-public-header";
 
 type MarketingProductHeroProps = {
@@ -60,10 +60,9 @@ function MarketingPageShell({
       />
       <TowerPublicHeaderSpacer />
       <MarketingPageScroll>
-        <main className="mx-auto flex w-full max-w-[90rem] flex-col gap-20 px-6 py-16 sm:px-12 lg:gap-28 lg:px-20 lg:py-24">
+        <TowerMarketingPublicPageBody contentAs="main" contentClassName="gap-20 lg:gap-28">
           {children}
-        </main>
-        <TowerPublicFooter variant="marketing" />
+        </TowerMarketingPublicPageBody>
       </MarketingPageScroll>
     </div>
   );

@@ -19,6 +19,11 @@ export const TOWER_MARKETING_SELF_CONTAINED_PATHS = ["/", TOWER_PRODUCT_MARKETIN
 
 export type TowerMarketingSelfContainedPath = (typeof TOWER_MARKETING_SELF_CONTAINED_PATHS)[number];
 
+/** Logged-out marketing inner pages that use app header chrome (for example legal). */
+export const TOWER_MARKETING_INNER_PAGE_PATHS = [TOWER_TERMS_PATH, TOWER_PRIVACY_PATH] as const;
+
+export type TowerMarketingInnerPagePath = (typeof TOWER_MARKETING_INNER_PAGE_PATHS)[number];
+
 function normalizePathname(pathname: string): string {
   return pathname === "" ? "/" : pathname;
 }
@@ -31,6 +36,11 @@ export function isTowerMarketingPublicPath(pathname: string): boolean {
 export function isTowerMarketingSelfContainedPath(pathname: string): boolean {
   const normalized = normalizePathname(pathname);
   return TOWER_MARKETING_SELF_CONTAINED_PATHS.some((path) => normalized === path);
+}
+
+export function isTowerMarketingInnerPagePath(pathname: string): boolean {
+  const normalized = normalizePathname(pathname);
+  return TOWER_MARKETING_INNER_PAGE_PATHS.some((path) => normalized === path);
 }
 
 /** Public marketing/legal pages that render `TowerPublicFooter`. */

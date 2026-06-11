@@ -1,44 +1,63 @@
-import { IconPlug, IconRadar2, IconUsers } from "@tabler/icons-react";
-import type * as React from "react";
-import { AuthPageFrame } from "@/features/tower-ui/auth-page-frame";
+"use client";
 
-export function AuthShell({ children }: { children: React.ReactNode }) {
+import { usePathname } from "next/navigation";
+import type * as React from "react";
+import { AuthPageBackButton } from "@/features/tower-ui/auth-page-back-button";
+import { AuthPageBackdrop } from "@/features/tower-ui/auth-page-backdrop";
+import { AuthSurfaceLegalNotice } from "@/features/tower-ui/auth-surface-legal-notice";
+import { cn } from "@/shared/lib/utils";
+
+const authShellContentWidths = {
+  md: "max-w-md",
+  lg: "max-w-lg",
+} as const;
+
+type AuthShellContentWidth = keyof typeof authShellContentWidths;
+
+type AuthShellLegalNoticeVariant = "signIn" | "signUp" | "generic";
+
+function resolveAuthShellLegalNoticeVariant(pathname: string): AuthShellLegalNoticeVariant {
+  if (pathname === "/sign-in" || pathname.startsWith("/sign-in/")) {
+    return "signIn";
+  }
+  if (pathname === "/sign-up" || pathname.startsWith("/sign-up/")) {
+    return "signUp";
+  }
+  return "generic";
+}
+
+type AuthShellProps = {
+  children: React.ReactNode;
+  backHref?: string;
+  backLabel?: string;
+  contentWidth?: AuthShellContentWidth;
+  legalNoticeVariant?: AuthShellLegalNoticeVariant;
+  className?: string;
+};
+
+export function AuthShell({
+  children,
+  backHref = "/",
+  backLabel = "Back",
+  contentWidth = "md",
+  legalNoticeVariant,
+  className,
+}: AuthShellProps) {
+  const pathname = usePathname();
+  const resolvedLegalNoticeVariant = legalNoticeVariant ?? resolveAuthShellLegalNoticeVariant(pathname);
+
   return (
-    <AuthPageFrame>
-      <div className="relative mx-auto flex h-full w-full max-w-6xl flex-col items-start justify-center gap-10 px-4 py-10 sm:gap-12 sm:py-12 md:items-center lg:flex-row lg:items-center lg:justify-between lg:gap-10 lg:px-8 lg:py-14">
-        <div className="mx-auto w-full max-w-sm shrink-0 text-left md:max-w-3xl md:text-center lg:mx-0 lg:max-w-sm lg:text-left">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground md:text-center lg:text-left">
-            Tower
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-balance sm:text-3xl md:text-center lg:text-left">
-            Built for Webflow teams
-          </h2>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground text-pretty md:text-center lg:text-left">
-            Secure sign-in for your Codalyn workspace. Same account for Beacon, integrations, and team settings.
-          </p>
-          <ul className="mt-8 grid w-full grid-cols-1 gap-4 text-left md:mt-10 md:grid-cols-3 md:gap-x-4 md:gap-y-8 md:text-center lg:mt-8 lg:flex lg:flex-col lg:gap-4 lg:text-left">
-            <li className="flex items-start gap-3 md:flex-col md:items-center md:gap-2 md:text-center lg:flex-row lg:items-center lg:gap-3 lg:text-left">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-background/70 shadow-sm backdrop-blur-sm dark:bg-background/40 lg:shrink-0">
-                <IconUsers aria-hidden className="size-4.5 text-primary" stroke={1.5} />
-              </span>
-              <p className="text-sm font-medium leading-snug text-foreground">Team workspaces, one place.</p>
-            </li>
-            <li className="flex items-start gap-3 md:flex-col md:items-center md:gap-2 md:text-center lg:flex-row lg:items-center lg:gap-3 lg:text-left">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-background/70 shadow-sm backdrop-blur-sm dark:bg-background/40 lg:shrink-0">
-                <IconPlug aria-hidden className="size-4.5 text-primary" stroke={1.5} />
-              </span>
-              <p className="text-sm font-medium leading-snug text-foreground">OAuth and Data API, unified.</p>
-            </li>
-            <li className="flex items-start gap-3 md:flex-col md:items-center md:gap-2 md:text-center lg:flex-row lg:items-center lg:gap-3 lg:text-left">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-background/70 shadow-sm backdrop-blur-sm dark:bg-background/40 lg:shrink-0">
-                <IconRadar2 aria-hidden className="size-4.5 text-primary" stroke={1.5} />
-              </span>
-              <p className="text-sm font-medium leading-snug text-foreground">Beacon syncs with Tower.</p>
-            </li>
-          </ul>
-        </div>
-        <div className="mx-auto w-full max-w-md shrink-0 lg:mx-0">{children}</div>
+    <div className={cn("relative min-h-dvh bg-background", className)}>
+      <AuthPageBackdrop />
+      <div className="absolute left-0 top-0 z-10 px-4 py-4 sm:px-6">
+        <AuthPageBackButton href={backHref} label={backLabel} />
       </div>
-    </AuthPageFrame>
+      <div className="flex min-h-dvh flex-col items-center justify-center px-4 py-16 sm:px-6 sm:py-20">
+        <div className={cn("w-full", authShellContentWidths[contentWidth])}>
+          {children}
+          <AuthSurfaceLegalNotice variant={resolvedLegalNoticeVariant} />
+        </div>
+      </div>
+    </div>
   );
 }

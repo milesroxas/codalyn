@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isTowerMarketingInnerPagePath,
   isTowerMarketingPublicPath,
   isTowerMarketingSelfContainedPath,
   isTowerPublicFooterPath,
@@ -23,6 +24,13 @@ describe("tower marketing paths", () => {
     expect(isTowerMarketingSelfContainedPath("/flint")).toBe(true);
     expect(isTowerMarketingSelfContainedPath("/tower")).toBe(true);
     expect(isTowerMarketingSelfContainedPath("/sign-in")).toBe(false);
+  });
+
+  it("recognizes marketing inner pages", () => {
+    expect(isTowerMarketingInnerPagePath("/terms")).toBe(true);
+    expect(isTowerMarketingInnerPagePath("/privacy")).toBe(true);
+    expect(isTowerMarketingInnerPagePath("/tower")).toBe(false);
+    expect(isTowerMarketingInnerPagePath("/sign-in")).toBe(false);
   });
 
   it("recognizes public footer paths", () => {

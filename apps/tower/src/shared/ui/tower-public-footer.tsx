@@ -71,4 +71,5 @@ function TowerPublicFooter({ variant = "default", placement = "static", classNam
   );
 }
 
+export type { TowerPublicFooterVariant };
 export { TowerPublicFooter };

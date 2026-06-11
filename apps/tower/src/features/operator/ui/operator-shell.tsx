@@ -155,7 +155,13 @@ function OperatorShellContent({ userEmail, userName, children }: OperatorShellPr
   );
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+    <div
+      className={cn(
+        "relative flex h-dvh flex-col overflow-hidden bg-background text-foreground",
+        signingOut && "pointer-events-none tl-marketing-page-transition--exit"
+      )}
+      aria-busy={signingOut || undefined}
+    >
       {/* Top bar */}
       <header className="z-40 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/90 px-3 backdrop-blur supports-backdrop-filter:bg-background/75 sm:px-4">
         <Button

@@ -101,3 +101,11 @@ export function resolveTowerPostSignOutUrl(options?: { hostname?: string }): str
 export function isTowerPostSignOutExternalUrl(url: string): boolean {
   return url.startsWith("http://") || url.startsWith("https://");
 }
+
+/** Absolute URL for a hard post-sign-out navigation (drops the current query string/hash). */
+export function resolveTowerSignOutNavigationHref(destination: string, origin: string): string {
+  if (isTowerPostSignOutExternalUrl(destination)) {
+    return destination;
+  }
+  return new URL(destination, origin).href;
+}

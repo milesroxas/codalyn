@@ -114,6 +114,8 @@ async function visitComponentInstanceInteriorCanvasOrder(
 
 export type CollectWebflowStructureNodesOptions = {
   onDiscovered?: (count: number) => void;
+  /** When provided, skips an extra `webflow.getAllElements()` call during collection. */
+  allElements?: AnyElement[];
 };
 
 /**
@@ -125,7 +127,7 @@ export async function collectWebflowStructureNodesInCanvasOrder(
   options?: CollectWebflowStructureNodesOptions
 ): Promise<AnyElement[]> {
   const onDiscovered = options?.onDiscovered;
-  const all = await webflow.getAllElements();
+  const all = options?.allElements ?? (await webflow.getAllElements());
   const start = await readWebflowPageStructureStart();
   if (start == null) {
     return [];

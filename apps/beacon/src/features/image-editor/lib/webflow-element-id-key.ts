@@ -3,6 +3,16 @@ export function webflowElementIdKey(el: AnyElement): string {
   return `${el.id.component}|${el.id.element}`;
 }
 
+function stableWebflowIdFallbackKey(id: object): string {
+  const record = id as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  const normalized: Record<string, unknown> = {};
+  for (const key of keys) {
+    normalized[key] = record[key];
+  }
+  return JSON.stringify(normalized);
+}
+
 /**
  * Map key for parent-graph walks (elements + **slot instances**). Uses explicit id fields
  * so lookups match `linkAsChildOf` / `getChildren` **even when** different `id` object
@@ -20,5 +30,5 @@ export function webflowTreeNodeKey(node: { id: object }): string {
     }
     return `${id.component}|${id.element}`;
   }
-  return JSON.stringify(node.id);
+  return stableWebflowIdFallbackKey(node.id);
 }

@@ -15,6 +15,23 @@ export type ImageEditorTargetScanProgressView = {
 
 export const IMAGE_PAGE_TARGET_SCAN_PROGRESS_DELAY_MS = 1500;
 
+export const IMAGE_PAGE_TARGET_SCAN_FALLBACK_PROGRESS: ImagePageTargetScanProgress = {
+  phase: "collecting",
+  scannedElements: 0,
+  totalElements: 0,
+  foundTargets: 0,
+};
+
+export function resolveImagePageTargetScanLoadingProgress(
+  scanProgress: ImagePageTargetScanProgress | null,
+  showProgressBar: boolean
+): ImageEditorTargetScanProgressView | null {
+  if (!showProgressBar) {
+    return null;
+  }
+  return formatImagePageTargetScanProgress(scanProgress ?? IMAGE_PAGE_TARGET_SCAN_FALLBACK_PROGRESS);
+}
+
 export function formatImagePageTargetScanCollectionDetail(discovered: number): string {
   return `${discovered.toLocaleString()} elements mapped…`;
 }

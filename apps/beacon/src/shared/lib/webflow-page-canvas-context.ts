@@ -14,7 +14,13 @@ export async function readCurrentPageIdOrNull(): Promise<string | null> {
   try {
     const page = await webflow.getCurrentPage();
     const id = page?.id;
-    return typeof id === "string" && id.length > 0 ? id : null;
+    if (typeof id === "string" && id.length > 0) {
+      return id;
+    }
+    if (typeof id === "number" && Number.isFinite(id)) {
+      return String(id);
+    }
+    return null;
   } catch (err) {
     if (isMissingCurrentPageError(err)) {
       return null;

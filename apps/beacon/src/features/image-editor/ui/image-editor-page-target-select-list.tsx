@@ -2,8 +2,8 @@ import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { useMemo } from "react";
 import { imagePageTargetTablerIcon } from "@/features/image-editor/lib/image-editor-page-target-icon";
 import {
-  formatImagePageTargetScanProgress,
   IMAGE_PAGE_TARGET_SCAN_PROGRESS_DELAY_MS,
+  resolveImagePageTargetScanLoadingProgress,
 } from "@/features/image-editor/lib/image-editor-target-scan-progress";
 import {
   IMAGE_TARGET_STEP_EMPTY,
@@ -140,7 +140,7 @@ function ImagePageTargetScanListScrollPanel(
   const showInlineScanLoading = useDeferredLoadingIndicator(scanPending && targets.length > 0);
   const showScanProgressBar = useDeferredLoadingIndicator(scanPending, IMAGE_PAGE_TARGET_SCAN_PROGRESS_DELAY_MS);
   const loadingProgress = useMemo(
-    () => (showScanProgressBar && scanProgress != null ? formatImagePageTargetScanProgress(scanProgress) : null),
+    () => resolveImagePageTargetScanLoadingProgress(scanProgress, showScanProgressBar),
     [scanProgress, showScanProgressBar]
   );
   const isEmpty = pageScanned && targets.length === 0 && !scanPending;

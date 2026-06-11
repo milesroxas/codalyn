@@ -24,11 +24,10 @@ afterEach(() => {
 });
 
 describe("middleware host split", () => {
-  it("redirects logged-out app host / to the marketing homepage", () => {
+  it("does not redirect logged-out app host / in middleware", () => {
     process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
     const response = middleware(makeRequest("tower-preview.codalyn.app", "/"));
-    expect(response?.status).toBe(307);
-    expect(response?.headers.get("location")).toBe("https://preview.codalyn.app/");
+    expect(response?.status).not.toBe(307);
   });
 
   it("allows marketing host / when logged out", () => {

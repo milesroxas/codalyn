@@ -101,9 +101,9 @@ describe("tower-hosts", () => {
     expect(buildMarketingUrl("/")).toBe("https://codalyn.app/");
     expect(buildFlintMarketingUrl("/")).toBe("https://flint.codalyn.app/");
     expect(buildTowerLandingAppLinks("tower.codalyn.app").home).toBe("https://codalyn.app/");
-    expect(buildTowerLandingAppLinks("tower.codalyn.app").tower).toBe("https://tower.codalyn.app/");
+    expect(buildTowerLandingAppLinks("tower.codalyn.app").tower).toBe("https://codalyn.app/tower");
     expect(buildTowerLandingAppLinks("tower.codalyn.app").beacon).toBe("https://codalyn.app/beacon");
-    expect(buildTowerLandingAppLinks("tower.codalyn.app").flint).toBe("https://flint.codalyn.app/");
+    expect(buildTowerLandingAppLinks("tower.codalyn.app").flint).toBe("https://codalyn.app/flint");
     expect(buildTowerLandingAppLinks("codalyn.app").home).toBe("/");
     expect(buildTowerLandingAppLinks("codalyn.app").tower).toBe("/tower");
     expect(buildTowerLandingAppLinks("codalyn.app").beacon).toBe("/beacon");
@@ -125,7 +125,7 @@ describe("tower-hosts", () => {
     process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
     expect(isFlintMarketingHost("flint-preview.codalyn.app")).toBe(true);
     expect(isFlintMarketingHost("flint.codalyn.app")).toBe(true);
-    expect(resolveTowerPublicFlintHref("tower-preview.codalyn.app")).toBe("https://flint-preview.codalyn.app/");
+    expect(resolveTowerPublicFlintHref("tower-preview.codalyn.app")).toBe("https://preview.codalyn.app/flint");
   });
 
   it("derives marketing origin from tower app URL when TOWER_MARKETING_URL is unset", () => {

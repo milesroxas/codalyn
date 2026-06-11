@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type * as React from "react";
 
 import { TOWER_PRODUCT_MARKETING_PATH } from "@/shared/lib/navigation/tower-marketing-paths";
@@ -6,7 +5,7 @@ import { cn } from "@/shared/lib/utils";
 import { CodalynLogo } from "@/shared/ui/codalyn-logo";
 import { TowerPublicHeaderAuthActions } from "@/shared/ui/tower-public-header-auth-actions";
 import { TowerPublicHeaderMobileMenu } from "@/shared/ui/tower-public-header-mobile-menu";
-import { TowerPublicHeaderProductNav } from "@/shared/ui/tower-public-header-product-nav";
+import { TowerPublicHeaderLink, TowerPublicHeaderProductNav } from "@/shared/ui/tower-public-header-product-nav";
 
 export const TOWER_PUBLIC_HEADER_HEIGHT_PX = 72;
 
@@ -60,21 +59,21 @@ function TowerPublicHeader({
             signInHref={signInHref}
           />
 
-          <Link
+          <TowerPublicHeaderLink
             href={homeHref}
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white transition-opacity hover:opacity-80"
           >
             <CodalynLogo />
-          </Link>
+          </TowerPublicHeaderLink>
 
           {authActions}
         </div>
 
         <div className="relative mx-auto hidden h-12 w-full md:block">
           <div className="pointer-events-auto absolute top-0 left-1/2 flex -translate-x-1/2 items-center gap-14 rounded-sm bg-[#FFFFFF40] px-4 py-2 backdrop-blur-sm">
-            <Link href={homeHref} className="text-white transition-opacity hover:opacity-80">
+            <TowerPublicHeaderLink href={homeHref} className="text-white transition-opacity hover:opacity-80">
               <CodalynLogo />
-            </Link>
+            </TowerPublicHeaderLink>
             <TowerPublicHeaderProductNav
               activeProduct={activeProduct}
               beaconHref={beaconHref}

@@ -17,22 +17,22 @@ type ProductNavItem = {
   label: string;
 };
 
-function TowerPublicHeaderNavLink({
+function isExternalHref(href: string): boolean {
+  return href.startsWith("http");
+}
+
+function TowerPublicHeaderLink({
   href,
   active,
+  className,
   children,
 }: {
   href: string;
   active?: boolean;
+  className?: string;
   children: React.ReactNode;
 }) {
-  const isAbsolute = href.startsWith("http");
-  const className = cn(
-    "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-white transition-colors hover:bg-white/10",
-    active && "bg-white/20"
-  );
-
-  if (isAbsolute) {
+  if (isExternalHref(href)) {
     return (
       <a href={href} className={className} aria-current={active ? "page" : undefined}>
         {children}
@@ -44,6 +44,29 @@ function TowerPublicHeaderNavLink({
     <Link href={href} className={className} aria-current={active ? "page" : undefined}>
       {children}
     </Link>
+  );
+}
+
+function TowerPublicHeaderNavLink({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <TowerPublicHeaderLink
+      href={href}
+      active={active}
+      className={cn(
+        "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-white transition-colors hover:bg-white/10",
+        active && "bg-white/20"
+      )}
+    >
+      {children}
+    </TowerPublicHeaderLink>
   );
 }
 
@@ -70,4 +93,4 @@ function TowerPublicHeaderProductNav({
   );
 }
 
-export { TowerPublicHeaderProductNav };
+export { TowerPublicHeaderLink, TowerPublicHeaderProductNav };

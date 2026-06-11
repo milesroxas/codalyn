@@ -10,7 +10,14 @@ import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { getTowerDashboardSummary } from "@/server/dashboard-summary";
 import { createMarketingPageMetadata } from "@/server/marketing/marketing-seo";
-import { buildTowerLandingAppLinks, isMarketingHost, normalizeHostname } from "@/server/tower-hosts";
+import {
+  buildMarketingUrl,
+  buildTowerLandingAppLinks,
+  isAppHost,
+  isHostSplitEnabled,
+  isMarketingHost,
+  normalizeHostname,
+} from "@/server/tower-hosts";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +39,10 @@ export default async function HomePage() {
   }
 
   const summary = await getTowerDashboardSummary({ includeWebflowSites: false });
+
+  if (!summary.signedIn && isHostSplitEnabled() && isAppHost(host)) {
+    redirect(buildMarketingUrl("/"));
+  }
 
   if (summary.signedIn) {
     const h = await headers();

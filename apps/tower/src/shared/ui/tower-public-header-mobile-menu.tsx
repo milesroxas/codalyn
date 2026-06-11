@@ -1,7 +1,6 @@
 "use client";
 
 import { IconMenu2 } from "@tabler/icons-react";
-import Link from "next/link";
 
 import { Button } from "@/shared/ui/button";
 import {
@@ -12,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import type { TowerPublicHeaderProduct } from "@/shared/ui/tower-public-header";
+import { TowerPublicHeaderLink } from "@/shared/ui/tower-public-header-product-nav";
 
 type TowerPublicHeaderMobileMenuProps = {
   activeProduct?: TowerPublicHeaderProduct;
@@ -50,14 +50,14 @@ function TowerPublicHeaderMobileMenu({
       <DropdownMenuContent align="start" className="min-w-44">
         {items.map((item) => (
           <DropdownMenuItem key={item.id} asChild data-active={activeProduct === item.id ? true : undefined}>
-            <Link href={item.href} aria-current={activeProduct === item.id ? "page" : undefined}>
+            <TowerPublicHeaderLink href={item.href} active={activeProduct === item.id}>
               {item.label}
-            </Link>
+            </TowerPublicHeaderLink>
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href={signInHref}>Sign in</Link>
+          <TowerPublicHeaderLink href={signInHref}>Sign in</TowerPublicHeaderLink>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

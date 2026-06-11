@@ -85,7 +85,7 @@ export function TowerAppShell({
 
   const authenticated = isPending ? signedIn : Boolean(session?.user);
 
-  if (isTowerMarketingSelfContainedPath(pathname)) {
+  if (isTowerMarketingSelfContainedPath(pathname) && !authenticated) {
     return children;
   }
 

@@ -264,14 +264,14 @@ export function resolveTowerPublicHomeHref(hostname: string): string {
   return "/";
 }
 
-/** Product marketing page for Tower — `/tower` on marketing/unified hosts, app origin when split on the app host. */
+/** Product marketing page for Tower — `/tower` on marketing/unified hosts, marketing origin when split on the app host. */
 export function resolveTowerPublicTowerHref(hostname: string): string {
   const normalized = normalizeHostname(hostname);
   if (isHostSplitEnabled()) {
     if (normalized && isMarketingHost(normalized)) {
       return "/tower";
     }
-    return buildTowerAppUrl("/");
+    return buildMarketingUrl("/tower");
   }
   return "/tower";
 }
@@ -308,7 +308,7 @@ export function resolveTowerPublicFlintHref(hostname: string): string {
     return "/flint";
   }
   if (isHostSplitEnabled()) {
-    return buildFlintMarketingUrl("/");
+    return buildMarketingUrl("/flint");
   }
   return "/flint";
 }

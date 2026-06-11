@@ -86,7 +86,7 @@ describe("middleware host split", () => {
     const response = middleware(
       makeRequest(
         "tower.codalyn.app",
-        "/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F%3FemailVerified%3D1"
+        "/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F"
       )
     );
     expect(response?.status).not.toBe(307);
@@ -112,14 +112,11 @@ describe("middleware host split", () => {
     process.env.TOWER_HOST_SPLIT = "1";
     process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
     const response = middleware(
-      makeRequest(
-        "codalyn.app",
-        "/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F%3FemailVerified%3D1"
-      )
+      makeRequest("codalyn.app", "/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F")
     );
     expect(response?.status).toBe(307);
     expect(response?.headers.get("location")).toBe(
-      "https://tower.codalyn.app/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F%3FemailVerified%3D1"
+      "https://tower.codalyn.app/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F"
     );
   });
 

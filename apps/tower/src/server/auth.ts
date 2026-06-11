@@ -21,6 +21,8 @@ import {
   rewriteBetterAuthVerifyEmailUrlToAppPage,
   rewriteVerifyEmailCallbackUrl,
 } from "@/server/auth/email-verification-token";
+import { setTowerEmailVerifiedFlashCookieInHook } from "@/server/auth/tower-auth-flash-cookie";
+import { shouldSetTowerEmailVerifiedFlashAfterVerifyEmail } from "@/server/auth/tower-email-verification-after-hook";
 import { resolveAuthSecret } from "@/server/auth-secret";
 import { sendChangeEmailConfirmationEmail } from "@/server/email/change-email-confirmation-email";
 import { sendChangeEmailNewAddressVerificationEmail } from "@/server/email/change-email-new-address-email";
@@ -180,6 +182,19 @@ export const auth = betterAuth({
         await assertUserMaySignInByEmail(email);
         await trustEmailForPendingTeamInvitation(email, readTeamInvitationIdFromAuthContext(ctx));
         await trustEmailForOperatorInvite(email, readOperatorInviteTokenFromAuthContext(ctx));
+      }
+    }),
+    after: createAuthMiddleware(async (ctx) => {
+      const token = typeof ctx.query?.token === "string" ? ctx.query.token : null;
+      const redirectLocation = ctx.context.responseHeaders?.get("location") ?? null;
+      if (
+        shouldSetTowerEmailVerifiedFlashAfterVerifyEmail({
+          path: ctx.path,
+          token,
+          redirectLocation,
+        })
+      ) {
+        setTowerEmailVerifiedFlashCookieInHook(ctx);
       }
     }),
   },

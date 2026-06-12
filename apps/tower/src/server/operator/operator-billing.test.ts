@@ -74,9 +74,9 @@ describe("buildOperatorOrgBillingSnapshot", () => {
 });
 
 describe("buildOperatorUserBillingSnapshot", () => {
-  it("does not grant stripe pro when billing feature is off", () => {
+  it("marks stripe individual pro subscriptions as entitled when billing is enabled", () => {
     const prev = process.env.TOWER_BILLING_ENABLED;
-    process.env.TOWER_BILLING_ENABLED = "0";
+    process.env.TOWER_BILLING_ENABLED = "1";
     try {
       expect(
         buildOperatorUserBillingSnapshot({
@@ -85,8 +85,11 @@ describe("buildOperatorUserBillingSnapshot", () => {
           stripeSubscriptionId: "sub_1",
         })
       ).toEqual({
+        billingMode: "stripe_individual",
         billingManagedByStripe: true,
-        hasStripePro: false,
+        isIndividualPaidEntitled: true,
+        displayBillingPlan: "pro",
+        planLabel: "Pro",
       });
     } finally {
       if (prev === undefined) {
@@ -95,6 +98,48 @@ describe("buildOperatorUserBillingSnapshot", () => {
         process.env.TOWER_BILLING_ENABLED = prev;
       }
     }
+  });
+
+  it("does not grant individual paid entitlements when billing feature is off", () => {
+    const prev = process.env.TOWER_BILLING_ENABLED;
+    process.env.TOWER_BILLING_ENABLED = "0";
+    try {
+      expect(
+        buildOperatorUserBillingSnapshot({
+          subscriptionPlan: "studio",
+          subscriptionStatus: "active",
+          stripeSubscriptionId: "sub_1",
+        })
+      ).toEqual({
+        billingMode: "stripe_individual",
+        billingManagedByStripe: true,
+        isIndividualPaidEntitled: false,
+        displayBillingPlan: "studio",
+        planLabel: "Studio",
+      });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.TOWER_BILLING_ENABLED;
+      } else {
+        process.env.TOWER_BILLING_ENABLED = prev;
+      }
+    }
+  });
+
+  it("marks users without stripe subscriptions as free", () => {
+    expect(
+      buildOperatorUserBillingSnapshot({
+        subscriptionPlan: "free",
+        subscriptionStatus: null,
+        stripeSubscriptionId: null,
+      })
+    ).toEqual({
+      billingMode: "free",
+      billingManagedByStripe: false,
+      isIndividualPaidEntitled: false,
+      displayBillingPlan: null,
+      planLabel: "Free",
+    });
   });
 });
 

@@ -220,8 +220,11 @@ export type OperatorUserRow = {
   subscriptionStatus: string | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
+  billingMode: OperatorUserBillingMode;
   billingManagedByStripe: boolean;
-  hasStripePro: boolean;
+  isIndividualPaidEntitled: boolean;
+  displayBillingPlan: string | null;
+  planLabel: string;
   memberships: number;
   usage: OperatorUsageLimitsView;
   createdAt: string;
@@ -260,6 +263,8 @@ export type OperatorUserDetail = OperatorUserRow & {
   activeSessions: OperatorUserSession[];
   usageTrend: OperatorUsageTrendPoint[];
 };
+
+export type OperatorUserBillingMode = "free" | "stripe_individual";
 
 export type OperatorWorkspaceBillingMode = "free" | "stripe_team" | "legacy_paid";
 

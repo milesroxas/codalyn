@@ -16,6 +16,7 @@ import Link from "next/link";
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { formatOperatorUserDeleteError, OperatorApiError, operatorApi } from "@/features/operator/api/client";
+import { operatorUserBillingModeDescription } from "@/features/operator/lib/operator-user-billing-copy";
 import {
   appRoleLabel,
   formatDateTime,
@@ -23,6 +24,7 @@ import {
   initialsFor,
   userAgentSummary,
 } from "@/features/operator/model/format";
+import { OperatorBillingPlanBadges } from "@/features/operator/ui/operator-billing-plan-badges";
 import {
   OperatorDetailSheetAccessibleTitle,
   OperatorDetailSheetSkeleton,
@@ -34,6 +36,7 @@ import {
 } from "@/features/operator/ui/operator-usage-limits-section";
 import { OperatorUsageTrendSection } from "@/features/operator/ui/operator-usage-trend-section";
 import type { OperatorUserDetail, OperatorUserPatch, OperatorUserRow } from "@/server/operator/types";
+import { usageTierLabel } from "@/shared/lib/usage-display";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -97,8 +100,11 @@ function detailToRow(d: OperatorUserDetail): OperatorUserRow {
     subscriptionStatus: d.subscriptionStatus,
     stripeCustomerId: d.stripeCustomerId,
     stripeSubscriptionId: d.stripeSubscriptionId,
+    billingMode: d.billingMode,
     billingManagedByStripe: d.billingManagedByStripe,
-    hasStripePro: d.hasStripePro,
+    isIndividualPaidEntitled: d.isIndividualPaidEntitled,
+    displayBillingPlan: d.displayBillingPlan,
+    planLabel: d.planLabel,
     webflowConnected: d.webflowConnected,
     memberships: d.memberships,
     usage: d.usage,
@@ -322,12 +328,10 @@ function OperatorCustomerDetailSheetBody(props: OperatorCustomerDetailSheetBodyP
                   Banned
                 </Badge>
               ) : null}
-              {detail.hasStripePro ? (
-                <Badge variant="secondary">
-                  <IconCreditCard className="size-3" />
-                  Stripe Pro
-                </Badge>
-              ) : null}
+              <Badge variant={detail.billingMode === "free" ? "outline" : "secondary"}>
+                <IconCreditCard className="size-3" />
+                {detail.planLabel}
+              </Badge>
             </div>
           </div>
         </div>
@@ -413,31 +417,34 @@ function OperatorCustomerDetailSheetBody(props: OperatorCustomerDetailSheetBodyP
 function CustomerBillingSection({ detail }: { detail: OperatorUserDetail }) {
   return (
     <section className="space-y-3">
-      <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Billing</h3>
+      <div className="flex items-center gap-2">
+        <IconCreditCard className="size-4 text-muted-foreground" aria-hidden />
+        <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Individual billing</h3>
+      </div>
       <div className="space-y-3 rounded-lg border border-border bg-card p-3">
-        {detail.billingManagedByStripe ? (
-          <p className="text-xs text-muted-foreground">
-            Individual Pro plan and subscription status sync from Stripe webhooks.
-          </p>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            No active Stripe subscription. Grant Pro entitlements via workspace billing or ops overrides.
-          </p>
-        )}
-        <dl className="grid grid-cols-2 gap-3 text-xs">
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-muted-foreground">Plan</dt>
-            <dd className="font-mono text-foreground">{detail.subscriptionPlan ?? "—"}</dd>
+            <dt className="text-xs text-muted-foreground">Plan</dt>
+            <dd className="mt-1">
+              <OperatorBillingPlanBadges
+                planLabel={detail.planLabel}
+                isFreePlan={detail.billingMode === "free"}
+                subscriptionStatus={detail.subscriptionStatus}
+              />
+            </dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Subscription status</dt>
-            <dd className="font-mono text-foreground">{detail.subscriptionStatus ?? "—"}</dd>
+            <dt className="text-xs text-muted-foreground">Usage tier</dt>
+            <dd className="mt-1 text-xs text-foreground">{usageTierLabel(detail.usage.tier)}</dd>
           </div>
         </dl>
-        <OperatorStripeBillingMeta
-          stripeCustomerId={detail.stripeCustomerId}
-          stripeSubscriptionId={detail.stripeSubscriptionId}
-        />
+        <p className="text-xs text-muted-foreground">{operatorUserBillingModeDescription(detail.billingMode)}</p>
+        {detail.billingMode === "stripe_individual" ? (
+          <OperatorStripeBillingMeta
+            stripeCustomerId={detail.stripeCustomerId}
+            stripeSubscriptionId={detail.stripeSubscriptionId}
+          />
+        ) : null}
       </div>
     </section>
   );

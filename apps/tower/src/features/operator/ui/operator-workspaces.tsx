@@ -6,7 +6,6 @@ import {
   IconBuilding,
   IconChevronLeft,
   IconChevronRight,
-  IconCreditCard,
   IconMail,
   IconRefresh,
   IconSearch,
@@ -16,6 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { formatRelative } from "@/features/operator/model/format";
+import { OperatorBillingPlanBadges } from "@/features/operator/ui/operator-billing-plan-badges";
 import { OperatorUsageLimitsTableCell } from "@/features/operator/ui/operator-usage-limits-section";
 import { OperatorWorkspaceDetailSheet } from "@/features/operator/ui/operator-workspace-detail";
 import type { OperatorWorkspaceRow } from "@/server/operator/types";
@@ -351,14 +351,12 @@ function WorkspaceRow({
           {workspace.isOverSeatCap ? (
             <Badge variant="destructive">Over limit</Badge>
           ) : (
-            <Badge variant={workspace.billingMode === "free" ? "outline" : "secondary"} className="gap-1">
-              <IconCreditCard className="size-3" />
-              {planLabel}
-            </Badge>
+            <OperatorBillingPlanBadges
+              planLabel={planLabel}
+              isFreePlan={workspace.billingMode === "free"}
+              subscriptionStatus={workspace.subscriptionStatus}
+            />
           )}
-          {workspace.subscriptionStatus && workspace.billingMode !== "free" ? (
-            <Badge variant="outline">{workspace.subscriptionStatus}</Badge>
-          ) : null}
         </div>
       </TableCell>
       <TableCell className="text-right text-sm tabular-nums text-foreground">{workspace.effectiveSeatLimit}</TableCell>

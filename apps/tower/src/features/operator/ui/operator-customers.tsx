@@ -7,7 +7,6 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconCircleCheck,
-  IconCreditCard,
   IconMail,
   IconMailCheck,
   IconRefresh,
@@ -20,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import { appRoleLabel, formatRelative, initialsFor } from "@/features/operator/model/format";
+import { OperatorBillingPlanBadges } from "@/features/operator/ui/operator-billing-plan-badges";
 import { OperatorCustomerDetail } from "@/features/operator/ui/operator-customer-detail";
 import { OperatorInviteCustomer } from "@/features/operator/ui/operator-invite-customer";
 import { OperatorUsageLimitsTableCell } from "@/features/operator/ui/operator-usage-limits-section";
@@ -227,7 +227,8 @@ export function OperatorCustomers() {
             <TableRow>
               <TableHead>Customer</TableHead>
               <TableHead>Role</TableHead>
-              <TableHead>Flags</TableHead>
+              <TableHead>Billing</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Usage</TableHead>
               <TableHead className="text-right">Workspaces</TableHead>
               <TableHead className="text-right">Created</TableHead>
@@ -326,6 +327,9 @@ function CustomersTableBody({
               <Skeleton className="h-4 w-24" />
             </TableCell>
             <TableCell>
+              <Skeleton className="h-4 w-20" />
+            </TableCell>
+            <TableCell>
               <Skeleton className="h-10 w-28" />
             </TableCell>
             <TableCell className="text-right">
@@ -342,7 +346,7 @@ function CustomersTableBody({
   if (rows.length === 0) {
     return (
       <TableRow>
-        <TableCell colSpan={6}>
+        <TableCell colSpan={7}>
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
             <span className="flex size-10 items-center justify-center rounded-lg bg-muted">
               <IconUsers className="size-5" />
@@ -372,7 +376,7 @@ function CustomerRow({
   selected: boolean;
   onOpen: (id: string) => void;
 }) {
-  const noFlags = !user.banned && !user.canCreateOrganization && !user.emailVerified && !user.hasStripePro;
+  const noStatusFlags = !user.banned && !user.canCreateOrganization && !user.emailVerified;
   return (
     <TableRow className="cursor-pointer" onClick={() => onOpen(user.id)} data-state={selected ? "selected" : undefined}>
       <TableCell>
@@ -397,6 +401,13 @@ function CustomerRow({
         )}
       </TableCell>
       <TableCell>
+        <OperatorBillingPlanBadges
+          planLabel={user.planLabel}
+          isFreePlan={user.billingMode === "free"}
+          subscriptionStatus={user.subscriptionStatus}
+        />
+      </TableCell>
+      <TableCell>
         <div className="flex flex-wrap gap-1">
           {user.banned ? (
             <Badge variant="destructive" className="gap-1">
@@ -410,14 +421,8 @@ function CustomerRow({
               Eligible
             </Badge>
           ) : null}
-          {user.hasStripePro ? (
-            <Badge variant="secondary" className="gap-1">
-              <IconCreditCard className="size-3" />
-              Stripe Pro
-            </Badge>
-          ) : null}
           <VerifiedBadge verified={user.emailVerified} />
-          {noFlags ? <span className="text-xs text-muted-foreground">—</span> : null}
+          {noStatusFlags ? <span className="text-xs text-muted-foreground">—</span> : null}
         </div>
       </TableCell>
       <TableCell>

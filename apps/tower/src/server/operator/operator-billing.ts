@@ -1,11 +1,20 @@
+import { towerPlanName } from "@codalyn/webflow-kit";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import {
   isOrganizationTeamEntitled,
   type OrganizationBillingRow,
   organizationBillingPlanLabel,
 } from "@/server/billing/organization-billing";
-import { userRowHasIndividualPaidPlan } from "@/server/billing/stripe-subscription-status";
-import type { OperatorWorkspaceBillingMode, OperatorWorkspacePatch } from "@/server/operator/types";
+import {
+  type IndividualPaidPlan,
+  userRowHasIndividualPaidPlan,
+  userRowIndividualPlan,
+} from "@/server/billing/stripe-subscription-status";
+import type {
+  OperatorUserBillingMode,
+  OperatorWorkspaceBillingMode,
+  OperatorWorkspacePatch,
+} from "@/server/operator/types";
 
 /** Stripe subscription id on a row means webhook-synced billing fields must not be operator-patched. */
 export function isOperatorBillingManagedByStripe(stripeSubscriptionId: string | null | undefined): boolean {
@@ -67,20 +76,50 @@ export type OperatorUserBillingRow = {
 };
 
 export type OperatorUserBillingSnapshot = {
+  billingMode: OperatorUserBillingMode;
   billingManagedByStripe: boolean;
-  hasStripePro: boolean;
+  isIndividualPaidEntitled: boolean;
+  displayBillingPlan: string | null;
+  planLabel: string;
 };
 
+function resolveOperatorUserBillingMode(row: OperatorUserBillingRow): OperatorUserBillingMode {
+  if (isOperatorBillingManagedByStripe(row.stripeSubscriptionId)) {
+    return "stripe_individual";
+  }
+  return "free";
+}
+
+function formatOperatorUserPlanLabel(
+  mode: OperatorUserBillingMode,
+  individualPlan: IndividualPaidPlan | null,
+  subscriptionPlan: string | null
+): string {
+  if (mode === "free") {
+    return "Free";
+  }
+  if (individualPlan) {
+    return towerPlanName(individualPlan);
+  }
+  if (subscriptionPlan === "pro" || subscriptionPlan === "studio") {
+    return towerPlanName(subscriptionPlan);
+  }
+  return "Free";
+}
+
 export function buildOperatorUserBillingSnapshot(row: OperatorUserBillingRow): OperatorUserBillingSnapshot {
+  const billingMode = resolveOperatorUserBillingMode(row);
+  const billingManagedByStripe = isOperatorBillingManagedByStripe(row.stripeSubscriptionId);
+  const individualPlan = isTowerBillingEnabled() ? userRowIndividualPlan(row) : null;
+  const isIndividualPaidEntitled = userRowHasIndividualPaidPlan(row) && isTowerBillingEnabled();
+  const displayBillingPlan = individualPlan ?? (billingMode === "stripe_individual" ? row.subscriptionPlan : null);
+
   return {
-    billingManagedByStripe: isOperatorBillingManagedByStripe(row.stripeSubscriptionId),
-    hasStripePro:
-      isTowerBillingEnabled() &&
-      userRowHasIndividualPaidPlan({
-        subscriptionPlan: row.subscriptionPlan,
-        subscriptionStatus: row.subscriptionStatus,
-        stripeSubscriptionId: row.stripeSubscriptionId,
-      }),
+    billingMode,
+    billingManagedByStripe,
+    isIndividualPaidEntitled,
+    displayBillingPlan,
+    planLabel: formatOperatorUserPlanLabel(billingMode, individualPlan, row.subscriptionPlan),
   };
 }
 

@@ -70,4 +70,4 @@ function ActionTileGrid({ className, children, ...props }: ComponentProps<"div">
   );
 }
 
-export { ActionTile, ActionTileGrid, actionTileIconVariants, actionTileVariants };
+export { ActionTile, ActionTileGrid };

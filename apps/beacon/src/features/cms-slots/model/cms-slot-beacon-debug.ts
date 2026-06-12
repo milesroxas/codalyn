@@ -1,18 +1,9 @@
-/** Root element id for the published-site beacon debug overlay (kept stable for styling + cleanup). */
-export const CMS_SLOT_BEACON_DEBUG_OVERLAY_ID = "codalyn-beacon-debug";
-
-/** `<style>` id used so the overlay CSS is injected at most once per page. */
-export const CMS_SLOT_BEACON_DEBUG_STYLE_ID = "codalyn-beacon-debug-style";
-
-/** Keyboard chord that toggles the overlay on the published site. */
-export const CMS_SLOT_BEACON_DEBUG_TOGGLE_HINT = "Ctrl/Cmd + Shift + D";
-
 /**
  * Minified runtime fragment embedded in the footer beacon runtime ({@link getCmsSlotPageInlineScriptSource}).
  *
  * Ships the *entire* debug component to the published client: a styled, draggable HUD (summary header + expandable
  * live event log) plus the `bLog`/`bDbgBump` instrumentation the runtime calls. The panel is hidden until the visitor
- * presses {@link CMS_SLOT_BEACON_DEBUG_TOGGLE_HINT}, so it never leaks to normal traffic while still shipping on
+ * presses Ctrl/Cmd + Shift + D, so it never leaks to normal traffic while still shipping on
  * publish. All styling lives in a single injected `<style>` scoped under `#codalyn-beacon-debug` so it cannot clash
  * with (or be clobbered by) the host site's CSS.
  *

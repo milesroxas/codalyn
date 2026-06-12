@@ -1,44 +1,63 @@
 "use client";
 
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
-import { IconUserPlus } from "@tabler/icons-react";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
-import { Button } from "@/shared/ui/button";
-import { Skeleton } from "@/shared/ui/skeleton";
-import { towerAppShellContentClassName } from "@/shared/ui/tower-page-shell";
+import type { TowerLandingAppLinks } from "@/features/tower-ui/tower-landing";
+import { TOWER_PRODUCT_MARKETING_PATH } from "@/shared/lib/navigation/tower-marketing-paths";
+import { TowerPublicHeader, TowerPublicHeaderSpacer } from "@/shared/ui/tower-public-header";
+import { TowerPublicHeaderAuthActionsSkeleton } from "@/shared/ui/tower-public-header-auth-actions";
 
-export function TowerLoggedOutHeader() {
+type TowerLoggedOutHeaderProps = {
+  publicHeaderLinks?: Pick<TowerLandingAppLinks, "beacon" | "flint" | "home" | "signIn" | "tower">;
+};
+
+export function TowerLoggedOutHeader({ publicHeaderLinks }: TowerLoggedOutHeaderProps) {
   const { isPending } = authClient.useSession();
   const showHeaderSkeleton = useDeferredLoadingIndicator(isPending);
+  const [earlyAccessRequired, setEarlyAccessRequired] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/account/access-policy", { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { earlyAccessRequired?: boolean } | null) => {
+        if (!cancelled) {
+          setEarlyAccessRequired(Boolean(data?.earlyAccessRequired));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEarlyAccessRequired(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const primaryCtaHref = earlyAccessRequired ? "/request-access" : "/sign-up";
+  const primaryCtaLabel = earlyAccessRequired ? "Early Access" : "Sign up";
+
+  const homeHref = publicHeaderLinks?.home ?? "/";
+  const signInHref = publicHeaderLinks?.signIn ?? "/sign-in";
+  const beaconHref = publicHeaderLinks?.beacon ?? "/beacon";
+  const flintHref = publicHeaderLinks?.flint ?? "/flint";
+  const towerHref = publicHeaderLinks?.tower ?? TOWER_PRODUCT_MARKETING_PATH;
 
   return (
-    <header className="supports-backdrop-filter:bg-background/75 shrink-0 border-b border-border bg-background/90 py-3 backdrop-blur">
-      <div className={towerAppShellContentClassName("default", "flex items-center justify-between gap-3")}>
-        <Link href="/" className="font-semibold tracking-tight text-foreground">
-          Tower
-        </Link>
-        <div className="flex shrink-0 items-center gap-2">
-          {showHeaderSkeleton ? (
-            <>
-              <Skeleton className="h-8 w-16 rounded-md" aria-hidden />
-              <Skeleton className="h-8 w-20 rounded-md" aria-hidden />
-            </>
-          ) : isPending ? null : (
-            <>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/sign-in">Sign in</Link>
-              </Button>
-              <Button variant="default" size="sm" asChild>
-                <Link href="/sign-up" className="inline-flex items-center gap-1.5">
-                  <IconUserPlus aria-hidden className="size-4 shrink-0" stroke={1.5} />
-                  Sign up
-                </Link>
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    </header>
+    <>
+      <TowerPublicHeader
+        homeHref={homeHref}
+        beaconHref={beaconHref}
+        flintHref={flintHref}
+        signInHref={signInHref}
+        primaryCtaHref={primaryCtaHref}
+        primaryCtaLabel={primaryCtaLabel}
+        towerHref={towerHref}
+        actions={showHeaderSkeleton || isPending ? <TowerPublicHeaderAuthActionsSkeleton /> : undefined}
+      />
+      <TowerPublicHeaderSpacer />
+    </>
   );
 }

@@ -3,7 +3,11 @@ import { formatTowerUsageRatio } from "./tower-usage-metering.js";
 import type { TowerUsageProductFeature } from "./tower-usage-product-feature.js";
 import { parseTowerUsageProductFeature, towerUsageProductFeatureLabel } from "./tower-usage-product-feature.js";
 
-export const TOWER_USAGE_APPROACHING_ALERT_TITLE = "Approaching monthly usage limit";
+export const TOWER_USAGE_APPROACHING_ALERT_TITLE = "Approaching monthly limit";
+
+export const TOWER_USAGE_APPROACHING_DETAILS_ACTION_LABEL = "View";
+
+export const TOWER_USAGE_APPROACHING_ALERT_DISMISS_LABEL = "Dismiss";
 
 /**
  * One-line explanation of how the reported usage is scoped, so UIs never imply Team is just higher
@@ -207,9 +211,9 @@ export function towerUsageApproachingAlertDescription(
     (meter) => `${towerUsageMeterLabel(meter.kind)}: ${formatTowerUsageRatio(meter.used, meter.limit)}`
   );
   if (pooled) {
-    return `Your workspace has used at least 80% of its monthly Team pool for ${lines.join("; ")}. This pool is shared by everyone on the workspace and resets at the start of next month.`;
+    return `Your workspace has used at least 80% of its monthly Team pool for ${lines.join("; ")}. This pool is shared by everyone on the workspace.`;
   }
-  return `You have used at least 80% of your monthly allowance for ${lines.join("; ")}. These limits reset at the start of next month.`;
+  return `You have used at least 80% of your monthly allowance for ${lines.join("; ")}.`;
 }
 
 export const TOWER_USAGE_LIMIT_DIALOG_TITLE = "Monthly limit reached";

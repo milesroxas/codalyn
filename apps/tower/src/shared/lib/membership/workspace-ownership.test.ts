@@ -21,9 +21,27 @@ describe("computeAccountDeletionBlockers", () => {
           billingOwnerUserId: null,
           hasTeamSubscription: false,
           memberCount: 2,
+          deletedAt: null,
         },
       ])
     ).toEqual([]);
+  });
+
+  it("blocks deletion when user owns a soft-deleted workspace", () => {
+    const blockers = computeAccountDeletionBlockers(userId, [
+      {
+        organizationId: "org-1",
+        organizationName: "Solo",
+        organizationSlug: "solo",
+        ownerUserId: userId,
+        billingOwnerUserId: null,
+        hasTeamSubscription: false,
+        memberCount: 1,
+        deletedAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ]);
+
+    expect(blockers[0]?.reason).toBe("workspace_pending_deletion");
   });
 
   it("blocks deletion when user owns a shared workspace", () => {
@@ -36,6 +54,7 @@ describe("computeAccountDeletionBlockers", () => {
         billingOwnerUserId: userId,
         hasTeamSubscription: true,
         memberCount: 3,
+        deletedAt: null,
       },
     ]);
 
@@ -62,6 +81,7 @@ describe("computeAccountDeletionBlockers", () => {
         billingOwnerUserId: null,
         hasTeamSubscription: false,
         memberCount: 1,
+        deletedAt: null,
       },
     ]);
 
@@ -78,6 +98,7 @@ describe("computeAccountDeletionBlockers", () => {
         billingOwnerUserId: userId,
         hasTeamSubscription: true,
         memberCount: 2,
+        deletedAt: null,
       },
     ]);
 
@@ -124,6 +145,22 @@ describe("formatAccountDeletionBlockedMessage", () => {
         },
       ])
     ).toContain("billing ownership");
+  });
+
+  it("mentions recovery window for workspaces pending deletion", () => {
+    expect(
+      formatAccountDeletionBlockedMessage([
+        {
+          organizationId: "org-1",
+          organizationName: "Solo",
+          organizationSlug: "solo",
+          reason: "workspace_pending_deletion",
+          memberCount: 1,
+          otherMemberCount: 0,
+          hasTeamSubscription: false,
+        },
+      ])
+    ).toContain(String(WORKSPACE_SOFT_DELETE_RECOVERY_DAYS));
   });
 });
 

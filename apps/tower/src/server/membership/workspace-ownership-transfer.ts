@@ -118,7 +118,7 @@ async function resolveTransferAcceptanceContext(input: { transferId: string; rec
   return { transfer, orgRow, billingRow };
 }
 
-export function createWorkspaceOwnershipTransferService() {
+function createWorkspaceOwnershipTransferService() {
   return {
     async createTransfer(input: { organizationId: string; fromUserId: string; toUserId: string }) {
       const orgRow = await assertUserIsWorkspaceOwner(input.fromUserId, input.organizationId);

@@ -7,13 +7,26 @@ import {
   CMS_SLOTS_COMPOSER_PALETTE_SHEET_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/shared/ui/drawer";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+  drawerListSheetContentDefaults,
+} from "@/shared/ui/drawer";
 import { ComposerPaletteList, type ComposerPaletteListProps } from "./composer-palette-list";
 
 export function ComposerPaletteSheet(props: ComposerPaletteListProps) {
-  const { busy } = props;
+  const { busy, onAddFromPalette } = props;
   const [open, setOpen] = useState(false);
   const dismissBlocked = useCmsSlotsDrawerDismissBlocked(busy);
+
+  const handleAddFromPalette: ComposerPaletteListProps["onAddFromPalette"] = (entry) => {
+    setOpen(false);
+    onAddFromPalette(entry);
+  };
 
   return (
     <Drawer open={open} onOpenChange={setOpen} interactionBlocked={dismissBlocked}>
@@ -23,12 +36,12 @@ export function ComposerPaletteSheet(props: ComposerPaletteListProps) {
           {CMS_SLOTS_COMPOSER_ADD_COMPONENT_LABEL}
         </Button>
       </DrawerTrigger>
-      <DrawerContent stickyFooter showCloseButton>
+      <DrawerContent {...drawerListSheetContentDefaults}>
         <DrawerHeader align="start">
           <DrawerTitle>{CMS_SLOTS_COMPOSER_PALETTE_SHEET_TITLE}</DrawerTitle>
           <DrawerDescription>{CMS_SLOTS_COMPOSER_PALETTE_SHEET_DESCRIPTION}</DrawerDescription>
         </DrawerHeader>
-        <ComposerPaletteList {...props} />
+        <ComposerPaletteList {...props} onAddFromPalette={handleAddFromPalette} />
       </DrawerContent>
     </Drawer>
   );

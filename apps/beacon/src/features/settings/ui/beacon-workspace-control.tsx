@@ -11,7 +11,7 @@ import {
 } from "@/shared/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
-export const BEACON_WORKSPACE_SELECT_NONE = "__beacon_workspace_none__";
+const BEACON_WORKSPACE_SELECT_NONE = "__beacon_workspace_none__";
 
 type BeaconWorkspaceControlBaseProps = {
   syncState: BeaconSettingsSyncState;

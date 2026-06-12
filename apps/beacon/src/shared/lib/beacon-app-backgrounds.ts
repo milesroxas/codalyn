@@ -1,5 +1,5 @@
 /** Paths relative to `import.meta.env.BASE_URL` (files live in `public/images/`). */
-export const BEACON_APP_BACKGROUND_PATHS = {
+const BEACON_APP_BACKGROUND_PATHS = {
   light: "images/light-app-bg.webp",
   dark: "images/dark-app-bg.webp",
 } as const;
@@ -15,7 +15,7 @@ export const BEACON_HOME_TILE_CSS_VARS = {
 } as const;
 
 /** Home launcher tile art (`public/images/`); filenames pair with {@link BEACON_HOME_TILE_CSS_VARS}. */
-export const BEACON_HOME_TILE_BACKGROUND_PATHS = {
+const BEACON_HOME_TILE_BACKGROUND_PATHS = {
   cmsSlot: {
     light: "images/light-tile-cms-slot.webp",
     dark: "images/dark-tile-cms-slot.webp",

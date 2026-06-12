@@ -53,10 +53,3 @@ export const EARLY_ACCESS_REQUEST_INVALID_EMAIL = "Enter a valid email address."
 export const EARLY_ACCESS_REQUEST_SUBMIT_ERROR = "Could not send your request. Try again.";
 
 export const EARLY_ACCESS_REQUEST_SIGN_IN_LABEL = "Sign in";
-
-export function isEarlyAccessAuthError(message: string | undefined | null): boolean {
-  if (!message) {
-    return false;
-  }
-  return message.includes("early access") || message.includes(EARLY_ACCESS_REQUIRED_CODE);
-}

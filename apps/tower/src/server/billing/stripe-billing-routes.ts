@@ -4,8 +4,6 @@ import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { getStripe } from "@/server/billing/stripe-client";
 import { getStripePricePro, getStripePriceStudio } from "@/server/billing/stripe-config";
 
-export { getStripePricePro, getStripePriceStudio } from "@/server/billing/stripe-config";
-
 export function isStripeCheckoutConfigured(): boolean {
   return Boolean(getStripe() && getStripePricePro());
 }

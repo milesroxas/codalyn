@@ -1,12 +1,13 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
-import { deleteWorkspace } from "@/server/membership/delete-workspace";
+import { deleteWorkspace, loadWorkspaceDeletionTargetForOperator } from "@/server/membership/delete-workspace";
 import {
+  parseOperatorWorkspacePurgePhrase,
   parseWorkspaceDeleteConfirmBody,
   workspaceDeleteErrorResponse,
 } from "@/server/membership/workspace-delete-http";
-import { mapOperatorOrgBillingFields } from "@/server/operator/operator-billing";
+import { buildOperatorWorkspaceDetail } from "@/server/operator/operator-workspace-detail-map";
 import { applyOperatorWorkspacePatch } from "@/server/operator/operator-workspace-patch-apply";
 import { requireProductAdmin } from "@/server/operator/require-product-admin";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch } from "@/server/operator/types";
@@ -15,8 +16,8 @@ import {
   fetchOperatorWorkspaceUsageLimits,
   sanitizeUsageLimitsPatch,
 } from "@/server/operator/usage-limits";
+import { fetchOperatorUsageTrend } from "@/server/operator/usage-metrics";
 import { assertWorkspaceDeleteRateLimit } from "@/server/security/destructive-action-rate-limit";
-import { buildWorkspaceSeatUsage } from "@/shared/lib/billing/workspace-seat-usage";
 import { db } from "@/shared/lib/db";
 import { invitation, member, organization, user } from "@/shared/lib/db/auth-schema";
 import { parseWorkspaceSlug } from "@/shared/lib/membership/workspace-slug";
@@ -46,6 +47,8 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
       stripeCustomerId: organization.stripeCustomerId,
       stripeSubscriptionId: organization.stripeSubscriptionId,
       createdAt: organization.createdAt,
+      deletedAt: organization.deletedAt,
+      purgeScheduledAt: organization.purgeScheduledAt,
       memberCount: sql<number>`COALESCE((SELECT COUNT(*) FROM ${member} WHERE ${member.organizationId} = ${organization.id}), 0)`,
       pendingInvitations: sql<number>`COALESCE((SELECT COUNT(*) FROM ${invitation} WHERE ${invitation.organizationId} = ${organization.id} AND ${invitation.status} = 'pending'), 0)`,
     })
@@ -88,56 +91,25 @@ async function fetchWorkspaceDetail(orgId: string): Promise<OperatorWorkspaceDet
       .orderBy(desc(invitation.createdAt)),
   ]);
 
-  const memberCount = Number(row.memberCount ?? 0);
-  const pendingInvitations = Number(row.pendingInvitations ?? 0);
   const seatsUsed = await countOrganizationSeatsUsed(orgId);
-  const seatUsage = buildWorkspaceSeatUsage(seatsUsed, {
-    seatLimit: row.seatLimit ?? null,
-    stripeSeatQuantity: row.stripeSeatQuantity ?? null,
-    operatorSeatLimitOverride: row.operatorSeatLimitOverride ?? false,
-  });
+  const [usage, usageTrend] = await Promise.all([
+    fetchOperatorWorkspaceUsageLimits(orgId).then((limits) => limits ?? defaultOperatorWorkspaceUsageLimits()),
+    fetchOperatorUsageTrend("workspace", orgId),
+  ]);
 
-  return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    logo: row.logo ?? null,
-    metadata: row.metadata ?? null,
-    seatLimit: seatUsage.seatLimit,
-    effectiveSeatLimit: seatUsage.effectiveSeatLimit,
-    isAtSeatCap: seatUsage.isAtSeatCap,
-    isOverSeatCap: seatUsage.isOverSeatCap,
-    ...mapOperatorOrgBillingFields({
-      billingPlan: row.billingPlan ?? null,
-      subscriptionStatus: row.subscriptionStatus ?? null,
-      stripeCustomerId: row.stripeCustomerId ?? null,
-      stripeSubscriptionId: row.stripeSubscriptionId ?? null,
-      operatorSeatLimitOverride: row.operatorSeatLimitOverride ?? false,
-      stripeSeatQuantity: row.stripeSeatQuantity ?? null,
-    }),
-    memberCount,
-    pendingInvitations,
-    usage: (await fetchOperatorWorkspaceUsageLimits(orgId)) ?? (await defaultOperatorWorkspaceUsageLimits()),
-    createdAt: toIso(row.createdAt),
-    members: memberRows.map((m) => ({
-      memberId: m.memberId,
-      userId: m.userId,
-      email: m.email,
-      name: m.name,
-      role: m.role,
-      beaconRestrictToEditorExperience: Boolean(m.beaconRestrictToEditorExperience),
-      createdAt: toIso(m.createdAt),
-    })),
-    invitations: invitationRows.map((i) => ({
-      id: i.id,
-      email: i.email,
-      role: i.role ?? null,
-      status: i.status,
-      expiresAt: toIso(i.expiresAt),
-      createdAt: toIso(i.createdAt),
-      inviterEmail: i.inviterEmail ?? null,
-    })),
-  };
+  return buildOperatorWorkspaceDetail({
+    row: {
+      ...row,
+      memberCount: Number(row.memberCount ?? 0),
+      pendingInvitations: Number(row.pendingInvitations ?? 0),
+    },
+    seatsUsed,
+    usage,
+    usageTrend,
+    memberRows,
+    invitationRows,
+    toIso,
+  });
 }
 
 export async function GET(
@@ -281,17 +253,37 @@ export async function DELETE(
     return authRes.response;
   }
   const { orgId } = await ctx.params;
-  const parsedConfirm = parseWorkspaceDeleteConfirmBody(await req.json().catch(() => null));
-  if ("error" in parsedConfirm) {
-    return NextResponse.json({ error: parsedConfirm.error }, { status: 400 });
-  }
+  const rawBody = (await req.json().catch(() => null)) as unknown;
 
   try {
     await assertWorkspaceDeleteRateLimit(authRes.user.id);
+    const target = await loadWorkspaceDeletionTargetForOperator(orgId);
+    if (!target) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    let confirmSlug: string;
+    let operatorPurgePhrase: string | undefined;
+    if (target.deletedAt) {
+      const parsedPurge = parseOperatorWorkspacePurgePhrase(rawBody);
+      if ("error" in parsedPurge) {
+        return NextResponse.json({ error: parsedPurge.error }, { status: 400 });
+      }
+      confirmSlug = parsedPurge.confirmSlug;
+      operatorPurgePhrase = parsedPurge.confirmPhrase;
+    } else {
+      const parsedConfirm = parseWorkspaceDeleteConfirmBody(rawBody);
+      if ("error" in parsedConfirm) {
+        return NextResponse.json({ error: parsedConfirm.error }, { status: 400 });
+      }
+      confirmSlug = parsedConfirm.confirmSlug;
+    }
+
     await deleteWorkspace({
       organizationId: orgId,
-      confirmSlug: parsedConfirm.confirmSlug,
+      confirmSlug,
       operatorInitiated: true,
+      operatorPurgePhrase,
     });
   } catch (error) {
     const response = workspaceDeleteErrorResponse(error);

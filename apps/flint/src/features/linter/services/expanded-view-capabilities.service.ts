@@ -5,7 +5,7 @@ import type { ExpandedViewCapability, RuleResult } from "@/features/linter/model
  * Follows domain-driven design by encapsulating the logic for determining
  * what expanded content is available for a given violation.
  */
-export class ExpandedViewCapabilitiesService {
+class ExpandedViewCapabilitiesService {
   /**
    * Gets all available expanded view capabilities for a violation
    */

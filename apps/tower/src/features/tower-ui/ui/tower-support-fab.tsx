@@ -1,16 +1,20 @@
 "use client";
 
 import { IconLifebuoy, IconMessageCircle } from "@tabler/icons-react";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { TowerSupportRequestKind } from "@/features/tower-ui/lib/tower-support-request";
 import { TowerSupportRequestDialog } from "@/features/tower-ui/ui/tower-support-request-dialog";
+import { isTowerPublicFooterPath } from "@/shared/lib/navigation/tower-marketing-paths";
 import { Button } from "@/shared/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
 import { FloatingActionButtonAnchor, FloatingActionButtonSlot } from "@/shared/ui/floating-action-button";
 
 export function TowerSupportFab() {
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeDialog, setActiveDialog] = useState<TowerSupportRequestKind | null>(null);
+  const fabPlacement = isTowerPublicFooterPath(pathname) ? "screen-end-above-public-footer" : "screen-end";
 
   function openDialog(kind: TowerSupportRequestKind) {
     setMenuOpen(false);
@@ -18,7 +22,7 @@ export function TowerSupportFab() {
   }
 
   return (
-    <FloatingActionButtonAnchor>
+    <FloatingActionButtonAnchor placement={fabPlacement}>
       <FloatingActionButtonSlot>
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>

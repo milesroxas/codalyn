@@ -1,23 +1,25 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { authClient } from "@/features/auth/model/auth-client";
+import {
+  completeTowerWebSignOutNavigation,
+  setTowerSignOutTransition,
+  useTowerSignOutTransition,
+} from "@/features/auth/model/tower-sign-out-transition";
 
 export function useTowerWebSignOut() {
-  const router = useRouter();
-  const [signingOut, setSigningOut] = useState(false);
+  const signingOut = useTowerSignOutTransition();
 
   const signOut = useCallback(async () => {
-    setSigningOut(true);
+    setTowerSignOutTransition(true);
     try {
       await authClient.signOut({ fetchOptions: { credentials: "include" } });
-      router.push("/");
-      router.refresh();
-    } finally {
-      setSigningOut(false);
+      await completeTowerWebSignOutNavigation();
+    } catch {
+      setTowerSignOutTransition(false);
     }
-  }, [router]);
+  }, []);
 
   return { signOut, signingOut };
 }

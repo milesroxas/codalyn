@@ -13,12 +13,14 @@ export const formFieldFocusWithinClass =
 export const formFieldInvalidClass =
   "aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/30";
 
-export const formFieldDisabledClass =
+const formFieldDisabledClass =
   "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-input/50 dark:disabled:bg-input/80";
 
 export const formFieldSurfaceClass = {
   default: "bg-transparent dark:bg-input/30",
   elevated: "bg-background/80 shadow-xs dark:bg-input/40",
+  marketing:
+    "border-white/15 bg-white/5 text-neutral-50 placeholder:text-neutral-500 focus-visible:border-white/30 focus-visible:ring-white/15",
 } as const;
 
 export const formFieldSharedClass = cn(
@@ -39,6 +41,7 @@ export const formFieldVariants = cva(formFieldSharedClass, {
     surface: {
       default: formFieldSurfaceClass.default,
       elevated: formFieldSurfaceClass.elevated,
+      marketing: formFieldSurfaceClass.marketing,
     },
     numeric: {
       true: "tabular-nums",
@@ -56,6 +59,10 @@ export const formFieldVariants = cva(formFieldSharedClass, {
       default: "",
       filter: "w-36",
     },
+    stepperHidden: {
+      true: "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+      false: "",
+    },
   },
   defaultVariants: {
     fieldSize: "default",
@@ -64,6 +71,7 @@ export const formFieldVariants = cva(formFieldSharedClass, {
     mono: false,
     leadingIcon: false,
     width: "default",
+    stepperHidden: false,
   },
 });
 

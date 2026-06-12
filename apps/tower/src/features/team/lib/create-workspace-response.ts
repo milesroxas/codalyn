@@ -17,7 +17,7 @@ export function readOrganizationIdFromCreateResponse(data: unknown): string | nu
   return null;
 }
 
-export function normalizeOrganizationListRows(data: unknown): Array<{ id: string; slug: string }> {
+function normalizeOrganizationListRows(data: unknown): Array<{ id: string; slug: string }> {
   const rows = Array.isArray(data)
     ? data
     : data && typeof data === "object" && Array.isArray((data as Record<string, unknown>).organizations)

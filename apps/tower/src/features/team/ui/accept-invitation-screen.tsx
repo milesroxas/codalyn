@@ -3,7 +3,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { buildTowerAuthSurfaceHref } from "@/features/auth/lib/build-tower-auth-surface-href";
-import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
 import {
   buildTeamInvitationAcceptPath,
@@ -86,15 +85,6 @@ export function AcceptInvitationWrongAccountScreen(props: {
         </Button>
       }
     />
-  );
-}
-
-export function AcceptInvitationVerifyEmailScreen(props: { email: string; invitationId: string }) {
-  const callbackUrl = buildTeamInvitationAcceptPath(props.invitationId);
-  return (
-    <AuthShell>
-      <CheckEmailPrompt email={props.email} callbackPath={callbackUrl} footerHref={callbackUrl} context="teamInvite" />
-    </AuthShell>
   );
 }
 

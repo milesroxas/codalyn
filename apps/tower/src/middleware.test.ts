@@ -24,11 +24,10 @@ afterEach(() => {
 });
 
 describe("middleware host split", () => {
-  it("redirects logged-out app host / to /sign-in", () => {
+  it("does not redirect logged-out app host / in middleware", () => {
     process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
     const response = middleware(makeRequest("tower-preview.codalyn.app", "/"));
-    expect(response?.status).toBe(307);
-    expect(response?.headers.get("location")).toBe("https://tower-preview.codalyn.app/sign-in");
+    expect(response?.status).not.toBe(307);
   });
 
   it("allows marketing host / when logged out", () => {
@@ -36,6 +35,43 @@ describe("middleware host split", () => {
     process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
     const response = middleware(makeRequest("codalyn.app", "/"));
     expect(response?.status).not.toBe(307);
+  });
+
+  it("allows marketing host /beacon when logged out", () => {
+    process.env.TOWER_HOST_SPLIT = "1";
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    const response = middleware(makeRequest("codalyn.app", "/beacon"));
+    expect(response?.status).not.toBe(307);
+  });
+
+  it("allows marketing host /tower when logged out", () => {
+    process.env.TOWER_HOST_SPLIT = "1";
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    const response = middleware(makeRequest("codalyn.app", "/tower"));
+    expect(response?.status).not.toBe(307);
+  });
+
+  it("allows marketing host /flint when logged out", () => {
+    process.env.TOWER_HOST_SPLIT = "1";
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    const response = middleware(makeRequest("codalyn.app", "/flint"));
+    expect(response?.status).not.toBe(307);
+  });
+
+  it("rewrites flint marketing host / to the flint landing page", () => {
+    process.env.TOWER_HOST_SPLIT = "1";
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    const response = middleware(makeRequest("flint-preview.codalyn.app", "/"));
+    expect(response?.status).not.toBe(307);
+    expect(response?.headers.get("x-middleware-rewrite")).toBe("https://flint-preview.codalyn.app/flint");
+  });
+
+  it("redirects marketing host protected routes to the app host", () => {
+    process.env.TOWER_HOST_SPLIT = "1";
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    const response = middleware(makeRequest("codalyn.app", "/account"));
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get("location")).toBe("https://tower-preview.codalyn.app/account");
   });
 
   it("does not redirect app host / when a session cookie is present", () => {
@@ -50,7 +86,7 @@ describe("middleware host split", () => {
     const response = middleware(
       makeRequest(
         "tower.codalyn.app",
-        "/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F%3FemailVerified%3D1"
+        "/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F"
       )
     );
     expect(response?.status).not.toBe(307);
@@ -76,14 +112,11 @@ describe("middleware host split", () => {
     process.env.TOWER_HOST_SPLIT = "1";
     process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
     const response = middleware(
-      makeRequest(
-        "codalyn.app",
-        "/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F%3FemailVerified%3D1"
-      )
+      makeRequest("codalyn.app", "/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F")
     );
     expect(response?.status).toBe(307);
     expect(response?.headers.get("location")).toBe(
-      "https://tower.codalyn.app/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F%3FemailVerified%3D1"
+      "https://tower.codalyn.app/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.codalyn.app%2F"
     );
   });
 

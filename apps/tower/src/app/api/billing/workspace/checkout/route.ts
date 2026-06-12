@@ -3,7 +3,8 @@ import { resolveOrganizationSeatQuantity } from "@/server/billing/organization-s
 import { ensureStripeCustomerForOrganization } from "@/server/billing/stripe-customer-org";
 import { STRIPE_BILLING_SCOPE_ORGANIZATION } from "@/server/billing/stripe-metadata";
 import { orgRowHasStripeTeam } from "@/server/billing/stripe-subscription-status";
-import { getStripePriceTeamSeat } from "@/server/billing/team-billing-config";
+import { getStripePriceTeamSeat, getTeamMaxSeats } from "@/server/billing/team-billing-config";
+import { parseRequestedSeatQuantity, resolveCheckoutSeatQuantity } from "@/server/billing/team-seat-quantity";
 import { requireStripeWorkspaceBillingAdmin } from "@/server/billing/workspace-billing-routes";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { db } from "@/shared/lib/db";
@@ -11,22 +12,34 @@ import { user } from "@/shared/lib/db/auth-schema";
 
 export const runtime = "nodejs";
 
-async function readOrganizationId(request: Request): Promise<string | null> {
+type WorkspaceCheckoutInput = {
+  organizationId: string | null;
+  /** Admin-selected seat count; null when unspecified or malformed (caller falls back to the seat floor). */
+  requestedSeats: number | null;
+};
+
+async function readWorkspaceCheckoutInput(request: Request): Promise<WorkspaceCheckoutInput> {
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    const body = (await request.json().catch(() => null)) as { organizationId?: unknown } | null;
-    return typeof body?.organizationId === "string" ? body.organizationId.trim() : null;
+    const body = (await request.json().catch(() => null)) as { organizationId?: unknown; seats?: unknown } | null;
+    return {
+      organizationId: typeof body?.organizationId === "string" ? body.organizationId.trim() : null,
+      requestedSeats: parseRequestedSeatQuantity(body?.seats),
+    };
   }
   const form = await request.formData().catch(() => null);
-  const raw = form?.get("organizationId");
-  return typeof raw === "string" ? raw.trim() : null;
+  const rawOrganizationId = form?.get("organizationId");
+  return {
+    organizationId: typeof rawOrganizationId === "string" ? rawOrganizationId.trim() : null,
+    requestedSeats: parseRequestedSeatQuantity(form?.get("seats") ?? null),
+  };
 }
 
 /**
  * Start Stripe Checkout for workspace (team) billing — per-seat subscription on `organization`.
  */
 export async function POST(request: Request) {
-  const organizationId = await readOrganizationId(request);
+  const { organizationId, requestedSeats } = await readWorkspaceCheckoutInput(request);
   if (!organizationId) {
     return Response.json({ error: "organizationId required" }, { status: 400 });
   }
@@ -64,7 +77,8 @@ export async function POST(request: Request) {
   }
 
   const customerId = await ensureStripeCustomerForOrganization(stripe, org, u.email);
-  const quantity = await resolveOrganizationSeatQuantity(org.id);
+  const seatFloor = await resolveOrganizationSeatQuantity(org.id);
+  const quantity = resolveCheckoutSeatQuantity(seatFloor, requestedSeats, getTeamMaxSeats());
   const base = resolveTowerPublicBaseUrl();
 
   const checkout = await stripe.checkout.sessions.create({

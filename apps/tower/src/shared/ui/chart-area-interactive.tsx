@@ -9,8 +9,6 @@ import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group";
 
-export const description = "An interactive area chart";
-
 const chartData = [
   { date: "2024-04-01", desktop: 222, mobile: 150 },
   { date: "2024-04-02", desktop: 97, mobile: 180 },

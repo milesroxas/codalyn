@@ -159,6 +159,27 @@ body {
   * {
     @apply border-border outline-ring/50;
   }
+  button:not(:disabled),
+  a[href],
+  label[for],
+  summary,
+  select:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([data-disabled]),
+  [role="menuitemcheckbox"]:not([data-disabled]),
+  [role="menuitemradio"]:not([data-disabled]),
+  [role="option"]:not([data-disabled]),
+  [role="tab"]:not([data-disabled]),
+  [role="checkbox"]:not([data-disabled]),
+  [role="radio"]:not([data-disabled]),
+  [role="switch"]:not([data-disabled]) {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
   body {
     @apply text-foreground;
     background-color: var(--background);
@@ -227,5 +248,15 @@ body {
       0 1px 2px oklch(0 0 0 / 0.12),
       0 2px 6px oklch(0 0 0 / 0.1),
       inset 0 1px 0 oklch(1 0 0 / 0.35);
+  }
+}
+
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(400%);
   }
 }

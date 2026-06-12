@@ -156,6 +156,23 @@ function isEmptySettingsPatch(patch: Partial<BeaconAppSettings>): boolean {
   return Object.keys(patch).length === 0;
 }
 
+function mergePendingTowerPatches(patches: ReadonlyArray<Partial<BeaconAppSettings>>): Partial<BeaconAppSettings> {
+  if (patches.length === 0) {
+    return {};
+  }
+  let merged = getDefaultBeaconAppSettings();
+  const keys = new Set<keyof BeaconAppSettings>();
+  for (const patch of patches) {
+    for (const key of Object.keys(patch) as (keyof BeaconAppSettings)[]) {
+      if (patch[key] !== undefined) {
+        keys.add(key);
+      }
+    }
+    merged = mergeBeaconAppSettings(merged, patch);
+  }
+  return Object.fromEntries([...keys].map((key) => [key, merged[key]])) as Partial<BeaconAppSettings>;
+}
+
 function rollbackOptimisticSettings(previous: BeaconAppSettings, setSettings: (s: BeaconAppSettings) => void) {
   setSettings(previous);
   writeLocal(previous);
@@ -245,6 +262,10 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
   const lastVisibilityPullAtRef = useRef(0);
   /** Ignore stale Tower PUT responses when a newer update is in flight. */
   const putGenerationRef = useRef(0);
+  /** Patches saved before Tower settings pull completes; flushed once syncState is synced. */
+  const pendingTowerPatchesRef = useRef<Partial<BeaconAppSettings>[]>([]);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   const pullSettingsFromTower = useCallback(() => {
     if (!user?.id) {
@@ -290,6 +311,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
     if (!user?.id) {
       abortRef.current?.abort();
       lastVisibilityPullAtRef.current = 0;
+      pendingTowerPatchesRef.current = [];
       setSettings(readLocal());
       setSyncState("idle");
       setEditorExperience(false);
@@ -368,6 +390,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
       }
 
       if (syncState !== "synced") {
+        pendingTowerPatchesRef.current.push(resolved);
         return { ok: true };
       }
 
@@ -413,6 +436,43 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
     },
     [user?.id, pullSettingsFromTower]
   );
+
+  useEffect(() => {
+    if (syncState !== "synced" || !user?.id || pendingTowerPatchesRef.current.length === 0) {
+      return;
+    }
+    const queued = pendingTowerPatchesRef.current;
+    pendingTowerPatchesRef.current = [];
+    const resolved = mergePendingTowerPatches(queued);
+    if (isEmptySettingsPatch(resolved)) {
+      return;
+    }
+    const rejection = getBeaconSettingsTowerPutRejection(resolved, towerPutPolicy);
+    if (rejection !== null) {
+      return;
+    }
+    const previous = settingsRef.current;
+    const generation = ++putGenerationRef.current;
+    void persistSettingsPatchToTower({
+      resolved,
+      previous,
+      generation,
+      putGenerationRef,
+      setSyncState,
+      setters: {
+        setSettings,
+        setEditorExperience,
+        setCanManageTeamBeaconSettings,
+        setRestrictToEditorExperience,
+        setWorkspaceMemberRole,
+        setAppUserRole,
+        setHasActiveWorkspace,
+        setBeaconWorkspaces,
+        setActiveOrganizationId,
+        setActiveOrganizationName,
+      },
+    });
+  }, [syncState, user?.id, towerPutPolicy]);
 
   useEffect(() => {
     if (syncState !== "synced" || !user?.id || activeOrganizationId || beaconWorkspaces.length !== 1) {

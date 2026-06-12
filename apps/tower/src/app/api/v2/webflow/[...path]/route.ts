@@ -1,7 +1,8 @@
 import { classifyWebflowProxyUsage, webflowDataApiUrl } from "@codalyn/webflow-kit";
+import { after } from "next/server";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import { getActiveOrganizationIdForApiRequest } from "@/server/billing/session-org";
-import { consumeWebflowProxy } from "@/server/billing/usage-gate";
+import { consumeWebflowProxy, recordMeterCost, type UsageScope } from "@/server/billing/usage-gate";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { hasWebflowOAuthCredentials, resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 
@@ -52,6 +53,7 @@ async function forward(req: Request, segments: string[]) {
     );
   }
 
+  let usageScope: UsageScope | null = null;
   if (auth.userId) {
     const activeOrg = await getActiveOrganizationIdForApiRequest(req);
     const entitlement = await resolveTowerEntitlement(auth.userId, activeOrg);
@@ -59,8 +61,12 @@ async function forward(req: Request, segments: string[]) {
     if (!usage.ok) {
       return usage.response;
     }
+    usageScope = usage.scope;
   }
 
+  // Proxy time is dominated by the upstream Webflow round-trip (I/O wait, not Vercel active CPU), so we
+  // measure local handler compute as total local time minus the awaited fetch.
+  const computeStart = Date.now();
   const target = webflowDataApiUrl(segments);
   const src = new URL(req.url);
   target.search = src.search;
@@ -84,10 +90,26 @@ async function forward(req: Request, segments: string[]) {
     init.body = await req.arrayBuffer();
   }
 
+  const fetchStart = Date.now();
   const res = await fetch(target, init);
+  const fetchMs = Date.now() - fetchStart;
   const responseHeaders = new Headers(res.headers);
   responseHeaders.set("Cache-Control", "no-store");
-  return new Response(res.body, { status: res.status, headers: responseHeaders });
+  const response = new Response(res.body, { status: res.status, headers: responseHeaders });
+
+  if (usageScope) {
+    // Egress uses Content-Length to avoid buffering the streamed body (0 when the upstream omits it).
+    const contentLength = Number.parseInt(res.headers.get("content-length") ?? "", 10);
+    const computeMs = Math.max(0, Date.now() - computeStart - fetchMs);
+    const scope = usageScope;
+    after(() =>
+      recordMeterCost(scope, "webflowProxy", {
+        computeMs,
+        egressBytes: Number.isFinite(contentLength) ? contentLength : 0,
+      })
+    );
+  }
+  return response;
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {

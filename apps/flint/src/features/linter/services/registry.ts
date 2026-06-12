@@ -1,5 +1,4 @@
 import { applyOpinionMode, type OpinionMode } from "@/features/linter/model/opinion.modes";
-import type { Rule } from "@/features/linter/model/rule.types";
 import { resolvePresetOrFallback } from "@/features/linter/presets";
 import { createChildGroupKeyMatchRule } from "@/features/linter/rules/canonical/child-group-key-match";
 import { createMainChildrenPageRule } from "@/features/linter/rules/canonical/main-children.page";
@@ -15,7 +14,7 @@ import { createRuleRegistry } from "@/features/linter/services/rule-registry";
 export const ruleRegistry = createRuleRegistry();
 
 // Pass the registry into the config service
-export const ruleConfigService = createRuleConfigurationService(ruleRegistry);
+const ruleConfigService = createRuleConfigurationService(ruleRegistry);
 
 // Initialize with default rules and user configurations
 export function initializeRuleRegistry(mode: OpinionMode = "balanced", presetId?: string): void {
@@ -58,10 +57,4 @@ export function initializeRuleRegistry(mode: OpinionMode = "balanced", presetId?
   console.log(
     `Registry initialized with preset '${selected.id}' containing ${ruleRegistry.getAllRules().length} rules`
   );
-}
-
-// Helper for dynamic rules
-export function addCustomRule(rule: Rule): void {
-  ruleRegistry.registerRule(rule);
-  console.log(`Added custom rule: ${rule.id}`);
 }

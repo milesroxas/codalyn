@@ -1,10 +1,13 @@
 "use client";
 
+import { cva, type VariantProps } from "class-variance-authority";
 import { AlertDialog as AlertDialogPrimitive } from "radix-ui";
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
+import { Label } from "@/shared/ui/label";
+import { ScrollArea } from "@/shared/ui/scroll-area";
 
 function AlertDialog({ ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />;
@@ -31,23 +34,44 @@ function AlertDialogOverlay({ className, ...props }: React.ComponentProps<typeof
   );
 }
 
+const alertDialogContentVariants = cva(
+  "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+  {
+    variants: {
+      size: {
+        default: "max-w-xs sm:max-w-sm",
+        sm: "max-w-xs",
+      },
+      layout: {
+        default: "grid gap-4 rounded-sm bg-popover p-4",
+        scroll:
+          "grid max-h-[min(90vh,600px)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-sm bg-popover p-0",
+      },
+    },
+    defaultVariants: {
+      size: "default",
+      layout: "default",
+    },
+  }
+);
+
 function AlertDialogContent({
   className,
   size = "default",
+  layout = "default",
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
-  size?: "default" | "sm";
-}) {
+}: React.ComponentProps<typeof AlertDialogPrimitive.Content> &
+  VariantProps<typeof alertDialogContentVariants> & {
+    size?: "default" | "sm";
+  }) {
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         data-size={size}
-        className={cn(
-          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-sm bg-popover p-4 text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          className
-        )}
+        data-layout={layout}
+        className={cn(alertDialogContentVariants({ size, layout }), className)}
         {...props}
       />
     </AlertDialogPortal>
@@ -60,6 +84,7 @@ function AlertDialogHeader({ className, ...props }: React.ComponentProps<"div">)
       data-slot="alert-dialog-header"
       className={cn(
         "grid grid-rows-[auto_1fr] place-items-start gap-1.5 text-left has-data-[slot=alert-dialog-media]:grid-rows-[auto_auto_1fr] has-data-[slot=alert-dialog-media]:gap-x-4 sm:group-data-[size=default]/alert-dialog-content:has-data-[slot=alert-dialog-media]:grid-rows-[auto_1fr]",
+        "group-data-[layout=scroll]/alert-dialog-content:shrink-0 group-data-[layout=scroll]/alert-dialog-content:bg-popover group-data-[layout=scroll]/alert-dialog-content:px-4 group-data-[layout=scroll]/alert-dialog-content:pt-4 group-data-[layout=scroll]/alert-dialog-content:pb-3 group-data-[layout=scroll]/alert-dialog-content:relative group-data-[layout=scroll]/alert-dialog-content:z-10",
         className
       )}
       {...props}
@@ -67,16 +92,94 @@ function AlertDialogHeader({ className, ...props }: React.ComponentProps<"div">)
   );
 }
 
-function AlertDialogFooter({ className, ...props }: React.ComponentProps<"div">) {
+const alertDialogFooterVariants = cva("", {
+  variants: {
+    layout: {
+      default:
+        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-sm border-t bg-muted/50 p-4 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2 sm:flex-row sm:justify-end",
+      sticky: "relative z-10 mt-0 flex shrink-0 flex-col gap-2 border-t border-border bg-popover px-4 pt-4 pb-4",
+    },
+  },
+  defaultVariants: {
+    layout: "default",
+  },
+});
+
+function AlertDialogFooter({
+  className,
+  layout,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof alertDialogFooterVariants>) {
+  return (
+    <div data-slot="alert-dialog-footer" className={cn(alertDialogFooterVariants({ layout }), className)} {...props} />
+  );
+}
+
+const alertDialogScrollBodyRegionClass = "h-full min-h-0 overflow-hidden";
+const alertDialogScrollBodyScrollAreaClass = "h-full min-h-0 w-full";
+
+const alertDialogScrollBodyVariants = cva("px-4 pb-2", {
+  variants: {
+    spacing: {
+      default: "space-y-3",
+      form: "space-y-4",
+    },
+  },
+  defaultVariants: {
+    spacing: "default",
+  },
+});
+
+function AlertDialogScrollBody({
+  className,
+  spacing,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof alertDialogScrollBodyVariants>) {
+  return (
+    <div className={alertDialogScrollBodyRegionClass} data-slot="alert-dialog-scroll-body">
+      <ScrollArea className={alertDialogScrollBodyScrollAreaClass} data-slot="alert-dialog-scroll-body_scroll">
+        <div className={cn(alertDialogScrollBodyVariants({ spacing }), className)} {...props} />
+      </ScrollArea>
+    </div>
+  );
+}
+
+const alertDialogScrollSectionVariants = cva("", {
+  variants: {
+    divider: {
+      true: "space-y-3 border-t border-border/50 pt-3",
+      false: "",
+    },
+  },
+  defaultVariants: {
+    divider: false,
+  },
+});
+
+function AlertDialogScrollSection({
+  className,
+  divider,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof alertDialogScrollSectionVariants>) {
   return (
     <div
-      data-slot="alert-dialog-footer"
-      className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-sm border-t bg-muted/50 p-4 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2 sm:flex-row sm:justify-end",
-        className
-      )}
+      data-slot="alert-dialog-scroll-section"
+      className={cn(alertDialogScrollSectionVariants({ divider }), className)}
       {...props}
     />
+  );
+}
+
+function AlertDialogFormField(props: { label: React.ReactNode; labelHtmlFor: string; children: React.ReactNode }) {
+  const { label, labelHtmlFor, children } = props;
+
+  return (
+    <div className="space-y-0.5" data-slot="alert-dialog-form-field">
+      <Label className="text-xs text-muted-foreground" htmlFor={labelHtmlFor}>
+        {label}
+      </Label>
+      {children}
+    </div>
   );
 }
 
@@ -177,6 +280,11 @@ function AlertDialogFactHint({ className, ...props }: React.ComponentProps<"p">)
   return <p data-slot="alert-dialog-fact-hint" className={cn(alertDialogFactHintClass, className)} {...props} />;
 }
 
+const alertDialogScrollContentDefaults = {
+  size: "default",
+  layout: "scroll",
+} as const;
+
 export {
   AlertDialog,
   AlertDialogAction,
@@ -189,10 +297,14 @@ export {
   AlertDialogFactPanel,
   AlertDialogFactValue,
   AlertDialogFooter,
+  AlertDialogFormField,
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogOverlay,
   AlertDialogPortal,
+  AlertDialogScrollBody,
+  AlertDialogScrollSection,
   AlertDialogTitle,
   AlertDialogTrigger,
+  alertDialogScrollContentDefaults,
 };

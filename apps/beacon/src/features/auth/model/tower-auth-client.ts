@@ -1,6 +1,7 @@
 import { createAuthClient } from "better-auth/react";
 import { readBeaconTowerSessionToken } from "@/features/auth/lib/beacon-tower-session-token";
 import { isBeaconTowerOriginConfigured, readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
+import { towerFetch } from "@/shared/lib/tower-client";
 
 const baseURL = readBeaconTowerOrigin();
 
@@ -30,8 +31,6 @@ export function isTowerConfigured(): boolean {
   return isBeaconTowerOriginConfigured();
 }
 
-const TOWER_AUTH_POPUP_FEATURES = "popup=yes,width=540,height=780,scrollbars=yes,resizable=yes";
-
 export function buildTowerAppUrl(path: string): string | null {
   if (!baseURL) {
     return null;
@@ -47,22 +46,54 @@ export function buildTowerAuthPopupUrl(path: "/sign-in" | "/sign-up", beaconOrig
   return `${baseURL}${path}?beaconOrigin=${encodeURIComponent(beaconOrigin)}`;
 }
 
-/** Opens Tower sign-in or sign-up in a popup for Beacon (Designer extension) flows. */
-export function openTowerAuthPopup(path: "/sign-in" | "/sign-up"): void {
-  const url = buildTowerAuthPopupUrl(path, window.location.origin);
-  if (!url) {
-    return;
+/** Mints a single-use Tower handoff token for the current Designer session, or null on failure. */
+async function mintTowerHandoffToken(): Promise<string | null> {
+  try {
+    const res = await towerFetch("/api/auth/one-time-token/generate");
+    if (!res.ok) {
+      return null;
+    }
+    const data = (await res.json()) as { token?: unknown };
+    const token = typeof data.token === "string" ? data.token.trim() : "";
+    return token || null;
+  } catch {
+    return null;
   }
-  window.open(url, "beacon-tower-auth", TOWER_AUTH_POPUP_FEATURES);
 }
 
-/** Opens a Tower app route in a new browser tab. */
+/**
+ * Opens a Tower app route in a new browser tab.
+ *
+ * When the Designer session holds a Tower bearer token, the tab is routed through a single-use
+ * one-time-token handoff (`/api/beacon-handoff`) so Tower establishes a first-party cookie session
+ * instead of bouncing the user to sign-in. The window is opened synchronously to preserve the user
+ * gesture for popup blockers, then redirected once the short-lived token is minted; any failure
+ * falls back to the plain route, which enforces its own auth.
+ */
 export function openTowerAppPath(path: string): void {
-  const url = buildTowerAppUrl(path);
-  if (!url) {
+  const directUrl = buildTowerAppUrl(path);
+  if (!directUrl) {
     return;
   }
-  window.open(url, "_blank", "noopener,noreferrer");
+  if (!readBeaconTowerSessionToken()) {
+    window.open(directUrl, "_blank", "noopener,noreferrer");
+    return;
+  }
+  const handoffWindow = window.open("about:blank", "_blank");
+  if (!handoffWindow) {
+    window.open(directUrl, "_blank", "noopener,noreferrer");
+    return;
+  }
+  void mintTowerHandoffToken().then((token) => {
+    if (!token) {
+      handoffWindow.location.replace(directUrl);
+      return;
+    }
+    const handoffUrl = buildTowerAppUrl(
+      `/api/beacon-handoff?ott=${encodeURIComponent(token)}&callbackUrl=${encodeURIComponent(path)}`
+    );
+    handoffWindow.location.replace(handoffUrl ?? directUrl);
+  });
 }
 
 /** Opens the Tower dashboard entry (app host) in a new tab. */

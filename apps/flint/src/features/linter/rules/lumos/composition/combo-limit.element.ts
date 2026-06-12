@@ -25,7 +25,7 @@ const defaultConfig: ComboLimitConfig = {
   assumeFirstAsBase: true,
 };
 
-export const comboLimitConfigSchema: RuleConfigSchema = {
+const comboLimitConfigSchema: RuleConfigSchema = {
   maxCombos: {
     type: "number",
     label: "Max classes after base",

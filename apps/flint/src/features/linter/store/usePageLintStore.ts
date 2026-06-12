@@ -42,7 +42,7 @@ function buildPageLintOptions() {
   };
 }
 
-export const usePageLintStore = create<PageLintStore>()(
+const usePageLintStore = create<PageLintStore>()(
   devtools(
     (set, get) => ({
       ...initialState,

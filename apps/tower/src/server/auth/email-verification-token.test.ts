@@ -53,8 +53,8 @@ describe("buildTowerEmailVerificationPageUrl", () => {
   it("builds a first-party verification page URL", () => {
     const prev = process.env.BETTER_AUTH_URL;
     process.env.BETTER_AUTH_URL = "https://tower.example.com";
-    expect(buildTowerEmailVerificationPageUrl("abc", "https://tower.example.com/?emailVerified=1")).toBe(
-      "https://tower.example.com/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.example.com%2F%3FemailVerified%3D1"
+    expect(buildTowerEmailVerificationPageUrl("abc", "https://tower.example.com/")).toBe(
+      "https://tower.example.com/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.example.com%2F"
     );
     process.env.BETTER_AUTH_URL = prev;
   });

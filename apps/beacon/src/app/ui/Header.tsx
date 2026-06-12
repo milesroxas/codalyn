@@ -1,3 +1,4 @@
+import type { TowerSupportRequestKind } from "@codalyn/webflow-kit";
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { IconLayoutGrid } from "@tabler/icons-react";
 import {
@@ -5,10 +6,12 @@ import {
   ChevronRight,
   ExternalLink,
   Image as ImageIcon,
+  LifeBuoy,
   Loader2,
   LogIn,
   LogOut,
   Menu,
+  MessageCircle,
   Settings,
 } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
@@ -16,9 +19,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { isTowerConfigured, openTowerAppHome } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerInlineSignIn } from "@/features/auth/model/use-beacon-tower-inline-sign-in";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import {
+  BeaconTowerConnectionIndicator,
+  type BeaconTowerConnectionStatus,
+} from "@/features/auth/ui/beacon-tower-connection-indicator";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { BeaconWorkspaceMenuGroup } from "@/features/settings/ui/beacon-workspace-control";
+import { BeaconSupportRequestDialog } from "@/features/support/ui/beacon-support-request-dialog";
 import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
@@ -122,7 +130,7 @@ type HeaderLogoProps = {
   to?: string;
 };
 
-export function HeaderLogo({ asHeading = true, to }: HeaderLogoProps) {
+function HeaderLogo({ asHeading = true, to }: HeaderLogoProps) {
   const className = "m-0 flex shrink-0 items-center justify-center text-lg font-medium leading-widest";
   const inner = (
     <>
@@ -201,6 +209,32 @@ function BeaconMenuSettingsGroup(props: { pathname: string }) {
       <DropdownMenuItem className={routeActiveClass("/settings", pathname)} onSelect={() => navigate("/settings")}>
         <Settings aria-hidden />
         Settings
+      </DropdownMenuItem>
+    </DropdownMenuGroup>
+  );
+}
+
+function BeaconMenuHelpGroup(props: { onOpenSupportDialog: (kind: TowerSupportRequestKind) => void }) {
+  const { onOpenSupportDialog } = props;
+
+  return (
+    <DropdownMenuGroup>
+      <BeaconMenuSectionLabel>Help</BeaconMenuSectionLabel>
+      <DropdownMenuItem
+        onSelect={() => {
+          onOpenSupportDialog("feedback");
+        }}
+      >
+        <MessageCircle aria-hidden />
+        Submit feedback
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        onSelect={() => {
+          onOpenSupportDialog("help");
+        }}
+      >
+        <LifeBuoy aria-hidden />
+        Get help
       </DropdownMenuItem>
     </DropdownMenuGroup>
   );
@@ -296,72 +330,118 @@ function BeaconMenuWorkspaceSection() {
 function BeaconAppMenu({ towerConfigured, user, sessionPending, onSignIn, onSignOut }: BeaconAppMenuProps) {
   const { pathname } = useLocation();
   const [towerActionsOpen, setTowerActionsOpen] = useState(false);
+  const [activeSupportDialog, setActiveSupportDialog] = useState<TowerSupportRequestKind | null>(null);
 
   const openTowerApp = useCallback(() => {
     openTowerAppHome();
   }, []);
 
+  const sessionEmail = user?.email.trim() ?? "";
+
   return (
-    <DropdownMenu
-      onOpenChange={(open) => {
-        if (!open) {
-          setTowerActionsOpen(false);
-        }
-      }}
-    >
-      <DropdownMenuTrigger asChild>
-        <Button type="button" variant="headerMenu" aria-haspopup="menu">
-          <Menu aria-hidden className="size-[1.05rem]" strokeWidth={2} />
-          Menu
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-62 max-w-[min(17.5rem,calc(100vw-2rem))] rounded-sm">
-        {!towerConfigured ? (
-          <>
-            <BeaconTowerUnavailableBanner />
-            <DropdownMenuSeparator />
-            <BeaconMenuNavigateGroup pathname={pathname} />
-            <DropdownMenuSeparator />
-            <BeaconMenuSettingsGroup pathname={pathname} />
-          </>
-        ) : towerActionsOpen ? (
-          <BeaconMenuTowerActionsPane
-            onBack={() => setTowerActionsOpen(false)}
-            onOpenTower={openTowerApp}
-            onSignOut={onSignOut}
-          />
-        ) : (
-          <>
-            <BeaconMenuAccountGroup
-              user={user}
-              sessionPending={sessionPending}
-              onSignIn={onSignIn}
-              onOpenTowerActions={() => setTowerActionsOpen(true)}
+    <>
+      <DropdownMenu
+        onOpenChange={(open) => {
+          if (!open) {
+            setTowerActionsOpen(false);
+          }
+        }}
+      >
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="headerMenu" aria-haspopup="menu">
+            <Menu aria-hidden className="size-[1.05rem]" strokeWidth={2} />
+            Menu
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-62 max-w-[min(17.5rem,calc(100vw-2rem))] rounded-sm">
+          {!towerConfigured ? (
+            <>
+              <BeaconTowerUnavailableBanner />
+              <DropdownMenuSeparator />
+              <BeaconMenuNavigateGroup pathname={pathname} />
+              <DropdownMenuSeparator />
+              <BeaconMenuSettingsGroup pathname={pathname} />
+            </>
+          ) : towerActionsOpen ? (
+            <BeaconMenuTowerActionsPane
+              onBack={() => setTowerActionsOpen(false)}
+              onOpenTower={openTowerApp}
+              onSignOut={onSignOut}
             />
-            {user ? (
-              <>
-                <DropdownMenuSeparator />
-                <BeaconMenuWorkspaceSection />
-              </>
-            ) : null}
-            <DropdownMenuSeparator />
-            <BeaconMenuNavigateGroup pathname={pathname} />
-            <DropdownMenuSeparator />
-            <BeaconMenuSettingsGroup pathname={pathname} />
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          ) : (
+            <>
+              <BeaconMenuAccountGroup
+                user={user}
+                sessionPending={sessionPending}
+                onSignIn={onSignIn}
+                onOpenTowerActions={() => setTowerActionsOpen(true)}
+              />
+              {user ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <BeaconMenuWorkspaceSection />
+                </>
+              ) : null}
+              <DropdownMenuSeparator />
+              <BeaconMenuNavigateGroup pathname={pathname} />
+              <DropdownMenuSeparator />
+              <BeaconMenuHelpGroup onOpenSupportDialog={(kind) => setActiveSupportDialog(kind)} />
+              <DropdownMenuSeparator />
+              <BeaconMenuSettingsGroup pathname={pathname} />
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <BeaconSupportRequestDialog
+        kind="feedback"
+        open={activeSupportDialog === "feedback"}
+        sessionEmail={sessionEmail}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveSupportDialog(null);
+          }
+        }}
+      />
+      <BeaconSupportRequestDialog
+        kind="help"
+        open={activeSupportDialog === "help"}
+        sessionEmail={sessionEmail}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveSupportDialog(null);
+          }
+        }}
+      />
+    </>
   );
 }
 
+function resolveTowerConnectionStatus(props: {
+  towerConfigured: boolean;
+  user: BridgedTowerUser | undefined;
+  sessionPending: boolean;
+}): BeaconTowerConnectionStatus | null {
+  if (!props.towerConfigured) {
+    return null;
+  }
+  if (props.sessionPending) {
+    return "connecting";
+  }
+  return props.user ? "connected" : "disconnected";
+}
+
 function HeaderShell(props: BeaconAppMenuProps) {
+  const towerConnectionStatus = resolveTowerConnectionStatus(props);
+
   return (
     <div className="shrink-0">
       <header data-slot="beacon-app-header" className="border-border/65 border-b bg-background px-4 py-2.5">
         <div className="flex items-center justify-between gap-4">
           <HeaderLogo to="/home" />
-          <BeaconAppMenu {...props} />
+          <div className="flex shrink-0 items-center gap-2">
+            {towerConnectionStatus ? <BeaconTowerConnectionIndicator status={towerConnectionStatus} /> : null}
+            <BeaconAppMenu {...props} />
+          </div>
         </div>
       </header>
     </div>

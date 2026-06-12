@@ -2,7 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/shared/lib/db";
 import { towerDestructiveActionRateLimit } from "@/shared/lib/db/auth-schema";
 
-export const WORKSPACE_DELETE_RATE_LIMIT = {
+const WORKSPACE_DELETE_RATE_LIMIT = {
   maxAttempts: 5,
   windowSeconds: 300,
 } as const;
@@ -26,7 +26,7 @@ export { isRateLimitWindowExpired };
  * Postgres-backed sliding window (works across serverless instances).
  * Counts every attempt, including failed slug confirmation, to slow enumeration.
  */
-export async function assertDestructiveActionRateLimit(
+async function assertDestructiveActionRateLimit(
   key: string,
   options: { maxAttempts: number; windowSeconds: number }
 ): Promise<void> {

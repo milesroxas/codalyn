@@ -350,6 +350,47 @@ export function applySiteDefaultPresetPatch(
   return coalesceBeaconPresetStorage({ siteDefault: null, byTargetKey });
 }
 
+/** Upserts a preset row by id and target key (site-default or scoped). */
+export function applyBeaconPresetRowUpsert(storage: PresetStorageRecord, row: BeaconPresetRow): PresetStorageRecord {
+  if (row.targetKey.kind === "site-default") {
+    return applySiteDefaultPresetPatch(storage, readSiteIdFromPresetTargetKey(row.targetKey), row);
+  }
+  const coalesced = coalesceBeaconPresetStorage(storage);
+  const byTargetKey: Record<string, BeaconPresetRow> = {};
+  for (const [serialized, existingRow] of Object.entries(coalesced.byTargetKey)) {
+    if (existingRow.id !== row.id) {
+      byTargetKey[serialized] = existingRow;
+    }
+  }
+  const siteDefault = coalesced.siteDefault?.id === row.id ? null : coalesced.siteDefault;
+  byTargetKey[serializePresetTargetKey(row.targetKey)] = row;
+  return coalesceBeaconPresetStorage({ siteDefault, byTargetKey });
+}
+
+/** Removes a preset row by stable id (site-default or scoped). */
+export function removeBeaconPresetRowById(storage: PresetStorageRecord, presetId: string): PresetStorageRecord {
+  const coalesced = coalesceBeaconPresetStorage(storage);
+  if (coalesced.siteDefault?.id === presetId) {
+    return applySiteDefaultPresetPatch(storage, readSiteIdFromPresetTargetKey(coalesced.siteDefault.targetKey), null);
+  }
+  for (const row of Object.values(coalesced.byTargetKey)) {
+    if (row.id !== presetId) {
+      continue;
+    }
+    if (row.targetKey.kind === "site-default") {
+      return applySiteDefaultPresetPatch(storage, readSiteIdFromPresetTargetKey(row.targetKey), null);
+    }
+    const byTargetKey = Object.fromEntries(
+      Object.entries(coalesced.byTargetKey).filter(([, existingRow]) => existingRow.id !== presetId)
+    );
+    return coalesceBeaconPresetStorage({
+      siteDefault: coalesced.siteDefault,
+      byTargetKey,
+    });
+  }
+  return storage;
+}
+
 export function createSiteDefaultPresetTargetKey(siteId: string): SiteDefaultPresetTargetKey {
   return {
     kind: "site-default",

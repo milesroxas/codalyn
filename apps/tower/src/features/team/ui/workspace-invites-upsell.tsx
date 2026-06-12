@@ -2,11 +2,18 @@
 
 import { IconUsers } from "@tabler/icons-react";
 import { WorkspaceTeamCheckoutForm } from "@/features/team/ui/workspace-team-checkout-form";
+import type { TeamSeatPrice } from "@/shared/lib/billing/team-seat-price";
 import { Card, CardContent } from "@/shared/ui/card";
 import { TabsContent } from "@/shared/ui/tabs";
 
-export function WorkspaceInvitesUpsellState(props: { organizationId: string; canManageBilling: boolean }) {
-  const { organizationId, canManageBilling } = props;
+export function WorkspaceInvitesUpsellState(props: {
+  organizationId: string;
+  canManageBilling: boolean;
+  seatFloor: number;
+  seatMax: number;
+  seatPrice: TeamSeatPrice | null;
+}) {
+  const { organizationId, canManageBilling, seatFloor, seatMax, seatPrice } = props;
 
   return (
     <TabsContent value="invites" className="space-y-6">
@@ -22,7 +29,12 @@ export function WorkspaceInvitesUpsellState(props: { organizationId: string; can
             </p>
           </div>
           {canManageBilling ? (
-            <WorkspaceTeamCheckoutForm organizationId={organizationId} />
+            <WorkspaceTeamCheckoutForm
+              organizationId={organizationId}
+              seatFloor={seatFloor}
+              seatMax={seatMax}
+              seatPrice={seatPrice}
+            />
           ) : (
             <p className="text-xs text-muted-foreground">Ask a workspace admin to subscribe.</p>
           )}

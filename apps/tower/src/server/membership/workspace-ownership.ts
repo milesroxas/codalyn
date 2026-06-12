@@ -11,7 +11,7 @@ export type WorkspaceOwnerRow = {
   deletedAt: Date | null;
 };
 
-export function activeOrganizationCondition() {
+function activeOrganizationCondition() {
   return isNull(organization.deletedAt);
 }
 
@@ -52,4 +52,15 @@ export async function assertUserIsWorkspaceMember(userId: string, organizationId
   if (!membership) {
     throw new Error("forbidden");
   }
+}
+
+/** Membership in a workspace that is not soft-deleted (authoritative for client-supplied organizationId). */
+export async function userHasActiveMembershipInOrganization(userId: string, organizationId: string): Promise<boolean> {
+  const [membership] = await db
+    .select({ id: member.id })
+    .from(member)
+    .innerJoin(organization, eq(member.organizationId, organization.id))
+    .where(and(eq(member.userId, userId), eq(member.organizationId, organizationId), activeOrganizationCondition()))
+    .limit(1);
+  return Boolean(membership);
 }

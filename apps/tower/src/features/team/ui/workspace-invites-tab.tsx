@@ -55,7 +55,15 @@ export function WorkspaceInvitesTab(props: {
   const { showInvitesUpsellState } = getInviteSeatUiState(seatState, invitations.length, organizationId);
 
   if (showInvitesUpsellState && organizationId) {
-    return <WorkspaceInvitesUpsellState organizationId={organizationId} canManageBilling={canManageBilling} />;
+    return (
+      <WorkspaceInvitesUpsellState
+        organizationId={organizationId}
+        canManageBilling={canManageBilling}
+        seatFloor={seatState.checkoutSeatFloor}
+        seatMax={seatState.checkoutSeatMax}
+        seatPrice={seatState.teamSeatPrice}
+      />
+    );
   }
 
   return (

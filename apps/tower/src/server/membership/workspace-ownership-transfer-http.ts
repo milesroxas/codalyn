@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { WorkspaceOwnershipTransferError } from "@/server/membership/workspace-ownership-transfer";
 
-export function ownershipTransferErrorStatus(code: WorkspaceOwnershipTransferError["code"]): number {
+function ownershipTransferErrorStatus(code: WorkspaceOwnershipTransferError["code"]): number {
   switch (code) {
     case "not_found":
       return 404;

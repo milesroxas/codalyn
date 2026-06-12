@@ -188,6 +188,21 @@ describe("ImageEditorCropExportPanel export size controls", () => {
     expect(screen.getByText("Crop shape")).toBeInTheDocument();
   });
 
+  it("shows crop shape controls on position when picker is hidden and manual sizing is required", () => {
+    render(
+      <TooltipProvider>
+        <ImageEditorCropExportPanel
+          {...baseProps({
+            flowPhase: "position",
+            uploadPresetPickerVisible: false,
+            showExportSizeControls: true,
+          })}
+        />
+      </TooltipProvider>
+    );
+    expect(screen.getByText("Crop shape")).toBeInTheDocument();
+  });
+
   it("hides crop shape controls on position when a preset is active", () => {
     render(
       <ImageEditorCropExportPanel

@@ -42,7 +42,7 @@ export function getPresetIds(): string[] {
   return Array.from(presets.keys());
 }
 
-export function getPresetById(id: string | undefined): Preset | undefined {
+function getPresetById(id: string | undefined): Preset | undefined {
   if (!id) return undefined;
   return presets.get(id);
 }

@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import {
   parseCmsLayoutSaveRequest,
   readUpstreamErrorMessage,
@@ -6,12 +7,30 @@ import {
 } from "@/server/beacon-cms-layout";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import { getActiveOrganizationIdForApiRequest } from "@/server/billing/session-org";
-import { consumeCmsWrite } from "@/server/billing/usage-gate";
+import { consumeCmsWrite, recordMeterCost } from "@/server/billing/usage-gate";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 
 export const runtime = "nodejs";
+
+async function upstreamErrorResponse(upstream: Response): Promise<Response> {
+  let upstreamBody: unknown = null;
+  try {
+    upstreamBody = await upstream.json();
+  } catch {
+    /* ignore */
+  }
+  const retryAfter = upstream.headers.get("Retry-After");
+  const headers = retryAfter ? { "Retry-After": retryAfter } : undefined;
+  return Response.json(
+    {
+      code: upstream.status === 429 ? "RATE_LIMITED" : "WEBFLOW_API_ERROR",
+      message: readUpstreamErrorMessage(upstreamBody, upstream.status),
+    },
+    { status: upstream.status, headers }
+  );
+}
 
 export async function POST(req: Request) {
   if (!isCmsSlotsSurfaceEnabled()) {
@@ -62,6 +81,15 @@ export async function POST(req: Request) {
     return usage.response;
   }
 
+  // Measure active compute (local serialization) separately from the upstream Webflow round-trip, which
+  // is I/O wait and not billed as Vercel active CPU.
+  const computeStart = Date.now();
+  const upstreamBody = JSON.stringify({
+    fieldData: {
+      [fieldSlug]: JSON.stringify(body.composition),
+    },
+  });
+  const fetchStart = Date.now();
   const upstream = await fetch(webflowCmsItemUrl(body.collectionId, body.itemId), {
     method: "PATCH",
     headers: {
@@ -69,30 +97,22 @@ export async function POST(req: Request) {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({
-      fieldData: {
-        [fieldSlug]: JSON.stringify(body.composition),
-      },
-    }),
+    body: upstreamBody,
   });
+  const fetchMs = Date.now() - fetchStart;
 
   if (!upstream.ok) {
-    let upstreamBody: unknown = null;
-    try {
-      upstreamBody = await upstream.json();
-    } catch {
-      /* ignore */
-    }
-    const retryAfter = upstream.headers.get("Retry-After");
-    const headers = retryAfter ? { "Retry-After": retryAfter } : undefined;
-    return Response.json(
-      {
-        code: upstream.status === 429 ? "RATE_LIMITED" : "WEBFLOW_API_ERROR",
-        message: readUpstreamErrorMessage(upstreamBody, upstream.status),
-      },
-      { status: upstream.status, headers }
-    );
+    return upstreamErrorResponse(upstream);
   }
 
-  return Response.json({ composition: body.composition }, { headers: { "Cache-Control": "no-store" } });
+  const responseBody = JSON.stringify({ composition: body.composition });
+  if (usage.scope) {
+    const computeMs = Math.max(0, Date.now() - computeStart - fetchMs);
+    const egressBytes = Buffer.byteLength(responseBody);
+    const scope = usage.scope;
+    after(() => recordMeterCost(scope, "cmsWrite", { computeMs, egressBytes }));
+  }
+  return new Response(responseBody, {
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+  });
 }

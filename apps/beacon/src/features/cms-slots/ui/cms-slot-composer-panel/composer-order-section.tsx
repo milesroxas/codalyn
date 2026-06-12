@@ -9,7 +9,7 @@ import { CmsSlotsPanelEmptyState } from "@/features/cms-slots/ui/cms-slots-panel
 import {
   CMS_SLOTS_COMPOSER_ORDER_EMPTY_DESCRIPTION,
   CMS_SLOTS_COMPOSER_ORDER_EMPTY_TITLE,
-  CMS_SLOTS_ENGINE_COMPONENTS_LABEL,
+  CMS_SLOTS_DESIGNER_COMPONENTS_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import {
@@ -34,10 +34,22 @@ type ComposerOrderSectionProps = {
   onReorder: (fromIndex: number, toIndex: number) => void;
   onRenameSlot: (rowKey: string, name: string) => void;
   onRemove: (key: string) => void;
+  autoOpenEditDialogRowKey?: string | null;
+  onAutoOpenEditDialogConsumed?: () => void;
 };
 
 export function ComposerOrderSection(props: ComposerOrderSectionProps) {
-  const { draft, rowMeta, onChangePropValue, busy, onReorder, onRenameSlot, onRemove } = props;
+  const {
+    draft,
+    rowMeta,
+    onChangePropValue,
+    busy,
+    onReorder,
+    onRenameSlot,
+    onRemove,
+    autoOpenEditDialogRowKey = null,
+    onAutoOpenEditDialogConsumed,
+  } = props;
 
   const [removeConfirmKey, setRemoveConfirmKey] = useState<string | null>(null);
   const removeConfirmRow = draft.find((row) => row.key === removeConfirmKey) ?? null;
@@ -78,7 +90,7 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
         className="flex min-h-0 min-w-0 flex-1 flex-col"
         data-slot="beacon_composer_order"
       >
-        <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_ENGINE_COMPONENTS_LABEL}</SurfaceSummaryCardPanelSectionLabel>
+        <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_DESIGNER_COMPONENTS_LABEL}</SurfaceSummaryCardPanelSectionLabel>
         {draft.length === 0 ? (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-3">
             <CmsSlotsPanelEmptyState
@@ -115,6 +127,8 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
                           onChangePropValue={onChangePropValue}
                           onRenameSlot={onRenameSlot}
                           onRemove={handleRequestRemove}
+                          autoOpenEditDialogRowKey={autoOpenEditDialogRowKey}
+                          onAutoOpenEditDialogConsumed={onAutoOpenEditDialogConsumed}
                         />
                       );
                     })}

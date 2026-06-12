@@ -27,6 +27,14 @@ function ConfirmPromptValue({ children }: { children: React.ReactNode }) {
   return <code className="rounded bg-muted px-1 font-mono text-xs">{children}</code>;
 }
 
+type TypedConfirmSecondaryConfirm = {
+  fieldLabel: string;
+  fieldId: string;
+  expectedValue: string;
+  value: string;
+  onValueChange: (value: string) => void;
+};
+
 type TypedConfirmAlertDialogProps = {
   triggerLabel: string;
   triggerDisabled?: boolean;
@@ -37,6 +45,7 @@ type TypedConfirmAlertDialogProps = {
   expectedValue: string;
   confirmValue: string;
   onConfirmValueChange: (value: string) => void;
+  secondaryConfirm?: TypedConfirmSecondaryConfirm;
   passwordFieldId?: string;
   passwordValue?: string;
   onPasswordValueChange?: (value: string) => void;
@@ -44,6 +53,7 @@ type TypedConfirmAlertDialogProps = {
   busyLabel?: string;
   busy?: boolean;
   onConfirm: () => void;
+  onOpenChange?: (open: boolean) => void;
 };
 
 function TypedConfirmAlertDialog({
@@ -56,6 +66,7 @@ function TypedConfirmAlertDialog({
   expectedValue,
   confirmValue,
   onConfirmValueChange,
+  secondaryConfirm,
   passwordFieldId,
   passwordValue = "",
   onPasswordValueChange,
@@ -63,12 +74,16 @@ function TypedConfirmAlertDialog({
   busyLabel = "Deleting…",
   busy = false,
   onConfirm,
+  onOpenChange,
 }: TypedConfirmAlertDialogProps) {
   const matches = confirmTextMatches(confirmValue, expectedValue);
+  const secondaryMatches = secondaryConfirm
+    ? confirmTextMatches(secondaryConfirm.value, secondaryConfirm.expectedValue)
+    : true;
   const passwordReady = !passwordFieldId || passwordValue.trim().length > 0;
 
   return (
-    <AlertDialog>
+    <AlertDialog onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>
         <Button type="button" variant="destructive" size="sm" disabled={triggerDisabled}>
           <IconTrash data-icon="inline-start" />
@@ -112,13 +127,28 @@ function TypedConfirmAlertDialog({
             autoComplete="off"
           />
         </FormField>
+        {secondaryConfirm ? (
+          <FormField className="py-2">
+            <Label htmlFor={secondaryConfirm.fieldId}>{secondaryConfirm.fieldLabel}</Label>
+            <Input
+              id={secondaryConfirm.fieldId}
+              value={secondaryConfirm.value}
+              onChange={(event) => secondaryConfirm.onValueChange(event.target.value)}
+              placeholder={secondaryConfirm.expectedValue}
+              autoComplete="off"
+            />
+          </FormField>
+        ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
           <AlertDialogAction
             type="button"
             variant="destructive"
-            disabled={busy || !matches || !passwordReady}
-            onClick={onConfirm}
+            disabled={busy || !matches || !secondaryMatches || !passwordReady}
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
           >
             {busy ? busyLabel : actionLabel}
           </AlertDialogAction>
@@ -156,4 +186,4 @@ function DangerZoneTypedDelete({
   );
 }
 
-export { ConfirmPromptValue, confirmTextMatches, DangerZoneTypedDelete, TypedConfirmAlertDialog };
+export { DangerZoneTypedDelete, TypedConfirmAlertDialog };

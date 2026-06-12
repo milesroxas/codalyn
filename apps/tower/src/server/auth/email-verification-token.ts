@@ -1,6 +1,6 @@
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 
-export const TOWER_EMAIL_VERIFICATION_PAGE_PATH = "/verify-email";
+const TOWER_EMAIL_VERIFICATION_PAGE_PATH = "/verify-email";
 
 /**
  * Decode Better Auth email verification JWT payload for routing only.

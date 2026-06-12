@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   readBeaconGuestWelcomeComplete,
   writeBeaconGuestWelcomeComplete,
@@ -10,6 +10,14 @@ export function useBeaconGuestWelcomeVisible() {
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
   const [guestWelcomeDone, setGuestWelcomeDone] = useState(readBeaconGuestWelcomeComplete);
   const visible = !towerSessionPending && !towerUser && !guestWelcomeDone;
+
+  useEffect(() => {
+    if (!towerUser) {
+      return;
+    }
+    writeBeaconGuestWelcomeComplete();
+    setGuestWelcomeDone(true);
+  }, [towerUser]);
 
   const markGuestWelcomeComplete = () => {
     writeBeaconGuestWelcomeComplete();

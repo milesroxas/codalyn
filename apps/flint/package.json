@@ -22,8 +22,8 @@
     "test:class-order": "vitest run src/features/linter/rules/lumos/structure/__tests__/class-order.element.test.ts"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.29.2",
-    "@babel/preset-react": "^7.28.5",
+    "vitest": "^4.1.4",
+    "vite": "^8.0.8",
     "@biomejs/biome": "^2.4.12",
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
@@ -32,13 +32,10 @@
     "@vitest/coverage-v8": "^4.1.4",
     "@webflow/designer-extension-typings": "^2.0.33",
     "@webflow/webflow-cli": "^1.15.0",
-    "concurrently": "^9.2.1",
-    "mini-css-extract-plugin": "^2.10.2",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
     "typescript": "^6.0.3",
-    "vite": "^8.0.8",
-    "vitest": "^4.1.4"
+    "react-dom": "^19.2.5",
+    "concurrently": "^9.2.1",
+    "react": "^19.2.5"
   },
   "dependencies": {
     "@codalyn/observability": "workspace:*",

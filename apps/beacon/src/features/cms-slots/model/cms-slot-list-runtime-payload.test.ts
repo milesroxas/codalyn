@@ -3,7 +3,7 @@ import {
   CMS_SLOT_LIST_RUNTIME_JSON_VERSION,
   cmsSlotListRuntimePayloadSequential,
   parseCmsSlotListRuntimePayload,
-  publishedDisplayNamesForEnginePool,
+  publishedDisplayNamesForDesignerPool,
   resolveCmsSlotPublishedDisplayName,
   serializeCmsSlotListRuntimePayload,
 } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
@@ -20,7 +20,7 @@ describe("resolveCmsSlotPublishedDisplayName", () => {
   });
 });
 
-describe("publishedDisplayNamesForEnginePool", () => {
+describe("publishedDisplayNamesForDesignerPool", () => {
   it("maps pool rows from payload n[] and falls back to component name when pool unused", () => {
     const payload = parseCmsSlotListRuntimePayload(
       serializeCmsSlotListRuntimePayload([0, 1, 0], [{}, {}, {}], ["A", "B", "A"])
@@ -30,7 +30,7 @@ describe("publishedDisplayNamesForEnginePool", () => {
       return;
     }
     const rows = [{ name: "One" }, { name: "Two" }, { name: "Three" }];
-    expect(publishedDisplayNamesForEnginePool(payload, rows)).toEqual(["A", "B", "Three"]);
+    expect(publishedDisplayNamesForDesignerPool(payload, rows)).toEqual(["A", "B", "Three"]);
   });
 
   it("uses component name when the same pool index has mixed composed labels", () => {
@@ -42,7 +42,7 @@ describe("publishedDisplayNamesForEnginePool", () => {
       return;
     }
     const rows = [{ name: "Dup" }];
-    expect(publishedDisplayNamesForEnginePool(payload, rows)).toEqual(["Dup"]);
+    expect(publishedDisplayNamesForDesignerPool(payload, rows)).toEqual(["Dup"]);
   });
 });
 

@@ -70,7 +70,16 @@ pnpm app tower db:seed:local
 
 ### Local URL / port (dev owns **3100**)
 
-**`pnpm app tower dev`** defaults to **http://localhost:3100** (`scripts/dev.mjs`). Treat **3100** as the host port for **Tower dev** (Turbopack / HMR) during normal monorepo work.
+**`pnpm app tower dev`** defaults to **http://localhost:3100** (`scripts/dev.mjs`) and uses **local** `DATABASE_URL` from `.env` / `.env.local`. Treat **3100** as the host port for **Tower dev** (Turbopack / HMR) during normal monorepo work.
+
+Remote Neon (same `TOWER_DATABASE_URL_*` as `db:migrate:*` — set in `.env.local`):
+
+```bash
+pnpm app tower dev:neon      # Neon development branch
+pnpm app tower dev:preview   # Neon preview branch
+```
+
+`prod` is rejected for dev. Default `pnpm dev` at the repo root is unchanged (local DB unless you run Tower with one of the commands above).
 
 ## Docker (isolated stack)
 

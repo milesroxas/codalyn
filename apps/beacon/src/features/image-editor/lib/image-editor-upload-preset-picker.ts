@@ -10,6 +10,10 @@ import {
   serializePresetTargetKey,
 } from "@codalyn/webflow-kit";
 
+export function hasValidExportConstraints(constraints: ExportConstraints | null | undefined): boolean {
+  return constraints != null && constraints.width > 0 && constraints.height > 0;
+}
+
 const MANUAL_UPLOAD_PRESET_OPTION_ID = "manual-override";
 const RESOLVED_CONSTRAINTS_UPLOAD_PRESET_OPTION_ID = "resolved-constraints";
 
@@ -217,6 +221,20 @@ export function resolveAutoUploadPresetOptionId(input: {
 
 export function isManualUploadPresetOptionId(id: string): boolean {
   return id === MANUAL_UPLOAD_PRESET_OPTION_ID;
+}
+
+/**
+ * Show aspect ratio and export dimension controls when the session is not driven by
+ * tagged designer dimensions or resolved preset constraints (including site default).
+ */
+export function resolveShowExportSizeControls(input: {
+  effectiveTaggedDimensionsActive: boolean;
+  effectiveExportConstraints: ExportConstraints | null;
+}): boolean {
+  if (input.effectiveTaggedDimensionsActive) {
+    return false;
+  }
+  return !hasValidExportConstraints(input.effectiveExportConstraints);
 }
 
 export function isUploadPresetExportFormatLocked(selectedOption: UploadPresetPickerOption | null | undefined): boolean {

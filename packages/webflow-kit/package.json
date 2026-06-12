@@ -18,6 +18,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "clean": "rm -rf dist .turbo",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

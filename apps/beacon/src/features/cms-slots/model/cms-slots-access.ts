@@ -1,8 +1,8 @@
 /**
  * CMS Slots route access mirrors Tower `computeBeaconEditorExperience`:
- * editors and admins in editor-style mode use Composer only; designers and admins in designer view use Engine + Composer.
+ * editors and admins in editor-style mode use Composer only; designers and admins in designer view use Designer + Composer.
  */
-export type CmsSlotsRouteSegment = "engine" | "composer";
+export type CmsSlotsRouteSegment = "designer" | "composer";
 
 function isTowerTeamAdminRole(role: string): boolean {
   return role === "admin" || role === "owner";
@@ -27,20 +27,20 @@ export function computeEditorExperienceFromMembership(
   return false;
 }
 
-export function canAccessCmsSlotsEngine(editorExperience: boolean): boolean {
+export function canAccessCmsSlotsDesigner(editorExperience: boolean): boolean {
   return !editorExperience;
 }
 
 export function defaultCmsSlotsRouteSegment(editorExperience: boolean): CmsSlotsRouteSegment {
-  return editorExperience ? "composer" : "engine";
+  return editorExperience ? "composer" : "designer";
 }
 
-/** Coerce a requested segment when Engine is not permitted for the current member. */
+/** Coerce a requested segment when Designer is not permitted for the current member. */
 export function resolveAllowedCmsSlotsSegment(
   segment: CmsSlotsRouteSegment,
   editorExperience: boolean
 ): CmsSlotsRouteSegment {
-  if (segment === "engine" && editorExperience) {
+  if (segment === "designer" && editorExperience) {
     return "composer";
   }
   return segment;
@@ -54,14 +54,14 @@ export function shouldShowCmsSlotsPreInstall(input: {
   return input.routeStateKnown && !input.beaconsWrapperInstalled;
 }
 
-/** Composer list: prompt Engine install (no install control) for members who can access Engine. */
-export function shouldShowCmsSlotsComposerInstallInEngineEmpty(input: {
-  canAccessEngine: boolean;
+/** Composer list: prompt Designer install (no install control) for members who can access Designer. */
+export function shouldShowCmsSlotsComposerInstallInDesignerEmpty(input: {
+  canAccessDesigner: boolean;
   routeStateKnown: boolean;
   beaconsWrapperInstalled: boolean;
 }): boolean {
   return (
-    input.canAccessEngine &&
+    input.canAccessDesigner &&
     shouldShowCmsSlotsPreInstall({
       routeStateKnown: input.routeStateKnown,
       beaconsWrapperInstalled: input.beaconsWrapperInstalled,
@@ -69,15 +69,15 @@ export function shouldShowCmsSlotsComposerInstallInEngineEmpty(input: {
   );
 }
 
-/** Composer list: installed but no slot has an Engine-configured component ready for composing. */
-export function shouldShowCmsSlotsComposerEngineNotReadyEmpty(input: {
-  canAccessEngine: boolean;
+/** Composer list: installed but no slot has an Designer-configured component ready for composing. */
+export function shouldShowCmsSlotsComposerDesignerNotReadyEmpty(input: {
+  canAccessDesigner: boolean;
   /** True once page scan, runtime status, and composer eligibility have all settled. */
   composerListSettled: boolean;
   beaconsWrapperInstalled: boolean;
   eligibleCount: number;
 }): boolean {
-  if (!input.canAccessEngine || !input.composerListSettled || !input.beaconsWrapperInstalled) {
+  if (!input.canAccessDesigner || !input.composerListSettled || !input.beaconsWrapperInstalled) {
     return false;
   }
   return input.eligibleCount === 0;

@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { sendSupportRequestNotificationEmail } from "@/server/email/support-request-notification-email";
 import { listProductAdminEmails } from "@/server/membership/product-admin";
-import { normalizeAccessEmail, parseAccessEmailInput } from "@/shared/lib/access/email-input";
+import { parseAccessEmailInput } from "@/shared/lib/access/email-input";
 import { db } from "@/shared/lib/db";
 import { supportRequest } from "@/shared/lib/db/auth-schema";
 import {
@@ -236,8 +236,4 @@ export function parseSupportRequestListKind(raw: string | null): TowerSupportReq
     return raw;
   }
   return "all";
-}
-
-export function normalizeSupportRequestEmail(raw: string): string {
-  return normalizeAccessEmail(raw);
 }

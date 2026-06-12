@@ -1,3 +1,9 @@
+export const AUTH_SURFACE_LEGAL_NOTICE_PREFIX = {
+  signIn: "By signing in, you agree to our ",
+  signUp: "By signing up, you agree to our ",
+  generic: "By continuing, you agree to our ",
+} as const;
+
 export function resolveSignInCardDescription(input: {
   joiningViaTeamInvite: boolean;
   earlyAccessRequired: boolean;

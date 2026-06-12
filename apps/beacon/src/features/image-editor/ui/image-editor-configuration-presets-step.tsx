@@ -1,5 +1,4 @@
 import {
-  applySiteDefaultPresetPatch,
   BEACON_PRESET_DEFAULT_MAX_FILE_BYTES,
   formatBeaconPresetDisplayName,
   formatBeaconPresetInstanceLocationLabel,
@@ -8,7 +7,7 @@ import {
   type MaxSizeUnit,
   maxBytesToDraft,
   type PresetCrudScope,
-  readSiteIdFromPresetTargetKey,
+  removeBeaconPresetRowById,
 } from "@codalyn/webflow-kit";
 import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -49,8 +48,8 @@ import {
   IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
 } from "@/shared/lib/beacon-feature-route-copy";
 import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
+import { useDesignerCurrentPageId } from "@/shared/lib/use-designer-current-page-id";
 import { cn } from "@/shared/lib/utils";
-import { readCurrentPageIdOrNull } from "@/shared/lib/webflow-page-canvas-context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -100,7 +99,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   const [formSubStep, setFormSubStep] = useState<PresetFormSubStep>(1);
   const [presetPendingDelete, setPresetPendingDelete] = useState<PresetListRow | null>(null);
   const [siteId, setSiteId] = useState<string | null>(null);
-  const [pageId, setPageId] = useState<string | null>(null);
+  const { pageId } = useDesignerCurrentPageId();
 
   const isForm = view === "form";
   const isEditing = editingId != null;
@@ -118,6 +117,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   const {
     targets: formTargets,
     scanPending: formScanPending,
+    scanProgress: formScanProgress,
     scanError: formScanError,
     pageScanned: formPageScanned,
     rescan: formRescan,
@@ -139,19 +139,8 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
           setSiteId(null);
         }
       });
-    void readCurrentPageIdOrNull().then((id) => {
-      if (!cancelled && id != null) {
-        setPageId(id);
-      }
-    });
-    const unsub = webflow.subscribe("currentpage", (page) => {
-      if (page?.id != null) {
-        setPageId(page.id);
-      }
-    });
     return () => {
       cancelled = true;
-      unsub();
     };
   }, []);
 
@@ -222,26 +211,9 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   const onDeletePreset = useCallback(
     async (id: string) => {
       const entry = presetEntriesById.get(id) ?? null;
-      const result = await updateSettings((prev) => {
-        if (entry?.scope === "site-default") {
-          return {
-            imagePresetStorage: applySiteDefaultPresetPatch(
-              prev.imagePresetStorage,
-              readSiteIdFromPresetTargetKey(entry.row.targetKey),
-              null
-            ),
-          };
-        }
-        const nextByTargetKey = Object.fromEntries(
-          Object.entries(prev.imagePresetStorage.byTargetKey).filter(([, row]) => row.id !== id)
-        );
-        return {
-          imagePresetStorage: {
-            siteDefault: prev.imagePresetStorage.siteDefault?.id === id ? null : prev.imagePresetStorage.siteDefault,
-            byTargetKey: nextByTargetKey,
-          },
-        };
-      });
+      const result = await updateSettings((prev) => ({
+        imagePresetStorage: removeBeaconPresetRowById(prev.imagePresetStorage, id),
+      }));
       if (!result.ok) {
         void webflow.notify({ type: "Error", message: result.error });
         return;
@@ -282,6 +254,19 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
       await removeTemporaryPageComponentInstance(instance);
     });
   }, []);
+
+  const designerPageIdRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const prev = designerPageIdRef.current;
+    designerPageIdRef.current = pageId;
+    if (prev === undefined || prev === pageId) {
+      return;
+    }
+    editTargetResolveGenRef.current += 1;
+    setFormTarget(null);
+    void cleanupTemporaryPresetInstance();
+  }, [cleanupTemporaryPresetInstance, pageId]);
 
   const backToList = useCallback(() => {
     void cleanupTemporaryPresetInstance();
@@ -612,6 +597,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
           formRescan={formRescan}
           formScanError={formScanError}
           formScanPending={formScanPending}
+          formScanProgress={formScanProgress}
           formSubStep={formSubStep}
           formTarget={formTarget}
           formTargetSelect={(t) => {

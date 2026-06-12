@@ -4,7 +4,10 @@ import type {
   PresetFormAddableScope,
   PresetFormExistingMatch,
 } from "@/features/image-editor/lib/image-editor-preset-form-existing";
-import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
+import type {
+  ImagePageTarget,
+  ImagePageTargetScanProgress,
+} from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { PresetFormStep2 } from "@/features/image-editor/ui/image-editor-preset-form-fields";
 import { ImageEditorTargetStepColumn } from "@/features/image-editor/ui/image-editor-target-step-column";
 import { PresetTargetLocateControl } from "@/features/image-editor/ui/preset-target-locate-control";
@@ -47,6 +50,7 @@ export function ImageEditorConfigurationPresetsFormView(props: {
   setMaxSizeUnit: (v: MaxSizeUnit) => void;
   formTarget: ImagePageTarget | null;
   formScanPending: boolean;
+  formScanProgress: ImagePageTargetScanProgress | null;
   formScanError: string | null;
   formPageScanned: boolean;
   formRescan: () => void;
@@ -87,6 +91,7 @@ export function ImageEditorConfigurationPresetsFormView(props: {
     maxSizeUnit,
     setMaxSizeUnit,
     formScanPending,
+    formScanProgress,
     formScanError,
     formPageScanned,
     formRescan,
@@ -156,6 +161,7 @@ export function ImageEditorConfigurationPresetsFormView(props: {
           scanButtonPlacement="trailing"
           scanError={formScanError}
           scanPending={formScanPending}
+          scanProgress={formScanProgress}
           selectedTarget={formTarget}
           surface={{
             addableScopes,

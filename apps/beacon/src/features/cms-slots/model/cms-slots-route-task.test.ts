@@ -17,7 +17,7 @@ const idleInput = {
   routeTaskPhase: null,
   picking: false,
   addPending: false,
-  resyncingEngineSlotKey: null,
+  resyncingDesignerSlotKey: null,
   listTargetCreatePending: false,
   listTargetFocusOnCanvasPending: false,
   listTargetPlaceOnCanvasPending: false,
@@ -50,7 +50,7 @@ describe("resolveCmsSlotsRouteTask", () => {
     expect(
       resolveCmsSlotsRouteTask({
         ...idleInput,
-        resyncingEngineSlotKey: "row-1",
+        resyncingDesignerSlotKey: "row-1",
         addPending: true,
       })?.message
     ).toBe(CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES);

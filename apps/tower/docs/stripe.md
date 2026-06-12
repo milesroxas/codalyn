@@ -81,11 +81,16 @@ delay and local dev when webhooks are not forwarded to localhost
 
 Seat *policy* is documented in the pricing doc; the Stripe mechanics are:
 
-- Checkout quantity = `max(TOWER_TEAM_MIN_SEATS, members + pending invitations)`.
+- Checkout quantity = the admin-selected seat count, clamped up to a floor of
+  `max(TOWER_TEAM_MIN_SEATS, members + pending invitations)` (so a workspace can buy spare seats to
+  invite into; it can never buy below the minimum or below current usage). Defaults to the floor when
+  no seat count is submitted (`team-seat-quantity.ts`).
 - Webhooks set `organization.seat_limit` from the Stripe subscription quantity.
 - Member/invitation Better Auth hooks (`beforeCreateInvitation`, `beforeAcceptInvitation`,
   `beforeAddMember`) call `syncOrganizationSeatQuantityWithStripe` to keep Stripe quantity and
-  `seat_limit` aligned. `seat_limit` is **not** client-writable.
+  `seat_limit` aligned. Sync is **grow-only**: it raises quantity to fit new seats in use but never
+  drops below the seats already purchased — reductions are made via the Customer Portal and applied
+  through the webhook. `seat_limit` is **not** client-writable.
 - `operator_seat_limit_override`: operator-granted seats — Stripe quantity sync must not change billing
   or `seat_limit` while set.
 
@@ -163,6 +168,8 @@ Create the products (names are up to you; Tower only cares about price ids and r
 Also:
 
 4. **Customer portal** — enable in [Settings → Billing → Customer portal](https://dashboard.stripe.com/settings/billing/portal) so portal routes work.
+   - Keep the **default** configuration with *switch plans* on and *change quantity* **off** (individual Pro/Studio are `quantity: 1` — customers must not edit quantity).
+   - For self-serve **Team seat reductions**, create one extra portal **configuration** with *change quantity* **on** (eligible product = the Team seat price) and set its id as `STRIPE_PORTAL_CONFIG_WORKSPACE`. The workspace portal route (`/api/billing/workspace/portal`) passes it as `configuration`; unset falls back to the default portal. Seat *increases* still happen automatically as members are added (grow-only sync); the portal quantity control is the reduction lever.
 5. **Webhooks** — endpoint: `https://<your-tower-host>/api/stripe/webhook` (same path in dev with `stripe listen` forwarding to localhost).
 
 Subscribe to at least:

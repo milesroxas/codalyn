@@ -1,7 +1,7 @@
 import type { ComposerEligibleList } from "@/features/cms-slots/model/cms-slot-composer-eligible";
 import { displayLabelForCmsSlotList } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import {
-  shouldShowCmsSlotsComposerEngineNotReadyEmpty,
+  shouldShowCmsSlotsComposerDesignerNotReadyEmpty,
   shouldShowCmsSlotsEditorNoSlotsEmpty,
 } from "@/features/cms-slots/model/cms-slots-access";
 import {
@@ -11,9 +11,9 @@ import {
 import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotListTile } from "@/features/cms-slots/ui/cms-slot-list-tile";
+import { CmsSlotsComposerDesignerNotReadyEmptyState } from "@/features/cms-slots/ui/cms-slots-composer-designer-not-ready-empty-state";
 import { CmsSlotsComposerEditingContextCard } from "@/features/cms-slots/ui/cms-slots-composer-editing-context-card";
-import { CmsSlotsComposerEngineNotReadyEmptyState } from "@/features/cms-slots/ui/cms-slots-composer-engine-not-ready-empty-state";
-import { CmsSlotsComposerInstallInEngineEmptyState } from "@/features/cms-slots/ui/cms-slots-composer-install-in-engine-empty-state";
+import { CmsSlotsComposerInstallInDesignerEmptyState } from "@/features/cms-slots/ui/cms-slots-composer-install-in-designer-empty-state";
 import { CmsSlotsEditorNoSlotsEmptyState } from "@/features/cms-slots/ui/cms-slots-editor-no-slots-empty-state";
 import { CmsSlotsRouteMainIntro } from "@/features/cms-slots/ui/cms-slots-route-main-intro";
 import { CMS_SLOTS_COMPOSER_EDITABLE_SECTION_LABEL } from "@/shared/lib/cms-slots-feature-copy";
@@ -49,7 +49,7 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
     onOpenList,
     onEditorNoSlotsBack,
   } = props;
-  const { composerOnly, canAccessEngine } = useCmsSlotsAccess();
+  const { composerOnly, canAccessDesigner } = useCmsSlotsAccess();
   const listDataReady = cmsSlotsComposerListDataReady({
     routeStateKnown,
     pageBootBlocking,
@@ -63,8 +63,8 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
     beaconsWrapperInstalled,
     eligibleCount: eligible.length,
   });
-  const showEngineNotReadyEmpty = shouldShowCmsSlotsComposerEngineNotReadyEmpty({
-    canAccessEngine,
+  const showDesignerNotReadyEmpty = shouldShowCmsSlotsComposerDesignerNotReadyEmpty({
+    canAccessDesigner,
     composerListSettled: listDataReady,
     beaconsWrapperInstalled,
     eligibleCount: eligible.length,
@@ -73,22 +73,22 @@ export function CmsSlotComposerListPanel(props: CmsSlotComposerListPanelProps) {
     routeStateKnown,
     beaconsWrapperInstalled,
     showEditorNoSlotsEmpty,
-    showEngineNotReadyEmpty,
-    canAccessEngine,
+    showDesignerNotReadyEmpty,
+    canAccessDesigner,
   });
 
   if (listContentKey === "editor-empty") {
     return <CmsSlotsEditorNoSlotsEmptyState data-slot="beacon_composer_editor_no_slots" onBack={onEditorNoSlotsBack} />;
   }
 
-  if (listContentKey === "engine-install-prompt") {
-    return <CmsSlotsComposerInstallInEngineEmptyState data-slot="beacon_composer_install_in_engine" />;
+  if (listContentKey === "designer-install-prompt") {
+    return <CmsSlotsComposerInstallInDesignerEmptyState data-slot="beacon_composer_install_in_designer" />;
   }
 
-  if (listContentKey === "engine-not-ready") {
+  if (listContentKey === "designer-not-ready") {
     return (
-      <CmsSlotsComposerEngineNotReadyEmptyState
-        data-slot="beacon_composer_engine_not_ready"
+      <CmsSlotsComposerDesignerNotReadyEmptyState
+        data-slot="beacon_composer_designer_not_ready"
         onBack={onEditorNoSlotsBack}
       />
     );

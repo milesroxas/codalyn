@@ -1,10 +1,10 @@
 {
   "name": "@codalyn/beacon",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
     "build": "node ../../scripts/build-cli.mjs --app beacon",
     "build:prod": "node ../../scripts/build-cli.mjs --app beacon --channel production",
     "build:dev": "node ../../scripts/build-cli.mjs --app beacon --channel development",
@@ -33,13 +33,13 @@
     "@vitest/coverage-v8": "^4.1.4",
     "@webflow/designer-extension-typings": "^2.0.33",
     "@webflow/webflow-cli": "^1.15.0",
+    "vitest": "^4.1.4",
+    "vite": "^8.0.8",
     "jsdom": "^29.0.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "tailwindcss": "^4.2.2",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.8",
-    "vitest": "^4.1.4"
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "@codalyn/observability": "workspace:*",

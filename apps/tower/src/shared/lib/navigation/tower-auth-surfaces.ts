@@ -1,6 +1,6 @@
 import { TEAM_INVITATION_ACCEPT_PATH } from "@/shared/lib/membership/team-invitation-accept";
 
-export const TOWER_AUTH_SURFACE_HREF_PATHS = [
+const TOWER_AUTH_SURFACE_HREF_PATHS = [
   "/sign-in",
   "/sign-up",
   "/forgot-password",

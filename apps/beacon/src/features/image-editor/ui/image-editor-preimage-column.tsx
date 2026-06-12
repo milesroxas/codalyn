@@ -7,12 +7,16 @@ import {
   imageEditorStepExitTransitionClass,
   isImageEditorStepExitTransitionEnd,
 } from "@/features/image-editor/lib/image-editor-step-transition";
-import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
+import type {
+  ImagePageTarget,
+  ImagePageTargetScanProgress,
+} from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { useImageEditorStepEnter } from "@/features/image-editor/model/use-image-editor-step-enter";
 import { ImageEditorAutoTargetColumn } from "@/features/image-editor/ui/image-editor-auto-target-column";
 import { ImageEditorConfigurationPresetsStep } from "@/features/image-editor/ui/image-editor-configuration-presets-step";
 import { ImageEditorEntryColumn } from "@/features/image-editor/ui/image-editor-entry-column";
 import { EmptyImageSourceSection } from "@/features/image-editor/ui/image-editor-source-sections";
+import { cn } from "@/shared/lib/utils";
 
 type ImageEditorPreimageColumnProps = {
   flowStep: ImageEditorFlowStep;
@@ -35,6 +39,7 @@ type ImageEditorPreimageColumnProps = {
   /** Auto path: element scan */
   autoTargets: ImagePageTarget[];
   autoScanPending: boolean;
+  autoScanProgress: ImagePageTargetScanProgress | null;
   autoScanError: string | null;
   autoPageScanned: boolean;
   onAutoRescan: () => void;
@@ -67,6 +72,7 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
     onConfigurePresetsScrollResetKeyChange,
     autoTargets,
     autoScanPending,
+    autoScanProgress,
     autoScanError,
     autoPageScanned,
     onAutoRescan,
@@ -83,7 +89,7 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
   const showRoleLoading = useDeferredLoadingIndicator(!roleReady && isTowerUser);
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className={cn("flex min-w-0 flex-col gap-3", flowStep === "autoElement" && "min-h-0 flex-1")}>
       {showRoleLoading ? (
         <p className="text-muted-foreground flex items-center justify-center gap-2 py-8 text-xs" role="status">
           <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
@@ -105,7 +111,7 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
 
       {flowStep === "autoElement" ? (
         <div
-          className={imageEditorStepExitTransitionClass(stepExitFade)}
+          className={cn(imageEditorStepExitTransitionClass(stepExitFade), "flex min-h-0 flex-1 flex-col")}
           onTransitionEnd={(e) => {
             if (isImageEditorStepExitTransitionEnd(e, stepExitFade)) {
               onStepExitTransitionEnd(e);
@@ -121,6 +127,7 @@ export function ImageEditorPreimageColumn(props: ImageEditorPreimageColumnProps)
             pageScanned={autoPageScanned}
             scanError={autoScanError}
             scanPending={autoScanPending}
+            scanProgress={autoScanProgress}
             selectedTarget={autoSelectedTarget}
             displaySurfaceTarget={autoDisplaySurfaceTarget}
             targets={autoTargets}

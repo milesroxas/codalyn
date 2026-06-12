@@ -7,13 +7,27 @@ import {
   resolveTowerAppCallbackUrl,
   resolveTowerEmailVerificationAppCallbackUrl,
   resolveTowerEmailVerificationCallbackUrl,
+  stripLegacyEmailVerifiedQueryParam,
 } from "@/features/auth/lib/email-verification";
 
 describe("resolveTowerEmailVerificationCallbackUrl", () => {
-  it("adds emailVerified query and rejects open redirects", () => {
-    expect(resolveTowerEmailVerificationCallbackUrl("/dashboard")).toBe("/dashboard?emailVerified=1");
-    expect(resolveTowerEmailVerificationCallbackUrl("//evil.example")).toBe("/?emailVerified=1");
-    expect(resolveTowerEmailVerificationCallbackUrl("https://evil.example")).toBe("/?emailVerified=1");
+  it("sanitizes unsafe paths without adding flash query params", () => {
+    expect(resolveTowerEmailVerificationCallbackUrl("/dashboard")).toBe("/dashboard");
+    expect(resolveTowerEmailVerificationCallbackUrl("//evil.example")).toBe("/");
+    expect(resolveTowerEmailVerificationCallbackUrl("https://evil.example")).toBe("/");
+  });
+
+  it("strips legacy emailVerified query params from callback paths", () => {
+    expect(resolveTowerEmailVerificationCallbackUrl("/dashboard?emailVerified=1")).toBe("/dashboard");
+    expect(resolveTowerEmailVerificationCallbackUrl("/billing?emailVerified=1&tab=usage")).toBe("/billing?tab=usage");
+  });
+});
+
+describe("stripLegacyEmailVerifiedQueryParam", () => {
+  it("removes only the legacy flash param", () => {
+    expect(stripLegacyEmailVerifiedQueryParam("/account")).toBe("/account");
+    expect(stripLegacyEmailVerifiedQueryParam("/?emailVerified=1")).toBe("/");
+    expect(stripLegacyEmailVerifiedQueryParam("/billing?emailVerified=1&tab=usage")).toBe("/billing?tab=usage");
   });
 });
 
@@ -21,9 +35,7 @@ describe("resolveTowerEmailVerificationAppCallbackUrl", () => {
   it("composes absolute url from env base when set", () => {
     const prev = process.env.NEXT_PUBLIC_APP_URL;
     process.env.NEXT_PUBLIC_APP_URL = "https://app.example.com";
-    expect(resolveTowerEmailVerificationAppCallbackUrl("/billing")).toBe(
-      "https://app.example.com/billing?emailVerified=1"
-    );
+    expect(resolveTowerEmailVerificationAppCallbackUrl("/billing")).toBe("https://app.example.com/billing");
     process.env.NEXT_PUBLIC_APP_URL = prev;
   });
 });
@@ -38,14 +50,14 @@ describe("resolveTowerAppCallbackUrl", () => {
 });
 
 describe("readEmailVerificationCallbackUrl", () => {
-  it("accepts same-origin absolute callback URLs", () => {
+  it("accepts same-origin absolute callback URLs and strips legacy flash params", () => {
     const prev = process.env.NEXT_PUBLIC_APP_URL;
     process.env.NEXT_PUBLIC_APP_URL = "https://app.example.com";
     expect(
       readEmailVerificationCallbackUrl(
         new URLSearchParams("callbackURL=https%3A%2F%2Fapp.example.com%2Fbilling%3FemailVerified%3D1")
       )
-    ).toBe("/billing?emailVerified=1");
+    ).toBe("/billing");
     if (prev === undefined) {
       delete process.env.NEXT_PUBLIC_APP_URL;
     } else {
@@ -56,10 +68,8 @@ describe("readEmailVerificationCallbackUrl", () => {
   it("falls back to a safe default for missing or invalid callbacks", () => {
     const prev = process.env.NEXT_PUBLIC_APP_URL;
     delete process.env.NEXT_PUBLIC_APP_URL;
-    expect(readEmailVerificationCallbackUrl(new URLSearchParams())).toBe("/?emailVerified=1");
-    expect(readEmailVerificationCallbackUrl(new URLSearchParams("callbackURL=https%3A%2F%2Fevil.example"))).toBe(
-      "/?emailVerified=1"
-    );
+    expect(readEmailVerificationCallbackUrl(new URLSearchParams())).toBe("/");
+    expect(readEmailVerificationCallbackUrl(new URLSearchParams("callbackURL=https%3A%2F%2Fevil.example"))).toBe("/");
     if (prev === undefined) {
       delete process.env.NEXT_PUBLIC_APP_URL;
     } else {
@@ -72,8 +82,8 @@ describe("buildTowerVerifyEmailApiUrl", () => {
   it("builds a same-origin API url with an absolute callback for Better Auth originCheck", () => {
     const prev = process.env.NEXT_PUBLIC_APP_URL;
     process.env.NEXT_PUBLIC_APP_URL = "https://app.example.com";
-    expect(buildTowerVerifyEmailApiUrl("tok", "/dashboard?emailVerified=1", "https://app.example.com")).toBe(
-      "https://app.example.com/api/auth/verify-email?token=tok&callbackURL=https%3A%2F%2Fapp.example.com%2Fdashboard%3FemailVerified%3D1"
+    expect(buildTowerVerifyEmailApiUrl("tok", "/dashboard", "https://app.example.com")).toBe(
+      "https://app.example.com/api/auth/verify-email?token=tok&callbackURL=https%3A%2F%2Fapp.example.com%2Fdashboard"
     );
     process.env.NEXT_PUBLIC_APP_URL = prev;
   });

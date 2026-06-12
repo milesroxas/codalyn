@@ -5,7 +5,7 @@ import type { DragEvent } from "react";
 import { cn } from "@/shared/lib/utils";
 import { buttonVariants } from "@/shared/ui/button";
 
-export const imageDropzoneVariants = cva(
+const imageDropzoneVariants = cva(
   "flex aspect-video w-full cursor-pointer items-center justify-center rounded-sm border-2 border-dashed p-4 transition-colors",
   {
     variants: {

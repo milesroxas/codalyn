@@ -1,5 +1,5 @@
 import type { BeaconOrgTeamSettings } from "@codalyn/webflow-kit";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { auth } from "@/server/auth";
 import { resolveActiveOrganizationId } from "@/server/resolve-active-organization-id";
 import { db } from "@/shared/lib/db";
@@ -15,7 +15,7 @@ export async function listBeaconWorkspacesForUser(userId: string): Promise<Beaco
     .select({ id: organization.id, name: organization.name })
     .from(member)
     .innerJoin(organization, eq(member.organizationId, organization.id))
-    .where(eq(member.userId, userId))
+    .where(and(eq(member.userId, userId), isNull(organization.deletedAt)))
     .orderBy(asc(organization.name));
 }
 

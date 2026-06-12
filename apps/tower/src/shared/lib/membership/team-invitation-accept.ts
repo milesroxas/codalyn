@@ -37,6 +37,9 @@ export const TEAM_INVITATION_ACCEPT_COPY = {
   expiredDescription: "Ask your workspace admin to send a new invitation.",
   unavailableTitle: "Invitation unavailable",
   unavailableDescription: "This invitation is no longer active. Ask your workspace admin for a new link.",
+  verificationRedirectTitle: "Verification link expired",
+  verificationRedirectDescription: (email: string, organizationName: string) =>
+    `Your email verification link is no longer valid. Sign in as ${email} to finish joining ${organizationName}.`,
   joinTitle: "Join workspace",
   joinDescription: (input: { organizationName: string; inviterName: string; role: string; email: string }) =>
     `${input.inviterName} invited you to join ${input.organizationName} as ${input.role}. Use ${input.email} to continue.`,
@@ -51,6 +54,14 @@ export const TEAM_INVITATION_ACCEPT_COPY = {
   goToTeamLabel: "Go to Team",
   backToHomeLabel: "Back to home",
 } as const;
+
+export function isTeamInvitationVerificationRedirectError(error: string | null | undefined): boolean {
+  if (!error?.trim()) {
+    return false;
+  }
+  const normalized = error.trim().toLowerCase();
+  return normalized === "invalid_token" || normalized === "token_expired";
+}
 
 export type TeamInvitationAcceptErrorKind =
   | "email_verification_required"

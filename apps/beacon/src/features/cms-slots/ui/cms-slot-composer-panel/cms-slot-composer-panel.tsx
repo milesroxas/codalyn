@@ -11,7 +11,7 @@ export type CmsSlotComposerPanelProps = {
   composerEditingContext: CmsComposerEditingContextViewModel;
   draft: CmsSlotCompositionDraftRow[];
   dirty: boolean;
-  /** Component types present in the Engine-defined CMS slot; Composer can only add from this set. */
+  /** Component types present in the Designer-defined CMS slot; Composer can only add from this set. */
   allowedPalette: CmsSlotPaletteEntry[];
   onAddFromPalette: (c: CmsSlotPaletteEntry) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
@@ -23,6 +23,8 @@ export type CmsSlotComposerPanelProps = {
   rowMeta: CmsSlotComposerRowMeta[];
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
   onRenameSlot: (rowKey: string, name: string) => void;
+  autoOpenEditDialogRowKey?: string | null;
+  onAutoOpenEditDialogConsumed?: () => void;
   /** Editor-style Composer: Save lives in the app footer; header shows Back to List only. */
   composerOnly?: boolean;
 };
@@ -44,6 +46,8 @@ export function CmsSlotComposerPanel(props: CmsSlotComposerPanelProps) {
     rowMeta,
     onChangePropValue,
     onRenameSlot,
+    autoOpenEditDialogRowKey = null,
+    onAutoOpenEditDialogConsumed,
     composerOnly = false,
   } = props;
 
@@ -76,6 +80,8 @@ export function CmsSlotComposerPanel(props: CmsSlotComposerPanelProps) {
         busy={busy}
         onReorder={onReorder}
         onRemove={onRemove}
+        autoOpenEditDialogRowKey={autoOpenEditDialogRowKey}
+        onAutoOpenEditDialogConsumed={onAutoOpenEditDialogConsumed}
       />
     </div>
   );

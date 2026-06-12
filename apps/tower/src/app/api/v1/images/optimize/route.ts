@@ -3,6 +3,7 @@ import {
   fileExtensionForFormat,
   type ImageExportFormat,
 } from "@codalyn/webflow-kit";
+import { after } from "next/server";
 import {
   type ImageOptimizeTelemetry,
   logImageOptimizeTelemetry,
@@ -16,7 +17,7 @@ import {
 } from "@/features/image-processing/lib/optimize-image";
 import { resolveTowerEntitlement, type TowerEntitlement, type TowerTier } from "@/server/billing/entitlements";
 import { getActiveOrganizationIdForApiRequest } from "@/server/billing/session-org";
-import { consumeImageOptimize } from "@/server/billing/usage-gate";
+import { consumeImageOptimize, recordMeterCost, type UsageScope } from "@/server/billing/usage-gate";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 
 export const runtime = "nodejs";
@@ -56,7 +57,7 @@ function makeTelemetryLogger(ctx: RequestContext) {
 
 type Prepared =
   | { ok: false; response: Response }
-  | { ok: true; metadata: SourceImageMetadata; credits: number; chargedCredits: number };
+  | { ok: true; metadata: SourceImageMetadata; credits: number; chargedCredits: number; scope: UsageScope | null };
 
 /**
  * Validates the buffer, parses dimensions, enforces hard safety caps, and reserves the calculated
@@ -103,7 +104,7 @@ async function prepareOptimize(
   });
 
   if (!(userId && entitlement)) {
-    return { ok: true, metadata, credits, chargedCredits: 0 };
+    return { ok: true, metadata, credits, chargedCredits: 0, scope: null };
   }
 
   const usage = await consumeImageOptimize(userId, entitlement, activeOrg, credits);
@@ -118,7 +119,7 @@ async function prepareOptimize(
     });
     return { ok: false, response: usage.response };
   }
-  return { ok: true, metadata, credits, chargedCredits: usage.limit === null ? 0 : credits };
+  return { ok: true, metadata, credits, chargedCredits: usage.limit === null ? 0 : credits, scope: usage.scope };
 }
 
 export async function POST(req: Request) {
@@ -168,11 +169,12 @@ export async function POST(req: Request) {
   if (!prepared.ok) {
     return prepared.response;
   }
-  const { metadata, chargedCredits } = prepared;
+  const { metadata, chargedCredits, scope } = prepared;
 
   const startedAt = Date.now();
   try {
     const { buffer, mimeType } = await optimizeImageBuffer(buf, format, quality);
+    const durationMs = Date.now() - startedAt;
     log({
       ok: true,
       inputBytes: buf.length,
@@ -180,8 +182,14 @@ export async function POST(req: Request) {
       width: metadata.width,
       height: metadata.height,
       credits: chargedCredits,
-      durationMs: Date.now() - startedAt,
+      durationMs,
     });
+
+    // AVIF/WebP encode is CPU-bound, so wall-clock ≈ Vercel active compute; output buffer length is the
+    // egress (Fast Data Transfer) we serve. Record after the response so it never adds request latency.
+    if (scope) {
+      after(() => recordMeterCost(scope, "image", { computeMs: durationMs, egressBytes: buffer.length }));
+    }
 
     return new Response(new Uint8Array(buffer), {
       headers: {

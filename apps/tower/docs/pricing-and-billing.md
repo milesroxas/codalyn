@@ -193,8 +193,11 @@ Source: `src/shared/lib/billing/organization-seat-cap.ts`, `workspace-seat-usage
   `TOWER_TEAM_MIN_SEATS` (default **6**, `TOWER_TEAM_DEFAULT_SEAT_MINIMUM`).
 - A "seat" is consumed by **members + pending invitations**. Invite creation is blocked at the cap
   (dynamic Better Auth `invitationLimit`).
-- Checkout quantity = `max(min seats, members + pending invitations)`. Membership/invitation hooks
-  sync the quantity back to Stripe.
+- Checkout quantity = the admin-selected seat count, clamped up to a floor of
+  `max(min seats, members + pending invitations)` — admins can buy spare seats to invite into, but
+  never below the minimum or current usage (defaults to the floor when unspecified). Membership/invitation
+  hooks then sync the quantity back to Stripe **grow-only** (member churn never reduces purchased seats;
+  reductions go through the Customer Portal).
 - **Over-cap** workspaces (e.g. after a cancel) keep existing members but block new invites/accepts
   until resolved.
 - `operator_seat_limit_override`: operator-granted seats; Stripe quantity sync must not change billing

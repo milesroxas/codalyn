@@ -4,6 +4,7 @@ import {
   BeaconFeatureRouteChrome,
   BeaconFeatureRouteScrollBody,
 } from "@/app/ui/beacon-feature-route-chrome";
+import { SettingsAppVersionFooter } from "@/features/settings/ui/settings-app-version-footer";
 
 export type SettingsRouteChromeProps = {
   title: string;
@@ -26,6 +27,7 @@ export function SettingsRouteChrome(props: SettingsRouteChromeProps) {
           dataSlot="settings_route_header"
         />
       }
+      footer={<SettingsAppVersionFooter />}
     >
       <BeaconFeatureRouteScrollBody scrollResetKey={scrollResetKey}>{children}</BeaconFeatureRouteScrollBody>
     </BeaconFeatureRouteChrome>

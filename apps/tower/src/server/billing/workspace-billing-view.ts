@@ -4,7 +4,14 @@ import { isOrganizationTeamEntitled, organizationBillingPlanLabel } from "@/serv
 import { countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
 import { shouldBumpStripeTeamQuantityToMinimum } from "@/server/billing/organization-seat-override";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
-import { isTeamBillingCheckoutConfigured } from "@/server/billing/team-billing-config";
+import {
+  getTeamMaxSeats,
+  getTeamMinSeats,
+  isTeamBillingCheckoutConfigured,
+} from "@/server/billing/team-billing-config";
+import { getTeamSeatPrice } from "@/server/billing/team-seat-price";
+import { resolveSeatFloor } from "@/server/billing/team-seat-quantity";
+import type { TeamSeatPrice } from "@/shared/lib/billing/team-seat-price";
 import { buildWorkspaceSeatUsage } from "@/shared/lib/billing/workspace-seat-usage";
 import { db } from "@/shared/lib/db";
 import { member, organization } from "@/shared/lib/db/auth-schema";
@@ -19,6 +26,12 @@ export type WorkspaceBillingView = {
   subscriptionStatus: string | null;
   seatLimit: number | null;
   seatsUsed: number;
+  /** Minimum seats a Team checkout must purchase (team minimum or current usage, whichever is larger). */
+  checkoutSeatFloor: number;
+  /** Upper bound on seats a single Team checkout may request. */
+  checkoutSeatMax: number;
+  /** Per-seat price (from Stripe) for the checkout cost preview, or null when unavailable. */
+  teamSeatPrice: TeamSeatPrice | null;
   effectiveSeatLimit: number;
   isAtSeatCap: boolean;
   isOverSeatCap: boolean;
@@ -26,13 +39,19 @@ export type WorkspaceBillingView = {
   stripeSeatQuantity: number | null;
   operatorSeatLimitOverride: boolean;
   hasStripeCustomer: boolean;
+  /**
+   * Whether the current admin may manage a paid subscription (portal/cancel). Only the billing owner
+   * (the admin who started the subscription) or the workspace owner can — other admins can invite/manage
+   * seats but not the subscription itself.
+   */
+  canManagePaidBilling: boolean;
 };
 
 export async function fetchWorkspaceBillingView(
   userId: string,
   organizationId: string
 ): Promise<WorkspaceBillingView | null> {
-  const [[memberRow], [org], seatsUsed] = await Promise.all([
+  const [[memberRow], [org], seatsUsed, teamSeatPrice] = await Promise.all([
     db
       .select({ role: member.role })
       .from(member)
@@ -47,11 +66,14 @@ export async function fetchWorkspaceBillingView(
         seatLimit: organization.seatLimit,
         stripeSeatQuantity: organization.stripeSeatQuantity,
         operatorSeatLimitOverride: organization.operatorSeatLimitOverride,
+        ownerUserId: organization.ownerUserId,
+        billingOwnerUserId: organization.billingOwnerUserId,
       })
       .from(organization)
       .where(eq(organization.id, organizationId))
       .limit(1),
     countOrganizationSeatsUsed(organizationId),
+    isTeamBillingCheckoutConfigured() ? getTeamSeatPrice() : Promise.resolve(null),
   ]);
 
   if (!memberRow || !org) {
@@ -97,6 +119,9 @@ export async function fetchWorkspaceBillingView(
     subscriptionStatus: org.subscriptionStatus,
     seatLimit: seatUsage.seatLimit,
     seatsUsed: seatUsage.seatsUsed,
+    checkoutSeatFloor: resolveSeatFloor(getTeamMinSeats(), seatUsage.seatsUsed),
+    checkoutSeatMax: getTeamMaxSeats(),
+    teamSeatPrice,
     effectiveSeatLimit: seatUsage.effectiveSeatLimit,
     isAtSeatCap: seatUsage.isAtSeatCap,
     isOverSeatCap: seatUsage.isOverSeatCap,
@@ -104,5 +129,6 @@ export async function fetchWorkspaceBillingView(
     stripeSeatQuantity: seatUsage.stripeSeatQuantity,
     operatorSeatLimitOverride: seatUsage.operatorSeatLimitOverride,
     hasStripeCustomer: Boolean(org.stripeCustomerId),
+    canManagePaidBilling: org.ownerUserId === userId || org.billingOwnerUserId === userId,
   };
 }

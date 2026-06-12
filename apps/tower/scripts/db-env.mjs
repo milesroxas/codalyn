@@ -61,7 +61,7 @@ export function assertValidNeonBranchName(branch) {
 }
 
 /** @param {string} databaseUrl */
-export function parsePostgresDatabaseUrl(databaseUrl) {
+function parsePostgresDatabaseUrl(databaseUrl) {
   let parsed;
   try {
     parsed = new URL(databaseUrl);

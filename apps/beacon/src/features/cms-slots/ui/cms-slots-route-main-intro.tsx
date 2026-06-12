@@ -2,15 +2,15 @@ import type { CmsSlotsRouteSegment } from "@/features/cms-slots/model/cms-slots-
 import {
   CMS_SLOTS_COMPOSER_MAIN_DESCRIPTION,
   CMS_SLOTS_COMPOSER_MAIN_TITLE,
-  CMS_SLOTS_ENGINE_MAIN_DESCRIPTION,
-  CMS_SLOTS_ENGINE_MAIN_TITLE,
+  CMS_SLOTS_DESIGNER_MAIN_DESCRIPTION,
+  CMS_SLOTS_DESIGNER_MAIN_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { SurfaceSummaryCardPageIntro } from "@/shared/ui/surface-summary-card";
 
 const MAIN_INTRO_COPY: Record<CmsSlotsRouteSegment, { title: string; description: string }> = {
-  engine: {
-    title: CMS_SLOTS_ENGINE_MAIN_TITLE,
-    description: CMS_SLOTS_ENGINE_MAIN_DESCRIPTION,
+  designer: {
+    title: CMS_SLOTS_DESIGNER_MAIN_TITLE,
+    description: CMS_SLOTS_DESIGNER_MAIN_DESCRIPTION,
   },
   composer: {
     title: CMS_SLOTS_COMPOSER_MAIN_TITLE,

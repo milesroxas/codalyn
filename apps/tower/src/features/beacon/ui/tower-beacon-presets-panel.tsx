@@ -1,7 +1,16 @@
 "use client";
 
-import type { BeaconAppSettings, BeaconPresetRow, ImageExportFormat } from "@codalyn/webflow-kit";
-import { type BeaconPresetSiteGroup, buildBeaconPresetSiteGroups, formatBeaconPresetMax } from "@codalyn/webflow-kit";
+import type {
+  BeaconAppSettings,
+  BeaconPresetRow,
+  BeaconPresetStorageEntry,
+  ImageExportFormat,
+} from "@codalyn/webflow-kit";
+import {
+  type BeaconPresetSiteGroup,
+  buildBeaconPresetSiteGroups,
+  formatBeaconPresetDisplayName,
+} from "@codalyn/webflow-kit";
 import { IconPlug } from "@tabler/icons-react";
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
 import {
@@ -11,7 +20,13 @@ import {
   parsePresetOutputDimension,
 } from "@/features/beacon/lib/preset-dimensions";
 import { BeaconDesignerOpenLink } from "@/features/beacon/ui/beacon-designer-open-link";
-import { BeaconSiteDefaultPresetFields } from "@/features/beacon/ui/beacon-preset-form-fields";
+import { BeaconPresetExportPlaceholder } from "@/features/beacon/ui/beacon-preset-export-placeholder";
+import {
+  BeaconScopedPresetFields,
+  BeaconSiteDefaultPresetFields,
+} from "@/features/beacon/ui/beacon-preset-form-fields";
+import { TowerBeaconPresetCard } from "@/features/beacon/ui/tower-beacon-preset-card";
+import { countBeaconSitePresets } from "@/features/beacon/ui/tower-beacon-preset-list";
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -76,6 +91,8 @@ export type TowerBeaconPresetsPanelProps = {
   canEditSiteDefault: boolean;
   upsertSiteDefaultPresetAction: (siteId: string, row: BeaconPresetRow) => void;
   clearSiteDefaultPresetAction: (siteId: string) => void;
+  upsertPresetRowAction: (row: BeaconPresetRow) => void;
+  removePresetByIdAction: (presetId: string) => void;
 };
 
 function TowerBeaconPanelStatus(props: { canManage: boolean; teamPresetsLocked: boolean }) {
@@ -101,34 +118,16 @@ function TowerBeaconPanelStatus(props: { canManage: boolean; teamPresetsLocked: 
   );
 }
 
-function SiteDefaultPresetSummary(props: {
-  siteDefaultPreset: BeaconPresetRow;
-  defaultExportFormat?: ImageExportFormat;
-}) {
-  const { siteDefaultPreset, defaultExportFormat } = props;
-  return (
-    <div className="rounded-md border border-border/60 bg-muted/15 px-3 py-2 text-sm">
-      <p className="font-medium">{siteDefaultPreset.name}</p>
-      <p className="text-muted-foreground text-xs tabular-nums">
-        {siteDefaultPreset.width}×{siteDefaultPreset.height}
-        {siteDefaultPreset.exportFormat
-          ? ` · ${siteDefaultPreset.exportFormat}`
-          : defaultExportFormat
-            ? ` · ${defaultExportFormat}`
-            : ""}{" "}
-        · max {formatBeaconPresetMax(siteDefaultPreset.maxFileSizeBytes)}
-      </p>
-    </div>
-  );
-}
-
-type SiteDefaultDraft = {
+type PresetFormDraft = {
+  draftName: string;
   draftW: string;
   draftH: string;
   draftFormat: ImageExportFormat;
   draftMaxStr: string;
   draftMaxUnit: MaxSizeUnit;
 };
+
+type SiteDefaultDraft = Omit<PresetFormDraft, "draftName">;
 
 function createSiteDefaultDraft(
   siteDefaultPreset: BeaconPresetRow | null,
@@ -220,8 +219,17 @@ function SiteDefaultPresetEditor(props: {
     onSaved();
   };
 
+  const previewWidth = parsePresetOutputDimension(draft.draftW, 1920);
+  const previewHeight = parsePresetOutputDimension(draft.draftH, 1080);
+
   return (
     <FormFieldInset>
+      <BeaconPresetExportPlaceholder
+        width={previewWidth}
+        height={previewHeight}
+        exportFormat={draft.draftFormat}
+        defaultExportFormat={defaultExportFormat}
+      />
       <BeaconSiteDefaultPresetFields
         baseId={`${baseId}-${siteId}`}
         disabled={saving}
@@ -262,8 +270,179 @@ function SiteDefaultPresetEditor(props: {
   );
 }
 
-function countSitePresets(group: BeaconPresetSiteGroup): number {
-  return group.siteDefault ? 1 : 0;
+function createScopedPresetDraft(row: BeaconPresetRow, defaultExportFormat: ImageExportFormat): PresetFormDraft {
+  const maxDraft = maxBytesToDraft(row.maxFileSizeBytes);
+  return {
+    draftName: row.name,
+    draftW: String(row.width),
+    draftH: String(row.height),
+    draftFormat: row.exportFormat ?? defaultExportFormat,
+    draftMaxStr: maxDraft.value,
+    draftMaxUnit: maxDraft.unit,
+  };
+}
+
+function ScopedPresetEditor(props: {
+  baseId: string;
+  entry: BeaconPresetStorageEntry;
+  saving: boolean;
+  defaultExportFormat: ImageExportFormat;
+  upsertPresetRowAction: (row: BeaconPresetRow) => void;
+  removePresetByIdAction: (presetId: string) => void;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const {
+    baseId,
+    entry,
+    saving,
+    defaultExportFormat,
+    upsertPresetRowAction,
+    removePresetByIdAction,
+    onCancel,
+    onSaved,
+  } = props;
+  const { row } = entry;
+  const [draft, setDraft] = useState<PresetFormDraft>(() => createScopedPresetDraft(row, defaultExportFormat));
+
+  useEffect(() => {
+    setDraft(createScopedPresetDraft(row, defaultExportFormat));
+  }, [row, defaultExportFormat]);
+
+  const save = () => {
+    const name = draft.draftName.trim();
+    if (name.length === 0) {
+      return;
+    }
+    const width = parsePresetOutputDimension(draft.draftW, row.width);
+    const height = parsePresetOutputDimension(draft.draftH, row.height);
+    upsertPresetRowAction({
+      ...row,
+      name,
+      width,
+      height,
+      exportFormat: draft.draftFormat,
+      maxFileSizeBytes: draftToMaxBytes(draft.draftMaxStr, draft.draftMaxUnit),
+    });
+    onSaved();
+  };
+
+  const previewWidth = parsePresetOutputDimension(draft.draftW, row.width);
+  const previewHeight = parsePresetOutputDimension(draft.draftH, row.height);
+
+  return (
+    <FormFieldInset>
+      <BeaconPresetExportPlaceholder
+        width={previewWidth}
+        height={previewHeight}
+        exportFormat={draft.draftFormat}
+        defaultExportFormat={defaultExportFormat}
+      />
+      <BeaconScopedPresetFields
+        baseId={`${baseId}-${row.id}`}
+        disabled={saving}
+        name={draft.draftName}
+        width={draft.draftW}
+        height={draft.draftH}
+        exportFormat={draft.draftFormat}
+        maxStr={draft.draftMaxStr}
+        maxUnit={draft.draftMaxUnit}
+        onNameChange={(value) => setDraft((current) => ({ ...current, draftName: value }))}
+        onWidthChange={(value) => setDraft((current) => ({ ...current, draftW: value }))}
+        onHeightChange={(value) => setDraft((current) => ({ ...current, draftH: value }))}
+        onExportFormatChange={(value) => setDraft((current) => ({ ...current, draftFormat: value }))}
+        onMaxStrChange={(value) => setDraft((current) => ({ ...current, draftMaxStr: value }))}
+        onMaxUnitChange={(value) => setDraft((current) => ({ ...current, draftMaxUnit: value }))}
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" disabled={saving || draft.draftName.trim().length === 0} onClick={save}>
+          Update
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={saving}
+          onClick={() => {
+            removePresetByIdAction(row.id);
+            onCancel();
+          }}
+        >
+          Remove
+        </Button>
+        <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </FormFieldInset>
+  );
+}
+
+function ScopedPresetsSection(props: {
+  baseId: string;
+  group: BeaconPresetSiteGroup;
+  saving: boolean;
+  canEdit: boolean;
+  defaultExportFormat?: ImageExportFormat;
+  upsertPresetRowAction: (row: BeaconPresetRow) => void;
+  removePresetByIdAction: (presetId: string) => void;
+}) {
+  const { baseId, group, saving, canEdit, defaultExportFormat, upsertPresetRowAction, removePresetByIdAction } = props;
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const resolvedDefaultFormat = defaultExportFormat ?? "webp";
+
+  if (group.scopedPresets.length === 0) {
+    return (
+      <div className="space-y-1">
+        <p className="text-sm font-medium">Scoped presets</p>
+        <p className="text-sm text-muted-foreground">
+          No element, component, or instance presets for this site yet. Create them in Beacon&apos;s image editor.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <p className="text-sm font-medium">Scoped presets</p>
+        <p className="text-sm text-muted-foreground">
+          Element, component, and instance presets. Changes sync to Beacon for this workspace.
+        </p>
+      </div>
+      <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
+        {group.scopedPresets.map((entry) => {
+          const isEditing = editingPresetId === entry.row.id;
+          const { row, scope } = entry;
+          return (
+            <li key={entry.row.id} className={isEditing ? "min-w-0 sm:col-span-2" : "min-w-0"}>
+              {isEditing ? (
+                <ScopedPresetEditor
+                  baseId={baseId}
+                  entry={entry}
+                  saving={saving}
+                  defaultExportFormat={resolvedDefaultFormat}
+                  upsertPresetRowAction={upsertPresetRowAction}
+                  removePresetByIdAction={removePresetByIdAction}
+                  onCancel={() => setEditingPresetId(null)}
+                  onSaved={() => setEditingPresetId(null)}
+                />
+              ) : (
+                <TowerBeaconPresetCard
+                  row={row}
+                  scope={scope}
+                  displayName={formatBeaconPresetDisplayName(row, scope)}
+                  defaultExportFormat={defaultExportFormat}
+                  canEdit={canEdit}
+                  onEdit={canEdit ? () => setEditingPresetId(row.id) : undefined}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 function BeaconSitePicker(props: {
@@ -284,7 +463,7 @@ function BeaconSitePicker(props: {
       </SelectTrigger>
       <SelectContent>
         {siteGroups.map((group) => {
-          const presetCount = countSitePresets(group);
+          const presetCount = countBeaconSitePresets(group);
           const presetSuffix = presetCount > 0 ? ` · ${presetCount} preset${presetCount === 1 ? "" : "s"}` : "";
           return (
             <SelectItem key={group.siteId} value={group.siteId}>
@@ -309,6 +488,8 @@ function SitePresetsDetail(props: {
   canEditSiteDefault: boolean;
   upsertSiteDefaultPresetAction: (siteId: string, row: BeaconPresetRow) => void;
   clearSiteDefaultPresetAction: (siteId: string) => void;
+  upsertPresetRowAction: (row: BeaconPresetRow) => void;
+  removePresetByIdAction: (presetId: string) => void;
 }) {
   const {
     baseId,
@@ -321,6 +502,8 @@ function SitePresetsDetail(props: {
     canEditSiteDefault,
     upsertSiteDefaultPresetAction,
     clearSiteDefaultPresetAction,
+    upsertPresetRowAction,
+    removePresetByIdAction,
   } = props;
   const [siteDefaultFormOpen, setSiteDefaultFormOpen] = useState(false);
   const siteDefaultPreset = group.siteDefault;
@@ -341,10 +524,14 @@ function SitePresetsDetail(props: {
             Used when Beacon exports images without a more specific preset.
           </p>
         </div>
-        {siteDefaultPreset ? (
-          <SiteDefaultPresetSummary
-            siteDefaultPreset={siteDefaultPreset}
+        {siteDefaultPreset && !siteDefaultFormOpen ? (
+          <TowerBeaconPresetCard
+            row={siteDefaultPreset}
+            scope="site-default"
+            displayName={siteDefaultPreset.name}
             defaultExportFormat={settings?.defaultExportFormat}
+            canEdit={canEditSiteDefault}
+            onEdit={canEditSiteDefault ? () => setSiteDefaultFormOpen(true) : undefined}
           />
         ) : null}
         {!siteDefaultPreset && !siteDefaultFormOpen ? (
@@ -352,11 +539,6 @@ function SitePresetsDetail(props: {
             canEdit={canEditSiteDefault}
             onSet={canEditSiteDefault ? () => setSiteDefaultFormOpen(true) : undefined}
           />
-        ) : null}
-        {canEditSiteDefault && siteDefaultPreset && !siteDefaultFormOpen ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => setSiteDefaultFormOpen(true)}>
-            Edit site default preset
-          </Button>
         ) : null}
         {canEditSiteDefault && siteDefaultFormOpen ? (
           <SiteDefaultPresetEditor
@@ -372,6 +554,15 @@ function SitePresetsDetail(props: {
           />
         ) : null}
       </div>
+      <ScopedPresetsSection
+        baseId={baseId}
+        group={group}
+        saving={saving}
+        canEdit={canEditSiteDefault}
+        defaultExportFormat={settings?.defaultExportFormat}
+        upsertPresetRowAction={upsertPresetRowAction}
+        removePresetByIdAction={removePresetByIdAction}
+      />
       {saving ? <p className="text-xs text-muted-foreground">Saving…</p> : null}
     </div>
   );
@@ -419,8 +610,8 @@ export function TowerBeaconPresetsPanel(props: TowerBeaconPresetsPanelProps) {
             <CardTitle>{multipleSites ? "Webflow sites" : selectedGroup.displayName}</CardTitle>
             <CardDescription>
               {multipleSites
-                ? "Choose a site to manage its image export presets."
-                : "Manage image export presets for this site."}
+                ? "Choose a site to manage its image export presets. Changes sync to Beacon."
+                : "Manage image export presets for this site. Changes sync to Beacon."}
             </CardDescription>
             <CardAction align="center">
               <BeaconDesignerOpenLink shortName={selectedGroup.shortName} webflowAppClientId={webflowAppClientId} />

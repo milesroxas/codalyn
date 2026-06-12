@@ -7,7 +7,7 @@ import {
 } from "@/server/billing/tower-limits-config";
 import type { OperatorPlatformMeteringConfig, OperatorPlatformMeteringPatch } from "@/server/operator/types";
 
-export function mapPlatformMeteringConfig(snapshot: TowerLimitsSnapshot): OperatorPlatformMeteringConfig {
+function mapPlatformMeteringConfig(snapshot: TowerLimitsSnapshot): OperatorPlatformMeteringConfig {
   return {
     globalMeteringEnabled: snapshot.globalMeteringEnabled,
     envEmergencyMeteringDisabled: snapshot.envEmergencyMeteringDisabled,

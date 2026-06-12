@@ -1,7 +1,7 @@
 import { sanitizeSlotLabelForPayload } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 
 /** Hidden CMS slot block: user-facing slot name (independent of slugified `data-list`). */
-export const CMS_SLOT_LIST_DISPLAY_NAME_ATTR = "data-beacon-display-name";
+const CMS_SLOT_LIST_DISPLAY_NAME_ATTR = "data-beacon-display-name";
 
 /** User-facing label for a beacon `dataList` (strips the `beacon-` prefix when present). */
 export function displayLabelForDataList(dataList: string): string {

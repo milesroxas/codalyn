@@ -154,7 +154,7 @@ export function publishPlaceholderForValueType(valueType: string): ResolvedValue
   }
 }
 
-/** Minimal Designer `setProps` value from Engine-exposed prop metadata. */
+/** Minimal Designer `setProps` value from Designer-exposed prop metadata. */
 export function publishPlaceholderForExposedProp(meta: Pick<ComposableInstancePropMeta, "valueType">): ResolvedValue {
   return publishPlaceholderForValueType(meta.valueType);
 }

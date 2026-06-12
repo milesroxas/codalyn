@@ -2,6 +2,7 @@ import type {
   OperatorMetrics,
   OperatorPlatformMeteringConfig,
   OperatorPlatformMeteringPatch,
+  OperatorUsageMetrics,
   OperatorUserDetail,
   OperatorUserListResponse,
   OperatorUserPatch,
@@ -46,9 +47,26 @@ export class OperatorApiError extends Error {
   }
 }
 
+export function formatOperatorUserDeleteError(error: OperatorApiError): string {
+  if (error.message === "confirm_mismatch") {
+    return "Email does not match.";
+  }
+  if (error.message === "delete_failed") {
+    return "Delete failed. Check server logs and workspace ownership.";
+  }
+  if (error.message === "cannot_delete_self") {
+    return "You cannot delete your own operator account from this panel.";
+  }
+  // 409 responses include a human-readable `message` from UserAccountDeletionBlockedError.
+  return error.message;
+}
+
 export function formatOperatorWorkspaceDeleteError(error: OperatorApiError): string {
   if (error.message === "confirm_mismatch") {
     return "Slug does not match.";
+  }
+  if (error.message === "confirm_phrase_mismatch" || error.message === "confirmPhrase required") {
+    return "Type PURGE to confirm permanent removal.";
   }
   if (error.message === "rate_limited") {
     return "Too many delete attempts. Wait a few minutes and try again.";
@@ -60,6 +78,9 @@ export function formatOperatorWorkspaceDeleteError(error: OperatorApiError): str
 }
 
 export function formatOperatorWorkspacePatchError(error: OperatorApiError): string {
+  if (error.message === "workspace_scheduled_for_deletion") {
+    return "This workspace is scheduled for deletion. Purge it or wait for the recovery window to end before editing.";
+  }
   if (error.message === "billing_managed_by_stripe") {
     return "Plan and subscription status are managed by Stripe for this workspace.";
   }
@@ -101,6 +122,8 @@ function toSearchParams(query: Record<string, unknown>): string {
 
 export const operatorApi = {
   metrics: async (): Promise<OperatorMetrics> => requestJson<OperatorMetrics>("/api/operator/metrics"),
+  usageMetrics: async (): Promise<OperatorUsageMetrics> =>
+    requestJson<OperatorUsageMetrics>("/api/operator/usage-metrics"),
   listUsers: async (query: OperatorUserListQuery = {}): Promise<OperatorUserListResponse> =>
     requestJson<OperatorUserListResponse>(`/api/operator/users${toSearchParams(query)}`),
   getUser: async (userId: string): Promise<OperatorUserDetail> =>
@@ -184,6 +207,30 @@ export const operatorApi = {
       method: "PATCH",
       body: JSON.stringify({ operatorNote }),
     }),
+  listFlintBetaGroupRequests: async (
+    status: "pending" | "resolved" | "dismissed" | "all" = "pending"
+  ): Promise<{
+    rows: Array<{
+      id: string;
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+      status: "pending" | "resolved" | "dismissed";
+      operatorNote: string | null;
+      createdAt: string;
+      resolvedAt: string | null;
+      resolvedByUserId: string | null;
+    }>;
+  }> => requestJson(`/api/operator/flint-beta-group-requests?status=${encodeURIComponent(status)}`),
+  resolveFlintBetaGroupRequest: async (
+    id: string,
+    action: "resolve" | "dismiss",
+    operatorNote?: string | null
+  ): Promise<{ ok: true }> =>
+    requestJson(`/api/operator/flint-beta-group-requests/${encodeURIComponent(id)}`, {
+      method: "POST",
+      body: JSON.stringify({ action, operatorNote: operatorNote ?? null }),
+    }),
   listWorkspaces: async (query: OperatorWorkspaceListQuery = {}): Promise<OperatorWorkspaceListResponse> =>
     requestJson<OperatorWorkspaceListResponse>(`/api/operator/workspaces${toSearchParams(query)}`),
   getWorkspace: async (orgId: string): Promise<OperatorWorkspaceDetail> =>
@@ -208,9 +255,16 @@ export const operatorApi = {
       method: "PATCH",
       body: JSON.stringify(patch),
     }),
-  deleteWorkspace: async (orgId: string, confirmSlug: string): Promise<{ ok: true }> =>
+  deleteWorkspace: async (
+    orgId: string,
+    confirmSlug: string,
+    options?: { confirmPhrase?: string }
+  ): Promise<{ ok: true }> =>
     requestJson<{ ok: true }>(`/api/operator/workspaces/${encodeURIComponent(orgId)}`, {
       method: "DELETE",
-      body: JSON.stringify({ confirmSlug }),
+      body: JSON.stringify({
+        confirmSlug,
+        ...(options?.confirmPhrase ? { confirmPhrase: options.confirmPhrase } : {}),
+      }),
     }),
 };

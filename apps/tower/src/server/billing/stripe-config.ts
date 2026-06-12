@@ -69,3 +69,12 @@ export function getStripePriceTeamSeat(): string | null {
 export function isTeamBillingCheckoutConfigured(): boolean {
   return Boolean(getStripePriceTeamSeat());
 }
+
+/**
+ * Optional Stripe Customer Portal configuration id for workspace (team) billing. Lets the workspace
+ * portal expose seat-quantity changes while the default (individual) portal keeps quantity locked.
+ * Falls back to the account's default portal configuration when unset.
+ */
+export function getStripeWorkspacePortalConfigurationId(): string | null {
+  return readEnvNonEmpty("STRIPE_PORTAL_CONFIG_WORKSPACE");
+}

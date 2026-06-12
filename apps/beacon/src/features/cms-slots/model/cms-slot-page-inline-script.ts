@@ -12,17 +12,18 @@ import {
   cmsSlotListTargetRuntimeLayoutRevealSource,
   ensureCmsSlotListTargetLayoutStyle,
 } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
+import { readStringLikeValue } from "@/shared/lib/read-string-like-value";
 import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
 
 /** Matches `attributes` on the applied page script so we can replace it on sync. */
-export const CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR = "data-codalyn-beacon";
-export const CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE = "runtime";
+const CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR = "data-codalyn-beacon";
+const CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE = "runtime";
 
 /** Fingerprint of {@link getCmsSlotPageInlineScriptSource} so we can detect drift vs the page footer script. */
-export const CMS_SLOT_PAGE_SCRIPT_HASH_ATTR = "data-codalyn-beacon-src-hash";
+const CMS_SLOT_PAGE_SCRIPT_HASH_ATTR = "data-codalyn-beacon-src-hash";
 
 /** 32-bit FNV-1a → 8 hex chars (stable across browsers for the same source string). */
-export function hashCmsSlotRuntimeSource(source: string): string {
+function hashCmsSlotRuntimeSource(source: string): string {
   let h = 2166136261;
   for (let i = 0; i < source.length; i++) {
     h ^= source.charCodeAt(i);
@@ -34,7 +35,7 @@ export function hashCmsSlotRuntimeSource(source: string): string {
 const REGISTER_DISPLAY_NAME = "CodalynBeaconRuntime";
 
 /** Uploaded JS files for the hosted beacon runtime (`registerHostedRuntimeScript`). */
-export const CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX = "codalyn-beacon-runtime-";
+const CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX = "codalyn-beacon-runtime-";
 
 const LOG_PREFIX = "[codalyn-beacon-runtime-cleanup]";
 
@@ -351,6 +352,39 @@ export function isBeaconRuntimeAssetFileName(fileName: string): boolean {
   return fileName.startsWith(CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX) && fileName.endsWith(".js");
 }
 
+function readBeaconRuntimeFileNameFromAssetRow(raw: Record<string, unknown>): string | null {
+  for (const key of ["originalFileName", "fileName", "file_name", "displayName"] as const) {
+    const value = readStringLikeValue(raw[key]);
+    if (value == null) {
+      continue;
+    }
+    if (isBeaconRuntimeAssetFileName(value)) {
+      return value;
+    }
+    const prefixIndex = value.indexOf(CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX);
+    if (prefixIndex >= 0 && value.endsWith(".js")) {
+      return value.slice(prefixIndex);
+    }
+  }
+  return null;
+}
+
+/** Normalizes Webflow list-asset rows before beacon runtime cleanup compares URLs and filenames. */
+export function normalizeBeaconRuntimeAssetRow(raw: unknown): SiteAssetRow | null {
+  if (raw == null || typeof raw !== "object") {
+    return null;
+  }
+  const record = raw as Record<string, unknown>;
+  const id = readStringLikeValue(record.id);
+  const hostedUrl =
+    readStringLikeValue(record.hostedUrl) ?? readStringLikeValue(record.url) ?? readStringLikeValue(record.assetUrl);
+  const originalFileName = readBeaconRuntimeFileNameFromAssetRow(record);
+  if (id == null || hostedUrl == null || originalFileName == null) {
+    return null;
+  }
+  return { id, hostedUrl, originalFileName };
+}
+
 export function normalizeHostedAssetUrl(url: string): string {
   try {
     const parsed = new URL(url);
@@ -426,20 +460,21 @@ async function listAllSitePageIds(siteId: string): Promise<string[]> {
 }
 
 async function listBeaconRuntimeAssets(siteId: string): Promise<SiteAssetRow[]> {
-  const assets = await fetchAllPaginated<SiteAssetRow>(
+  const assets = await fetchAllPaginated<Record<string, unknown>>(
     `/api/v2/webflow/sites/${encodeURIComponent(siteId)}/assets`,
     (body) => ({
-      items: Array.isArray(body.assets) ? (body.assets as SiteAssetRow[]) : [],
+      items: Array.isArray(body.assets) ? (body.assets as Record<string, unknown>[]) : [],
       pagination: body.pagination as PaginatedList | undefined,
     })
   );
-  return assets.filter(
-    (asset) =>
-      typeof asset.id === "string" &&
-      typeof asset.hostedUrl === "string" &&
-      typeof asset.originalFileName === "string" &&
-      isBeaconRuntimeAssetFileName(asset.originalFileName)
-  );
+  const out: SiteAssetRow[] = [];
+  for (const raw of assets) {
+    const normalized = normalizeBeaconRuntimeAssetRow(raw);
+    if (normalized != null) {
+      out.push(normalized);
+    }
+  }
+  return out;
 }
 
 async function listRegisteredBeaconRuntimeScripts(siteId: string): Promise<RegisteredScriptRow[]> {
@@ -565,6 +600,7 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
   ];
 
   await putPageCustomScripts(pageId, merged);
+  await purgeUnreferencedBeaconRuntimeAssets(siteId);
 }
 
 export type CmsSlotPageRuntimeRemovalResult =
@@ -588,12 +624,12 @@ export async function removeCmsSlotPageRuntimeFromPage(): Promise<CmsSlotPageRun
     const pageId = (await webflow.getCurrentPage()).id as string;
     const existing = await getPageCustomScripts(pageId);
     const next = withoutCmsSlotMarkedScripts(existing);
-    if (next.length === existing.length) {
-      return { status: "not_found" };
+    const status: CmsSlotPageRuntimeRemovalResult["status"] = next.length === existing.length ? "not_found" : "removed";
+    if (status === "removed") {
+      await putPageCustomScripts(pageId, next);
     }
-    await putPageCustomScripts(pageId, next);
     await purgeUnreferencedBeaconRuntimeAssets(siteId);
-    return { status: "removed" };
+    return { status };
   } catch (err) {
     return { status: "failed", reason: formatRuntimeStatusError(err) };
   }
@@ -631,14 +667,14 @@ export async function getCmsSlotPageRuntimeSyncStatus(): Promise<CmsSlotPageRunt
     if (beacon == null) {
       return {
         synced: false,
-        reason: "No beacon script in footer — sync from Engine.",
+        reason: "No beacon script in footer — sync from Designer.",
       };
     }
     const applied = scriptAttrCI(beacon.attributes, CMS_SLOT_PAGE_SCRIPT_HASH_ATTR);
     if (applied !== expectedHash) {
       return {
         synced: false,
-        reason: "Beacon script out of date — sync from Engine.",
+        reason: "Beacon script out of date — sync from Designer.",
       };
     }
     return { synced: true };

@@ -1,4 +1,7 @@
-import { CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME } from "@/features/cms-slots/model/cms-slot-publish-placeholder-image-asset";
+import {
+  CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME,
+  isPublishPlaceholderImageReference,
+} from "@/features/cms-slots/model/cms-slot-publish-placeholder-image-asset";
 
 /**
  * Content tag on a prop-bound element; footer runtime swaps this element's content with the Composer value.
@@ -13,8 +16,8 @@ export const CMS_SLOT_CONTENT_ATTR = "data-cb-c";
  */
 export const CMS_SLOT_COND_ATTR = "data-cb-v";
 
-/** Tag attributes the Engine writes onto bound elements (and that cleanup removes). */
-export const CMS_SLOT_WRITTEN_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR] as const;
+/** Tag attributes the Designer writes onto bound elements (and that cleanup removes). */
+const CMS_SLOT_WRITTEN_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR] as const;
 
 /** Canonical exposed prop id from a `data-cb-c` segment (strips the `@N` / `@…` suffix). */
 export function canonicalPropIdFromContentAttrSegment(segment: string): string {
@@ -41,7 +44,7 @@ export function formatContentAttrSegmentsForBindings(
   return segments;
 }
 
-/** Minimal attr API for removing Engine tags from a bound element. */
+/** Minimal attr API for removing Designer tags from a bound element. */
 export type BeaconCmsSlotAttrRemoveOps = {
   get: (name: string) => Promise<null | string>;
   remove: (name: string) => Promise<null>;
@@ -66,7 +69,7 @@ export async function removeCmsSlotTagAttrsIfPresent(attr: BeaconCmsSlotAttrRemo
 }
 
 /** Split a `data-cb-c` value into trimmed, non-empty segments. */
-export function parseContentAttrSegments(value: string | null | undefined): string[] {
+function parseContentAttrSegments(value: string | null | undefined): string[] {
   if (value == null) {
     return [];
   }
@@ -99,10 +102,10 @@ export function contentAttrSegmentOwnedBy(segment: string, ownerIds: ReadonlySet
 }
 
 /**
- * Recomputes a (possibly shared) element's `data-cb-c` segments during **one** Engine component's tag sync.
- * Keeps segments owned by **other** Engine components (`foreignExposedIds`); drops the current component's old
+ * Recomputes a (possibly shared) element's `data-cb-c` segments during **one** Designer component's tag sync.
+ * Keeps segments owned by **other** Designer components (`foreignExposedIds`); drops the current component's old
  * segments and any segment owned by no current component (stale); then appends this sync's `newSegments`.
- * The same nested component definition can therefore carry one segment per Engine component that exposes it
+ * The same nested component definition can therefore carry one segment per Designer component that exposes it
  * (e.g. an Image nested in both Hero and Card), and the footer runtime resolves the right value per row via `pickP`.
  */
 export function mergeContentAttrSegments(input: {
@@ -126,8 +129,8 @@ export function mergeContentAttrSegments(input: {
 }
 
 /**
- * Removes segments owned by `ownerExposedIds` (one deleted Engine component) from a `data-cb-c` value, returning the
- * segments that remain (owned by other Engine components). Used to clean a deleted component's tags off shared
+ * Removes segments owned by `ownerExposedIds` (one deleted Designer component) from a `data-cb-c` value, returning the
+ * segments that remain (owned by other Designer components). Used to clean a deleted component's tags off shared
  * element definitions without disturbing the rest.
  */
 export function removeOwnedContentAttrSegments(
@@ -138,7 +141,7 @@ export function removeOwnedContentAttrSegments(
 }
 
 /**
- * Strips one Engine component's tags from a (possibly shared) element. Rewrites `data-cb-c` to the segments owned by
+ * Strips one Designer component's tags from a (possibly shared) element. Rewrites `data-cb-c` to the segments owned by
  * other components; when none remain also removes `data-cb-v`. `ownerExposedIds` empty
  * ⇒ removes all tags (single-owner / legacy). Returns the number of attributes changed.
  */
@@ -176,12 +179,6 @@ export const CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL = "placeholder@codalyn.invalid";
 /** Non-breaking space used as a minimal text publish placeholder. */
 export const CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT = "\u00a0";
 
-export {
-  CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME,
-  getCachedPublishPlaceholderImageAssetId,
-  isPublishPlaceholderImageReference,
-} from "@/features/cms-slots/model/cms-slot-publish-placeholder-image-asset";
-
 /** True when a value is a Designer/publish seed sentinel — not real Composer content. */
 export function isBeaconPublishPlaceholderValue(v: unknown): boolean {
   if (v == null) {
@@ -195,7 +192,7 @@ export function isBeaconPublishPlaceholderValue(v: unknown): boolean {
   if (s === CMS_SLOT_PUBLISH_PLACEHOLDER_URL || s === CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL) {
     return true;
   }
-  return s.includes(CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME);
+  return isPublishPlaceholderImageReference(v);
 }
 
 /** True when a Composer field is unset (Designer empty checks). */

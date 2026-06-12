@@ -1,23 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { cmsSlotHasComposerReadyEngineComponent } from "@/features/cms-slots/model/cms-slot-composer-eligible";
-import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+import { cmsSlotHasComposerReadyDesignerComponent } from "@/features/cms-slots/model/cms-slot-composer-eligible";
+import type { CmsSlotDesignerSlotPropsFile } from "@/features/cms-slots/model/cms-slot-designer-slot-props";
 
-describe("cmsSlotHasComposerReadyEngineComponent", () => {
-  const slotPropsWithExpose: CmsSlotEngineSlotPropsFile = {
+describe("cmsSlotHasComposerReadyDesignerComponent", () => {
+  const slotPropsWithExpose: CmsSlotDesignerSlotPropsFile = {
     v: 1,
     slots: [{ exposed: [{ propId: "title", label: "Title", valueType: "Text" }] }],
   };
 
-  it("is false when Engine palette is unset", () => {
+  it("is false when Designer palette is unset", () => {
     expect(
-      cmsSlotHasComposerReadyEngineComponent({
+      cmsSlotHasComposerReadyDesignerComponent({
         configuredComponentIds: null,
         scopedRowCount: 1,
         slotProps: slotPropsWithExpose,
       })
     ).toBe(false);
     expect(
-      cmsSlotHasComposerReadyEngineComponent({
+      cmsSlotHasComposerReadyDesignerComponent({
         configuredComponentIds: [],
         scopedRowCount: 1,
         slotProps: slotPropsWithExpose,
@@ -27,7 +27,7 @@ describe("cmsSlotHasComposerReadyEngineComponent", () => {
 
   it("is false when configured palette has no matching hidden-list rows", () => {
     expect(
-      cmsSlotHasComposerReadyEngineComponent({
+      cmsSlotHasComposerReadyDesignerComponent({
         configuredComponentIds: ["comp-1"],
         scopedRowCount: 0,
         slotProps: slotPropsWithExpose,
@@ -37,7 +37,7 @@ describe("cmsSlotHasComposerReadyEngineComponent", () => {
 
   it("is false when no slot exposes Composer props", () => {
     expect(
-      cmsSlotHasComposerReadyEngineComponent({
+      cmsSlotHasComposerReadyDesignerComponent({
         configuredComponentIds: ["comp-1"],
         scopedRowCount: 1,
         slotProps: { v: 1, slots: [{ exposed: [] }] },
@@ -45,9 +45,9 @@ describe("cmsSlotHasComposerReadyEngineComponent", () => {
     ).toBe(false);
   });
 
-  it("is true when at least one Engine slot exposes props", () => {
+  it("is true when at least one Designer slot exposes props", () => {
     expect(
-      cmsSlotHasComposerReadyEngineComponent({
+      cmsSlotHasComposerReadyDesignerComponent({
         configuredComponentIds: ["comp-1"],
         scopedRowCount: 1,
         slotProps: slotPropsWithExpose,

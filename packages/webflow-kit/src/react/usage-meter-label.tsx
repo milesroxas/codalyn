@@ -11,6 +11,8 @@ import { USAGE_METER_TOOLTIP_COLLISION_PADDING, usageMeterTooltipMaxWidthClass }
 export type UsageMeterLabelProps = {
   kind: TowerUsageMeterKind;
   label?: string;
+  /** When false, omits the info tooltip trigger (e.g. inside a details dialog). */
+  showInfoTooltip?: boolean;
 };
 
 export const usageMeterTooltipSurfaceVariants = cva(
@@ -23,8 +25,12 @@ export const usageMeterTooltipSurfaceVariants = cva(
   ].join(" ")
 );
 
-export function UsageMeterLabel({ kind, label }: UsageMeterLabelProps) {
+export function UsageMeterLabel({ kind, label, showInfoTooltip = true }: UsageMeterLabelProps) {
   const displayLabel = label ?? towerUsageMeterLabel(kind);
+
+  if (!showInfoTooltip) {
+    return <span>{displayLabel}</span>;
+  }
 
   return (
     <span className="inline-flex items-center gap-1">

@@ -88,7 +88,7 @@ async function clearListTargetMirrorContentForResync(
  * Mirror only ever inserts `ComponentInstance` nodes (plus an optional Codalyn hint `<p>`). If we see
  * other node types, this is not the real list-target inner surface — do not bulk-remove children.
  */
-export async function mirrorChildrenAreOnlyComponentInstances(contentRoot: ListTargetMirrorParent): Promise<boolean> {
+async function mirrorChildrenAreOnlyComponentInstances(contentRoot: ListTargetMirrorParent): Promise<boolean> {
   const ch = await contentRoot.getChildren();
   let hintNodes = 0;
   for (const c of ch) {

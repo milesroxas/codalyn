@@ -1,6 +1,7 @@
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
+import { Badge } from "@/shared/ui/badge";
 
 const towerAppShellContentWidths = {
   full: "",
@@ -14,6 +15,21 @@ type TowerAppShellContentWidth = keyof typeof towerAppShellContentWidths;
 /** Shared horizontal bounds for logged-out header chrome. */
 function towerAppShellContentClassName(width: TowerAppShellContentWidth = "default", className?: string) {
   return cn("mx-auto w-full px-4 sm:px-6", towerAppShellContentWidths[width], className);
+}
+
+/** Main inset for logged-out pages below `TowerLoggedOutHeader`. */
+function towerLoggedOutMainClassName(className?: string) {
+  return cn("flex min-h-0 flex-1 flex-col px-4 pt-6 pb-8 lg:px-6 md:pt-8 md:pb-10", className);
+}
+
+/** Extra top inset for legal pages rendered inside authenticated app chrome. */
+function towerAuthenticatedLegalInsetClassName(className?: string) {
+  return cn("pt-4 md:pt-6", className);
+}
+
+/** Authenticated legal page shell — keeps site footer separated from document content. */
+function towerAuthenticatedLegalPageShellClassName(className?: string) {
+  return cn(towerAuthenticatedLegalInsetClassName(), "flex min-h-0 flex-1 flex-col", className);
 }
 
 function towerPageMainClassName(width: TowerAppShellContentWidth = "full", className?: string) {
@@ -63,10 +79,10 @@ function TowerCurrentWorkspaceMeta({ name, className }: { name: string | null | 
   }
 
   return (
-    <p className={cn("max-w-full text-sm", className)}>
-      <span className="text-muted-foreground">Current workspace:</span>{" "}
-      <span className="font-semibold text-foreground">{name}</span>
-    </p>
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      <span className="text-xs font-medium text-muted-foreground">Current workspace:</span>
+      <Badge variant="secondary">{name}</Badge>
+    </div>
   );
 }
 
@@ -114,5 +130,8 @@ export {
   TowerPageMain,
   TowerPageSection,
   towerAppShellContentClassName,
+  towerAuthenticatedLegalInsetClassName,
+  towerAuthenticatedLegalPageShellClassName,
+  towerLoggedOutMainClassName,
   towerPageMainClassName,
 };

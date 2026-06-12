@@ -42,7 +42,7 @@ export async function countUserActiveWorkspaceMemberships(userId: string): Promi
   return Number(row?.total ?? 0);
 }
 
-export async function countUserOwnedWorkspaces(userId: string): Promise<number> {
+async function countUserOwnedWorkspaces(userId: string): Promise<number> {
   const [row] = await db
     .select({ total: count() })
     .from(member)
@@ -77,7 +77,7 @@ export function userMayCreateAnotherWorkspace(
   return opts.canCreateOrganizationOverride;
 }
 
-export async function loadUserWorkspaceEligibilityRow(userId: string): Promise<UserWorkspaceEligibilityRow | null> {
+async function loadUserWorkspaceEligibilityRow(userId: string): Promise<UserWorkspaceEligibilityRow | null> {
   const [row] = await db
     .select({
       id: user.id,

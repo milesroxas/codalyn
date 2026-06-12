@@ -1,4 +1,4 @@
-export const TEAM_WORKSPACE_TABS = ["people", "invites", "settings", "billing"] as const;
+const TEAM_WORKSPACE_TABS = ["people", "invites", "settings", "billing"] as const;
 
 export type TeamWorkspaceTab = (typeof TEAM_WORKSPACE_TABS)[number];
 

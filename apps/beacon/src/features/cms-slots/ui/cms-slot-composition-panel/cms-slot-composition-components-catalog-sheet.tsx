@@ -2,12 +2,20 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useCmsSlotsDrawerDismissBlocked } from "@/features/cms-slots/ui/cms-slots-route-interaction-context";
 import {
-  CMS_SLOTS_ENGINE_ADD_COMPONENT_LABEL,
-  CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_DESCRIPTION,
-  CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_TITLE,
+  CMS_SLOTS_DESIGNER_ADD_COMPONENT_LABEL,
+  CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_DESCRIPTION,
+  CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/shared/ui/drawer";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+  drawerListSheetContentDefaults,
+} from "@/shared/ui/drawer";
 import {
   CmsSlotCompositionComponentsCatalogList,
   type CmsSlotCompositionComponentsCatalogProps,
@@ -24,13 +32,13 @@ export function CmsSlotCompositionComponentsCatalogSheet(props: CmsSlotCompositi
       <DrawerTrigger asChild>
         <Button type="button" variant="default" size="actionCard" disabled={addPending}>
           <Plus data-icon="inline-start" aria-hidden strokeWidth={2.25} />
-          <span>{CMS_SLOTS_ENGINE_ADD_COMPONENT_LABEL}</span>
+          <span>{CMS_SLOTS_DESIGNER_ADD_COMPONENT_LABEL}</span>
         </Button>
       </DrawerTrigger>
-      <DrawerContent stickyFooter showCloseButton>
+      <DrawerContent {...drawerListSheetContentDefaults}>
         <DrawerHeader align="start">
-          <DrawerTitle>{CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_TITLE}</DrawerTitle>
-          <DrawerDescription>{CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_DESCRIPTION}</DrawerDescription>
+          <DrawerTitle>{CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_TITLE}</DrawerTitle>
+          <DrawerDescription>{CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_DESCRIPTION}</DrawerDescription>
           <CompositionComponentCatalogSearch
             searchFieldId={searchFieldId}
             componentQuery={componentQuery}

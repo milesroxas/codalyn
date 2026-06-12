@@ -1,9 +1,6 @@
-import {
-  WORKSPACE_OWNERSHIP_TRANSFER_STATUSES,
-  type WorkspaceOwnershipTransferStatus,
-} from "@/shared/lib/db/auth-schema";
+import type { WorkspaceOwnershipTransferStatus } from "@/shared/lib/db/auth-schema";
 
-export { WORKSPACE_OWNERSHIP_TRANSFER_STATUSES, type WorkspaceOwnershipTransferStatus };
+export type { WorkspaceOwnershipTransferStatus };
 
 export type WorkspaceOwnershipTransferErrorCode =
   | "not_found"
@@ -17,10 +14,6 @@ export type WorkspaceOwnershipTransferErrorCode =
 
 export function isPendingOwnershipTransferStatus(status: string): boolean {
   return status === "pending";
-}
-
-export function isTerminalOwnershipTransferStatus(status: WorkspaceOwnershipTransferStatus): boolean {
-  return status !== "pending";
 }
 
 export function ownershipTransferRequiresBillingHandoff(input: {
@@ -53,10 +46,4 @@ export function canCommitOwnershipTransferAcceptance(input: {
     return { ok: false, code: "billing_setup_required" };
   }
   return { ok: true };
-}
-
-export function parseWorkspaceOwnershipTransferStatus(raw: string): WorkspaceOwnershipTransferStatus | null {
-  return (WORKSPACE_OWNERSHIP_TRANSFER_STATUSES as readonly string[]).includes(raw)
-    ? (raw as WorkspaceOwnershipTransferStatus)
-    : null;
 }

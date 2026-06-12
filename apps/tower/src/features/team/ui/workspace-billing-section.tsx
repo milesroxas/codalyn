@@ -1,37 +1,83 @@
 import { IconCreditCard } from "@tabler/icons-react";
 import { WorkspaceSeatUsageBlock } from "@/features/billing/ui/workspace-seat-usage-block";
-import { WorkspaceTeamCheckoutForm } from "@/features/team/ui/workspace-team-checkout-form";
+import { WorkspaceManageSubscriptionButton } from "@/features/team/ui/workspace-manage-subscription-button";
+import { WorkspaceTeamSubscribeUpsell } from "@/features/team/ui/workspace-team-checkout-form";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
-import { Button } from "@/shared/ui/button";
+import { cn } from "@/shared/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+
+function WorkspaceBillingPlanStatus(props: { billing: WorkspaceBillingView }) {
+  const { billing } = props;
+  const planLabel = billing.isPaid ? (billing.billingPlan ?? "Team") : "Free";
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <p className="text-sm font-semibold capitalize text-foreground">{planLabel}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {billing.isPaid
+            ? "Paid Team billing covers seats and Team usage limits for this workspace."
+            : "Solo free workspace. Subscribe to Team to invite collaborators."}
+        </p>
+      </div>
+      {billing.billingEnabled && billing.subscriptionStatus ? (
+        <p className="text-xs text-muted-foreground">
+          Subscription status:{" "}
+          <span className="font-mono text-foreground">{billing.subscriptionStatus.replaceAll("_", " ")}</span>
+        </p>
+      ) : null}
+      <WorkspaceSeatUsageBlock usage={billing} />
+    </div>
+  );
+}
 
 function WorkspaceBillingActions(props: { organizationId: string; billing: WorkspaceBillingView }) {
   const { organizationId, billing } = props;
 
-  if (!billing.billingEnabled || !billing.canManageBilling) {
-    if (billing.billingEnabled) {
-      return <p className="text-xs text-muted-foreground">Only workspace admins can manage billing.</p>;
+  if (!billing.billingEnabled) {
+    return null;
+  }
+
+  if (!billing.canManageBilling) {
+    return <p className="text-xs text-muted-foreground">Only workspace admins can manage billing.</p>;
+  }
+
+  const showCheckout = !billing.isPaid && billing.teamCheckoutConfigured;
+  const showPaidPortal = billing.isPaid && billing.hasStripeCustomer && billing.canManagePaidBilling;
+  const showLapsedPortalLink = !billing.isPaid && billing.hasStripeCustomer && billing.canManagePaidBilling;
+
+  if (!(showCheckout || showPaidPortal || showLapsedPortalLink)) {
+    if (!billing.teamCheckoutConfigured && !billing.isPaid) {
+      return (
+        <p className="text-xs text-muted-foreground">
+          Team checkout is disabled until <code className="font-mono">STRIPE_PRICE_TEAM_SEAT</code> is configured.
+        </p>
+      );
     }
     return null;
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {!billing.isPaid && billing.teamCheckoutConfigured && !billing.isOverSeatCap ? (
-          <WorkspaceTeamCheckoutForm organizationId={organizationId} />
-        ) : null}
-        {billing.hasStripeCustomer ? (
-          <Button asChild variant="outline">
-            <a href={`/api/billing/workspace/portal?organizationId=${encodeURIComponent(organizationId)}`}>
-              Manage subscription
-            </a>
-          </Button>
-        ) : null}
-      </div>
-      {!billing.teamCheckoutConfigured && !billing.isPaid ? (
+      {showPaidPortal ? <WorkspaceManageSubscriptionButton organizationId={organizationId} /> : null}
+      {showCheckout ? (
+        <WorkspaceTeamSubscribeUpsell
+          organizationId={organizationId}
+          seatFloor={billing.checkoutSeatFloor}
+          seatMax={billing.checkoutSeatMax}
+          seatPrice={billing.teamSeatPrice}
+        />
+      ) : null}
+      {showLapsedPortalLink ? (
         <p className="text-xs text-muted-foreground">
-          Team checkout is disabled until <code className="font-mono">STRIPE_PRICE_TEAM_SEAT</code> is configured.
+          Need invoices or a past subscription? Open the{" "}
+          <WorkspaceManageSubscriptionButton organizationId={organizationId} variant="link" />.
+        </p>
+      ) : null}
+      {billing.isPaid && !billing.canManagePaidBilling ? (
+        <p className="text-xs text-muted-foreground">
+          Only the billing owner (the admin who started this subscription) or the workspace owner can manage the
+          subscription.
         </p>
       ) : null}
     </div>
@@ -40,9 +86,14 @@ function WorkspaceBillingActions(props: { organizationId: string; billing: Works
 
 export function WorkspaceBillingSection(props: { organizationId: string; billing: WorkspaceBillingView }) {
   const { organizationId, billing } = props;
+  const showActions =
+    billing.billingEnabled &&
+    (billing.canManageBilling ||
+      (!billing.teamCheckoutConfigured && !billing.isPaid) ||
+      (billing.isPaid && !billing.canManagePaidBilling));
 
   return (
-    <Card size="sm">
+    <Card size="sm" className="@container/billing-card">
       <CardHeader>
         <div className="flex items-center gap-2">
           <IconCreditCard className="size-4 text-muted-foreground" aria-hidden />
@@ -50,32 +101,31 @@ export function WorkspaceBillingSection(props: { organizationId: string; billing
         </div>
         <CardDescription>Manage seats and subscription for this workspace.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          {billing.billingEnabled ? (
-            <span>
-              Plan:{" "}
-              <span className="font-medium capitalize">
-                {billing.isPaid ? (billing.billingPlan ?? "team") : "free"}
-              </span>
-            </span>
-          ) : null}
-          {billing.billingEnabled && billing.subscriptionStatus ? (
-            <span className="text-muted-foreground">
-              Status: <span className="font-mono text-xs">{billing.subscriptionStatus}</span>
-            </span>
+      <CardContent>
+        <div
+          className={cn(
+            showActions
+              ? "flex flex-col gap-4 @[40rem]/billing-card:grid @[40rem]/billing-card:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] @[40rem]/billing-card:items-start @[40rem]/billing-card:gap-8"
+              : "space-y-4"
+          )}
+        >
+          <div className="space-y-4">
+            <WorkspaceBillingPlanStatus billing={billing} />
+
+            {billing.isOverSeatCap ? (
+              <p className="text-sm text-destructive">
+                Over seat limit ({billing.seatsUsed}/{billing.effectiveSeatLimit}). Remove members or resubscribe before
+                inviting.
+              </p>
+            ) : null}
+          </div>
+
+          {showActions ? (
+            <div className="border-t border-border pt-4 @[40rem]/billing-card:border-t-0 @[40rem]/billing-card:pt-0">
+              <WorkspaceBillingActions organizationId={organizationId} billing={billing} />
+            </div>
           ) : null}
         </div>
-        <WorkspaceSeatUsageBlock usage={billing} />
-
-        {billing.isOverSeatCap ? (
-          <p className="text-sm text-destructive">
-            Over seat limit ({billing.seatsUsed}/{billing.effectiveSeatLimit}). Remove members or resubscribe before
-            inviting.
-          </p>
-        ) : null}
-
-        <WorkspaceBillingActions organizationId={organizationId} billing={billing} />
       </CardContent>
     </Card>
   );

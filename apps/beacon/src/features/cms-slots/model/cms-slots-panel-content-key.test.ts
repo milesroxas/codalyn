@@ -7,9 +7,9 @@ import {
   cmsSlotsComposerListDataReady,
   cmsSlotsComposerRouteContentKey,
   cmsSlotsComposerRouteContentReady,
-  cmsSlotsEngineRouteContentKey,
-  cmsSlotsEngineRouteContentReady,
-  resolveCmsSlotsEngineRouteSurface,
+  cmsSlotsDesignerRouteContentKey,
+  cmsSlotsDesignerRouteContentReady,
+  resolveCmsSlotsDesignerRouteSurface,
 } from "@/features/cms-slots/model/cms-slots-panel-content-key";
 
 describe("cmsSlotListTargetSettled", () => {
@@ -33,7 +33,7 @@ describe("cmsSlotListTargetSettled", () => {
   });
 });
 
-describe("cmsSlotsEngineRouteSurface", () => {
+describe("cmsSlotsDesignerRouteSurface", () => {
   const idleHome = {
     picking: false,
     openingBeaconKey: null,
@@ -45,7 +45,7 @@ describe("cmsSlotsEngineRouteSurface", () => {
 
   it("keeps home key while opening a slot", () => {
     expect(
-      cmsSlotsEngineRouteContentKey({
+      cmsSlotsDesignerRouteContentKey({
         picking: true,
         openingBeaconKey: "beacon-1",
       })
@@ -54,7 +54,7 @@ describe("cmsSlotsEngineRouteSurface", () => {
 
   it("uses composition key only after open completes", () => {
     expect(
-      cmsSlotsEngineRouteContentKey({
+      cmsSlotsDesignerRouteContentKey({
         picking: true,
         openingBeaconKey: null,
       })
@@ -62,17 +62,17 @@ describe("cmsSlotsEngineRouteSurface", () => {
   });
 
   it("stays hidden while opening", () => {
-    expect(cmsSlotsEngineRouteContentReady({ ...idleHome, openingBeaconKey: "beacon-1" })).toBe(false);
+    expect(cmsSlotsDesignerRouteContentReady({ ...idleHome, openingBeaconKey: "beacon-1" })).toBe(false);
   });
 
   it("does not hide home on background rescans", () => {
-    expect(cmsSlotsEngineRouteContentReady({ ...idleHome, pageBootBlocking: false })).toBe(true);
-    expect(cmsSlotsEngineRouteContentReady({ ...idleHome, pageBootBlocking: true })).toBe(false);
+    expect(cmsSlotsDesignerRouteContentReady({ ...idleHome, pageBootBlocking: false })).toBe(true);
+    expect(cmsSlotsDesignerRouteContentReady({ ...idleHome, pageBootBlocking: true })).toBe(false);
   });
 
   it("waits for list target reconcile before showing composition", () => {
     expect(
-      resolveCmsSlotsEngineRouteSurface({
+      resolveCmsSlotsDesignerRouteSurface({
         ...idleHome,
         picking: true,
         listTargetPhase: "loading",
@@ -82,7 +82,7 @@ describe("cmsSlotsEngineRouteSurface", () => {
 
   it("shows composition once list target phase is synced", () => {
     expect(
-      cmsSlotsEngineRouteContentReady({
+      cmsSlotsDesignerRouteContentReady({
         ...idleHome,
         picking: true,
         listTargetPhase: "synced",
@@ -90,9 +90,9 @@ describe("cmsSlotsEngineRouteSurface", () => {
     ).toBe(true);
   });
 
-  it("waits for editing context on engine routes", () => {
+  it("waits for editing context on designer routes", () => {
     expect(
-      cmsSlotsEngineRouteContentReady({
+      cmsSlotsDesignerRouteContentReady({
         ...idleHome,
         editingContextPhase: "loading",
       })

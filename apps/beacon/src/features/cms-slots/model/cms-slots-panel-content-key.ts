@@ -1,7 +1,7 @@
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import { cmsSlotListTargetPhaseSettledForRouteSurface } from "@/features/cms-slots/model/cms-slot-list-target-settled";
 import {
-  shouldShowCmsSlotsComposerInstallInEngineEmpty,
+  shouldShowCmsSlotsComposerInstallInDesignerEmpty,
   shouldShowCmsSlotsPreInstall,
 } from "@/features/cms-slots/model/cms-slots-access";
 import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
@@ -23,9 +23,9 @@ export function cmsSlotsHomePanelContentKey(input: {
   return "installed";
 }
 
-export type CmsSlotsEngineRouteContentKey = "home" | "composition";
+export type CmsSlotsDesignerRouteContentKey = "home" | "composition";
 
-export type CmsSlotsEngineRouteSurfaceInput = {
+export type CmsSlotsDesignerRouteSurfaceInput = {
   picking: boolean;
   openingBeaconKey: string | null;
   routeStateKnown: boolean;
@@ -34,17 +34,17 @@ export type CmsSlotsEngineRouteSurfaceInput = {
   editingContextPhase: CmsComposerEditingContextViewModel["phase"];
 };
 
-export function cmsSlotsEngineRouteContentKey(input: {
+export function cmsSlotsDesignerRouteContentKey(input: {
   picking: boolean;
   openingBeaconKey: string | null;
-}): CmsSlotsEngineRouteContentKey {
+}): CmsSlotsDesignerRouteContentKey {
   if (input.picking && input.openingBeaconKey == null) {
     return "composition";
   }
   return "home";
 }
 
-export function cmsSlotsEngineRouteContentReady(input: CmsSlotsEngineRouteSurfaceInput): boolean {
+export function cmsSlotsDesignerRouteContentReady(input: CmsSlotsDesignerRouteSurfaceInput): boolean {
   if (input.openingBeaconKey != null) {
     return false;
   }
@@ -57,16 +57,16 @@ export function cmsSlotsEngineRouteContentReady(input: CmsSlotsEngineRouteSurfac
   return input.routeStateKnown && !input.pageBootBlocking;
 }
 
-export function resolveCmsSlotsEngineRouteSurface(input: CmsSlotsEngineRouteSurfaceInput): {
-  contentKey: CmsSlotsEngineRouteContentKey;
+export function resolveCmsSlotsDesignerRouteSurface(input: CmsSlotsDesignerRouteSurfaceInput): {
+  contentKey: CmsSlotsDesignerRouteContentKey;
   contentReady: boolean;
 } {
   return {
-    contentKey: cmsSlotsEngineRouteContentKey({
+    contentKey: cmsSlotsDesignerRouteContentKey({
       picking: input.picking,
       openingBeaconKey: input.openingBeaconKey,
     }),
-    contentReady: cmsSlotsEngineRouteContentReady(input),
+    contentReady: cmsSlotsDesignerRouteContentReady(input),
   };
 }
 
@@ -137,31 +137,31 @@ export function resolveCmsSlotsComposerRouteSurface(input: CmsSlotsComposerRoute
 
 export type CmsSlotsComposerListPanelContentKey =
   | "editor-empty"
-  | "engine-install-prompt"
-  | "engine-not-ready"
+  | "designer-install-prompt"
+  | "designer-not-ready"
   | "list";
 
 export function cmsSlotsComposerListPanelContentKey(input: {
   routeStateKnown: boolean;
   beaconsWrapperInstalled: boolean;
   showEditorNoSlotsEmpty: boolean;
-  showEngineNotReadyEmpty: boolean;
-  canAccessEngine: boolean;
+  showDesignerNotReadyEmpty: boolean;
+  canAccessDesigner: boolean;
 }): CmsSlotsComposerListPanelContentKey {
   if (input.showEditorNoSlotsEmpty) {
     return "editor-empty";
   }
   if (
-    shouldShowCmsSlotsComposerInstallInEngineEmpty({
-      canAccessEngine: input.canAccessEngine,
+    shouldShowCmsSlotsComposerInstallInDesignerEmpty({
+      canAccessDesigner: input.canAccessDesigner,
       routeStateKnown: input.routeStateKnown,
       beaconsWrapperInstalled: input.beaconsWrapperInstalled,
     })
   ) {
-    return "engine-install-prompt";
+    return "designer-install-prompt";
   }
-  if (input.showEngineNotReadyEmpty) {
-    return "engine-not-ready";
+  if (input.showDesignerNotReadyEmpty) {
+    return "designer-not-ready";
   }
   return "list";
 }

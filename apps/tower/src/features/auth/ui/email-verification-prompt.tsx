@@ -38,7 +38,7 @@ type EmailVerificationResendButtonProps = {
   callbackPath?: string;
 };
 
-export function EmailVerificationResendButton({ email, callbackPath = "/" }: EmailVerificationResendButtonProps) {
+function EmailVerificationResendButton({ email, callbackPath = "/" }: EmailVerificationResendButtonProps) {
   const [pending, setPending] = useState(false);
 
   const onResend = useCallback(async () => {

@@ -33,8 +33,3 @@ export async function resolveUserIndividualPlan(row: UserStripeProRow): Promise<
     .limit(1);
   return orgWithSameSub ? null : plan;
 }
-
-/** True when the user row reflects any individual paid subscription (Pro or Studio). */
-export async function userHasIndividualStripePro(row: UserStripeProRow): Promise<boolean> {
-  return (await resolveUserIndividualPlan(row)) !== null;
-}

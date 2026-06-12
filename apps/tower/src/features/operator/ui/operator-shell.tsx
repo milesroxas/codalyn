@@ -3,8 +3,10 @@
 import {
   IconArrowLeft,
   IconBuilding,
+  IconChartHistogram,
   IconChevronDown,
   IconDashboard,
+  IconFlame,
   IconKey,
   IconLifebuoy,
   IconMenu2,
@@ -29,6 +31,7 @@ import { operatorPendingCountForHref } from "@/features/operator/model/operator-
 import { OperatorCommandPalette } from "@/features/operator/ui/operator-command-palette";
 import { OperatorNavCountBadge } from "@/features/operator/ui/operator-nav-count-badge";
 import { OperatorPendingReviewAlert } from "@/features/operator/ui/operator-pending-review-alert";
+import { OperatorSidebarUser } from "@/features/operator/ui/operator-sidebar-user";
 import { TowerAccountMenu } from "@/features/tower-ui/tower-account-menu";
 import { cn } from "@/shared/lib/utils";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
@@ -38,9 +41,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 const nav = [
   { href: "/console", label: "Overview", icon: IconDashboard },
   { href: "/console/access-requests", label: "Access requests", icon: IconKey },
+  { href: "/console/flint-requests", label: "Flint requests", icon: IconFlame },
   { href: "/console/support-requests", label: "Support requests", icon: IconLifebuoy },
   { href: "/console/customers", label: "Customers", icon: IconUsers },
   { href: "/console/workspaces", label: "Workspaces", icon: IconBuilding },
+  { href: "/console/usage", label: "Usage", icon: IconChartHistogram },
   { href: "/console/platform", label: "Platform", icon: IconPlug },
 ] as const;
 
@@ -144,23 +149,19 @@ function OperatorShellContent({ userEmail, userName, children }: OperatorShellPr
   );
 
   const SidebarFooter = (
-    <div className="mt-auto flex flex-col gap-2 border-t border-border px-3 py-3">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
-        asChild
-      >
-        <Link href="/">
-          <IconArrowLeft className="size-4" aria-hidden />
-          Tenant workspace
-        </Link>
-      </Button>
+    <div className="mt-auto border-t border-border px-2 py-3">
+      <OperatorSidebarUser />
     </div>
   );
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+    <div
+      className={cn(
+        "relative flex h-dvh flex-col overflow-hidden bg-background text-foreground",
+        signingOut && "pointer-events-none tl-marketing-page-transition--exit"
+      )}
+      aria-busy={signingOut || undefined}
+    >
       {/* Top bar */}
       <header className="z-40 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/90 px-3 backdrop-blur supports-backdrop-filter:bg-background/75 sm:px-4">
         <Button
@@ -221,7 +222,7 @@ function OperatorShellContent({ userEmail, userName, children }: OperatorShellPr
             displayName={userName || userEmail}
             email={userEmail}
             showOperatorBadge
-            links={[{ href: "/", label: "Switch to tenant", icon: IconArrowLeft }]}
+            links={[{ href: "/", label: "Tenant workspace", icon: IconArrowLeft }]}
             signingOut={signingOut}
             onSignOut={onSignOut}
             trigger={

@@ -73,10 +73,6 @@ export function trackViolationOpened(props: { rule_id: string; severity: string;
   posthog.capture("violation_opened", props);
 }
 
-export function trackThirdPartyListViewed(props: { ignored_count: number }) {
-  posthog.capture("third_party_list_viewed", props);
-}
-
 export function trackIgnoredClassListsViewed(props: { source: string }) {
   posthog.capture("ignored_class_lists_viewed", props);
 }

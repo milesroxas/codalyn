@@ -23,6 +23,7 @@ import {
   TeamWorkspaceLeaveApiError,
 } from "@/features/team/api/leave-workspace";
 import { normalizeInvitationRows, normalizeMemberRows } from "@/features/team/lib/team-org-boundary";
+import { useActiveTowerOrganizations } from "@/features/team/model/use-active-tower-organizations";
 import type { InvitationRow, MemberDepartureRow } from "@/features/team/model/workspace-types";
 import { TeamDashboardSkeleton } from "@/features/team/ui/team-dashboard-skeleton";
 import { TeamWorkspacePanel } from "@/features/team/ui/team-workspace-panel";
@@ -44,12 +45,7 @@ export function TeamDashboard(props: {
 }) {
   const { workspaceBilling = null, activeOrganizationId = null } = props;
   const { session, sessionPending } = useRequireTowerSession("/team");
-  const { refetch: refetchOrgs } = authClient.useListOrganizations();
-  const {
-    data: activeOrg,
-    isPending: activeOrgPending,
-    refetch: refetchActiveOrg,
-  } = authClient.useActiveOrganization();
+  const { activeOrg, activeOrgPending, refetchOrgs, refetchActiveOrg } = useActiveTowerOrganizations();
   const { data: activeMember, refetch: refetchActiveMember } = authClient.useActiveMember();
 
   const [activeTeamNameEdit, setActiveTeamNameEdit] = useState("");

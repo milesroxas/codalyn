@@ -2,7 +2,7 @@ import { openTowerAppPath } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { useTowerUsageStatus } from "@/features/billing/model/use-tower-usage-status";
 import { Button } from "@/shared/ui/button";
-import { UsageApproachingLimitAlert } from "@/shared/ui/usage-approaching-limit-alert";
+import { UsageApproachingLimitCompactBanner } from "@/shared/ui/usage-approaching-limit-compact-banner";
 
 export function BeaconUsageApproachingBanner() {
   const { user } = useBeaconTowerSession();
@@ -20,25 +20,23 @@ export function BeaconUsageApproachingBanner() {
   const showBillingLever = status.tier === "free" || status.tier === "team";
 
   return (
-    <div className="px-2 pb-2">
-      <UsageApproachingLimitAlert
-        meters={meters}
-        usageScope={status.usageScope}
-        upgradeAction={
-          showBillingLever ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                openTowerAppPath("/billing");
-              }}
-            >
-              Open Tower billing
-            </Button>
-          ) : undefined
-        }
-      />
-    </div>
+    <UsageApproachingLimitCompactBanner
+      meters={meters}
+      usageScope={status.usageScope}
+      upgradeAction={
+        showBillingLever ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              openTowerAppPath("/billing");
+            }}
+          >
+            Open Tower billing
+          </Button>
+        ) : undefined
+      }
+    />
   );
 }

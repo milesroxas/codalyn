@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
-import { admin, bearer } from "better-auth/plugins";
+import { admin, bearer, oneTimeToken } from "better-auth/plugins";
 import { adminAc, userAc } from "better-auth/plugins/admin/access";
 import {
   assertEmailMaySignUp,
@@ -21,14 +21,18 @@ import {
   rewriteBetterAuthVerifyEmailUrlToAppPage,
   rewriteVerifyEmailCallbackUrl,
 } from "@/server/auth/email-verification-token";
+import { setTowerEmailVerifiedFlashCookieInHook } from "@/server/auth/tower-auth-flash-cookie";
+import { shouldSetTowerEmailVerifiedFlashAfterVerifyEmail } from "@/server/auth/tower-email-verification-after-hook";
 import { resolveAuthSecret } from "@/server/auth-secret";
 import { sendChangeEmailConfirmationEmail } from "@/server/email/change-email-confirmation-email";
 import { sendChangeEmailNewAddressVerificationEmail } from "@/server/email/change-email-new-address-email";
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
 import { sendPasswordResetEmail } from "@/server/email/password-reset-email";
 import {
-  isPendingTeamInvitationForEmail,
   readTeamInvitationIdFromAuthContext,
+  shouldMarkEmailVerifiedOnTeamInviteSignUp,
+  shouldSkipVerificationEmailForTeamInvite,
+  trustEmailForPendingOrgInvitationEmail,
   trustEmailForPendingTeamInvitation,
 } from "@/server/membership/team-invitation-email-trust";
 import { towerOrganization } from "@/server/membership/tower-organization";
@@ -86,9 +90,10 @@ export const auth = betterAuth({
       const changeEmailVerification = isChangeEmailVerificationRequest(token);
       const teamInvitationId = readTeamInvitationIdFromAuthContext({ request });
       const operatorInviteToken = readOperatorInviteTokenFromAuthContext({ request });
-      const skipForTeamInvitation = teamInvitationId
-        ? await isPendingTeamInvitationForEmail(teamInvitationId, user.email)
-        : false;
+      const skipForTeamInvitation = await shouldSkipVerificationEmailForTeamInvite({
+        email: user.email,
+        invitationId: teamInvitationId,
+      });
       const skipForOperatorInvite = operatorInviteToken
         ? isValidOperatorInviteForEmail(operatorInviteToken, user.email)
         : false;
@@ -179,7 +184,21 @@ export const auth = betterAuth({
         const email = typeof ctx.body?.email === "string" ? ctx.body.email : "";
         await assertUserMaySignInByEmail(email);
         await trustEmailForPendingTeamInvitation(email, readTeamInvitationIdFromAuthContext(ctx));
+        await trustEmailForPendingOrgInvitationEmail(email);
         await trustEmailForOperatorInvite(email, readOperatorInviteTokenFromAuthContext(ctx));
+      }
+    }),
+    after: createAuthMiddleware(async (ctx) => {
+      const token = typeof ctx.query?.token === "string" ? ctx.query.token : null;
+      const redirectLocation = ctx.context.responseHeaders?.get("location") ?? null;
+      if (
+        shouldSetTowerEmailVerifiedFlashAfterVerifyEmail({
+          path: ctx.path,
+          token,
+          redirectLocation,
+        })
+      ) {
+        setTowerEmailVerifiedFlashCookieInHook(ctx);
       }
     }),
   },
@@ -191,7 +210,12 @@ export const auth = betterAuth({
             return;
           }
           const invitationId = readTeamInvitationIdFromAuthContext(ctx);
-          if (invitationId && (await isPendingTeamInvitationForEmail(invitationId, createdUser.email))) {
+          if (
+            await shouldMarkEmailVerifiedOnTeamInviteSignUp({
+              email: createdUser.email,
+              invitationId,
+            })
+          ) {
             return {
               data: {
                 ...createdUser,
@@ -221,6 +245,16 @@ export const auth = betterAuth({
   plugins: [
     nextCookies(),
     bearer(),
+    /**
+     * Single-use session handoff for the Beacon Designer extension: Beacon authenticates Tower with
+     * a cross-origin bearer token, so it mints a one-time token to bootstrap a first-party cookie
+     * session when opening Tower in a browser tab (see `/api/beacon-handoff`). Tokens are hashed at
+     * rest, single-use, and expire in one minute; they never carry the session value.
+     */
+    oneTimeToken({
+      storeToken: "hashed",
+      expiresIn: 1,
+    }),
     towerOrganization,
     admin({
       defaultRole: "user",

@@ -46,7 +46,7 @@ function BeaconPresetSelectField(props: {
   );
 }
 
-export function BeaconPresetOutputDimensionFields(props: {
+function BeaconPresetOutputDimensionFields(props: {
   baseId: string;
   disabled?: boolean;
   width: string;
@@ -90,7 +90,7 @@ export function BeaconPresetOutputDimensionFields(props: {
   );
 }
 
-export function BeaconPresetExportFormatField(props: {
+function BeaconPresetExportFormatField(props: {
   baseId: string;
   disabled?: boolean;
   value: ImageExportFormat;
@@ -114,7 +114,7 @@ export function BeaconPresetExportFormatField(props: {
   );
 }
 
-export function BeaconPresetMaxEncodedSizeField(props: {
+function BeaconPresetMaxEncodedSizeField(props: {
   baseId: string;
   disabled?: boolean;
   maxStr: string;
@@ -161,6 +161,87 @@ export function BeaconPresetMaxEncodedSizeField(props: {
         </Select>
       </FormFieldRow>
     </FormField>
+  );
+}
+
+function BeaconPresetNameField(props: {
+  baseId: string;
+  disabled?: boolean;
+  name: string;
+  onNameChange: (value: string) => void;
+}) {
+  const { baseId, disabled, name, onNameChange } = props;
+  const nameId = `${baseId}-preset-name`;
+
+  return (
+    <FormField span="full">
+      <Label htmlFor={nameId} size="sm">
+        Name
+      </Label>
+      <Input id={nameId} value={name} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} />
+    </FormField>
+  );
+}
+
+export function BeaconScopedPresetFields(props: {
+  baseId: string;
+  disabled?: boolean;
+  name: string;
+  width: string;
+  height: string;
+  exportFormat: ImageExportFormat;
+  maxStr: string;
+  maxUnit: MaxSizeUnit;
+  onNameChange: (value: string) => void;
+  onWidthChange: (value: string) => void;
+  onHeightChange: (value: string) => void;
+  onExportFormatChange: (value: ImageExportFormat) => void;
+  onMaxStrChange: (value: string) => void;
+  onMaxUnitChange: (value: MaxSizeUnit) => void;
+}) {
+  const {
+    baseId,
+    disabled,
+    name,
+    width,
+    height,
+    exportFormat,
+    maxStr,
+    maxUnit,
+    onNameChange,
+    onWidthChange,
+    onHeightChange,
+    onExportFormatChange,
+    onMaxStrChange,
+    onMaxUnitChange,
+  } = props;
+
+  return (
+    <FormFieldGrid>
+      <BeaconPresetNameField baseId={baseId} disabled={disabled} name={name} onNameChange={onNameChange} />
+      <BeaconPresetOutputDimensionFields
+        baseId={baseId}
+        disabled={disabled}
+        width={width}
+        height={height}
+        onWidthChange={onWidthChange}
+        onHeightChange={onHeightChange}
+      />
+      <BeaconPresetExportFormatField
+        baseId={baseId}
+        disabled={disabled}
+        value={exportFormat}
+        onChange={onExportFormatChange}
+      />
+      <BeaconPresetMaxEncodedSizeField
+        baseId={baseId}
+        disabled={disabled}
+        maxStr={maxStr}
+        maxUnit={maxUnit}
+        onMaxStrChange={onMaxStrChange}
+        onMaxUnitChange={onMaxUnitChange}
+      />
+    </FormFieldGrid>
   );
 }
 

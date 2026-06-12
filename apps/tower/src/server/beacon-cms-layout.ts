@@ -38,7 +38,7 @@ export function parseCmsLayoutSaveRequest(raw: unknown): CmsLayoutSaveRequest | 
   return parsed.success ? parsed.data : null;
 }
 
-export function createEmptyComposition(): CmsLayoutComposition {
+function createEmptyComposition(): CmsLayoutComposition {
   return { v: 1, blocks: [] };
 }
 

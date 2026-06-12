@@ -3,7 +3,7 @@
  * Variable bindings are objects `{ id: "variable-..." }`; prefer human-readable names when provided.
  */
 
-export function isWebflowVariableRef(value: unknown): value is { id: string } {
+function isWebflowVariableRef(value: unknown): value is { id: string } {
   return (
     typeof value === "object" &&
     value !== null &&

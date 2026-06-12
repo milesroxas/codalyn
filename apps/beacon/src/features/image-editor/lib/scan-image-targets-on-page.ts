@@ -1,12 +1,19 @@
 import { WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
-import { searchComponentInstanceImageProps } from "@/features/image-editor/lib/search-component-instance-image-props";
-import { webflowTreeNodeKey } from "@/features/image-editor/lib/webflow-element-id-key";
-import { enqueueWebflowStructureChildren } from "@/features/image-editor/lib/webflow-element-structure-walk";
-
-/** Descendants to traverse from a component: main children + each slot’s children. */
-async function collectComponentInstanceDescendantsToQueue(instance: ComponentElement, queue: AnyElement[]) {
-  await enqueueWebflowStructureChildren(instance, queue);
-}
+import {
+  computeImagePageStructureKey,
+  type ImagePageTargetCacheRecord,
+  imagePageTargetsToCacheRecords,
+  readComponentInstanceDisplayName,
+  readImagePageTargetScanCache,
+  readInflightImagePageTargetScan,
+  readPageScanCacheEntry,
+  rebindImagePageTargetsFromCache,
+  resolveImagePageTargetScanPageId,
+  searchComponentInstanceImagePropsForPageScan,
+  trackInflightImagePageTargetScan,
+  writeImagePageTargetScanCache,
+} from "@/features/image-editor/lib/image-page-target-scan-cache";
+import { collectWebflowStructureNodesInCanvasOrder } from "@/features/image-editor/lib/webflow-element-structure-walk";
 
 export type ImagePageTarget = {
   id: string;
@@ -19,6 +26,44 @@ export type ImagePageTarget = {
 };
 
 const MAX_TARGETS = 200;
+
+export type ImagePageTargetScanProgress = {
+  phase: "collecting" | "scanning";
+  scannedElements: number;
+  totalElements: number;
+  foundTargets: number;
+};
+
+export type ScanImageTargetsOnPageResult = {
+  targets: ImagePageTarget[];
+  cacheHit: boolean;
+};
+
+export type ScanImageTargetsOnPageOptions = {
+  onProgress?: (progress: ImagePageTargetScanProgress) => void;
+  /** Bypass cached scan results (explicit re-scan). Collection still runs to validate page structure. */
+  forceRefresh?: boolean;
+  pageId?: string | null;
+};
+
+function shouldReportImageTargetScanProgress(scanned: number, total: number, lastReported: number): boolean {
+  if (scanned === 0 || scanned === total) {
+    return true;
+  }
+  if (total <= 40) {
+    return true;
+  }
+  const step = Math.max(1, Math.floor(total / 40));
+  return scanned - lastReported >= step;
+}
+
+function shouldReportImageTargetCollectionProgress(discovered: number, lastReported: number): boolean {
+  if (discovered <= 1) {
+    return true;
+  }
+  const step = Math.max(1, Math.floor(discovered / 40));
+  return discovered - lastReported >= step;
+}
 
 function shortId(n: number, prefix: string): string {
   return `${prefix}-${n}`;
@@ -46,12 +91,11 @@ async function tryPushScannedImageTarget(el: AnyElement, out: ImagePageTarget[])
   }
   if (el.type === "ComponentInstance") {
     const inst = el as ComponentElement;
-    const props = await searchComponentInstanceImageProps(inst);
+    const props = await searchComponentInstanceImagePropsForPageScan(inst);
     if (props.length === 0) {
       return;
     }
-    const comp = await inst.getComponent();
-    const cname = (await comp.getName()) || "Component";
+    const cname = await readComponentInstanceDisplayName(inst);
     const p0 = props[0];
     if (!p0) {
       return;
@@ -69,34 +113,175 @@ async function tryPushScannedImageTarget(el: AnyElement, out: ImagePageTarget[])
 
 /**
  * Every canvas node we should consider for image targets, including **nested** component
- * instances and **slot** content — those are not always present in
- * {@link webflow.getAllElements} alone (see parent-graph notes in
- * `webflow-page-parent-map.ts`).
+ * instances and **slot** content — in **canvas / DOM order** (see
+ * {@link collectWebflowStructureNodesInCanvasOrder}).
  */
-export async function collectAllPageElementsForImageScan(): Promise<AnyElement[]> {
-  const seed = await webflow.getAllElements();
-  const seen = new Set<string>();
-  const out: AnyElement[] = [];
-  const queue: AnyElement[] = [...seed];
+export async function collectAllPageElementsForImageScan(options?: {
+  onDiscovered?: (count: number) => void;
+  allElements?: AnyElement[];
+}): Promise<AnyElement[]> {
+  return collectWebflowStructureNodesInCanvasOrder(options);
+}
 
-  while (queue.length > 0) {
-    const el = queue.pop();
-    if (el == null) {
-      continue;
-    }
-    const k = webflowTreeNodeKey(el as { id: object });
-    if (seen.has(k)) {
-      continue;
-    }
-    seen.add(k);
-    out.push(el);
+async function collectPageElementsForScan(
+  report: ScanImageTargetsOnPageOptions["onProgress"] | undefined,
+  options?: { silent?: boolean }
+): Promise<AnyElement[]> {
+  const silent = options?.silent === true;
+  let lastCollectionReport = 0;
+  if (!silent) {
+    report?.({
+      phase: "collecting",
+      scannedElements: 0,
+      totalElements: 0,
+      foundTargets: 0,
+    });
+  }
 
-    if (el.type === "ComponentInstance") {
-      await collectComponentInstanceDescendantsToQueue(el as ComponentElement, queue);
+  const allElements = await webflow.getAllElements();
+  return collectAllPageElementsForImageScan({
+    allElements,
+    onDiscovered: (discovered) => {
+      if (silent || !shouldReportImageTargetCollectionProgress(discovered, lastCollectionReport)) {
+        return;
+      }
+      lastCollectionReport = discovered;
+      report?.({
+        phase: "collecting",
+        scannedElements: discovered,
+        totalElements: 0,
+        foundTargets: 0,
+      });
+    },
+  });
+}
+
+async function scanCollectedPageElements(
+  all: AnyElement[],
+  report: ScanImageTargetsOnPageOptions["onProgress"]
+): Promise<ImagePageTarget[]> {
+  const out: ImagePageTarget[] = [];
+  const totalElements = all.length;
+  let lastReported = -1;
+
+  report?.({
+    phase: "scanning",
+    scannedElements: 0,
+    totalElements,
+    foundTargets: 0,
+  });
+
+  for (let index = 0; index < all.length; index += 1) {
+    if (out.length >= MAX_TARGETS) {
+      if (shouldReportImageTargetScanProgress(totalElements, totalElements, lastReported)) {
+        report?.({
+          phase: "scanning",
+          scannedElements: totalElements,
+          totalElements,
+          foundTargets: out.length,
+        });
+      }
+      break;
+    }
+
+    const el = all[index];
+    if (el) {
+      await tryPushScannedImageTarget(el, out);
+    }
+
+    const scannedElements = index + 1;
+    if (shouldReportImageTargetScanProgress(scannedElements, totalElements, lastReported)) {
+      lastReported = scannedElements;
+      report?.({
+        phase: "scanning",
+        scannedElements,
+        totalElements,
+        foundTargets: out.length,
+      });
     }
   }
 
   return out;
+}
+
+function tryFastRebindFromPageElements(
+  records: readonly ImagePageTargetCacheRecord[],
+  allElements: AnyElement[]
+): ImagePageTarget[] | null {
+  const rebound = rebindImagePageTargetsFromCache(records, allElements);
+  if (rebound.length !== records.length) {
+    return null;
+  }
+  return rebound;
+}
+
+async function runImagePageTargetScan(options?: ScanImageTargetsOnPageOptions): Promise<ScanImageTargetsOnPageResult> {
+  const report = options?.onProgress;
+  const pageId = await resolveImagePageTargetScanPageId(options?.pageId);
+  if (pageId == null) {
+    return { targets: [], cacheHit: false };
+  }
+
+  const mayUseCache = options?.forceRefresh !== true;
+  if (mayUseCache) {
+    const cachedEntry = readPageScanCacheEntry(pageId);
+    if (cachedEntry != null) {
+      const allElements = await webflow.getAllElements();
+      const fastRebound = tryFastRebindFromPageElements(cachedEntry.records, allElements);
+      if (fastRebound != null) {
+        return { targets: fastRebound, cacheHit: true };
+      }
+    }
+  }
+
+  const all = await collectPageElementsForScan(report);
+  const structureKey = computeImagePageStructureKey(all);
+
+  if (mayUseCache) {
+    const cachedRecords = readImagePageTargetScanCache(pageId, structureKey);
+    if (cachedRecords != null) {
+      const rebound = rebindImagePageTargetsFromCache(cachedRecords, all);
+      return { targets: rebound, cacheHit: true };
+    }
+  }
+
+  const targets = await scanCollectedPageElements(all, report);
+  writeImagePageTargetScanCache(pageId, structureKey, imagePageTargetsToCacheRecords(targets));
+  return { targets, cacheHit: false };
+}
+
+/**
+ * Restores cached scan results when the page structure is unchanged — no scanning phase.
+ * Returns null when there is no cache or the page structure changed.
+ */
+export async function tryRestoreCachedImagePageTargets(
+  pageId: string,
+  onProgress?: ScanImageTargetsOnPageOptions["onProgress"]
+): Promise<ImagePageTarget[] | null> {
+  const resolvedPageId = await resolveImagePageTargetScanPageId(pageId);
+  if (resolvedPageId == null) {
+    return null;
+  }
+
+  const cachedEntry = readPageScanCacheEntry(resolvedPageId);
+  if (cachedEntry == null) {
+    return null;
+  }
+
+  const allElements = await webflow.getAllElements();
+  const fastRebound = tryFastRebindFromPageElements(cachedEntry.records, allElements);
+  if (fastRebound != null) {
+    return fastRebound;
+  }
+
+  const all = await collectPageElementsForScan(onProgress);
+  const structureKey = computeImagePageStructureKey(all);
+  const cachedRecords = readImagePageTargetScanCache(resolvedPageId, structureKey);
+  if (cachedRecords == null) {
+    return null;
+  }
+
+  return rebindImagePageTargetsFromCache(cachedRecords, all);
 }
 
 /**
@@ -105,19 +290,26 @@ export async function collectAllPageElementsForImageScan(): Promise<AnyElement[]
  *
  * Merges {@link webflow.getAllElements} with each instance’s public children and **slot**
  * children so image-capable components inside slots or other instances are not skipped.
+ *
+ * Scan results are cached per page until the page structure changes. Pass
+ * {@link ScanImageTargetsOnPageOptions.forceRefresh} for an explicit re-scan.
  */
-export async function scanImageTargetsOnPage(): Promise<ImagePageTarget[]> {
-  const all = await collectAllPageElementsForImageScan();
-  const out: ImagePageTarget[] = [];
-
-  for (const el of all) {
-    if (out.length >= MAX_TARGETS) {
-      break;
-    }
-    await tryPushScannedImageTarget(el, out);
+export async function scanImageTargetsOnPage(
+  options?: ScanImageTargetsOnPageOptions
+): Promise<ScanImageTargetsOnPageResult> {
+  const pageId = await resolveImagePageTargetScanPageId(options?.pageId);
+  if (pageId == null) {
+    return { targets: [], cacheHit: false };
   }
 
-  return out;
+  if (!options?.forceRefresh) {
+    const inflight = readInflightImagePageTargetScan(pageId);
+    if (inflight != null) {
+      return inflight;
+    }
+  }
+
+  return trackInflightImagePageTargetScan(pageId, runImagePageTargetScan(options));
 }
 
 export type SelectedImageTargetHint =
@@ -159,12 +351,11 @@ async function hintForSelectedOutsideList(sel: AnyElement): Promise<SelectedImag
     return { kind: "none" };
   }
   const inst = sel as ComponentElement;
-  const props = await searchComponentInstanceImageProps(inst);
+  const props = await searchComponentInstanceImagePropsForPageScan(inst);
   if (props.length === 0) {
     return { kind: "none" };
   }
-  const comp = await inst.getComponent();
-  const cname = (await comp.getName()) || "Component";
+  const cname = await readComponentInstanceDisplayName(inst);
   const p0 = props[0];
   if (!p0) {
     return { kind: "none" };

@@ -2,7 +2,7 @@
 export const DEFAULT_PRODUCTION_TOWER_ORIGIN = "https://tower.codalyn.app";
 
 /** Marketing-only hosts — API/auth must use the Tower app subdomain instead. */
-export const TOWER_MARKETING_ONLY_HOSTS = ["codalyn.app", "www.codalyn.app", "preview.codalyn.app"] as const;
+const TOWER_MARKETING_ONLY_HOSTS = ["codalyn.app", "www.codalyn.app", "preview.codalyn.app"] as const;
 
 export type ResolveBeaconTowerOriginForBuildOptions = {
   mode: string;
@@ -24,7 +24,7 @@ function hostnameFromOrigin(origin: string): string | null {
   }
 }
 
-export function isLocalTowerOrigin(origin: string): boolean {
+function isLocalTowerOrigin(origin: string): boolean {
   const hostname = hostnameFromOrigin(origin);
   return hostname === "localhost" || hostname === "127.0.0.1";
 }

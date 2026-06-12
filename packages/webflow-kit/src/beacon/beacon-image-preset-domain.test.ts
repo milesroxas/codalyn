@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyBeaconPresetRowUpsert,
   applySiteDefaultPresetPatch,
   type BeaconPresetRow,
   type BeaconPresetSettingsSnapshot,
@@ -16,6 +17,7 @@ import {
   isInstancePresetTargetKey,
   listBeaconPresetStorageEntries,
   type PresetTargetKey,
+  removeBeaconPresetRowById,
   resolveSiteDefaultPresetRow,
   serializePresetTargetKey,
 } from "./beacon-image-preset-domain.js";
@@ -668,6 +670,29 @@ describe("multi-site preset storage helpers", () => {
     const next = applySiteDefaultPresetPatch(base, "site_2", updatedSiteTwo);
     expect(resolveSiteDefaultPresetRow(next, "site_1")?.id).toBe("site_1_default");
     expect(resolveSiteDefaultPresetRow(next, "site_2")?.width).toBe(1600);
+  });
+
+  it("upserts and removes scoped presets by id", () => {
+    const instance = makeRow({
+      id: "inst",
+      name: "Hero",
+      targetKey: {
+        kind: "bare-image-instance",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+      },
+    });
+    const base = coalesceBeaconPresetStorage({ siteDefault: null, byTargetKey: {} });
+    const withRow = applyBeaconPresetRowUpsert(base, instance);
+    expect(withRow.byTargetKey[serializePresetTargetKey(instance.targetKey)]?.name).toBe("Hero");
+
+    const updated = { ...instance, name: "Hero updated", width: 800, height: 600 };
+    const next = applyBeaconPresetRowUpsert(withRow, updated);
+    expect(next.byTargetKey[serializePresetTargetKey(instance.targetKey)]?.name).toBe("Hero updated");
+
+    const cleared = removeBeaconPresetRowById(next, "inst");
+    expect(Object.keys(cleared.byTargetKey)).toHaveLength(0);
   });
 
   it("groups presets by site id and includes catalog-only sites", () => {

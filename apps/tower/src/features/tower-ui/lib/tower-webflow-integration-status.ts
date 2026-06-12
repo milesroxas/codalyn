@@ -13,7 +13,7 @@ export type WebflowIntegrationStatusSnapshot = {
   tone: StatTileTone;
 };
 
-export function formatWebflowLinkedSitesCaption(count: number): string {
+function formatWebflowLinkedSitesCaption(count: number): string {
   return `${count} site${count === 1 ? "" : "s"} linked`;
 }
 

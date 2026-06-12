@@ -11,9 +11,9 @@ import {
 } from "@/features/cms-slots/model/cms-slot-composer-cms-draft";
 import {
   mergeSlotFileAfterListRebuild,
-  readCmsSlotEngineSlotPropsFile,
-  writeCmsSlotEngineSlotPropsFile,
-} from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+  readCmsSlotDesignerSlotPropsFile,
+  writeCmsSlotDesignerSlotPropsFile,
+} from "@/features/cms-slots/model/cms-slot-designer-slot-props";
 import {
   saveCmsSlotListRuntimePayloadToCmsItem,
   setCmsSlotListTargetInstancesStaticRuntimeText,
@@ -28,19 +28,19 @@ import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model
 import { syncCmsSlotPageInlineScript } from "@/features/cms-slots/model/cms-slot-page-inline-script";
 import {
   type CmsSlotListOnPage,
-  enginePoolIndexForRuntimeCloneIndex,
+  designerPoolIndexForRuntimeCloneIndex,
   filterHydratedCmsSlotRowsByComponentIds,
   type HydratedCmsSlotRow,
   listInstancesInSlotListContainer,
-  resolveCmsSlotEngineConfiguredComponentIds,
-  writeCmsSlotEngineConfiguredComponentIds,
+  resolveCmsSlotDesignerConfiguredComponentIds,
+  writeCmsSlotDesignerConfiguredComponentIds,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import {
   applyCmsSlotCompositionDraft,
   type CmsSlotCompositionDraftRow,
   type CmsSlotPaletteEntry,
-  ensureEnginePoolHasDraftComponentTypes,
+  ensureDesignerPoolHasDraftComponentTypes,
 } from "@/features/cms-slots/model/site-components";
 import {
   CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION,
@@ -77,25 +77,25 @@ async function trySyncCmsSlotPageRuntime(): Promise<void> {
 function buildPropValueRowsForDraft(params: {
   draftToApply: CmsSlotCompositionDraftRow[];
   mapped: { ok: true; indices: number[] };
-  engineScopedRows: HydratedCmsSlotRow[];
-  slotF: Awaited<ReturnType<typeof readCmsSlotEngineSlotPropsFile>>;
-  composerEngineComposable: Record<string, ComposableInstancePropMeta[] | undefined>;
+  designerScopedRows: HydratedCmsSlotRow[];
+  slotF: Awaited<ReturnType<typeof readCmsSlotDesignerSlotPropsFile>>;
+  composerDesignerComposable: Record<string, ComposableInstancePropMeta[] | undefined>;
 }): Array<Record<string, string>> {
-  const { draftToApply, mapped, engineScopedRows, slotF, composerEngineComposable } = params;
+  const { draftToApply, mapped, designerScopedRows, slotF, composerDesignerComposable } = params;
   return draftToApply.map((d, j) => {
     const runtimeDomIdx = j < mapped.indices.length ? mapped.indices[j] : undefined;
     if (runtimeDomIdx == null) {
       return {};
     }
-    const poolI = enginePoolIndexForRuntimeCloneIndex(engineScopedRows, runtimeDomIdx);
+    const poolI = designerPoolIndexForRuntimeCloneIndex(designerScopedRows, runtimeDomIdx);
     if (poolI < 0) {
       return {};
     }
-    const engineRow = engineScopedRows[poolI];
+    const designerRow = designerScopedRows[poolI];
     const rawEx = slotF.slots[poolI]?.exposed ?? [];
     const { metas, aliasToCanonical } = mergeComposableMetaWithLiveResolved(
       rawEx,
-      engineRow != null ? composerEngineComposable[engineRow.key] : undefined
+      designerRow != null ? composerDesignerComposable[designerRow.key] : undefined
     );
     return buildCmsSlotRuntimePropRow(d, metas, aliasToCanonical);
   });
@@ -103,11 +103,11 @@ function buildPropValueRowsForDraft(params: {
 
 async function finalizeStaticComposerReload(beacon: CmsSlotListOnPage, setters: ComposerSaveSetters): Promise<void> {
   const rows2 = await listInstancesInSlotListContainer(beacon.container);
-  const c2 = await resolveCmsSlotEngineConfiguredComponentIds(beacon.container, rows2);
+  const c2 = await resolveCmsSlotDesignerConfiguredComponentIds(beacon.container, rows2);
   const e2 = filterHydratedCmsSlotRowsByComponentIds(rows2, c2);
-  setters.setComposerEngineRows(e2);
-  setters.setComposerEngineComposable(await listComposableMetaByInstanceKey(e2));
-  setters.setComposerSlotProps(await readCmsSlotEngineSlotPropsFile(beacon.container, e2.length));
+  setters.setComposerDesignerRows(e2);
+  setters.setComposerDesignerComposable(await listComposableMetaByInstanceKey(e2));
+  setters.setComposerSlotProps(await readCmsSlotDesignerSlotPropsFile(beacon.container, e2.length));
 }
 
 type ComposerSaveSetters = {
@@ -117,9 +117,9 @@ type ComposerSaveSetters = {
   setActiveComposer: (
     v: ActiveComposerState | null | ((p: ActiveComposerState | null) => ActiveComposerState | null)
   ) => void;
-  setComposerEngineRows: (v: HydratedCmsSlotRow[]) => void;
-  setComposerEngineComposable: (v: Record<string, ComposableInstancePropMeta[]>) => void;
-  setComposerSlotProps: (v: Awaited<ReturnType<typeof readCmsSlotEngineSlotPropsFile>>) => void;
+  setComposerDesignerRows: (v: HydratedCmsSlotRow[]) => void;
+  setComposerDesignerComposable: (v: Record<string, ComposableInstancePropMeta[]>) => void;
+  setComposerSlotProps: (v: Awaited<ReturnType<typeof readCmsSlotDesignerSlotPropsFile>>) => void;
 };
 
 async function applyComposerSaveCmsTemplatePath(args: {
@@ -148,7 +148,7 @@ async function applyComposerSaveCmsTemplatePath(args: {
     void webflow.notify({
       type: "Error",
       message:
-        "On a collection template, select a collection item in the Designer and connect Codalyn to Tower. The layout is saved only to the CMS field — the Engine list on the page is not changed.",
+        "On a collection template, select a collection item in the Designer and connect Codalyn to Tower. The layout is saved only to the CMS field — the Designer list on the page is not changed.",
     });
     return false;
   }
@@ -214,7 +214,7 @@ async function applyComposerSaveCmsTemplatePath(args: {
     void webflow.notify({
       type: "Success",
       message:
-        "Layout saved to the current CMS item’s text field. Publish for the live site. The Engine reference list was not changed.",
+        "Layout saved to the current CMS item’s text field. Publish for the live site. The Designer reference list was not changed.",
     });
   }
   return true;
@@ -223,7 +223,7 @@ async function applyComposerSaveCmsTemplatePath(args: {
 async function applyComposerSaveStaticPagePath(args: {
   beacon: CmsSlotListOnPage;
   listTargetDefinitionIdRef: MutableRefObject<string | null>;
-  engineScopedRows: HydratedCmsSlotRow[];
+  designerScopedRows: HydratedCmsSlotRow[];
   draftToApply: CmsSlotCompositionDraftRow[];
   propValueRows: Array<Record<string, string>>;
   slotLabels: string[];
@@ -233,15 +233,15 @@ async function applyComposerSaveStaticPagePath(args: {
   const {
     beacon,
     listTargetDefinitionIdRef,
-    engineScopedRows,
+    designerScopedRows,
     draftToApply,
     propValueRows,
     slotLabels,
     setters,
     onProgress,
   } = args;
-  const beforePoolIds = engineScopedRows.map((r) => r.componentId);
-  const oldFile = await readCmsSlotEngineSlotPropsFile(beacon.container, engineScopedRows.length);
+  const beforePoolIds = designerScopedRows.map((r) => r.componentId);
+  const oldFile = await readCmsSlotDesignerSlotPropsFile(beacon.container, designerScopedRows.length);
   onProgress?.(CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION);
   const rebuiltRows = await applyCmsSlotCompositionDraft(beacon.container, draftToApply);
   const rebuiltMapped = draftToHiddenListIndices(rebuiltRows, draftToApply);
@@ -251,8 +251,8 @@ async function applyComposerSaveStaticPagePath(args: {
   const runtimeText = serializeCmsSlotListRuntimePayload(hiddenListIndicesForRuntime, propValueRows, slotLabels);
   const newFile = mergeSlotFileAfterListRebuild(beforePoolIds, oldFile, draftToApply);
   onProgress?.(CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG);
-  await writeCmsSlotEngineSlotPropsFile(beacon.container, newFile);
-  await writeCmsSlotEngineConfiguredComponentIds(
+  await writeCmsSlotDesignerSlotPropsFile(beacon.container, newFile);
+  await writeCmsSlotDesignerConfiguredComponentIds(
     beacon.container,
     rebuiltRows.map((row) => row.componentId)
   );
@@ -291,7 +291,7 @@ export async function executeCmsSlotComposerSave(input: {
   beacon: CmsSlotListOnPage;
   composerDraft: CmsSlotCompositionDraftRow[];
   composerAllowedPalette: CmsSlotPaletteEntry[];
-  composerEngineComposable: Record<string, ComposableInstancePropMeta[]>;
+  composerDesignerComposable: Record<string, ComposableInstancePropMeta[]>;
   currentCmsItemId: string | null;
   listTargetDefinitionIdRef: MutableRefObject<string | null>;
   setters: ComposerSaveSetters;
@@ -302,7 +302,7 @@ export async function executeCmsSlotComposerSave(input: {
     beacon,
     composerDraft,
     composerAllowedPalette,
-    composerEngineComposable,
+    composerDesignerComposable,
     currentCmsItemId,
     listTargetDefinitionIdRef,
     setters,
@@ -317,32 +317,32 @@ export async function executeCmsSlotComposerSave(input: {
   if (draftToApply.length === 0 && composerDraft.length > 0) {
     void webflow.notify({
       type: "Error",
-      message: "This list only allows component types configured in Engine.",
+      message: "This list only allows component types configured in Designer.",
     });
     return false;
   }
 
   const rows = await listInstancesInSlotListContainer(beacon.container);
-  const configuredComponentIds = await resolveCmsSlotEngineConfiguredComponentIds(beacon.container, rows);
-  let engineScopedRows = filterHydratedCmsSlotRowsByComponentIds(rows, configuredComponentIds);
-  engineScopedRows = await ensureEnginePoolHasDraftComponentTypes(beacon.container, draftToApply);
-  const mapped = draftToHiddenListIndices(engineScopedRows, draftToApply);
+  const configuredComponentIds = await resolveCmsSlotDesignerConfiguredComponentIds(beacon.container, rows);
+  let designerScopedRows = filterHydratedCmsSlotRowsByComponentIds(rows, configuredComponentIds);
+  designerScopedRows = await ensureDesignerPoolHasDraftComponentTypes(beacon.container, draftToApply);
+  const mapped = draftToHiddenListIndices(designerScopedRows, draftToApply);
   if (!mapped.ok) {
     void webflow.notify({
       type: "Error",
       message:
-        "Your order uses component types that are not available in the Engine list (or not enough instances). Add them in Engine, then try again.",
+        "Your order uses component types that are not available in the Designer list (or not enough instances). Add them in Designer, then try again.",
     });
     return false;
   }
 
-  const slotF = await readCmsSlotEngineSlotPropsFile(beacon.container, engineScopedRows.length);
+  const slotF = await readCmsSlotDesignerSlotPropsFile(beacon.container, designerScopedRows.length);
   const propValueRows = buildPropValueRowsForDraft({
     draftToApply,
     mapped,
-    engineScopedRows,
+    designerScopedRows,
     slotF,
-    composerEngineComposable,
+    composerDesignerComposable,
   });
 
   const onCmsTemplate = (await getCmsTemplateCollectionIdFromCurrentPage()) != null;
@@ -367,7 +367,7 @@ export async function executeCmsSlotComposerSave(input: {
     await applyComposerSaveStaticPagePath({
       beacon,
       listTargetDefinitionIdRef,
-      engineScopedRows,
+      designerScopedRows,
       draftToApply,
       propValueRows,
       slotLabels,

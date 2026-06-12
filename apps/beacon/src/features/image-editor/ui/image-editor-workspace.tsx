@@ -48,7 +48,7 @@ export function ImageEditorWorkspace(props: ImageEditorWorkspaceProps) {
   } = props;
 
   return (
-    <div className={cn(beaconPanelContainClass, "flex flex-col gap-3")}>
+    <div className={cn(beaconPanelContainClass, "flex min-h-0 flex-1 flex-col gap-3")}>
       <input
         ref={fileInputRef}
         disabled={dissolving}
@@ -57,7 +57,10 @@ export function ImageEditorWorkspace(props: ImageEditorWorkspaceProps) {
         className="sr-only"
         type="file"
         accept="image/*"
-        onChange={(e) => queueFile(e.target.files?.[0])}
+        onChange={(e) => {
+          queueFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
       />
       {dissolving ? (
         <ImageEditorDissolveBranch

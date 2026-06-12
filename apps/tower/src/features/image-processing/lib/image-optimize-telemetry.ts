@@ -2,7 +2,7 @@ import type { ImageExportFormat } from "@codalyn/webflow-kit";
 import type { TowerTier } from "@/server/billing/entitlements";
 
 /** Stable event name for internal image-optimization telemetry (not a customer-facing meter). */
-export const IMAGE_OPTIMIZE_TELEMETRY_EVENT = "tower.image_optimize";
+const IMAGE_OPTIMIZE_TELEMETRY_EVENT = "tower.image_optimize";
 
 /**
  * Internal infra-protection telemetry for the highest-risk path (large image → AVIF).

@@ -4,11 +4,14 @@
 declare const __APP_VERSION__: string;
 declare const __BUILD_CHANNEL__: string;
 declare const __BUILD_TIME__: string;
+declare const __BEACON_TOWER_ORIGIN__: string;
 
 interface ImportMetaEnv {
   readonly VITE_BUNDLE_RECIPIENT?: string;
   readonly VITE_TOWER_ORIGIN?: string;
   readonly VITE_BEACON_API_KEY?: string;
+  /** `stable` / `ga` for public launch; unset or any other value keeps the Early access label in the UI. */
+  readonly VITE_BEACON_RELEASE_STAGE?: string;
   /** When `"true"` in production builds, enables the CMS Slots surface (`#/cms-slots/*`). */
   readonly VITE_CMS_SLOTS_SURFACE_ENABLED?: string;
   readonly VITE_POSTHOG_KEY?: string;

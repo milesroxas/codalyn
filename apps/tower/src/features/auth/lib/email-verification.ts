@@ -2,6 +2,7 @@ import { authClient } from "@/features/auth/model/auth-client";
 import type { AuthCheckEmailCardCopy } from "@/features/auth/ui/auth-check-email-card";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 
+/** @deprecated Legacy flash query param from pre-cookie verification redirects. Stripped on read. */
 export const TOWER_EMAIL_VERIFIED_QUERY = "emailVerified";
 
 export const EMAIL_VERIFICATION_BANNER_COPY = {
@@ -63,18 +64,9 @@ export const VERIFY_EMAIL_PAGE_COPY = {
   signInLabel: "Back to sign in",
 } as const;
 
+/** Same-origin post-verify destination — no flash query params (flash uses an httpOnly cookie). */
 export function resolveTowerEmailVerificationCallbackUrl(path = "/"): string {
-  const safePath = sanitizeRelativePath(path);
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
-  const url = new URL(safePath, base || "http://localhost");
-  url.searchParams.set(TOWER_EMAIL_VERIFIED_QUERY, "1");
-  if (base) {
-    return `${url.pathname}${url.search}`;
-  }
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}${url.pathname}${url.search}`;
-  }
-  return `${url.pathname}${url.search}`;
+  return stripLegacyEmailVerifiedQueryParam(sanitizeRelativePath(path));
 }
 
 export function resolveTowerAppCallbackUrl(path: string): string {
@@ -89,7 +81,7 @@ export function resolveTowerAppCallbackUrl(path: string): string {
   return safePath;
 }
 
-/** Absolute callback URL for Better Auth verification emails, with post-verify query flag. */
+/** Absolute callback URL for Better Auth verification emails. */
 export function resolveTowerEmailVerificationAppCallbackUrl(callbackPath = "/"): string {
   return resolveTowerAppCallbackUrl(resolveTowerEmailVerificationCallbackUrl(callbackPath));
 }
@@ -145,29 +137,33 @@ export function readEmailVerificationCallbackUrl(searchParams: URLSearchParams):
   try {
     const decoded = decodeURIComponent(raw);
     if (decoded.startsWith("/")) {
-      const queryIndex = decoded.indexOf("?");
-      if (queryIndex === -1) {
-        return resolveTowerEmailVerificationCallbackUrl(decoded);
-      }
-      const path = decoded.slice(0, queryIndex);
-      const merged = new URL(resolveTowerEmailVerificationCallbackUrl(path), "http://localhost");
-      for (const [key, value] of new URLSearchParams(decoded.slice(queryIndex + 1))) {
-        merged.searchParams.set(key, value);
-      }
-      return `${merged.pathname}${merged.search}`;
+      return resolveTowerEmailVerificationCallbackUrl(decoded);
     }
 
     const target = new URL(decoded);
     if (typeof window !== "undefined" && target.origin === window.location.origin) {
-      return `${target.pathname}${target.search}`;
+      return resolveTowerEmailVerificationCallbackUrl(`${target.pathname}${target.search}`);
     }
     const appBase = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
     if (appBase && target.origin === new URL(appBase).origin) {
-      return `${target.pathname}${target.search}`;
+      return resolveTowerEmailVerificationCallbackUrl(`${target.pathname}${target.search}`);
     }
   } catch {
     // fall through
   }
 
   return resolveTowerEmailVerificationCallbackUrl("/");
+}
+
+/** Remove legacy ?emailVerified=1 from in-flight verification links. */
+export function stripLegacyEmailVerifiedQueryParam(pathWithQuery: string): string {
+  const queryIndex = pathWithQuery.indexOf("?");
+  if (queryIndex === -1) {
+    return pathWithQuery;
+  }
+  const path = pathWithQuery.slice(0, queryIndex);
+  const params = new URLSearchParams(pathWithQuery.slice(queryIndex + 1));
+  params.delete(TOWER_EMAIL_VERIFIED_QUERY);
+  const search = params.toString();
+  return search ? `${path}?${search}` : path;
 }

@@ -26,7 +26,7 @@ type CmsSlotsComposerEditingContextCardProps = {
   context: CmsComposerEditingContextViewModel;
   /** When set, shown as a third line while editing a specific slot list. */
   slotListLabel?: string | null;
-  /** Composer shows the entry title as primary; Engine shows the collection name. */
+  /** Composer shows the entry title as primary; Designer shows the collection name. */
   primaryField?: "entry" | "collection";
 };
 
@@ -136,7 +136,7 @@ export function CmsSlotsComposerEditingContextCard(props: CmsSlotsComposerEditin
   return (
     <SurfaceSummaryCardSurfaceSummary
       data-slot={
-        primaryField === "collection" ? "cms_slots_engine_editing_context" : "cms_slots_composer_editing_context"
+        primaryField === "collection" ? "cms_slots_designer_editing_context" : "cms_slots_composer_editing_context"
       }
     >
       <SurfaceSummaryCardPanelSectionLabel>{sectionLabel}</SurfaceSummaryCardPanelSectionLabel>

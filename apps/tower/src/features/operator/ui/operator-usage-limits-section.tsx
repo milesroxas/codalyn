@@ -5,8 +5,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { OperatorApiError, operatorApi } from "@/features/operator/api/client";
 import type { OperatorUsageLimitsPatch, OperatorUsageLimitsView } from "@/server/operator/types";
-import { formatUsageRatio, meteringStatusLabel } from "@/shared/lib/usage-display";
+import { formatUsageRatio, meteringStatusLabel, usageTierLabel } from "@/shared/lib/usage-display";
 import { parseOptionalLimitInteger } from "@/shared/lib/usage-limit-input";
+import {
+  USAGE_METER_COUNT_KEY,
+  USAGE_METER_EFFECTIVE_LIMIT_KEY,
+  USAGE_METER_KINDS,
+  usageMeterLabel,
+} from "@/shared/lib/usage-meter-chart";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { FormField, FormFieldGrid } from "@/shared/ui/form-field";
@@ -290,25 +296,43 @@ export function OperatorUsageLimitsTableCell({ usage }: { usage: OperatorUsageLi
     globalMeteringDisabled: usage.globalMeteringDisabled,
     tier: usage.tier,
   });
-  // Workspace rows show the enforced pooled count (per-seat cap × seats); user rows show the individual count.
-  const webflowProxyUsed = usage.webflowProxyRequestCount;
-  const cmsWriteUsed = usage.cmsWriteCount;
-  const imageUsed = usage.imageOptimizeCount;
+
+  // Unpaid workspaces meter usage on each member's user row, not a workspace pool.
+  if (usage.scope === "workspace" && usage.tier !== "team") {
+    return (
+      <div className="space-y-1 text-xs">
+        <div className="flex flex-wrap gap-1">
+          <Badge variant={status === "Metered" ? "outline" : "secondary"} className="font-normal">
+            {status}
+          </Badge>
+          <Badge variant="outline" className="font-normal">
+            {usageTierLabel(usage.tier)}
+          </Badge>
+        </div>
+        <p className="text-muted-foreground">Metered per member account</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-1 text-xs">
-      <Badge variant={status === "Metered" ? "outline" : "secondary"} className="font-normal">
-        {status}
-      </Badge>
-      <p className="font-mono tabular-nums text-muted-foreground">
-        PROXY {formatUsageRatio(webflowProxyUsed, usage.effectiveWebflowProxyLimit)}
-      </p>
-      <p className="font-mono tabular-nums text-muted-foreground">
-        CMS {formatUsageRatio(cmsWriteUsed, usage.effectiveCmsWriteLimit)}
-      </p>
-      <p className="font-mono tabular-nums text-muted-foreground">
-        IMG {formatUsageRatio(imageUsed, usage.effectiveImageLimit)}
-      </p>
+    <div className="space-y-1.5 text-xs">
+      <div className="flex flex-wrap gap-1">
+        <Badge variant={status === "Metered" ? "outline" : "secondary"} className="font-normal">
+          {status}
+        </Badge>
+        <Badge variant="outline" className="font-normal">
+          {usageTierLabel(usage.tier)}
+        </Badge>
+        <Badge variant="outline" className="font-normal font-mono">
+          {usage.yearMonth}
+        </Badge>
+      </div>
+      {USAGE_METER_KINDS.map((kind) => (
+        <p key={kind} className="font-mono tabular-nums text-muted-foreground">
+          <span className="text-foreground/90">{usageMeterLabel(kind)}:</span>{" "}
+          {formatUsageRatio(usage[USAGE_METER_COUNT_KEY[kind]], usage[USAGE_METER_EFFECTIVE_LIMIT_KEY[kind]])}
+        </p>
+      ))}
     </div>
   );
 }

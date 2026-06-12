@@ -154,7 +154,7 @@ export async function removeAllInstancesOfComponentOnPage(definition: Component)
 /**
  * True when a component instance on the current page matches the list-target by name/group.
  * Skips the mirror-surface check (no `enterComponent` / `exitComponent`) — for Composer list eligibility
- * and other read-only gating. Engine flows that need a precise match use
+ * and other read-only gating. Designer flows that need a precise match use
  * {@link listCmsSlotListTargetInstancesOnPage} instead.
  */
 export async function hasCmsSlotListTargetInstanceOnPageByName(

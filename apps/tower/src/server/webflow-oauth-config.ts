@@ -24,10 +24,29 @@ export function resolveWebflowOAuthRedirectUri(): string {
 export const WEBFLOW_OAUTH_STATE_COOKIE = "wf_oauth_state";
 export const WEBFLOW_OAUTH_ORG_COOKIE = "wf_oauth_org";
 
+/** Binds a browser to a staged Webflow-initiated install authorization code (httpOnly). */
+export const WEBFLOW_OAUTH_INSTALL_PENDING_COOKIE = "wf_oauth_install_pending";
+
+/**
+ * Webflow authorization codes expire after 15 minutes.
+ * @see https://developers.webflow.com/data/v2.0.0/reference/oauth-app
+ */
+export const WEBFLOW_OAUTH_AUTHORIZATION_CODE_TTL_MS = 15 * 60 * 1000;
+
+export const WEBFLOW_OAUTH_FINISH_PATH = "/api/integrations/webflow/finish";
+
 export const webflowOAuthPkceCookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax" as const,
   maxAge: 600,
+  path: "/",
+};
+
+export const webflowOAuthInstallPendingCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  maxAge: Math.floor(WEBFLOW_OAUTH_AUTHORIZATION_CODE_TTL_MS / 1000),
   path: "/",
 };

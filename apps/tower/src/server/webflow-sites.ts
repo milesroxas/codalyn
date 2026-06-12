@@ -3,7 +3,7 @@ import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
 
 export type { WebflowSiteSummary };
 
-export async function listWebflowSitesWithToken(accessToken: string): Promise<WebflowSiteSummary[]> {
+async function listWebflowSitesWithToken(accessToken: string): Promise<WebflowSiteSummary[]> {
   const token = accessToken.trim();
   if (!token) {
     return [];

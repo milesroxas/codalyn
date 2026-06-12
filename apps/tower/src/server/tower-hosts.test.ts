@@ -1,15 +1,19 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  buildFlintMarketingUrl,
   buildMarketingUrl,
   buildTowerAppUrl,
+  buildTowerLandingAppLinks,
   isAppHost,
+  isFlintMarketingHost,
   isHostSplitEnabled,
   isMarketingHost,
   normalizeHostname,
   parentDomainForCookie,
   resetTowerHostConfigCacheForTests,
   resolveTowerCookieDomain,
+  resolveTowerPublicFlintHref,
   sanitizeRelativePath,
 } from "./tower-hosts";
 
@@ -17,6 +21,8 @@ describe("tower-hosts", () => {
   const envKeys = [
     "TOWER_HOST_SPLIT",
     "TOWER_MARKETING_HOSTS",
+    "TOWER_FLINT_MARKETING_HOSTS",
+    "TOWER_FLINT_MARKETING_URL",
     "TOWER_APP_HOST",
     "TOWER_MARKETING_URL",
     "TOWER_COOKIE_DOMAIN",
@@ -93,6 +99,39 @@ describe("tower-hosts", () => {
     process.env.TOWER_MARKETING_URL = "https://codalyn.app";
     expect(buildTowerAppUrl("/sign-in")).toBe("https://tower.codalyn.app/sign-in");
     expect(buildMarketingUrl("/")).toBe("https://codalyn.app/");
+    expect(buildFlintMarketingUrl("/")).toBe("https://flint.codalyn.app/");
+    expect(buildTowerLandingAppLinks("tower.codalyn.app").home).toBe("https://codalyn.app/");
+    expect(buildTowerLandingAppLinks("tower.codalyn.app").tower).toBe("https://codalyn.app/tower");
+    expect(buildTowerLandingAppLinks("tower.codalyn.app").beacon).toBe("https://codalyn.app/beacon");
+    expect(buildTowerLandingAppLinks("tower.codalyn.app").flint).toBe("https://codalyn.app/flint");
+    expect(buildTowerLandingAppLinks("codalyn.app").home).toBe("/");
+    expect(buildTowerLandingAppLinks("codalyn.app").tower).toBe("/tower");
+    expect(buildTowerLandingAppLinks("codalyn.app").beacon).toBe("/beacon");
+    expect(buildTowerLandingAppLinks("codalyn.app").flint).toBe("/flint");
+    expect(buildTowerLandingAppLinks("flint.codalyn.app").flint).toBe("/");
+  });
+
+  it("builds unified local tower product link", () => {
+    snapshotEnv();
+    process.env.TOWER_HOST_SPLIT = "0";
+    process.env.BETTER_AUTH_URL = "http://localhost:3100";
+    process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3100";
+    expect(buildTowerLandingAppLinks("localhost").tower).toBe("/tower");
+  });
+
+  it("detects flint marketing hosts when split is enabled", () => {
+    snapshotEnv();
+    process.env.TOWER_HOST_SPLIT = "1";
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    expect(isFlintMarketingHost("flint-preview.codalyn.app")).toBe(true);
+    expect(isFlintMarketingHost("flint.codalyn.app")).toBe(true);
+    expect(resolveTowerPublicFlintHref("tower-preview.codalyn.app")).toBe("https://preview.codalyn.app/flint");
+  });
+
+  it("derives marketing origin from tower app URL when TOWER_MARKETING_URL is unset", () => {
+    snapshotEnv();
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    expect(buildMarketingUrl("/")).toBe("https://preview.codalyn.app/");
   });
 
   it("derives parent cookie domain from app host", () => {

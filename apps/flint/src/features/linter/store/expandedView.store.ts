@@ -38,7 +38,7 @@ const initialState: ExpandedViewState = {
   content: null,
 };
 
-export const useExpandedViewStore = create<ExpandedViewStore>()(
+const useExpandedViewStore = create<ExpandedViewStore>()(
   devtools(
     (set, get) => ({
       ...initialState,

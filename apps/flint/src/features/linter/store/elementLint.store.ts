@@ -100,7 +100,7 @@ async function runElementLintRefresh(
   });
 }
 
-export const useElementLintStore = create<ElementLintStore>()(
+const useElementLintStore = create<ElementLintStore>()(
   devtools(
     (set, get) => ({
       ...initialState,

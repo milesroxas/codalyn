@@ -1,5 +1,5 @@
 /**
- * Engine lists every bindable **instance** prop (via `searchProps`) so designers can choose what Composer exposes.
+ * Designer lists every bindable **instance** prop (via `searchProps`) so designers can choose what Composer exposes.
  * Per-row values still serialize to JSON `p` as strings (booleans `true`/`false`, numbers as text, link JSON, etc.).
  */
 
@@ -28,7 +28,7 @@ function selectOptionsFromInstanceProp(
   return opts.map((o) => ({ value: o.id, label: o.name ?? o.id }));
 }
 
-/** Which control Composer renders for props the designer enabled in Engine. */
+/** Which control Composer renders for props the designer enabled in Designer. */
 export type CmsSlotComposerPropFieldKind =
   | "multiline"
   | "line"
@@ -143,7 +143,7 @@ function headingLevelFromOptionLabel(label: string): string | undefined {
 /**
  * Stabilize labels for “same” props when Webflow renames the label slightly (extra spaces, etc.).
  */
-export function normalizeLabelForCmsSlotPropMatch(label: string): string {
+function normalizeLabelForCmsSlotPropMatch(label: string): string {
   return label.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
@@ -229,7 +229,7 @@ export function mergeComposableMetaWithLiveResolved(
   return { metas, aliasToCanonical };
 }
 
-/** Merges Engine-stored “exposed” metas with current `searchProps()` so labels/options match the hidden list instance. */
+/** Merges Designer-stored “exposed” metas with current `searchProps()` so labels/options match the hidden list instance. */
 export function mergeComposableMetaWithLive(
   exposed: ComposableInstancePropMeta[],
   live: ComposableInstancePropMeta[] | undefined
@@ -303,11 +303,9 @@ export async function listComposableMetaByInstanceKey(
 }
 
 /**
- * All bindable instance props (full `InstanceProp` from `searchProps`), for Engine “Expose to Composer”.
+ * All bindable instance props (full `InstanceProp` from `searchProps`), for Designer “Expose to Composer”.
  */
-export async function listComposablePropsForInstance(
-  instance: ComponentElement
-): Promise<ComposableInstancePropMeta[]> {
+async function listComposablePropsForInstance(instance: ComponentElement): Promise<ComposableInstancePropMeta[]> {
   let rows: InstanceProp[];
   try {
     rows = await instance.searchProps();

@@ -10,6 +10,7 @@ import { CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME } from "@/features/cms-slots/mod
 import {
   getCmsSlotPageInlineScriptSource,
   isBeaconRuntimeAssetFileName,
+  normalizeBeaconRuntimeAssetRow,
   normalizeHostedAssetUrl,
   selectBeaconRuntimeAssetIdsToPurge,
 } from "@/features/cms-slots/model/cms-slot-page-inline-script";
@@ -68,6 +69,33 @@ describe("beacon runtime asset cleanup helpers", () => {
   it("normalizes hosted asset URLs for comparison", () => {
     expect(normalizeHostedAssetUrl("https://cdn.example.com/a.js?x=1")).toBe("https://cdn.example.com/a.js");
     expect(normalizeHostedAssetUrl("https://cdn.example.com/a.js/")).toBe("https://cdn.example.com/a.js");
+  });
+
+  it("normalizes canonical and alternate Webflow asset list shapes", () => {
+    expect(
+      normalizeBeaconRuntimeAssetRow({
+        id: "asset-1",
+        hostedUrl: "https://cdn.example.com/codalyn-beacon-runtime-abc.js",
+        originalFileName: "codalyn-beacon-runtime-abc.js",
+      })
+    ).toEqual({
+      id: "asset-1",
+      hostedUrl: "https://cdn.example.com/codalyn-beacon-runtime-abc.js",
+      originalFileName: "codalyn-beacon-runtime-abc.js",
+    });
+    expect(
+      normalizeBeaconRuntimeAssetRow({
+        id: "asset-2",
+        url: "https://cdn.example.com/codalyn-beacon-runtime-old.js",
+        displayName: "63e5889e_codalyn-beacon-runtime-old.js",
+      })
+    ).toEqual({
+      id: "asset-2",
+      hostedUrl: "https://cdn.example.com/codalyn-beacon-runtime-old.js",
+      originalFileName: "codalyn-beacon-runtime-old.js",
+    });
+    expect(normalizeBeaconRuntimeAssetRow({ id: "asset-3", hostedUrl: "https://cdn.example.com/logo.png" })).toBeNull();
+    expect(normalizeBeaconRuntimeAssetRow(null)).toBeNull();
   });
 
   it("selects only unreferenced beacon runtime assets", () => {
@@ -140,14 +168,14 @@ describe("cms slot beacon runtime (published DOM)", () => {
     expect(target.children.length).toBe(0);
   });
 
-  it("falls back to cloning Engine rows when list target text is empty or invalid", () => {
+  it("falls back to cloning Designer rows when list target text is empty or invalid", () => {
     for (const payloadJson of ["", "not-json", '{"v":2,"i":[0]}']) {
       const doc = document;
       const source = doc.createElement("div");
       source.setAttribute("data-target", "beacons");
       source.setAttribute("data-list", LIST);
       const row = doc.createElement("div");
-      row.textContent = "Engine row";
+      row.textContent = "Designer row";
       source.appendChild(row);
 
       const target = doc.createElement("div");

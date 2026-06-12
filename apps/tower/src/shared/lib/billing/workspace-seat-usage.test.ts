@@ -3,6 +3,8 @@ import {
   buildWorkspaceSeatUsage,
   formatWorkspaceSeatUsageLabel,
   shouldShowWorkspaceSeatBillingBreakdown,
+  workspacePaidSeatsAvailable,
+  workspacePaidSeatsAvailableLabel,
   workspaceSeatBillingBreakdownLines,
 } from "@/shared/lib/billing/workspace-seat-usage";
 
@@ -50,5 +52,52 @@ describe("workspace seat billing breakdown", () => {
   it("hides when billed matches effective cap", () => {
     const usage = buildWorkspaceSeatUsage(2, { seatLimit: 6, stripeSeatQuantity: 6 });
     expect(shouldShowWorkspaceSeatBillingBreakdown(usage)).toBe(false);
+  });
+});
+
+describe("workspacePaidSeatsAvailable", () => {
+  it("counts purchased seats not currently in use", () => {
+    expect(workspacePaidSeatsAvailable({ seatsUsed: 4, stripeSeatQuantity: 6, operatorSeatLimitOverride: false })).toBe(
+      2
+    );
+  });
+
+  it("is zero when all purchased seats are in use", () => {
+    expect(workspacePaidSeatsAvailable({ seatsUsed: 6, stripeSeatQuantity: 6, operatorSeatLimitOverride: false })).toBe(
+      0
+    );
+  });
+
+  it("never returns negative when usage exceeds purchased seats", () => {
+    expect(workspacePaidSeatsAvailable({ seatsUsed: 8, stripeSeatQuantity: 6, operatorSeatLimitOverride: false })).toBe(
+      0
+    );
+  });
+
+  it("ignores operator-granted caps (not Stripe-billed) and unknown quantities", () => {
+    expect(workspacePaidSeatsAvailable({ seatsUsed: 2, stripeSeatQuantity: 6, operatorSeatLimitOverride: true })).toBe(
+      0
+    );
+    expect(
+      workspacePaidSeatsAvailable({ seatsUsed: 2, stripeSeatQuantity: null, operatorSeatLimitOverride: false })
+    ).toBe(0);
+  });
+});
+
+describe("workspacePaidSeatsAvailableLabel", () => {
+  it("nudges to release empty paid seats, pluralizing", () => {
+    expect(workspacePaidSeatsAvailableLabel(2)).toBe(
+      "2 paid seats available — reduce seats in the billing portal to stop paying for empty seats."
+    );
+  });
+
+  it("singularizes one seat", () => {
+    expect(workspacePaidSeatsAvailableLabel(1)).toBe(
+      "1 paid seat available — reduce seats in the billing portal to stop paying for empty seats."
+    );
+  });
+
+  it("returns null when no paid seats are unused", () => {
+    expect(workspacePaidSeatsAvailableLabel(0)).toBeNull();
   });
 });

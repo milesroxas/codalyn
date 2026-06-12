@@ -1,5 +1,5 @@
 import {
-  applySiteDefaultPresetPatch,
+  applyBeaconPresetRowUpsert,
   type BeaconPresetRow,
   type BeaconPresetStorageEntry,
   buildPresetTargetKeyForScope,
@@ -15,7 +15,6 @@ import {
   type PresetTargetKey,
   type ResolvedUploadTarget,
   readPageIdFromInstancePresetTargetKey,
-  serializePresetTargetKey,
 } from "@codalyn/webflow-kit";
 import type { MutableRefObject } from "react";
 import {
@@ -73,7 +72,7 @@ export type ParsedPresetDraft = {
   maxFileSizeBytes: number;
 };
 
-export function parsePresetDraft(input: {
+function parsePresetDraft(input: {
   nameDraft: string;
   wStr: string;
   hStr: string;
@@ -243,21 +242,8 @@ async function savePreset(args: {
       return {};
     }
 
-    const filteredByTargetEntries = Object.entries(prev.imagePresetStorage.byTargetKey).filter(
-      ([, row]) => row.id !== nextId
-    );
-    const byTargetKey = Object.fromEntries(filteredByTargetEntries);
-    if (nextTargetKey.kind === "site-default") {
-      return {
-        imagePresetStorage: applySiteDefaultPresetPatch(prev.imagePresetStorage, siteId, nextRow),
-      };
-    }
-    byTargetKey[serializePresetTargetKey(nextTargetKey)] = nextRow;
     return {
-      imagePresetStorage: {
-        siteDefault: prev.imagePresetStorage.siteDefault?.id === nextId ? null : prev.imagePresetStorage.siteDefault,
-        byTargetKey,
-      },
+      imagePresetStorage: applyBeaconPresetRowUpsert(prev.imagePresetStorage, nextRow),
     };
   });
 

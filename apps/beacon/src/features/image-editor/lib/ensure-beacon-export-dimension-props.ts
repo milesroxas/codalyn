@@ -10,7 +10,6 @@ import {
 import type { ComponentInstanceImageProp } from "@/features/image-editor/lib/search-component-instance-image-props";
 import { readWebflowElementChildren } from "@/features/image-editor/lib/webflow-element-structure-walk";
 import {
-  CMS_SLOT_COMPONENT_STRING_PROPS_GROUP,
   type CmsSlotStringComponentPropOptions,
   cmsSlotStringComponentPropOptions,
 } from "@/shared/lib/beacon-component-string-prop";
@@ -18,8 +17,7 @@ import { MAX_DESIGNER_COMPONENT_NESTING } from "@/shared/lib/component-definitio
 import { nestedAliasForComponentInstance } from "@/shared/lib/nested-component-prop-alias";
 
 export const BEACON_EXPORT_WIDTH_PROP_NAME = "Beacon export width";
-export const BEACON_EXPORT_HEIGHT_PROP_NAME = "Beacon export height";
-export const BEACON_EXPORT_PROPS_GROUP = CMS_SLOT_COMPONENT_STRING_PROPS_GROUP;
+const BEACON_EXPORT_HEIGHT_PROP_NAME = "Beacon export height";
 
 type ExportDimensionPropIds = { widthPropId: string; heightPropId: string };
 
@@ -115,7 +113,7 @@ async function bindExportDimensionAttributesOnImage(
   await img.setSettings(settings as SetSettingsInput);
 }
 
-export async function applyExportDimensionDefaultValuesOnDefinition(
+async function applyExportDimensionDefaultValuesOnDefinition(
   def: Component,
   propIds: ExportDimensionPropIds,
   width: string | null,

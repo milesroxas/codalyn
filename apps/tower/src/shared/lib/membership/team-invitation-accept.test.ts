@@ -3,6 +3,7 @@ import {
   buildTeamInvitationAcceptPath,
   classifyTeamInvitationAcceptError,
   isTeamInvitationAcceptPath,
+  isTeamInvitationVerificationRedirectError,
   messageForTeamInvitationAcceptError,
 } from "@/shared/lib/membership/team-invitation-accept";
 
@@ -37,5 +38,14 @@ describe("messageForTeamInvitationAcceptError", () => {
   it("returns user-facing guidance", () => {
     expect(messageForTeamInvitationAcceptError("seat_limit")).toContain("open seats");
     expect(messageForTeamInvitationAcceptError("unknown", "Server exploded")).toBe("Server exploded");
+  });
+});
+
+describe("isTeamInvitationVerificationRedirectError", () => {
+  it("matches Better Auth verification redirect errors", () => {
+    expect(isTeamInvitationVerificationRedirectError("invalid_token")).toBe(true);
+    expect(isTeamInvitationVerificationRedirectError("TOKEN_EXPIRED")).toBe(true);
+    expect(isTeamInvitationVerificationRedirectError("early_access_required")).toBe(false);
+    expect(isTeamInvitationVerificationRedirectError(null)).toBe(false);
   });
 });

@@ -9,6 +9,7 @@ export * from "./beacon/beacon-settings-tower-put.js";
 export * from "./image/image-optimization-credits.js";
 export * from "./image/output-formats.js";
 export * from "./tower/tower-plan-catalog.js";
+export * from "./tower/tower-support-request.js";
 export * from "./tower/tower-usage-display.js";
 export * from "./tower/tower-usage-metering.js";
 export * from "./tower/tower-usage-metering-copy.js";

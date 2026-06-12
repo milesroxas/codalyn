@@ -4,7 +4,7 @@ import {
   draftToHiddenListIndices,
   normalizeComposerDraftPropValues,
 } from "@/features/cms-slots/model/cms-slot-composer-cms-draft";
-import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+import type { CmsSlotDesignerSlotPropsFile } from "@/features/cms-slots/model/cms-slot-designer-slot-props";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 
 describe("draftToHiddenListIndices", () => {
@@ -35,8 +35,8 @@ describe("draftToHiddenListIndices", () => {
 describe("normalizeComposerDraftPropValues", () => {
   it("migrates legacy CMS prop keys to current searchProps ids for that slot", () => {
     const ex: ComposableInstancePropMeta[] = [{ propId: "old", label: "Title", valueType: "string" }];
-    const slotProps: CmsSlotEngineSlotPropsFile = { v: 1, slots: [{ exposed: ex }] };
-    const engineRows = [
+    const slotProps: CmsSlotDesignerSlotPropsFile = { v: 1, slots: [{ exposed: ex }] };
+    const designerRows = [
       { key: "k1", componentId: "c1", name: "C", instance: null as unknown as ComponentElement, domChildIndex: 0 },
     ] satisfies HydratedCmsSlotRow[];
     const live: Record<string, ComposableInstancePropMeta[]> = {
@@ -45,7 +45,7 @@ describe("normalizeComposerDraftPropValues", () => {
     const draft = normalizeComposerDraftPropValues(
       [{ key: "r1", componentId: "c1", name: "C", propValues: { old: "v1" } }],
       [0],
-      engineRows,
+      designerRows,
       slotProps,
       live
     );

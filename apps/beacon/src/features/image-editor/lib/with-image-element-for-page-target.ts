@@ -3,8 +3,6 @@ import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-tar
 import { searchComponentInstanceImageProps } from "@/features/image-editor/lib/search-component-instance-image-props";
 import { withComponentDefinitionScope } from "@/shared/lib/component-definition-scope";
 
-export { exitCurrentComponentIfAny, exitUntilPageForComponentEnter } from "@/shared/lib/component-definition-scope";
-
 export async function resolveComponentImagePropId(
   instance: ComponentElement,
   hintedPropId: string | undefined

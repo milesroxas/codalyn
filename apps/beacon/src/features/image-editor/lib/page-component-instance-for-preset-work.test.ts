@@ -6,6 +6,21 @@ import {
   withPageComponentInstanceForDefinitionWork,
 } from "./page-component-instance-for-preset-work";
 
+function mockWebflowPage(children: unknown[], webflowOverrides: Record<string, unknown> = {}) {
+  const body = {
+    type: "Body",
+    id: { component: "page_1", element: "body_1" },
+    getChildren: vi.fn().mockResolvedValue(children),
+  };
+  return {
+    body,
+    webflow: {
+      getAllElements: vi.fn().mockResolvedValue([body, ...children]),
+      ...webflowOverrides,
+    },
+  };
+}
+
 vi.mock("@/shared/lib/component-definition-scope", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/lib/component-definition-scope")>();
   return {
@@ -35,9 +50,8 @@ describe("page-component-instance-for-preset-work", () => {
       getChildren: vi.fn().mockResolvedValue([]),
       getSlots: vi.fn().mockResolvedValue([]),
     };
-    vi.stubGlobal("webflow", {
-      getAllElements: vi.fn().mockResolvedValue([instance]),
-    });
+    const { webflow } = mockWebflowPage([instance]);
+    vi.stubGlobal("webflow", webflow);
 
     await expect(findComponentInstanceByDefinitionIdOnPage("cmp_1")).resolves.toBe(instance);
   });
@@ -67,9 +81,8 @@ describe("page-component-instance-for-preset-work", () => {
       getChildren: vi.fn().mockResolvedValue([]),
       getSlots: vi.fn().mockResolvedValue([]),
     };
-    vi.stubGlobal("webflow", {
-      getAllElements: vi.fn().mockResolvedValue([existing]),
-    });
+    const { webflow } = mockWebflowPage([existing]);
+    vi.stubGlobal("webflow", webflow);
 
     const fn = vi.fn().mockResolvedValue("ok");
     await expect(

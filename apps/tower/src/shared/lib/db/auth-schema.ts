@@ -2,6 +2,7 @@ import type { BeaconAppSettings, BeaconOrgTeamSettings } from "@codalyn/webflow-
 import { relations } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  bigint,
   boolean,
   index,
   integer,
@@ -264,6 +265,20 @@ export const webflowOauthAuthorizeState = pgTable("webflow_oauth_authorize_state
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+/**
+ * Short-lived authorization `code` from Webflow-initiated OAuth (dashboard Install / marketplace install URL).
+ * Tower-initiated OAuth binds `state` before redirect; Webflow-initiated flows may omit `state` per OAuth docs.
+ * @see https://developers.webflow.com/data/v2.0.0/reference/oauth-app
+ */
+export const webflowOauthInstallCode = pgTable("webflow_oauth_install_code", {
+  id: text("id").primaryKey(),
+  authorizationCode: text("authorization_code").notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  /** Optional `state` echoed by Webflow when the install URL included one. */
+  externalState: text("external_state"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const member = pgTable(
   "member",
   {
@@ -381,6 +396,27 @@ export const earlyAccessRequest = pgTable(
   (table) => [index("early_access_request_status_idx").on(table.status)]
 );
 
+/** Inbound Flint marketing beta group signups from the public landing page. */
+export const flintBetaGroupRequest = pgTable(
+  "flint_beta_group_request",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull().unique(),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    /** `pending` · `resolved` · `dismissed` */
+    status: text("status").notNull().default("pending"),
+    operatorNote: text("operator_note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at"),
+    resolvedByUserId: text("resolved_by_user_id").references(() => user.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    index("flint_beta_group_request_status_idx").on(table.status),
+    index("flint_beta_group_request_created_at_idx").on(table.createdAt),
+  ]
+);
+
 /** Monthly Vercel-side usage for metering (Beacon API + proxy); resets by calendar month. */
 export const towerUsageMonth = pgTable(
   "tower_usage_month",
@@ -395,6 +431,15 @@ export const towerUsageMonth = pgTable(
     webflowProxyImageUploadCmsCount: integer("webflow_proxy_image_upload_cms_count").notNull().default(0),
     cmsWriteCount: integer("cms_write_count").notNull().default(0),
     imageOptimizeCount: integer("image_optimize_count").notNull().default(0),
+    // Measured infra cost drivers, accumulated per meter for operator profitability analysis: active
+    // compute (Vercel CPU) milliseconds and egress (Fast Data Transfer) bytes. bigint to survive a busy
+    // month without overflow.
+    webflowProxyComputeMs: bigint("webflow_proxy_compute_ms", { mode: "number" }).notNull().default(0),
+    webflowProxyEgressBytes: bigint("webflow_proxy_egress_bytes", { mode: "number" }).notNull().default(0),
+    cmsWriteComputeMs: bigint("cms_write_compute_ms", { mode: "number" }).notNull().default(0),
+    cmsWriteEgressBytes: bigint("cms_write_egress_bytes", { mode: "number" }).notNull().default(0),
+    imageComputeMs: bigint("image_compute_ms", { mode: "number" }).notNull().default(0),
+    imageEgressBytes: bigint("image_egress_bytes", { mode: "number" }).notNull().default(0),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
@@ -420,6 +465,13 @@ export const towerWorkspaceUsageMonth = pgTable(
     webflowProxyImageUploadCmsCount: integer("webflow_proxy_image_upload_cms_count").notNull().default(0),
     cmsWriteCount: integer("cms_write_count").notNull().default(0),
     imageOptimizeCount: integer("image_optimize_count").notNull().default(0),
+    // Measured infra cost drivers (pooled across the workspace), mirroring `tower_usage_month`.
+    webflowProxyComputeMs: bigint("webflow_proxy_compute_ms", { mode: "number" }).notNull().default(0),
+    webflowProxyEgressBytes: bigint("webflow_proxy_egress_bytes", { mode: "number" }).notNull().default(0),
+    cmsWriteComputeMs: bigint("cms_write_compute_ms", { mode: "number" }).notNull().default(0),
+    cmsWriteEgressBytes: bigint("cms_write_egress_bytes", { mode: "number" }).notNull().default(0),
+    imageComputeMs: bigint("image_compute_ms", { mode: "number" }).notNull().default(0),
+    imageEgressBytes: bigint("image_egress_bytes", { mode: "number" }).notNull().default(0),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
@@ -490,6 +542,13 @@ export const towerDestructiveActionRateLimit = pgTable("tower_destructive_action
   key: text("key").primaryKey(),
   windowStartedAt: timestamp("window_started_at").notNull(),
   attemptCount: integer("attempt_count").notNull(),
+});
+
+/** Processed Stripe webhook event ids — dedupes at-least-once delivery so handlers never re-run. */
+export const stripeWebhookEvent = pgTable("stripe_webhook_event", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
 });
 
 export const userRelations = relations(user, ({ many, one }) => ({

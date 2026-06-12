@@ -1,6 +1,19 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
+
+const formFieldHintVariants = cva("text-muted-foreground", {
+  variants: {
+    size: {
+      sm: "text-xs",
+      md: "text-sm",
+    },
+  },
+  defaultVariants: {
+    size: "sm",
+  },
+});
 
 function FormField({
   className,
@@ -24,14 +37,29 @@ function FormFieldRow({ className, ...props }: React.ComponentProps<"div">) {
   return <div data-slot="form-field-row" className={cn("flex gap-2", className)} {...props} />;
 }
 
+function FormFieldHint({
+  className,
+  size,
+  ...props
+}: React.ComponentProps<"p"> & VariantProps<typeof formFieldHintVariants>) {
+  return <p data-slot="form-field-hint" className={cn(formFieldHintVariants({ size }), className)} {...props} />;
+}
+
+function FormSubmitRow({ className, ...props }: React.ComponentProps<"div">) {
+  return <div data-slot="form-submit-row" className={cn("flex flex-wrap items-end gap-3", className)} {...props} />;
+}
+
 function FormFieldInset({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="form-field-inset"
-      className={cn("space-y-3 rounded-lg border border-dashed border-border/80 bg-background/50 p-3", className)}
+      className={cn(
+        "@container/form-inset space-y-3 rounded-lg border border-dashed border-border/80 bg-background/50 p-3",
+        className
+      )}
       {...props}
     />
   );
 }
 
-export { FormField, FormFieldGrid, FormFieldInset, FormFieldRow };
+export { FormField, FormFieldGrid, FormFieldHint, FormFieldInset, FormFieldRow, FormSubmitRow };

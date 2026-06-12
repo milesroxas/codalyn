@@ -19,6 +19,11 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
+        "marketing-nav-ghost":
+          "h-8 rounded-md px-2.5 text-sm font-medium text-white hover:bg-white/10 hover:text-white",
+        "marketing-nav-cta": "h-8 rounded-sm bg-white px-2.5 text-sm font-medium text-black hover:bg-white/90",
+        "marketing-form-submit":
+          "rounded-sm bg-white text-sm font-medium text-black hover:bg-white/90 disabled:bg-white/60",
       },
       size: {
         default: "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",

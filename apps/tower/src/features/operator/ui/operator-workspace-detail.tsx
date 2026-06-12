@@ -12,6 +12,10 @@ import {
   operatorApi,
 } from "@/features/operator/api/client";
 import { buildOperatorWorkspaceBillingOverridePatch } from "@/features/operator/lib/operator-workspace-billing-patch";
+import {
+  OPERATOR_WORKSPACE_PURGE_CONFIRM_PHRASE,
+  operatorWorkspaceScheduledDeletionDescription,
+} from "@/features/operator/lib/operator-workspace-purge-copy";
 import { formatDateTime, formatRelative, initialsFor } from "@/features/operator/model/format";
 import {
   OperatorDetailSheetAccessibleTitle,
@@ -21,12 +25,14 @@ import {
   OperatorUsageLimitsSection,
   reloadWorkspaceUsageLimits,
 } from "@/features/operator/ui/operator-usage-limits-section";
+import { OperatorUsageTrendSection } from "@/features/operator/ui/operator-usage-trend-section";
 import { OperatorWorkspaceBillingSection } from "@/features/operator/ui/operator-workspace-billing-section";
 import type { OperatorWorkspaceDetail, OperatorWorkspacePatch, OperatorWorkspaceRow } from "@/server/operator/types";
 import {
   formatTowerInvitationStatusLabel,
   towerInvitationBadgeVariant,
 } from "@/shared/lib/membership/tower-invitation-status";
+import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -80,6 +86,8 @@ function detailToRow(d: OperatorWorkspaceDetail): OperatorWorkspaceRow {
     pendingInvitations: d.pendingInvitations,
     usage: d.usage,
     createdAt: d.createdAt,
+    deletedAt: d.deletedAt,
+    purgeScheduledAt: d.purgeScheduledAt,
   };
 }
 
@@ -96,6 +104,8 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
   const [billingPlanDraft, setBillingPlanDraft] = useState("");
   const [subscriptionStatusDraft, setSubscriptionStatusDraft] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [purgeSlugConfirm, setPurgeSlugConfirm] = useState("");
+  const [purgePhraseConfirm, setPurgePhraseConfirm] = useState("");
 
   const load = useCallback(async (id: string) => {
     setLoading(true);
@@ -128,6 +138,8 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
       setDetail(null);
       setError(null);
       setDeleteConfirm("");
+      setPurgeSlugConfirm("");
+      setPurgePhraseConfirm("");
     }
   }, [open]);
 
@@ -211,7 +223,7 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
     void patch(result);
   }, [billingPlanDraft, subscriptionStatusDraft, detail, patch, seatLimitDraft]);
 
-  const onDelete = useCallback(async () => {
+  const onDeleteActiveWorkspace = useCallback(async () => {
     if (!detail) {
       return;
     }
@@ -231,6 +243,28 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
     }
   }, [detail, deleteConfirm, onDeleted, onOpenChange]);
 
+  const onPurgeScheduledWorkspace = useCallback(async () => {
+    if (!detail) {
+      return;
+    }
+    setDeleteBusy(true);
+    setError(null);
+    try {
+      await operatorApi.deleteWorkspace(detail.id, purgeSlugConfirm, {
+        confirmPhrase: purgePhraseConfirm,
+      });
+      toast.success("Workspace purged");
+      onDeleted?.(detail.id);
+      onOpenChange(false);
+    } catch (err) {
+      const msg = err instanceof OperatorApiError ? formatOperatorWorkspaceDeleteError(err) : "Purge failed";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [detail, purgeSlugConfirm, purgePhraseConfirm, onDeleted, onOpenChange]);
+
   const showPlaceholder = useDeferredLoadingIndicator(loading);
 
   return (
@@ -246,6 +280,8 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
           billingPlanDraft={billingPlanDraft}
           subscriptionStatusDraft={subscriptionStatusDraft}
           deleteConfirm={deleteConfirm}
+          purgeSlugConfirm={purgeSlugConfirm}
+          purgePhraseConfirm={purgePhraseConfirm}
           patchBusy={patchBusy}
           deleteBusy={deleteBusy}
           billingOverridesDirty={billingOverridesDirty}
@@ -255,12 +291,15 @@ export function OperatorWorkspaceDetailSheet(props: OperatorWorkspaceDetailSheet
           onBillingPlanDraftChange={setBillingPlanDraft}
           onSubscriptionStatusDraftChange={setSubscriptionStatusDraft}
           onDeleteConfirmChange={setDeleteConfirm}
+          onPurgeSlugConfirmChange={setPurgeSlugConfirm}
+          onPurgePhraseConfirmChange={setPurgePhraseConfirm}
           onOpenChange={onOpenChange}
           onSaveName={onSaveName}
           onSaveSlug={onSaveSlug}
           onSaveBillingOverrides={onSaveBillingOverrides}
           onRestoreStripeSeatSync={onRestoreStripeSeatSync}
-          onDelete={onDelete}
+          onDeleteActiveWorkspace={onDeleteActiveWorkspace}
+          onPurgeScheduledWorkspace={onPurgeScheduledWorkspace}
           onUpdated={onUpdated}
           setDetail={setDetail}
         />
@@ -279,6 +318,8 @@ type OperatorWorkspaceDetailSheetBodyProps = {
   billingPlanDraft: string;
   subscriptionStatusDraft: string;
   deleteConfirm: string;
+  purgeSlugConfirm: string;
+  purgePhraseConfirm: string;
   patchBusy: boolean;
   deleteBusy: boolean;
   billingOverridesDirty: boolean;
@@ -288,12 +329,15 @@ type OperatorWorkspaceDetailSheetBodyProps = {
   onBillingPlanDraftChange: (next: string) => void;
   onSubscriptionStatusDraftChange: (next: string) => void;
   onDeleteConfirmChange: (next: string) => void;
+  onPurgeSlugConfirmChange: (next: string) => void;
+  onPurgePhraseConfirmChange: (next: string) => void;
   onOpenChange: (open: boolean) => void;
   onSaveName: () => void;
   onSaveSlug: () => void;
   onSaveBillingOverrides: () => void;
   onRestoreStripeSeatSync: () => void;
-  onDelete: () => void | Promise<void>;
+  onDeleteActiveWorkspace: () => void | Promise<void>;
+  onPurgeScheduledWorkspace: () => void | Promise<void>;
   onUpdated?: (row: OperatorWorkspaceRow) => void;
   setDetail: Dispatch<SetStateAction<OperatorWorkspaceDetail | null>>;
 };
@@ -309,6 +353,8 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
     billingPlanDraft,
     subscriptionStatusDraft,
     deleteConfirm,
+    purgeSlugConfirm,
+    purgePhraseConfirm,
     patchBusy,
     deleteBusy,
     billingOverridesDirty,
@@ -318,15 +364,20 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
     onBillingPlanDraftChange,
     onSubscriptionStatusDraftChange,
     onDeleteConfirmChange,
+    onPurgeSlugConfirmChange,
+    onPurgePhraseConfirmChange,
     onOpenChange,
     onSaveName,
     onSaveSlug,
     onSaveBillingOverrides,
     onRestoreStripeSeatSync,
-    onDelete,
+    onDeleteActiveWorkspace,
+    onPurgeScheduledWorkspace,
     onUpdated,
     setDetail,
   } = props;
+
+  const isScheduledForDeletion = detail?.deletedAt != null;
 
   if (showPlaceholder) {
     return <OperatorDetailSheetSkeleton title="Workspace details" />;
@@ -375,6 +426,7 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
                   {detail.pendingInvitations} pending
                 </Badge>
               ) : null}
+              {isScheduledForDeletion ? <Badge variant="destructive">Scheduled for deletion</Badge> : null}
               {detail.isOverSeatCap ? (
                 <Badge variant="destructive">Over seat limit</Badge>
               ) : (
@@ -392,48 +444,62 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
           </div>
         ) : null}
 
-        <IdentitySection
-          detail={detail}
-          nameDraft={nameDraft}
-          slugDraft={slugDraft}
-          onNameDraftChange={onNameDraftChange}
-          onSlugDraftChange={onSlugDraftChange}
-          patchBusy={patchBusy}
-          onSaveName={onSaveName}
-          onSaveSlug={onSaveSlug}
-        />
-        <OperatorWorkspaceBillingSection
-          detail={detail}
-          billingPlanDraft={billingPlanDraft}
-          onBillingPlanDraftChange={onBillingPlanDraftChange}
-          subscriptionStatusDraft={subscriptionStatusDraft}
-          onSubscriptionStatusDraftChange={onSubscriptionStatusDraftChange}
-          seatLimitDraft={seatLimitDraft}
-          onSeatLimitDraftChange={onSeatLimitDraftChange}
-          overridesDirty={billingOverridesDirty}
-          patchBusy={patchBusy}
-          onSaveOverrides={onSaveBillingOverrides}
-          onRestoreStripeSeatSync={onRestoreStripeSeatSync}
-        />
-        <OperatorUsageLimitsSection
-          scope="workspace"
-          usage={detail.usage}
-          busy={patchBusy}
-          onSave={async (update) => {
-            const next = await operatorApi.patchWorkspace(detail.id, update);
-            setDetail(next);
-            onUpdated?.(detailToRow(next));
-            return next.usage;
-          }}
-          onReset={async () => {
-            await operatorApi.resetWorkspaceUsage(detail.id);
-            const usage = await reloadWorkspaceUsageLimits(detail.id);
-            setDetail((current) => (current ? { ...current, usage } : current));
-            onUpdated?.(detailToRow({ ...detail, usage }));
-            return usage;
-          }}
-        />
+        {isScheduledForDeletion ? (
+          <Alert variant="destructive">
+            <AlertTitle>Scheduled for deletion</AlertTitle>
+            <AlertDescription>
+              {operatorWorkspaceScheduledDeletionDescription(detail.purgeScheduledAt)}
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
+        {!isScheduledForDeletion ? (
+          <>
+            <IdentitySection
+              detail={detail}
+              nameDraft={nameDraft}
+              slugDraft={slugDraft}
+              onNameDraftChange={onNameDraftChange}
+              onSlugDraftChange={onSlugDraftChange}
+              patchBusy={patchBusy}
+              onSaveName={onSaveName}
+              onSaveSlug={onSaveSlug}
+            />
+            <OperatorWorkspaceBillingSection
+              detail={detail}
+              billingPlanDraft={billingPlanDraft}
+              onBillingPlanDraftChange={onBillingPlanDraftChange}
+              subscriptionStatusDraft={subscriptionStatusDraft}
+              onSubscriptionStatusDraftChange={onSubscriptionStatusDraftChange}
+              seatLimitDraft={seatLimitDraft}
+              onSeatLimitDraftChange={onSeatLimitDraftChange}
+              overridesDirty={billingOverridesDirty}
+              patchBusy={patchBusy}
+              onSaveOverrides={onSaveBillingOverrides}
+              onRestoreStripeSeatSync={onRestoreStripeSeatSync}
+            />
+            <OperatorUsageLimitsSection
+              scope="workspace"
+              usage={detail.usage}
+              busy={patchBusy}
+              onSave={async (update) => {
+                const next = await operatorApi.patchWorkspace(detail.id, update);
+                setDetail(next);
+                onUpdated?.(detailToRow(next));
+                return next.usage;
+              }}
+              onReset={async () => {
+                await operatorApi.resetWorkspaceUsage(detail.id);
+                const usage = await reloadWorkspaceUsageLimits(detail.id);
+                setDetail((current) => (current ? { ...current, usage } : current));
+                onUpdated?.(detailToRow({ ...detail, usage }));
+                return usage;
+              }}
+            />
+          </>
+        ) : null}
+
+        <OperatorUsageTrendSection trend={detail.usageTrend} />
         <MembersSection members={detail.members} onCloseSheet={() => onOpenChange(false)} />
         <InvitationsSection invitations={detail.invitations} />
 
@@ -450,26 +516,86 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
               <dt className="text-muted-foreground">Created</dt>
               <dd className="text-foreground">{formatDateTime(detail.createdAt)}</dd>
             </div>
+            {detail.deletedAt ? (
+              <div>
+                <dt className="text-muted-foreground">Scheduled deleted</dt>
+                <dd className="text-foreground">{formatDateTime(detail.deletedAt)}</dd>
+              </div>
+            ) : null}
+            {detail.purgeScheduledAt ? (
+              <div>
+                <dt className="text-muted-foreground">Purge scheduled</dt>
+                <dd className="text-foreground">{formatDateTime(detail.purgeScheduledAt)}</dd>
+              </div>
+            ) : null}
           </dl>
         </section>
 
-        <DangerZoneTypedDelete
-          panelDescription={
-            <>
-              Permanently delete this workspace, its memberships, and invitations. Users keep their accounts and Webflow
-              tokens.
-            </>
-          }
-          triggerLabel="Delete workspace"
-          title="Delete workspace?"
-          confirmFieldLabel="Slug"
-          confirmFieldId="confirm-slug"
-          expectedValue={detail.slug}
-          confirmValue={deleteConfirm}
-          onConfirmValueChange={onDeleteConfirmChange}
-          busy={deleteBusy}
-          onConfirm={() => void onDelete()}
-        />
+        {isScheduledForDeletion ? (
+          <DangerZoneTypedDelete
+            panelTitle="Purge workspace"
+            panelDescription={
+              <>
+                Permanently removes this workspace and all memberships immediately. This cannot be undone and skips the
+                member recovery window. Owners can delete their Tower account after purge.
+              </>
+            }
+            triggerLabel="Purge now"
+            title="Purge workspace permanently?"
+            description={
+              <>
+                Type the slug <strong>{detail.slug}</strong> and{" "}
+                <strong>{OPERATOR_WORKSPACE_PURGE_CONFIRM_PHRASE}</strong> to confirm. All workspace data will be
+                removed immediately.
+              </>
+            }
+            confirmFieldLabel="Slug"
+            confirmFieldId="operator-purge-workspace-slug"
+            expectedValue={detail.slug}
+            confirmValue={purgeSlugConfirm}
+            onConfirmValueChange={onPurgeSlugConfirmChange}
+            secondaryConfirm={{
+              fieldLabel: "Confirmation",
+              fieldId: "operator-purge-workspace-phrase",
+              expectedValue: OPERATOR_WORKSPACE_PURGE_CONFIRM_PHRASE,
+              value: purgePhraseConfirm,
+              onValueChange: onPurgePhraseConfirmChange,
+            }}
+            actionLabel="Purge permanently"
+            busyLabel="Purging…"
+            busy={deleteBusy}
+            onConfirm={() => void onPurgeScheduledWorkspace()}
+            onOpenChange={(next) => {
+              if (!next) {
+                onPurgeSlugConfirmChange("");
+                onPurgePhraseConfirmChange("");
+              }
+            }}
+          />
+        ) : (
+          <DangerZoneTypedDelete
+            panelDescription={
+              <>
+                Permanently delete this workspace, its memberships, and invitations. Users keep their accounts and
+                Webflow tokens.
+              </>
+            }
+            triggerLabel="Delete workspace"
+            title="Delete workspace?"
+            confirmFieldLabel="Slug"
+            confirmFieldId="confirm-slug"
+            expectedValue={detail.slug}
+            confirmValue={deleteConfirm}
+            onConfirmValueChange={onDeleteConfirmChange}
+            busy={deleteBusy}
+            onConfirm={() => void onDeleteActiveWorkspace()}
+            onOpenChange={(next) => {
+              if (!next) {
+                onDeleteConfirmChange("");
+              }
+            }}
+          />
+        )}
       </SheetBody>
 
       <SheetFooter>

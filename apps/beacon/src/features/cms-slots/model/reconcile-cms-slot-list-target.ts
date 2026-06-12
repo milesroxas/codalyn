@@ -80,28 +80,3 @@ export async function reconcileCmsSlotListTarget(
 
   return opResult;
 }
-
-export type CmsSlotListTargetOpenReconcile = {
-  phase: "absent" | "synced";
-  displayName: string | null;
-  toasts: Array<{ type: "Success" | "Error" | "Info" | "Warning"; message: string }>;
-};
-
-/** Single call site for the “open a beacon / composition” flow: map reconcile result to UI + optional toasts. */
-export async function reconcileCmsSlotListTargetForOpen(
-  dataList: string,
-  listContainer: BlockElement
-): Promise<CmsSlotListTargetOpenReconcile> {
-  const r = await reconcileCmsSlotListTarget(dataList, listContainer);
-  if (r.type === "absent") {
-    return { phase: "absent", displayName: null, toasts: [] };
-  }
-  if (r.type === "update_apply_failed") {
-    return { phase: "synced", displayName: r.name, toasts: [{ type: "Error", message: r.errorMessage }] };
-  }
-  const toasts: CmsSlotListTargetOpenReconcile["toasts"] = [];
-  if (r.listWasUpdated) {
-    toasts.push({ type: "Success", message: "List target updated to match this CMS slot." });
-  }
-  return { phase: "synced", displayName: r.name, toasts };
-}

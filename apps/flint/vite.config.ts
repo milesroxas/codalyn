@@ -1,88 +1,30 @@
 /// <reference types="vitest/config" />
-import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
-import chokidar from "chokidar";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig } from "vite";
+// @ts-expect-error — shared JS module at repo root
+import { createWebflowDesignerExtensionPlugin } from "../../scripts/vite-wf-designer-extension-plugin.mjs";
 import pkg from "./package.json";
 
-/** Vitest loads this config; skip Webflow dev plugins (chokidar) so the process can exit cleanly. */
+const flintRoot = path.dirname(fileURLToPath(import.meta.url));
+
+/** Vitest loads this config; skip Webflow dev plugins so the process can exit cleanly. */
 const isVitest = Boolean(process.env.VITEST);
-
-const wfDesignerExtensionPlugin = (): Plugin => {
-  let webflowHTML = "";
-  const configPath = path.join("./webflow.json");
-  const configContent = fs.readFileSync(configPath, "utf-8");
-  const webflowConfig = JSON.parse(configContent);
-
-  return {
-    name: "wf-vite-extension-plugin",
-    transformIndexHtml: {
-      order: "pre",
-      handler: async (html: string, ctx) => {
-        if (ctx.server) {
-          // Development mode
-          console.log("\x1b[36m%s\x1b[0m", "Development mode");
-          if (!webflowHTML) {
-            const { name, apiVersion } = webflowConfig;
-            const template = apiVersion === "2" ? "/template/v2" : "/template";
-            const url = `https://webflow-ext.com${template}?name=${name}`;
-            webflowHTML = await fetch(url).then((res) => res.text());
-          }
-
-          // Extract script tags from webflowHTML
-          const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
-          let scripts = "";
-          let match: RegExpExecArray | null = scriptRegex.exec(webflowHTML);
-          while (match !== null) {
-            scripts += `${match[0]}\n`;
-            match = scriptRegex.exec(webflowHTML);
-          }
-
-          // Insert extracted scripts at the end of the head tag
-          const finalHTML = html.replace("</head>", `${scripts}</head>`);
-          return finalHTML;
-        }
-      },
-    },
-
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        if (req.url === "/__webflow") {
-          res.writeHead(200, {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "*",
-          });
-          res.end(configContent);
-        } else {
-          next();
-        }
-      });
-
-      // Watch for changes in your source files
-      const watcher = chokidar.watch(["./src/**/*.tsx", "./src/**/*.ts", "./src/**/*.css"], {
-        ignoreInitial: true,
-        persistent: true,
-      });
-
-      watcher.on("all", (event, filePath) => {
-        console.log("\x1b[33m%s\x1b[0m", `File ${filePath} has been ${event}, restarting server...`);
-
-        void server.restart();
-      });
-
-      // Close the watcher when the server is closed
-      server?.httpServer?.on("close", () => {
-        void watcher.close();
-      });
-    },
-  };
-};
 
 export default defineConfig(({ mode }) => ({
   base: "./",
-  plugins: [react(), ...(isVitest ? [] : [wfDesignerExtensionPlugin()])],
+  plugins: [
+    react(),
+    ...(isVitest
+      ? []
+      : [
+          createWebflowDesignerExtensionPlugin({
+            appRoot: flintRoot,
+            restartOnSourceChange: true,
+          }),
+        ]),
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_CHANNEL__: JSON.stringify(mode),
@@ -90,7 +32,7 @@ export default defineConfig(({ mode }) => ({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(flintRoot, "./src"),
     },
   },
   server: {
@@ -101,11 +43,12 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     outDir: "dist",
+    emptyOutDir: true,
     cssCodeSplit: false,
     rollupOptions: {
       output: {
         entryFileNames: "bundle.js",
-        assetFileNames: (assetInfo: any) =>
+        assetFileNames: (assetInfo: { name?: string | undefined }) =>
           assetInfo.name?.endsWith(".css") ? "styles.css" : "assets/[name]-[hash][extname]",
       },
     },

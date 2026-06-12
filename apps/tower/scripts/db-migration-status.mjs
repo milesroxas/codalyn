@@ -13,7 +13,7 @@ const drizzleDir = join(towerRoot, "drizzle");
 const journalPath = join(drizzleDir, "meta", "_journal.json");
 
 /** @returns {Array<{ idx: number; tag: string; when: number }>} */
-export function readMigrationJournal() {
+function readMigrationJournal() {
   if (!existsSync(journalPath)) {
     throw new Error(`Missing Drizzle journal: ${journalPath}`);
   }

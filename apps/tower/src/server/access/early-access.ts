@@ -15,12 +15,12 @@ export {
   parseTeamMemberEmailsInput,
 } from "@/shared/lib/access/email-input";
 
-export function readOperatorInviteTokenFromHeaders(headers: Headers): string | null {
+function readOperatorInviteTokenFromHeaders(headers: Headers): string | null {
   const value = headers.get(TOWER_OPERATOR_INVITE_HEADER)?.trim();
   return value || null;
 }
 
-export function readOperatorInviteTokenFromRequest(request: Request | undefined): string | null {
+function readOperatorInviteTokenFromRequest(request: Request | undefined): string | null {
   if (!request?.headers) {
     return null;
   }

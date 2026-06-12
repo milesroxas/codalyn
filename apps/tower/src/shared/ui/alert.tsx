@@ -12,6 +12,8 @@ const alertVariants = cva(
         info: "border-border/80 bg-muted/35 text-foreground *:data-[slot=alert-description]:text-muted-foreground *:[svg]:text-muted-foreground",
         warning:
           "border-amber-500/35 bg-amber-500/10 text-foreground *:data-[slot=alert-description]:text-muted-foreground *:[svg]:text-amber-600 dark:*:[svg]:text-amber-400",
+        approaching:
+          "border-chart-4/55 bg-chart-4/22 text-foreground *:data-[slot=alert-title]:text-chart-4 *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-chart-4",
         destructive:
           "border-destructive/35 bg-destructive/10 text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current",
       },
@@ -52,17 +54,12 @@ function AlertDescription({ className, ...props }: React.ComponentProps<"div">) 
   );
 }
 
+const alertActionVariants = cva(
+  "mt-2 flex w-fit shrink-0 flex-wrap items-center gap-2 group-has-[>svg]/alert:col-start-2 md:col-start-2 md:mt-0 group-has-[>svg]/alert:md:col-start-3 md:row-start-1 md:row-span-2 md:self-center"
+);
+
 function AlertAction({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="alert-action"
-      className={cn(
-        "mt-2 flex w-fit shrink-0 flex-wrap items-center gap-2 group-has-[>svg]/alert:col-start-2 md:col-start-2 md:row-start-1 md:row-span-2 md:mt-0 md:self-center group-has-[>svg]/alert:md:col-start-3",
-        className
-      )}
-      {...props}
-    />
-  );
+  return <div data-slot="alert-action" className={cn(alertActionVariants(), className)} {...props} />;
 }
 
 export { Alert, AlertAction, AlertDescription, AlertTitle };

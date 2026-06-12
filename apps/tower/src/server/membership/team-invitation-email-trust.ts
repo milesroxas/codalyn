@@ -1,3 +1,4 @@
+import { emailHasPendingOrgInvitation } from "@/server/access/early-access";
 import { markEmailVerifiedForEmail } from "@/server/membership/email-verification-trust";
 import { loadTeamInvitationPreview } from "@/server/membership/team-invitation-preview";
 import { normalizeAccessEmail } from "@/shared/lib/access/email-input";
@@ -5,7 +6,7 @@ import { TOWER_TEAM_INVITATION_HEADER } from "@/shared/lib/membership/team-invit
 
 export { markEmailVerifiedForUserId } from "@/server/membership/email-verification-trust";
 
-export function readTeamInvitationIdFromHeaders(headers: Headers): string | null {
+function readTeamInvitationIdFromHeaders(headers: Headers): string | null {
   const value = headers.get(TOWER_TEAM_INVITATION_HEADER)?.trim();
   return value || null;
 }
@@ -60,4 +61,31 @@ export async function trustEmailForPendingTeamInvitation(
   }
   await markEmailVerifiedForEmail(email);
   return true;
+}
+
+/** Any active workspace invite for this email is treated as verified ownership (header-independent fallback). */
+export async function trustEmailForPendingOrgInvitationEmail(email: string): Promise<boolean> {
+  if (!(await emailHasPendingOrgInvitation(email))) {
+    return false;
+  }
+  await markEmailVerifiedForEmail(email);
+  return true;
+}
+
+export async function shouldSkipVerificationEmailForTeamInvite(input: {
+  email: string;
+  invitationId: string | null | undefined;
+}): Promise<boolean> {
+  const invitationId = input.invitationId?.trim();
+  if (invitationId && (await isPendingTeamInvitationForEmail(invitationId, input.email))) {
+    return true;
+  }
+  return emailHasPendingOrgInvitation(input.email);
+}
+
+export async function shouldMarkEmailVerifiedOnTeamInviteSignUp(input: {
+  email: string;
+  invitationId: string | null | undefined;
+}): Promise<boolean> {
+  return shouldSkipVerificationEmailForTeamInvite(input);
 }

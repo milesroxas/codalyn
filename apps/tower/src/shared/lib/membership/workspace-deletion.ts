@@ -1,6 +1,18 @@
-export type WorkspaceDeletionErrorCode = "not_found" | "confirm_mismatch" | "forbidden" | "deletion_incomplete";
+export type WorkspaceDeletionErrorCode =
+  | "not_found"
+  | "confirm_mismatch"
+  | "confirm_phrase_mismatch"
+  | "forbidden"
+  | "deletion_incomplete";
 
-export function workspaceSlugConfirmationMatches(confirmSlug: string, expectedSlug: string): boolean {
+/** Operator-only second factor when permanently purging a soft-deleted workspace. */
+export const OPERATOR_WORKSPACE_PURGE_CONFIRM_PHRASE = "PURGE";
+
+export function operatorWorkspacePurgePhraseMatches(phrase: string): boolean {
+  return phrase.trim().toUpperCase() === OPERATOR_WORKSPACE_PURGE_CONFIRM_PHRASE;
+}
+
+function workspaceSlugConfirmationMatches(confirmSlug: string, expectedSlug: string): boolean {
   return confirmSlug.trim().toLowerCase() === expectedSlug.trim().toLowerCase();
 }
 

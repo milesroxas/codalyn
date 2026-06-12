@@ -1,6 +1,6 @@
 import { readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
 
-export function isTowerNetworkFetchError(error: unknown): boolean {
+function isTowerNetworkFetchError(error: unknown): boolean {
   if (!(error instanceof TypeError)) {
     return false;
   }

@@ -1,5 +1,7 @@
+import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import { useBeaconGuestWelcomeVisible } from "@/features/auth/lib/use-beacon-guest-welcome-visible";
 import { isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
@@ -12,6 +14,7 @@ import { CMS_SLOTS_FEATURE_NAME, CMS_SLOTS_HOME_TILE_DESCRIPTION } from "@/share
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 import { cn } from "@/shared/lib/utils";
+import { RouteLoadingSurface } from "@/shared/ui/route-loading";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
 type BeaconHomeTileCssVar = (typeof BEACON_HOME_TILE_CSS_VARS)[keyof typeof BEACON_HOME_TILE_CSS_VARS];
@@ -104,7 +107,16 @@ export function BeaconHomeScreen() {
   const { ready: cmsPageKindReady, isCmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
   const cmsSlotsOnCollectionTemplate = cmsPageKindReady && isCmsCollectionTemplatePage;
   const cmsSlotsNeedsCollectionTemplate = cmsSlotsSurfaceEnabled && cmsPageKindReady && !cmsSlotsOnCollectionTemplate;
-  const { visible: showWelcomeGate, markGuestWelcomeComplete } = useBeaconGuestWelcomeVisible();
+  const { visible: showWelcomeGate, markGuestWelcomeComplete, towerSessionPending } = useBeaconGuestWelcomeVisible();
+  const showSessionBootstrap = useDeferredLoadingIndicator(towerSessionPending);
+
+  if (showSessionBootstrap) {
+    return (
+      <RouteLoadingSurface layout="route" role="status" aria-live="polite" data-slot="beacon_home_session_bootstrap">
+        <BeaconRouteLoadingStatus ariaLabel="Connecting to Tower…" message="Connecting to Tower…" />
+      </RouteLoadingSurface>
+    );
+  }
 
   if (showWelcomeGate) {
     return (

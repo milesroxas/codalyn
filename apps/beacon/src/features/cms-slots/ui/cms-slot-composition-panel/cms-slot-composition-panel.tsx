@@ -1,14 +1,14 @@
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
-import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+import type { CmsSlotDesignerSlotPropsFile } from "@/features/cms-slots/model/cms-slot-designer-slot-props";
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import { cmsSlotListTargetPhaseUnsettled } from "@/features/cms-slots/model/cms-slot-list-target-settled";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
 import { CmsSlotsComposerEditingContextCard } from "@/features/cms-slots/ui/cms-slots-composer-editing-context-card";
 import {
-  CMS_SLOTS_ENGINE_COMPONENTS_LABEL,
-  CMS_SLOTS_ENGINE_EDITING_DESCRIPTION,
-  CMS_SLOTS_ENGINE_EDITING_TITLE,
+  CMS_SLOTS_DESIGNER_COMPONENTS_LABEL,
+  CMS_SLOTS_DESIGNER_EDITING_DESCRIPTION,
+  CMS_SLOTS_DESIGNER_EDITING_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
 import {
   SurfaceSummaryCardPageIntro,
@@ -16,9 +16,9 @@ import {
   SurfaceSummaryCardSurfaceSummary,
 } from "@/shared/ui/surface-summary-card";
 import { CmsSlotCompositionComponentsCatalogSheet } from "./cms-slot-composition-components-catalog-sheet";
-import { CmsSlotEngineComponentsEmptyState } from "./cms-slot-engine-components-empty-state";
-import { CmsSlotEngineListContextSection } from "./cms-slot-engine-list-context-section";
-import { CmsSlotEngineSelectedComponentsList } from "./cms-slot-engine-selected-components-list";
+import { CmsSlotDesignerComponentsEmptyState } from "./cms-slot-designer-components-empty-state";
+import { CmsSlotDesignerListContextSection } from "./cms-slot-designer-list-context-section";
+import { CmsSlotDesignerSelectedComponentsList } from "./cms-slot-designer-selected-components-list";
 import { useCompositionComposableMeta } from "./use-composition-composable-meta";
 
 export type CmsSlotCompositionPanelProps = {
@@ -51,13 +51,13 @@ export type CmsSlotCompositionPanelProps = {
   listTargetFocusOnCanvasPending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
   listTargetSelectedOnCanvas: boolean;
-  engineSlotProps: CmsSlotEngineSlotPropsFile;
+  designerSlotProps: CmsSlotDesignerSlotPropsFile;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
-  /** Re-apply `data-cb-c` content tags on the component definition from current Engine “Expose” + bindings. */
-  onResyncEngineSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
-  resyncingEngineSlotKey: string | null;
+  /** Re-apply `data-cb-c` content tags on the component definition from current Designer “Expose” + bindings. */
+  onResyncDesignerSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
+  resyncingDesignerSlotKey: string | null;
   /** Index-aligned with `selected`; from runtime JSON `n[]` (null while loading). */
-  enginePublishedDisplayNames: string[] | null;
+  designerPublishedDisplayNames: string[] | null;
   onRenamePublishedDisplayName: (rowKey: string, nextName: string) => void;
   renamingPublishedSlotKey: string | null;
   autoOpenExposeDrawerRowKey?: string | null;
@@ -93,11 +93,11 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     listTargetSelectedOnCanvas,
     listTargetOnCanvasCount,
     listTargetOnCanvasCountResolved,
-    engineSlotProps,
+    designerSlotProps,
     onSetSlotExposed,
-    onResyncEngineSlotAttrs,
-    resyncingEngineSlotKey,
-    enginePublishedDisplayNames,
+    onResyncDesignerSlotAttrs,
+    resyncingDesignerSlotKey,
+    designerPublishedDisplayNames,
     onRenamePublishedDisplayName,
     renamingPublishedSlotKey,
     autoOpenExposeDrawerRowKey = null,
@@ -116,8 +116,8 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
   return (
     <>
       <SurfaceSummaryCardPageIntro
-        title={CMS_SLOTS_ENGINE_EDITING_TITLE}
-        description={CMS_SLOTS_ENGINE_EDITING_DESCRIPTION}
+        title={CMS_SLOTS_DESIGNER_EDITING_TITLE}
+        description={CMS_SLOTS_DESIGNER_EDITING_DESCRIPTION}
       />
 
       <CmsSlotsComposerEditingContextCard
@@ -126,7 +126,7 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
         slotListLabel={activeListLabel}
       />
 
-      <CmsSlotEngineListContextSection
+      <CmsSlotDesignerListContextSection
         activeDataList={activeDataList}
         listTargetActionBusy={listTargetActionBusy}
         listTargetCreatePending={listTargetCreatePending}
@@ -145,25 +145,25 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
       />
 
       <SurfaceSummaryCardSurfaceSummary>
-        <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_ENGINE_COMPONENTS_LABEL}</SurfaceSummaryCardPanelSectionLabel>
+        <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_DESIGNER_COMPONENTS_LABEL}</SurfaceSummaryCardPanelSectionLabel>
         {selected.length === 0 ? (
-          <CmsSlotEngineComponentsEmptyState />
+          <CmsSlotDesignerComponentsEmptyState />
         ) : (
-          <CmsSlotEngineSelectedComponentsList
+          <CmsSlotDesignerSelectedComponentsList
             selected={selected}
             composableByKey={composableByKey}
             composableLoading={composableLoading}
-            engineSlotProps={engineSlotProps}
-            enginePublishedDisplayNames={enginePublishedDisplayNames}
+            designerSlotProps={designerSlotProps}
+            designerPublishedDisplayNames={designerPublishedDisplayNames}
             onRenamePublishedDisplayName={onRenamePublishedDisplayName}
             renamingPublishedSlotKey={renamingPublishedSlotKey}
             addPending={addPending}
             removingKey={removingKey}
             listTargetActionBusy={listTargetActionBusy}
-            resyncingEngineSlotKey={resyncingEngineSlotKey}
+            resyncingDesignerSlotKey={resyncingDesignerSlotKey}
             onRemove={onRemove}
             onSetSlotExposed={onSetSlotExposed}
-            onResyncEngineSlotAttrs={onResyncEngineSlotAttrs}
+            onResyncDesignerSlotAttrs={onResyncDesignerSlotAttrs}
             autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
             onAutoOpenExposeDrawerConsumed={onAutoOpenExposeDrawerConsumed}
           />

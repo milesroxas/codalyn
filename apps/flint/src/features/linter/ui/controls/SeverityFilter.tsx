@@ -15,13 +15,7 @@ interface SeverityFilterProps {
   condensed?: boolean;
 }
 
-export const SeverityFilter: React.FC<SeverityFilterProps> = ({
-  filter,
-  counts,
-  onChange,
-  className,
-  condensed = false,
-}) => {
+const SeverityFilter: React.FC<SeverityFilterProps> = ({ filter, counts, onChange, className, condensed = false }) => {
   // Subscribe to animation store
   const severityTilesVisible = useAnimationStore((state) => state.severityTilesVisible);
   const severityCountsAnimating = useAnimationStore((state) => state.severityCountsAnimating);

@@ -18,7 +18,7 @@ import {
 import { subscriptionPlanForStatus } from "@/server/billing/stripe-subscription-status";
 import { workspaceOwnershipTransferService } from "@/server/membership/workspace-ownership-transfer";
 import { db } from "@/shared/lib/db";
-import { organization, user } from "@/shared/lib/db/auth-schema";
+import { organization, stripeWebhookEvent, user } from "@/shared/lib/db/auth-schema";
 
 async function resolveTowerUserIdBySubscription(sub: Stripe.Subscription): Promise<string | undefined> {
   if (!isIndividualUserStripeSubscriptionMetadata(sub.metadata)) {
@@ -92,7 +92,11 @@ export async function applyStripeCheckoutSessionCompleted(
   await applyStripeSubscriptionToUser(sub, towerUserId);
 }
 
-async function onSubscriptionChanged(s: Stripe.Subscription): Promise<void> {
+async function onSubscriptionChanged(stripe: Stripe, event: Stripe.Subscription): Promise<void> {
+  // Stripe does not guarantee event ordering: a stale `customer.subscription.updated` can be delivered
+  // after a `deleted` and resurrect a canceled subscription (or revert seat quantity). Re-retrieve the
+  // authoritative current state by id before applying so writes never depend on a stale event payload.
+  const s = await stripe.subscriptions.retrieve(event.id);
   const orgId = await resolveTowerOrgIdBySubscription(s);
   if (orgId) {
     if (subscriptionPlanForStatus(s.status) === "free") {
@@ -115,22 +119,44 @@ async function onSubscriptionChanged(s: Stripe.Subscription): Promise<void> {
   await applyStripeSubscriptionToUser(s, userId);
 }
 
-/**
- * Idempotent: maps Stripe webhooks to `user` or `organization` subscription fields.
- */
-export async function applyStripeWebhookEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
+async function dispatchStripeWebhookEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case "checkout.session.completed":
       await applyStripeCheckoutSessionCompleted(stripe, event.data.object);
       break;
     case "customer.subscription.created":
     case "customer.subscription.updated":
-      await onSubscriptionChanged(event.data.object);
+      await onSubscriptionChanged(stripe, event.data.object);
       break;
     case "customer.subscription.deleted":
-      await onSubscriptionChanged(event.data.object);
+      await onSubscriptionChanged(stripe, event.data.object);
       break;
     default:
       break;
+  }
+}
+
+/**
+ * Idempotent: maps Stripe webhooks to `user` or `organization` subscription fields.
+ *
+ * Deliveries are deduplicated via a processed-event ledger so Stripe's at-least-once retries never
+ * re-run handlers: the event id is claimed before processing (concurrent duplicates lose the insert and
+ * short-circuit). If a handler throws, the claim is released so the next Stripe retry re-processes it.
+ */
+export async function applyStripeWebhookEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
+  const claimed = await db
+    .insert(stripeWebhookEvent)
+    .values({ id: event.id, type: event.type })
+    .onConflictDoNothing()
+    .returning({ id: stripeWebhookEvent.id });
+  if (claimed.length === 0) {
+    return;
+  }
+
+  try {
+    await dispatchStripeWebhookEvent(stripe, event);
+  } catch (e) {
+    await db.delete(stripeWebhookEvent).where(eq(stripeWebhookEvent.id, event.id));
+    throw e;
   }
 }

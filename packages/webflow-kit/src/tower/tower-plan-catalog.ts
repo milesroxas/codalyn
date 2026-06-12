@@ -21,6 +21,12 @@ export type TowerPlanSeatModel = "single" | "per_seat";
  */
 export const TOWER_TEAM_DEFAULT_SEAT_MINIMUM = 6;
 
+/**
+ * Default upper bound on seats a single Team checkout may request. Tower may override at runtime via
+ * `TOWER_TEAM_MAX_SEATS`; this constant is the shared fallback (guards fat-finger / abuse on checkout).
+ */
+export const TOWER_TEAM_DEFAULT_SEAT_MAXIMUM = 500;
+
 export type TowerPlanDefinition = {
   key: TowerPlanKey;
   /** Customer-facing marketing name. */

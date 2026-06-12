@@ -23,6 +23,7 @@ import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/featur
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { resolveTowerEmailLinkAuthFetchOptions } from "@/features/auth/lib/team-invitation-auth-fetch-options";
 import { authClient } from "@/features/auth/model/auth-client";
+import { completeTowerWebPostAuthNavigation } from "@/features/auth/model/tower-post-auth-navigation";
 import { useBeaconPopupSessionHandoff } from "@/features/auth/model/use-beacon-popup-session-handoff";
 import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
 import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
@@ -210,8 +211,7 @@ function SignInForm() {
       return;
     }
     if (post.kind === "done" && post.user) {
-      router.push(resolvePostAuthRedirectTarget(post.user, callbackUrl));
-      router.refresh();
+      completeTowerWebPostAuthNavigation(resolvePostAuthRedirectTarget(post.user, callbackUrl));
     }
   }
 

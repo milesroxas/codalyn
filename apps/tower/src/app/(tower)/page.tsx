@@ -1,3 +1,4 @@
+import { getSessionCookie } from "better-auth/cookies";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { TowerDashboard } from "@/features/tower-ui/tower-dashboard";
@@ -10,6 +11,7 @@ import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { getTowerDashboardSummary } from "@/server/dashboard-summary";
 import { createMarketingPageMetadata } from "@/server/marketing/marketing-seo";
+import { shouldRedirectLoggedOutAppHostHomeToMarketing } from "@/server/tower-app-home-routing";
 import {
   buildMarketingUrl,
   buildTowerLandingAppLinks,
@@ -38,15 +40,22 @@ export default async function HomePage() {
     );
   }
 
+  const requestHeaders = await headers();
   const summary = await getTowerDashboardSummary({ includeWebflowSites: false });
 
-  if (!summary.signedIn && isHostSplitEnabled() && isAppHost(host)) {
+  if (
+    shouldRedirectLoggedOutAppHostHomeToMarketing({
+      signedIn: summary.signedIn,
+      hostSplitEnabled: isHostSplitEnabled(),
+      isAppHost: isAppHost(host),
+      hasSessionCookie: Boolean(getSessionCookie(requestHeaders)),
+    })
+  ) {
     redirect(buildMarketingUrl("/"));
   }
 
   if (summary.signedIn) {
-    const h = await headers();
-    const session = await auth.api.getSession({ headers: h });
+    const session = await auth.api.getSession({ headers: requestHeaders });
     if (isProductAdminAppRole(session?.user?.role)) {
       redirect("/console");
     }
@@ -60,7 +69,7 @@ export default async function HomePage() {
       );
     }
 
-    const activeOrg = await getActiveOrganizationIdForAuthHeaders(h);
+    const activeOrg = await getActiveOrganizationIdForAuthHeaders(requestHeaders);
     const usage = await fetchEndUserUsageStatus(userId, activeOrg);
 
     return <TowerDashboard summary={summary} usage={usage} billingEnabled={isTowerBillingEnabled()} />;

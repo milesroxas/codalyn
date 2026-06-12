@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useId, useState } from "react";
 import { resolveSignUpCardDescription, shouldShowEarlyAccessSignUpGate } from "@/features/auth/lib/auth-surface-copy";
 import { tryFinishBeaconTowerAuthPopup } from "@/features/auth/lib/beacon-opener-auth";
@@ -11,6 +11,7 @@ import { messageForRedeemFailure, redeemOperatorInviteClient } from "@/features/
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { submitTowerEmailSignUp } from "@/features/auth/lib/submit-tower-email-sign-up";
+import { completeTowerWebPostAuthNavigation } from "@/features/auth/model/tower-post-auth-navigation";
 import { useAuthInviteSignUpPrefill } from "@/features/auth/model/use-auth-invite-sign-up-prefill";
 import { useBeaconPopupSessionHandoff } from "@/features/auth/model/use-beacon-popup-session-handoff";
 import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
@@ -38,7 +39,6 @@ async function runAfterTowerSignUp(opts: {
 }
 
 function SignUpForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = sanitizeRelativePath(searchParams.get("callbackUrl") ?? "/");
   const beaconOrigin = searchParams.get("beaconOrigin");
@@ -108,8 +108,7 @@ function SignUpForm() {
     if (tryFinishBeaconTowerAuthPopup(beaconOrigin, u ? userToBeaconPayload(u) : undefined, token)) {
       return;
     }
-    router.push(resolvePostAuthRedirectTarget(u, callbackUrl));
-    router.refresh();
+    completeTowerWebPostAuthNavigation(resolvePostAuthRedirectTarget(u, callbackUrl));
   }
 
   async function onSubmit(e: FormEvent) {

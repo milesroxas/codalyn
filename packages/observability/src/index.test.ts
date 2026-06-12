@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCodalynPostHogSuperProperties,
+  buildCodalynSentryEnvironment,
+  buildCodalynSentryTags,
   CODALYN_POSTHOG_KEY,
   CODALYN_SENTRY_DSN,
+  resolveCodalynBuildChannel,
+  resolveCodalynSentryTracesSampleRate,
   resolvePostHogHost,
   resolvePostHogKey,
   resolveSentryDsn,
@@ -50,5 +55,65 @@ describe("resolveSentryDsn", () => {
 describe("resolvePostHogHost", () => {
   it("defaults to us host", () => {
     expect(resolvePostHogHost()).toBe("https://us.i.posthog.com");
+  });
+});
+
+describe("resolveCodalynBuildChannel", () => {
+  it("normalizes production aliases", () => {
+    expect(resolveCodalynBuildChannel("production")).toBe("production");
+    expect(resolveCodalynBuildChannel("prod")).toBe("production");
+  });
+
+  it("normalizes preview", () => {
+    expect(resolveCodalynBuildChannel("preview")).toBe("preview");
+  });
+
+  it("normalizes development aliases", () => {
+    expect(resolveCodalynBuildChannel("development")).toBe("development");
+    expect(resolveCodalynBuildChannel("dev")).toBe("development");
+  });
+
+  it("defaults unknown values to development", () => {
+    expect(resolveCodalynBuildChannel()).toBe("development");
+    expect(resolveCodalynBuildChannel("staging")).toBe("development");
+  });
+});
+
+describe("buildCodalynSentryEnvironment", () => {
+  it("combines app and channel", () => {
+    expect(buildCodalynSentryEnvironment("beacon", "production")).toBe("beacon-production");
+    expect(buildCodalynSentryEnvironment("tower", "preview")).toBe("tower-preview");
+  });
+});
+
+describe("buildCodalynSentryTags", () => {
+  it("includes app and build_channel", () => {
+    expect(buildCodalynSentryTags("flint", "development")).toEqual({
+      app: "flint",
+      build_channel: "development",
+    });
+  });
+});
+
+describe("resolveCodalynSentryTracesSampleRate", () => {
+  it("samples less in production", () => {
+    expect(resolveCodalynSentryTracesSampleRate("production")).toBe(0.1);
+    expect(resolveCodalynSentryTracesSampleRate("preview")).toBe(1);
+  });
+});
+
+describe("buildCodalynPostHogSuperProperties", () => {
+  it("includes required fields and omits undefined optional fields", () => {
+    expect(
+      buildCodalynPostHogSuperProperties({
+        app: "beacon",
+        environment: "preview",
+        app_version: "1.0.0",
+      })
+    ).toEqual({
+      app: "beacon",
+      environment: "preview",
+      app_version: "1.0.0",
+    });
   });
 });

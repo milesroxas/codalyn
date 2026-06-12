@@ -1,6 +1,6 @@
 export const buildInfo = {
   version: __APP_VERSION__,
-  channel: __BUILD_CHANNEL__ as "production" | "development",
+  channel: __BUILD_CHANNEL__ as "production" | "development" | "preview",
   buildTime: __BUILD_TIME__,
   recipient: import.meta.env.VITE_BUNDLE_RECIPIENT ?? "internal",
 };

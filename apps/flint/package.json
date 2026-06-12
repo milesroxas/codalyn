@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "node ../../scripts/build-cli.mjs --app flint",
     "build:prod": "node ../../scripts/build-cli.mjs --app flint --channel production",
+    "build:preview": "node ../../scripts/build-cli.mjs --app flint --channel preview",
     "build:dev": "node ../../scripts/build-cli.mjs --app flint --channel development",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",

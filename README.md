@@ -22,7 +22,7 @@ packages/
 | `apps/tower` | Next.js dashboard: auth, billing, metering, Webflow Data API proxy | [README](apps/tower/README.md) · [pricing & billing](apps/tower/docs/pricing-and-billing.md) · [Stripe](apps/tower/docs/stripe.md) |
 | `packages/loadout` | Webflow runtime library, published to npm | [README](packages/loadout/README.md) |
 | `packages/webflow-kit` | Shared Webflow + image constants for Tower & Beacon | — |
-| `packages/observability` | Shared PostHog + Sentry setup | — |
+| `packages/observability` | Shared PostHog + Sentry setup | [README](packages/observability/README.md) |
 
 ### Conventions
 
@@ -61,17 +61,62 @@ pnpm format                           # biome format --write .
 
 A `pre-commit` hook (simple-git-hooks + lint-staged) runs `biome check --write` on staged files.
 
+### Tower database (Postgres / Drizzle)
+
+Tower owns all database scripts. Run from the **repo root** with `pnpm app tower <script>`. Set `DATABASE_URL` in `apps/tower/.env.local` (see `apps/tower/.env.example`). Full workflow: [apps/tower/drizzle/README.md](apps/tower/drizzle/README.md).
+
+**Local Postgres (Docker):**
+
+```bash
+cd apps/tower && docker compose up -d postgres   # or: pnpm app tower docker:up (full stack)
+pnpm app tower db:migrate:local                # apply pending migrations
+pnpm app tower dev                             # uses local DATABASE_URL (port 3100)
+```
+
+**Remote Neon:**
+
+```bash
+pnpm app tower db:migrate:dev                  # Neon dev branch (NEON_* + TOWER_NEON_BRANCH_DEV)
+pnpm app tower db:migrate:preview              # Neon preview branch
+pnpm app tower db:migrate:prod -- --confirm    # production — requires --confirm
+pnpm app tower dev:neon                        # dev server against Neon dev branch
+pnpm app tower dev:preview                     # dev server against Neon preview branch
+```
+
+**Schema & maintenance:**
+
+```bash
+pnpm app tower db:generate                     # after auth-schema.ts changes; commit SQL + drizzle/meta/
+pnpm app tower db:check                        # validate journal + snapshots (run before PR)
+pnpm app tower db:push                         # dev-only schema sync without migration files
+pnpm app tower db:studio                       # Drizzle Studio (uses DATABASE_URL)
+pnpm app tower db:reset:local -- --confirm     # wipe local Docker volume, migrate, seed operators
+pnpm app tower db:seed:local                   # create/update operators only — does not wipe data
+```
+
+**Seed vs reset (local only):**
+
+| Command | Wipes DB? | What it does |
+| --- | --- | --- |
+| `db:seed:local` | **No** | Creates or updates accounts in `TOWER_PRODUCT_ADMIN_EMAILS` (password, `product_admin` role). All other data stays. |
+| `db:reset:local -- --confirm` | **Yes** | `docker compose down -v`, migrate, then seed. Fresh empty database. Requires localhost `DATABASE_URL`. |
+
+Set `TOWER_PRODUCT_ADMIN_EMAILS` in `apps/tower/.env` or `.env.local` before seed/reset. Default password: `codalyn-local-dev` (or `TOWER_LOCAL_DEV_PASSWORD`).
+
+Vercel-hosted DB targets: `db:migrate:dev:vercel`, `db:migrate:preview:vercel`, `db:migrate:prod:vercel -- --confirm`. More detail: [apps/tower/README.md](apps/tower/README.md).
+
 ### Webflow extension builds (flint, beacon)
 
-Each Webflow Designer Extension app shares a single interactive build CLI at `scripts/build-cli.mjs`. It typechecks, cleans `dist/`, runs `vite build`, calls `webflow extension bundle`, and moves `bundle.zip` into `apps/<app>/bundle/<channel>/<recipient>/v<version>_<recipient>_<timestamp>.zip` (upload that file to Webflow).
+Each Webflow Designer Extension app shares a single interactive build CLI at `scripts/build-cli.mjs`. Before bundling it runs **`pnpm lint:all`** (typecheck + lint) and **`pnpm test:run`** for that app, then builds with Vite, verifies baked-in markers, calls `webflow extension bundle`, and moves `bundle.zip` into `apps/<app>/bundle/<channel>/<recipient>/v<version>_<recipient>_<timestamp>.zip` (upload that file to Webflow).
 
 ```bash
 pnpm app <app> build           # interactive: prompts for channel + recipient
-pnpm app <app> build:prod      # channel preset to production, prompts for recipient
-pnpm app <app> build:dev       # channel preset to development, prompts for recipient
+pnpm app <app> build:prod      # production → bundle/production/ (Beacon: tower.codalyn.app)
+pnpm app <app> build:preview   # preview → bundle/preview/ (Beacon: tower-preview.codalyn.app)
+pnpm app <app> build:dev       # development → bundle/development/ (local Tower default)
 ```
 
-Applies to `flint` and `beacon`. Tower uses `pnpm app tower dev` / `pnpm app tower build`. Local Tower dev owns host port **3100** by default; Docker and Postgres are documented in `apps/tower/README.md` (including how to avoid port clashes).
+Applies to `flint` and `beacon`. Tower uses `pnpm app tower dev` / `pnpm app tower build`. Local Tower dev owns host port **3100** by default; see **Tower database** above and [apps/tower/README.md](apps/tower/README.md) for Docker/Neon setup.
 
 ## Release — @codalyn/loadout
 

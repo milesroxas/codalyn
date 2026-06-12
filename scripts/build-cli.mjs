@@ -7,11 +7,10 @@
  * Extension bundles across apps. Handles channel selection, recipient
  * targeting, and versioned output. Invoked from app package scripts.
  *
- * Pipeline: clean dist → tsc → vite build → webflow extension bundle → move
- * bundle.zip into bundle/<channel>/<recipient>/v<version>_<recipient>_<timestamp>.zip
+ * Pipeline: lint:all → test:run → clean dist → vite build → verify markers → webflow bundle → archive
  *
  * Usage:
- *   node scripts/build-cli.mjs --app <name> [--channel production|development]
+ *   node scripts/build-cli.mjs --app <name> [--channel production|development|preview]
  */
 
 import { execSync, spawn } from "node:child_process";
@@ -20,7 +19,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as p from "@clack/prompts";
 import color from "picocolors";
-import { WEBFLOW_EXTENSION_BUNDLE_FILENAME, assertBundleOutputMatchesBuild } from "./extension-build.mjs";
+import { assertBundleOutputMatchesBuild, WEBFLOW_EXTENSION_BUNDLE_FILENAME } from "./extension-build.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,6 +27,14 @@ const ROOT = resolve(__dirname, "..");
 const isNonInteractive = process.env.CI === "true" || !process.stdin.isTTY || !process.stdout.isTTY;
 
 const BEACON_PRODUCTION_TOWER_ORIGIN = "https://tower.codalyn.app";
+const BEACON_PREVIEW_TOWER_ORIGIN = "https://tower-preview.codalyn.app";
+const VALID_BUILD_CHANNELS = ["production", "development", "preview"];
+
+function channelOutputDir(channel) {
+  if (channel === "production") return "production";
+  if (channel === "preview") return "preview";
+  return "development";
+}
 
 function parseArgs(argv) {
   const args = { app: null, channel: null };
@@ -95,14 +102,15 @@ function buildTimestamp() {
 }
 
 const STEPS = [
-  { label: "Type checking", pct: 10 },
-  { label: "Building with Vite", pct: 40 },
+  { label: "Lint & typecheck", pct: 5 },
+  { label: "Running tests", pct: 15 },
+  { label: "Building with Vite", pct: 45 },
   { label: "Bundling extension", pct: 75 },
   { label: "Organizing output", pct: 95 },
 ];
 
 async function resolveBuildChannel(channelArg) {
-  if (channelArg && channelArg !== "production" && channelArg !== "development") {
+  if (channelArg && !VALID_BUILD_CHANNELS.includes(channelArg)) {
     p.cancel(`Invalid --channel value: ${channelArg}`);
     process.exit(1);
   }
@@ -111,8 +119,9 @@ async function resolveBuildChannel(channelArg) {
   const picked = await p.select({
     message: "Build channel",
     options: [
-      { value: "production", label: "Production", hint: "bundle/prod/ — for distribution" },
-      { value: "development", label: "Development", hint: "bundle/development/ — for testing" },
+      { value: "production", label: "Production", hint: "bundle/production/ — tower.codalyn.app" },
+      { value: "preview", label: "Preview", hint: "bundle/preview/ — tower-preview.codalyn.app" },
+      { value: "development", label: "Development", hint: "bundle/development/ — local Tower default" },
     ],
   });
   if (p.isCancel(picked)) {
@@ -156,6 +165,13 @@ function buildViteEnv({ appName, channel, recipient }) {
     env.VITE_BEACON_API_KEY = "";
     if (appName === "beacon") {
       env.VITE_TOWER_ORIGIN = BEACON_PRODUCTION_TOWER_ORIGIN;
+      env.BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION = "";
+    }
+  }
+  if (channel === "preview") {
+    env.VITE_BEACON_API_KEY = "";
+    if (appName === "beacon") {
+      env.VITE_TOWER_ORIGIN = BEACON_PREVIEW_TOWER_ORIGIN;
       env.BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION = "";
     }
   }
@@ -211,6 +227,9 @@ function expectedBundleMarkers({ appName, channel, recipient, pkg }) {
   if (appName === "beacon" && channel === "production") {
     expected.towerOrigin = BEACON_PRODUCTION_TOWER_ORIGIN;
   }
+  if (appName === "beacon" && channel === "preview") {
+    expected.towerOrigin = BEACON_PREVIEW_TOWER_ORIGIN;
+  }
   return expected;
 }
 
@@ -222,21 +241,31 @@ function verifyArchivedZipBundle(archivePath, markers) {
   verifyArchivedZipContains(archivePath, markers);
 }
 
+function reportStepFailure(s, title, result) {
+  s.stop(color.red(title));
+  p.log.error(result.stdout || result.stderr || "Unknown error");
+  process.exit(1);
+}
+
 async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
-  const channelDir = channel === "production" ? "prod" : "development";
-  const viteMode = channel === "production" ? "production" : "development";
+  const channelDir = channelOutputDir(channel);
+  const viteMode = channel;
   const s = p.spinner();
   const viteEnv = buildViteEnv({ appName, channel, recipient });
 
   s.start(`${progressBar(STEPS[0].pct)}  ${STEPS[0].label}…`);
-  const tscResult = await run("pnpm", ["exec", "tsc", "--noEmit"], { cwd: appPath });
-  if (tscResult.status !== 0) {
-    s.stop(color.red("Type check failed"));
-    p.log.error(tscResult.stdout || tscResult.stderr || "Unknown error");
-    process.exit(1);
+  const lintResult = await run("pnpm", ["lint:all"], { cwd: appPath });
+  if (lintResult.status !== 0) {
+    reportStepFailure(s, "Lint / typecheck failed", lintResult);
   }
 
   s.message(`${progressBar(STEPS[1].pct)}  ${STEPS[1].label}…`);
+  const testResult = await run("pnpm", ["test:run"], { cwd: appPath });
+  if (testResult.status !== 0) {
+    reportStepFailure(s, "Tests failed", testResult);
+  }
+
+  s.message(`${progressBar(STEPS[2].pct)}  ${STEPS[2].label}…`);
   cleanDist(appPath);
   const markers = expectedBundleMarkers({ appName, channel, recipient, pkg });
   const viteResult = await run("pnpm", ["exec", "vite", "build", "--mode", viteMode], {
@@ -244,9 +273,7 @@ async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
     env: viteEnv,
   });
   if (viteResult.status !== 0) {
-    s.stop(color.red("Vite build failed"));
-    p.log.error(viteResult.stdout || viteResult.stderr || "Unknown error");
-    process.exit(1);
+    reportStepFailure(s, "Vite build failed", viteResult);
   }
 
   try {
@@ -257,17 +284,15 @@ async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
     process.exit(1);
   }
 
-  s.message(`${progressBar(STEPS[2].pct)}  ${STEPS[2].label}…`);
+  s.message(`${progressBar(STEPS[3].pct)}  ${STEPS[3].label}…`);
   const bundleResult = await run("pnpm", ["exec", "webflow", "extension", "bundle", "--no-input"], {
     cwd: appPath,
   });
   if (bundleResult.status !== 0) {
-    s.stop(color.red("Webflow bundle failed"));
-    p.log.error(bundleResult.stdout || bundleResult.stderr || "Unknown error");
-    process.exit(1);
+    reportStepFailure(s, "Webflow bundle failed", bundleResult);
   }
 
-  s.message(`${progressBar(STEPS[3].pct)}  ${STEPS[3].label}…`);
+  s.message(`${progressBar(STEPS[4].pct)}  ${STEPS[4].label}…`);
   const uploadBundlePath = resolve(appPath, WEBFLOW_EXTENSION_BUNDLE_FILENAME);
   if (!existsSync(uploadBundlePath)) {
     s.stop(color.red("Webflow bundle missing"));
@@ -297,7 +322,7 @@ async function main() {
   const { app: appArg, channel: channelArg } = parseArgs(process.argv.slice(2));
 
   if (!appArg) {
-    console.error("Usage: node scripts/build-cli.mjs --app <name> [--channel production|development]");
+    console.error("Usage: node scripts/build-cli.mjs --app <name> [--channel production|development|preview]");
     process.exit(1);
   }
 
@@ -316,7 +341,7 @@ async function main() {
   p.intro(`${color.bgCyan(color.black(`  ${appArg}  `))} ${color.dim("build cli")}  ${color.dim(`v${pkg.version}`)}`);
 
   const channel = await resolveBuildChannel(channelArg);
-  const channelDir = channel === "production" ? "prod" : "development";
+  const channelDir = channelOutputDir(channel);
   const recipient = await resolveRecipientName(appPath, channelDir);
 
   p.note(

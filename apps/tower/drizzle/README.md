@@ -28,9 +28,9 @@ From the repo root, use `pnpm app tower <script>` (e.g. `pnpm app tower db:reset
 1. `docker compose down -v` — deletes the `tower_pgdata` volume
 2. `docker compose up -d postgres` — fresh Postgres
 3. `pnpm db:migrate:local` — apply migrations
-4. Seeds accounts for every email in **`TOWER_PRODUCT_ADMIN_EMAILS`** (`apps/tower/.env`)
+4. Seeds accounts for every email in **`TOWER_PRODUCT_ADMIN_EMAILS`** (`apps/tower/.env` or `.env.local`)
 
-Seeded operators get `role = product_admin`, verified email, early access (when the gate is on), and a credential account. Default password: **`codalyn-local-dev`**, or set **`TOWER_LOCAL_DEV_PASSWORD`**.
+Seeded operators get `role = product_admin`, verified email, `early_access_granted_at` (for early-access gate testing), and a Better Auth `credential` account. Default password: **`codalyn-local-dev`**, or set **`TOWER_LOCAL_DEV_PASSWORD`**. Platform metering defaults come from migrations + `tower-limits-config.ts` on first use — not from this seed script.
 
 **`pnpm db:seed:local`** runs step 4 only — useful after changing operator emails or refreshing dev passwords. Updates existing rows and resets their passwords.
 

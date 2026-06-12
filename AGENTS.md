@@ -32,7 +32,7 @@ Use **pnpm** only (`packageManager` in root `package.json`).
 ## Monorepo constraints
 
 - Apps: `apps/flint`, `apps/beacon`, `apps/tower` — **no imports between apps**.
-- Shared code: `packages/loadout`, `packages/webflow-kit`, `packages/observability`.
+- Shared code: `packages/loadout`, `packages/webflow-kit`, `packages/observability` ([observability guide](packages/observability/README.md)).
 - Workspace layout and commands: root `README.md`.
 
 ## UI styling ownership (always enforce)

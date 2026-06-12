@@ -16,7 +16,7 @@ Exposes build-time constants injected by Vite at compile time. Used to tag PostH
 import { buildInfo } from "@/shared/lib/build-info";
 
 buildInfo.version    // e.g. "1.2.0"  — from package.json at build time
-buildInfo.channel    // "production" | "development"  — from --mode flag
+buildInfo.channel    // "production" | "development" | "preview"  — from --mode flag
 buildInfo.buildTime  // ISO 8601 timestamp  — e.g. "2026-02-27T10:30:00.000Z"
 ```
 
@@ -33,15 +33,7 @@ Recipient at build time comes from the shared root build CLI (see repository roo
 
 ### PostHog integration
 
-Registered as [super properties](https://posthog.com/docs/libraries/js#super-properties) in `src/index.tsx` — automatically attached to every PostHog event without any extra instrumentation:
-
-```ts
-posthog.register({
-  app_version: buildInfo.version,
-  build_channel: buildInfo.channel,
-  build_time: buildInfo.buildTime,
-});
-```
+Observability tags (`app`, `environment`, `app_version`, etc.) are registered in `init-observability.ts` via `@codalyn/observability`. See **[`packages/observability/README.md`](../../../../../packages/observability/README.md)** for the full setup, env vars, and dashboard filters.
 
 ---
 

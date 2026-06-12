@@ -1,4 +1,12 @@
-import { resolvePostHogHost, resolvePostHogKey, resolveSentryDsn } from "@codalyn/observability";
+import {
+  buildCodalynPostHogSuperProperties,
+  buildCodalynSentryEnvironment,
+  buildCodalynSentryTags,
+  resolveCodalynSentryTracesSampleRate,
+  resolvePostHogHost,
+  resolvePostHogKey,
+  resolveSentryDsn,
+} from "@codalyn/observability";
 import * as Sentry from "@sentry/react";
 import posthog from "posthog-js";
 import { buildInfo } from "@/shared/lib/build-info";
@@ -11,11 +19,11 @@ export function initObservability(): void {
   if (sentryDsn) {
     Sentry.init({
       dsn: sentryDsn,
-      environment: buildInfo.channel,
+      environment: buildCodalynSentryEnvironment("beacon", buildInfo.channel),
       release: buildInfo.version,
-      tracesSampleRate: buildInfo.channel === "production" ? 0.1 : 1,
+      tracesSampleRate: resolveCodalynSentryTracesSampleRate(buildInfo.channel),
       initialScope: {
-        tags: { app: "beacon" },
+        tags: buildCodalynSentryTags("beacon", buildInfo.channel),
       },
     });
   }
@@ -30,14 +38,16 @@ export function initObservability(): void {
         capture_console_errors: false,
       },
     });
-    posthog.register({
-      app: "beacon",
-      app_version: buildInfo.version,
-      release_stage: buildInfo.releaseStage,
-      build_channel: buildInfo.channel,
-      build_time: buildInfo.buildTime,
-      bundle_recipient: buildInfo.recipient,
-    });
+    posthog.register(
+      buildCodalynPostHogSuperProperties({
+        app: "beacon",
+        environment: buildInfo.channel,
+        app_version: buildInfo.version,
+        release_stage: buildInfo.releaseStage,
+        build_time: buildInfo.buildTime,
+        bundle_recipient: buildInfo.recipient,
+      })
+    );
   }
 
   if (!posthogKey) {

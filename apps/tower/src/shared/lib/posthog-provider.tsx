@@ -1,9 +1,10 @@
 "use client";
 
-import { resolvePostHogHost, resolvePostHogKey } from "@codalyn/observability";
+import { buildCodalynPostHogSuperProperties, resolvePostHogHost, resolvePostHogKey } from "@codalyn/observability";
 import { PostHogProvider as PHProvider } from "@posthog/react";
 import posthog from "posthog-js";
 import { type ReactNode, useEffect, useState } from "react";
+import { codalynRuntimeInfo } from "@/shared/lib/codalyn-runtime-info";
 
 const posthogKey = resolvePostHogKey(process.env.NEXT_PUBLIC_POSTHOG_KEY);
 const posthogHost = resolvePostHogHost(process.env.NEXT_PUBLIC_POSTHOG_HOST);
@@ -28,7 +29,13 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
         capture_console_errors: false,
       },
     });
-    posthog.register({ app: "tower" });
+    posthog.register(
+      buildCodalynPostHogSuperProperties({
+        app: codalynRuntimeInfo.app,
+        environment: codalynRuntimeInfo.environment,
+        app_version: codalynRuntimeInfo.version,
+      })
+    );
     setReady(true);
   }, []);
 

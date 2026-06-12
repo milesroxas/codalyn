@@ -31,7 +31,7 @@ Flint is a React + Vite Designer extension written in strict TypeScript. It atta
 ### Quick start
 
 - From the repository root: `pnpm app flint dev` (or from this directory: `pnpm dev`). Use the printed URL as the Webflow “Development URL”.
-- Extension bundles: see root README (`pnpm app flint build`, `build:dev`, `build:prod`). Zips are written under `bundle/<channel>/<recipient>/` in this package.
+- Extension bundles: see root README (`pnpm app flint build`, `build:dev`, `build:preview`, `build:prod`). Zips are written under `bundle/<channel>/<recipient>/` in this package.
 - Preview the compiled extension locally:
   ```bash
   pnpm preview

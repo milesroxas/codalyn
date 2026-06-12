@@ -1,6 +1,9 @@
 /** Default Tower app origin for production Webflow bundles (not the marketing site). */
 export const DEFAULT_PRODUCTION_TOWER_ORIGIN = "https://tower.codalyn.app";
 
+/** Default Tower app origin for preview/staging Webflow bundles. */
+export const DEFAULT_PREVIEW_TOWER_ORIGIN = "https://tower-preview.codalyn.app";
+
 /** Marketing-only hosts — API/auth must use the Tower app subdomain instead. */
 const TOWER_MARKETING_ONLY_HOSTS = ["codalyn.app", "www.codalyn.app", "preview.codalyn.app"] as const;
 
@@ -47,17 +50,24 @@ export function resolveBeaconTowerOriginForBuild(options: ResolveBeaconTowerOrig
   } = options;
 
   const explicit = normalizeOrigin(explicitOrigin);
+  const isReleaseBuild = mode === "production" || mode === "preview";
+  const defaultReleaseOrigin = mode === "preview" ? DEFAULT_PREVIEW_TOWER_ORIGIN : DEFAULT_PRODUCTION_TOWER_ORIGIN;
+
   if (explicit) {
-    if (mode === "production") {
+    if (isReleaseBuild) {
       const hostname = hostnameFromOrigin(explicit);
       if (hostname && isTowerMarketingOnlyHost(hostname)) {
-        return normalizeOrigin(DEFAULT_PRODUCTION_TOWER_ORIGIN);
+        return normalizeOrigin(defaultReleaseOrigin);
       }
       if (isLocalTowerOrigin(explicit) && !allowLocalInProduction) {
-        return normalizeOrigin(DEFAULT_PRODUCTION_TOWER_ORIGIN);
+        return normalizeOrigin(defaultReleaseOrigin);
       }
     }
     return explicit;
+  }
+
+  if (mode === "preview") {
+    return normalizeOrigin(DEFAULT_PREVIEW_TOWER_ORIGIN);
   }
 
   if (mode === "production") {

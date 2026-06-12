@@ -1,4 +1,12 @@
-import { resolvePostHogHost, resolvePostHogKey, resolveSentryDsn } from "@codalyn/observability";
+import {
+  buildCodalynPostHogSuperProperties,
+  buildCodalynSentryEnvironment,
+  buildCodalynSentryTags,
+  resolveCodalynSentryTracesSampleRate,
+  resolvePostHogHost,
+  resolvePostHogKey,
+  resolveSentryDsn,
+} from "@codalyn/observability";
 import * as Sentry from "@sentry/react";
 import posthog from "posthog-js";
 import { getCurrentPreset } from "@/features/linter/model/linter.factory";
@@ -13,11 +21,11 @@ export function initObservability(): void {
   if (sentryDsn) {
     Sentry.init({
       dsn: sentryDsn,
-      environment: buildInfo.channel,
+      environment: buildCodalynSentryEnvironment("flint", buildInfo.channel),
       release: buildInfo.version,
-      tracesSampleRate: buildInfo.channel === "production" ? 0.1 : 1,
+      tracesSampleRate: resolveCodalynSentryTracesSampleRate(buildInfo.channel),
       initialScope: {
-        tags: { app: "flint" },
+        tags: buildCodalynSentryTags("flint", buildInfo.channel),
       },
     });
   }
@@ -32,13 +40,15 @@ export function initObservability(): void {
         capture_console_errors: false,
       },
     });
-    posthog.register({
-      app: "flint",
-      app_version: buildInfo.version,
-      build_channel: buildInfo.channel,
-      build_time: buildInfo.buildTime,
-      bundle_recipient: buildInfo.recipient,
-    });
+    posthog.register(
+      buildCodalynPostHogSuperProperties({
+        app: "flint",
+        environment: buildInfo.channel,
+        app_version: buildInfo.version,
+        build_time: buildInfo.buildTime,
+        bundle_recipient: buildInfo.recipient,
+      })
+    );
     registerFrameworkPreset(getCurrentPreset());
   }
 

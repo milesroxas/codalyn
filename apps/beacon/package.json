@@ -7,6 +7,7 @@
     "dev": "node scripts/dev.mjs",
     "build": "node ../../scripts/build-cli.mjs --app beacon",
     "build:prod": "node ../../scripts/build-cli.mjs --app beacon --channel production",
+    "build:preview": "node ../../scripts/build-cli.mjs --app beacon --channel preview",
     "build:dev": "node ../../scripts/build-cli.mjs --app beacon --channel development",
     "typecheck": "tsc --noEmit",
     "lint": "biome check . && node scripts/assert-no-biome-ignore.mjs",

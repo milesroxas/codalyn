@@ -12,7 +12,7 @@ import { assertLocalDatabaseHost, readTowerEnvFiles, resolveDatabaseUrl } from "
 const DEFAULT_LOCAL_DEV_PASSWORD = "codalyn-local-dev";
 
 function parseProductAdminEmails() {
-  const raw = (readTowerEnvFiles().TOWER_PRODUCT_ADMIN_EMAILS || "").trim();
+  const raw = (process.env.TOWER_PRODUCT_ADMIN_EMAILS || readTowerEnvFiles().TOWER_PRODUCT_ADMIN_EMAILS || "").trim();
   if (!raw) {
     return [];
   }
@@ -25,6 +25,19 @@ function parseProductAdminEmails() {
 function resolveLocalDevPassword() {
   const fromEnv = (process.env.TOWER_LOCAL_DEV_PASSWORD || readTowerEnvFiles().TOWER_LOCAL_DEV_PASSWORD || "").trim();
   return fromEnv || DEFAULT_LOCAL_DEV_PASSWORD;
+}
+
+/** Local Tower origin for post-seed sign-in hints (respects PORT / BETTER_AUTH_URL from env files). */
+function resolveTowerLocalDevOrigin() {
+  const env = readTowerEnvFiles();
+  const fromAuth = (process.env.BETTER_AUTH_URL || env.BETTER_AUTH_URL || "").trim();
+  const fromPublic = (process.env.NEXT_PUBLIC_APP_URL || env.NEXT_PUBLIC_APP_URL || "").trim();
+  const origin = fromAuth || fromPublic;
+  if (origin) {
+    return origin.replace(/\/$/, "");
+  }
+  const port = (process.env.PORT || env.PORT || "3100").trim();
+  return `http://localhost:${port}`;
 }
 
 function displayNameFromEmail(email) {
@@ -65,6 +78,9 @@ export async function seedLocalProductAdminUsers(databaseUrl) {
            SET role = 'product_admin',
                email_verified = true,
                early_access_granted_at = COALESCE(early_access_granted_at, NOW()),
+               banned = false,
+               ban_reason = NULL,
+               ban_expires = NULL,
                updated_at = NOW()
            WHERE id = $1`,
           [userId]
@@ -141,11 +157,12 @@ export async function runSeedLocalOperators(databaseUrl) {
     const action = row.created ? "created" : "updated";
     console.log(`  • ${row.email} (${action})`);
   }
-  console.log(`\nSign in at http://localhost:3100/sign-in`);
+  const origin = resolveTowerLocalDevOrigin();
+  console.log(`\nSign in at ${origin}/sign-in`);
   console.log(
     `Password: ${seeded[0]?.password ?? resolveLocalDevPassword()} (all seeded operators share this password)`
   );
-  console.log("Operator console: http://localhost:3100/console");
+  console.log(`Operator console: ${origin}/console`);
 }
 
 async function main() {

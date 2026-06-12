@@ -20,7 +20,8 @@ const isVitest = Boolean(process.env.VITEST);
  * Tower base URL baked into the bundle.
  * - Dev / `vite build --mode development`: default `http://TOWER_DEV_HOST:TOWER_PORT` when unset.
  * - Production (`vite build --mode production`): defaults to tower.codalyn.app when unset.
- *   Override with `VITE_TOWER_ORIGIN`. Marketing hosts and `http://localhost` are rejected in production;
+ * - Preview (`vite build --mode preview`): defaults to tower-preview.codalyn.app when unset.
+ *   Override with `VITE_TOWER_ORIGIN`. Marketing hosts and `http://localhost` are rejected in release builds;
  *   use `BEACON_ALLOW_LOCAL_TOWER_IN_PRODUCTION=1` for rare local Tower tests.
  */
 function resolveTowerOrigin(mode: string): string {

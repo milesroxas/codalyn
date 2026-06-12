@@ -67,7 +67,21 @@ describe("rewriteBetterAuthVerifyEmailUrlToAppPage", () => {
     const next = rewriteBetterAuthVerifyEmailUrlToAppPage(
       "https://tower.example.com/api/auth/verify-email?token=abc&callbackURL=%2Faccount"
     );
-    expect(next).toBe("https://tower.example.com/verify-email?token=abc&callbackURL=%2Faccount");
+    expect(next).toBe(
+      "https://tower.example.com/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.example.com%2Faccount"
+    );
+    process.env.BETTER_AUTH_URL = prev;
+  });
+
+  it("strips legacy flash and Webflow status params from embedded callback URLs", () => {
+    const prev = process.env.BETTER_AUTH_URL;
+    process.env.BETTER_AUTH_URL = "https://tower.example.com";
+    const next = rewriteBetterAuthVerifyEmailUrlToAppPage(
+      "https://tower.example.com/api/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.example.com%2Fdashboard%3FemailVerified%3D1"
+    );
+    expect(next).toBe(
+      "https://tower.example.com/verify-email?token=abc&callbackURL=https%3A%2F%2Ftower.example.com%2Fdashboard"
+    );
     process.env.BETTER_AUTH_URL = prev;
   });
 });

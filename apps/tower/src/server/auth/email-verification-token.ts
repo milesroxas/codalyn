@@ -1,6 +1,28 @@
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
+import { resolveTowerEmailVerificationCallbackPath } from "@/shared/lib/auth/tower-email-verification-callback";
 
 const TOWER_EMAIL_VERIFICATION_PAGE_PATH = "/verify-email";
+
+function sanitizeTowerEmailVerificationAppCallbackUrl(callbackUrl: string): string {
+  const base = resolveTowerPublicBaseUrl().replace(/\/$/, "");
+  const trimmed = callbackUrl.trim();
+  if (!trimmed) {
+    return `${base}/`;
+  }
+  if (trimmed.startsWith("/")) {
+    return `${base}${resolveTowerEmailVerificationCallbackPath(trimmed)}`;
+  }
+  try {
+    const target = new URL(trimmed);
+    const appOrigin = new URL(`${base}/`).origin;
+    if (target.origin === appOrigin) {
+      return `${base}${resolveTowerEmailVerificationCallbackPath(`${target.pathname}${target.search}`)}`;
+    }
+  } catch {
+    // fall through
+  }
+  return `${base}/`;
+}
 
 /**
  * Decode Better Auth email verification JWT payload for routing only.
@@ -40,7 +62,7 @@ export function buildTowerEmailVerificationPageUrl(token: string, callbackUrl: s
   const base = resolveTowerPublicBaseUrl().replace(/\/$/, "");
   const url = new URL(TOWER_EMAIL_VERIFICATION_PAGE_PATH, `${base}/`);
   url.searchParams.set("token", token);
-  url.searchParams.set("callbackURL", callbackUrl);
+  url.searchParams.set("callbackURL", sanitizeTowerEmailVerificationAppCallbackUrl(callbackUrl));
   return url.toString();
 }
 

@@ -1,3 +1,5 @@
+import { isEmailVerificationRedirectError } from "@/shared/lib/auth/tower-email-verification-callback";
+
 export const TEAM_INVITATION_ACCEPT_PATH = "/invitations/accept";
 
 export function buildTeamInvitationAcceptPath(invitationId: string): string {
@@ -56,11 +58,7 @@ export const TEAM_INVITATION_ACCEPT_COPY = {
 } as const;
 
 export function isTeamInvitationVerificationRedirectError(error: string | null | undefined): boolean {
-  if (!error?.trim()) {
-    return false;
-  }
-  const normalized = error.trim().toLowerCase();
-  return normalized === "invalid_token" || normalized === "token_expired";
+  return isEmailVerificationRedirectError(error);
 }
 
 export type TeamInvitationAcceptErrorKind =

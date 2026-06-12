@@ -3,6 +3,7 @@ import {
   buildTowerVerifyEmailApiUrl,
   isEmailNotVerifiedAuthError,
   readEmailVerificationCallbackUrl,
+  readEmailVerificationRedirectError,
   resolveCheckEmailPromptCopy,
   resolveTowerAppCallbackUrl,
   resolveTowerEmailVerificationAppCallbackUrl,
@@ -20,6 +21,7 @@ describe("resolveTowerEmailVerificationCallbackUrl", () => {
   it("strips legacy emailVerified query params from callback paths", () => {
     expect(resolveTowerEmailVerificationCallbackUrl("/dashboard?emailVerified=1")).toBe("/dashboard");
     expect(resolveTowerEmailVerificationCallbackUrl("/billing?emailVerified=1&tab=usage")).toBe("/billing?tab=usage");
+    expect(resolveTowerEmailVerificationCallbackUrl("/connection?connection=connected")).toBe("/connection");
   });
 });
 
@@ -94,6 +96,14 @@ describe("resolveCheckEmailPromptCopy", () => {
     const copy = resolveCheckEmailPromptCopy("teamInvite");
     expect(copy.title).toBe("Verify your email to join");
     expect(copy.footerLabel).toBe("Back to invitation");
+  });
+});
+
+describe("readEmailVerificationRedirectError", () => {
+  it("matches verify-email redirect errors only", () => {
+    expect(readEmailVerificationRedirectError(new URLSearchParams("error=invalid_token"))).toBe("invalid_token");
+    expect(readEmailVerificationRedirectError(new URLSearchParams("error=invalid_state"))).toBeNull();
+    expect(readEmailVerificationRedirectError(new URLSearchParams("error=token_exchange"))).toBeNull();
   });
 });
 

@@ -1,9 +1,14 @@
 import { authClient } from "@/features/auth/model/auth-client";
 import type { AuthCheckEmailCardCopy } from "@/features/auth/ui/auth-check-email-card";
+import {
+  isEmailVerificationRedirectError,
+  resolveTowerEmailVerificationCallbackPath,
+  stripLegacyEmailVerifiedQueryParam,
+  TOWER_EMAIL_VERIFIED_QUERY,
+} from "@/shared/lib/auth/tower-email-verification-callback";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 
-/** @deprecated Legacy flash query param from pre-cookie verification redirects. Stripped on read. */
-export const TOWER_EMAIL_VERIFIED_QUERY = "emailVerified";
+export { TOWER_EMAIL_VERIFIED_QUERY };
 
 export const EMAIL_VERIFICATION_BANNER_COPY = {
   title: "Verify your email",
@@ -66,7 +71,7 @@ export const VERIFY_EMAIL_PAGE_COPY = {
 
 /** Same-origin post-verify destination — no flash query params (flash uses an httpOnly cookie). */
 export function resolveTowerEmailVerificationCallbackUrl(path = "/"): string {
-  return stripLegacyEmailVerifiedQueryParam(sanitizeRelativePath(path));
+  return resolveTowerEmailVerificationCallbackPath(path);
 }
 
 export function resolveTowerAppCallbackUrl(path: string): string {
@@ -111,7 +116,10 @@ export function readSessionEmailVerified(user: { emailVerified?: boolean | null 
 
 export function readEmailVerificationRedirectError(searchParams: URLSearchParams): string | null {
   const error = searchParams.get("error")?.trim();
-  return error || null;
+  if (!error || !isEmailVerificationRedirectError(error)) {
+    return null;
+  }
+  return error;
 }
 
 export function readEmailVerificationToken(searchParams: URLSearchParams): string | null {
@@ -123,7 +131,7 @@ export function readEmailVerificationToken(searchParams: URLSearchParams): strin
 export function buildTowerVerifyEmailApiUrl(token: string, callbackPath: string, origin = "http://localhost"): string {
   const apiUrl = new URL("/api/auth/verify-email", origin);
   apiUrl.searchParams.set("token", token);
-  apiUrl.searchParams.set("callbackURL", resolveTowerAppCallbackUrl(callbackPath));
+  apiUrl.searchParams.set("callbackURL", resolveTowerEmailVerificationAppCallbackUrl(callbackPath));
   return apiUrl.toString();
 }
 
@@ -155,15 +163,4 @@ export function readEmailVerificationCallbackUrl(searchParams: URLSearchParams):
   return resolveTowerEmailVerificationCallbackUrl("/");
 }
 
-/** Remove legacy ?emailVerified=1 from in-flight verification links. */
-export function stripLegacyEmailVerifiedQueryParam(pathWithQuery: string): string {
-  const queryIndex = pathWithQuery.indexOf("?");
-  if (queryIndex === -1) {
-    return pathWithQuery;
-  }
-  const path = pathWithQuery.slice(0, queryIndex);
-  const params = new URLSearchParams(pathWithQuery.slice(queryIndex + 1));
-  params.delete(TOWER_EMAIL_VERIFIED_QUERY);
-  const search = params.toString();
-  return search ? `${path}?${search}` : path;
-}
+export { stripLegacyEmailVerifiedQueryParam };

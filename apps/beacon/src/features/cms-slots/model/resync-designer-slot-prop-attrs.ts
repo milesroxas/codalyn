@@ -1,27 +1,27 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
-  type EngineCodalynAttrSyncResult,
-  syncEngineCodalynSlotPropAttributes,
-} from "@/features/cms-slots/model/cms-slot-engine-codalyn-attr-sync";
+  type DesignerCodalynAttrSyncResult,
+  syncDesignerCodalynSlotPropAttributes,
+} from "@/features/cms-slots/model/cms-slot-designer-codalyn-attr-sync";
 import {
-  type CmsSlotEngineSlotPropsFile,
+  type CmsSlotDesignerSlotPropsFile,
   readAllExposedPropIdsForContainer,
-  readCmsSlotEngineSlotPropsFile,
-} from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+  readCmsSlotDesignerSlotPropsFile,
+} from "@/features/cms-slots/model/cms-slot-designer-slot-props";
 import {
   cmsSlotListKey,
   filterHydratedCmsSlotRowsByComponentIds,
   findCmsSlotListsOnPage,
   type HydratedCmsSlotRow,
   listInstancesInSlotListContainer,
-  resolveCmsSlotEngineConfiguredComponentIds,
+  resolveCmsSlotDesignerConfiguredComponentIds,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import {
-  CMS_SLOTS_ENGINE_RESYNC_NO_FIELDS,
-  CMS_SLOTS_ENGINE_RESYNC_NOTHING_BOUND,
-  CMS_SLOTS_ENGINE_RESYNC_UP_TO_DATE,
-  CMS_SLOTS_ENGINE_RESYNC_UPDATED,
+  CMS_SLOTS_DESIGNER_RESYNC_NO_FIELDS,
+  CMS_SLOTS_DESIGNER_RESYNC_NOTHING_BOUND,
+  CMS_SLOTS_DESIGNER_RESYNC_UP_TO_DATE,
+  CMS_SLOTS_DESIGNER_RESYNC_UPDATED,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { formatWebflowDesignerError } from "@/shared/lib/webflow-designer-error";
 
@@ -34,23 +34,23 @@ export type ResyncNotice = { type: "Warning" | "Success" | "Info"; message: stri
  * (`matchedPropCount > 0`) — it's "already up to date". The "connect your elements" guidance is reserved for the
  * genuine case where fields are selected but nothing in the component is bound to them.
  */
-export function resolveResyncNotice(r: EngineCodalynAttrSyncResult, exposedCount: number): ResyncNotice {
+export function resolveResyncNotice(r: DesignerCodalynAttrSyncResult, exposedCount: number): ResyncNotice {
   if (r.errors.length > 0) {
     return { type: "Warning", message: r.errors[0] };
   }
   if (r.tagged > 0 || r.removed > 0) {
-    return { type: "Success", message: CMS_SLOTS_ENGINE_RESYNC_UPDATED };
+    return { type: "Success", message: CMS_SLOTS_DESIGNER_RESYNC_UPDATED };
   }
   if (r.matchedPropCount > 0) {
-    return { type: "Success", message: CMS_SLOTS_ENGINE_RESYNC_UP_TO_DATE };
+    return { type: "Success", message: CMS_SLOTS_DESIGNER_RESYNC_UP_TO_DATE };
   }
   if (exposedCount > 0) {
-    return { type: "Info", message: CMS_SLOTS_ENGINE_RESYNC_NOTHING_BOUND };
+    return { type: "Info", message: CMS_SLOTS_DESIGNER_RESYNC_NOTHING_BOUND };
   }
-  return { type: "Success", message: CMS_SLOTS_ENGINE_RESYNC_NO_FIELDS };
+  return { type: "Success", message: CMS_SLOTS_DESIGNER_RESYNC_NO_FIELDS };
 }
 
-function notifyResyncOutcome(r: EngineCodalynAttrSyncResult, exposed: ComposableInstancePropMeta[]): void {
+function notifyResyncOutcome(r: DesignerCodalynAttrSyncResult, exposed: ComposableInstancePropMeta[]): void {
   const notice = resolveResyncNotice(r, exposed.length);
   void webflow.notify(notice);
 }
@@ -67,13 +67,13 @@ function mergeScopedIntoSelected(prev: HydratedCmsSlotRow[], scoped: HydratedCms
 
 /**
  * Exposed prop ids whose `data-cb-c` segments must be preserved while re-tagging slot `slotIndex`:
- * the **other** Engine components in this slot, plus every Engine component in **other CMS slots on the page**.
+ * the **other** Designer components in this slot, plus every Designer component in **other CMS slots on the page**.
  * The cross-slot ids stop a shared nested component definition (e.g. an Image used by slot A and slot B) from
  * losing one slot's segments when the other slot re-tags it (last-write-wins).
  */
 async function collectForeignExposedIdsAcrossPage(
   container: BlockElement,
-  sameSlotFile: CmsSlotEngineSlotPropsFile,
+  sameSlotFile: CmsSlotDesignerSlotPropsFile,
   slotIndex: number
 ): Promise<Set<string>> {
   const ids = new Set<string>();
@@ -99,15 +99,15 @@ async function collectForeignExposedIdsAcrossPage(
   return ids;
 }
 
-export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
+export async function resyncDesignerSlotPropAttributesForSlotIndex(input: {
   slotIndex: number;
   selected: HydratedCmsSlotRow[];
   container: BlockElement | null;
-  setResyncingEngineSlotKey: (key: string | null) => void;
+  setResyncingDesignerSlotKey: (key: string | null) => void;
   setSelected: Dispatch<SetStateAction<HydratedCmsSlotRow[]>>;
   onProgress?: (message: string) => void;
 }): Promise<boolean> {
-  const { slotIndex, selected, container, setResyncingEngineSlotKey, setSelected, onProgress } = input;
+  const { slotIndex, selected, container, setResyncingDesignerSlotKey, setSelected, onProgress } = input;
   const labelRow = selected[slotIndex];
   if (labelRow == null) {
     return false;
@@ -115,10 +115,10 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
   if (container == null) {
     return false;
   }
-  setResyncingEngineSlotKey(labelRow.key);
+  setResyncingDesignerSlotKey(labelRow.key);
   try {
     const freshRows = await listInstancesInSlotListContainer(container);
-    const configuredIds = await resolveCmsSlotEngineConfiguredComponentIds(container, freshRows);
+    const configuredIds = await resolveCmsSlotDesignerConfiguredComponentIds(container, freshRows);
     const scoped = filterHydratedCmsSlotRowsByComponentIds(freshRows, configuredIds);
 
     const row = scoped[slotIndex];
@@ -131,11 +131,11 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
       return false;
     }
 
-    const f = await readCmsSlotEngineSlotPropsFile(container, scoped.length);
+    const f = await readCmsSlotDesignerSlotPropsFile(container, scoped.length);
     const exposed = f.slots[slotIndex]?.exposed ?? [];
     const foreignExposedIds = await collectForeignExposedIdsAcrossPage(container, f, slotIndex);
 
-    const r = await syncEngineCodalynSlotPropAttributes(row.instance, exposed, foreignExposedIds, onProgress);
+    const r = await syncDesignerCodalynSlotPropAttributes(row.instance, exposed, foreignExposedIds, onProgress);
 
     setSelected((prev) => mergeScopedIntoSelected(prev, scoped));
     notifyResyncOutcome(r, exposed);
@@ -144,6 +144,6 @@ export async function resyncEngineSlotPropAttributesForSlotIndex(input: {
     void webflow.notify({ type: "Error", message: formatWebflowDesignerError(e) });
     return false;
   } finally {
-    setResyncingEngineSlotKey(null);
+    setResyncingDesignerSlotKey(null);
   }
 }

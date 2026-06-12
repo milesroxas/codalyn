@@ -12,7 +12,7 @@ import {
   classifyElementBindings,
   type ElementBindingClassification,
   isConditionalVisibilityValue,
-} from "@/features/cms-slots/model/cms-slot-engine-element-bindings";
+} from "@/features/cms-slots/model/cms-slot-designer-element-bindings";
 import { seedConditionalControllerPlaceholders } from "@/features/cms-slots/model/cms-slot-hidden-list-publish-placeholders";
 import {
   bindingPropIdFromSettingValue,
@@ -31,7 +31,7 @@ import {
 } from "@/shared/lib/component-definition-scope";
 import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
 
-export type EngineCodalynAttrSyncResult = {
+export type DesignerCodalynAttrSyncResult = {
   tagged: number;
   removed: number;
   /**
@@ -46,13 +46,13 @@ export type EngineCodalynAttrSyncResult = {
   errors: string[];
 };
 
-export type EngineCodalynAttrStripResult = {
+export type DesignerCodalynAttrStripResult = {
   removed: number;
   errors: string[];
 };
 
 /** Accumulated walk output: exposed content props tagged, and controller props that need a publish seed. */
-export type EngineTagWalkResult = {
+export type DesignerTagWalkResult = {
   taggedPropIds: Set<string>;
   /** Prop ids (on the placed instance) to seed truthy so conditionally visible nodes survive publish. */
   conditionalControllerPropIds: Set<string>;
@@ -140,11 +140,11 @@ function seedablePropIdForController(
 }
 
 type WalkAcc = {
-  out: Pick<EngineCodalynAttrSyncResult, "tagged" | "removed" | "errors">;
+  out: Pick<DesignerCodalynAttrSyncResult, "tagged" | "removed" | "errors">;
   taggedPropIds: Set<string>;
   contentBindingCounts: Map<string, number>;
   conditionalControllerPropIds: Set<string>;
-  /** Exposed prop ids of the **other** Engine components in this list; their `data-cb-c` segments are preserved. */
+  /** Exposed prop ids of the **other** Designer components in this list; their `data-cb-c` segments are preserved. */
   foreignExposedIds: ReadonlySet<string>;
 };
 
@@ -166,7 +166,7 @@ async function setOrClearAttr(attr: PropAttrOps, name: string, value: string | n
 
 /**
  * `data-cb-v` target for a shared element: `"1"` when the current component binds it conditionally; otherwise keep
- * the existing flag while another Engine component still owns a segment here (that component may rely on it); else clear.
+ * the existing flag while another Designer component still owns a segment here (that component may rely on it); else clear.
  */
 async function resolveConditionalTarget(
   attr: PropAttrOps,
@@ -224,7 +224,7 @@ async function writeMergedTagAttrs(
 }
 
 /**
- * Writes this component's tags onto one element while preserving other Engine components' segments. `data-cb-c`
+ * Writes this component's tags onto one element while preserving other Designer components' segments. `data-cb-c`
  * becomes the merge of foreign-owned segments and this sync's new segments; `data-cb-v` (conditional) is kept while
  * any segment remains, and cleared (along with `data-cb-c`) when none do.
  */
@@ -254,7 +254,7 @@ async function applyMergedCmsSlotAttrsForElement(
 
     if (merged.length === 0) {
       // An empty merge means no foreign-owned segment survived and this sync added none, so nothing on this
-      // element should stay tagged. Strip every Engine tag (covers a just-deselected prop whose stale segment is
+      // element should stay tagged. Strip every Designer tag (covers a just-deselected prop whose stale segment is
       // no longer in `exposedIds`); ownership-scoped removal would wrongly preserve that orphaned segment.
       acc.out.removed += await removeCmsSlotTagAttrsIfPresent(attr);
       return;
@@ -361,10 +361,10 @@ async function enterComponentDefinitionsAndWalk(
   comp: Component,
   exposed: readonly ComposableInstancePropMeta[],
   foreignExposedIds: ReadonlySet<string>,
-  out: EngineCodalynAttrSyncResult,
+  out: DesignerCodalynAttrSyncResult,
   gate: TagSyncEnteredGate,
   onProgress?: (message: string) => void
-): Promise<EngineTagWalkResult> {
+): Promise<DesignerTagWalkResult> {
   const exposedIds = new Set(exposed.map((e) => e.propId));
   const acc: WalkAcc = {
     out,
@@ -392,7 +392,7 @@ async function enterComponentDefinitionsAndWalk(
 
 async function stripElementCmsSlotAttrs(
   el: AnyElement,
-  out: EngineCodalynAttrStripResult,
+  out: DesignerCodalynAttrStripResult,
   ownerExposedIds: ReadonlySet<string>
 ): Promise<void> {
   const attr = propAttrOpsFor(el);
@@ -408,7 +408,7 @@ async function stripElementCmsSlotAttrs(
 
 async function enterNestedDefinitionAndStripCmsSlotAttrs(
   inst: ComponentElement,
-  out: EngineCodalynAttrStripResult,
+  out: DesignerCodalynAttrStripResult,
   nestedDepth: number,
   ownerExposedIds: ReadonlySet<string>
 ): Promise<void> {
@@ -433,7 +433,7 @@ async function enterNestedDefinitionAndStripCmsSlotAttrs(
 
 async function stripTreeCmsSlotAttrs(
   el: AnyElement,
-  out: EngineCodalynAttrStripResult,
+  out: DesignerCodalynAttrStripResult,
   nestedDepth: number,
   ownerExposedIds: ReadonlySet<string>
 ): Promise<void> {
@@ -464,18 +464,18 @@ async function stripTreeCmsSlotAttrs(
  * site component is not left with stale CMS slot attrs.
  *
  * Pass `ownerExposedIds` (the deleted component's exposed prop ids) so a **shared** nested definition keeps the
- * `data-cb-c` segments owned by other Engine components (e.g. an Image used by both Hero and Card): only this
+ * `data-cb-c` segments owned by other Designer components (e.g. an Image used by both Hero and Card): only this
  * component's segments are removed, and the element's tags are cleared only when no segment remains. Omit / empty
  * set ⇒ remove all tags (single-owner / legacy callers).
  */
-export function stripEngineCodalynAttrsFromComponentInstance(
+export function stripDesignerCodalynAttrsFromComponentInstance(
   instance: ComponentElement,
   ownerExposedIds: ReadonlySet<string> = new Set()
-): Promise<EngineCodalynAttrStripResult> {
+): Promise<DesignerCodalynAttrStripResult> {
   return withComponentDefinitionScope(
     instance,
     async ({ definitionRoot }) => {
-      const out: EngineCodalynAttrStripResult = { removed: 0, errors: [] };
+      const out: DesignerCodalynAttrStripResult = { removed: 0, errors: [] };
       if (definitionRoot != null) {
         await stripTreeCmsSlotAttrs(definitionRoot, out, 0, ownerExposedIds);
       }
@@ -493,20 +493,20 @@ export function stripEngineCodalynAttrsFromComponentInstance(
  * component definitions only when `getProps()` shows their props are wired to an exposed parent prop. Seeds publish
  * placeholders on every conditional element's controller prop so conditionally visible nodes survive publish.
  *
- * `foreignExposedIds` are the exposed prop ids of the **other** Engine components that may share a definition with
+ * `foreignExposedIds` are the exposed prop ids of the **other** Designer components that may share a definition with
  * this one — both the other components in this list and the components in other CMS slots on the page. When a nested
- * component definition is shared across multiple Engine components (e.g. an Image used by both Hero and Card, or by
+ * component definition is shared across multiple Designer components (e.g. an Image used by both Hero and Card, or by
  * slots on two different lists), their `data-cb-c` segments are preserved so each row resolves its own prop at
  * runtime instead of last-write-wins.
  */
-export function syncEngineCodalynSlotPropAttributes(
+export function syncDesignerCodalynSlotPropAttributes(
   instance: ComponentElement,
   exposed: readonly ComposableInstancePropMeta[],
   foreignExposedIds: ReadonlySet<string> = new Set(),
   onProgress?: (message: string) => void
-): Promise<EngineCodalynAttrSyncResult> {
+): Promise<DesignerCodalynAttrSyncResult> {
   return runExclusiveDesignerOp(async () => {
-    const out: EngineCodalynAttrSyncResult = {
+    const out: DesignerCodalynAttrSyncResult = {
       tagged: 0,
       removed: 0,
       matchedPropCount: 0,

@@ -58,7 +58,7 @@ const buttonVariants = cva(
         "icon-xs": "size-7 rounded-sm in-data-[slot=button-group]:rounded-sm [&_svg:not([class*='size-'])]:size-3.5",
         "icon-sm": "size-8 rounded-sm in-data-[slot=button-group]:rounded-sm [&_svg:not([class*='size-'])]:size-4",
         "icon-lg": "size-9",
-        /** CMS Slots Engine / Composer / Sync dock */
+        /** CMS Slots Designer / Composer / Sync dock */
         dockNav: "h-9 min-h-9 gap-2 px-3 py-2 text-[0.8125rem]",
         /** Full-width dock back row (icon + label centered). */
         dockNavFull: "h-9 min-h-9 w-full gap-2 px-3 py-2 text-[0.8125rem]",

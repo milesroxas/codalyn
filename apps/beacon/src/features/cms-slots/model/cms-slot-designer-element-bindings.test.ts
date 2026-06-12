@@ -5,7 +5,7 @@ import {
   imageSearchSettingsRecord,
   isConditionalVisibilityValue,
   resolveElementBindingsSettings,
-} from "@/features/cms-slots/model/cms-slot-engine-element-bindings";
+} from "@/features/cms-slots/model/cms-slot-designer-element-bindings";
 
 describe("resolveElementBindingsSettings", () => {
   it("reads Image bindings from searchSettings", async () => {

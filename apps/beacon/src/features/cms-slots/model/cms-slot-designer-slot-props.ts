@@ -3,14 +3,14 @@ import type {
   ComposableInstancePropSelectOption,
 } from "@/features/cms-slots/model/cms-slot-composable-props";
 
-const ATTR = "data-beacon-engine-slot-props";
+const ATTR = "data-beacon-designer-slot-props";
 const FILE_VERSION = 1 as const;
 
-export type CmsSlotEngineSlotEntry = { exposed: ComposableInstancePropMeta[] };
+export type CmsSlotDesignerSlotEntry = { exposed: ComposableInstancePropMeta[] };
 
-export type CmsSlotEngineSlotPropsFile = {
+export type CmsSlotDesignerSlotPropsFile = {
   v: typeof FILE_VERSION;
-  slots: CmsSlotEngineSlotEntry[];
+  slots: CmsSlotDesignerSlotEntry[];
 };
 
 function isRecord(x: unknown): x is Record<string, unknown> {
@@ -46,7 +46,7 @@ function isComposableMeta(x: unknown): x is ComposableInstancePropMeta {
   return true;
 }
 
-function parseFile(raw: string | null | undefined, slotCount: number): CmsSlotEngineSlotPropsFile {
+function parseFile(raw: string | null | undefined, slotCount: number): CmsSlotDesignerSlotPropsFile {
   const t = (raw ?? "").trim();
   if (t.length === 0) {
     return { v: FILE_VERSION, slots: Array.from({ length: slotCount }, () => ({ exposed: [] })) };
@@ -60,7 +60,7 @@ function parseFile(raw: string | null | undefined, slotCount: number): CmsSlotEn
   if (!isRecord(u) || u.v !== FILE_VERSION || !Array.isArray(u.slots)) {
     return { v: FILE_VERSION, slots: Array.from({ length: slotCount }, () => ({ exposed: [] })) };
   }
-  const slots: CmsSlotEngineSlotEntry[] = [];
+  const slots: CmsSlotDesignerSlotEntry[] = [];
   for (let i = 0; i < slotCount; i++) {
     const s = u.slots[i];
     if (!isRecord(s) || !Array.isArray(s.exposed)) {
@@ -80,8 +80,8 @@ function parseFile(raw: string | null | undefined, slotCount: number): CmsSlotEn
   return { v: FILE_VERSION, slots };
 }
 
-export function serializeSlotPropsFile(f: CmsSlotEngineSlotPropsFile): string {
-  return JSON.stringify(f satisfies CmsSlotEngineSlotPropsFile);
+export function serializeSlotPropsFile(f: CmsSlotDesignerSlotPropsFile): string {
+  return JSON.stringify(f satisfies CmsSlotDesignerSlotPropsFile);
 }
 
 /**
@@ -149,7 +149,7 @@ function findOldPoolIndexForRow(
 function realignExposedByPoolOrder(
   oldPool: readonly { componentId: string; exposed: ComposableInstancePropMeta[] }[],
   newPool: readonly { componentId: string }[]
-): CmsSlotEngineSlotEntry[] {
+): CmsSlotDesignerSlotEntry[] {
   const used = new Set<number>();
   return newPool.map((row) => {
     const found = findOldPoolIndexForRow(oldPool, row.componentId, used);
@@ -164,17 +164,17 @@ function realignExposedByPoolOrder(
 /**
  * Merges stored slot data with the current child count; trims or pads `slots` as needed.
  */
-export async function readCmsSlotEngineSlotPropsFile(
+export async function readCmsSlotDesignerSlotPropsFile(
   listContainer: BlockElement,
   slotCount: number
-): Promise<CmsSlotEngineSlotPropsFile> {
+): Promise<CmsSlotDesignerSlotPropsFile> {
   const raw = await listContainer.getCustomAttribute(ATTR);
   return parseFile(raw ?? null, Math.max(0, slotCount));
 }
 
-export async function writeCmsSlotEngineSlotPropsFile(
+export async function writeCmsSlotDesignerSlotPropsFile(
   listContainer: BlockElement,
-  file: CmsSlotEngineSlotPropsFile
+  file: CmsSlotDesignerSlotPropsFile
 ): Promise<void> {
   await listContainer.setCustomAttribute(ATTR, serializeSlotPropsFile(file));
 }
@@ -186,9 +186,9 @@ export async function writeCmsSlotEngineSlotPropsFile(
  */
 export function mergeSlotFileAfterListRebuild(
   oldPoolIds: readonly string[],
-  oldFile: CmsSlotEngineSlotPropsFile,
+  oldFile: CmsSlotDesignerSlotPropsFile,
   newPool: readonly { componentId: string }[]
-): CmsSlotEngineSlotPropsFile {
+): CmsSlotDesignerSlotPropsFile {
   const oldCombined = oldPoolIds.map((componentId, i) => ({
     componentId,
     exposed: oldFile.slots[i]?.exposed ?? [],

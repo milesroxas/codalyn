@@ -1,8 +1,8 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import {
-  CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LIST_ARIA_LABEL,
-  CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LOADING_ARIA_LABEL,
-  CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_SEARCH_PLACEHOLDER,
+  CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_LIST_ARIA_LABEL,
+  CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_LOADING_ARIA_LABEL,
+  CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_SEARCH_PLACEHOLDER,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { DrawerScrollList, DrawerScrollListAddActionRow } from "@/shared/ui/drawer-scroll-list";
 import { InputSearch } from "@/shared/ui/input";
@@ -37,7 +37,7 @@ export function CompositionComponentCatalogSearch(props: CompositionComponentCat
       onChange={(event) => setComponentQuery(event.target.value)}
       autoComplete="off"
       aria-busy={showCatalogLoading}
-      placeholder={CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_SEARCH_PLACEHOLDER}
+      placeholder={CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_SEARCH_PLACEHOLDER}
     />
   );
 }
@@ -53,10 +53,10 @@ export function CmsSlotCompositionComponentsCatalogList(
 
   return (
     <DrawerScrollList
-      aria-label={CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LIST_ARIA_LABEL}
+      aria-label={CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_LIST_ARIA_LABEL}
       data-slot="cms_slots_component_catalog_list"
       loading={showCatalogLoading}
-      loadingAriaLabel={CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LOADING_ARIA_LABEL}
+      loadingAriaLabel={CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_LOADING_ARIA_LABEL}
       error={catalogError}
       isEmpty={componentCatalog.length === 0 && !showCatalogLoading}
     >

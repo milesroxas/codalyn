@@ -9,7 +9,7 @@ import { CmsSlotsPanelEmptyState } from "@/features/cms-slots/ui/cms-slots-panel
 import {
   CMS_SLOTS_COMPOSER_ORDER_EMPTY_DESCRIPTION,
   CMS_SLOTS_COMPOSER_ORDER_EMPTY_TITLE,
-  CMS_SLOTS_ENGINE_COMPONENTS_LABEL,
+  CMS_SLOTS_DESIGNER_COMPONENTS_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import {
@@ -90,7 +90,7 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
         className="flex min-h-0 min-w-0 flex-1 flex-col"
         data-slot="beacon_composer_order"
       >
-        <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_ENGINE_COMPONENTS_LABEL}</SurfaceSummaryCardPanelSectionLabel>
+        <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_DESIGNER_COMPONENTS_LABEL}</SurfaceSummaryCardPanelSectionLabel>
         {draft.length === 0 ? (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-3">
             <CmsSlotsPanelEmptyState

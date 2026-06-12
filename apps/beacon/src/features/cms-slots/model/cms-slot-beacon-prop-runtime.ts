@@ -16,7 +16,7 @@ export const CMS_SLOT_CONTENT_ATTR = "data-cb-c";
  */
 export const CMS_SLOT_COND_ATTR = "data-cb-v";
 
-/** Tag attributes the Engine writes onto bound elements (and that cleanup removes). */
+/** Tag attributes the Designer writes onto bound elements (and that cleanup removes). */
 const CMS_SLOT_WRITTEN_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR] as const;
 
 /** Canonical exposed prop id from a `data-cb-c` segment (strips the `@N` / `@…` suffix). */
@@ -44,7 +44,7 @@ export function formatContentAttrSegmentsForBindings(
   return segments;
 }
 
-/** Minimal attr API for removing Engine tags from a bound element. */
+/** Minimal attr API for removing Designer tags from a bound element. */
 export type BeaconCmsSlotAttrRemoveOps = {
   get: (name: string) => Promise<null | string>;
   remove: (name: string) => Promise<null>;
@@ -102,10 +102,10 @@ export function contentAttrSegmentOwnedBy(segment: string, ownerIds: ReadonlySet
 }
 
 /**
- * Recomputes a (possibly shared) element's `data-cb-c` segments during **one** Engine component's tag sync.
- * Keeps segments owned by **other** Engine components (`foreignExposedIds`); drops the current component's old
+ * Recomputes a (possibly shared) element's `data-cb-c` segments during **one** Designer component's tag sync.
+ * Keeps segments owned by **other** Designer components (`foreignExposedIds`); drops the current component's old
  * segments and any segment owned by no current component (stale); then appends this sync's `newSegments`.
- * The same nested component definition can therefore carry one segment per Engine component that exposes it
+ * The same nested component definition can therefore carry one segment per Designer component that exposes it
  * (e.g. an Image nested in both Hero and Card), and the footer runtime resolves the right value per row via `pickP`.
  */
 export function mergeContentAttrSegments(input: {
@@ -129,8 +129,8 @@ export function mergeContentAttrSegments(input: {
 }
 
 /**
- * Removes segments owned by `ownerExposedIds` (one deleted Engine component) from a `data-cb-c` value, returning the
- * segments that remain (owned by other Engine components). Used to clean a deleted component's tags off shared
+ * Removes segments owned by `ownerExposedIds` (one deleted Designer component) from a `data-cb-c` value, returning the
+ * segments that remain (owned by other Designer components). Used to clean a deleted component's tags off shared
  * element definitions without disturbing the rest.
  */
 export function removeOwnedContentAttrSegments(
@@ -141,7 +141,7 @@ export function removeOwnedContentAttrSegments(
 }
 
 /**
- * Strips one Engine component's tags from a (possibly shared) element. Rewrites `data-cb-c` to the segments owned by
+ * Strips one Designer component's tags from a (possibly shared) element. Rewrites `data-cb-c` to the segments owned by
  * other components; when none remain also removes `data-cb-v`. `ownerExposedIds` empty
  * ⇒ removes all tags (single-owner / legacy). Returns the number of attributes changed.
  */

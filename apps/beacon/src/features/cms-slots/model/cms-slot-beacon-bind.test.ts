@@ -57,7 +57,7 @@ describe("removeCmsSlotTagAttrsIfPresent", () => {
 });
 
 describe("mergeContentAttrSegments (shared nested component)", () => {
-  it("accumulates one segment per Engine component on a shared element instead of overwriting", () => {
+  it("accumulates one segment per Designer component on a shared element instead of overwriting", () => {
     // Image <img> is exposed standalone (`image`), inside Hero (`hero-image`), and inside Card (`card-image`).
     const afterStandalone = mergeContentAttrSegments({
       existing: null,

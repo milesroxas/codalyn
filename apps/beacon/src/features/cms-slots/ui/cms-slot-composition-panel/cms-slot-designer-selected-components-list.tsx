@@ -1,80 +1,80 @@
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
-import type { CmsSlotEngineSlotPropsFile } from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+import type { CmsSlotDesignerSlotPropsFile } from "@/features/cms-slots/model/cms-slot-designer-slot-props";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
-import { CMS_SLOTS_ENGINE_SELECTED_COMPONENTS_ARIA_LABEL } from "@/shared/lib/cms-slots-feature-copy";
+import { CMS_SLOTS_DESIGNER_SELECTED_COMPONENTS_ARIA_LABEL } from "@/shared/lib/cms-slots-feature-copy";
 import { ScrollArea } from "@/shared/ui/scroll-area";
-import { CmsSlotEngineSelectedRow } from "./cms-slot-engine-selected-row";
+import { CmsSlotDesignerSelectedRow } from "./cms-slot-designer-selected-row";
 
-const cmsSlotEngineSelectedComponentsListShellClass =
+const cmsSlotDesignerSelectedComponentsListShellClass =
   "overflow-hidden rounded-[10px] border border-border/70 bg-card text-card-foreground shadow-sm";
-const cmsSlotEngineSelectedComponentsListScrollAreaClass = "max-h-60";
-const cmsSlotEngineSelectedComponentsListClass = "m-0 list-none divide-y divide-border/80 p-0";
+const cmsSlotDesignerSelectedComponentsListScrollAreaClass = "max-h-60";
+const cmsSlotDesignerSelectedComponentsListClass = "m-0 list-none divide-y divide-border/80 p-0";
 
-type CmsSlotEngineSelectedComponentsListProps = {
+type CmsSlotDesignerSelectedComponentsListProps = {
   selected: HydratedCmsSlotRow[];
   composableByKey: Record<string, ComposableInstancePropMeta[]>;
   composableLoading: boolean;
-  engineSlotProps: CmsSlotEngineSlotPropsFile;
-  enginePublishedDisplayNames: string[] | null;
+  designerSlotProps: CmsSlotDesignerSlotPropsFile;
+  designerPublishedDisplayNames: string[] | null;
   onRenamePublishedDisplayName: (rowKey: string, nextName: string) => void;
   renamingPublishedSlotKey: string | null;
   addPending: boolean;
   removingKey: string | null;
   listTargetActionBusy: boolean;
-  resyncingEngineSlotKey: string | null;
+  resyncingDesignerSlotKey: string | null;
   onRemove: (row: HydratedCmsSlotRow) => void;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
-  onResyncEngineSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
+  onResyncDesignerSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
   autoOpenExposeDrawerRowKey?: string | null;
   onAutoOpenExposeDrawerConsumed?: () => void;
 };
 
-export function CmsSlotEngineSelectedComponentsList(props: CmsSlotEngineSelectedComponentsListProps) {
+export function CmsSlotDesignerSelectedComponentsList(props: CmsSlotDesignerSelectedComponentsListProps) {
   const {
     selected,
     composableByKey,
     composableLoading,
-    engineSlotProps,
-    enginePublishedDisplayNames,
+    designerSlotProps,
+    designerPublishedDisplayNames,
     onRenamePublishedDisplayName,
     renamingPublishedSlotKey,
     addPending,
     removingKey,
     listTargetActionBusy,
-    resyncingEngineSlotKey,
+    resyncingDesignerSlotKey,
     onRemove,
     onSetSlotExposed,
-    onResyncEngineSlotAttrs,
+    onResyncDesignerSlotAttrs,
     autoOpenExposeDrawerRowKey = null,
     onAutoOpenExposeDrawerConsumed,
   } = props;
 
   return (
-    <div className={cmsSlotEngineSelectedComponentsListShellClass} data-slot="cms_slots_selected_components">
-      <ScrollArea className={cmsSlotEngineSelectedComponentsListScrollAreaClass}>
+    <div className={cmsSlotDesignerSelectedComponentsListShellClass} data-slot="cms_slots_selected_components">
+      <ScrollArea className={cmsSlotDesignerSelectedComponentsListScrollAreaClass}>
         <ul
-          className={cmsSlotEngineSelectedComponentsListClass}
-          aria-label={CMS_SLOTS_ENGINE_SELECTED_COMPONENTS_ARIA_LABEL}
+          className={cmsSlotDesignerSelectedComponentsListClass}
+          aria-label={CMS_SLOTS_DESIGNER_SELECTED_COMPONENTS_ARIA_LABEL}
         >
           {selected.map((row, slotIndex) => (
-            <CmsSlotEngineSelectedRow
+            <CmsSlotDesignerSelectedRow
               key={row.key}
               row={row}
               slotIndex={slotIndex}
-              publishedDisplayName={enginePublishedDisplayNames?.[slotIndex] ?? row.name}
+              publishedDisplayName={designerPublishedDisplayNames?.[slotIndex] ?? row.name}
               onRenamePublishedDisplayName={onRenamePublishedDisplayName}
               renamingPublishedSlotKey={renamingPublishedSlotKey}
               available={composableByKey[row.key] ?? []}
-              slotExposed={engineSlotProps.slots[slotIndex]?.exposed ?? []}
+              slotExposed={designerSlotProps.slots[slotIndex]?.exposed ?? []}
               composableLoading={composableLoading}
               composableMetaReady={!composableLoading && row.key in composableByKey}
               addPending={addPending}
               removingKey={removingKey}
               listTargetActionBusy={listTargetActionBusy}
-              resyncingEngineSlotKey={resyncingEngineSlotKey}
+              resyncingDesignerSlotKey={resyncingDesignerSlotKey}
               onRemove={onRemove}
               onSetSlotExposed={onSetSlotExposed}
-              onResyncEngineSlotAttrs={onResyncEngineSlotAttrs}
+              onResyncDesignerSlotAttrs={onResyncDesignerSlotAttrs}
               autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
               onAutoOpenExposeDrawerConsumed={onAutoOpenExposeDrawerConsumed}
             />

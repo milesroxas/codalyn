@@ -1,27 +1,27 @@
 import { describe, expect, it } from "vitest";
 import {
-  canAccessCmsSlotsEngine,
+  canAccessCmsSlotsDesigner,
   computeEditorExperienceFromMembership,
   defaultCmsSlotsRouteSegment,
   resolveAllowedCmsSlotsSegment,
-  shouldShowCmsSlotsComposerEngineNotReadyEmpty,
-  shouldShowCmsSlotsComposerInstallInEngineEmpty,
+  shouldShowCmsSlotsComposerDesignerNotReadyEmpty,
+  shouldShowCmsSlotsComposerInstallInDesignerEmpty,
   shouldShowCmsSlotsEditorNoSlotsEmpty,
   shouldShowCmsSlotsPreInstall,
 } from "@/features/cms-slots/model/cms-slots-access";
 
 describe("cms-slots-access", () => {
-  it("allows Engine for designers and admins in designer view", () => {
-    expect(canAccessCmsSlotsEngine(false)).toBe(true);
-    expect(defaultCmsSlotsRouteSegment(false)).toBe("engine");
+  it("allows Designer for designers and admins in designer view", () => {
+    expect(canAccessCmsSlotsDesigner(false)).toBe(true);
+    expect(defaultCmsSlotsRouteSegment(false)).toBe("designer");
     expect(computeEditorExperienceFromMembership("designer", false)).toBe(false);
     expect(computeEditorExperienceFromMembership("admin", false)).toBe(false);
   });
 
   it("restricts editors and editor-mode admins to Composer", () => {
-    expect(canAccessCmsSlotsEngine(true)).toBe(false);
+    expect(canAccessCmsSlotsDesigner(true)).toBe(false);
     expect(defaultCmsSlotsRouteSegment(true)).toBe("composer");
-    expect(resolveAllowedCmsSlotsSegment("engine", true)).toBe("composer");
+    expect(resolveAllowedCmsSlotsSegment("designer", true)).toBe("composer");
     expect(resolveAllowedCmsSlotsSegment("composer", true)).toBe("composer");
     expect(computeEditorExperienceFromMembership("editor", false)).toBe(true);
     expect(computeEditorExperienceFromMembership(" member ", false)).toBe(true);
@@ -34,73 +34,73 @@ describe("cms-slots-access", () => {
     expect(shouldShowCmsSlotsPreInstall({ routeStateKnown: true, beaconsWrapperInstalled: true })).toBe(false);
   });
 
-  it("shows composer install-in-engine empty only for engine-capable members before install", () => {
+  it("shows composer install-in-designer empty only for designer-capable members before install", () => {
     expect(
-      shouldShowCmsSlotsComposerInstallInEngineEmpty({
-        canAccessEngine: false,
+      shouldShowCmsSlotsComposerInstallInDesignerEmpty({
+        canAccessDesigner: false,
         routeStateKnown: true,
         beaconsWrapperInstalled: false,
       })
     ).toBe(false);
     expect(
-      shouldShowCmsSlotsComposerInstallInEngineEmpty({
-        canAccessEngine: true,
+      shouldShowCmsSlotsComposerInstallInDesignerEmpty({
+        canAccessDesigner: true,
         routeStateKnown: false,
         beaconsWrapperInstalled: false,
       })
     ).toBe(false);
     expect(
-      shouldShowCmsSlotsComposerInstallInEngineEmpty({
-        canAccessEngine: true,
+      shouldShowCmsSlotsComposerInstallInDesignerEmpty({
+        canAccessDesigner: true,
         routeStateKnown: true,
         beaconsWrapperInstalled: false,
       })
     ).toBe(true);
     expect(
-      shouldShowCmsSlotsComposerInstallInEngineEmpty({
-        canAccessEngine: true,
+      shouldShowCmsSlotsComposerInstallInDesignerEmpty({
+        canAccessDesigner: true,
         routeStateKnown: true,
         beaconsWrapperInstalled: true,
       })
     ).toBe(false);
   });
 
-  it("shows composer engine-not-ready empty only for engine-capable members after install with no eligible lists", () => {
+  it("shows composer designer-not-ready empty only for designer-capable members after install with no eligible lists", () => {
     expect(
-      shouldShowCmsSlotsComposerEngineNotReadyEmpty({
-        canAccessEngine: false,
+      shouldShowCmsSlotsComposerDesignerNotReadyEmpty({
+        canAccessDesigner: false,
         composerListSettled: true,
         beaconsWrapperInstalled: true,
         eligibleCount: 0,
       })
     ).toBe(false);
     expect(
-      shouldShowCmsSlotsComposerEngineNotReadyEmpty({
-        canAccessEngine: true,
+      shouldShowCmsSlotsComposerDesignerNotReadyEmpty({
+        canAccessDesigner: true,
         composerListSettled: false,
         beaconsWrapperInstalled: true,
         eligibleCount: 0,
       })
     ).toBe(false);
     expect(
-      shouldShowCmsSlotsComposerEngineNotReadyEmpty({
-        canAccessEngine: true,
+      shouldShowCmsSlotsComposerDesignerNotReadyEmpty({
+        canAccessDesigner: true,
         composerListSettled: true,
         beaconsWrapperInstalled: false,
         eligibleCount: 0,
       })
     ).toBe(false);
     expect(
-      shouldShowCmsSlotsComposerEngineNotReadyEmpty({
-        canAccessEngine: true,
+      shouldShowCmsSlotsComposerDesignerNotReadyEmpty({
+        canAccessDesigner: true,
         composerListSettled: true,
         beaconsWrapperInstalled: true,
         eligibleCount: 0,
       })
     ).toBe(true);
     expect(
-      shouldShowCmsSlotsComposerEngineNotReadyEmpty({
-        canAccessEngine: true,
+      shouldShowCmsSlotsComposerDesignerNotReadyEmpty({
+        canAccessDesigner: true,
         composerListSettled: true,
         beaconsWrapperInstalled: true,
         eligibleCount: 1,

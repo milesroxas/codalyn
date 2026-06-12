@@ -1,8 +1,8 @@
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_EMPTY,
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL,
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_LOADING,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_EMPTY,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_LIST_ARIA_LABEL,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_LOADING,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { CheckboxField } from "@/shared/ui/checkbox-field";
 import {
@@ -26,7 +26,7 @@ function toggleSlotExposedProp(
   return [...byId.values()];
 }
 
-export type CmsSlotEngineExposePropsPanelProps = {
+export type CmsSlotDesignerExposePropsPanelProps = {
   rowKey: string;
   slotIndex: number;
   available: ComposableInstancePropMeta[];
@@ -36,19 +36,19 @@ export type CmsSlotEngineExposePropsPanelProps = {
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
 };
 
-export function CmsSlotEngineExposePropsPanel(props: CmsSlotEngineExposePropsPanelProps) {
+export function CmsSlotDesignerExposePropsPanel(props: CmsSlotDesignerExposePropsPanelProps) {
   const { rowKey, slotIndex, available, slotExposed, showComposableLoading, disabled, onSetSlotExposed } = props;
   const loading = showComposableLoading && available.length === 0;
   const isEmpty = available.length === 0 && !loading;
 
   return (
     <DrawerScrollList
-      aria-label={CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL}
-      data-slot="beacon_engine_exposed_props"
+      aria-label={CMS_SLOTS_DESIGNER_EXPOSE_PROPS_LIST_ARIA_LABEL}
+      data-slot="beacon_designer_exposed_props"
       loading={loading}
-      loadingAriaLabel={CMS_SLOTS_ENGINE_EXPOSE_PROPS_LOADING}
+      loadingAriaLabel={CMS_SLOTS_DESIGNER_EXPOSE_PROPS_LOADING}
       isEmpty={isEmpty}
-      emptyMessage={CMS_SLOTS_ENGINE_EXPOSE_PROPS_EMPTY}
+      emptyMessage={CMS_SLOTS_DESIGNER_EXPOSE_PROPS_EMPTY}
     >
       {available.map((prop) => {
         const checked = slotExposed.some((entry) => entry.propId === prop.propId);

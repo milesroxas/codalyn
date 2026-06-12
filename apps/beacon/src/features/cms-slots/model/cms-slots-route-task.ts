@@ -26,7 +26,7 @@ export type CmsSlotsRouteTaskInput = {
   routeTaskPhase: string | null;
   picking: boolean;
   addPending: boolean;
-  resyncingEngineSlotKey: string | null;
+  resyncingDesignerSlotKey: string | null;
   listTargetCreatePending: boolean;
   listTargetFocusOnCanvasPending: boolean;
   listTargetPlaceOnCanvasPending: boolean;
@@ -60,7 +60,7 @@ const CMS_SLOTS_ROUTE_TASK_RULES: RouteTaskRule[] = [
   },
   {
     match: (input) =>
-      input.resyncingEngineSlotKey != null ? task(CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES) : null,
+      input.resyncingDesignerSlotKey != null ? task(CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES) : null,
   },
   {
     match: (input) => (input.addPending ? task(CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT) : null),

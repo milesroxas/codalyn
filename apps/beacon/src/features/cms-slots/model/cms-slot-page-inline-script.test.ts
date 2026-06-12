@@ -140,14 +140,14 @@ describe("cms slot beacon runtime (published DOM)", () => {
     expect(target.children.length).toBe(0);
   });
 
-  it("falls back to cloning Engine rows when list target text is empty or invalid", () => {
+  it("falls back to cloning Designer rows when list target text is empty or invalid", () => {
     for (const payloadJson of ["", "not-json", '{"v":2,"i":[0]}']) {
       const doc = document;
       const source = doc.createElement("div");
       source.setAttribute("data-target", "beacons");
       source.setAttribute("data-list", LIST);
       const row = doc.createElement("div");
-      row.textContent = "Engine row";
+      row.textContent = "Designer row";
       source.appendChild(row);
 
       const target = doc.createElement("div");

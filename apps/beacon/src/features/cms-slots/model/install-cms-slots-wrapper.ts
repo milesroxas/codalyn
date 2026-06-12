@@ -7,7 +7,7 @@ import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-des
 import {
   purgeCmsSlotListTargetDefinitionsForDataList,
   purgeCmsSlotRuntimeForDataList,
-  stripEngineCodalynAttrsForSlotListContainer,
+  stripDesignerCodalynAttrsForSlotListContainer,
 } from "@/features/cms-slots/model/site-components";
 import {
   CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
@@ -174,7 +174,7 @@ export async function uninstallCmsSlotsPageInstall(
   const dataLists = new Set(options?.dataLists ?? []);
   for (const beacon of await findCmsSlotListsOnPage()) {
     dataLists.add(beacon.dataList);
-    await stripEngineCodalynAttrsForSlotListContainer(beacon.container);
+    await stripDesignerCodalynAttrsForSlotListContainer(beacon.container);
     await purgeCmsSlotRuntimeForDataList(beacon.dataList, beacon.container);
   }
   for (const dataList of dataLists) {

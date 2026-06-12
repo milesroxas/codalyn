@@ -29,16 +29,16 @@ export const CMS_SLOTS_PRE_INSTALL_TITLE = "Not installed";
 
 export const CMS_SLOTS_PRE_INSTALL_DESCRIPTION = `Install ${CMS_SLOTS_FEATURE_NAME} on this collection template to continue.`;
 
-/** Composer empty state when a designer must install from Engine before composing. */
-export const CMS_SLOTS_COMPOSER_INSTALL_IN_ENGINE_TITLE = "Not installed";
+/** Composer empty state when a designer must install from Designer before composing. */
+export const CMS_SLOTS_COMPOSER_INSTALL_IN_DESIGNER_TITLE = "Not installed";
 
-export const CMS_SLOTS_COMPOSER_INSTALL_IN_ENGINE_DESCRIPTION = `Install ${CMS_SLOTS_FEATURE_NAME} in Engine to compose slot content. Click the button below to install.`;
+export const CMS_SLOTS_COMPOSER_INSTALL_IN_DESIGNER_DESCRIPTION = `Install ${CMS_SLOTS_FEATURE_NAME} in Designer to compose slot content. Click the button below to install.`;
 
-/** Composer empty state when Engine is installed but no slot component is configured and synced yet. */
-export const CMS_SLOTS_COMPOSER_ENGINE_NOT_READY_TITLE = "Not ready";
+/** Composer empty state when Designer is installed but no slot component is configured and synced yet. */
+export const CMS_SLOTS_COMPOSER_DESIGNER_NOT_READY_TITLE = "Not ready";
 
-export const CMS_SLOTS_COMPOSER_ENGINE_NOT_READY_DESCRIPTION =
-  "Configure, expose, and sync at least one component in Engine to compose slot content.";
+export const CMS_SLOTS_COMPOSER_DESIGNER_NOT_READY_DESCRIPTION =
+  "Configure, expose, and sync at least one component in Designer to compose slot content.";
 
 export const CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL = "Checking install…";
 
@@ -100,7 +100,7 @@ export const CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD = "Linking CMS field…";
 
 export const CMS_SLOTS_SYNC_REQUIRES_INSTALL_TOOLTIP = `Install ${CMS_SLOTS_FEATURE_NAME} on this page first.`;
 
-export const CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON = "CMS slot list changed in Engine — sync page script.";
+export const CMS_SLOTS_DESIGNER_LIST_CHANGED_SYNC_REASON = "CMS slot list changed in Designer — sync page script.";
 
 export const CMS_SLOTS_TOAST_LIST_TARGET_FOCUSED = "Selected the list target on the canvas.";
 
@@ -174,9 +174,9 @@ export const CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_NOTIFY_MESSAGE =
 /** Screen-reader label for the collection-template prompt control. */
 export const CMS_SLOTS_REQUIRES_COLLECTION_TEMPLATE_ARIA_LABEL = `${CMS_SLOTS_FEATURE_NAME}: ${CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_LABEL}`;
 
-export const CMS_SLOTS_ENGINE_MAIN_TITLE = "Engine";
+export const CMS_SLOTS_DESIGNER_MAIN_TITLE = "Designer";
 
-export const CMS_SLOTS_ENGINE_MAIN_DESCRIPTION = "Set up slots, components, and fields for this collection.";
+export const CMS_SLOTS_DESIGNER_MAIN_DESCRIPTION = "Set up slots, components, and fields for this collection.";
 
 export const CMS_SLOTS_COMPOSER_MAIN_TITLE = "Compose";
 
@@ -200,77 +200,77 @@ export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_STATIC_PAGE =
 
 export const CMS_SLOTS_COMPOSER_EDITING_CONTEXT_UNAVAILABLE = "Could not load this collection from Webflow.";
 
-export const CMS_SLOTS_ENGINE_EDITING_TITLE = "Configure Slot Settings";
+export const CMS_SLOTS_DESIGNER_EDITING_TITLE = "Configure Slot Settings";
 
-export const CMS_SLOTS_ENGINE_EDITING_DESCRIPTION = "Add components and expose props for this slot list.";
+export const CMS_SLOTS_DESIGNER_EDITING_DESCRIPTION = "Add components and expose props for this slot list.";
 
-export const CMS_SLOTS_ENGINE_STEP_NAV_ARIA_LABEL = `${CMS_SLOTS_FEATURE_NAME} engine steps`;
+export const CMS_SLOTS_DESIGNER_STEP_NAV_ARIA_LABEL = `${CMS_SLOTS_FEATURE_NAME} designer steps`;
 
-export const CMS_SLOTS_ENGINE_SLOT_COMPONENT_LABEL = "Slot component";
+export const CMS_SLOTS_DESIGNER_SLOT_COMPONENT_LABEL = "Slot component";
 
-export const CMS_SLOTS_ENGINE_LIST_TARGET_ON_CANVAS_TITLE = "On canvas";
+export const CMS_SLOTS_DESIGNER_LIST_TARGET_ON_CANVAS_TITLE = "On canvas";
 
-export const CMS_SLOTS_ENGINE_COMPONENTS_LABEL = "Components";
+export const CMS_SLOTS_DESIGNER_COMPONENTS_LABEL = "Components";
 
-export const CMS_SLOTS_ENGINE_COMPONENTS_EMPTY_TITLE = "No components yet";
+export const CMS_SLOTS_DESIGNER_COMPONENTS_EMPTY_TITLE = "No components yet";
 
-export const CMS_SLOTS_ENGINE_COMPONENTS_EMPTY_DESCRIPTION = "Click the Add button to add components to this slot.";
+export const CMS_SLOTS_DESIGNER_COMPONENTS_EMPTY_DESCRIPTION = "Click the Add button to add components to this slot.";
 
-export const CMS_SLOTS_ENGINE_ADD_COMPONENT_LABEL = "Add component";
+export const CMS_SLOTS_DESIGNER_ADD_COMPONENT_LABEL = "Add component";
 
-export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_TITLE = "Component library";
+export const CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_TITLE = "Component library";
 
-export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_DESCRIPTION = "Search site components to add to this list.";
+export const CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_DESCRIPTION = "Search site components to add to this list.";
 
-export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_SEARCH_PLACEHOLDER = "Search components";
+export const CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_SEARCH_PLACEHOLDER = "Search components";
 
-export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LOADING_ARIA_LABEL = "Loading components";
+export const CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_LOADING_ARIA_LABEL = "Loading components";
 
-export const CMS_SLOTS_ENGINE_COMPONENT_LIBRARY_LIST_ARIA_LABEL = "Components";
+export const CMS_SLOTS_DESIGNER_COMPONENT_LIBRARY_LIST_ARIA_LABEL = "Components";
 
-export const CMS_SLOTS_ENGINE_SELECTED_COMPONENTS_ARIA_LABEL = "Selected components";
+export const CMS_SLOTS_DESIGNER_SELECTED_COMPONENTS_ARIA_LABEL = "Selected components";
 
-export const CMS_SLOTS_ENGINE_SLOT_COMPONENT_PLACE_TITLE = "Not on canvas";
+export const CMS_SLOTS_DESIGNER_SLOT_COMPONENT_PLACE_TITLE = "Not on canvas";
 
-export const CMS_SLOTS_ENGINE_SLOT_COMPONENT_PLACE_GUIDE = "Place the slot on the page to continue setup.";
+export const CMS_SLOTS_DESIGNER_SLOT_COMPONENT_PLACE_GUIDE = "Place the slot on the page to continue setup.";
 
-export const CMS_SLOTS_ENGINE_SLOT_COMPONENT_ON_CANVAS_GUIDE = "Select and use navigator to position it on the page.";
+export const CMS_SLOTS_DESIGNER_SLOT_COMPONENT_ON_CANVAS_GUIDE = "Select and use navigator to position it on the page.";
 
-export const CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_LABEL = "Select";
+export const CMS_SLOTS_DESIGNER_SELECT_ON_CANVAS_LABEL = "Select";
 
-export const CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_SELECTED_LABEL = "Selected";
+export const CMS_SLOTS_DESIGNER_SELECT_ON_CANVAS_SELECTED_LABEL = "Selected";
 
-export const CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_PENDING_LABEL = "Selecting…";
+export const CMS_SLOTS_DESIGNER_SELECT_ON_CANVAS_PENDING_LABEL = "Selecting…";
 
-export const CMS_SLOTS_ENGINE_LIST_TARGET_ABSENT_TITLE = "Not set up";
+export const CMS_SLOTS_DESIGNER_LIST_TARGET_ABSENT_TITLE = "Not set up";
 
-export const CMS_SLOTS_ENGINE_LIST_TARGET_ABSENT_DESCRIPTION =
+export const CMS_SLOTS_DESIGNER_LIST_TARGET_ABSENT_DESCRIPTION =
   "This list needs a slot component before it can render on the page.";
 
-export const CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_TITLE = "Checking status";
+export const CMS_SLOTS_DESIGNER_LIST_TARGET_CHECKING_TITLE = "Checking status";
 
-export const CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_DESCRIPTION =
+export const CMS_SLOTS_DESIGNER_LIST_TARGET_CHECKING_DESCRIPTION =
   "Verifying whether the slot component is on this page.";
 
-export const CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_TITLE = "Updating";
+export const CMS_SLOTS_DESIGNER_LIST_TARGET_UPDATING_TITLE = "Updating";
 
-export const CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_DESCRIPTION = "Syncing slot component changes on this page.";
+export const CMS_SLOTS_DESIGNER_LIST_TARGET_UPDATING_DESCRIPTION = "Syncing slot component changes on this page.";
 
-export const CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_LABEL = "Place on canvas";
+export const CMS_SLOTS_DESIGNER_PLACE_ON_CANVAS_LABEL = "Place on canvas";
 
-export const CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_PENDING_LABEL = "Placing…";
+export const CMS_SLOTS_DESIGNER_PLACE_ON_CANVAS_PENDING_LABEL = "Placing…";
 
-export const CMS_SLOTS_ENGINE_CREATE_TARGET_LABEL = "Create";
+export const CMS_SLOTS_DESIGNER_CREATE_TARGET_LABEL = "Create";
 
-export const CMS_SLOTS_ENGINE_CREATE_TARGET_PENDING_LABEL = "Creating…";
+export const CMS_SLOTS_DESIGNER_CREATE_TARGET_PENDING_LABEL = "Creating…";
 
-export const CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_LABEL = "Checking…";
+export const CMS_SLOTS_DESIGNER_LIST_TARGET_CHECKING_LABEL = "Checking…";
 
-export const CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_LABEL = "Updating…";
+export const CMS_SLOTS_DESIGNER_LIST_TARGET_UPDATING_LABEL = "Updating…";
 
-export const CMS_SLOTS_ENGINE_REMOVE_TARGET_LABEL = "Remove target…";
+export const CMS_SLOTS_DESIGNER_REMOVE_TARGET_LABEL = "Remove target…";
 
-export const CMS_SLOTS_ENGINE_BACK_TO_LIST_LABEL = "Back to list";
+export const CMS_SLOTS_DESIGNER_BACK_TO_LIST_LABEL = "Back to list";
 
 export const CMS_SLOTS_COMPOSER_ORDER_EMPTY_TITLE = "No components yet";
 
@@ -280,14 +280,14 @@ export const CMS_SLOTS_COMPOSER_ADD_COMPONENT_LABEL = "Add Component";
 
 export const CMS_SLOTS_COMPOSER_PALETTE_SHEET_TITLE = "Add components";
 
-export const CMS_SLOTS_COMPOSER_PALETTE_SHEET_DESCRIPTION = "Component types exposed in Engine for this list.";
+export const CMS_SLOTS_COMPOSER_PALETTE_SHEET_DESCRIPTION = "Component types exposed in Designer for this list.";
 
 export const CMS_SLOTS_COMPOSER_PALETTE_LIST_ARIA_LABEL = "Allowed component types for this list";
 
 export const CMS_SLOTS_COMPOSER_PALETTE_EMPTY_TITLE = "No component types available";
 
 export const CMS_SLOTS_COMPOSER_PALETTE_EMPTY_DESCRIPTION =
-  "Configure and expose components in Engine before adding them here.";
+  "Configure and expose components in Designer before adding them here.";
 
 export const CMS_SLOTS_COMPOSER_REMOVE_COMPONENT_DIALOG_TITLE = "Remove this component?";
 
@@ -318,44 +318,44 @@ export const CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_TOOLTIP =
 
 export const CMS_SLOTS_COMPOSER_IMAGE_PROP_HINT = "Copy image link from Webflow Assets.";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DESCRIPTION = "Choose which props to include for this slot.";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DESCRIPTION = "Choose which props to include for this slot.";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_LOADING = "Loading…";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_LOADING = "Loading…";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_EMPTY = "No composable props found for this component.";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_EMPTY = "No composable props found for this component.";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_LIST_ARIA_LABEL = "Composer props";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_LIST_ARIA_LABEL = "Composer props";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_OPEN_LABEL = "Open";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_OPEN_LABEL = "Open";
 
 /** First-time label: this slot has no editable fields yet. */
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL = "Make editable";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_TAG_LABEL = "Make editable";
 
 /** Update label: this slot already has editable fields and the selection changed. */
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_LABEL = "Apply changes";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_APPLY_LABEL = "Apply changes";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL = "Applying…";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_TAG_PENDING_LABEL = "Applying…";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE = "Make editable first?";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_TITLE = "Make editable first?";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_DISCARD_DIALOG_TITLE = "Apply changes first?";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_APPLY_DISCARD_DIALOG_TITLE = "Apply changes first?";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION =
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION =
   "Apply your changes so editors can fill these fields in Composer, or discard to restore the fields you started with.";
 
 /** Apply outcome — something changed on the canvas. */
-export const CMS_SLOTS_ENGINE_RESYNC_UPDATED = "Editable fields updated. Publish your site to update the live page.";
+export const CMS_SLOTS_DESIGNER_RESYNC_UPDATED = "Editable fields updated. Publish your site to update the live page.";
 
 /** Apply outcome — fields are wired but already matched the canvas (idempotent re-apply); not an error. */
-export const CMS_SLOTS_ENGINE_RESYNC_UP_TO_DATE = "Already up to date — these fields are editable in Composer.";
+export const CMS_SLOTS_DESIGNER_RESYNC_UP_TO_DATE = "Already up to date — these fields are editable in Composer.";
 
 /** Apply outcome — fields are selected but no element in the component is connected to them yet. */
-export const CMS_SLOTS_ENGINE_RESYNC_NOTHING_BOUND =
+export const CMS_SLOTS_DESIGNER_RESYNC_NOTHING_BOUND =
   "No elements are connected to these fields yet. Inside the component, connect an element to each prop (or wire a nested instance to it), then Apply changes.";
 
 /** Apply outcome — no editable fields are selected and nothing needed changing. */
-export const CMS_SLOTS_ENGINE_RESYNC_NO_FIELDS = "No editable fields selected for this slot.";
+export const CMS_SLOTS_DESIGNER_RESYNC_NO_FIELDS = "No editable fields selected for this slot.";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL = "Continue editing";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL = "Continue editing";
 
-export const CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL = "Discard changes";
+export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL = "Discard changes";

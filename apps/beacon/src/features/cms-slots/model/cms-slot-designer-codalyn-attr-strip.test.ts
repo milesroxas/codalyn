@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CMS_SLOT_CONTENT_ATTR } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
-import { stripEngineCodalynAttrsFromComponentInstance } from "@/features/cms-slots/model/cms-slot-engine-codalyn-attr-sync";
+import { stripDesignerCodalynAttrsFromComponentInstance } from "@/features/cms-slots/model/cms-slot-designer-codalyn-attr-sync";
 
 function domWithCodalynAttrs(attrs: Record<string, string>, children: AnyElement[] = []): AnyElement {
   const store = new Map(Object.entries(attrs));
@@ -20,7 +20,7 @@ function domWithCodalynAttrs(attrs: Record<string, string>, children: AnyElement
   } as unknown as AnyElement;
 }
 
-describe("stripEngineCodalynAttrsFromComponentInstance", () => {
+describe("stripDesignerCodalynAttrsFromComponentInstance", () => {
   const exitComponent = vi.fn().mockResolvedValue(undefined);
   const enterComponent = vi.fn().mockResolvedValue(undefined);
   const getCurrentComponent = vi.fn();
@@ -64,7 +64,7 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
     getCurrentComponent.mockResolvedValueOnce(null).mockResolvedValue(definition);
     getRootElement.mockResolvedValue(root);
 
-    const result = await stripEngineCodalynAttrsFromComponentInstance(instance);
+    const result = await stripDesignerCodalynAttrsFromComponentInstance(instance);
 
     expect(result.removed).toBe(2);
     expect(result.errors).toEqual([]);
@@ -80,7 +80,7 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
     expect(nestedRootDom.removeAttribute).toHaveBeenCalledWith(CMS_SLOT_CONTENT_ATTR);
   });
 
-  it("keeps other Engine components' segments on a shared definition when ownerExposedIds is scoped", async () => {
+  it("keeps other Designer components' segments on a shared definition when ownerExposedIds is scoped", async () => {
     // Shared Image <img> is exposed by Hero (`hero-image`) and Card (`card-image`); deleting Hero must keep Card.
     const sharedImg = domWithCodalynAttrs({
       [CMS_SLOT_CONTENT_ATTR]: "hero-image|card-image",
@@ -92,7 +92,7 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
     getCurrentComponent.mockResolvedValueOnce(null).mockResolvedValue(definition);
     getRootElement.mockResolvedValue(root);
 
-    const result = await stripEngineCodalynAttrsFromComponentInstance(instance, new Set(["hero-image"]));
+    const result = await stripDesignerCodalynAttrsFromComponentInstance(instance, new Set(["hero-image"]));
 
     expect(result.errors).toEqual([]);
     const sharedDom = sharedImg as unknown as {
@@ -106,7 +106,7 @@ describe("stripEngineCodalynAttrsFromComponentInstance", () => {
     enterComponent.mockRejectedValueOnce(new Error("forbidden"));
     getCurrentComponent.mockResolvedValue(null);
 
-    const result = await stripEngineCodalynAttrsFromComponentInstance({
+    const result = await stripDesignerCodalynAttrsFromComponentInstance({
       type: "ComponentInstance",
     } as ComponentElement);
 

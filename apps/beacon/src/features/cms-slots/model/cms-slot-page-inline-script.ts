@@ -631,14 +631,14 @@ export async function getCmsSlotPageRuntimeSyncStatus(): Promise<CmsSlotPageRunt
     if (beacon == null) {
       return {
         synced: false,
-        reason: "No beacon script in footer — sync from Engine.",
+        reason: "No beacon script in footer — sync from Designer.",
       };
     }
     const applied = scriptAttrCI(beacon.attributes, CMS_SLOT_PAGE_SCRIPT_HASH_ATTR);
     if (applied !== expectedHash) {
       return {
         synced: false,
-        reason: "Beacon script out of date — sync from Engine.",
+        reason: "Beacon script out of date — sync from Designer.",
       };
     }
     return { synced: true };

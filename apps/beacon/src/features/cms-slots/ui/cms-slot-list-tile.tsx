@@ -9,7 +9,7 @@ type CmsSlotListTileProps = {
   disabled?: boolean;
   busy?: boolean;
   onOpen: () => void;
-  /** When set, renders the Engine more-actions menu in the top-right. */
+  /** When set, renders the Designer more-actions menu in the top-right. */
   onRequestDelete?: () => void;
   onRequestRename?: () => void;
 };

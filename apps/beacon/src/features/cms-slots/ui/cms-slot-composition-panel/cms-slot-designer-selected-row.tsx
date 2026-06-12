@@ -5,22 +5,22 @@ import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import { ComposerSlotNameDialog } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-slot-name-dialog";
-import { CmsSlotEngineExposePropsPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel/cms-slot-engine-expose-props-panel";
+import { CmsSlotDesignerExposePropsPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel/cms-slot-designer-expose-props-panel";
 import {
   useCmsSlotsDrawerDismissBlocked,
   useCmsSlotsRouteInteractionBlocked,
 } from "@/features/cms-slots/ui/cms-slots-route-interaction-context";
 import {
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_DISCARD_DIALOG_TITLE,
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_LABEL,
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_DESCRIPTION,
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL,
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION,
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL,
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE,
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_OPEN_LABEL,
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL,
-  CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_APPLY_DISCARD_DIALOG_TITLE,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_APPLY_LABEL,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DESCRIPTION,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_TITLE,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_OPEN_LABEL,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_TAG_LABEL,
+  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_TAG_PENDING_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import {
   AlertDialog,
@@ -61,10 +61,10 @@ function snapshotExposed(exposed: ComposableInstancePropMeta[]): ComposableInsta
   return exposed.map((x) => ({ ...x }));
 }
 
-type CmsSlotEngineSelectedRowProps = {
+type CmsSlotDesignerSelectedRowProps = {
   row: HydratedCmsSlotRow;
   slotIndex: number;
-  /** Resolved from the same runtime JSON `n[]` Composer uses (see {@link publishedDisplayNamesForEnginePool}). */
+  /** Resolved from the same runtime JSON `n[]` Composer uses (see {@link publishedDisplayNamesForDesignerPool}). */
   publishedDisplayName: string;
   onRenamePublishedDisplayName: (rowKey: string, nextName: string) => void;
   renamingPublishedSlotKey: string | null;
@@ -75,16 +75,16 @@ type CmsSlotEngineSelectedRowProps = {
   addPending: boolean;
   removingKey: string | null;
   listTargetActionBusy: boolean;
-  resyncingEngineSlotKey: string | null;
+  resyncingDesignerSlotKey: string | null;
   onRemove: (row: HydratedCmsSlotRow) => void;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
-  onResyncEngineSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
+  onResyncDesignerSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
   /** When set to this row’s `key`, opens the expose/tag drawer once (e.g. right after adding the component). */
   autoOpenExposeDrawerRowKey?: string | null;
   onAutoOpenExposeDrawerConsumed?: () => void;
 };
 
-export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
+export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProps) {
   const {
     row,
     slotIndex,
@@ -98,10 +98,10 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     addPending,
     removingKey,
     listTargetActionBusy,
-    resyncingEngineSlotKey,
+    resyncingDesignerSlotKey,
     onRemove,
     onSetSlotExposed,
-    onResyncEngineSlotAttrs,
+    onResyncDesignerSlotAttrs,
     autoOpenExposeDrawerRowKey = null,
     onAutoOpenExposeDrawerConsumed,
   } = props;
@@ -117,7 +117,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
   const exposeBaselineRef = useRef<ComposableInstancePropMeta[]>([]);
   const exposedCount = slotExposed.length;
 
-  const tagAttrsBusy = tagAttrsPending || resyncingEngineSlotKey === row.key;
+  const tagAttrsBusy = tagAttrsPending || resyncingDesignerSlotKey === row.key;
   const exposeDrawerDismissBlocked = useCmsSlotsDrawerDismissBlocked(tagAttrsBusy);
 
   const hasNewExposeSelections = propsDrawerOpen && !sameExposedPropSelection(slotExposed, exposeBaselineRef.current);
@@ -129,11 +129,11 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
   }, [slotExposed]);
 
   const applyActionLabel = editingExistingSelection
-    ? CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_LABEL
-    : CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_LABEL;
+    ? CMS_SLOTS_DESIGNER_EXPOSE_PROPS_APPLY_LABEL
+    : CMS_SLOTS_DESIGNER_EXPOSE_PROPS_TAG_LABEL;
   const discardDialogTitle = editingExistingSelection
-    ? CMS_SLOTS_ENGINE_EXPOSE_PROPS_APPLY_DISCARD_DIALOG_TITLE
-    : CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_TITLE;
+    ? CMS_SLOTS_DESIGNER_EXPOSE_PROPS_APPLY_DISCARD_DIALOG_TITLE
+    : CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_TITLE;
 
   useEffect(() => {
     if (autoOpenExposeDrawerRowKey !== row.key) {
@@ -170,7 +170,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
       if (exposeDrawerDismissBlocked) {
         return;
       }
-      if (tagAttrsPendingRef.current || resyncingEngineSlotKey === row.key) {
+      if (tagAttrsPendingRef.current || resyncingDesignerSlotKey === row.key) {
         return;
       }
       if (sameExposedPropSelection(slotExposed, exposeBaselineRef.current)) {
@@ -179,7 +179,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
       }
       setCloseBeforeTagDialogOpen(true);
     },
-    [exposeDrawerDismissBlocked, resyncingEngineSlotKey, row.key, slotExposed]
+    [exposeDrawerDismissBlocked, resyncingDesignerSlotKey, row.key, slotExposed]
   );
 
   const handleDiscardExposeChangesClose = useCallback(() => {
@@ -195,7 +195,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
     tagAttrsPendingRef.current = true;
     setTagAttrsPending(true);
     try {
-      const ok = await onResyncEngineSlotAttrs(slotIndex);
+      const ok = await onResyncDesignerSlotAttrs(slotIndex);
       if (ok !== true) {
         return;
       }
@@ -206,7 +206,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
       tagAttrsPendingRef.current = false;
       setTagAttrsPending(false);
     }
-  }, [onResyncEngineSlotAttrs, slotIndex, slotExposed]);
+  }, [onResyncDesignerSlotAttrs, slotIndex, slotExposed]);
   const drawerRow: CmsSlotCompositionDraftRow = {
     key: row.key,
     componentId: row.componentId,
@@ -233,7 +233,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
           exposed={[]}
           renameCommit="persist"
           disabled={
-            removingKey !== null || listTargetActionBusy || resyncingEngineSlotKey !== null || publishedRenameBusy
+            removingKey !== null || listTargetActionBusy || resyncingDesignerSlotKey !== null || publishedRenameBusy
           }
           dialogTitle="Rename published slot"
           slotNameFieldLabel="Published name"
@@ -248,7 +248,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
           disabled={removingKey !== null || listTargetActionBusy}
           onClick={openExposeDrawer}
         >
-          {CMS_SLOTS_ENGINE_EXPOSE_PROPS_OPEN_LABEL}
+          {CMS_SLOTS_DESIGNER_EXPOSE_PROPS_OPEN_LABEL}
         </Button>
       </div>
 
@@ -260,9 +260,9 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
         <DrawerContent {...drawerListSheetContentDefaults}>
           <DrawerHeader align="start">
             <DrawerTitle>{publishedDisplayName}</DrawerTitle>
-            <DrawerDescription>{CMS_SLOTS_ENGINE_EXPOSE_PROPS_DESCRIPTION}</DrawerDescription>
+            <DrawerDescription>{CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DESCRIPTION}</DrawerDescription>
           </DrawerHeader>
-          <CmsSlotEngineExposePropsPanel
+          <CmsSlotDesignerExposePropsPanel
             rowKey={row.key}
             slotIndex={slotIndex}
             available={available}
@@ -286,7 +286,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
               aria-busy={tagAttrsBusy}
               onClick={() => void applyTagAttrsAndCloseDrawer()}
             >
-              {tagAttrsBusy ? CMS_SLOTS_ENGINE_EXPOSE_PROPS_TAG_PENDING_LABEL : applyActionLabel}
+              {tagAttrsBusy ? CMS_SLOTS_DESIGNER_EXPOSE_PROPS_TAG_PENDING_LABEL : applyActionLabel}
             </Button>
           </DrawerFooter>
         </DrawerContent>
@@ -303,11 +303,13 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{discardDialogTitle}</AlertDialogTitle>
-            <AlertDialogDescription>{CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel type="button" disabled={tagAttrsBusy}>
-              {CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL}
+              {CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_CONTINUE_LABEL}
             </AlertDialogCancel>
             <AlertDialogCancel
               type="button"
@@ -316,7 +318,7 @@ export function CmsSlotEngineSelectedRow(props: CmsSlotEngineSelectedRowProps) {
               disabled={tagAttrsBusy}
               onClick={handleDiscardExposeChangesClose}
             >
-              {CMS_SLOTS_ENGINE_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL}
+              {CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL}
             </AlertDialogCancel>
             <AlertDialogAction
               type="button"

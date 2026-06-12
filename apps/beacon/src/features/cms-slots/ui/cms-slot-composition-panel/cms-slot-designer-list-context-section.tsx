@@ -1,7 +1,7 @@
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
-import { CmsSlotEngineSlotComponentSection } from "./cms-slot-engine-slot-component-section";
+import { CmsSlotDesignerSlotComponentSection } from "./cms-slot-designer-slot-component-section";
 
-type CmsSlotEngineListContextSectionProps = {
+type CmsSlotDesignerListContextSectionProps = {
   activeDataList: string | null;
   removingKey: string | null;
   listTargetPhase: CmsSlotListTargetPhase;
@@ -19,7 +19,7 @@ type CmsSlotEngineListContextSectionProps = {
   onPlaceListTargetOnCanvas: () => void;
 };
 
-export function CmsSlotEngineListContextSection(props: CmsSlotEngineListContextSectionProps) {
+export function CmsSlotDesignerListContextSection(props: CmsSlotDesignerListContextSectionProps) {
   const {
     activeDataList,
     removingKey,
@@ -41,7 +41,7 @@ export function CmsSlotEngineListContextSection(props: CmsSlotEngineListContextS
   const ctaDisabled = listTargetActionBusy || removingKey !== null || activeDataList == null;
 
   return (
-    <CmsSlotEngineSlotComponentSection
+    <CmsSlotDesignerSlotComponentSection
       ctaDisabled={ctaDisabled}
       listTargetCreatePending={listTargetCreatePending}
       listTargetFocusOnCanvasPending={listTargetFocusOnCanvasPending}

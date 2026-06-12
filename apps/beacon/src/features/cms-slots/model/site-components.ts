@@ -1,9 +1,9 @@
-import { stripEngineCodalynAttrsFromComponentInstance } from "@/features/cms-slots/model/cms-slot-engine-codalyn-attr-sync";
+import { stripDesignerCodalynAttrsFromComponentInstance } from "@/features/cms-slots/model/cms-slot-designer-codalyn-attr-sync";
 import {
   readAllExposedPropIdsForContainer,
-  readCmsSlotEngineSlotPropsFile,
-  writeCmsSlotEngineSlotPropsFile,
-} from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+  readCmsSlotDesignerSlotPropsFile,
+  writeCmsSlotDesignerSlotPropsFile,
+} from "@/features/cms-slots/model/cms-slot-designer-slot-props";
 import {
   getCmsSlotListTargetCmsFieldIdFromListContainer,
   resolveCmsSlotListTargetCmsCollectionIdForCleanup,
@@ -17,8 +17,8 @@ import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-pag
 import {
   filterHydratedCmsSlotRowsByComponentIds,
   listInstancesInSlotListContainer,
-  resolveCmsSlotEngineConfiguredComponentIds,
-  writeCmsSlotEngineConfiguredComponentIds,
+  resolveCmsSlotDesignerConfiguredComponentIds,
+  writeCmsSlotDesignerConfiguredComponentIds,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import {
   CMS_SLOT_UTILITIES_COMPONENT_GROUP,
@@ -27,7 +27,7 @@ import {
 } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 
-/** Site component id + label for the Composer palette (types allowed by Engine for a CMS slot). */
+/** Site component id + label for the Composer palette (types allowed by Designer for a CMS slot). */
 export type CmsSlotPaletteEntry = { id: string; name: string; group: string | null };
 
 function excludeCmsSlotUtilitiesGroup(results: ComponentSearchResult[]): ComponentSearchResult[] {
@@ -81,22 +81,22 @@ export async function removeComponentInstanceFromCanvas(instance: ComponentEleme
 }
 
 /**
- * Strips this CMS slot's `data-cb-c` / `data-cb-v` tags from the Engine component
+ * Strips this CMS slot's `data-cb-c` / `data-cb-v` tags from the Designer component
  * definitions placed in `container`, **before** the list block (or install wrapper) is removed.
  *
- * The tags live on shared, site-level component definitions (the Engine component's own definition and any nested
+ * The tags live on shared, site-level component definitions (the Designer component's own definition and any nested
  * component definitions linked through exposed props), not on the page instances — so removing the block/instances
  * alone leaves those definitions tagged. The strip is scoped to the prop ids this slot owns
- * ({@link readAllExposedPropIdsForContainer}) so a definition shared with Engine components in other lists/slots on
+ * ({@link readAllExposedPropIdsForContainer}) so a definition shared with Designer components in other lists/slots on
  * the page keeps the segments those components own. Best-effort: per-instance strip failures are logged and never
  * block deletion.
  */
-export async function stripEngineCodalynAttrsForSlotListContainer(container: BlockElement): Promise<void> {
+export async function stripDesignerCodalynAttrsForSlotListContainer(container: BlockElement): Promise<void> {
   const ownerExposedIds = new Set(await readAllExposedPropIdsForContainer(container));
   for (const row of await listInstancesInSlotListContainer(container)) {
-    const strip = await stripEngineCodalynAttrsFromComponentInstance(row.instance, ownerExposedIds);
+    const strip = await stripDesignerCodalynAttrsFromComponentInstance(row.instance, ownerExposedIds);
     if (strip.errors.length > 0) {
-      console.warn("[beacon] engine attr strip before list delete (non-fatal):", strip.errors);
+      console.warn("[beacon] designer attr strip before list delete (non-fatal):", strip.errors);
     }
   }
 }
@@ -163,8 +163,8 @@ export async function purgeCmsSlotRuntimeForDataList(
 /**
  * If a CMS slot list-target **site component** exists for this slot (in {@link CMS_SLOT_UTILITIES_COMPONENT_GROUP}),
  * removes its **page instances** (Placed on canvas), unregisters the definition, deletes the per-list CMS field, then
- * removes the hidden CMS slot block. Order: strip this slot's Engine `data-cb-*` tags off the shared component
- * definitions ({@link stripEngineCodalynAttrsForSlotListContainer}) → resolve definition + CMS ids from `container` →
+ * removes the hidden CMS slot block. Order: strip this slot's Designer `data-cb-*` tags off the shared component
+ * definitions ({@link stripDesignerCodalynAttrsForSlotListContainer}) → resolve definition + CMS ids from `container` →
  * remove instances → `unregisterComponent` → delete CMS field → remove the block, so Webflow is not left with orphan
  * list-target nodes, stale `data-cb-c` tags on shared/nested component definitions, a definition that still references
  * removed structure, or a dangling per-list Plain Text field.
@@ -174,7 +174,7 @@ export async function deleteCmsSlotListAndListTargetDefinition(
   container: BlockElement,
   preferredDefinitionId?: string | null
 ): Promise<void> {
-  await stripEngineCodalynAttrsForSlotListContainer(container);
+  await stripDesignerCodalynAttrsForSlotListContainer(container);
   await purgeCmsSlotRuntimeForDataList(dataList, container, preferredDefinitionId);
   await removeCmsSlotListFromPage(container);
 }
@@ -184,22 +184,22 @@ export type CmsSlotCompositionDraftRow = {
   componentId: string;
   name: string;
   /**
-   * Composer-only values for engine-exposed component props, keyed by `propId`.
+   * Composer-only values for designer-exposed component props, keyed by `propId`.
    * Saved in the list target CMS JSON as {@link import("@/features/cms-slots/model/cms-slot-list-runtime-payload").CmsSlotListRuntimePayload.p}.
    */
   propValues?: Record<string, string>;
 };
 
 /**
- * Ensures the hidden Engine list has at least one instance per component type in `draft`. Appends missing
+ * Ensures the hidden Designer list has at least one instance per component type in `draft`. Appends missing
  * types (existing rows first, then first-seen draft order) and refreshes configured ids + slot props length.
  */
-export async function ensureEnginePoolHasDraftComponentTypes(
+export async function ensureDesignerPoolHasDraftComponentTypes(
   container: BlockElement,
   draft: ReadonlyArray<{ componentId: string }>
 ): Promise<HydratedCmsSlotRow[]> {
   let rows = await listInstancesInSlotListContainer(container);
-  const configured = await resolveCmsSlotEngineConfiguredComponentIds(container, rows);
+  const configured = await resolveCmsSlotDesignerConfiguredComponentIds(container, rows);
   let scoped = filterHydratedCmsSlotRowsByComponentIds(rows, configured);
 
   const present = new Set(scoped.map((row) => row.componentId));
@@ -220,14 +220,14 @@ export async function ensureEnginePoolHasDraftComponentTypes(
   }
 
   rows = await listInstancesInSlotListContainer(container);
-  await writeCmsSlotEngineConfiguredComponentIds(
+  await writeCmsSlotDesignerConfiguredComponentIds(
     container,
     rows.map((row) => row.componentId)
   );
-  const slotFile = await readCmsSlotEngineSlotPropsFile(container, rows.length);
-  await writeCmsSlotEngineSlotPropsFile(container, slotFile);
+  const slotFile = await readCmsSlotDesignerSlotPropsFile(container, rows.length);
+  await writeCmsSlotDesignerSlotPropsFile(container, slotFile);
 
-  const configuredAfter = await resolveCmsSlotEngineConfiguredComponentIds(container, rows);
+  const configuredAfter = await resolveCmsSlotDesignerConfiguredComponentIds(container, rows);
   scoped = filterHydratedCmsSlotRowsByComponentIds(rows, configuredAfter);
   return scoped;
 }

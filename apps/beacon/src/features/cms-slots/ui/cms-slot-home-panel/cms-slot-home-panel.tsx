@@ -68,7 +68,7 @@ export function CmsSlotHomePanel(props: CmsSlotHomePanelProps) {
 
   return (
     <div className="space-y-4" data-slot="beacon_home_installed">
-      <CmsSlotsRouteMainIntro segment="engine" />
+      <CmsSlotsRouteMainIntro segment="designer" />
       <CmsSlotsComposerEditingContextCard context={composerEditingContext} primaryField="collection" />
       <OnThisPageSection
         nameFieldId={nameFieldId}

@@ -18,30 +18,30 @@ import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model
 import { syncCmsSlotPageInlineScript } from "@/features/cms-slots/model/cms-slot-page-inline-script";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import {
-  engineRowForRuntimeCloneIndex,
+  designerRowForRuntimeCloneIndex,
   maxHiddenListDomChildIndex,
-  runtimeCloneIndexForEnginePoolIndex,
+  runtimeCloneIndexForDesignerPoolIndex,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { getTowerOrigin } from "@/shared/lib/tower-client";
 
 function nextSlotLabelsAfterPoolRename(
   payload: NonNullable<ReturnType<typeof parseCmsSlotListRuntimePayload>>,
-  engineScopedRows: ReadonlyArray<HydratedCmsSlotRow>,
+  designerScopedRows: ReadonlyArray<HydratedCmsSlotRow>,
   poolIndex: number,
   rawNextName: string
 ): string[] {
-  const row = engineScopedRows[poolIndex];
+  const row = designerScopedRows[poolIndex];
   const fallback = row?.name.trim() || "Untitled";
   const sanitizedInput = sanitizeSlotLabelForPayload(rawNextName);
   const labelForRenamedPool = sanitizedInput !== "" ? sanitizedInput : fallback;
 
   return payload.i.map((runtimeIdx, u) => {
-    const renamedRuntimeIdx = runtimeCloneIndexForEnginePoolIndex(engineScopedRows, poolIndex);
+    const renamedRuntimeIdx = runtimeCloneIndexForDesignerPoolIndex(designerScopedRows, poolIndex);
     if (runtimeIdx === renamedRuntimeIdx) {
       return labelForRenamedPool;
     }
-    const defRow = engineRowForRuntimeCloneIndex(engineScopedRows, runtimeIdx);
+    const defRow = designerRowForRuntimeCloneIndex(designerScopedRows, runtimeIdx);
     const defName = defRow?.name ?? "";
     return resolveCmsSlotPublishedDisplayName(defName, payload.n?.[u]);
   });
@@ -56,13 +56,13 @@ export async function renamePublishedSlotDisplayNameAtPoolIndex(input: {
   dataList: string;
   preferredDefinitionId: string | null;
   currentCmsItemId: string | null;
-  engineScopedRows: ReadonlyArray<HydratedCmsSlotRow>;
+  designerScopedRows: ReadonlyArray<HydratedCmsSlotRow>;
   poolIndex: number;
   nextName: string;
 }): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const { listContainer, dataList, preferredDefinitionId, currentCmsItemId, engineScopedRows, poolIndex, nextName } =
+  const { listContainer, dataList, preferredDefinitionId, currentCmsItemId, designerScopedRows, poolIndex, nextName } =
     input;
-  if (poolIndex < 0 || poolIndex >= engineScopedRows.length) {
+  if (poolIndex < 0 || poolIndex >= designerScopedRows.length) {
     return { ok: false, reason: "Slot index is out of range." };
   }
 
@@ -80,7 +80,7 @@ export async function renamePublishedSlotDisplayNameAtPoolIndex(input: {
     };
   }
 
-  const parsed = parseCmsSlotListRuntimePayload(text, maxHiddenListDomChildIndex(engineScopedRows) + 1);
+  const parsed = parseCmsSlotListRuntimePayload(text, maxHiddenListDomChildIndex(designerScopedRows) + 1);
   if (parsed == null || parsed.i.length === 0) {
     return {
       ok: false,
@@ -88,7 +88,7 @@ export async function renamePublishedSlotDisplayNameAtPoolIndex(input: {
     };
   }
 
-  const slotLabels = nextSlotLabelsAfterPoolRename(parsed, engineScopedRows, poolIndex, nextName);
+  const slotLabels = nextSlotLabelsAfterPoolRename(parsed, designerScopedRows, poolIndex, nextName);
 
   const onCmsTemplate = (await getCmsTemplateCollectionIdFromCurrentPage()) != null;
   if (onCmsTemplate) {

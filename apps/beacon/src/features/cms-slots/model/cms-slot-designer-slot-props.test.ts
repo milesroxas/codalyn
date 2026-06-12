@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   collectExposedPropIdsFromSlotFileRaw,
   serializeSlotPropsFile,
-} from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+} from "@/features/cms-slots/model/cms-slot-designer-slot-props";
 
 describe("collectExposedPropIdsFromSlotFileRaw", () => {
   it("collects exposed prop ids across every slot, de-duplicated", () => {

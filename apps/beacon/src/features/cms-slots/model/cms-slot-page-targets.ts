@@ -8,8 +8,8 @@ function hasGetChildren(e: AnyElement): e is ElementWithChildren {
   return typeof (e as { getChildren?: unknown }).getChildren === "function";
 }
 
-const CMS_SLOT_ENGINE_COMPONENT_IDS_ATTR = "data-beacon-engine-component-ids";
-const BEACON_ENGINE_COMPONENT_IDS_EMPTY = "__none__";
+const CMS_SLOT_DESIGNER_COMPONENT_IDS_ATTR = "data-beacon-designer-component-ids";
+const BEACON_DESIGNER_COMPONENT_IDS_EMPTY = "__none__";
 
 function uniqueComponentIds(componentIds: readonly string[]): string[] {
   const seen = new Set<string>();
@@ -25,17 +25,17 @@ function uniqueComponentIds(componentIds: readonly string[]): string[] {
   return out;
 }
 
-function serializeBeaconEngineConfiguredComponentIds(componentIds: readonly string[]): string {
+function serializeBeaconDesignerConfiguredComponentIds(componentIds: readonly string[]): string {
   const unique = uniqueComponentIds(componentIds);
   if (unique.length === 0) {
-    return BEACON_ENGINE_COMPONENT_IDS_EMPTY;
+    return BEACON_DESIGNER_COMPONENT_IDS_EMPTY;
   }
   return unique.join(",");
 }
 
-function parseBeaconEngineConfiguredComponentIds(raw: string): string[] {
+function parseBeaconDesignerConfiguredComponentIds(raw: string): string[] {
   const trimmed = raw.trim();
-  if (trimmed.length === 0 || trimmed === BEACON_ENGINE_COMPONENT_IDS_EMPTY) {
+  if (trimmed.length === 0 || trimmed === BEACON_DESIGNER_COMPONENT_IDS_EMPTY) {
     return [];
   }
   return uniqueComponentIds(trimmed.split(","));
@@ -98,23 +98,23 @@ export type HydratedCmsSlotRow = {
   domChildIndex: number;
 };
 
-/** Engine-configured component ids for this CMS slot, or `null` when not configured yet. */
-export async function readCmsSlotEngineConfiguredComponentIds(container: BlockElement): Promise<string[] | null> {
-  const raw = await container.getCustomAttribute(CMS_SLOT_ENGINE_COMPONENT_IDS_ATTR);
+/** Designer-configured component ids for this CMS slot, or `null` when not configured yet. */
+export async function readCmsSlotDesignerConfiguredComponentIds(container: BlockElement): Promise<string[] | null> {
+  const raw = await container.getCustomAttribute(CMS_SLOT_DESIGNER_COMPONENT_IDS_ATTR);
   if (raw == null) {
     return null;
   }
-  return parseBeaconEngineConfiguredComponentIds(raw);
+  return parseBeaconDesignerConfiguredComponentIds(raw);
 }
 
-/** Persists the Engine-configured component ids for this CMS slot. */
-export async function writeCmsSlotEngineConfiguredComponentIds(
+/** Persists the Designer-configured component ids for this CMS slot. */
+export async function writeCmsSlotDesignerConfiguredComponentIds(
   container: BlockElement,
   componentIds: readonly string[]
 ): Promise<void> {
   await container.setCustomAttribute(
-    CMS_SLOT_ENGINE_COMPONENT_IDS_ATTR,
-    serializeBeaconEngineConfiguredComponentIds(componentIds)
+    CMS_SLOT_DESIGNER_COMPONENT_IDS_ATTR,
+    serializeBeaconDesignerConfiguredComponentIds(componentIds)
   );
 }
 
@@ -131,15 +131,15 @@ export function filterHydratedCmsSlotRowsByComponentIds(
 }
 
 /**
- * Returns Engine-configured component ids for this CMS slot. Falls back to component ids from the
+ * Returns Designer-configured component ids for this CMS slot. Falls back to component ids from the
  * current hidden-list instances when the attribute is missing **or** persisted as empty (`__none__` —
- * written on new lists before any slot row exists). Non-empty stored ids always win (Engine palette).
+ * written on new lists before any slot row exists). Non-empty stored ids always win (Designer palette).
  */
-export async function resolveCmsSlotEngineConfiguredComponentIds(
+export async function resolveCmsSlotDesignerConfiguredComponentIds(
   container: BlockElement,
   rows: HydratedCmsSlotRow[]
 ): Promise<string[]> {
-  const configured = await readCmsSlotEngineConfiguredComponentIds(container);
+  const configured = await readCmsSlotDesignerConfiguredComponentIds(container);
   if (configured != null && configured.length > 0) {
     return configured;
   }
@@ -163,36 +163,36 @@ export async function listInstancesInSlotListContainer(container: BlockElement):
   return out;
 }
 
-/** Resolves a published runtime clone index (`payload.i[]`) to the matching Engine pool row. */
-export function engineRowForRuntimeCloneIndex(
-  engineScopedRows: readonly HydratedCmsSlotRow[],
+/** Resolves a published runtime clone index (`payload.i[]`) to the matching Designer pool row. */
+export function designerRowForRuntimeCloneIndex(
+  designerScopedRows: readonly HydratedCmsSlotRow[],
   runtimeIndex: number
 ): HydratedCmsSlotRow | undefined {
-  for (const row of engineScopedRows) {
+  for (const row of designerScopedRows) {
     if (row.domChildIndex === runtimeIndex) {
       return row;
     }
   }
-  return runtimeIndex >= 0 && runtimeIndex < engineScopedRows.length ? engineScopedRows[runtimeIndex] : undefined;
+  return runtimeIndex >= 0 && runtimeIndex < designerScopedRows.length ? designerScopedRows[runtimeIndex] : undefined;
 }
 
-export function enginePoolIndexForRuntimeCloneIndex(
-  engineScopedRows: ReadonlyArray<{ domChildIndex?: number }>,
+export function designerPoolIndexForRuntimeCloneIndex(
+  designerScopedRows: ReadonlyArray<{ domChildIndex?: number }>,
   runtimeIndex: number
 ): number {
-  for (let i = 0; i < engineScopedRows.length; i++) {
-    if (engineScopedRows[i]?.domChildIndex === runtimeIndex) {
+  for (let i = 0; i < designerScopedRows.length; i++) {
+    if (designerScopedRows[i]?.domChildIndex === runtimeIndex) {
       return i;
     }
   }
-  return runtimeIndex >= 0 && runtimeIndex < engineScopedRows.length ? runtimeIndex : -1;
+  return runtimeIndex >= 0 && runtimeIndex < designerScopedRows.length ? runtimeIndex : -1;
 }
 
-export function runtimeCloneIndexForEnginePoolIndex(
-  engineScopedRows: ReadonlyArray<{ domChildIndex?: number }>,
+export function runtimeCloneIndexForDesignerPoolIndex(
+  designerScopedRows: ReadonlyArray<{ domChildIndex?: number }>,
   poolIndex: number
 ): number {
-  return engineScopedRows[poolIndex]?.domChildIndex ?? poolIndex;
+  return designerScopedRows[poolIndex]?.domChildIndex ?? poolIndex;
 }
 
 /** Upper bound for clamping runtime payload `i[]` against published clone sources (DOM child count). */

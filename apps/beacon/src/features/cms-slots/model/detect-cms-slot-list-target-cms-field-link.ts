@@ -14,7 +14,7 @@ export type DetectCmsSlotListTargetCmsFieldLinkResult =
 
 /**
  * Checks whether list-target instance Text props on the current page are bound to the slot’s CMS Plain Text field.
- * Used when opening Engine for a slot so stale Designer CMS caches surface an inline “Link CMS field” action.
+ * Used when opening Designer for a slot so stale Designer CMS caches surface an inline “Link CMS field” action.
  */
 export async function detectCmsSlotListTargetCmsFieldLink(options: {
   dataList: string;

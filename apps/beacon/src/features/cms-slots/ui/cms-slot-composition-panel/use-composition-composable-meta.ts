@@ -4,7 +4,7 @@ import { listComposableMetaByInstanceKey } from "@/features/cms-slots/model/cms-
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 
 /**
- * Load composable prop metadata for each selected Engine row (for “Expose to Composer” checkboxes).
+ * Load composable prop metadata for each selected Designer row (for “Expose to Composer” checkboxes).
  */
 export function useCompositionComposableMeta(selected: HydratedCmsSlotRow[]) {
   const [composableByKey, setComposableByKey] = useState<Record<string, ComposableInstancePropMeta[]>>({});

@@ -27,17 +27,17 @@ import {
   displayLabelForCmsSlotList,
   displayLabelForDataList,
 } from "@/features/cms-slots/model/cms-slot-data-list-display";
-import { stripEngineCodalynAttrsFromComponentInstance } from "@/features/cms-slots/model/cms-slot-engine-codalyn-attr-sync";
-import { renamePublishedSlotDisplayNameAtPoolIndex } from "@/features/cms-slots/model/cms-slot-engine-rename-published-slot";
+import { stripDesignerCodalynAttrsFromComponentInstance } from "@/features/cms-slots/model/cms-slot-designer-codalyn-attr-sync";
+import { renamePublishedSlotDisplayNameAtPoolIndex } from "@/features/cms-slots/model/cms-slot-designer-rename-published-slot";
 import {
-  type CmsSlotEngineSlotPropsFile,
-  readCmsSlotEngineSlotPropsFile,
-  writeCmsSlotEngineSlotPropsFile,
-} from "@/features/cms-slots/model/cms-slot-engine-slot-props";
+  type CmsSlotDesignerSlotPropsFile,
+  readCmsSlotDesignerSlotPropsFile,
+  writeCmsSlotDesignerSlotPropsFile,
+} from "@/features/cms-slots/model/cms-slot-designer-slot-props";
 import { readCmsSlotListRuntimePayloadText } from "@/features/cms-slots/model/cms-slot-list-cms-composition-save";
 import {
   parseCmsSlotListRuntimePayload,
-  publishedDisplayNamesForEnginePool,
+  publishedDisplayNamesForDesignerPool,
 } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import type { CmsSlotListCmsTextFieldEnsureResult } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import {
@@ -60,13 +60,13 @@ import {
 import {
   type CmsSlotListOnPage,
   cmsSlotListKey,
-  enginePoolIndexForRuntimeCloneIndex,
+  designerPoolIndexForRuntimeCloneIndex,
   filterHydratedCmsSlotRowsByComponentIds,
   findCmsSlotListsOnPage,
   type HydratedCmsSlotRow,
   listInstancesInSlotListContainer,
-  resolveCmsSlotEngineConfiguredComponentIds,
-  writeCmsSlotEngineConfiguredComponentIds,
+  resolveCmsSlotDesignerConfiguredComponentIds,
+  writeCmsSlotDesignerConfiguredComponentIds,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { resolveAllowedCmsSlotsSegment } from "@/features/cms-slots/model/cms-slots-access";
 import {
@@ -95,7 +95,7 @@ import {
   placeCmsSlotListTargetOnCanvas,
 } from "@/features/cms-slots/model/place-cms-slot-list-target-on-canvas";
 import { renameCmsSlotListOnPage } from "@/features/cms-slots/model/rename-cms-slot-list-on-page";
-import { resyncEngineSlotPropAttributesForSlotIndex } from "@/features/cms-slots/model/resync-engine-slot-prop-attrs";
+import { resyncDesignerSlotPropAttributesForSlotIndex } from "@/features/cms-slots/model/resync-designer-slot-prop-attrs";
 import { retryCmsSlotListTargetCmsFieldLink } from "@/features/cms-slots/model/retry-cms-slot-list-target-cms-field-link";
 import {
   appendComponentToSlotListContainer,
@@ -113,7 +113,7 @@ import { CmsSlotsRouteChrome } from "@/features/cms-slots/ui/cms-slots-route-chr
 import {
   CMS_SLOTS_CMS_FIELD_LINK_TOAST_SUCCESS,
   CMS_SLOTS_CMS_FIELD_NOT_VISIBLE_NOTIFY,
-  CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON,
+  CMS_SLOTS_DESIGNER_LIST_CHANGED_SYNC_REASON,
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
   CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
   CMS_SLOTS_ROUTE_TASK_FINISHING,
@@ -188,22 +188,22 @@ async function runListTargetReconcileOnOpen(
  * `CmsSlotsScreen` is wrapped by a parent route element; `useParams` is often empty. Prefer `pathname` from
  * `useLocation`, then the hash (HashRouter) if needed.
  */
-function parseCmsSlotsRouteSegment(pathname: string, locationHash: string): "engine" | "composer" | null {
+function parseCmsSlotsRouteSegment(pathname: string, locationHash: string): "designer" | "composer" | null {
   for (const raw of [pathname, locationHash.replace(/^#/, "")].filter(Boolean)) {
     const p = raw.startsWith("/") ? raw : `/${raw}`;
-    const m = /^\/(?:cms-slots|beacons)\/(engine|composer)\/?$/.exec(p);
+    const m = /^\/(?:cms-slots|beacons)\/(designer|composer)\/?$/.exec(p);
     if (m != null) {
-      return m[1] as "engine" | "composer";
+      return m[1] as "designer" | "composer";
     }
   }
   return null;
 }
 
 function useCmsSlotsInvalidSegmentRedirect(
-  segmentFromPath: "engine" | "composer" | null,
+  segmentFromPath: "designer" | "composer" | null,
   routePathname: string,
   routeHash: string,
-  defaultSegment: "engine" | "composer",
+  defaultSegment: "designer" | "composer",
   navigate: (to: string, options?: { replace?: boolean }) => void
 ) {
   useEffect(() => {
@@ -211,7 +211,7 @@ function useCmsSlotsInvalidSegmentRedirect(
     for (const raw of [routePathname, routeHash.replace(/^#/, "")].filter(Boolean)) {
       const p = raw.startsWith("/") ? raw : `/${raw}`;
       const m = /^\/(?:cms-slots|beacons)\/([^/]+)\/?$/.exec(p);
-      if (m != null && m[1] !== "engine" && m[1] !== "composer") {
+      if (m != null && m[1] !== "designer" && m[1] !== "composer") {
         void navigate(`/cms-slots/${defaultSegment}`, { replace: true });
         return;
       }
@@ -262,10 +262,10 @@ type BeaconsPageChangeReset = {
   setActiveComposer: (v: { beacon: CmsSlotListOnPage; initialSignature: string } | null) => void;
   setComposerDraft: (v: CmsSlotCompositionDraftRow[]) => void;
   setComposerAllowedPalette: (v: CmsSlotPaletteEntry[]) => void;
-  setComposerEngineRows: (v: HydratedCmsSlotRow[]) => void;
-  setComposerEngineComposable: (v: Record<string, ComposableInstancePropMeta[]>) => void;
-  setComposerSlotProps: (v: CmsSlotEngineSlotPropsFile | null) => void;
-  setEngineListSlotFile: (v: CmsSlotEngineSlotPropsFile | null) => void;
+  setComposerDesignerRows: (v: HydratedCmsSlotRow[]) => void;
+  setComposerDesignerComposable: (v: Record<string, ComposableInstancePropMeta[]>) => void;
+  setComposerSlotProps: (v: CmsSlotDesignerSlotPropsFile | null) => void;
+  setDesignerListSlotFile: (v: CmsSlotDesignerSlotPropsFile | null) => void;
   setComposerOpeningKey: (v: string | null) => void;
   setBeaconName: (v: string) => void;
   setListTargetCreatePending: (v: boolean) => void;
@@ -278,7 +278,7 @@ type BeaconsPageChangeReset = {
   setListTargetOnCanvasCountResolved: (v: boolean) => void;
   setRemoveListTargetDialogOpen: (v: boolean) => void;
   setActiveBeaconKey: (v: string | null) => void;
-  setEngineListCompositionStale: (v: boolean) => void;
+  setDesignerListCompositionStale: (v: boolean) => void;
   targetRef: MutableRefObject<BlockElement | null>;
   listTargetResolveGen: MutableRefObject<number>;
   listTargetReconcileCacheRef: MutableRefObject<ListTargetReconcileCacheEntry | null>;
@@ -328,14 +328,14 @@ function useBeaconsPageChangeReset(
         reset.setActiveDataList(null);
         reset.setSelected([]);
         reset.targetRef.current = null;
-        void navigate("/cms-slots/engine", { replace: true });
+        void navigate("/cms-slots/designer", { replace: true });
         reset.setActiveComposer(null);
         reset.setComposerDraft([]);
         reset.setComposerAllowedPalette([]);
-        reset.setComposerEngineRows([]);
-        reset.setComposerEngineComposable({});
+        reset.setComposerDesignerRows([]);
+        reset.setComposerDesignerComposable({});
         reset.setComposerSlotProps(null);
-        reset.setEngineListSlotFile(null);
+        reset.setDesignerListSlotFile(null);
         reset.setComposerOpeningKey(null);
         reset.setBeaconName("");
         reset.setListTargetCreatePending(false);
@@ -351,7 +351,7 @@ function useBeaconsPageChangeReset(
         reset.listTargetResolveGen.current += 1;
         reset.listTargetReconcileCacheRef.current = null;
         reset.listTargetDefinitionIdRef.current = null;
-        reset.setEngineListCompositionStale(false);
+        reset.setDesignerListCompositionStale(false);
         void refreshPageBeacons();
         if (typeof webflow.getCurrentMode === "function") {
           void (async () => {
@@ -377,20 +377,20 @@ function useBeaconsPageChangeReset(
 function useBeaconSyncShellLabels(
   pageRuntimeSynced: boolean,
   pageRuntimeSyncReason: string | undefined,
-  engineListCompositionStale: boolean
+  designerListCompositionStale: boolean
 ) {
   return useMemo((): { syncShellOk: boolean; syncShellReason: string | undefined } => {
     if (!pageRuntimeSynced) {
       return { syncShellOk: false, syncShellReason: pageRuntimeSyncReason };
     }
-    if (engineListCompositionStale) {
+    if (designerListCompositionStale) {
       return {
         syncShellOk: false,
-        syncShellReason: CMS_SLOTS_ENGINE_LIST_CHANGED_SYNC_REASON,
+        syncShellReason: CMS_SLOTS_DESIGNER_LIST_CHANGED_SYNC_REASON,
       };
     }
     return { syncShellOk: true, syncShellReason: undefined };
-  }, [pageRuntimeSynced, pageRuntimeSyncReason, engineListCompositionStale]);
+  }, [pageRuntimeSynced, pageRuntimeSyncReason, designerListCompositionStale]);
 }
 
 type LoadComposerEligibleOptions = {
@@ -743,13 +743,13 @@ export function CmsSlotsScreen() {
   const nameFieldId = useId();
   const searchFieldId = useId();
   const lastBeaconUninstallChoiceId = useId();
-  const { editorExperience, canAccessEngine, defaultSegment } = useCmsSlotsAccess();
+  const { editorExperience, canAccessDesigner, defaultSegment } = useCmsSlotsAccess();
   const { segment: segmentParam } = useParams();
   const { pathname: routePathname, hash: routeHash } = useLocation();
   const segmentFromPath = parseCmsSlotsRouteSegment(routePathname, routeHash);
   /** Matched route param is authoritative; fall back to parsed path for older/wrapper edge cases. */
-  const segment: "engine" | "composer" =
-    segmentParam === "engine" || segmentParam === "composer"
+  const segment: "designer" | "composer" =
+    segmentParam === "designer" || segmentParam === "composer"
       ? resolveAllowedCmsSlotsSegment(segmentParam, editorExperience)
       : (segmentFromPath ?? defaultSegment);
   const navigate = useNavigate();
@@ -784,9 +784,9 @@ export function CmsSlotsScreen() {
   const [autoOpenExposeDrawerRowKey, setAutoOpenExposeDrawerRowKey] = useState<string | null>(null);
   const [selected, setSelected] = useState<HydratedCmsSlotRow[]>([]);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
-  const [resyncingEngineSlotKey, setResyncingEngineSlotKey] = useState<string | null>(null);
-  const [enginePublishedDisplayNames, setEnginePublishedDisplayNames] = useState<string[] | null>(null);
-  const [engineSlotLabelRefreshToken, setEngineSlotLabelRefreshToken] = useState(0);
+  const [resyncingDesignerSlotKey, setResyncingDesignerSlotKey] = useState<string | null>(null);
+  const [designerPublishedDisplayNames, setDesignerPublishedDisplayNames] = useState<string[] | null>(null);
+  const [designerSlotLabelRefreshToken, setDesignerSlotLabelRefreshToken] = useState(0);
   const [renamingPublishedSlotKey, setRenamingPublishedSlotKey] = useState<string | null>(null);
   const [listTargetCreatePending, setListTargetCreatePending] = useState(false);
   const [listTargetRemovePending, setListTargetRemovePending] = useState(false);
@@ -825,12 +825,12 @@ export function CmsSlotsScreen() {
   const pageRuntimeSyncReasonRef = useRef(pageRuntimeSyncReason);
   pageRuntimeSyncReasonRef.current = pageRuntimeSyncReason;
   /**
-   * True when Engine slot composition metadata changed before canvas attrs / footer script reflect it.
+   * True when Designer slot composition metadata changed before canvas attrs / footer script reflect it.
    * Cleared after a successful “Make editable” apply or footer Sync.
    */
-  const [engineListCompositionStale, setEngineListCompositionStale] = useState(false);
+  const [designerListCompositionStale, setDesignerListCompositionStale] = useState(false);
 
-  const isEngine = segment === "engine";
+  const isDesigner = segment === "designer";
   const isComposer = segment === "composer";
   const [composerEligibleLoading, setComposerEligibleLoading] = useState(false);
   const [composerEligibleResolved, setComposerEligibleResolved] = useState(false);
@@ -840,21 +840,21 @@ export function CmsSlotsScreen() {
     null
   );
   const [composerDraft, setComposerDraft] = useState<CmsSlotCompositionDraftRow[]>([]);
-  const [composerEngineRows, setComposerEngineRows] = useState<HydratedCmsSlotRow[]>([]);
-  const [composerEngineComposable, setComposerEngineComposable] = useState<
+  const [composerDesignerRows, setComposerDesignerRows] = useState<HydratedCmsSlotRow[]>([]);
+  const [composerDesignerComposable, setComposerDesignerComposable] = useState<
     Record<string, ComposableInstancePropMeta[]>
   >({});
-  const [composerSlotProps, setComposerSlotProps] = useState<CmsSlotEngineSlotPropsFile | null>(null);
+  const [composerSlotProps, setComposerSlotProps] = useState<CmsSlotDesignerSlotPropsFile | null>(null);
   const [composerAllowedPalette, setComposerAllowedPalette] = useState<CmsSlotPaletteEntry[]>([]);
   const [composerOpeningKey, setComposerOpeningKey] = useState<string | null>(null);
-  const [engineListSlotFile, setEngineListSlotFile] = useState<CmsSlotEngineSlotPropsFile | null>(null);
+  const [designerListSlotFile, setDesignerListSlotFile] = useState<CmsSlotDesignerSlotPropsFile | null>(null);
   const [composerSavePending, setComposerSavePending] = useState(false);
   const [composerLeaveDialogOpen, setComposerLeaveDialogOpen] = useState(false);
-  type ComposerLeaveDestination = "composer-list" | "engine";
+  type ComposerLeaveDestination = "composer-list" | "designer";
   const composerLeaveDestinationRef = useRef<ComposerLeaveDestination>("composer-list");
   const [currentCmsItemId, setCurrentCmsItemId] = useState<string | null>(null);
   const composerEditingContext = useCmsComposerEditingContextState({
-    enabled: isComposer || isEngine,
+    enabled: isComposer || isDesigner,
     currentCmsItemId,
   });
   const activeComposerRef = useRef<{
@@ -866,12 +866,12 @@ export function CmsSlotsScreen() {
   const composerEligibleResolvedRef = useRef(composerEligibleResolved);
   composerEligibleResolvedRef.current = composerEligibleResolved;
 
-  /** Latest engine rows — avoids stale closures inside queued slot-prop writes. */
+  /** Latest designer rows — avoids stale closures inside queued slot-prop writes. */
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
 
   /**
-   * Serializes `data-beacon-engine-slot-props` writes so “Make editable” reads the same exposed props the UI
+   * Serializes `data-beacon-designer-slot-props` writes so “Make editable” reads the same exposed props the UI
    * just persisted (no read-before-write race on rapid checkbox + apply).
    */
   const slotPropsWriteTailRef = useRef(Promise.resolve<void>(undefined));
@@ -971,7 +971,7 @@ export function CmsSlotsScreen() {
   const { syncShellOk, syncShellReason } = useBeaconSyncShellLabels(
     pageRuntimeSynced,
     pageRuntimeSyncReason,
-    engineListCompositionStale
+    designerListCompositionStale
   );
 
   /** Page script sync only matters once the wrapper is installed and at least one CMS slot exists. */
@@ -1009,10 +1009,10 @@ export function CmsSlotsScreen() {
   useCmsSlotsInvalidSegmentRedirect(segmentFromPath, routePathname, routeHash, defaultSegment, navigate);
 
   useEffect(() => {
-    if (!canAccessEngine && isEngine) {
+    if (!canAccessDesigner && isDesigner) {
       void navigate("/cms-slots/composer", { replace: true });
     }
-  }, [canAccessEngine, isEngine, navigate]);
+  }, [canAccessDesigner, isDesigner, navigate]);
 
   useEffect(() => {
     if (!isComposer || pageScanLoading || pageRuntimeStatusLoading) return;
@@ -1056,8 +1056,8 @@ export function CmsSlotsScreen() {
           return;
         }
         setComposerAllowedPalette(result.allowedPalette);
-        setComposerEngineRows(result.engineScopedRows);
-        setComposerEngineComposable(result.composerEngineComposable);
+        setComposerDesignerRows(result.designerScopedRows);
+        setComposerDesignerComposable(result.composerDesignerComposable);
         setComposerSlotProps(result.composerSlotProps);
         setComposerDraft(result.draft);
         setActiveComposer((prev) =>
@@ -1085,10 +1085,10 @@ export function CmsSlotsScreen() {
     setActiveComposer,
     setComposerDraft,
     setComposerAllowedPalette,
-    setComposerEngineRows,
-    setComposerEngineComposable,
+    setComposerDesignerRows,
+    setComposerDesignerComposable,
     setComposerSlotProps,
-    setEngineListSlotFile,
+    setDesignerListSlotFile,
     setComposerOpeningKey,
     setBeaconName,
     setListTargetCreatePending,
@@ -1101,7 +1101,7 @@ export function CmsSlotsScreen() {
     setListTargetOnCanvasCountResolved,
     setRemoveListTargetDialogOpen,
     setActiveBeaconKey,
-    setEngineListCompositionStale,
+    setDesignerListCompositionStale,
     targetRef,
     listTargetResolveGen,
     listTargetReconcileCacheRef,
@@ -1161,9 +1161,9 @@ export function CmsSlotsScreen() {
     setCmsFieldLinkPromptOpen(false);
     cmsFieldLinkDismissedBeaconKeyRef.current = null;
     setActiveBeaconKey(null);
-    setEngineListSlotFile(null);
-    setEnginePublishedDisplayNames(null);
-    setEngineSlotLabelRefreshToken(0);
+    setDesignerListSlotFile(null);
+    setDesignerPublishedDisplayNames(null);
+    setDesignerSlotLabelRefreshToken(0);
     setRenamingPublishedSlotKey(null);
     listTargetResolveGen.current += 1;
     void refreshPageBeacons();
@@ -1240,8 +1240,8 @@ export function CmsSlotsScreen() {
       setActiveDataList(beacon.dataList);
       setActiveBeaconKey(beacon.key);
       setSelected(rows);
-      const f = await readCmsSlotEngineSlotPropsFile(beacon.container, rows.length);
-      setEngineListSlotFile(f);
+      const f = await readCmsSlotDesignerSlotPropsFile(beacon.container, rows.length);
+      setDesignerListSlotFile(f);
       setListTargetPhase("loading");
       setListTargetRegisteredName(null);
       setListTargetOnCanvasCount(0);
@@ -1332,7 +1332,7 @@ export function CmsSlotsScreen() {
       const listTargetRegisteredName = await listTargetComponent.getName();
       setListTargetPhase("synced");
       setListTargetRegisteredName(listTargetRegisteredName);
-      await writeCmsSlotEngineConfiguredComponentIds(container, []);
+      await writeCmsSlotDesignerConfiguredComponentIds(container, []);
       await placeCmsSlotListTargetOnCanvas(dataList, container, definitionId, { resolvedCmsEnsure: cmsEnsure });
       promptCmsFieldLinkIfCreated(cmsEnsure);
       if (cmsEnsure == null) {
@@ -1374,14 +1374,14 @@ export function CmsSlotsScreen() {
 
   useEffect(() => {
     void listTargetPhase;
-    void engineSlotLabelRefreshToken;
-    if (!isEngine || !picking || selected.length === 0 || activeDataList == null) {
-      setEnginePublishedDisplayNames(null);
+    void designerSlotLabelRefreshToken;
+    if (!isDesigner || !picking || selected.length === 0 || activeDataList == null) {
+      setDesignerPublishedDisplayNames(null);
       return;
     }
     const container = targetRef.current;
     if (container == null) {
-      setEnginePublishedDisplayNames(null);
+      setDesignerPublishedDisplayNames(null);
       return;
     }
     let cancelled = false;
@@ -1398,17 +1398,17 @@ export function CmsSlotsScreen() {
         }
         const parsed =
           text != null && text.trim() !== "" ? parseCmsSlotListRuntimePayload(text, selected.length) : null;
-        setEnginePublishedDisplayNames(publishedDisplayNamesForEnginePool(parsed, selected));
+        setDesignerPublishedDisplayNames(publishedDisplayNamesForDesignerPool(parsed, selected));
       } catch {
         if (!cancelled) {
-          setEnginePublishedDisplayNames(selected.map((r) => r.name));
+          setDesignerPublishedDisplayNames(selected.map((r) => r.name));
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [isEngine, picking, activeDataList, currentCmsItemId, selected, listTargetPhase, engineSlotLabelRefreshToken]);
+  }, [isDesigner, picking, activeDataList, currentCmsItemId, selected, listTargetPhase, designerSlotLabelRefreshToken]);
 
   const composerDirty = useMemo(() => {
     if (activeComposer == null) return false;
@@ -1416,48 +1416,48 @@ export function CmsSlotsScreen() {
   }, [composerDraft, activeComposer]);
 
   const composerRowMeta = useMemo((): CmsSlotComposerRowMeta[] => {
-    if (composerSlotProps == null || composerEngineRows.length === 0) {
+    if (composerSlotProps == null || composerDesignerRows.length === 0) {
       return composerDraft.map((row) => ({ row, exposed: [] as ComposableInstancePropMeta[] }));
     }
-    const map = draftToHiddenListIndices(composerEngineRows, composerDraft);
+    const map = draftToHiddenListIndices(composerDesignerRows, composerDraft);
     if (!map.ok) {
       return composerDraft.map((row) => ({ row, exposed: [] as ComposableInstancePropMeta[] }));
     }
     return composerDraft.map((row, j) => {
       const runtimeDomIdx = map.indices[j];
       const poolIdx =
-        runtimeDomIdx != null ? enginePoolIndexForRuntimeCloneIndex(composerEngineRows, runtimeDomIdx) : -1;
+        runtimeDomIdx != null ? designerPoolIndexForRuntimeCloneIndex(composerDesignerRows, runtimeDomIdx) : -1;
       const raw = poolIdx >= 0 ? (composerSlotProps.slots[poolIdx]?.exposed ?? []) : [];
-      const engineRow = poolIdx >= 0 ? composerEngineRows[poolIdx] : undefined;
-      const live = engineRow != null ? composerEngineComposable[engineRow.key] : undefined;
+      const designerRow = poolIdx >= 0 ? composerDesignerRows[poolIdx] : undefined;
+      const live = designerRow != null ? composerDesignerComposable[designerRow.key] : undefined;
       return {
         row,
         exposed: mergeComposableMetaWithLive(raw, live),
       };
     });
-  }, [composerDraft, composerEngineRows, composerEngineComposable, composerSlotProps]);
+  }, [composerDraft, composerDesignerRows, composerDesignerComposable, composerSlotProps]);
 
   const handleOpenComposer = async (beacon: CmsSlotListOnPage) => {
     setComposerOpeningKey(beacon.key);
     try {
       const rows = await listInstancesInSlotListContainer(beacon.container);
-      const configuredComponentIds = await resolveCmsSlotEngineConfiguredComponentIds(beacon.container, rows);
-      const engineScopedRows = filterHydratedCmsSlotRowsByComponentIds(rows, configuredComponentIds);
+      const configuredComponentIds = await resolveCmsSlotDesignerConfiguredComponentIds(beacon.container, rows);
+      const designerScopedRows = filterHydratedCmsSlotRowsByComponentIds(rows, configuredComponentIds);
       const allowedPalette = await paletteForConfiguredComponentIds(configuredComponentIds, rows);
       setComposerAllowedPalette(allowedPalette);
-      setComposerEngineRows(engineScopedRows);
-      const liveComposable = await listComposableMetaByInstanceKey(engineScopedRows);
-      setComposerEngineComposable(liveComposable);
-      const sp = await readCmsSlotEngineSlotPropsFile(beacon.container, engineScopedRows.length);
+      setComposerDesignerRows(designerScopedRows);
+      const liveComposable = await listComposableMetaByInstanceKey(designerScopedRows);
+      setComposerDesignerComposable(liveComposable);
+      const sp = await readCmsSlotDesignerSlotPropsFile(beacon.container, designerScopedRows.length);
       setComposerSlotProps(sp);
       const { draft: rawDraft } = await resolveComposerTargetOrder({
         listContainer: beacon.container,
-        engineScopedRows,
+        designerScopedRows,
         currentCmsItemId,
       });
-      const mapped = draftToHiddenListIndices(engineScopedRows, rawDraft);
+      const mapped = draftToHiddenListIndices(designerScopedRows, rawDraft);
       const draft = mapped.ok
-        ? normalizeComposerDraftPropValues(rawDraft, mapped.indices, engineScopedRows, sp, liveComposable)
+        ? normalizeComposerDraftPropValues(rawDraft, mapped.indices, designerScopedRows, sp, liveComposable)
         : rawDraft;
       const initialSignature = cmsSlotCompositionSignature(draft);
       setComposerDraft(draft);
@@ -1473,8 +1473,8 @@ export function CmsSlotsScreen() {
   const handleComposerBack = useCallback(() => {
     setActiveComposer(null);
     setComposerDraft([]);
-    setComposerEngineRows([]);
-    setComposerEngineComposable({});
+    setComposerDesignerRows([]);
+    setComposerDesignerComposable({});
     setComposerSlotProps(null);
     setComposerAllowedPalette([]);
     setComposerLeaveDialogOpen(false);
@@ -1489,8 +1489,8 @@ export function CmsSlotsScreen() {
     const destination = composerLeaveDestinationRef.current;
     composerLeaveDestinationRef.current = "composer-list";
     handleComposerBack();
-    if (destination === "engine") {
-      void navigate("/cms-slots/engine");
+    if (destination === "designer") {
+      void navigate("/cms-slots/designer");
     }
   }, [handleComposerBack, navigate]);
 
@@ -1510,12 +1510,12 @@ export function CmsSlotsScreen() {
     setComposerLeaveDialogOpen(true);
   }, [composerDirty, handleComposerBack]);
 
-  const handleRequestNavigateToEngine = useCallback(() => {
+  const handleRequestNavigateToDesigner = useCallback(() => {
     if (activeComposer == null) {
-      void navigate("/cms-slots/engine");
+      void navigate("/cms-slots/designer");
       return;
     }
-    composerLeaveDestinationRef.current = "engine";
+    composerLeaveDestinationRef.current = "designer";
     if (!composerDirty) {
       finishComposerLeave();
       return;
@@ -1543,18 +1543,18 @@ export function CmsSlotsScreen() {
           beacon: activeComposer.beacon,
           composerDraft: draftToSave,
           composerAllowedPalette,
-          composerEngineComposable,
+          composerDesignerComposable,
           currentCmsItemId,
           listTargetDefinitionIdRef,
           setters: {
             setComposerDraft,
             setActiveComposer,
-            setComposerEngineRows,
-            setComposerEngineComposable,
+            setComposerDesignerRows,
+            setComposerDesignerComposable,
             setComposerSlotProps,
           },
           onCompleteSideEffects: () => {
-            setEngineListCompositionStale(false);
+            setDesignerListCompositionStale(false);
             void fetchPageBeaconsAndRuntime().then((runtime) => {
               void loadComposerEligible({ runtime });
             });
@@ -1574,7 +1574,7 @@ export function CmsSlotsScreen() {
     [
       composerAllowedPalette,
       composerDraft,
-      composerEngineComposable,
+      composerDesignerComposable,
       composerSavePending,
       activeComposer,
       currentCmsItemId,
@@ -1607,7 +1607,7 @@ export function CmsSlotsScreen() {
     setComposerDraft((prev) => prev.map((r) => (r.key === rowKey ? { ...r, name } : r)));
   }, []);
 
-  const handleSetEngineSlotExposed = useCallback(
+  const handleSetDesignerSlotExposed = useCallback(
     async (slotIndex: number, exposed: ComposableInstancePropMeta[]) => {
       await withSlotPropsWriteExclusive(async () => {
         const container = targetRef.current;
@@ -1615,36 +1615,36 @@ export function CmsSlotsScreen() {
           return;
         }
         const n = selectedRef.current.length;
-        const f = await readCmsSlotEngineSlotPropsFile(container, n);
+        const f = await readCmsSlotDesignerSlotPropsFile(container, n);
         const nextSlots = f.slots.slice(0, n);
         while (nextSlots.length < n) {
           nextSlots.push({ exposed: [] });
         }
         nextSlots[slotIndex] = { exposed: [...exposed] };
-        const out: CmsSlotEngineSlotPropsFile = { v: 1, slots: nextSlots };
-        await writeCmsSlotEngineSlotPropsFile(container, out);
-        setEngineListSlotFile(out);
-        setEngineListCompositionStale(true);
+        const out: CmsSlotDesignerSlotPropsFile = { v: 1, slots: nextSlots };
+        await writeCmsSlotDesignerSlotPropsFile(container, out);
+        setDesignerListSlotFile(out);
+        setDesignerListCompositionStale(true);
       });
     },
     [withSlotPropsWriteExclusive]
   );
 
-  const handleResyncEngineSlotAttrs = useCallback(
+  const handleResyncDesignerSlotAttrs = useCallback(
     async (slotIndex: number) => {
       await awaitSlotPropsWritesIdle();
       setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES);
       try {
-        const ok = await resyncEngineSlotPropAttributesForSlotIndex({
+        const ok = await resyncDesignerSlotPropAttributesForSlotIndex({
           slotIndex,
           selected,
           container: targetRef.current,
-          setResyncingEngineSlotKey,
+          setResyncingDesignerSlotKey,
           setSelected,
           onProgress: setRouteTaskPhase,
         });
         if (ok) {
-          setEngineListCompositionStale(false);
+          setDesignerListCompositionStale(false);
           await refreshPageBeacons();
         }
         return ok;
@@ -1672,7 +1672,7 @@ export function CmsSlotsScreen() {
             dataList: activeDataList,
             preferredDefinitionId: listTargetDefinitionIdRef.current,
             currentCmsItemId,
-            engineScopedRows: selected,
+            designerScopedRows: selected,
             poolIndex: slotIndex,
             nextName,
           });
@@ -1684,7 +1684,7 @@ export function CmsSlotsScreen() {
             type: "Success",
             message: "Published slot name updated. Publish the site for changes on the live page.",
           });
-          setEngineSlotLabelRefreshToken((g) => g + 1);
+          setDesignerSlotLabelRefreshToken((g) => g + 1);
           void refreshPageBeacons();
         } catch (err) {
           const message = formatWebflowDesignerError(err);
@@ -1730,14 +1730,14 @@ export function CmsSlotsScreen() {
       const nextSelected = [...selected, { ...addedRow, key: rowKey }];
       setSelected(nextSelected);
       setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG);
-      await writeCmsSlotEngineConfiguredComponentIds(
+      await writeCmsSlotDesignerConfiguredComponentIds(
         container,
         nextSelected.map((row) => row.componentId)
       );
-      const slotF = await readCmsSlotEngineSlotPropsFile(container, nextSelected.length);
-      await writeCmsSlotEngineSlotPropsFile(container, slotF);
-      setEngineListSlotFile(slotF);
-      setEngineListCompositionStale(true);
+      const slotF = await readCmsSlotDesignerSlotPropsFile(container, nextSelected.length);
+      await writeCmsSlotDesignerSlotPropsFile(container, slotF);
+      setDesignerListSlotFile(slotF);
+      setDesignerListCompositionStale(true);
       void refreshPageBeacons();
 
       const dataList = activeDataList;
@@ -1774,7 +1774,7 @@ export function CmsSlotsScreen() {
     setEmbedSyncPending(true);
     try {
       await syncCmsSlotsInstallEmbedOnPage();
-      setEngineListCompositionStale(false);
+      setDesignerListCompositionStale(false);
       void webflow.notify({
         type: "Success",
         message: "Page custom code updated. Publish the site to apply on the live site.",
@@ -1809,7 +1809,7 @@ export function CmsSlotsScreen() {
         /* selection is optional */
       }
       setCreateFormOpen(true);
-      setEngineListCompositionStale(false);
+      setDesignerListCompositionStale(false);
       setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_FINISHING);
       void refreshPageBeacons();
     } catch (err) {
@@ -1853,7 +1853,7 @@ export function CmsSlotsScreen() {
           }
         }
         void webflow.notify({ type: "Success", message: CMS_SLOTS_TOAST_LIST_RENAMED });
-        setEngineListCompositionStale(true);
+        setDesignerListCompositionStale(true);
         void refreshPageBeacons();
         return true;
       } catch (err) {
@@ -1890,7 +1890,7 @@ export function CmsSlotsScreen() {
         uninstallResult,
       });
       void webflow.notify({ type: notify.type, message: notify.message });
-      setEngineListCompositionStale(true);
+      setDesignerListCompositionStale(true);
       void refreshPageBeacons();
     } catch (err) {
       const message = formatWebflowDesignerError(err);
@@ -1907,26 +1907,26 @@ export function CmsSlotsScreen() {
     setRemovingKey(row.key);
     try {
       const removeIdx = selected.findIndex((p) => p.key === row.key);
-      const slotFileBefore = await readCmsSlotEngineSlotPropsFile(container, selected.length);
+      const slotFileBefore = await readCmsSlotDesignerSlotPropsFile(container, selected.length);
       const ownerExposedIds = new Set(
         (removeIdx >= 0 ? (slotFileBefore.slots[removeIdx]?.exposed ?? []) : []).map((e) => e.propId)
       );
-      const strip = await stripEngineCodalynAttrsFromComponentInstance(row.instance, ownerExposedIds);
+      const strip = await stripDesignerCodalynAttrsFromComponentInstance(row.instance, ownerExposedIds);
       if (strip.errors.length > 0) {
-        console.warn("[beacon] engine attr strip before remove (non-fatal):", strip.errors);
+        console.warn("[beacon] designer attr strip before remove (non-fatal):", strip.errors);
       }
       await removeComponentInstanceFromCanvas(row.instance);
       const nextSelected = selected.filter((p) => p.key !== row.key);
       setSelected(nextSelected);
-      await writeCmsSlotEngineConfiguredComponentIds(
+      await writeCmsSlotDesignerConfiguredComponentIds(
         container,
         nextSelected.map((entry) => entry.componentId)
       );
       const nextSlots = removeIdx >= 0 ? slotFileBefore.slots.filter((_, j) => j !== removeIdx) : slotFileBefore.slots;
-      const out: CmsSlotEngineSlotPropsFile = { v: 1, slots: nextSlots };
-      await writeCmsSlotEngineSlotPropsFile(container, out);
-      setEngineListSlotFile(out);
-      setEngineListCompositionStale(true);
+      const out: CmsSlotDesignerSlotPropsFile = { v: 1, slots: nextSlots };
+      await writeCmsSlotDesignerSlotPropsFile(container, out);
+      setDesignerListSlotFile(out);
+      setDesignerListCompositionStale(true);
       void refreshPageBeacons();
     } catch (err) {
       const message = formatWebflowDesignerError(err);
@@ -2173,7 +2173,7 @@ export function CmsSlotsScreen() {
       pageRuntimeStatusLoading={pageRuntimeStatusLoading}
       syncShellOk={syncShellOk}
       syncShellReason={syncShellReason}
-      isEngine={isEngine}
+      isDesigner={isDesigner}
       isComposer={isComposer}
       picking={picking}
       activeDataList={activeDataList}
@@ -2222,11 +2222,11 @@ export function CmsSlotsScreen() {
       listTargetFocusOnCanvasPending={listTargetFocusOnCanvasPending}
       listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
       listTargetSelectedOnCanvas={listTargetSelectedOnCanvas}
-      engineListSlotFile={engineListSlotFile}
-      onSetEngineSlotExposed={handleSetEngineSlotExposed}
-      onResyncEngineSlotAttrs={handleResyncEngineSlotAttrs}
-      resyncingEngineSlotKey={resyncingEngineSlotKey}
-      enginePublishedDisplayNames={enginePublishedDisplayNames}
+      designerListSlotFile={designerListSlotFile}
+      onSetDesignerSlotExposed={handleSetDesignerSlotExposed}
+      onResyncDesignerSlotAttrs={handleResyncDesignerSlotAttrs}
+      resyncingDesignerSlotKey={resyncingDesignerSlotKey}
+      designerPublishedDisplayNames={designerPublishedDisplayNames}
       onRenamePublishedDisplayName={handleRenamePublishedDisplayName}
       renamingPublishedSlotKey={renamingPublishedSlotKey}
       autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
@@ -2246,7 +2246,7 @@ export function CmsSlotsScreen() {
       onComposerReorderDraft={handleComposerReorderDraft}
       onComposerRemoveDraft={handleComposerRemoveDraft}
       onComposerBack={handleRequestComposerBack}
-      onRequestNavigateToEngine={handleRequestNavigateToEngine}
+      onRequestNavigateToDesigner={handleRequestNavigateToDesigner}
       onEditorNoSlotsBack={handleEditorNoSlotsBack}
       onComposerSave={handleComposerSave}
       composerSavePending={composerSavePending}

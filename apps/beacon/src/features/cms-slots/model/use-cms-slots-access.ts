@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import {
   type CmsSlotsRouteSegment,
-  canAccessCmsSlotsEngine,
+  canAccessCmsSlotsDesigner,
   computeEditorExperienceFromMembership,
   defaultCmsSlotsRouteSegment,
 } from "@/features/cms-slots/model/cms-slots-access";
@@ -12,8 +12,8 @@ export type CmsSlotsAccess = {
   editorExperience: boolean;
   /** Role flags are authoritative once Tower settings have synced (or user is unsigned). */
   accessResolved: boolean;
-  canAccessEngine: boolean;
-  /** True when the member only uses Composer (no Engine tab in the dock). */
+  canAccessDesigner: boolean;
+  /** True when the member only uses Composer (no Designer tab in the dock). */
   composerOnly: boolean;
   defaultSegment: CmsSlotsRouteSegment;
 };
@@ -29,7 +29,7 @@ export function useCmsSlotsAccess(): CmsSlotsAccess {
       restrictToEditorExperience
     );
     const effectiveEditorExperience = editorExperience || (accessResolved && membershipEditorExperience);
-    const canAccessEngine = accessResolved ? canAccessCmsSlotsEngine(effectiveEditorExperience) : false;
+    const canAccessDesigner = accessResolved ? canAccessCmsSlotsDesigner(effectiveEditorExperience) : false;
     const defaultSegment = accessResolved
       ? defaultCmsSlotsRouteSegment(effectiveEditorExperience)
       : ("composer" satisfies CmsSlotsRouteSegment);
@@ -37,8 +37,8 @@ export function useCmsSlotsAccess(): CmsSlotsAccess {
     return {
       editorExperience: effectiveEditorExperience,
       accessResolved,
-      canAccessEngine,
-      composerOnly: !canAccessEngine,
+      canAccessDesigner,
+      composerOnly: !canAccessDesigner,
       defaultSegment,
     };
   }, [accessResolved, editorExperience, restrictToEditorExperience, workspaceMemberRole]);

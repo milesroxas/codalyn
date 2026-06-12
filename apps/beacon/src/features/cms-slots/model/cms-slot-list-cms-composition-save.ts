@@ -222,7 +222,7 @@ export async function saveCmsSlotListRuntimePayloadToCmsItem(options: {
   cmsItemId: string;
   /** Ordered indices into the hidden CMS slot block’s `children` (what the site runtime will clone by index). */
   hiddenListIndices: readonly number[];
-  /** One entry per `hiddenListIndices` item; per-row `propId` → string (Engine-exposed props from Composer). */
+  /** One entry per `hiddenListIndices` item; per-row `propId` → string (Designer-exposed props from Composer). */
   propValueRows?: readonly Readonly<Record<string, string>>[] | null;
   /** Parallel Composer slot display names (`n` in persisted JSON); length must match `hiddenListIndices`. */
   slotLabels?: readonly string[] | null;

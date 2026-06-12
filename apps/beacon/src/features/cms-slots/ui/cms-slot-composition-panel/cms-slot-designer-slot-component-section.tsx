@@ -4,27 +4,27 @@ import type { ReactNode } from "react";
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import { cmsSlotListTargetPhaseUnsettled } from "@/features/cms-slots/model/cms-slot-list-target-settled";
 import {
-  CMS_SLOTS_ENGINE_CREATE_TARGET_LABEL,
-  CMS_SLOTS_ENGINE_CREATE_TARGET_PENDING_LABEL,
-  CMS_SLOTS_ENGINE_LIST_TARGET_ABSENT_DESCRIPTION,
-  CMS_SLOTS_ENGINE_LIST_TARGET_ABSENT_TITLE,
-  CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_DESCRIPTION,
-  CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_LABEL,
-  CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_TITLE,
-  CMS_SLOTS_ENGINE_LIST_TARGET_ON_CANVAS_TITLE,
-  CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_DESCRIPTION,
-  CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_LABEL,
-  CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_TITLE,
-  CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_LABEL,
-  CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_PENDING_LABEL,
-  CMS_SLOTS_ENGINE_REMOVE_TARGET_LABEL,
-  CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_LABEL,
-  CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_PENDING_LABEL,
-  CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_SELECTED_LABEL,
-  CMS_SLOTS_ENGINE_SLOT_COMPONENT_LABEL,
-  CMS_SLOTS_ENGINE_SLOT_COMPONENT_ON_CANVAS_GUIDE,
-  CMS_SLOTS_ENGINE_SLOT_COMPONENT_PLACE_GUIDE,
-  CMS_SLOTS_ENGINE_SLOT_COMPONENT_PLACE_TITLE,
+  CMS_SLOTS_DESIGNER_CREATE_TARGET_LABEL,
+  CMS_SLOTS_DESIGNER_CREATE_TARGET_PENDING_LABEL,
+  CMS_SLOTS_DESIGNER_LIST_TARGET_ABSENT_DESCRIPTION,
+  CMS_SLOTS_DESIGNER_LIST_TARGET_ABSENT_TITLE,
+  CMS_SLOTS_DESIGNER_LIST_TARGET_CHECKING_DESCRIPTION,
+  CMS_SLOTS_DESIGNER_LIST_TARGET_CHECKING_LABEL,
+  CMS_SLOTS_DESIGNER_LIST_TARGET_CHECKING_TITLE,
+  CMS_SLOTS_DESIGNER_LIST_TARGET_ON_CANVAS_TITLE,
+  CMS_SLOTS_DESIGNER_LIST_TARGET_UPDATING_DESCRIPTION,
+  CMS_SLOTS_DESIGNER_LIST_TARGET_UPDATING_LABEL,
+  CMS_SLOTS_DESIGNER_LIST_TARGET_UPDATING_TITLE,
+  CMS_SLOTS_DESIGNER_PLACE_ON_CANVAS_LABEL,
+  CMS_SLOTS_DESIGNER_PLACE_ON_CANVAS_PENDING_LABEL,
+  CMS_SLOTS_DESIGNER_REMOVE_TARGET_LABEL,
+  CMS_SLOTS_DESIGNER_SELECT_ON_CANVAS_LABEL,
+  CMS_SLOTS_DESIGNER_SELECT_ON_CANVAS_PENDING_LABEL,
+  CMS_SLOTS_DESIGNER_SELECT_ON_CANVAS_SELECTED_LABEL,
+  CMS_SLOTS_DESIGNER_SLOT_COMPONENT_LABEL,
+  CMS_SLOTS_DESIGNER_SLOT_COMPONENT_ON_CANVAS_GUIDE,
+  CMS_SLOTS_DESIGNER_SLOT_COMPONENT_PLACE_GUIDE,
+  CMS_SLOTS_DESIGNER_SLOT_COMPONENT_PLACE_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
 import {
@@ -39,7 +39,7 @@ import {
   SurfaceSummaryCardTitle,
 } from "@/shared/ui/surface-summary-card";
 
-type CmsSlotEngineSlotComponentSectionProps = {
+type CmsSlotDesignerSlotComponentSectionProps = {
   listTargetPhase: CmsSlotListTargetPhase;
   listTargetOnCanvasCount: number;
   listTargetOnCanvasCountResolved: boolean;
@@ -55,11 +55,11 @@ type CmsSlotEngineSlotComponentSectionProps = {
   onPlaceListTargetOnCanvas: () => void;
 };
 
-function CmsSlotEngineSlotComponentCard(props: { children: ReactNode }) {
+function CmsSlotDesignerSlotComponentCard(props: { children: ReactNode }) {
   const { children } = props;
 
   return (
-    <SurfaceSummaryCardPanel tone="default" data-slot="cms_slots_engine_slot_component_card">
+    <SurfaceSummaryCardPanel tone="default" data-slot="cms_slots_designer_slot_component_card">
       <SurfaceSummaryCardPanelSection showDivider={false} density="compact">
         {children}
       </SurfaceSummaryCardPanelSection>
@@ -67,7 +67,7 @@ function CmsSlotEngineSlotComponentCard(props: { children: ReactNode }) {
   );
 }
 
-function CmsSlotEngineSlotComponentAbsentContent(props: {
+function CmsSlotDesignerSlotComponentAbsentContent(props: {
   ctaDisabled: boolean;
   listTargetCreatePending: boolean;
   onCreateListTarget: () => void;
@@ -75,10 +75,10 @@ function CmsSlotEngineSlotComponentAbsentContent(props: {
   const { ctaDisabled, listTargetCreatePending, onCreateListTarget } = props;
 
   return (
-    <SurfaceSummaryCardIconRow data-slot="cms_slots_engine_list_target_absent">
+    <SurfaceSummaryCardIconRow data-slot="cms_slots_designer_list_target_absent">
       <SurfaceSummaryCardIconRowCopy>
-        <SurfaceSummaryCardTitle>{CMS_SLOTS_ENGINE_LIST_TARGET_ABSENT_TITLE}</SurfaceSummaryCardTitle>
-        <SurfaceSummaryCardIntro>{CMS_SLOTS_ENGINE_LIST_TARGET_ABSENT_DESCRIPTION}</SurfaceSummaryCardIntro>
+        <SurfaceSummaryCardTitle>{CMS_SLOTS_DESIGNER_LIST_TARGET_ABSENT_TITLE}</SurfaceSummaryCardTitle>
+        <SurfaceSummaryCardIntro>{CMS_SLOTS_DESIGNER_LIST_TARGET_ABSENT_DESCRIPTION}</SurfaceSummaryCardIntro>
       </SurfaceSummaryCardIconRowCopy>
       <Button
         type="button"
@@ -88,25 +88,29 @@ function CmsSlotEngineSlotComponentAbsentContent(props: {
         aria-busy={listTargetCreatePending}
         onClick={() => void onCreateListTarget()}
       >
-        {listTargetCreatePending ? CMS_SLOTS_ENGINE_CREATE_TARGET_PENDING_LABEL : CMS_SLOTS_ENGINE_CREATE_TARGET_LABEL}
+        {listTargetCreatePending
+          ? CMS_SLOTS_DESIGNER_CREATE_TARGET_PENDING_LABEL
+          : CMS_SLOTS_DESIGNER_CREATE_TARGET_LABEL}
       </Button>
     </SurfaceSummaryCardIconRow>
   );
 }
 
-function CmsSlotEngineListTargetPendingActions(props: { listTargetPhase: "loading" | "updating" }) {
+function CmsSlotDesignerListTargetPendingActions(props: { listTargetPhase: "loading" | "updating" }) {
   const { listTargetPhase } = props;
   const isUpdating = listTargetPhase === "updating";
-  const title = isUpdating ? CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_TITLE : CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_TITLE;
+  const title = isUpdating
+    ? CMS_SLOTS_DESIGNER_LIST_TARGET_UPDATING_TITLE
+    : CMS_SLOTS_DESIGNER_LIST_TARGET_CHECKING_TITLE;
   const description = isUpdating
-    ? CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_DESCRIPTION
-    : CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_DESCRIPTION;
+    ? CMS_SLOTS_DESIGNER_LIST_TARGET_UPDATING_DESCRIPTION
+    : CMS_SLOTS_DESIGNER_LIST_TARGET_CHECKING_DESCRIPTION;
   const pendingLabel = isUpdating
-    ? CMS_SLOTS_ENGINE_LIST_TARGET_UPDATING_LABEL
-    : CMS_SLOTS_ENGINE_LIST_TARGET_CHECKING_LABEL;
+    ? CMS_SLOTS_DESIGNER_LIST_TARGET_UPDATING_LABEL
+    : CMS_SLOTS_DESIGNER_LIST_TARGET_CHECKING_LABEL;
 
   return (
-    <SurfaceSummaryCardIconRow data-slot="cms_slots_engine_list_target_pending">
+    <SurfaceSummaryCardIconRow data-slot="cms_slots_designer_list_target_pending">
       <SurfaceSummaryCardIconRowCopy>
         <SurfaceSummaryCardTitle>{title}</SurfaceSummaryCardTitle>
         <SurfaceSummaryCardIntro>{description}</SurfaceSummaryCardIntro>
@@ -119,7 +123,7 @@ function CmsSlotEngineListTargetPendingActions(props: { listTargetPhase: "loadin
   );
 }
 
-function CmsSlotEngineListTargetPlaceActions(props: {
+function CmsSlotDesignerListTargetPlaceActions(props: {
   ctaDisabled: boolean;
   listTargetPlaceOnCanvasPending: boolean;
   onPlaceListTargetOnCanvas: () => void;
@@ -127,10 +131,10 @@ function CmsSlotEngineListTargetPlaceActions(props: {
   const { ctaDisabled, listTargetPlaceOnCanvasPending, onPlaceListTargetOnCanvas } = props;
 
   return (
-    <SurfaceSummaryCardIconRow data-slot="cms_slots_engine_list_target_place">
+    <SurfaceSummaryCardIconRow data-slot="cms_slots_designer_list_target_place">
       <SurfaceSummaryCardIconRowCopy>
-        <SurfaceSummaryCardTitle>{CMS_SLOTS_ENGINE_SLOT_COMPONENT_PLACE_TITLE}</SurfaceSummaryCardTitle>
-        <SurfaceSummaryCardIntro>{CMS_SLOTS_ENGINE_SLOT_COMPONENT_PLACE_GUIDE}</SurfaceSummaryCardIntro>
+        <SurfaceSummaryCardTitle>{CMS_SLOTS_DESIGNER_SLOT_COMPONENT_PLACE_TITLE}</SurfaceSummaryCardTitle>
+        <SurfaceSummaryCardIntro>{CMS_SLOTS_DESIGNER_SLOT_COMPONENT_PLACE_GUIDE}</SurfaceSummaryCardIntro>
       </SurfaceSummaryCardIconRowCopy>
       <Button
         type="button"
@@ -138,21 +142,21 @@ function CmsSlotEngineListTargetPlaceActions(props: {
         size="sm"
         disabled={ctaDisabled}
         aria-busy={listTargetPlaceOnCanvasPending}
-        data-slot="cms_slots_engine_list_target_place_action"
+        data-slot="cms_slots_designer_list_target_place_action"
         onClick={() => void onPlaceListTargetOnCanvas()}
       >
         {listTargetPlaceOnCanvasPending ? (
           <Loader2 aria-hidden className="animate-spin" data-icon="inline-start" />
         ) : null}
         {listTargetPlaceOnCanvasPending
-          ? CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_PENDING_LABEL
-          : CMS_SLOTS_ENGINE_PLACE_ON_CANVAS_LABEL}
+          ? CMS_SLOTS_DESIGNER_PLACE_ON_CANVAS_PENDING_LABEL
+          : CMS_SLOTS_DESIGNER_PLACE_ON_CANVAS_LABEL}
       </Button>
     </SurfaceSummaryCardIconRow>
   );
 }
 
-function CmsSlotEngineListTargetOnCanvasActions(props: {
+function CmsSlotDesignerListTargetOnCanvasActions(props: {
   ctaDisabled: boolean;
   listTargetFocusOnCanvasPending: boolean;
   listTargetRemovePending: boolean;
@@ -170,16 +174,16 @@ function CmsSlotEngineListTargetOnCanvasActions(props: {
   } = props;
 
   const selectLabel = listTargetFocusOnCanvasPending
-    ? CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_PENDING_LABEL
+    ? CMS_SLOTS_DESIGNER_SELECT_ON_CANVAS_PENDING_LABEL
     : listTargetSelectedOnCanvas
-      ? CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_SELECTED_LABEL
-      : CMS_SLOTS_ENGINE_SELECT_ON_CANVAS_LABEL;
+      ? CMS_SLOTS_DESIGNER_SELECT_ON_CANVAS_SELECTED_LABEL
+      : CMS_SLOTS_DESIGNER_SELECT_ON_CANVAS_LABEL;
 
   return (
-    <SurfaceSummaryCardIconRow data-slot="cms_slots_engine_list_target_on_canvas">
+    <SurfaceSummaryCardIconRow data-slot="cms_slots_designer_list_target_on_canvas">
       <SurfaceSummaryCardIconRowCopy>
-        <SurfaceSummaryCardTitle>{CMS_SLOTS_ENGINE_LIST_TARGET_ON_CANVAS_TITLE}</SurfaceSummaryCardTitle>
-        <SurfaceSummaryCardIntro>{CMS_SLOTS_ENGINE_SLOT_COMPONENT_ON_CANVAS_GUIDE}</SurfaceSummaryCardIntro>
+        <SurfaceSummaryCardTitle>{CMS_SLOTS_DESIGNER_LIST_TARGET_ON_CANVAS_TITLE}</SurfaceSummaryCardTitle>
+        <SurfaceSummaryCardIntro>{CMS_SLOTS_DESIGNER_SLOT_COMPONENT_ON_CANVAS_GUIDE}</SurfaceSummaryCardIntro>
       </SurfaceSummaryCardIconRowCopy>
       <SurfaceSummaryCardIconActionGroup>
         <Button
@@ -188,7 +192,7 @@ function CmsSlotEngineListTargetOnCanvasActions(props: {
           size="sm"
           disabled={ctaDisabled || listTargetSelectedOnCanvas}
           aria-busy={listTargetFocusOnCanvasPending}
-          data-slot="cms_slots_engine_list_target_focus"
+          data-slot="cms_slots_designer_list_target_focus"
           onClick={() => void onFocusListTargetOnCanvas()}
         >
           {listTargetFocusOnCanvasPending ? (
@@ -202,8 +206,8 @@ function CmsSlotEngineListTargetOnCanvasActions(props: {
           size="icon-sm"
           disabled={ctaDisabled || listTargetRemovePending}
           aria-busy={listTargetRemovePending}
-          aria-label={CMS_SLOTS_ENGINE_REMOVE_TARGET_LABEL}
-          data-slot="cms_slots_engine_list_target_remove"
+          aria-label={CMS_SLOTS_DESIGNER_REMOVE_TARGET_LABEL}
+          data-slot="cms_slots_designer_list_target_remove"
           onClick={() => void onRequestRemoveListTarget()}
         >
           {listTargetRemovePending ? (
@@ -217,7 +221,7 @@ function CmsSlotEngineListTargetOnCanvasActions(props: {
   );
 }
 
-function CmsSlotEngineListTargetSyncedActions(props: {
+function CmsSlotDesignerListTargetSyncedActions(props: {
   ctaDisabled: boolean;
   showPlaceStep: boolean;
   showOnCanvasStep: boolean;
@@ -244,7 +248,7 @@ function CmsSlotEngineListTargetSyncedActions(props: {
 
   if (showOnCanvasStep) {
     return (
-      <CmsSlotEngineListTargetOnCanvasActions
+      <CmsSlotDesignerListTargetOnCanvasActions
         ctaDisabled={ctaDisabled}
         listTargetFocusOnCanvasPending={listTargetFocusOnCanvasPending}
         listTargetRemovePending={listTargetRemovePending}
@@ -257,7 +261,7 @@ function CmsSlotEngineListTargetSyncedActions(props: {
 
   if (showPlaceStep) {
     return (
-      <CmsSlotEngineListTargetPlaceActions
+      <CmsSlotDesignerListTargetPlaceActions
         ctaDisabled={ctaDisabled}
         listTargetPlaceOnCanvasPending={listTargetPlaceOnCanvasPending}
         onPlaceListTargetOnCanvas={onPlaceListTargetOnCanvas}
@@ -268,7 +272,7 @@ function CmsSlotEngineListTargetSyncedActions(props: {
   return null;
 }
 
-export function CmsSlotEngineSlotComponentSection(props: CmsSlotEngineSlotComponentSectionProps) {
+export function CmsSlotDesignerSlotComponentSection(props: CmsSlotDesignerSlotComponentSectionProps) {
   const {
     listTargetPhase,
     listTargetOnCanvasCount,
@@ -294,12 +298,14 @@ export function CmsSlotEngineSlotComponentSection(props: CmsSlotEngineSlotCompon
   const showOnCanvasStep = showSyncedActions && listTargetOnCanvasCount > 0;
 
   return (
-    <SurfaceSummaryCardSurfaceSummary data-slot="cms_slots_engine_slot_component">
-      <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_ENGINE_SLOT_COMPONENT_LABEL}</SurfaceSummaryCardPanelSectionLabel>
+    <SurfaceSummaryCardSurfaceSummary data-slot="cms_slots_designer_slot_component">
+      <SurfaceSummaryCardPanelSectionLabel>
+        {CMS_SLOTS_DESIGNER_SLOT_COMPONENT_LABEL}
+      </SurfaceSummaryCardPanelSectionLabel>
 
-      <CmsSlotEngineSlotComponentCard>
+      <CmsSlotDesignerSlotComponentCard>
         {listTargetPhase === "absent" ? (
-          <CmsSlotEngineSlotComponentAbsentContent
+          <CmsSlotDesignerSlotComponentAbsentContent
             ctaDisabled={ctaDisabled}
             listTargetCreatePending={listTargetCreatePending}
             onCreateListTarget={onCreateListTarget}
@@ -307,13 +313,13 @@ export function CmsSlotEngineSlotComponentSection(props: CmsSlotEngineSlotCompon
         ) : null}
 
         {listTargetCanvasStatusPending ? (
-          <CmsSlotEngineListTargetPendingActions
+          <CmsSlotDesignerListTargetPendingActions
             listTargetPhase={listTargetPhase === "updating" ? "updating" : "loading"}
           />
         ) : null}
 
         {showSyncedActions ? (
-          <CmsSlotEngineListTargetSyncedActions
+          <CmsSlotDesignerListTargetSyncedActions
             ctaDisabled={ctaDisabled}
             showPlaceStep={showPlaceStep}
             showOnCanvasStep={showOnCanvasStep}
@@ -326,7 +332,7 @@ export function CmsSlotEngineSlotComponentSection(props: CmsSlotEngineSlotCompon
             onRequestRemoveListTarget={onRequestRemoveListTarget}
           />
         ) : null}
-      </CmsSlotEngineSlotComponentCard>
+      </CmsSlotDesignerSlotComponentCard>
     </SurfaceSummaryCardSurfaceSummary>
   );
 }

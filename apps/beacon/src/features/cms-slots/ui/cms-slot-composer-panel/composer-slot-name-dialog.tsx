@@ -33,7 +33,7 @@ export type ComposerSlotNameDialogProps = {
   disabled?: boolean;
   /**
    * `draft` (Composer): flush display name into the local composition on Done or dismiss.
-   * `persist` (Engine published rename): call {@link onRename} only on Done; dismiss reverts the field.
+   * `persist` (Designer published rename): call {@link onRename} only on Done; dismiss reverts the field.
    */
   renameCommit?: ComposerSlotNameDialogRenameCommit;
   dialogTitle?: string;

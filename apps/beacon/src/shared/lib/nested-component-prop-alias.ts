@@ -40,7 +40,7 @@ export function canonicalExposedPropId(
 /**
  * True when any of this instance's props is wired to a parent prop, regardless of whether that parent prop is
  * currently exposed. A definition entered on an earlier tag run keeps this wiring after a prop is deselected, so
- * cleanup must still re-enter it to strip the now-orphaned Engine segment — `mapNestedPropsToExposedIds` alone
+ * cleanup must still re-enter it to strip the now-orphaned Designer segment — `mapNestedPropsToExposedIds` alone
  * would report "not linked" and skip it. Pairs with {@link mapNestedPropsToExposedIds} for alias translation.
  */
 export function hasParentPropWiring(props: ReadonlyArray<{ value: unknown }>): boolean {

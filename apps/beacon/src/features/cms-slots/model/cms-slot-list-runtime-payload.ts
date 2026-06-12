@@ -4,16 +4,16 @@
  *
  * 1. **Composer (CMS item)** — `saveCmsSlotListRuntimePayloadToCmsItem` writes this string to that field (staged + live) for
  *    the *current* collection entry, so every CMS row has its own `i` + `p`.
- * 2. **Published page** — the footer `beacon` runtime reads `listTarget.textContent` (JSON), clones hidden Engine children
- *    by `i` into the list target (empty or missing `i` ⇒ no rows; invalid JSON does not fall back to the full Engine list),
+ * 2. **Published page** — the footer `beacon` runtime reads `listTarget.textContent` (JSON), clones hidden Designer children
+ *    by `i` into the list target (empty or missing `i` ⇒ no rows; invalid JSON does not fall back to the full Designer list),
  *    then for each row applies `p[propId]` onto elements with matching `data-cb-c`
  *    (keys are matched case-insensitively; the attribute may list `propId@N` segments separated by `|` for duplicate sites).
  *    When the same exposed prop is bound on multiple elements, later sites are tagged `propId@N` (ordinal) but still
- *    resolve the Composer value via the base `propId`. A shared nested definition carries one segment per Engine
+ *    resolve the Composer value via the base `propId`. A shared nested definition carries one segment per Designer
  *    component that exposes it, so each cloned row resolves its own value.
  *
  * v3: `i` = clone order (indices into the hidden list’s children), `p` = parallel array of per-row `propId` → string.
- * `p` keys are **only** propIds the Engine had marked `exposed` in the slot file (not every Webflow prop on the
+ * `p` keys are **only** propIds the Designer had marked `exposed` in the slot file (not every Webflow prop on the
  * component), and **only** props the Composer actually set (empty values are omitted). The footer runtime applies those
  * keys to `data-cb-c` nodes in each cloned row; when a value is set it reveals the node (clearing
  * `w-condition-invisible` on ancestor wrappers). When a key is absent the runtime leaves the authored default content
@@ -23,7 +23,7 @@
  * for Composer UX persistence in the same JSON blob.
  */
 import { isBeaconPropValueEmpty } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
-import { enginePoolIndexForRuntimeCloneIndex } from "@/features/cms-slots/model/cms-slot-page-targets";
+import { designerPoolIndexForRuntimeCloneIndex } from "@/features/cms-slots/model/cms-slot-page-targets";
 
 export const CMS_SLOT_LIST_RUNTIME_JSON_VERSION = 3 as const;
 /** Max length for a Composer slot display name persisted in payload `n[]`. */
@@ -34,7 +34,7 @@ export type CmsSlotListRuntimePayload = {
   /** 0-based indices into the hidden list block’s `children` (the clone sources). */
   i: number[];
   /**
-   * Parallel to `i`: string values for each property exposed in Engine, keyed by Webflow `propId`.
+   * Parallel to `i`: string values for each property exposed in Designer, keyed by Webflow `propId`.
    * (Text, image URL, `true`/`false`, decimal numbers, hex colors, etc.)
    */
   p: Array<Record<string, string>>;
@@ -103,30 +103,30 @@ export function resolveCmsSlotPublishedDisplayName(
 }
 
 /**
- * For each Engine pool row (hidden list index), derive the label shown in Composer from the live v2 payload, or the
+ * For each Designer pool row (hidden list index), derive the label shown in Composer from the live v2 payload, or the
  * component name when the payload is missing or that pool index has **mixed** composed-row labels (same index used
  * more than once with different `n[]` entries).
  */
-export function publishedDisplayNamesForEnginePool(
+export function publishedDisplayNamesForDesignerPool(
   payload: CmsSlotListRuntimePayload | null,
-  engineScopedRows: ReadonlyArray<{ name: string; domChildIndex?: number }>
+  designerScopedRows: ReadonlyArray<{ name: string; domChildIndex?: number }>
 ): string[] {
   if (payload == null || payload.i.length === 0) {
-    return engineScopedRows.map((r) => r.name);
+    return designerScopedRows.map((r) => r.name);
   }
   const collected = new Map<number, string[]>();
   for (let u = 0; u < payload.i.length; u++) {
-    const poolIdx = enginePoolIndexForRuntimeCloneIndex(engineScopedRows, payload.i[u]);
-    if (poolIdx < 0 || poolIdx >= engineScopedRows.length) {
+    const poolIdx = designerPoolIndexForRuntimeCloneIndex(designerScopedRows, payload.i[u]);
+    if (poolIdx < 0 || poolIdx >= designerScopedRows.length) {
       continue;
     }
-    const defName = engineScopedRows[poolIdx]?.name ?? "";
+    const defName = designerScopedRows[poolIdx]?.name ?? "";
     const resolved = resolveCmsSlotPublishedDisplayName(defName, payload.n?.[u]);
     const arr = collected.get(poolIdx) ?? [];
     arr.push(resolved);
     collected.set(poolIdx, arr);
   }
-  return engineScopedRows.map((row, j) => {
+  return designerScopedRows.map((row, j) => {
     const labels = collected.get(j);
     if (labels == null || labels.length === 0) {
       return row.name;

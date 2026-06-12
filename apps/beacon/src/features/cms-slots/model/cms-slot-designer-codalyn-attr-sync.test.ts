@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CMS_SLOT_CONTENT_ATTR } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
-import { syncEngineCodalynSlotPropAttributes } from "@/features/cms-slots/model/cms-slot-engine-codalyn-attr-sync";
+import { syncDesignerCodalynSlotPropAttributes } from "@/features/cms-slots/model/cms-slot-designer-codalyn-attr-sync";
 
 type BoundDom = AnyElement & { store: Map<string, string> };
 
@@ -53,7 +53,7 @@ function nestedInstance(
   } as unknown as ComponentElement;
 }
 
-describe("syncEngineCodalynSlotPropAttributes (re-tag after deselect)", () => {
+describe("syncDesignerCodalynSlotPropAttributes (re-tag after deselect)", () => {
   beforeEach(() => {
     vi.stubGlobal("webflow", {
       getCurrentComponent: vi.fn(async () => null),
@@ -73,7 +73,7 @@ describe("syncEngineCodalynSlotPropAttributes (re-tag after deselect)", () => {
     const bodyEl = boundDom({ [CMS_SLOT_CONTENT_ATTR]: "body" }, "body");
     const root = boundDom({}, null, [titleEl, bodyEl]);
 
-    const result = await syncEngineCodalynSlotPropAttributes(instanceForRoot(root), [exposedProp("body")]);
+    const result = await syncDesignerCodalynSlotPropAttributes(instanceForRoot(root), [exposedProp("body")]);
 
     expect(result.errors).toEqual([]);
     expect((titleEl as BoundDom).store.has(CMS_SLOT_CONTENT_ATTR)).toBe(false);
@@ -81,13 +81,13 @@ describe("syncEngineCodalynSlotPropAttributes (re-tag after deselect)", () => {
     expect(result.removed).toBe(1);
   });
 
-  it("preserves a foreign Engine component's segment on a shared element when this slot's prop is deselected", async () => {
+  it("preserves a foreign Designer component's segment on a shared element when this slot's prop is deselected", async () => {
     // Image shared by Card (this slot, `card-image`) and Hero (another CMS slot, `hero-image`). Deselecting
     // `card-image` here must keep Hero's `hero-image` segment so multi-slot tagging stays last-write-safe.
     const sharedImg = boundDom({ [CMS_SLOT_CONTENT_ATTR]: "card-image|hero-image" }, "card-image");
     const root = boundDom({}, null, [sharedImg]);
 
-    const result = await syncEngineCodalynSlotPropAttributes(instanceForRoot(root), [], new Set(["hero-image"]));
+    const result = await syncDesignerCodalynSlotPropAttributes(instanceForRoot(root), [], new Set(["hero-image"]));
 
     expect(result.errors).toEqual([]);
     expect((sharedImg as BoundDom).store.get(CMS_SLOT_CONTENT_ATTR)).toBe("hero-image");
@@ -105,7 +105,7 @@ describe("syncEngineCodalynSlotPropAttributes (re-tag after deselect)", () => {
     ]);
     const root = boundDom({}, null, [nested]);
 
-    const result = await syncEngineCodalynSlotPropAttributes(instanceForRoot(root), []);
+    const result = await syncDesignerCodalynSlotPropAttributes(instanceForRoot(root), []);
 
     expect(result.errors).toEqual([]);
     expect((innerImg as BoundDom).store.has(CMS_SLOT_CONTENT_ATTR)).toBe(false);
@@ -122,7 +122,7 @@ describe("syncEngineCodalynSlotPropAttributes (re-tag after deselect)", () => {
     ]);
     const root = boundDom({}, null, [nested]);
 
-    const result = await syncEngineCodalynSlotPropAttributes(instanceForRoot(root), [], new Set(["card-image"]));
+    const result = await syncDesignerCodalynSlotPropAttributes(instanceForRoot(root), [], new Set(["card-image"]));
 
     expect(result.errors).toEqual([]);
     expect((innerImg as BoundDom).store.get(CMS_SLOT_CONTENT_ATTR)).toBe("card-image");

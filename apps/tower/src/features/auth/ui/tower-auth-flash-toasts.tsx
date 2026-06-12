@@ -11,6 +11,7 @@ import {
 } from "@/features/auth/lib/email-verification";
 import { authClient } from "@/features/auth/model/auth-client";
 import { TOWER_AUTH_FLASH_EMAIL_VERIFIED, type TowerAuthFlash } from "@/shared/lib/auth/tower-auth-flash";
+import { isTeamInvitationVerificationRedirectError } from "@/shared/lib/membership/team-invitation-accept";
 
 type TowerAuthFlashToastsProps = {
   flash: TowerAuthFlash | null;
@@ -38,9 +39,11 @@ function TowerAuthFlashToastsInner({ flash }: TowerAuthFlashToastsProps) {
     notifiedRef.current = true;
 
     if (verificationError) {
-      toast.error(EMAIL_VERIFICATION_FAILED_TOAST.title, {
-        description: EMAIL_VERIFICATION_FAILED_TOAST.description,
-      });
+      if (!isTeamInvitationVerificationRedirectError(verificationError)) {
+        toast.error(EMAIL_VERIFICATION_FAILED_TOAST.title, {
+          description: EMAIL_VERIFICATION_FAILED_TOAST.description,
+        });
+      }
     } else {
       toast.success(EMAIL_VERIFIED_TOAST.title, { description: EMAIL_VERIFIED_TOAST.description });
       void refetch();

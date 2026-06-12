@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { buildTowerAuthSurfaceHref } from "@/features/auth/lib/build-tower-auth-surface-href";
+import { readEmailVerificationRedirectError } from "@/features/auth/lib/email-verification";
 import { authClient } from "@/features/auth/model/auth-client";
 import {
   AcceptInvitationAuthGateScreen,
@@ -15,7 +17,9 @@ import {
   AcceptInvitationWrongAccountScreen,
 } from "@/features/team/ui/accept-invitation-screen";
 import {
+  buildTeamInvitationAcceptPath,
   classifyTeamInvitationAcceptError,
+  isTeamInvitationVerificationRedirectError,
   messageForTeamInvitationAcceptError,
   readTeamInvitationIdFromSearchParams,
   TEAM_INVITATION_ACCEPT_COPY,
@@ -29,6 +33,8 @@ function AcceptInvitationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const invitationId = readTeamInvitationIdFromSearchParams(searchParams);
+  const verificationRedirectError = readEmailVerificationRedirectError(searchParams);
+  const [storedVerificationRedirectError, setStoredVerificationRedirectError] = useState<string | null>(null);
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const showInvitationSkeleton = useDeferredLoadingIndicator(sessionPending);
   const attemptedAcceptRef = useRef(false);
@@ -37,6 +43,18 @@ function AcceptInvitationContent() {
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    if (!verificationRedirectError || !isTeamInvitationVerificationRedirectError(verificationRedirectError)) {
+      return;
+    }
+    setStoredVerificationRedirectError(verificationRedirectError);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("error");
+    router.replace(`${url.pathname}${url.search}`, { scroll: false });
+  }, [router, verificationRedirectError]);
+
+  const activeVerificationRedirectError = storedVerificationRedirectError ?? verificationRedirectError;
 
   useEffect(() => {
     if (!invitationId) {
@@ -137,6 +155,21 @@ function AcceptInvitationContent() {
   }
 
   const preview = previewState.preview;
+  if (preview.ok && isTeamInvitationVerificationRedirectError(activeVerificationRedirectError) && !session?.user) {
+    const callbackUrl = buildTeamInvitationAcceptPath(invitationId);
+    const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl);
+    return (
+      <AcceptInvitationMessageScreen
+        title={TEAM_INVITATION_ACCEPT_COPY.verificationRedirectTitle}
+        description={TEAM_INVITATION_ACCEPT_COPY.verificationRedirectDescription(
+          preview.email,
+          preview.organizationName
+        )}
+        footer={<Link href={signInHref}>{TEAM_INVITATION_ACCEPT_COPY.signInLabel}</Link>}
+      />
+    );
+  }
+
   if (!preview.ok) {
     const expired = preview.reason === "expired";
     return (

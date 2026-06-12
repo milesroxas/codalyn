@@ -29,8 +29,10 @@ import { sendChangeEmailNewAddressVerificationEmail } from "@/server/email/chang
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
 import { sendPasswordResetEmail } from "@/server/email/password-reset-email";
 import {
-  isPendingTeamInvitationForEmail,
   readTeamInvitationIdFromAuthContext,
+  shouldMarkEmailVerifiedOnTeamInviteSignUp,
+  shouldSkipVerificationEmailForTeamInvite,
+  trustEmailForPendingOrgInvitationEmail,
   trustEmailForPendingTeamInvitation,
 } from "@/server/membership/team-invitation-email-trust";
 import { towerOrganization } from "@/server/membership/tower-organization";
@@ -88,9 +90,10 @@ export const auth = betterAuth({
       const changeEmailVerification = isChangeEmailVerificationRequest(token);
       const teamInvitationId = readTeamInvitationIdFromAuthContext({ request });
       const operatorInviteToken = readOperatorInviteTokenFromAuthContext({ request });
-      const skipForTeamInvitation = teamInvitationId
-        ? await isPendingTeamInvitationForEmail(teamInvitationId, user.email)
-        : false;
+      const skipForTeamInvitation = await shouldSkipVerificationEmailForTeamInvite({
+        email: user.email,
+        invitationId: teamInvitationId,
+      });
       const skipForOperatorInvite = operatorInviteToken
         ? isValidOperatorInviteForEmail(operatorInviteToken, user.email)
         : false;
@@ -181,6 +184,7 @@ export const auth = betterAuth({
         const email = typeof ctx.body?.email === "string" ? ctx.body.email : "";
         await assertUserMaySignInByEmail(email);
         await trustEmailForPendingTeamInvitation(email, readTeamInvitationIdFromAuthContext(ctx));
+        await trustEmailForPendingOrgInvitationEmail(email);
         await trustEmailForOperatorInvite(email, readOperatorInviteTokenFromAuthContext(ctx));
       }
     }),
@@ -206,7 +210,12 @@ export const auth = betterAuth({
             return;
           }
           const invitationId = readTeamInvitationIdFromAuthContext(ctx);
-          if (invitationId && (await isPendingTeamInvitationForEmail(invitationId, createdUser.email))) {
+          if (
+            await shouldMarkEmailVerifiedOnTeamInviteSignUp({
+              email: createdUser.email,
+              invitationId,
+            })
+          ) {
             return {
               data: {
                 ...createdUser,

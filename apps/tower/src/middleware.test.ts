@@ -74,6 +74,14 @@ describe("middleware host split", () => {
     expect(response?.headers.get("location")).toBe("https://tower-preview.codalyn.app/account");
   });
 
+  it("redirects signed-in preview marketing host / to auth continue on the app host", () => {
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    vi.mocked(getSessionCookie).mockReturnValue("session-token");
+    const response = middleware(makeRequest("preview.codalyn.app", "/"));
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get("location")).toBe("https://tower-preview.codalyn.app/auth/continue");
+  });
+
   it("does not redirect app host / when a session cookie is present", () => {
     process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
     vi.mocked(getSessionCookie).mockReturnValue("session-token");

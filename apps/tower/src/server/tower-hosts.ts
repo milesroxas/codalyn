@@ -47,11 +47,31 @@ function envConfigKey(): string {
   ].join("|");
 }
 
-function parseMarketingHosts(): readonly string[] {
+function deriveMarketingHostFromTowerAppUrl(appUrl: string): string | null {
+  try {
+    const { hostname } = new URL(appUrl.trim());
+    const host = normalizeHostname(hostname);
+    if (host.startsWith("tower.")) {
+      return host.slice("tower.".length);
+    }
+    if (host.startsWith("tower-")) {
+      return host.slice("tower-".length);
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function parseMarketingHosts(appUrl: string): readonly string[] {
   const fromEnv = process.env.TOWER_MARKETING_HOSTS?.split(",")
     .map((entry) => normalizeHostname(entry.trim()))
     .filter(Boolean);
-  return fromEnv?.length ? fromEnv : DEFAULT_MARKETING_HOSTS;
+  if (fromEnv?.length) {
+    return fromEnv;
+  }
+  const derived = deriveMarketingHostFromTowerAppUrl(appUrl);
+  return derived ? [derived, ...DEFAULT_MARKETING_HOSTS] : DEFAULT_MARKETING_HOSTS;
 }
 
 function deriveFlintMarketingHostFromTowerAppUrl(appUrl: string): string | null {
@@ -180,7 +200,7 @@ function buildTowerHostConfig(): TowerHostConfig {
   const appOrigin = resolveTowerPublicBaseUrl();
   return {
     splitEnabled,
-    marketingHosts: new Set(parseMarketingHosts()),
+    marketingHosts: new Set(parseMarketingHosts(appOrigin)),
     flintMarketingHosts: new Set(parseFlintMarketingHosts(appOrigin)),
     appHost,
     marketingOrigin: resolveMarketingOriginFromEnv(),

@@ -91,6 +91,7 @@ describe("tower-hosts", () => {
     expect(isHostSplitEnabled()).toBe(true);
     expect(isAppHost("tower-preview.codalyn.app")).toBe(true);
     expect(isMarketingHost("tower-preview.codalyn.app")).toBe(false);
+    expect(isMarketingHost("preview.codalyn.app")).toBe(true);
   });
 
   it("builds app and marketing URLs from env", () => {

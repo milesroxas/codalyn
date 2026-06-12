@@ -156,7 +156,7 @@ export const CMS_SLOTS_UNINSTALL_PAGE_LABEL = `Also uninstall ${CMS_SLOTS_FEATUR
 
 /** Shown when deleting the last list without also uninstalling the page install. */
 export const CMS_SLOTS_UNINSTALL_PAGE_HINT =
-  "The footer beacon script and hidden page install stay on this page unless you check the option above.";
+  "The footer beacon script, hidden page install, and runtime JS files in Assets stay on this site unless you check the option above.";
 
 /** Composer empty state when an editor has no slot lists to open on this page. */
 export const CMS_SLOTS_EDITOR_NO_SLOTS_TITLE = "No Slots Found";

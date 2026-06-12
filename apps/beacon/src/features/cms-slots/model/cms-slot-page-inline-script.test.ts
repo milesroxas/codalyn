@@ -10,6 +10,7 @@ import { CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME } from "@/features/cms-slots/mod
 import {
   getCmsSlotPageInlineScriptSource,
   isBeaconRuntimeAssetFileName,
+  normalizeBeaconRuntimeAssetRow,
   normalizeHostedAssetUrl,
   selectBeaconRuntimeAssetIdsToPurge,
 } from "@/features/cms-slots/model/cms-slot-page-inline-script";
@@ -68,6 +69,33 @@ describe("beacon runtime asset cleanup helpers", () => {
   it("normalizes hosted asset URLs for comparison", () => {
     expect(normalizeHostedAssetUrl("https://cdn.example.com/a.js?x=1")).toBe("https://cdn.example.com/a.js");
     expect(normalizeHostedAssetUrl("https://cdn.example.com/a.js/")).toBe("https://cdn.example.com/a.js");
+  });
+
+  it("normalizes canonical and alternate Webflow asset list shapes", () => {
+    expect(
+      normalizeBeaconRuntimeAssetRow({
+        id: "asset-1",
+        hostedUrl: "https://cdn.example.com/codalyn-beacon-runtime-abc.js",
+        originalFileName: "codalyn-beacon-runtime-abc.js",
+      })
+    ).toEqual({
+      id: "asset-1",
+      hostedUrl: "https://cdn.example.com/codalyn-beacon-runtime-abc.js",
+      originalFileName: "codalyn-beacon-runtime-abc.js",
+    });
+    expect(
+      normalizeBeaconRuntimeAssetRow({
+        id: "asset-2",
+        url: "https://cdn.example.com/codalyn-beacon-runtime-old.js",
+        displayName: "63e5889e_codalyn-beacon-runtime-old.js",
+      })
+    ).toEqual({
+      id: "asset-2",
+      hostedUrl: "https://cdn.example.com/codalyn-beacon-runtime-old.js",
+      originalFileName: "codalyn-beacon-runtime-old.js",
+    });
+    expect(normalizeBeaconRuntimeAssetRow({ id: "asset-3", hostedUrl: "https://cdn.example.com/logo.png" })).toBeNull();
+    expect(normalizeBeaconRuntimeAssetRow(null)).toBeNull();
   });
 
   it("selects only unreferenced beacon runtime assets", () => {

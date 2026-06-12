@@ -12,6 +12,7 @@ import {
   cmsSlotListTargetRuntimeLayoutRevealSource,
   ensureCmsSlotListTargetLayoutStyle,
 } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
+import { readStringLikeValue } from "@/shared/lib/read-string-like-value";
 import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
 
 /** Matches `attributes` on the applied page script so we can replace it on sync. */
@@ -351,6 +352,39 @@ export function isBeaconRuntimeAssetFileName(fileName: string): boolean {
   return fileName.startsWith(CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX) && fileName.endsWith(".js");
 }
 
+function readBeaconRuntimeFileNameFromAssetRow(raw: Record<string, unknown>): string | null {
+  for (const key of ["originalFileName", "fileName", "file_name", "displayName"] as const) {
+    const value = readStringLikeValue(raw[key]);
+    if (value == null) {
+      continue;
+    }
+    if (isBeaconRuntimeAssetFileName(value)) {
+      return value;
+    }
+    const prefixIndex = value.indexOf(CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX);
+    if (prefixIndex >= 0 && value.endsWith(".js")) {
+      return value.slice(prefixIndex);
+    }
+  }
+  return null;
+}
+
+/** Normalizes Webflow list-asset rows before beacon runtime cleanup compares URLs and filenames. */
+export function normalizeBeaconRuntimeAssetRow(raw: unknown): SiteAssetRow | null {
+  if (raw == null || typeof raw !== "object") {
+    return null;
+  }
+  const record = raw as Record<string, unknown>;
+  const id = readStringLikeValue(record.id);
+  const hostedUrl =
+    readStringLikeValue(record.hostedUrl) ?? readStringLikeValue(record.url) ?? readStringLikeValue(record.assetUrl);
+  const originalFileName = readBeaconRuntimeFileNameFromAssetRow(record);
+  if (id == null || hostedUrl == null || originalFileName == null) {
+    return null;
+  }
+  return { id, hostedUrl, originalFileName };
+}
+
 export function normalizeHostedAssetUrl(url: string): string {
   try {
     const parsed = new URL(url);
@@ -426,20 +460,21 @@ async function listAllSitePageIds(siteId: string): Promise<string[]> {
 }
 
 async function listBeaconRuntimeAssets(siteId: string): Promise<SiteAssetRow[]> {
-  const assets = await fetchAllPaginated<SiteAssetRow>(
+  const assets = await fetchAllPaginated<Record<string, unknown>>(
     `/api/v2/webflow/sites/${encodeURIComponent(siteId)}/assets`,
     (body) => ({
-      items: Array.isArray(body.assets) ? (body.assets as SiteAssetRow[]) : [],
+      items: Array.isArray(body.assets) ? (body.assets as Record<string, unknown>[]) : [],
       pagination: body.pagination as PaginatedList | undefined,
     })
   );
-  return assets.filter(
-    (asset) =>
-      typeof asset.id === "string" &&
-      typeof asset.hostedUrl === "string" &&
-      typeof asset.originalFileName === "string" &&
-      isBeaconRuntimeAssetFileName(asset.originalFileName)
-  );
+  const out: SiteAssetRow[] = [];
+  for (const raw of assets) {
+    const normalized = normalizeBeaconRuntimeAssetRow(raw);
+    if (normalized != null) {
+      out.push(normalized);
+    }
+  }
+  return out;
 }
 
 async function listRegisteredBeaconRuntimeScripts(siteId: string): Promise<RegisteredScriptRow[]> {
@@ -565,6 +600,7 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
   ];
 
   await putPageCustomScripts(pageId, merged);
+  await purgeUnreferencedBeaconRuntimeAssets(siteId);
 }
 
 export type CmsSlotPageRuntimeRemovalResult =
@@ -588,12 +624,12 @@ export async function removeCmsSlotPageRuntimeFromPage(): Promise<CmsSlotPageRun
     const pageId = (await webflow.getCurrentPage()).id as string;
     const existing = await getPageCustomScripts(pageId);
     const next = withoutCmsSlotMarkedScripts(existing);
-    if (next.length === existing.length) {
-      return { status: "not_found" };
+    const status: CmsSlotPageRuntimeRemovalResult["status"] = next.length === existing.length ? "not_found" : "removed";
+    if (status === "removed") {
+      await putPageCustomScripts(pageId, next);
     }
-    await putPageCustomScripts(pageId, next);
     await purgeUnreferencedBeaconRuntimeAssets(siteId);
-    return { status: "removed" };
+    return { status };
   } catch (err) {
     return { status: "failed", reason: formatRuntimeStatusError(err) };
   }

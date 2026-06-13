@@ -1,104 +1,102 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
+import {
+  type Icon,
+  IconAlertTriangle,
+  IconArrowsMoveVertical,
+  IconCarouselHorizontal,
+  IconClick,
+  IconPhotoUp,
+  IconScan,
+  IconTransitionRight,
+} from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import { useBeaconGuestWelcomeVisible } from "@/features/auth/lib/use-beacon-guest-welcome-visible";
 import { isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerAccessPolicy } from "@/features/auth/model/use-beacon-tower-access-policy";
+import { promptOpenCmsCollectionTemplateInDesigner } from "@/features/cms-slots/model/prompt-open-cms-collection-template";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
-import { CmsSlotsCollectionTemplatePrompt } from "@/features/cms-slots/ui/cms-slots-collection-template-prompt";
 import { CmsSlotsPageInstallPrefetch } from "@/features/cms-slots/ui/cms-slots-page-install-prefetch";
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
-import { BEACON_HOME_TILE_CSS_VARS } from "@/shared/lib/beacon-app-backgrounds";
-import { IMAGE_UPLOAD_FEATURE_NAME, IMAGE_UPLOAD_HOME_TILE_DESCRIPTION } from "@/shared/lib/beacon-feature-route-copy";
-import { CMS_SLOTS_FEATURE_NAME, CMS_SLOTS_HOME_TILE_DESCRIPTION } from "@/shared/lib/cms-slots-feature-copy";
+import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
+import {
+  BEACON_HOME_BETA_SECTION_LABEL,
+  BEACON_HOME_COMING_SOON_SECTION_LABEL,
+  BEACON_HOME_EARLY_ACCESS_SECTION_LABEL,
+  CAROUSEL_FEATURE_NAME,
+  FRAMEWORK_LINTER_FEATURE_NAME,
+  PAGE_TRANSITIONS_FEATURE_NAME,
+  SMOOTH_SCROLL_FEATURE_NAME,
+} from "@/shared/lib/beacon-home-copy";
+import {
+  CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_LABEL,
+  CMS_SLOTS_FEATURE_NAME,
+  CMS_SLOTS_REQUIRES_COLLECTION_TEMPLATE_ARIA_LABEL,
+} from "@/shared/lib/cms-slots-feature-copy";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 import { cn } from "@/shared/lib/utils";
 import { RouteLoadingSurface } from "@/shared/ui/route-loading";
 import { ScrollArea } from "@/shared/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui/tooltip";
 
-type BeaconHomeTileCssVar = (typeof BEACON_HOME_TILE_CSS_VARS)[keyof typeof BEACON_HOME_TILE_CSS_VARS];
+const beaconHomeSectionLabelClass = "px-1 text-xs font-semibold tracking-wide text-muted-foreground";
 
-const beaconHomeLaunchTileSurfaceClass =
-  "group relative flex min-h-[13.5rem] w-full shrink-0 flex-col overflow-hidden rounded-sm border border-border/50 text-left shadow-lg shadow-foreground/10 ring-1 ring-border/40 backdrop-blur-[1px] sm:h-full sm:min-h-0";
+// aria-disabled (not native disabled) keeps the tile focusable and hoverable so its tooltip still fires.
+const beaconHomeTileClass =
+  "group flex w-full items-center gap-3 rounded-md border border-border/60 bg-card/60 px-3 py-2.5 text-left outline-none transition-colors hover:border-primary/40 hover:bg-card focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-disabled:cursor-default aria-disabled:opacity-50 aria-disabled:hover:border-border/60 aria-disabled:hover:bg-card/60";
 
-function BeaconHomeLaunchTile(props: {
-  title: string;
-  description?: string;
-  decorationVar: BeaconHomeTileCssVar;
-  prompt?: ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-}) {
-  const { title, description, decorationVar, prompt, onClick, disabled } = props;
-  const isLaunchTile = prompt == null && onClick != null;
-
-  const artwork = (
-    <>
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-cover bg-center"
-        style={{
-          backgroundImage: `var(${decorationVar})`,
-        }}
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-linear-to-t from-background/90 via-background/20 to-transparent"
-      />
-    </>
-  );
-
-  const promptRegion = prompt ? (
-    <span className="relative z-1 flex min-h-0 w-full flex-1 items-center justify-center px-4">{prompt}</span>
-  ) : (
-    <span aria-hidden className="relative z-1 min-h-0 w-full flex-1" />
-  );
-
-  const footer = (
-    <span
-      className={cn(
-        "relative z-1 flex shrink-0 flex-col gap-1 border-t border-border/50 bg-card/50 px-4 py-4 text-card-foreground backdrop-blur-md supports-[backdrop-filter]:bg-card/40",
-        prompt ? null : "mt-auto"
-      )}
-    >
-      <span className="font-semibold tracking-tight">{title}</span>
-      {description ? (
-        <span className="text-[0.8125rem] leading-snug font-normal text-muted-foreground">{description}</span>
-      ) : null}
-    </span>
-  );
-
-  if (isLaunchTile) {
-    return (
-      <button
-        type="button"
-        disabled={disabled}
-        aria-disabled={disabled}
-        aria-label={description ? `${title}: ${description}` : title}
-        onClick={disabled ? undefined : onClick}
-        className={cn(
-          beaconHomeLaunchTileSurfaceClass,
-          "outline-none transition-[opacity,border-color] hover:border-primary/35 focus-visible:ring-4 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none",
-          disabled ? "opacity-60" : "active:opacity-[0.98]"
-        )}
-      >
-        {artwork}
-        {promptRegion}
-        {footer}
-      </button>
-    );
-  }
-
+function BeaconHomeSection(props: { label: string; children: ReactNode }) {
   return (
-    <div className={cn(beaconHomeLaunchTileSurfaceClass, prompt ? "opacity-90" : null)}>
-      {artwork}
-      {promptRegion}
-      {footer}
-    </div>
+    <section className="flex flex-col gap-2">
+      <h2 className={beaconHomeSectionLabelClass}>{props.label}</h2>
+      <div className="flex flex-col gap-2">{props.children}</div>
+    </section>
   );
 }
+
+function BeaconHomeTile(props: {
+  label: string;
+  icon: Icon;
+  onClick?: () => void;
+  disabled?: boolean;
+  /** Fixed-width trailing slot (e.g. a status indicator) kept on its own vertical lane. */
+  trailing?: ReactNode;
+  ariaLabel?: string;
+}) {
+  const { label, icon: TileIcon, onClick, disabled = false, trailing, ariaLabel } = props;
+  return (
+    <button
+      type="button"
+      aria-disabled={disabled}
+      aria-label={ariaLabel}
+      onClick={disabled ? undefined : onClick}
+      className={beaconHomeTileClass}
+    >
+      <TileIcon
+        aria-hidden
+        className={cn(
+          "size-5 shrink-0 text-muted-foreground transition-colors",
+          !disabled && "group-hover:text-foreground"
+        )}
+      />
+      <span className="min-w-0 flex-1 truncate text-base font-semibold text-foreground">{label}</span>
+      {trailing ? <span className="flex shrink-0 items-center">{trailing}</span> : null}
+    </button>
+  );
+}
+
+// Roadmap tiles — disabled for now; rendered to signal what's coming next.
+const BEACON_HOME_BETA_TILES: { label: string; icon: Icon }[] = [
+  { label: FRAMEWORK_LINTER_FEATURE_NAME, icon: IconScan },
+];
+
+const BEACON_HOME_COMING_SOON_TILES: { label: string; icon: Icon }[] = [
+  { label: CAROUSEL_FEATURE_NAME, icon: IconCarouselHorizontal },
+  { label: SMOOTH_SCROLL_FEATURE_NAME, icon: IconArrowsMoveVertical },
+  { label: PAGE_TRANSITIONS_FEATURE_NAME, icon: IconTransitionRight },
+];
 
 export function BeaconHomeScreen() {
   const navigate = useNavigate();
@@ -139,30 +137,57 @@ export function BeaconHomeScreen() {
       <CmsSlotsPageInstallPrefetch />
       <ScrollArea className="min-h-0 min-w-0 flex-1">
         <div className="flex min-h-full min-w-0 flex-col justify-center px-4 py-8">
-          <div className="mx-auto grid w-full max-w-160 grid-cols-1 gap-4 sm:auto-rows-fr sm:grid-cols-2 sm:gap-5 sm:min-h-[17rem]">
-            {cmsSlotsNeedsCollectionTemplate ? (
-              <BeaconHomeLaunchTile
-                title={CMS_SLOTS_FEATURE_NAME}
-                description={CMS_SLOTS_HOME_TILE_DESCRIPTION}
-                decorationVar={BEACON_HOME_TILE_CSS_VARS.cmsSlot}
-                prompt={<CmsSlotsCollectionTemplatePrompt variant="tile" />}
-              />
-            ) : (
-              <BeaconHomeLaunchTile
-                title={CMS_SLOTS_FEATURE_NAME}
-                description={CMS_SLOTS_HOME_TILE_DESCRIPTION}
-                decorationVar={BEACON_HOME_TILE_CSS_VARS.cmsSlot}
-                disabled={!cmsSlotsSurfaceEnabled || !cmsPageKindReady}
-                onClick={() => navigate(`/cms-slots/${defaultSegment}`)}
-              />
-            )}
-            <BeaconHomeLaunchTile
-              title={IMAGE_UPLOAD_FEATURE_NAME}
-              description={IMAGE_UPLOAD_HOME_TILE_DESCRIPTION}
-              decorationVar={BEACON_HOME_TILE_CSS_VARS.imageUpload}
-              onClick={() => navigate("/images")}
-            />
-          </div>
+          <TooltipProvider delayDuration={200}>
+            <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+              <BeaconHomeSection label={BEACON_HOME_EARLY_ACCESS_SECTION_LABEL}>
+                <BeaconHomeTile
+                  label={IMAGE_UPLOAD_FEATURE_NAME}
+                  icon={IconPhotoUp}
+                  onClick={() => navigate("/images")}
+                />
+                <BeaconHomeTile
+                  label={CMS_SLOTS_FEATURE_NAME}
+                  icon={IconClick}
+                  disabled={!cmsSlotsSurfaceEnabled || !cmsPageKindReady}
+                  ariaLabel={
+                    cmsSlotsNeedsCollectionTemplate ? CMS_SLOTS_REQUIRES_COLLECTION_TEMPLATE_ARIA_LABEL : undefined
+                  }
+                  onClick={
+                    cmsSlotsNeedsCollectionTemplate
+                      ? promptOpenCmsCollectionTemplateInDesigner
+                      : () => navigate(`/cms-slots/${defaultSegment}`)
+                  }
+                  trailing={
+                    cmsSlotsNeedsCollectionTemplate ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex items-center">
+                            <IconAlertTriangle
+                              aria-hidden
+                              className="size-5 text-muted-foreground transition-colors group-hover:text-foreground"
+                            />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent width="narrow">{CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_LABEL}</TooltipContent>
+                      </Tooltip>
+                    ) : undefined
+                  }
+                />
+              </BeaconHomeSection>
+
+              <BeaconHomeSection label={BEACON_HOME_BETA_SECTION_LABEL}>
+                {BEACON_HOME_BETA_TILES.map((tile) => (
+                  <BeaconHomeTile key={tile.label} label={tile.label} icon={tile.icon} disabled />
+                ))}
+              </BeaconHomeSection>
+
+              <BeaconHomeSection label={BEACON_HOME_COMING_SOON_SECTION_LABEL}>
+                {BEACON_HOME_COMING_SOON_TILES.map((tile) => (
+                  <BeaconHomeTile key={tile.label} label={tile.label} icon={tile.icon} disabled />
+                ))}
+              </BeaconHomeSection>
+            </div>
+          </TooltipProvider>
         </div>
       </ScrollArea>
     </>

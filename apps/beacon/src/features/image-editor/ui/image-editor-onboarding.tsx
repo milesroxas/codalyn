@@ -5,13 +5,16 @@ import { Button } from "@/shared/ui/button";
 
 type ImageEditorOnboardingProps = {
   towerConfigured: boolean;
+  /** True early access gate on (Request early access), false gate off (public Sign up), null unknown (defaults to early access). */
+  earlyAccessRequired: boolean | null;
   onContinueAsGuest: () => void;
 };
 
 const TOWER_BENEFITS = ["AVIF compression", "CMS-connected assets", "Synced sessions"] as const;
 
 export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
-  const { towerConfigured, onContinueAsGuest } = props;
+  const { towerConfigured, earlyAccessRequired, onContinueAsGuest } = props;
+  const publicSignUpOpen = earlyAccessRequired === false;
 
   return (
     <section
@@ -23,7 +26,7 @@ export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
           Welcome to Beacon
         </h2>
         <p className="max-w-sm text-sm text-muted-foreground">
-          Sign in with an early-access Tower account for the full workflow, or jump in as a guest.
+          Connect Tower for the complete workflow, or keep going as a guest.
         </p>
       </header>
 
@@ -35,8 +38,8 @@ export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
         <h3 className="mt-1.5 text-base font-semibold text-foreground">Sign in to Tower</h3>
         <p className="mt-1 text-xs leading-snug text-muted-foreground">
           {towerConfigured
-            ? "The complete workflow for publishing-ready assets."
-            : "Tower sign-in is unavailable in this environment."}
+            ? "Everything you need for publish-ready assets."
+            : "Tower isn’t available in this environment."}
         </p>
 
         <ul className="mt-3 space-y-1.5 text-xs text-foreground">
@@ -55,14 +58,14 @@ export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
               type="button"
               variant="outline"
               className="w-full"
-              onClick={() => openTowerAppPath("/request-access")}
+              onClick={() => openTowerAppPath(publicSignUpOpen ? "/sign-up" : "/request-access")}
             >
-              Request early access
+              {publicSignUpOpen ? "Create account" : "Request early access"}
             </Button>
           </div>
         ) : (
           <p className="mt-4 rounded-sm bg-muted/50 px-3 py-2 text-xs leading-snug text-muted-foreground">
-            Tower sign-in isn’t available in this environment. You can continue as a guest below.
+            Tower isn’t available here. Continue as a guest below.
           </p>
         )}
       </article>
@@ -70,11 +73,11 @@ export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
       <article className="rounded-sm border border-border bg-card/40 p-4">
         <h3 className="text-base font-semibold text-foreground">Continue as guest</h3>
         <p className="mt-1 text-xs leading-snug text-muted-foreground">
-          Core crop and export tools. WebP only, no CMS access.
+          Crop and export with the core tools. WebP exports, no CMS or synced settings.
         </p>
 
         <Button type="button" variant="outline" className="mt-4 w-full" onClick={onContinueAsGuest}>
-          Start as guest
+          Continue as guest
         </Button>
       </article>
 

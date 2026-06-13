@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import { useBeaconGuestWelcomeVisible } from "@/features/auth/lib/use-beacon-guest-welcome-visible";
 import { isTowerConfigured } from "@/features/auth/model/tower-auth-client";
+import { useBeaconTowerAccessPolicy } from "@/features/auth/model/use-beacon-tower-access-policy";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotsCollectionTemplatePrompt } from "@/features/cms-slots/ui/cms-slots-collection-template-prompt";
 import { CmsSlotsPageInstallPrefetch } from "@/features/cms-slots/ui/cms-slots-page-install-prefetch";
@@ -108,6 +109,7 @@ export function BeaconHomeScreen() {
   const cmsSlotsOnCollectionTemplate = cmsPageKindReady && isCmsCollectionTemplatePage;
   const cmsSlotsNeedsCollectionTemplate = cmsSlotsSurfaceEnabled && cmsPageKindReady && !cmsSlotsOnCollectionTemplate;
   const { visible: showWelcomeGate, markGuestWelcomeComplete, towerSessionPending } = useBeaconGuestWelcomeVisible();
+  const { earlyAccessRequired } = useBeaconTowerAccessPolicy();
   const showSessionBootstrap = useDeferredLoadingIndicator(towerSessionPending);
 
   if (showSessionBootstrap) {
@@ -122,7 +124,11 @@ export function BeaconHomeScreen() {
     return (
       <ScrollArea className="min-h-0 min-w-0 flex-1">
         <div className="flex min-h-full min-w-0 flex-col items-center justify-center px-3 py-6">
-          <ImageEditorOnboarding towerConfigured={towerConfigured} onContinueAsGuest={markGuestWelcomeComplete} />
+          <ImageEditorOnboarding
+            towerConfigured={towerConfigured}
+            earlyAccessRequired={earlyAccessRequired}
+            onContinueAsGuest={markGuestWelcomeComplete}
+          />
         </div>
       </ScrollArea>
     );

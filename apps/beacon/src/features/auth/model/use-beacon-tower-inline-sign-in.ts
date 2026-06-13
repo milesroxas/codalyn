@@ -16,7 +16,7 @@ function describeSignInFailure(error: string): string | null {
     case "tower_not_configured":
       return "Tower isn't configured for this extension build.";
     default:
-      return `Couldn't sign in to Tower (${error}).`;
+      return "Couldn’t sign in to Tower. Try again in a moment.";
   }
 }
 

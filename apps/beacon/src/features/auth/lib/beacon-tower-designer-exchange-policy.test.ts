@@ -9,9 +9,15 @@ describe("isPermanentDesignerExchangeFailure", () => {
     expect(isPermanentDesignerExchangeFailure("tower_not_configured")).toBe(true);
   });
 
+  it("treats resolve-bearer misconfig as permanent (retrying fresh idTokens cannot fix it)", () => {
+    expect(isPermanentDesignerExchangeFailure("webflow_resolve_bearer_invalid")).toBe(true);
+    expect(isPermanentDesignerExchangeFailure("webflow_resolve_scope_missing")).toBe(true);
+  });
+
   it("treats transient Designer and network errors as retryable", () => {
     expect(isPermanentDesignerExchangeFailure("get_id_token_failed")).toBe(false);
     expect(isPermanentDesignerExchangeFailure("id_token_resolve_failed")).toBe(false);
+    expect(isPermanentDesignerExchangeFailure("webflow_resolve_upstream_error")).toBe(false);
     expect(isPermanentDesignerExchangeFailure("Could not reach Tower")).toBe(false);
     expect(isPermanentDesignerExchangeFailure("http_503")).toBe(false);
   });

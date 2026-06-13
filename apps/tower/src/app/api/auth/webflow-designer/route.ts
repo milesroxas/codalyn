@@ -48,15 +48,46 @@ export async function POST(request: Request) {
   }
 
   const resolved = await resolveWebflowDesignerIdToken(idToken, resolveBearer);
-  if (!resolved) {
-    console.warn("[tower/webflow-designer] id_token_resolve_failed (resolve bearer present but resolve returned null)");
-    return jsonWithCors(request, { error: "id_token_resolve_failed" }, { status: 401 });
+  if (!resolved.ok) {
+    // Surface *why* resolve failed so the client and operator can act, instead of a blanket 401.
+    // Bearer problems are operator config (503, permanent for the client); only a rejected idToken is a
+    // true 401 the client can retry with a fresh token.
+    switch (resolved.reason) {
+      case "bearer_invalid":
+        return jsonWithCors(
+          request,
+          {
+            error: "webflow_resolve_bearer_invalid",
+            hint: "The Webflow resolve bearer was rejected (401). Set WEBFLOW_TOKEN_RESOLVE_BEARER to a valid Data Client token for the same Webflow App the extension is registered under.",
+          },
+          { status: 503 }
+        );
+      case "bearer_scope_missing":
+        return jsonWithCors(
+          request,
+          {
+            error: "webflow_resolve_scope_missing",
+            hint: "The Webflow resolve bearer is missing scope authorized_user:read (403). Reauthorize the token with that scope.",
+          },
+          { status: 503 }
+        );
+      case "upstream_error":
+      case "malformed_response":
+        return jsonWithCors(
+          request,
+          { error: "webflow_resolve_upstream_error", hint: `Webflow token/resolve returned ${resolved.status}.` },
+          { status: 502 }
+        );
+      case "id_token_rejected":
+      default:
+        return jsonWithCors(request, { error: "id_token_resolve_failed" }, { status: 401 });
+    }
   }
 
-  const session = await establishDesignerBetterAuthSession(resolved);
+  const session = await establishDesignerBetterAuthSession(resolved.user);
   if (!session.ok) {
     console.warn(
-      `[tower/webflow-designer] establish session failed for ${resolved.email}: ${session.status} ${session.message}`
+      `[tower/webflow-designer] establish session failed for ${resolved.user.email}: ${session.status} ${session.message}`
     );
     return jsonWithCors(request, { error: session.message }, { status: session.status });
   }

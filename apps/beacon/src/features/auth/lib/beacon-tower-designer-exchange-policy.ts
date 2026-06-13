@@ -4,6 +4,9 @@ const PERMANENT_DESIGNER_EXCHANGE_ERRORS = new Set([
   "webflow_user_mismatch",
   "tower_not_configured",
   "webflow_resolve_bearer_missing",
+  // Operator-side resolve-bearer config: retrying with fresh idTokens cannot fix it, so stop the storm.
+  "webflow_resolve_bearer_invalid",
+  "webflow_resolve_scope_missing",
   "no_session_token",
   "sign_up_failed",
 ]);

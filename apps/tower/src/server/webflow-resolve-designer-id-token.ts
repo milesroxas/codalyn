@@ -83,28 +83,117 @@ export async function resolveWebflowDesignerIdToken(
 }
 
 /**
- * Bearer for `POST /beta/token/resolve` must have Webflow scope `authorized_user:read`.
- * Prefer the signed-in user's stored OAuth access token; else env (see `.env.example`).
+ * A bearer candidate for `POST /beta/token/resolve` (scope `authorized_user:read`).
+ * `organizationId` is set when the token came from a stored workspace OAuth row — those can be pruned
+ * if Webflow rejects them. The env-fallback candidate has no `organizationId` (operator-owned).
  */
-export async function pickBearerForWebflowIdTokenResolve(request: Request): Promise<string | undefined> {
+export type WebflowResolveBearerCandidate = { token: string; organizationId?: string };
+
+/**
+ * Ordered, de-duplicated resolve-bearer candidates: active workspace token first, then any other
+ * stored workspace tokens, then the env fallback. The caller tries them and prunes revoked stored
+ * tokens (Webflow issues no refresh tokens, so a rejected token can only be cleared + reconnected).
+ */
+export async function collectWebflowIdTokenResolveBearers(request: Request): Promise<WebflowResolveBearerCandidate[]> {
   // Lazy-imported so unit tests can exercise resolveWebflowDesignerIdToken without loading the DB/auth stack.
-  const { auth } = await import("@/server/auth");
-  const { pickAnyOrganizationWebflowAccessToken, resolveWebflowBearerToken } = await import(
+  const { resolveActiveOrganizationWebflowToken, listOrganizationWebflowTokens } = await import(
     "@/server/webflow-proxy-token"
   );
 
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (session?.user?.id) {
-    const t = await resolveWebflowBearerToken({ userId: session.user.id, requestHeaders: request.headers });
-    if (t) {
-      return t;
+  const candidates: WebflowResolveBearerCandidate[] = [];
+  const seenOrgIds = new Set<string>();
+  const seenTokens = new Set<string>();
+
+  const pushOrgToken = (row: { organizationId: string; accessToken: string }) => {
+    if (seenOrgIds.has(row.organizationId) || seenTokens.has(row.accessToken)) {
+      return;
     }
+    seenOrgIds.add(row.organizationId);
+    seenTokens.add(row.accessToken);
+    candidates.push({ token: row.accessToken, organizationId: row.organizationId });
+  };
+
+  const active = await resolveActiveOrganizationWebflowToken({ requestHeaders: request.headers });
+  if (active) {
+    pushOrgToken(active);
+  }
+  for (const row of await listOrganizationWebflowTokens()) {
+    pushOrgToken(row);
   }
 
-  const orgToken = await pickAnyOrganizationWebflowAccessToken();
-  if (orgToken) {
-    return orgToken;
+  const envBearer = process.env.WEBFLOW_TOKEN_RESOLVE_BEARER?.trim() || process.env.WEBFLOW_API_TOKEN?.trim();
+  if (envBearer && !seenTokens.has(envBearer)) {
+    candidates.push({ token: envBearer });
   }
 
-  return process.env.WEBFLOW_TOKEN_RESOLVE_BEARER?.trim() || process.env.WEBFLOW_API_TOKEN?.trim() || undefined;
+  return candidates;
+}
+
+/** Action the route should take after a failed resolve attempt with the primary bearer candidate. */
+export type DesignerResolveFailureAction = {
+  /** When set, delete this org's stored token (Webflow rejected it and there is no refresh). */
+  pruneOrganizationId?: string;
+  response: { error: string; status: number; hint?: string };
+};
+
+/**
+ * Pure mapping from a failed resolve + primary candidate → the route's response and any token to prune.
+ * Keeps the route thin and makes the self-heal decision unit-testable without the DB.
+ */
+export function decideDesignerResolveFailure(
+  result: Extract<WebflowDesignerResolveResult, { ok: false }>,
+  primary: WebflowResolveBearerCandidate,
+  hasRemainingCandidates: boolean
+): DesignerResolveFailureAction {
+  if (result.reason === "bearer_invalid" && primary.organizationId) {
+    // A STORED token was rejected (revoked / app uninstalled). No refresh token exists, so prune it.
+    // If another bearer remains, signal a transient retry (id_token_resolve_failed) so the client's
+    // next fresh-idToken attempt picks it up; otherwise it's a hard, operator-actionable failure.
+    if (hasRemainingCandidates) {
+      return {
+        pruneOrganizationId: primary.organizationId,
+        response: { error: "id_token_resolve_failed", status: 401 },
+      };
+    }
+    return {
+      pruneOrganizationId: primary.organizationId,
+      response: {
+        error: "webflow_resolve_bearer_invalid",
+        status: 503,
+        hint: "The stored Webflow token was revoked. Reconnect Webflow on Tower — Webflow issues no refresh tokens.",
+      },
+    };
+  }
+
+  switch (result.reason) {
+    case "bearer_invalid":
+      // Non-prunable (env) bearer rejected — operator config.
+      return {
+        response: {
+          error: "webflow_resolve_bearer_invalid",
+          status: 503,
+          hint: "WEBFLOW_TOKEN_RESOLVE_BEARER was rejected (401). Replace it with a valid Data Client token for this app.",
+        },
+      };
+    case "bearer_scope_missing":
+      return {
+        response: {
+          error: "webflow_resolve_scope_missing",
+          status: 503,
+          hint: "The Webflow resolve bearer is missing scope authorized_user:read (403). Reconnect/regenerate with that scope.",
+        },
+      };
+    case "upstream_error":
+    case "malformed_response":
+      return {
+        response: {
+          error: "webflow_resolve_upstream_error",
+          status: 502,
+          hint: `Webflow token/resolve returned ${result.status}.`,
+        },
+      };
+    case "id_token_rejected":
+    default:
+      return { response: { error: "id_token_resolve_failed", status: 401 } };
+  }
 }

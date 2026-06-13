@@ -12,14 +12,16 @@ export type ResolveWebflowBearerTokenOptions = {
   requestHeaders?: Headers;
 };
 
+export type OrganizationWebflowToken = { organizationId: string; accessToken: string };
+
 /**
- * Resolves the Bearer token for outbound Webflow Data API v2 calls (proxy, server jobs).
- * Uses the workspace (active organization) OAuth row; all members share the same stored token.
+ * Resolves the active workspace's stored OAuth token (with its `organizationId` so a revoked token can
+ * be pruned). Webflow issues no refresh tokens, so a rejected token can only be cleared + reconnected.
  * @see https://developers.webflow.com/data/reference/authentication
  */
-export async function resolveWebflowBearerToken(
+export async function resolveActiveOrganizationWebflowToken(
   options?: ResolveWebflowBearerTokenOptions
-): Promise<string | undefined> {
+): Promise<OrganizationWebflowToken | undefined> {
   const hdrs = options?.request?.headers ?? options?.requestHeaders;
   let userId = options?.userId?.trim();
   if (!userId) {
@@ -49,16 +51,46 @@ export async function resolveWebflowBearerToken(
     .where(eq(organizationWebflowOAuthToken.organizationId, organizationId))
     .limit(1);
   const stored = rows[0]?.accessToken?.trim();
-  return stored || undefined;
+  return stored ? { organizationId, accessToken: stored } : undefined;
+}
+
+/**
+ * Resolves the Bearer token for outbound Webflow Data API v2 calls (proxy, server jobs).
+ * Uses the workspace (active organization) OAuth row; all members share the same stored token.
+ */
+export async function resolveWebflowBearerToken(
+  options?: ResolveWebflowBearerTokenOptions
+): Promise<string | undefined> {
+  return (await resolveActiveOrganizationWebflowToken(options))?.accessToken;
+}
+
+/** Workspace OAuth tokens (for Designer ID-token resolve when the extension has no Tower session cookie). */
+export async function listOrganizationWebflowTokens(limit = 5): Promise<OrganizationWebflowToken[]> {
+  const rows = await db
+    .select({
+      organizationId: organizationWebflowOAuthToken.organizationId,
+      accessToken: organizationWebflowOAuthToken.accessToken,
+    })
+    .from(organizationWebflowOAuthToken)
+    .limit(limit);
+  return rows
+    .map((r) => ({ organizationId: r.organizationId, accessToken: r.accessToken?.trim() ?? "" }))
+    .filter((r) => r.accessToken.length > 0);
 }
 
 /** Any workspace OAuth token (for Designer ID-token resolve when the extension has no Tower session cookie). */
 export async function pickAnyOrganizationWebflowAccessToken(): Promise<string | undefined> {
-  const rows = await db
-    .select({ accessToken: organizationWebflowOAuthToken.accessToken })
-    .from(organizationWebflowOAuthToken)
-    .limit(1);
-  return rows[0]?.accessToken?.trim() || undefined;
+  return (await listOrganizationWebflowTokens(1))[0]?.accessToken;
+}
+
+/**
+ * Removes a workspace's stored Webflow OAuth token. Used when Webflow rejects it (revoked/app uninstalled):
+ * there is no refresh token to recover with, so the org must reconnect Webflow.
+ */
+export async function deleteOrganizationWebflowOAuthToken(organizationId: string): Promise<void> {
+  await db
+    .delete(organizationWebflowOAuthToken)
+    .where(eq(organizationWebflowOAuthToken.organizationId, organizationId));
 }
 
 /** OAuth app credentials (authorization code flow); used to obtain an OAuth access token, not as the Data API Bearer. */

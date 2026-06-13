@@ -168,7 +168,10 @@ export function useBeaconTowerSession(): {
       // Populate the session before leaving the "running" phase so the stale-token reaper never
       // observes a freshly minted token without its user and clears it (logging the user back out).
       await refetch();
-    } else if (isPermanentDesignerExchangeFailure(result.error)) {
+    } else {
+      // The ladder already retried transient failures internally; once it ultimately fails, stop silent
+      // auto-retry for the session so the UI settles into the guest gate instead of re-storming Tower.
+      // This explicit sign-in resets the flag at its start, so the button always gives a fresh attempt.
       designerExchangeBlockedAfterFailure = true;
     }
     setBeaconTowerDesignerExchangePhase("settled");
@@ -209,7 +212,11 @@ export function useBeaconTowerSession(): {
               // reaper effect would clear the just-written token before the session resolves.
               await refetch();
             }
-          } else if (isPermanentDesignerExchangeFailure(r.error)) {
+          } else {
+            // Exhausted the retry ladder (or hit a permanent failure). Stop further SILENT auto-retries
+            // so focus/visibilitychange don't re-storm Tower with the same failing exchange; the user
+            // lands in the guest gate. A manual "Sign in to Tower" or a successful Tower postMessage
+            // (handleTowerMessage) clears this flag and re-enables sign-in.
             designerExchangeBlockedAfterFailure = true;
           }
         })

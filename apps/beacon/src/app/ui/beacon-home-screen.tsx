@@ -24,6 +24,8 @@ import {
   BEACON_HOME_BETA_SECTION_LABEL,
   BEACON_HOME_COMING_SOON_SECTION_LABEL,
   BEACON_HOME_EARLY_ACCESS_SECTION_LABEL,
+  BEACON_HOME_SESSION_BOOTSTRAP_DESCRIPTION,
+  BEACON_HOME_SESSION_BOOTSTRAP_TITLE,
   CAROUSEL_FEATURE_NAME,
   FRAMEWORK_LINTER_FEATURE_NAME,
   PAGE_TRANSITIONS_FEATURE_NAME,
@@ -106,14 +108,23 @@ export function BeaconHomeScreen() {
   const { ready: cmsPageKindReady, isCmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
   const cmsSlotsOnCollectionTemplate = cmsPageKindReady && isCmsCollectionTemplatePage;
   const cmsSlotsNeedsCollectionTemplate = cmsSlotsSurfaceEnabled && cmsPageKindReady && !cmsSlotsOnCollectionTemplate;
-  const { visible: showWelcomeGate, markGuestWelcomeComplete, towerSessionPending } = useBeaconGuestWelcomeVisible();
+  const { visible: showWelcomeGate, chooseGuest, towerSessionPending } = useBeaconGuestWelcomeVisible();
   const { earlyAccessRequired } = useBeaconTowerAccessPolicy();
   const showSessionBootstrap = useDeferredLoadingIndicator(towerSessionPending);
 
-  if (showSessionBootstrap) {
+  // While the Tower session is unresolved, hold on the loading surface — never fall through to home.
+  // The spinner itself is deferred (showSessionBootstrap) so fast resolves show a blank surface, not a
+  // flash of the home tiles followed by a spinner.
+  if (towerSessionPending) {
     return (
       <RouteLoadingSurface layout="route" role="status" aria-live="polite" data-slot="beacon_home_session_bootstrap">
-        <BeaconRouteLoadingStatus ariaLabel="Connecting to Tower…" message="Connecting to Tower…" />
+        {showSessionBootstrap ? (
+          <BeaconRouteLoadingStatus
+            ariaLabel={BEACON_HOME_SESSION_BOOTSTRAP_TITLE}
+            message={BEACON_HOME_SESSION_BOOTSTRAP_TITLE}
+            description={BEACON_HOME_SESSION_BOOTSTRAP_DESCRIPTION}
+          />
+        ) : null}
       </RouteLoadingSurface>
     );
   }
@@ -125,7 +136,7 @@ export function BeaconHomeScreen() {
           <ImageEditorOnboarding
             towerConfigured={towerConfigured}
             earlyAccessRequired={earlyAccessRequired}
-            onContinueAsGuest={markGuestWelcomeComplete}
+            onContinueAsGuest={chooseGuest}
           />
         </div>
       </ScrollArea>

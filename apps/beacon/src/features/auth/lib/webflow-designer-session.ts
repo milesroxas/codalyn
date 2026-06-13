@@ -56,7 +56,10 @@ export async function exchangeWebflowDesignerSession(): Promise<{ ok: true } | {
       body: JSON.stringify({ idToken }),
     });
   } catch (error) {
-    return { ok: false, error: formatTowerReachabilityError(error) };
+    // Network/CORS failure reaching Tower's auth API (common on preview behind Deployment Protection).
+    // Return a stable code so callers can act on it; keep the operator-facing detail in the console.
+    console.warn(`[beacon/webflow-designer] ${formatTowerReachabilityError(error)}`);
+    return { ok: false, error: "tower_unreachable" };
   }
 
   let data: { token?: string; error?: string; hint?: string } = {};

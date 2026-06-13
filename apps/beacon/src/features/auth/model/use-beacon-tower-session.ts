@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { clearBeaconGuestChosen } from "@/features/auth/lib/beacon-guest-choice";
 import {
   readBeaconTowerDesignerExchangePhase,
   setBeaconTowerDesignerExchangePhase,
@@ -144,6 +145,9 @@ export function useBeaconTowerSession(): {
   );
 
   const clearStoredSession = useCallback(() => {
+    // Signing out resets the in-memory guest choice so the logged-out login gate returns even if
+    // the user had earlier chosen "Continue as guest" in this same app load.
+    clearBeaconGuestChosen();
     setSuppressDesignerSessionExchange(true);
     setBeaconTowerDesignerExchangePhase("settled");
     const epoch = beginBeaconTowerSignOut();

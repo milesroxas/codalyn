@@ -18,7 +18,7 @@ describe("isPermanentDesignerExchangeFailure", () => {
     expect(isPermanentDesignerExchangeFailure("get_id_token_failed")).toBe(false);
     expect(isPermanentDesignerExchangeFailure("id_token_resolve_failed")).toBe(false);
     expect(isPermanentDesignerExchangeFailure("webflow_resolve_upstream_error")).toBe(false);
-    expect(isPermanentDesignerExchangeFailure("Could not reach Tower")).toBe(false);
+    expect(isPermanentDesignerExchangeFailure("tower_unreachable")).toBe(false);
     expect(isPermanentDesignerExchangeFailure("http_503")).toBe(false);
   });
 

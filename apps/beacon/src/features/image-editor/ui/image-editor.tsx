@@ -351,7 +351,7 @@ export function ImageEditor() {
   const [replaceLibraryAsset, setReplaceLibraryAsset] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [originalBytes, setOriginalBytes] = useState<number | null>(null);
-  const { visible: guestWelcomeVisible, markGuestWelcomeComplete } = useBeaconGuestWelcomeVisible();
+  const { visible: guestWelcomeVisible, chooseGuest } = useBeaconGuestWelcomeVisible();
   const [imageSrc, setImageSrcInternal] = useState<string | null>(null);
   const setImageSrc = useCallback((action: SetStateAction<string | null>) => {
     setImageSrcInternal(action);
@@ -831,12 +831,6 @@ export function ImageEditor() {
     uploadPresetExportFormatLocked,
     imageOptimizeLimitReached,
   ]);
-
-  useEffect(() => {
-    if (towerUser) {
-      markGuestWelcomeComplete();
-    }
-  }, [towerUser, markGuestWelcomeComplete]);
 
   useEffect(() => {
     if (towerUser && prevShowGuestOnboarding.current) {
@@ -1586,7 +1580,7 @@ export function ImageEditor() {
                 towerConfigured={towerConfigured}
                 earlyAccessRequired={earlyAccessRequired}
                 onContinueAsGuest={() => {
-                  markGuestWelcomeComplete();
+                  chooseGuest();
                   navigate("/home");
                 }}
               />

@@ -93,6 +93,18 @@ export const createRuleRunner = (
   const executeNamingRule = createNamingRuleExecutor();
   const executePropertyRule = createPropertyRuleExecutor(ruleRegistry, utilityAnalyzer);
 
+  // Per-rule isolation: a single throwing rule must never abort the whole scan.
+  // Every rule scope (class, element, page) routes through this helper so error
+  // handling stays consistent and DRY.
+  const runRuleSafely = (ruleId: string, run: () => RuleResult[], context?: Record<string, unknown>): RuleResult[] => {
+    try {
+      return run();
+    } catch (err) {
+      console.error(`Rule ${ruleId} failed`, { ...context, err });
+      return [];
+    }
+  };
+
   // Class-level dispatcher. Naming rules are delegated to the executor.
   const executeRule = (
     rule: Rule,
@@ -101,32 +113,28 @@ export const createRuleRunner = (
     allStyles: StyleInfo[],
     elementIdForLog?: string,
     variableNameById?: ReadonlyMap<string, string>
-  ): RuleResult[] => {
-    try {
-      const config = ruleRegistry.getRuleConfiguration(rule.id);
-      const effectiveSeverity = config?.severity ?? rule.severity;
+  ): RuleResult[] =>
+    runRuleSafely(
+      rule.id,
+      () => {
+        const config = ruleRegistry.getRuleConfiguration(rule.id);
+        const effectiveSeverity = config?.severity ?? rule.severity;
 
-      if (rule.type === "property") {
-        return executePropertyRule(
-          rule as Extract<Rule, { type: "property" }>,
-          className,
-          properties,
-          effectiveSeverity,
-          allStyles,
-          getClassType,
-          variableNameById
-        );
-      }
-      return [];
-    } catch (err) {
-      console.error(`Rule ${rule.id} failed`, {
-        className,
-        elementId: elementIdForLog,
-        err,
-      });
-      return [];
-    }
-  };
+        if (rule.type === "property") {
+          return executePropertyRule(
+            rule as Extract<Rule, { type: "property" }>,
+            className,
+            properties,
+            effectiveSeverity,
+            allStyles,
+            getClassType,
+            variableNameById
+          );
+        }
+        return [];
+      },
+      { className, elementId: elementIdForLog }
+    );
 
   const runRulesOnStylesWithContext = (
     stylesWithElement: StyleWithElement[],
@@ -190,22 +198,28 @@ export const createRuleRunner = (
         graph: pageGraph,
         styles: stylesWithElement,
         getRoleForElement: (id: string) => rolesByElement?.[id] || "unknown",
-        getRuleConfig: (ruleId: string) => ({
-          ruleId,
-          enabled: true,
-          severity: "error" as const,
-          customSettings: {} as any,
-        }),
+        // Surface the real registry configuration so page rules honor user
+        // enable/severity/customSettings overrides (single source of truth).
+        getRuleConfig: <T extends Record<string, unknown>>(ruleId: string) => {
+          const cfg = ruleRegistry.getRuleConfiguration(ruleId);
+          return {
+            ruleId,
+            enabled: cfg?.enabled ?? true,
+            severity: cfg?.severity ?? ("error" as const),
+            customSettings: (cfg?.customSettings ?? {}) as T,
+          };
+        },
         getTagName: getTagName ?? (() => null),
         getElementType: getElementType ?? (() => null),
         siteComponentNameById,
         componentIdByElementId,
       };
-      const pageRules = (ruleRegistry.getPageRules?.() ?? []).filter(
-        (r) => (ruleRegistry.getRuleConfiguration(r.id)?.enabled ?? true) === true
-      );
+      const pageRules = (ruleRegistry.getPageRules?.() ?? [])
+        .filter((r) => (ruleRegistry.getRuleConfiguration(r.id)?.enabled ?? r.enabled) === true)
+        .sort((a, b) => a.id.localeCompare(b.id));
       for (const pr of pageRules) {
-        normalizeAndAppendPageResults(pr.analyzePage(pageAnalyzePayload), pr);
+        const pageResults = runRuleSafely(pr.id, () => pr.analyzePage(pageAnalyzePayload), { scope: "page" });
+        normalizeAndAppendPageResults(pageResults, pr);
       }
     };
 
@@ -258,17 +272,27 @@ export const createRuleRunner = (
     const applyElementAnalyzeRule = (elId: string, list: StyleWithElement[], rule: Rule): void => {
       if (typeof rule.analyzeElement !== "function") return;
       const cfg = ruleRegistry.getRuleConfiguration(rule.id);
-      if (!(cfg?.enabled ?? rule.enabled)) return;
-      const elementResults = rule.analyzeElement(buildElementAnalyzeArgs(elId, list));
+      const analyze = rule.analyzeElement;
+      const elementResults = runRuleSafely(rule.id, () => analyze(buildElementAnalyzeArgs(elId, list)), {
+        scope: "element",
+        elementId: elId,
+      });
       stampElementAnalyzeResults(elementResults, elId, cfg, rule);
       results.push(...elementResults);
     };
 
     const runElementAnalyzePhase = (): void => {
-      const allRules = ruleRegistry.getAllRules();
+      // Resolve the enabled element-scope rules once per run (not per element),
+      // sorted by id for deterministic diagnostic ordering.
+      const elementRules = ruleRegistry
+        .getElementScopeRules()
+        .filter((rule) => (ruleRegistry.getRuleConfiguration(rule.id)?.enabled ?? rule.enabled) === true)
+        .sort((a, b) => a.id.localeCompare(b.id));
+      if (elementRules.length === 0) return;
+
       for (const [elId, list] of byElement.entries()) {
         if (filteredElementIds?.has(elId) && list.length === 0) continue;
-        for (const rule of allRules) {
+        for (const rule of elementRules) {
           applyElementAnalyzeRule(elId, list, rule);
         }
       }

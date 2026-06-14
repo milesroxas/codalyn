@@ -51,7 +51,7 @@ export function isContainerUtilityClass(name: string): boolean {
  */
 function getClassType(name: string): ClassType {
   if (name.startsWith("u-")) return "utility";
-  if (name.startsWith("c-")) return "component" as ClassType;
+  if (name.startsWith("c-")) return "component";
   if (name.startsWith("is-")) return "combo";
   // Client-First convention: underscore = custom folder class
   if (name.includes("_")) return "custom";

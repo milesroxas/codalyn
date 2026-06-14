@@ -50,6 +50,9 @@ function ruleResultFromNamingEvaluate(
       classType,
       comboIndex,
     },
+    // `fix` is the single canonical applicable-fix field (see RuleResult.fix).
+    // Propagate it from evaluate()-based rules so it is never dropped.
+    ...(evaluated.fix ? { fix: evaluated.fix } : {}),
     ...(evaluated.example ? { example: evaluated.example } : {}),
     ...(evaluated.expandedViewCapabilities ? { expandedViewCapabilities: evaluated.expandedViewCapabilities } : {}),
   };
@@ -87,6 +90,7 @@ function violationFromNamingTest(
 ): RuleResult[] {
   const baseMessage = baseMessageForFailedNamingTest(rule, className);
   const suggestion = suggestName?.(className, role);
+  const hasRename = Boolean(suggestion && suggestion !== className);
   const violation: RuleResult = {
     ruleId: rule.id,
     name: rule.name,
@@ -99,16 +103,11 @@ function violationFromNamingTest(
       role,
       classType,
       comboIndex,
-      fix:
-        suggestion && suggestion !== className
-          ? {
-              kind: "rename-class",
-              from: className,
-              to: suggestion,
-              scope: "element",
-            }
-          : undefined,
     },
+    // `fix` is the single canonical applicable-fix field (see RuleResult.fix).
+    ...(hasRename
+      ? { fix: { kind: "rename-class" as const, from: className, to: suggestion as string, scope: "element" as const } }
+      : {}),
     ...(rule.example ? { example: rule.example } : {}),
   };
   return [violation];
@@ -127,6 +126,11 @@ export const createNamingRuleExecutor = (): NamingRuleExecutor => {
     const severity: Severity = resolveSeverity?.(rule.id) ?? severityDefault;
 
     if ("evaluate" in rule && typeof rule.evaluate === "function") {
+      // Naming rules are syntactic by contract: they evaluate a single class name
+      // against its own grammar plus rule `config`. Cross-class context
+      // (allStyles / property maps) is intentionally empty here — naming rules
+      // MUST NOT depend on it. Rules needing cross-class data are PropertyRules,
+      // which receive the real context via the property executor.
       const evaluated = rule.evaluate(className, {
         allStyles: [],
         utilityClassPropertiesMap: new Map(),

@@ -1,6 +1,7 @@
 // src/features/linter/services/linter-service-factory.ts
 import { createStyleService } from "@/entities/style/services/style.service";
 import { getCurrentPreset, getRuleRegistry } from "@/features/linter/model/linter.factory";
+import type { GrammarAdapter } from "@/features/linter/model/linter.types";
 import { resolvePresetOrFallback } from "@/features/linter/presets";
 import { createUtilityClassAnalyzer } from "@/features/linter/services/analyzers/utility-class-analyzer";
 import { createElementLintService } from "@/features/linter/services/element-lint-service";
@@ -8,6 +9,16 @@ import { createLintContextService } from "@/features/linter/services/lint-contex
 import { createPageLintService } from "@/features/linter/services/page-lint-service";
 import { createPresetElementsService } from "@/features/linter/services/preset-elements.service";
 import { createRuleRunner } from "@/features/linter/services/rule-runner";
+
+/**
+ * Defensive grammar used only when a preset somehow resolves without one.
+ * Treats every class as custom so the runner still produces deterministic output.
+ */
+const FALLBACK_GRAMMAR: GrammarAdapter = {
+  id: "fallback",
+  elementSeparator: "_",
+  parse: (name: string) => ({ raw: name, kind: "custom" }),
+};
 
 /**
  * Centralized factory for creating linter services with shared dependencies.
@@ -22,11 +33,10 @@ export function createLinterServices() {
 
   // Get active preset for grammar-aware rule runner
   const activePreset = resolvePresetOrFallback(getCurrentPreset());
-  const activeGrammar =
-    activePreset.grammar || ({ parse: (n: string) => ({ raw: n, kind: "custom" as const }) } as any);
+  const activeGrammar: GrammarAdapter = activePreset.grammar ?? FALLBACK_GRAMMAR;
 
   const ruleRunner = createRuleRunner(getRuleRegistry(), analyzer, (name: string, isCombo?: boolean) => {
-    const kind = activeGrammar.parse(name).kind as any;
+    const kind = activeGrammar.parse(name).kind;
     // Grammar takes priority: naming conventions (is-*, u-*, dash-only) are authoritative.
     // This prevents utility classes like padding-section-* from being reclassified as combo
     // just because Webflow applied them as secondary classes alongside padding-global.

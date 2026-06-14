@@ -41,18 +41,24 @@ export function initializeRuleRegistry(mode: OpinionMode = "balanced", presetId?
   // 2b) register canonical element rules
   ruleRegistry.registerRules([childGroupRule]);
 
-  // 3) apply opinion mode adjustments
+  // 3) apply opinion mode adjustments (preset-level severity policy)
   applyOpinionMode(ruleRegistry, mode);
 
-  // 4) load any persisted user settings and apply
+  // 4) apply persisted user settings.
+  //    Severity precedence: explicit user override > opinion mode > rule default.
+  //    Enabled/customSettings always apply; severity applies ONLY where the user
+  //    stored an explicit override, so opinion-mode severities are not clobbered.
   const userConfigs = ruleConfigService.load();
   userConfigs.forEach((cfg) => {
     ruleRegistry.updateRuleConfiguration(cfg.ruleId, {
       enabled: cfg.enabled,
-      severity: cfg.severity,
       customSettings: cfg.customSettings,
     });
   });
+  const severityOverrides = ruleConfigService.getStoredSeverities();
+  for (const [ruleId, severity] of Object.entries(severityOverrides)) {
+    ruleRegistry.updateRuleConfiguration(ruleId, { severity });
+  }
 
   console.log(
     `Registry initialized with preset '${selected.id}' containing ${ruleRegistry.getAllRules().length} rules`

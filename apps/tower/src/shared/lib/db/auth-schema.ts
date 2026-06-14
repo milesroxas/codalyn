@@ -1,4 +1,11 @@
-import type { BeaconAppSettings, BeaconOrgTeamSettings } from "@codalyn/webflow-kit";
+import type {
+  BeaconAppSettings,
+  BeaconOrgTeamSettings,
+  FlintAppSettings,
+  FlintCustomPresets,
+  FlintOrgTeamSettings,
+  FlintRuleConfig,
+} from "@codalyn/webflow-kit";
 import { relations } from "drizzle-orm";
 import {
   type AnyPgColumn,
@@ -140,6 +147,23 @@ export const beaconAppSettings = pgTable("beacon_app_settings", {
     .notNull(),
 });
 
+/** Flint Designer extension config (settings, rule-config, custom presets) per Tower user. */
+export const flintAppSettings = pgTable("flint_app_settings", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  /** Personal app settings (theme, window, ignore lists, active preset). */
+  payload: jsonb("payload").$type<FlintAppSettings>().notNull(),
+  /** Personal serialized rule-config file; null until the user customizes rules. */
+  ruleConfig: jsonb("rule_config").$type<FlintRuleConfig | null>(),
+  /** Personal custom presets; null/empty until the user authors one (paid tiers). */
+  customPresets: jsonb("custom_presets").$type<FlintCustomPresets | null>(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
 /** Team tenant (Better Auth organization plugin). */
 export const organization = pgTable(
   "organization",
@@ -170,6 +194,8 @@ export const organization = pgTable(
     billingPlan: text("billing_plan"),
     /** Team-wide Beacon export presets (designers + product admins). Merged into members’ effective settings. */
     beaconTeamSettings: jsonb("beacon_team_settings").$type<BeaconOrgTeamSettings | null>(),
+    /** Team-wide Flint config (rule-config, custom presets, enforced ignore lists). Merged into members’ effective settings. */
+    flintTeamSettings: jsonb("flint_team_settings").$type<FlintOrgTeamSettings | null>(),
     /** Canonical workspace owner; must always reference an active member. */
     ownerUserId: text("owner_user_id")
       .notNull()
@@ -296,6 +322,8 @@ export const member = pgTable(
      * Default false: designer features on until explicitly restricted in Beacon settings.
      */
     beaconRestrictToEditorExperience: boolean("beacon_restrict_to_editor_experience").default(false).notNull(),
+    /** Team admins only: when true, Flint hides designer features (team rule-config/preset authoring) for this member. */
+    flintRestrictToEditorExperience: boolean("flint_restrict_to_editor_experience").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -556,6 +584,7 @@ export const userRelations = relations(user, ({ many, one }) => ({
   accounts: many(account),
   webflowOauthAuthorizeStates: many(webflowOauthAuthorizeState),
   beaconAppSettings: one(beaconAppSettings),
+  flintAppSettings: one(flintAppSettings),
   members: many(member),
   towerUsageMonths: many(towerUsageMonth),
 }));
@@ -595,6 +624,13 @@ export const webflowOauthAuthorizeStateRelations = relations(webflowOauthAuthori
 export const beaconAppSettingsRelations = relations(beaconAppSettings, ({ one }) => ({
   user: one(user, {
     fields: [beaconAppSettings.userId],
+    references: [user.id],
+  }),
+}));
+
+export const flintAppSettingsRelations = relations(flintAppSettings, ({ one }) => ({
+  user: one(user, {
+    fields: [flintAppSettings.userId],
     references: [user.id],
   }),
 }));

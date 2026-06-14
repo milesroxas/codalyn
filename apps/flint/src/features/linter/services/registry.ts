@@ -9,12 +9,29 @@ import {
 } from "@/features/linter/rules/client-first/structure";
 import { createRuleConfigurationService } from "@/features/linter/services/rule-configuration-service";
 import { createRuleRegistry } from "@/features/linter/services/rule-registry";
+import {
+  createLocalStorageAdapter,
+  DEFAULT_RULE_CONFIG_STORAGE_KEY,
+} from "@/features/linter/services/storage/local-storage-adapter";
+import { createTowerMirroringStorageAdapter } from "@/features/linter/services/storage/tower-mirroring-storage-adapter";
+import { isFlintCloudSyncEnabled, pushRuleConfigToTower } from "@/features/linter/services/sync/flint-settings-sync";
 
 // Global registry instance
 export const ruleRegistry = createRuleRegistry();
 
+// Local storage is always the source of truth (free/offline). The mirroring adapter
+// additionally pushes rule-config writes to Tower, but only when cloud sync is
+// enabled (paid tier + Tower configured) — otherwise it is a pass-through to local.
+const ruleConfigStorage = createTowerMirroringStorageAdapter(
+  createLocalStorageAdapter(DEFAULT_RULE_CONFIG_STORAGE_KEY),
+  {
+    shouldMirror: isFlintCloudSyncEnabled,
+    push: pushRuleConfigToTower,
+  }
+);
+
 // Pass the registry into the config service
-const ruleConfigService = createRuleConfigurationService(ruleRegistry);
+const ruleConfigService = createRuleConfigurationService(ruleRegistry, { storage: ruleConfigStorage });
 
 // Initialize with default rules and user configurations
 export function initializeRuleRegistry(mode: OpinionMode = "balanced", presetId?: string): void {

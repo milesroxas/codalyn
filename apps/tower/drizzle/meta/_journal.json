@@ -232,6 +232,13 @@
       "when": 1781208515615,
       "tag": "0032_stiff_odin",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1781411519661,
+      "tag": "0033_wealthy_pepper_potts",
+      "breakpoints": true
     }
   ]
 }

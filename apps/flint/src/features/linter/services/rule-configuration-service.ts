@@ -1,5 +1,10 @@
 // features/linter/services/rule-configuration-service.ts
 import type { Rule, RuleConfigSchema, RuleConfiguration, Severity } from "@/features/linter/model/rule.types";
+import {
+  createLocalStorageAdapter,
+  DEFAULT_RULE_CONFIG_STORAGE_KEY,
+  type StorageAdapter,
+} from "@/features/linter/services/storage/local-storage-adapter";
 import { stableStringify } from "@/shared/lib";
 
 /* ---------- Minimal registry interface (structural typing) ---------- */
@@ -8,27 +13,7 @@ type RuleRegistryLike = {
 };
 
 /* ---------- Storage adapters ---------- */
-export interface StorageAdapter {
-  read(): string | null;
-  write(value: string): void;
-}
-
-const createLocalStorageAdapter = (key: string): StorageAdapter => ({
-  read: () => {
-    try {
-      return typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
-    } catch {
-      return null;
-    }
-  },
-  write: (value: string) => {
-    try {
-      if (typeof localStorage !== "undefined") localStorage.setItem(key, value);
-    } catch {
-      /* no-op in private browsing or blocked storage */
-    }
-  },
-});
+export type { StorageAdapter } from "@/features/linter/services/storage/local-storage-adapter";
 
 /* ---------- File format (v1) ---------- */
 type SerializedConfigFileV1 = {
@@ -145,7 +130,7 @@ export const createRuleConfigurationService = (
   ruleRegistry: RuleRegistryLike,
   opts: RuleConfigurationServiceOptions = {}
 ) => {
-  const storageKey = opts.storageKey ?? "codalyn.linter.rules.v1";
+  const storageKey = opts.storageKey ?? DEFAULT_RULE_CONFIG_STORAGE_KEY;
   const storage = opts.storage ?? createLocalStorageAdapter(storageKey);
   const nowISO = opts.nowISO ?? (() => new Date().toISOString());
   const log = opts.log ?? (() => {});

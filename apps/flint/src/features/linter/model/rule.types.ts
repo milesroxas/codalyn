@@ -36,6 +36,14 @@ export interface RuleResult {
   comboIndex?: number;
   example?: string;
   metadata?: Record<string, any>;
+  /**
+   * Single canonical source of truth for an applicable fix.
+   *
+   * Rules and executors MUST set this top-level field (never `metadata.fix`).
+   * The future fix-application layer consumes `RuleResult.fix` together with
+   * `elementId`/`className`; `metadata.suggestedName` is a display-only hint and
+   * is NOT an applicable fix.
+   */
   fix?: QuickFix;
   /** Declares what expanded view capabilities this result supports */
   expandedViewCapabilities?: ExpandedViewCapability[];
@@ -85,7 +93,7 @@ export type RuleConfigSchema = Record<string, RuleConfigField>;
 // -------------------------
 // Core Rule Types
 // -------------------------
-export type ClassType = "custom" | "utility" | "combo" | "unknown";
+export type ClassType = "custom" | "utility" | "combo" | "component" | "unknown";
 export type RuleCategory =
   | "structure"
   | "format"
@@ -113,6 +121,12 @@ export interface NamingRule extends BaseRule {
   type: "naming";
   targetClassTypes: ClassType[];
   test: (className: string) => boolean;
+  /**
+   * Syntactic evaluation of a single class name. The executor supplies only
+   * `config`; the cross-class fields of `RuleContext` (allStyles / property maps)
+   * are intentionally empty for naming rules. Rules that need cross-class data
+   * must be modeled as PropertyRule, not NamingRule.
+   */
   evaluate?: (
     className: string,
     context: RuleContext & { config?: Record<string, unknown> }

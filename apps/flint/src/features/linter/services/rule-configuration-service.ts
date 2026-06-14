@@ -1,5 +1,5 @@
 // features/linter/services/rule-configuration-service.ts
-import type { Rule, RuleConfigSchema, RuleConfiguration } from "@/features/linter/model/rule.types";
+import type { Rule, RuleConfigSchema, RuleConfiguration, Severity } from "@/features/linter/model/rule.types";
 import { stableStringify } from "@/shared/lib";
 
 /* ---------- Minimal registry interface (structural typing) ---------- */
@@ -37,6 +37,12 @@ type SerializedConfigFileV1 = {
   presetId?: string | null;
   enabledRules?: string[];
   ruleConfigs: Record<string, Record<string, unknown>>;
+  /**
+   * Per-rule severity overrides. Only rules whose severity differs from the
+   * registry default are stored, so changing a rule's default in code still
+   * propagates to non-overridden rules (single source of truth = the default).
+   */
+  ruleSeverities?: Record<string, Severity>;
   lastUpdated?: string;
 };
 
@@ -47,6 +53,7 @@ type SerializedConfigFile =
       // v0 legacy shape (no version)
       enabledRules?: string[];
       ruleConfigs: Record<string, Record<string, unknown>>;
+      ruleSeverities?: Record<string, Severity>;
       lastUpdated?: string;
       presetId?: string | null;
     };
@@ -65,7 +72,37 @@ export type RuleConfigurationServiceOptions = {
   log?: (msg: string, data?: unknown) => void;
 };
 
-/* ---------- Helpers: schema seeding and pruning ---------- */
+/* ---------- Helpers: schema seeding, validation, and pruning ---------- */
+
+/** Returns true when `value` satisfies the declared schema field type. */
+function isValidFieldValue(
+  field: { type: RuleConfigSchema[string]["type"]; options?: string[] },
+  value: unknown
+): boolean {
+  switch (field.type) {
+    case "string":
+      return typeof value === "string";
+    case "string[]":
+      return Array.isArray(value) && value.every((v) => typeof v === "string");
+    case "number":
+      return typeof value === "number" && Number.isFinite(value);
+    case "boolean":
+      return typeof value === "boolean";
+    case "enum":
+      return typeof value === "string" && Array.isArray(field.options) && field.options.includes(value);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Seed effective custom settings from the schema:
+ * - keep a stored value only when it is present AND valid for the field type
+ * - otherwise fall back to the field default
+ * - prune any unknown keys not declared in the schema
+ *
+ * Malformed values (wrong type, out-of-range enum) never reach rules.
+ */
 function applySchemaDefaults(
   schema: RuleConfigSchema | undefined,
   stored: Readonly<Record<string, unknown>> | undefined
@@ -75,11 +112,27 @@ function applySchemaDefaults(
     return { ...(stored ?? {}) };
   }
   const out: Record<string, unknown> = {};
-  for (const key of Object.keys(schema)) {
-    const defVal = (schema as Record<string, { default: unknown }>)[key]?.default;
-    out[key] = stored && key in stored ? stored[key] : defVal;
+  for (const [key, field] of Object.entries(schema)) {
+    const hasStored = !!stored && key in stored;
+    out[key] = hasStored && isValidFieldValue(field, stored[key]) ? stored[key] : field.default;
   }
   // prune any unknown keys that were stored previously
+  return out;
+}
+
+const SEVERITIES: ReadonlySet<Severity> = new Set<Severity>(["suggestion", "warning", "error"]);
+
+function isSeverity(value: unknown): value is Severity {
+  return typeof value === "string" && SEVERITIES.has(value as Severity);
+}
+
+/** Keep only well-formed severity entries from a stored/imported map. */
+function sanitizeSeverityMap(raw: Record<string, unknown> | undefined): Record<string, Severity> {
+  const out: Record<string, Severity> = {};
+  if (!raw) return out;
+  for (const [ruleId, value] of Object.entries(raw)) {
+    if (isSeverity(value)) out[ruleId] = value;
+  }
   return out;
 }
 
@@ -109,6 +162,7 @@ export const createRuleConfigurationService = (
         version: 1,
         enabledRules: parsed.enabledRules ?? [],
         ruleConfigs: parsed.ruleConfigs ?? {},
+        ruleSeverities: parsed.ruleSeverities,
         lastUpdated: parsed.lastUpdated,
         presetId: parsed.presetId ?? null,
       };
@@ -136,6 +190,7 @@ export const createRuleConfigurationService = (
   const load = (): RuleConfiguration[] => {
     const file = readFile();
     const enabledSet = new Set(file.enabledRules ?? []);
+    const severityOverrides = sanitizeSeverityMap(file.ruleSeverities);
     const rules = ruleRegistry.getAllRules();
 
     return rules.map((rule) => {
@@ -152,17 +207,36 @@ export const createRuleConfigurationService = (
       return {
         ruleId: rule.id,
         enabled,
-        severity: rule.severity,
+        // Effective severity = stored override ?? registry default.
+        severity: severityOverrides[rule.id] ?? rule.severity,
         customSettings,
       };
     });
   };
 
   /**
-   * Persist a full set of configs. Keeps format stable and compatible.
+   * Persisted severity overrides only (validated). Used at init to apply user
+   * severity on top of preset/opinion-mode policy without clobbering it.
    */
-  const save = (configs: ReadonlyArray<RuleConfiguration>, presetId: string | null = opts.presetId ?? null): void => {
-    const file: SerializedConfigFileV1 = {
+  const getStoredSeverities = (): Record<string, Severity> => sanitizeSeverityMap(readFile().ruleSeverities);
+
+  /**
+   * Build the serialized file from a set of configs. Single source for both
+   * persistence (save) and export, so the on-disk shape never diverges.
+   * Only severities that differ from the registry default are stored.
+   */
+  const buildSerializedFile = (
+    configs: ReadonlyArray<RuleConfiguration>,
+    presetId: string | null
+  ): SerializedConfigFileV1 => {
+    const defaultSeverityById = new Map(ruleRegistry.getAllRules().map((r) => [r.id, r.severity]));
+    const ruleSeverities: Record<string, Severity> = {};
+    for (const cfg of configs) {
+      const def = defaultSeverityById.get(cfg.ruleId);
+      if (def !== undefined && cfg.severity !== def) ruleSeverities[cfg.ruleId] = cfg.severity;
+    }
+
+    return {
       version: 1,
       presetId,
       enabledRules: configs.filter((c) => c.enabled).map((c) => c.ruleId),
@@ -170,9 +244,16 @@ export const createRuleConfigurationService = (
         acc[cfg.ruleId] = { ...cfg.customSettings };
         return acc;
       }, {}),
+      ...(Object.keys(ruleSeverities).length > 0 ? { ruleSeverities } : {}),
       lastUpdated: nowISO(),
     };
-    writeFile(file);
+  };
+
+  /**
+   * Persist a full set of configs. Keeps format stable and compatible.
+   */
+  const save = (configs: ReadonlyArray<RuleConfiguration>, presetId: string | null = opts.presetId ?? null): void => {
+    writeFile(buildSerializedFile(configs, presetId));
   };
 
   /**
@@ -181,19 +262,7 @@ export const createRuleConfigurationService = (
   const exportConfiguration = (
     configs: ReadonlyArray<RuleConfiguration>,
     presetId: string | null = opts.presetId ?? null
-  ): string => {
-    const file: SerializedConfigFileV1 = {
-      version: 1,
-      presetId,
-      enabledRules: configs.filter((c) => c.enabled).map((c) => c.ruleId),
-      ruleConfigs: configs.reduce<Record<string, Record<string, unknown>>>((acc, cfg) => {
-        acc[cfg.ruleId] = { ...cfg.customSettings };
-        return acc;
-      }, {}),
-      lastUpdated: nowISO(),
-    };
-    return stableStringify(file);
-  };
+  ): string => stableStringify(buildSerializedFile(configs, presetId));
 
   /**
    * Import from JSON and return the effective merged array.
@@ -215,10 +284,12 @@ export const createRuleConfigurationService = (
 
     const base = load();
     const enabledSet = new Set(incoming.enabledRules ?? []);
+    const severityOverrides = sanitizeSeverityMap(incoming.ruleSeverities);
 
     return base.map((cfg) => {
       const next: RuleConfiguration = { ...cfg };
       if (incoming.enabledRules) next.enabled = enabledSet.has(cfg.ruleId);
+      if (cfg.ruleId in severityOverrides) next.severity = severityOverrides[cfg.ruleId];
       if (incoming.ruleConfigs[cfg.ruleId]) {
         // Re-apply schema to imported values as well
         const rule = ruleRegistry.getAllRules().find((r) => r.id === cfg.ruleId);
@@ -271,6 +342,7 @@ export const createRuleConfigurationService = (
 
   return {
     load,
+    getStoredSeverities,
     save,
     exportConfiguration,
     importConfiguration,

@@ -3,7 +3,7 @@ import type { ClassType } from "@/features/linter/model/rule.types";
 
 function getClassType(name: string): ClassType {
   if (name.startsWith("u-")) return "utility";
-  if (name.startsWith("c-")) return "component" as ClassType; // tolerated by ClassKind union via assignment narrowing
+  if (name.startsWith("c-")) return "component";
   // Treat variant-like classes as combos even when incorrectly formatted
   // Matches: is-foo, is_bar, isActive
   const comboLike = /^(?:is[-_][A-Za-z0-9_]+|is[A-Z][A-Za-z0-9_]*)$/;

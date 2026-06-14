@@ -198,16 +198,20 @@ export async function searchComponentInstanceImagePropsForPageScan(
 
 export async function readComponentInstanceDisplayName(instance: ComponentElement): Promise<string> {
   ensurePageChangeInvalidation();
-  const definitionId = instance.id.component;
-  if (typeof definitionId === "string" && definitionId.length > 0) {
+  // The component *definition* id comes from `getComponent().id` — it aligns with
+  // `webflow.getAllComponents()`. Do NOT key on `instance.id.component`: that is the
+  // enclosing component-instance context, which sibling instances nested in the same
+  // parent component all share, so caching on it returns the first sibling's name for all.
+  const component = await instance.getComponent();
+  const definitionId = typeof (component as { id?: unknown }).id === "string" ? (component as { id: string }).id : null;
+  if (definitionId != null && definitionId.length > 0) {
     const cached = componentDefinitionNameCache.get(definitionId);
     if (cached != null) {
       return cached;
     }
   }
-  const component = await instance.getComponent();
   const name = (await component.getName()) || "Component";
-  if (typeof definitionId === "string" && definitionId.length > 0) {
+  if (definitionId != null && definitionId.length > 0) {
     componentDefinitionNameCache.set(definitionId, name);
   }
   return name;

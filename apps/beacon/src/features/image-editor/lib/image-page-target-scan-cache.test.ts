@@ -4,6 +4,7 @@ import {
   computeImagePageStructureKey,
   imagePageTargetsToCacheRecords,
   invalidateImagePageTargetScanCache,
+  readComponentInstanceDisplayName,
   readImagePageTargetScanCache,
   rebindImagePageTargetsFromCache,
   writeImagePageTargetScanCache,
@@ -82,6 +83,36 @@ describe("image-page-target-scan-cache", () => {
     invalidateImagePageTargetScanCache();
 
     expect(readImagePageTargetScanCache("page_1", "structure-a")).toBeNull();
+  });
+
+  it("names each instance by its component definition, not the enclosing context", async () => {
+    // Two sibling instances nested in the same parent component share `id.component`.
+    // Cache must key on the definition id from getComponent(), or the second instance
+    // would inherit the first's name (e.g. both showing "Inline Video").
+    const inlineVideo = {
+      id: { component: "parent_inst", element: "child_a" },
+      getComponent: vi.fn().mockResolvedValue({ id: "def_inline_video", getName: async () => "Inline Video" }),
+    } as unknown as ComponentElement;
+    const image = {
+      id: { component: "parent_inst", element: "child_b" },
+      getComponent: vi.fn().mockResolvedValue({ id: "def_image", getName: async () => "Image" }),
+    } as unknown as ComponentElement;
+
+    expect(await readComponentInstanceDisplayName(inlineVideo)).toBe("Inline Video");
+    expect(await readComponentInstanceDisplayName(image)).toBe("Image");
+  });
+
+  it("caches the definition name across instances of the same component", async () => {
+    const getName = vi.fn().mockResolvedValue("Card");
+    const makeInstance = (element: string) =>
+      ({
+        id: { component: "parent_inst", element },
+        getComponent: vi.fn().mockResolvedValue({ id: "def_card", getName }),
+      }) as unknown as ComponentElement;
+
+    expect(await readComponentInstanceDisplayName(makeInstance("a"))).toBe("Card");
+    expect(await readComponentInstanceDisplayName(makeInstance("b"))).toBe("Card");
+    expect(getName).toHaveBeenCalledTimes(1);
   });
 
   it("retains per-page scan cache across Designer page changes", () => {

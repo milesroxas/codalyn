@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 // @ts-expect-error — shared JS module at repo root
@@ -15,6 +16,7 @@ const isVitest = Boolean(process.env.VITEST);
 export default defineConfig(({ mode }) => ({
   base: "./",
   plugins: [
+    tailwindcss(),
     react(),
     ...(isVitest
       ? []

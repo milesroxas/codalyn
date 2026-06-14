@@ -109,19 +109,22 @@ const STEPS = [
   { label: "Organizing output", pct: 95 },
 ];
 
-async function resolveBuildChannel(channelArg) {
+async function resolveBuildChannel(channelArg, appName) {
   if (channelArg && !VALID_BUILD_CHANNELS.includes(channelArg)) {
     p.cancel(`Invalid --channel value: ${channelArg}`);
     process.exit(1);
   }
   if (channelArg) return channelArg;
   if (isNonInteractive) return "production";
+  // Only beacon bakes a Tower origin into its bundle (see beacon vite.config resolveTowerOrigin);
+  // for other apps the channel only selects the output dir, so omit the Tower host from the hint.
+  const towerHost = appName === "beacon" ? { production: " — tower.codalyn.app", preview: " — tower-preview.codalyn.app", development: " — local Tower default" } : { production: "", preview: "", development: "" };
   const picked = await p.select({
     message: "Build channel",
     options: [
-      { value: "production", label: "Production", hint: "bundle/production/ — tower.codalyn.app" },
-      { value: "preview", label: "Preview", hint: "bundle/preview/ — tower-preview.codalyn.app" },
-      { value: "development", label: "Development", hint: "bundle/development/ — local Tower default" },
+      { value: "production", label: "Production", hint: `bundle/production/${towerHost.production}` },
+      { value: "preview", label: "Preview", hint: `bundle/preview/${towerHost.preview}` },
+      { value: "development", label: "Development", hint: `bundle/development/${towerHost.development}` },
     ],
   });
   if (p.isCancel(picked)) {
@@ -340,7 +343,7 @@ async function main() {
 
   p.intro(`${color.bgCyan(color.black(`  ${appArg}  `))} ${color.dim("build cli")}  ${color.dim(`v${pkg.version}`)}`);
 
-  const channel = await resolveBuildChannel(channelArg);
+  const channel = await resolveBuildChannel(channelArg, appArg);
   const channelDir = channelOutputDir(channel);
   const recipient = await resolveRecipientName(appPath, channelDir);
 

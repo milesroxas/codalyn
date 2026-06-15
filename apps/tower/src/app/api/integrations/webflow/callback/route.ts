@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
+import { normalizeWebflowAppKey, WEBFLOW_DATA_API_APP_KEY, type WebflowAppKey } from "@/server/webflow-app-registry";
 import {
   buildWebflowOAuthFinishSignInUrl,
   completeWebflowOAuthForOrganization,
@@ -52,12 +53,14 @@ function clearWebflowOauthCookies(cookieStore: CookieStore): void {
   cookieStore.delete(WEBFLOW_OAUTH_ORG_COOKIE);
 }
 
+type ResolvedConnectTarget = { organizationId: string; appKey: WebflowAppKey };
+
 async function resolveOrganizationFromCookieFlow(
   request: Request,
   cookieStore: CookieStore,
   appUrl: string,
   isPopupFlow: boolean
-): Promise<{ organizationId: string } | { error: NextResponse }> {
+): Promise<ResolvedConnectTarget | { error: NextResponse }> {
   cookieStore.delete(WEBFLOW_OAUTH_STATE_COOKIE);
   const orgFromCookie = cookieStore.get(WEBFLOW_OAUTH_ORG_COOKIE)?.value?.trim();
   cookieStore.delete(WEBFLOW_OAUTH_ORG_COOKIE);
@@ -70,7 +73,8 @@ async function resolveOrganizationFromCookieFlow(
   if (!admin) {
     return { error: oauthErrorRedirect(appUrl, { error: "team_admin_required" }, { popup: isPopupFlow }) };
   }
-  return { organizationId: orgFromCookie };
+  // The first-party dashboard "Connect Webflow" flow is the Beacon Data API app.
+  return { organizationId: orgFromCookie, appKey: WEBFLOW_DATA_API_APP_KEY };
 }
 
 async function resolveOrganizationFromDbStateFlow(
@@ -78,11 +82,12 @@ async function resolveOrganizationFromDbStateFlow(
   state: string,
   appUrl: string,
   isPopupFlow: boolean
-): Promise<{ organizationId: string } | { error: NextResponse }> {
+): Promise<ResolvedConnectTarget | { error: NextResponse }> {
   const rows = await db
     .select({
       userId: webflowOauthAuthorizeState.userId,
       organizationId: webflowOauthAuthorizeState.organizationId,
+      appKey: webflowOauthAuthorizeState.appKey,
     })
     .from(webflowOauthAuthorizeState)
     .where(eq(webflowOauthAuthorizeState.state, state))
@@ -99,7 +104,7 @@ async function resolveOrganizationFromDbStateFlow(
   if (!stillAdmin) {
     return { error: oauthErrorRedirect(appUrl, { error: "team_admin_required" }, { popup: isPopupFlow }) };
   }
-  return { organizationId: row.organizationId };
+  return { organizationId: row.organizationId, appKey: normalizeWebflowAppKey(row.appKey) };
 }
 
 async function tryCompleteWebflowInitiatedInstallInSession(
@@ -226,15 +231,15 @@ export async function GET(request: Request) {
   if ("error" in resolved) {
     return resolved.error;
   }
-  const { organizationId } = resolved;
+  const { organizationId, appKey } = resolved;
 
   let tokenResponse: WebflowOAuthTokenResponse;
   try {
-    tokenResponse = await exchangeWebflowAuthorizationCode(code, redirectUri);
+    tokenResponse = await exchangeWebflowAuthorizationCode(code, redirectUri, appKey);
   } catch {
     return oauthErrorRedirect(appUrl, { error: "token_exchange" }, { popup: isPopupFlow });
   }
 
-  await persistOrganizationWebflowOAuthToken(organizationId, tokenResponse);
+  await persistOrganizationWebflowOAuthToken(organizationId, tokenResponse, appKey);
   return oauthSuccessRedirect(appUrl, { popup: isPopupFlow });
 }

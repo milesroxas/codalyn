@@ -7,6 +7,7 @@ import {
   getDefaultFlintRuleConfig,
   parseFlintAppSettings,
   parseFlintCustomPresets,
+  parseFlintOrgTeamSettings,
   parseFlintRuleConfig,
 } from "@codalyn/webflow-kit";
 import { type FlintEntitlement, normalizeFlintEntitlement } from "@/shared/lib/flint-entitlement";
@@ -20,10 +21,14 @@ export type FlintEffectiveSettings = {
   settings: FlintAppSettings;
   ruleConfig: FlintRuleConfig;
   customPresets: FlintCustomPresets;
+  /** Raw team settings for admin editing (null when none / no active org). */
+  teamSettings: FlintOrgTeamSettings | null;
   entitlement: FlintEntitlement;
   editorExperience: boolean;
   canManageTeamFlintSettings: boolean;
   hasActiveWorkspace: boolean;
+  /** Whether the active workspace has a Flint Webflow token (Designer sign-in can resolve). */
+  webflowConnected: boolean;
   activeOrganizationId: string | null;
   activeOrganizationName: string | null;
 };
@@ -37,10 +42,12 @@ function normalizeEffectiveSettings(raw: unknown): FlintEffectiveSettings {
     settings: o.settings ? parseFlintAppSettings(o.settings) : getDefaultFlintAppSettings(),
     ruleConfig: o.ruleConfig ? parseFlintRuleConfig(o.ruleConfig) : getDefaultFlintRuleConfig(),
     customPresets: parseFlintCustomPresets(o.customPresets),
+    teamSettings: o.teamSettings ? parseFlintOrgTeamSettings(o.teamSettings) : null,
     entitlement: normalizeFlintEntitlement(o.entitlement),
     editorExperience: o.editorExperience === true,
     canManageTeamFlintSettings: o.canManageTeamFlintSettings === true,
     hasActiveWorkspace: o.hasActiveWorkspace === true,
+    webflowConnected: o.webflowConnected === true,
     activeOrganizationId: typeof o.activeOrganizationId === "string" ? o.activeOrganizationId : null,
     activeOrganizationName: typeof o.activeOrganizationName === "string" ? o.activeOrganizationName : null,
   };

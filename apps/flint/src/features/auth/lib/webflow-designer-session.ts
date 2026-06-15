@@ -54,7 +54,7 @@ export async function exchangeWebflowDesignerSession(): Promise<{ ok: true } | {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ idToken, app: "flint" }),
     });
   } catch (error) {
     console.warn(`[flint/webflow-designer] ${formatTowerReachabilityError(error)}`);

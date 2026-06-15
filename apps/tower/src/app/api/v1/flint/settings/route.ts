@@ -17,7 +17,7 @@ import {
   selectFlintTeamCustomPresets,
   selectFlintTeamRuleConfig,
 } from "@codalyn/webflow-kit";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import {
   canManageFlintTeamSettings,
@@ -30,7 +30,11 @@ import {
 import { persistTeamFlintPatch, upsertUserFlintPayload } from "@/server/flint-settings-persist";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { db } from "@/shared/lib/db";
-import { flintAppSettings as flintAppSettingsTable, organization } from "@/shared/lib/db/auth-schema";
+import {
+  flintAppSettings as flintAppSettingsTable,
+  organization,
+  organizationWebflowOAuthToken,
+} from "@/shared/lib/db/auth-schema";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 import { isTowerTeamAdminRole } from "@/shared/lib/membership/tower-organization-access";
 
@@ -119,10 +123,29 @@ async function loadEffectiveFlintSettings(userId: string, ctx: FlintMembershipCo
     activeOrganizationName = o[0]?.name ?? null;
   }
 
+  // Whether the active workspace has a Flint Webflow token (needed so Designer sign-in can resolve
+  // Flint ID tokens). Drives the extension's "Connect Webflow" gating.
+  let webflowConnected = false;
+  if (activeId) {
+    const tok = await db
+      .select({ accessToken: organizationWebflowOAuthToken.accessToken })
+      .from(organizationWebflowOAuthToken)
+      .where(
+        and(
+          eq(organizationWebflowOAuthToken.organizationId, activeId),
+          eq(organizationWebflowOAuthToken.appKey, "flint")
+        )
+      )
+      .limit(1);
+    webflowConnected = Boolean(tok[0]?.accessToken?.trim());
+  }
+
   return {
     settings,
     ruleConfig,
     customPresets,
+    /** Raw team settings (null when no active org / none set) so admins can edit team values directly. */
+    teamSettings: team,
     entitlement,
     editorExperience,
     canManageTeamFlintSettings: canManageTeam,
@@ -130,6 +153,7 @@ async function loadEffectiveFlintSettings(userId: string, ctx: FlintMembershipCo
     workspaceMemberRole: ctx.memberRole,
     appUserRole: ctx.appUserRole,
     hasActiveWorkspace: Boolean(activeId),
+    webflowConnected,
     activeOrganizationId: activeId,
     activeOrganizationName,
     workspaces,

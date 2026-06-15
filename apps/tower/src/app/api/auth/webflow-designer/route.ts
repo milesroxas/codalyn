@@ -1,4 +1,5 @@
 import { towerCorsHeadersFor } from "@/server/tower-cors";
+import { normalizeWebflowAppKey } from "@/server/webflow-app-registry";
 import { establishDesignerBetterAuthSession } from "@/server/webflow-designer-session-logic";
 import {
   collectWebflowIdTokenResolveBearers,
@@ -24,9 +25,9 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let parsed: { idToken?: string };
+  let parsed: { idToken?: string; app?: string };
   try {
-    parsed = (await request.json()) as { idToken?: string };
+    parsed = (await request.json()) as { idToken?: string; app?: string };
   } catch {
     return jsonWithCors(request, { error: "invalid_json" }, { status: 400 });
   }
@@ -36,13 +37,19 @@ export async function POST(request: Request) {
     return jsonWithCors(request, { error: "id_token_required" }, { status: 400 });
   }
 
-  const candidates = await collectWebflowIdTokenResolveBearers(request);
+  // Which Webflow app issued this ID token — selects the matching app's resolve bearer (cross-app
+  // resolves are rejected by Webflow). Untagged requests default to Beacon for back-compat.
+  const app = normalizeWebflowAppKey(parsed.app);
+  const candidates = await collectWebflowIdTokenResolveBearers(request, app);
   if (candidates.length === 0) {
+    const bearerVar = app === "flint" ? "WEBFLOW_FLINT_TOKEN_RESOLVE_BEARER" : "WEBFLOW_TOKEN_RESOLVE_BEARER";
     return jsonWithCors(
       request,
       {
         error: "webflow_resolve_bearer_missing",
-        hint: "Connect Webflow on Tower (or sign in so a stored workspace token can resolve the Designer ID token), or set WEBFLOW_TOKEN_RESOLVE_BEARER (scope authorized_user:read).",
+        hint: `No resolve bearer for the ${app} app. Set ${bearerVar} to a ${app}-app Data Client token (scope authorized_user:read)${
+          app === "beacon" ? ", or connect Webflow on Tower so a stored workspace token can resolve it" : ""
+        }.`,
       },
       { status: 503 }
     );
@@ -57,7 +64,7 @@ export async function POST(request: Request) {
     const action = decideDesignerResolveFailure(resolved, primary, rest.length > 0);
     if (action.pruneOrganizationId) {
       const { deleteOrganizationWebflowOAuthToken } = await import("@/server/webflow-proxy-token");
-      await deleteOrganizationWebflowOAuthToken(action.pruneOrganizationId);
+      await deleteOrganizationWebflowOAuthToken(action.pruneOrganizationId, app);
       console.warn(
         `[tower/webflow-designer] pruned revoked Webflow token for org ${action.pruneOrganizationId}; reconnect required (no refresh token)`
       );

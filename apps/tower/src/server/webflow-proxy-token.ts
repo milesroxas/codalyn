@@ -1,7 +1,12 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { auth } from "@/server/auth";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
+import {
+  resolveWebflowAppClientCredentials,
+  WEBFLOW_DATA_API_APP_KEY,
+  type WebflowAppKey,
+} from "@/server/webflow-app-registry";
 import { db } from "@/shared/lib/db";
 import { organizationWebflowOAuthToken } from "@/shared/lib/db/auth-schema";
 
@@ -10,6 +15,8 @@ export type ResolveWebflowBearerTokenOptions = {
   /** Prefer over Next `headers()` when handling an incoming Request (API routes, Route Handlers). */
   request?: Request;
   requestHeaders?: Headers;
+  /** Which app's stored token to use. Data API features are Beacon; default Beacon. */
+  app?: WebflowAppKey;
 };
 
 export type OrganizationWebflowToken = { organizationId: string; accessToken: string };
@@ -45,10 +52,16 @@ export async function resolveActiveOrganizationWebflowToken(
     return undefined;
   }
 
+  const app = options?.app ?? WEBFLOW_DATA_API_APP_KEY;
   const rows = await db
     .select({ accessToken: organizationWebflowOAuthToken.accessToken })
     .from(organizationWebflowOAuthToken)
-    .where(eq(organizationWebflowOAuthToken.organizationId, organizationId))
+    .where(
+      and(
+        eq(organizationWebflowOAuthToken.organizationId, organizationId),
+        eq(organizationWebflowOAuthToken.appKey, app)
+      )
+    )
     .limit(1);
   const stored = rows[0]?.accessToken?.trim();
   return stored ? { organizationId, accessToken: stored } : undefined;
@@ -64,36 +77,55 @@ export async function resolveWebflowBearerToken(
   return (await resolveActiveOrganizationWebflowToken(options))?.accessToken;
 }
 
-/** Workspace OAuth tokens (for Designer ID-token resolve when the extension has no Tower session cookie). */
-export async function listOrganizationWebflowTokens(limit = 5): Promise<OrganizationWebflowToken[]> {
+/**
+ * Pooled OAuth tokens for one app (for Designer ID-token resolve when the extension has no Tower
+ * session cookie). Any token from the same app can resolve that app's ID tokens, so this returns a
+ * small pool; cross-app tokens are excluded because Webflow rejects cross-app resolves.
+ */
+export async function listOrganizationWebflowTokens(
+  app: WebflowAppKey = WEBFLOW_DATA_API_APP_KEY,
+  limit = 5
+): Promise<OrganizationWebflowToken[]> {
   const rows = await db
     .select({
       organizationId: organizationWebflowOAuthToken.organizationId,
       accessToken: organizationWebflowOAuthToken.accessToken,
     })
     .from(organizationWebflowOAuthToken)
+    .where(eq(organizationWebflowOAuthToken.appKey, app))
     .limit(limit);
   return rows
     .map((r) => ({ organizationId: r.organizationId, accessToken: r.accessToken?.trim() ?? "" }))
     .filter((r) => r.accessToken.length > 0);
 }
 
-/** Any workspace OAuth token (for Designer ID-token resolve when the extension has no Tower session cookie). */
-export async function pickAnyOrganizationWebflowAccessToken(): Promise<string | undefined> {
-  return (await listOrganizationWebflowTokens(1))[0]?.accessToken;
+/** Any workspace OAuth token for an app (for Designer ID-token resolve when there is no Tower session cookie). */
+export async function pickAnyOrganizationWebflowAccessToken(
+  app: WebflowAppKey = WEBFLOW_DATA_API_APP_KEY
+): Promise<string | undefined> {
+  return (await listOrganizationWebflowTokens(app, 1))[0]?.accessToken;
 }
 
 /**
- * Removes a workspace's stored Webflow OAuth token. Used when Webflow rejects it (revoked/app uninstalled):
- * there is no refresh token to recover with, so the org must reconnect Webflow.
+ * Removes a workspace's stored Webflow OAuth token for one app. Used when Webflow rejects it
+ * (revoked/app uninstalled): there is no refresh token to recover with, so the org must reconnect.
  */
-export async function deleteOrganizationWebflowOAuthToken(organizationId: string): Promise<void> {
+export async function deleteOrganizationWebflowOAuthToken(
+  organizationId: string,
+  app: WebflowAppKey = WEBFLOW_DATA_API_APP_KEY
+): Promise<void> {
   await db
     .delete(organizationWebflowOAuthToken)
-    .where(eq(organizationWebflowOAuthToken.organizationId, organizationId));
+    .where(
+      and(
+        eq(organizationWebflowOAuthToken.organizationId, organizationId),
+        eq(organizationWebflowOAuthToken.appKey, app)
+      )
+    );
 }
 
-/** OAuth app credentials (authorization code flow); used to obtain an OAuth access token, not as the Data API Bearer. */
-export function hasWebflowOAuthCredentials(): boolean {
-  return Boolean(process.env.WEBFLOW_CLIENT_ID?.trim() && process.env.WEBFLOW_CLIENT_SECRET?.trim());
+/** OAuth app credentials (authorization code flow) for an app; used to obtain an OAuth access token, not as the Data API Bearer. */
+export function hasWebflowOAuthCredentials(app: WebflowAppKey = WEBFLOW_DATA_API_APP_KEY): boolean {
+  const { clientId, clientSecret } = resolveWebflowAppClientCredentials(app);
+  return Boolean(clientId && clientSecret);
 }

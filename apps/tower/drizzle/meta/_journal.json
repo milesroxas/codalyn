@@ -239,6 +239,13 @@
       "when": 1781411519661,
       "tag": "0033_wealthy_pepper_potts",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1781533581861,
+      "tag": "0034_orange_sue_storm",
+      "breakpoints": true
     }
   ]
 }

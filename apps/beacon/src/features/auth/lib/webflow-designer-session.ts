@@ -53,7 +53,7 @@ export async function exchangeWebflowDesignerSession(): Promise<{ ok: true } | {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ idToken, app: "beacon" }),
     });
   } catch (error) {
     // Network/CORS failure reaching Tower's auth API (common on preview behind Deployment Protection).

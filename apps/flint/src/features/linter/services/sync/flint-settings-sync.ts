@@ -1,4 +1,4 @@
-import { parseFlintRuleConfig } from "@codalyn/webflow-kit";
+import { type FlintRuleConfig, parseFlintRuleConfig } from "@codalyn/webflow-kit";
 import {
   createLocalStorageAdapter,
   DEFAULT_RULE_CONFIG_STORAGE_KEY,
@@ -20,6 +20,11 @@ const ruleConfigStorage = createLocalStorageAdapter(DEFAULT_RULE_CONFIG_STORAGE_
  */
 export function isFlintCloudSyncEnabled(): boolean {
   return isFlintTowerOriginConfigured() && isPaidFlintTier(readFlintEntitlement().tier);
+}
+
+/** Write a rule-config into local storage (offline source of truth) after a successful Tower exchange. */
+export function writeRuleConfigToLocal(ruleConfig: FlintRuleConfig): void {
+  ruleConfigStorage.write(JSON.stringify(ruleConfig));
 }
 
 /** Best-effort push of a serialized rule-config file to Tower (called by the mirroring adapter). */

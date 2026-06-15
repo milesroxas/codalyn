@@ -1,6 +1,7 @@
 import { ExternalLink, Eye } from "lucide-react";
 import type React from "react";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useFlintTower } from "@/features/auth/model/flint-tower-provider";
 import { parseIgnoredClassesInput } from "@/features/linter/lib/class-lint-ignore";
 import { getCurrentPreset, subscribePresetChanged } from "@/features/linter/model/linter.factory";
 import { getPresetIds } from "@/features/linter/presets";
@@ -67,6 +68,8 @@ const SettingsSelectRow: React.FC<SettingsSelectRowProps> = ({ label, descriptio
 export const SettingsPanel: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const { openExpandedView } = useExpandedView();
+  const { effective } = useFlintTower();
+  const teamIgnoredCount = effective?.teamSettings?.globalIgnoredClasses?.length ?? 0;
   const {
     autoSelectElement,
     ignoreThirdPartyClasses,
@@ -174,6 +177,12 @@ export const SettingsPanel: React.FC = () => {
             onBlur={() => setGlobalIgnoredClasses(parseIgnoredClassesInput(globalDraft))}
             spellCheck={false}
           />
+          {teamIgnoredCount > 0 && (
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              Your team enforces {teamIgnoredCount} additional ignored {teamIgnoredCount === 1 ? "class" : "classes"}{" "}
+              during linting.
+            </p>
+          )}
         </div>
         <div className="py-3 border-b border-border last:border-0 space-y-2">
           <div className="flex flex-col gap-0.5">

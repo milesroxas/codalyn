@@ -1,3 +1,8 @@
+import {
+  resolveWebflowAppClientCredentials,
+  WEBFLOW_DATA_API_APP_KEY,
+  type WebflowAppKey,
+} from "@/server/webflow-app-registry";
 import { resolveWebflowOAuthRedirectUri } from "@/server/webflow-oauth-config";
 
 const TOKEN_URL = "https://api.webflow.com/oauth/access_token";
@@ -17,12 +22,14 @@ type WebflowOAuthErrorBody = {
 
 export async function exchangeWebflowAuthorizationCode(
   code: string,
-  redirectUri: string = resolveWebflowOAuthRedirectUri()
+  redirectUri: string = resolveWebflowOAuthRedirectUri(),
+  app: WebflowAppKey = WEBFLOW_DATA_API_APP_KEY
 ): Promise<WebflowOAuthTokenResponse> {
-  const clientId = process.env.WEBFLOW_CLIENT_ID?.trim();
-  const clientSecret = process.env.WEBFLOW_CLIENT_SECRET?.trim();
+  const { clientId, clientSecret } = resolveWebflowAppClientCredentials(app);
   if (!clientId || !clientSecret || !redirectUri) {
-    throw new Error("WEBFLOW_CLIENT_ID, WEBFLOW_CLIENT_SECRET, and WEBFLOW_REDIRECT_URI are required");
+    throw new Error(
+      `Webflow OAuth for the ${app} app requires its WEBFLOW_${app.toUpperCase()}_CLIENT_ID / _CLIENT_SECRET (Beacon also accepts legacy WEBFLOW_CLIENT_ID/SECRET) and WEBFLOW_REDIRECT_URI`
+    );
   }
 
   const res = await fetch(TOKEN_URL, {

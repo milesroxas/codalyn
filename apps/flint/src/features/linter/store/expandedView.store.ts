@@ -10,7 +10,8 @@ export type ExpandedViewContentType =
   | "settings"
   | "suggested-fixes"
   | "third-party-libraries"
-  | "ignored-classes-lists";
+  | "ignored-classes-lists"
+  | "account-sync";
 
 export interface ExpandedViewContent {
   type: ExpandedViewContentType;

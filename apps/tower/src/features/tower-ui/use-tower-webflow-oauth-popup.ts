@@ -63,7 +63,12 @@ export function useTowerWebflowOAuthPopup(onSuccess?: () => void) {
   }, [onSuccess]);
 
   const openPopup = useCallback(async (): Promise<boolean> => {
-    const res = await fetch("/api/integrations/webflow/authorize", {
+    // Connect the app named in the page URL (`?app=flint`), default Beacon. Lets the same Tower web
+    // connect screen serve a Flint connect (opened from the Flint extension) without prop-drilling.
+    const appParam = new URLSearchParams(window.location.search).get("app");
+    const authorizeUrl =
+      appParam === "flint" ? "/api/integrations/webflow/authorize?app=flint" : "/api/integrations/webflow/authorize";
+    const res = await fetch(authorizeUrl, {
       method: "POST",
       credentials: "include",
     });

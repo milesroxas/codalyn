@@ -15,6 +15,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -261,20 +262,30 @@ export const workspaceOwnershipTransfer = pgTable(
 );
 
 /** Webflow OAuth access token for Data API (Bearer), one row per workspace (organization). Admins connect once; all members use this token. */
-export const organizationWebflowOAuthToken = pgTable("organization_webflow_oauth_token", {
-  organizationId: text("organization_id")
-    .primaryKey()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  accessToken: text("access_token").notNull(),
-  refreshToken: text("refresh_token"),
-  expiresAt: timestamp("expires_at"),
-  scope: text("scope"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-});
+export const organizationWebflowOAuthToken = pgTable(
+  "organization_webflow_oauth_token",
+  {
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    /**
+     * Which Webflow app this token was issued for (`beacon` | `flint`). A Designer ID token can only
+     * be resolved with a token from the same app, so tokens are stored and resolved per app. Existing
+     * rows default to `beacon` (the only app before Flint connected to the Data API).
+     */
+    appKey: text("app_key").notNull().default("beacon"),
+    accessToken: text("access_token").notNull(),
+    refreshToken: text("refresh_token"),
+    expiresAt: timestamp("expires_at"),
+    scope: text("scope"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.organizationId, table.appKey] })]
+);
 
 /**
  * Binds Webflow OAuth `state` to a Tower user + workspace when OAuth is started (POST from Beacon or admin dashboard),
@@ -288,6 +299,8 @@ export const webflowOauthAuthorizeState = pgTable("webflow_oauth_authorize_state
   organizationId: text("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
+  /** Which Webflow app initiated this OAuth (beacon|flint); the callback persists the token under it. */
+  appKey: text("app_key").notNull().default("beacon"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -302,6 +315,8 @@ export const webflowOauthInstallCode = pgTable("webflow_oauth_install_code", {
   redirectUri: text("redirect_uri").notNull(),
   /** Optional `state` echoed by Webflow when the install URL included one. */
   externalState: text("external_state"),
+  /** Which Webflow app's marketplace install this code came from (beacon|flint). */
+  appKey: text("app_key").notNull().default("beacon"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

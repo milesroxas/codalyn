@@ -5,6 +5,12 @@ import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-
 import { towerCorsHeadersFor } from "@/server/tower-cors";
 import { canTowerUserManageWebflowOAuthViaDashboard } from "@/server/tower-webflow-oauth-team-admin";
 import {
+  normalizeWebflowAppKey,
+  resolveWebflowAppClientCredentials,
+  WEBFLOW_DATA_API_APP_KEY,
+  type WebflowAppKey,
+} from "@/server/webflow-app-registry";
+import {
   resolveWebflowOAuthAppUrl,
   resolveWebflowOAuthRedirectUri,
   WEBFLOW_OAUTH_ORG_COOKIE,
@@ -18,16 +24,25 @@ import { towerConnectionPathWithStatus } from "@/shared/lib/navigation/tower-app
 
 // cms:write: Data API PATCH collection items (Beacon CMS-bound image replace).
 // custom_code:*: Beacon page inline script (registered_scripts + page custom_code).
-const DEFAULT_SCOPES =
+const BEACON_SCOPES =
   "sites:read pages:read cms:read cms:write assets:read assets:write custom_code:read custom_code:write authorized_user:read";
+// Flint's linter is Designer-only; OAuth exists only to identify the user (ID-token resolve).
+const FLINT_SCOPES = "sites:read authorized_user:read";
 
-function buildWebflowAuthorizeUrl(state: string): string {
-  const clientId = process.env.WEBFLOW_CLIENT_ID?.trim();
+function scopesForApp(app: WebflowAppKey): string {
+  if (app === "flint") {
+    return process.env.WEBFLOW_FLINT_OAUTH_SCOPES ?? FLINT_SCOPES;
+  }
+  return process.env.WEBFLOW_OAUTH_SCOPES ?? BEACON_SCOPES;
+}
+
+function buildWebflowAuthorizeUrl(state: string, app: WebflowAppKey = WEBFLOW_DATA_API_APP_KEY): string {
+  const { clientId } = resolveWebflowAppClientCredentials(app);
   const redirectUri = resolveWebflowOAuthRedirectUri();
   if (!clientId) {
-    throw new Error("WEBFLOW_CLIENT_ID is required");
+    throw new Error(`WEBFLOW_${app.toUpperCase()}_CLIENT_ID (or legacy WEBFLOW_CLIENT_ID for beacon) is required`);
   }
-  const scopes = (process.env.WEBFLOW_OAUTH_SCOPES ?? DEFAULT_SCOPES)
+  const scopes = scopesForApp(app)
     .split(/\s+/)
     .map((s) => s.trim())
     .filter(Boolean);
@@ -51,11 +66,9 @@ export async function OPTIONS(request: Request) {
 
 /** Dashboard / first-party: redirect to Webflow OAuth (state cookie + session cookie). Team admin/owner on active workspace only. */
 export async function GET(request: Request) {
-  if (!hasWebflowOAuthCredentials()) {
-    return Response.json(
-      { error: "WEBFLOW_CLIENT_ID and WEBFLOW_CLIENT_SECRET are required for OAuth" },
-      { status: 500 }
-    );
+  const app = normalizeWebflowAppKey(new URL(request.url).searchParams.get("app"));
+  if (!hasWebflowOAuthCredentials(app)) {
+    return Response.json({ error: `OAuth credentials for the ${app} app are not configured` }, { status: 500 });
   }
 
   const session = await auth.api.getSession({
@@ -84,7 +97,7 @@ export async function GET(request: Request) {
     const cookieStore = await cookies();
     cookieStore.set(WEBFLOW_OAUTH_STATE_COOKIE, state, webflowOAuthPkceCookieOptions);
     cookieStore.set(WEBFLOW_OAUTH_ORG_COOKIE, activeOrganizationId, webflowOAuthPkceCookieOptions);
-    url = buildWebflowAuthorizeUrl(state);
+    url = buildWebflowAuthorizeUrl(state, app);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "oauth_url_failed";
     return Response.json({ error: msg }, { status: 500 });
@@ -104,9 +117,10 @@ export async function POST(request: Request) {
     jsonHeaders.set(k, v);
   }
 
-  if (!hasWebflowOAuthCredentials()) {
+  const app = normalizeWebflowAppKey(new URL(request.url).searchParams.get("app"));
+  if (!hasWebflowOAuthCredentials(app)) {
     return Response.json(
-      { error: "WEBFLOW_CLIENT_ID and WEBFLOW_CLIENT_SECRET are required for OAuth" },
+      { error: `OAuth credentials for the ${app} app are not configured` },
       { status: 500, headers: jsonHeaders }
     );
   }
@@ -134,8 +148,9 @@ export async function POST(request: Request) {
       state,
       userId: session.user.id,
       organizationId: activeOrganizationId,
+      appKey: app,
     });
-    const url = buildWebflowAuthorizeUrl(state);
+    const url = buildWebflowAuthorizeUrl(state, app);
     return Response.json({ url }, { headers: jsonHeaders });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "oauth_url_failed";

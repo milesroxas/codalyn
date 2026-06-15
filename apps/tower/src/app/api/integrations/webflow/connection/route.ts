@@ -1,9 +1,8 @@
-import { eq } from "drizzle-orm";
 import { auth } from "@/server/auth";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { canTowerUserManageWebflowOAuthViaDashboard } from "@/server/tower-webflow-oauth-team-admin";
-import { db } from "@/shared/lib/db";
-import { organizationWebflowOAuthToken } from "@/shared/lib/db/auth-schema";
+import { normalizeWebflowAppKey } from "@/server/webflow-app-registry";
+import { deleteOrganizationWebflowOAuthToken } from "@/server/webflow-proxy-token";
 
 export async function DELETE(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -21,9 +20,9 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "no_active_workspace" }, { status: 400 });
   }
 
-  await db
-    .delete(organizationWebflowOAuthToken)
-    .where(eq(organizationWebflowOAuthToken.organizationId, activeOrganizationId));
+  // Disconnect only the requested app's token (default Beacon); leaves the other app connected.
+  const app = normalizeWebflowAppKey(new URL(request.url).searchParams.get("app"));
+  await deleteOrganizationWebflowOAuthToken(activeOrganizationId, app);
 
   return Response.json({ ok: true });
 }

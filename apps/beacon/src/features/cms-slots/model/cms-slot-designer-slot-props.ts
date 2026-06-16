@@ -4,7 +4,22 @@ import type {
 } from "@/features/cms-slots/model/cms-slot-composable-props";
 
 const ATTR = "data-beacon-designer-slot-props";
+/**
+ * Pre-rename attribute name. The Engine→Designer rename changed the persisted attribute but shipped no migration,
+ * so lists configured before it stored their exposed-props config here. Read it as a fallback (the next save rewrites
+ * the value under {@link ATTR}); without this, pre-rename lists silently lose all exposed props and the runtime
+ * payload saves with empty content.
+ */
+const LEGACY_ATTR = "data-beacon-engine-slot-props";
 const FILE_VERSION = 1 as const;
+
+async function readSlotPropsAttrRaw(container: BlockElement): Promise<string | null> {
+  const current = await container.getCustomAttribute(ATTR);
+  if (current != null && current.trim().length > 0) {
+    return current;
+  }
+  return container.getCustomAttribute(LEGACY_ATTR);
+}
 
 export type CmsSlotDesignerSlotEntry = { exposed: ComposableInstancePropMeta[] };
 
@@ -15,6 +30,34 @@ export type CmsSlotDesignerSlotPropsFile = {
 
 function isRecord(x: unknown): x is Record<string, unknown> {
   return x !== null && typeof x === "object" && !Array.isArray(x);
+}
+
+/**
+ * Webflow `setCustomAttribute` rejects values containing double quotes, so the slot-props JSON is base64-encoded on
+ * write and decoded on read. A raw `{...}` JSON value is still accepted so anything written before encoding keeps
+ * parsing; an undecodable value falls through to the empty-file default.
+ */
+function encodeSlotPropsAttrValue(json: string): string {
+  const bytes = new TextEncoder().encode(json);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+function decodeSlotPropsAttrValue(raw: string | null | undefined): string {
+  const t = (raw ?? "").trim();
+  if (t.length === 0 || t.startsWith("{")) {
+    return t;
+  }
+  try {
+    const binary = atob(t);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return t;
+  }
 }
 
 function isSelectOption(x: unknown): x is ComposableInstancePropSelectOption {
@@ -47,7 +90,7 @@ function isComposableMeta(x: unknown): x is ComposableInstancePropMeta {
 }
 
 function parseFile(raw: string | null | undefined, slotCount: number): CmsSlotDesignerSlotPropsFile {
-  const t = (raw ?? "").trim();
+  const t = decodeSlotPropsAttrValue(raw);
   if (t.length === 0) {
     return { v: FILE_VERSION, slots: Array.from({ length: slotCount }, () => ({ exposed: [] })) };
   }
@@ -81,7 +124,7 @@ function parseFile(raw: string | null | undefined, slotCount: number): CmsSlotDe
 }
 
 export function serializeSlotPropsFile(f: CmsSlotDesignerSlotPropsFile): string {
-  return JSON.stringify(f satisfies CmsSlotDesignerSlotPropsFile);
+  return encodeSlotPropsAttrValue(JSON.stringify(f satisfies CmsSlotDesignerSlotPropsFile));
 }
 
 /**
@@ -90,7 +133,7 @@ export function serializeSlotPropsFile(f: CmsSlotDesignerSlotPropsFile): string 
  * slot's segments when a **different** slot on the same page re-tags it.
  */
 export function collectExposedPropIdsFromSlotFileRaw(raw: string | null | undefined): string[] {
-  const t = (raw ?? "").trim();
+  const t = decodeSlotPropsAttrValue(raw);
   if (t.length === 0) {
     return [];
   }
@@ -119,7 +162,7 @@ export function collectExposedPropIdsFromSlotFileRaw(raw: string | null | undefi
 
 /** Reads {@link collectExposedPropIdsFromSlotFileRaw} for one CMS slot container. */
 export async function readAllExposedPropIdsForContainer(container: BlockElement): Promise<string[]> {
-  return collectExposedPropIdsFromSlotFileRaw(await container.getCustomAttribute(ATTR));
+  return collectExposedPropIdsFromSlotFileRaw(await readSlotPropsAttrRaw(container));
 }
 
 function findOldPoolIndexForRow(
@@ -168,7 +211,7 @@ export async function readCmsSlotDesignerSlotPropsFile(
   listContainer: BlockElement,
   slotCount: number
 ): Promise<CmsSlotDesignerSlotPropsFile> {
-  const raw = await listContainer.getCustomAttribute(ATTR);
+  const raw = await readSlotPropsAttrRaw(listContainer);
   return parseFile(raw ?? null, Math.max(0, slotCount));
 }
 

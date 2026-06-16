@@ -41,3 +41,33 @@ describe("collectExposedPropIdsFromSlotFileRaw", () => {
     ).toEqual([]);
   });
 });
+
+describe("serializeSlotPropsFile (Webflow attribute encoding)", () => {
+  const file = {
+    v: 1 as const,
+    slots: [{ exposed: [{ propId: "hero-title", label: "Title", valueType: "Plain Text" }] }],
+  };
+
+  it("never emits double quotes (Webflow setCustomAttribute rejects them)", () => {
+    expect(serializeSlotPropsFile(file)).not.toContain('"');
+  });
+
+  it("round-trips through collectExposedPropIdsFromSlotFileRaw via the encoded value", () => {
+    expect(collectExposedPropIdsFromSlotFileRaw(serializeSlotPropsFile(file))).toEqual(["hero-title"]);
+  });
+
+  it("preserves non-ASCII labels through encode/decode", () => {
+    const unicode = {
+      v: 1 as const,
+      slots: [{ exposed: [{ propId: "p1", label: "Überschrift — 标题", valueType: "Plain Text" }] }],
+    };
+    const encoded = serializeSlotPropsFile(unicode);
+    expect(encoded).not.toContain('"');
+    expect(collectExposedPropIdsFromSlotFileRaw(encoded)).toEqual(["p1"]);
+  });
+
+  it("still parses legacy unencoded raw JSON values", () => {
+    const legacy = JSON.stringify(file);
+    expect(collectExposedPropIdsFromSlotFileRaw(legacy)).toEqual(["hero-title"]);
+  });
+});

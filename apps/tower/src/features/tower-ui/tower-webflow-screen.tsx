@@ -10,7 +10,9 @@ import {
 } from "@/features/tower-ui/api/disconnect-webflow-integration";
 import {
   formatWebflowIntegrationStatus,
+  getCurrentSiteLinkNotice,
   getWebflowConnectionCardCopy,
+  resolveCurrentSiteLinkState,
 } from "@/features/tower-ui/lib/tower-webflow-integration-status";
 import { shouldShowPageHeaderWebflowAction } from "@/features/tower-ui/lib/tower-workspace-onboarding";
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
@@ -32,6 +34,8 @@ import { DangerZoneTypedDelete } from "@/shared/ui/typed-confirm-alert-dialog";
 type TowerWebflowScreenProps = {
   summary: TowerDashboardSummary;
   oauthConfigured: boolean;
+  /** Site open in the Designer when an extension routed here, so we can flag whether it's linked. */
+  currentSiteId?: string | null;
 } & WebflowBeaconPublicConfig;
 
 type WebflowScreenContext = {
@@ -39,6 +43,7 @@ type WebflowScreenContext = {
   oauthConfigured: boolean;
   canManage: boolean;
   sites: WebflowSiteSummary[];
+  currentSiteId: string | null;
   onRefresh: () => void;
 } & WebflowBeaconPublicConfig;
 
@@ -47,12 +52,14 @@ function WebflowSitesTable({
   webflowAppClientId,
   canManage,
   oauthConfigured,
+  currentSiteId,
   onRefresh,
 }: {
   sites: WebflowSiteSummary[];
   webflowAppClientId: string | null;
   canManage: boolean;
   oauthConfigured: boolean;
+  currentSiteId: string | null;
   onRefresh: () => void;
 }) {
   const relinkAction =
@@ -97,7 +104,12 @@ function WebflowSitesTable({
           <TableBody>
             {sites.map((site) => (
               <TableRow key={site.id}>
-                <TableCell>{site.displayName ?? "Untitled site"}</TableCell>
+                <TableCell>
+                  <span className="inline-flex items-center gap-2">
+                    {site.displayName ?? "Untitled site"}
+                    {currentSiteId === site.id ? <Badge variant="outline">Current</Badge> : null}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <code>{site.id}</code>
                 </TableCell>
@@ -141,11 +153,48 @@ function WebflowConnectionSection({ summary, sites }: Pick<WebflowScreenContext,
   );
 }
 
+/**
+ * Affordance for an extension that routed here scoped to the site open in the Designer: tells the user
+ * whether that exact site is linked and what to do (relink / connect) when it isn't.
+ */
+function WebflowCurrentSiteSection({
+  summary,
+  sites,
+  currentSiteId,
+}: Pick<WebflowScreenContext, "summary" | "sites" | "currentSiteId">) {
+  if (!currentSiteId) {
+    return null;
+  }
+  const state = resolveCurrentSiteLinkState({
+    webflowOAuthConnected: summary.webflowOAuthConnected,
+    currentSiteLinked: sites.some((site) => site.id === currentSiteId),
+  });
+  const notice = getCurrentSiteLinkNotice(state);
+
+  return (
+    <TowerPageSection title="Current site">
+      <Card>
+        <CardHeader>
+          <CardTitle>{notice.title}</CardTitle>
+          <CardDescription>{notice.detail}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge variant={notice.tone === "positive" ? "default" : "secondary"}>{notice.badge}</Badge>
+            <code className="text-sm text-muted-foreground">{currentSiteId}</code>
+          </div>
+        </CardContent>
+      </Card>
+    </TowerPageSection>
+  );
+}
+
 function WebflowSitesSection({
   summary,
   oauthConfigured,
   canManage,
   sites,
+  currentSiteId,
   onRefresh,
   webflowAppClientId,
 }: WebflowScreenContext) {
@@ -160,6 +209,7 @@ function WebflowSitesSection({
         webflowAppClientId={webflowAppClientId}
         canManage={canManage}
         oauthConfigured={oauthConfigured}
+        currentSiteId={currentSiteId}
         onRefresh={onRefresh}
       />
     </TowerPageSection>
@@ -212,7 +262,12 @@ function WebflowDisconnectSection({
   );
 }
 
-export function TowerWebflowScreen({ summary, oauthConfigured, webflowAppClientId }: TowerWebflowScreenProps) {
+export function TowerWebflowScreen({
+  summary,
+  oauthConfigured,
+  currentSiteId = null,
+  webflowAppClientId,
+}: TowerWebflowScreenProps) {
   const router = useRouter();
   const sites = summary.webflowSites ?? [];
   const canManage = summary.activeOrgTeamAdmin;
@@ -226,6 +281,7 @@ export function TowerWebflowScreen({ summary, oauthConfigured, webflowAppClientI
     oauthConfigured,
     canManage,
     sites,
+    currentSiteId,
     onRefresh,
     webflowAppClientId,
   };
@@ -254,6 +310,7 @@ export function TowerWebflowScreen({ summary, oauthConfigured, webflowAppClientI
           oauthConfigured={oauthConfigured}
         />
       </div>
+      <WebflowCurrentSiteSection summary={summary} sites={sites} currentSiteId={currentSiteId} />
       <WebflowConnectionSection summary={summary} sites={sites} />
       <WebflowSitesSection {...context} />
       <WebflowDisconnectSection summary={summary} canManage={canManage} onRefresh={onRefresh} />

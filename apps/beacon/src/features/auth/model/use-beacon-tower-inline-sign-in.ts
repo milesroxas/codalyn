@@ -21,13 +21,14 @@ function resolveSignInFailureAction(error: string): SignInFailureAction {
     case "early_access_required":
       return { kind: "redirect", path: "/request-access" };
     case "get_id_token_failed":
+      // Designer-local: the extension itself can't produce an identity. Opening Tower won't help.
       return { kind: "toast", message: "Couldn't read your Webflow identity. Reload the Designer and try again." };
-    case "id_token_resolve_failed":
-      return { kind: "toast", message: "Webflow couldn't verify your Designer session. Try again in a moment." };
     case "tower_not_configured":
       return { kind: "toast", message: "Tower isn't configured for this extension build." };
-    // No Webflow connection, Tower unreachable, no session issued, or any unmapped failure: we can't
-    // establish a session inline, so open Tower sign-in rather than dead-ending on a toast.
+    // `id_token_resolve_failed` (Webflow couldn't verify the Designer session), no Webflow connection,
+    // Tower unreachable, no session issued, or any unmapped failure: the silent on-focus exchange already
+    // retried the transient cases, so an explicit click that still fails is a dead end here. Open Tower
+    // sign-in — the user may already have a Tower account and just hasn't connected Webflow.
     default:
       return { kind: "tower-sign-in" };
   }
@@ -56,11 +57,11 @@ export function useBeaconTowerInlineSignIn(): { signIn: () => void; pending: boo
           // opens a clean /sign-in (no dead one-time-token handoff). Signing in there lets the next
           // attempt — or the on-focus silent exchange — establish a real session.
           clearBeaconTowerSessionToken();
-          openTowerAppPath("/sign-in");
+          openTowerAppPath("/sign-in", { popup: true });
           return;
         }
         if (action.kind === "redirect") {
-          openTowerAppPath(action.path);
+          openTowerAppPath(action.path, { popup: true });
           return;
         }
         void webflow.notify({ type: "Error", message: action.message });

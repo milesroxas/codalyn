@@ -9,6 +9,9 @@ function hasGetChildren(e: AnyElement): e is ElementWithChildren {
 }
 
 const CMS_SLOT_DESIGNER_COMPONENT_IDS_ATTR = "data-beacon-designer-component-ids";
+/** Pre-rename attribute name; read as a fallback so lists configured before the Engine→Designer rename keep their
+ * configured component ids (the next save rewrites under the current name). See the slot-props file for the same issue. */
+const CMS_SLOT_LEGACY_COMPONENT_IDS_ATTR = "data-beacon-engine-component-ids";
 const BEACON_DESIGNER_COMPONENT_IDS_EMPTY = "__none__";
 
 function uniqueComponentIds(componentIds: readonly string[]): string[] {
@@ -100,7 +103,11 @@ export type HydratedCmsSlotRow = {
 
 /** Designer-configured component ids for this CMS slot, or `null` when not configured yet. */
 export async function readCmsSlotDesignerConfiguredComponentIds(container: BlockElement): Promise<string[] | null> {
-  const raw = await container.getCustomAttribute(CMS_SLOT_DESIGNER_COMPONENT_IDS_ATTR);
+  const current = await container.getCustomAttribute(CMS_SLOT_DESIGNER_COMPONENT_IDS_ATTR);
+  const raw =
+    current != null && current.trim().length > 0
+      ? current
+      : await container.getCustomAttribute(CMS_SLOT_LEGACY_COMPONENT_IDS_ATTR);
   if (raw == null) {
     return null;
   }

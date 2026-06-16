@@ -52,36 +52,54 @@ async function mintTowerHandoffToken(): Promise<string | null> {
   }
 }
 
+/** Sized popup window (not a full browser tab) for the focused Tower connect flow. */
+const TOWER_POPUP_WINDOW_FEATURES = "popup=yes,width=520,height=760,scrollbars=yes,resizable=yes";
+
+/** The connection path for the Flint app, scoped to the site currently open in the Designer when known. */
+async function resolveFlintConnectionPath(): Promise<string> {
+  let siteId = "";
+  try {
+    const info = await webflow.getSiteInfo();
+    siteId = typeof info?.siteId === "string" ? info.siteId.trim() : "";
+  } catch {
+    /* siteId is optional — the connection screen still works without it. */
+  }
+  return siteId ? `/connection?app=flint&siteId=${encodeURIComponent(siteId)}` : "/connection?app=flint";
+}
+
 /**
- * Opens Tower's web "Connect Webflow" page for the Flint app in a new tab. Mirrors Beacon: when the
- * Designer session holds a Tower bearer, route through a one-time-token handoff so Tower establishes
- * a first-party cookie session; otherwise fall back to the plain page (which enforces its own auth —
- * the first-ever Flint user signs up there, then connects). Connecting pools a Flint token so all
- * subsequent Designer sign-ins resolve.
+ * Opens Tower's web "Connect Webflow" page for the Flint app in a popup, scoped to the site currently
+ * open in the Designer. Mirrors Beacon: when the Designer session holds a Tower bearer, route through a
+ * one-time-token handoff so Tower establishes a first-party cookie session; otherwise fall back to the
+ * plain page (which enforces its own auth — the first-ever Flint user signs up there, then connects).
+ * Connecting pools a Flint token so all subsequent Designer sign-ins resolve.
  */
 export function openTowerWebflowConnect(): void {
-  const callbackPath = "/connection?app=flint";
-  const directUrl = buildTowerAppUrl(callbackPath);
-  if (!directUrl) {
+  // Open synchronously inside the click gesture so popup blockers allow it; redirect once the
+  // site-scoped path and any one-time-token handoff resolve.
+  const popup = window.open("about:blank", "tower-webflow-connect", TOWER_POPUP_WINDOW_FEATURES);
+  if (!popup) {
     return;
   }
-  if (!readFlintTowerSessionToken()) {
-    window.open(directUrl, "_blank", "noopener,noreferrer");
-    return;
-  }
-  const handoffWindow = window.open("about:blank", "_blank");
-  if (!handoffWindow) {
-    window.open(directUrl, "_blank", "noopener,noreferrer");
-    return;
-  }
-  void mintTowerHandoffToken().then((token) => {
+  void (async () => {
+    const callbackPath = await resolveFlintConnectionPath();
+    const directUrl = buildTowerAppUrl(callbackPath);
+    if (!directUrl) {
+      popup.close();
+      return;
+    }
+    if (!readFlintTowerSessionToken()) {
+      popup.location.replace(directUrl);
+      return;
+    }
+    const token = await mintTowerHandoffToken();
     if (!token) {
-      handoffWindow.location.replace(directUrl);
+      popup.location.replace(directUrl);
       return;
     }
     const handoffUrl = buildTowerAppUrl(
       `/api/beacon-handoff?ott=${encodeURIComponent(token)}&callbackUrl=${encodeURIComponent(callbackPath)}`
     );
-    handoffWindow.location.replace(handoffUrl ?? directUrl);
-  });
+    popup.location.replace(handoffUrl ?? directUrl);
+  })();
 }

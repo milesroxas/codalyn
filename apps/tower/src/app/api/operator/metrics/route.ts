@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, sql } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, gt, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { countPendingEarlyAccessRequests } from "@/server/access/early-access-request";
 import { countPendingFlintBetaGroupRequests } from "@/server/marketing/flint-beta-group-request";
@@ -59,7 +59,10 @@ export async function GET(): Promise<NextResponse<OperatorMetrics | { error: str
     db.select({ total: count() }).from(user).where(eq(user.banned, true)),
     db.select({ total: count() }).from(organization),
     db.select({ total: count() }).from(invitation).where(eq(invitation.status, "pending")),
-    db.select({ total: count() }).from(organizationWebflowOAuthToken),
+    // Distinct workspaces with a Webflow connection (a workspace may connect both Beacon and Flint).
+    db
+      .select({ total: countDistinct(organizationWebflowOAuthToken.organizationId) })
+      .from(organizationWebflowOAuthToken),
     db.select({ total: count() }).from(sessionTable).where(gt(sessionTable.expiresAt, now)),
     db.select({ total: count() }).from(user).where(gt(user.createdAt, days7)),
     db.select({ total: count() }).from(user).where(gt(user.createdAt, days30)),

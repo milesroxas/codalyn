@@ -118,6 +118,29 @@ const OfflineModeSection: React.FC = () => (
   </Section>
 );
 
+/**
+ * Outcome of a failed Designer-session sign-in:
+ * - "tower-connect": no session can be minted here (no Webflow connection, resolve bearer rejected, no
+ *   session issued, no Tower account yet, or any unmapped failure). NOT a dead end — the user may already
+ *   have a Tower account and simply not have connected Webflow, so open Tower's web sign-in/connect flow.
+ * - "toast": a Designer-local issue the panel can't fix — surface it in place.
+ * - "silent": a transient network blip; the on-focus silent exchange will retry, so don't nag.
+ */
+type FlintSignInFailureAction = { kind: "tower-connect" } | { kind: "toast"; message: string } | { kind: "silent" };
+
+function resolveFlintSignInFailureAction(error: string): FlintSignInFailureAction {
+  switch (error) {
+    case "tower_unreachable":
+      return { kind: "silent" };
+    case "get_id_token_failed":
+      return { kind: "toast", message: "Couldn't read your Webflow identity. Reload the Designer and try again." };
+    case "tower_not_configured":
+      return { kind: "toast", message: "Cloud sync isn't available in this build." };
+    default:
+      return { kind: "tower-connect" };
+  }
+}
+
 /** Configured but signed out: prompt the Designer-session sign-in. */
 const SignedOutSection: React.FC = () => {
   const { signIn, sessionPending } = useFlintTower();
@@ -129,8 +152,17 @@ const SignedOutSection: React.FC = () => {
       .then((r) => {
         if (r.ok) {
           void webflow.notify({ type: "Success", message: "Signed in to Tower." });
-        } else if (r.error !== "tower_unreachable") {
-          void webflow.notify({ type: "Error", message: "Could not sign in to Tower." });
+          return;
+        }
+        const action = resolveFlintSignInFailureAction(r.error);
+        if (action.kind === "tower-connect") {
+          // Can't mint a session inline. Open Tower so the user can sign in (they may already have an
+          // account) and connect Webflow — instead of dead-ending on a "try again" toast.
+          openTowerWebflowConnect();
+          return;
+        }
+        if (action.kind === "toast") {
+          void webflow.notify({ type: "Error", message: action.message });
         }
       })
       .finally(() => setSigningIn(false));
@@ -200,11 +232,12 @@ const WebflowConnectionSection: React.FC<{ connected: boolean }> = ({ connected 
     {!connected && (
       <>
         <p className="text-[11px] text-muted-foreground leading-snug">
-          Connect your Webflow workspace to enable Tower sign-in across this team. Opens Tower in a new tab.
+          The site you're in isn't linked yet. Connect its Webflow workspace to enable Tower sign-in across this team.
+          Opens Tower in a popup, scoped to this site.
         </p>
         <Button type="button" size="sm" variant="outline" className="h-7 w-full" onClick={openTowerWebflowConnect}>
           <Plug className="size-3.5" />
-          Connect Webflow
+          Connect this site
         </Button>
       </>
     )}

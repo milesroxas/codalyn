@@ -1,5 +1,5 @@
-import { ExternalLink, LogOut, type LucideIcon } from "lucide-react";
-import { isTowerConfigured, openTowerAppPath } from "@/features/auth/model/tower-auth-client";
+import { ExternalLink, LogOut, type LucideIcon, Plug } from "lucide-react";
+import { isTowerConfigured, openTowerAppPath, openTowerWebflowConnect } from "@/features/auth/model/tower-auth-client";
 import { cn } from "@/shared/lib/utils";
 
 type BeaconTowerActionListItem = {
@@ -47,6 +47,14 @@ export function BeaconTowerActionList(props: BeaconTowerActionListProps) {
   const towerConfigured = isTowerConfigured();
 
   const items: BeaconTowerActionListItem[] = [
+    {
+      label: "Connect Webflow site",
+      icon: Plug,
+      disabled: !towerConfigured,
+      // Opens Tower's connection screen in a popup, scoped to the site open in the Designer, so the user
+      // can authorize/relink the workspace that owns it instead of landing on the dashboard.
+      onSelect: () => openTowerWebflowConnect(),
+    },
     {
       label: "Beacon & presets",
       icon: ExternalLink,

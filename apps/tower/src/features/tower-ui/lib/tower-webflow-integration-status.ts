@@ -41,6 +41,57 @@ export function getWebflowConnectionCardCopy(input: { webflowOAuthConnected: boo
   };
 }
 
+/**
+ * Whether the Webflow site currently open in the Designer is usable from this workspace. Sites are
+ * authorized at the workspace level (one OAuth token grants all sites it can see), so a site is
+ * "linked" when it appears in that workspace's authorized site list — matched by stable site id.
+ */
+export type CurrentSiteLinkState = "linked" | "needs-relink" | "needs-connect";
+
+export function resolveCurrentSiteLinkState(input: {
+  webflowOAuthConnected: boolean;
+  currentSiteLinked: boolean;
+}): CurrentSiteLinkState {
+  if (input.currentSiteLinked) {
+    return "linked";
+  }
+  return input.webflowOAuthConnected ? "needs-relink" : "needs-connect";
+}
+
+/** Affordance copy for the current Designer site: what state it's in and what the user should do next. */
+export function getCurrentSiteLinkNotice(state: CurrentSiteLinkState): {
+  tone: "positive" | "warn";
+  badge: string;
+  title: string;
+  detail: string;
+} {
+  switch (state) {
+    case "linked":
+      return {
+        tone: "positive",
+        badge: "Linked",
+        title: "This site is linked",
+        detail: "The site you opened in the Designer is authorized for this workspace.",
+      };
+    case "needs-relink":
+      return {
+        tone: "warn",
+        badge: "Action needed",
+        title: "This site isn’t linked yet",
+        detail:
+          "The site you opened in the Designer isn’t among this workspace’s authorized sites. Relink Webflow below to include it, or switch to the workspace that owns it.",
+      };
+    case "needs-connect":
+      return {
+        tone: "warn",
+        badge: "Action needed",
+        title: "Connect Webflow to link this site",
+        detail:
+          "The site you opened in the Designer can’t be used until you authorize Webflow for this workspace. Use Connect Webflow above.",
+      };
+  }
+}
+
 export function formatWebflowIntegrationStatus(input: WebflowIntegrationStatusInput): WebflowIntegrationStatusSnapshot {
   if (!input.webflowOAuthConnected) {
     return {

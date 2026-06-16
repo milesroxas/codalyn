@@ -6,6 +6,7 @@ import {
   getDefaultBeaconAppSettings,
   mergeBeaconAppSettings,
   parseBeaconAppSettings,
+  type WebflowSiteSummary,
 } from "@codalyn/webflow-kit";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
@@ -38,6 +39,11 @@ type BeaconAppSettingsContextValue = {
   refreshBeaconSettings: () => void;
   /** True when signed in to Tower (session may still be resolving). */
   isTowerUser: boolean;
+  /**
+   * Webflow sites in the workspace's Data API OAuth grant (authorized sites). `null` until a Tower pull
+   * has resolved them (or when Webflow isn't connected). Used to gate features on the current site.
+   */
+  webflowSites: WebflowSiteSummary[] | null;
   /** Persist export defaults from the image editor after Tower sync (or always for guests). */
   canPersistExportDefaults: boolean;
   /** Signed-in Tower user and initial settings pull still in flight. */
@@ -99,6 +105,7 @@ type TowerBeaconApiEnvelope = {
   workspaces?: BeaconTowerWorkspace[];
   activeOrganizationId?: string | null;
   activeOrganizationName?: string | null;
+  webflowSites?: WebflowSiteSummary[] | null;
 };
 
 function applyTowerBeaconEnvelope(
@@ -114,6 +121,7 @@ function applyTowerBeaconEnvelope(
     setBeaconWorkspaces: (v: BeaconTowerWorkspace[]) => void;
     setActiveOrganizationId: (v: string | null) => void;
     setActiveOrganizationName: (v: string | null) => void;
+    setWebflowSites?: (v: WebflowSiteSummary[] | null) => void;
   }
 ) {
   if (data.settings) {
@@ -149,6 +157,9 @@ function applyTowerBeaconEnvelope(
     setters.setHasActiveWorkspace(Boolean(data.activeOrganizationId));
   } else if (data.hasActiveWorkspace !== undefined) {
     setters.setHasActiveWorkspace(Boolean(data.hasActiveWorkspace));
+  }
+  if (data.webflowSites !== undefined) {
+    setters.setWebflowSites?.(data.webflowSites ?? null);
   }
 }
 
@@ -239,6 +250,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
   const [beaconWorkspaces, setBeaconWorkspaces] = useState<BeaconTowerWorkspace[]>([]);
   const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null);
   const [activeOrganizationName, setActiveOrganizationName] = useState<string | null>(null);
+  const [webflowSites, setWebflowSites] = useState<WebflowSiteSummary[] | null>(null);
 
   const isTowerUser = Boolean(user?.id);
 
@@ -295,6 +307,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
           setBeaconWorkspaces,
           setActiveOrganizationId,
           setActiveOrganizationName,
+          setWebflowSites,
         });
         setSyncState("synced");
         lastVisibilityPullAtRef.current = Date.now();
@@ -323,6 +336,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
       setBeaconWorkspaces([]);
       setActiveOrganizationId(null);
       setActiveOrganizationName(null);
+      setWebflowSites(null);
       return;
     }
 
@@ -502,6 +516,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
       syncState,
       refreshBeaconSettings,
       isTowerUser,
+      webflowSites,
       canPersistExportDefaults,
       settingsPullPending,
       settingsPullSynced,
@@ -523,6 +538,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
       syncState,
       refreshBeaconSettings,
       isTowerUser,
+      webflowSites,
       canPersistExportDefaults,
       settingsPullPending,
       settingsPullSynced,

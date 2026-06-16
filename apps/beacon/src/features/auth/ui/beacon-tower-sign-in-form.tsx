@@ -70,15 +70,29 @@ export function BeaconTowerSignInForm() {
         {pending ? <Loader2 aria-hidden data-icon="inline-start" className="animate-spin" /> : null}
         {pending ? "Signing in…" : "Sign in"}
       </Button>
-      <Button
-        type="button"
-        variant="link"
-        size="sm"
-        className="h-auto self-center text-xs"
-        onClick={() => openTowerAppPath("/sign-up")}
-      >
-        No account? Create one on Tower
-      </Button>
+      <div className="flex items-center justify-center gap-2 text-xs">
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto px-0 text-xs"
+          onClick={() => openTowerAppPath("/sign-up")}
+        >
+          Create account
+        </Button>
+        <span aria-hidden className="text-muted-foreground">
+          ·
+        </span>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto px-0 text-xs"
+          onClick={() => openTowerAppPath("/forgot-password")}
+        >
+          Forgot password?
+        </Button>
+      </div>
     </form>
   );
 }

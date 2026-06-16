@@ -133,15 +133,25 @@ const SignedOutSection: React.FC = () => {
         team.
       </p>
       <FlintTowerSignInForm />
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-7 w-full text-[11px]"
-        onClick={() => openTowerAppTab("/sign-up")}
-      >
-        No account? Create one on Tower
-      </Button>
+      <div className="flex items-center justify-center gap-2 text-[11px]">
+        <button
+          type="button"
+          className="text-muted-foreground underline-offset-2 hover:underline"
+          onClick={() => openTowerAppTab("/sign-up")}
+        >
+          Create account
+        </button>
+        <span aria-hidden className="text-muted-foreground">
+          ·
+        </span>
+        <button
+          type="button"
+          className="text-muted-foreground underline-offset-2 hover:underline"
+          onClick={() => openTowerAppTab("/forgot-password")}
+        >
+          Forgot password?
+        </button>
+      </div>
     </Section>
   );
 };

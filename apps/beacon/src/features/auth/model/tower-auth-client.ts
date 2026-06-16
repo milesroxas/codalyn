@@ -82,7 +82,18 @@ type OpenTowerAppPathOptions = {
    * gesture (popup blockers), then redirected once the path resolves.
    */
   resolvePath?: () => Promise<string>;
+  /** Called once the opened popup window is closed (e.g. to refetch state after an OAuth grant). */
+  onClosed?: () => void;
 };
+
+function watchPopupClosed(win: Window, onClosed: () => void): void {
+  const timer = window.setInterval(() => {
+    if (win.closed) {
+      window.clearInterval(timer);
+      onClosed();
+    }
+  }, 800);
+}
 
 export function openTowerAppPath(path: string, options: OpenTowerAppPathOptions = {}): void {
   // Open synchronously inside the click gesture so popup blockers allow it; fill the URL after any
@@ -92,6 +103,9 @@ export function openTowerAppPath(path: string, options: OpenTowerAppPathOptions 
     : window.open("about:blank", "_blank");
   if (!win) {
     return;
+  }
+  if (options.onClosed) {
+    watchPopupClosed(win, options.onClosed);
   }
   void (async () => {
     const resolvedPath = options.resolvePath ? await options.resolvePath() : path;
@@ -132,9 +146,48 @@ async function resolveCurrentSiteConnectionPath(): Promise<string> {
  * Opens Tower's Webflow connection screen in a popup, scoped to the site currently open in the Designer
  * so the user can authorize/relink the workspace that owns it. Use this when a feature needs the current
  * site linked — it lands on `/connection` (signed-in via one-time-token handoff), not the dashboard.
+ *
+ * `onClosed` fires when the popup closes so callers can refetch Tower state (the newly granted site then
+ * unlocks without a manual reload).
  */
-export function openTowerWebflowConnect(): void {
-  openTowerAppPath("/connection", { popup: true, resolvePath: resolveCurrentSiteConnectionPath });
+export function openTowerWebflowConnect(onClosed?: () => void): void {
+  openTowerAppPath("/connection", { popup: true, resolvePath: resolveCurrentSiteConnectionPath, onClosed });
+}
+
+/**
+ * Opens the Webflow OAuth consent screen directly in a popup — the same flow as Tower's "Relink", but
+ * skipping the Tower `/connection` page. Mints an authorize URL from Tower (`POST` with the Designer
+ * bearer; server stores the OAuth `state`→user/org so the cookie-less popup callback can resolve it),
+ * then points the popup at `webflow.com/oauth/authorize`. On grant, Webflow → Tower callback → success
+ * page closes the popup, which trips `onClosed` so the caller can refetch the now-updated grant.
+ *
+ * Must be called inside a user gesture (the blank popup is opened synchronously). Resolves to the
+ * authorize error code (`team_admin_required`, `no_active_workspace`, `unauthorized`, …) when Tower
+ * declines, or `popup_blocked` when the browser blocks the window.
+ */
+export async function openWebflowOAuthAuthorize(
+  onClosed?: () => void
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const win = window.open("about:blank", "webflow-oauth-authorize", TOWER_POPUP_WINDOW_FEATURES);
+  if (!win) {
+    return { ok: false, error: "popup_blocked" };
+  }
+  try {
+    const res = await towerFetch("/api/integrations/webflow/authorize", { method: "POST" });
+    const data = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
+    if (!res.ok || !data?.url) {
+      win.close();
+      return { ok: false, error: data?.error ?? `http_${res.status}` };
+    }
+    win.location.replace(data.url);
+    if (onClosed) {
+      watchPopupClosed(win, onClosed);
+    }
+    return { ok: true };
+  } catch {
+    win.close();
+    return { ok: false, error: "tower_unreachable" };
+  }
 }
 
 /** Opens the Tower dashboard entry (app host) in a new tab. */

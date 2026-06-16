@@ -7,15 +7,38 @@
 // choice only suppresses it for the current app load. It is never set automatically on sign-in;
 // auth state alone hides the gate while signed in.
 let guestChosen = false;
+const listeners = new Set<() => void>();
+
+function notifyGuestChosenChanged(): void {
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+/** Subscribe to guest-choice changes so the welcome gate can re-show when sign-in is requested elsewhere. */
+export function subscribeBeaconGuestChosen(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
 
 export function readBeaconGuestChosen(): boolean {
   return guestChosen;
 }
 
 export function writeBeaconGuestChosen(): void {
+  if (guestChosen) {
+    return;
+  }
   guestChosen = true;
+  notifyGuestChosenChanged();
 }
 
 export function clearBeaconGuestChosen(): void {
+  if (!guestChosen) {
+    return;
+  }
   guestChosen = false;
+  notifyGuestChosenChanged();
 }

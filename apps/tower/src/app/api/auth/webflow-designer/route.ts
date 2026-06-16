@@ -3,8 +3,7 @@ import { normalizeWebflowAppKey } from "@/server/webflow-app-registry";
 import { establishDesignerBetterAuthSession } from "@/server/webflow-designer-session-logic";
 import {
   collectWebflowIdTokenResolveBearers,
-  decideDesignerResolveFailure,
-  resolveWebflowDesignerIdToken,
+  resolveDesignerIdTokenAcrossCandidates,
 } from "@/server/webflow-resolve-designer-id-token";
 
 function jsonWithCors(request: Request, body: unknown, init?: ResponseInit) {
@@ -22,6 +21,23 @@ export async function OPTIONS(request: Request) {
     headers.set(k, v);
   }
   return new Response(null, { status: 204, headers });
+}
+
+/** Delete stored workspace tokens Webflow rejected as revoked (no refresh token exists to recover them). */
+async function pruneRevokedWebflowTokens(
+  orgIds: string[],
+  app: ReturnType<typeof normalizeWebflowAppKey>
+): Promise<void> {
+  if (orgIds.length === 0) {
+    return;
+  }
+  const { deleteOrganizationWebflowOAuthToken } = await import("@/server/webflow-proxy-token");
+  for (const orgId of orgIds) {
+    await deleteOrganizationWebflowOAuthToken(orgId, app);
+    console.warn(
+      `[tower/webflow-designer] pruned revoked Webflow token for org ${orgId}; reconnect required (no refresh token)`
+    );
+  }
 }
 
 export async function POST(request: Request) {
@@ -55,28 +71,19 @@ export async function POST(request: Request) {
     );
   }
 
-  // Resolve with the primary candidate only (one Webflow call per request — the idToken stays unused for
-  // a possible fresh-idToken client retry). On a revoked stored token we prune it and let the next
-  // attempt pick the next candidate; see decideDesignerResolveFailure.
-  const [primary, ...rest] = candidates;
-  const resolved = await resolveWebflowDesignerIdToken(idToken, primary.token);
-  if (!resolved.ok) {
-    const action = decideDesignerResolveFailure(resolved, primary, rest.length > 0);
-    if (action.pruneOrganizationId) {
-      const { deleteOrganizationWebflowOAuthToken } = await import("@/server/webflow-proxy-token");
-      await deleteOrganizationWebflowOAuthToken(action.pruneOrganizationId, app);
-      console.warn(
-        `[tower/webflow-designer] pruned revoked Webflow token for org ${action.pruneOrganizationId}; reconnect required (no refresh token)`
-      );
-    }
-    const { error, status, hint } = action.response;
+  // Try every candidate, not just the first: an ID token resolves only against its own workspace's token.
+  const resolution = await resolveDesignerIdTokenAcrossCandidates(idToken, candidates);
+  await pruneRevokedWebflowTokens(resolution.orgIdsToPrune, app);
+
+  if (!resolution.ok) {
+    const { error, status, hint } = resolution.response;
     return jsonWithCors(request, hint ? { error, hint } : { error }, { status });
   }
 
-  const session = await establishDesignerBetterAuthSession(resolved.user);
+  const session = await establishDesignerBetterAuthSession(resolution.user);
   if (!session.ok) {
     console.warn(
-      `[tower/webflow-designer] establish session failed for ${resolved.user.email}: ${session.status} ${session.message}`
+      `[tower/webflow-designer] establish session failed for ${resolution.user.email}: ${session.status} ${session.message}`
     );
     return jsonWithCors(request, { error: session.message }, { status: session.status });
   }

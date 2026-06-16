@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from "react";
+import { signInToTowerWithEmail, type TowerEmailSignInResult } from "@/features/auth/lib/tower-email-sign-in";
 import {
   clearFlintTowerSessionToken,
   exchangeWebflowDesignerSession,
@@ -72,24 +73,32 @@ export function useFlintTowerSession(): {
   user: FlintTowerUser | undefined;
   isPending: boolean;
   refetch: () => Promise<void>;
-  signInWithDesignerSession: () => Promise<{ ok: true } | { ok: false; error: string }>;
+  signInWithEmail: (email: string, password: string) => Promise<TowerEmailSignInResult>;
   signOut: () => void;
 } {
   const { data: session, isPending: authSessionPending, refetch } = towerAuthClient.useSession();
   const towerOrigin = getTowerAuthBaseUrl();
   const hasStoredSessionToken = Boolean(readFlintTowerSessionToken());
 
-  const signInWithDesignerSession = useCallback(async () => {
-    setSuppressDesignerSessionExchange(false);
-    designerExchangeBlockedAfterFailure = false;
-    const result = await runSilentExchangeWithRetries();
-    if (result.ok) {
-      await refetch();
-    } else {
-      designerExchangeBlockedAfterFailure = true;
-    }
-    return result;
-  }, [refetch]);
+  const signInWithEmail = useCallback(
+    async (email: string, password: string): Promise<TowerEmailSignInResult> => {
+      setSuppressDesignerSessionExchange(false);
+      designerExchangeBlockedAfterFailure = false;
+      // Gate the stale-token reaper (it checks this flag) until the post-sign-in refetch resolves, so it
+      // doesn't clear the freshly stored token before the session populates.
+      designerExchangeInFlight = true;
+      try {
+        const result = await signInToTowerWithEmail(email, password);
+        if (result.ok) {
+          await refetch();
+        }
+        return result;
+      } finally {
+        designerExchangeInFlight = false;
+      }
+    },
+    [refetch]
+  );
 
   const signOut = useCallback(() => {
     setSuppressDesignerSessionExchange(true);
@@ -160,5 +169,5 @@ export function useFlintTowerSession(): {
 
   const isPending = hasStoredSessionToken ? authSessionPending : false;
 
-  return { user, isPending, refetch, signInWithDesignerSession, signOut };
+  return { user, isPending, refetch, signInWithEmail, signOut };
 }

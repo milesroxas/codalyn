@@ -1,8 +1,9 @@
-import { CloudOff, LogIn, LogOut, Plug, RefreshCw } from "lucide-react";
+import { CloudOff, LogOut, Plug, RefreshCw } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useFlintTower } from "@/features/auth/model/flint-tower-provider";
-import { openTowerWebflowConnect } from "@/features/auth/model/tower-auth-client";
+import { openTowerAppTab, openTowerWebflowConnect } from "@/features/auth/model/tower-auth-client";
+import { FlintTowerSignInForm } from "@/features/auth/ui/FlintTowerSignInForm";
 import { parseIgnoredClassesInput } from "@/features/linter/lib/class-lint-ignore";
 import type { FlintSyncStatus } from "@/features/linter/services/sync/flint-sync.store";
 import type { FlintTier } from "@/shared/lib/flint-entitlement";
@@ -119,55 +120,11 @@ const OfflineModeSection: React.FC = () => (
 );
 
 /**
- * Outcome of a failed Designer-session sign-in:
- * - "tower-connect": no session can be minted here (no Webflow connection, resolve bearer rejected, no
- *   session issued, no Tower account yet, or any unmapped failure). NOT a dead end — the user may already
- *   have a Tower account and simply not have connected Webflow, so open Tower's web sign-in/connect flow.
- * - "toast": a Designer-local issue the panel can't fix — surface it in place.
- * - "silent": a transient network blip; the on-focus silent exchange will retry, so don't nag.
+ * Configured but signed out: the inline email/password form is the explicit sign-in. The Webflow
+ * Designer session is attempted silently on mount/focus (see useFlintTowerSession) — it is never a
+ * button. Connecting Webflow is a separate, post-sign-in step.
  */
-type FlintSignInFailureAction = { kind: "tower-connect" } | { kind: "toast"; message: string } | { kind: "silent" };
-
-function resolveFlintSignInFailureAction(error: string): FlintSignInFailureAction {
-  switch (error) {
-    case "tower_unreachable":
-      return { kind: "silent" };
-    case "get_id_token_failed":
-      return { kind: "toast", message: "Couldn't read your Webflow identity. Reload the Designer and try again." };
-    case "tower_not_configured":
-      return { kind: "toast", message: "Cloud sync isn't available in this build." };
-    default:
-      return { kind: "tower-connect" };
-  }
-}
-
-/** Configured but signed out: prompt the Designer-session sign-in. */
 const SignedOutSection: React.FC = () => {
-  const { signIn, sessionPending } = useFlintTower();
-  const [signingIn, setSigningIn] = useState(false);
-
-  const handleSignIn = () => {
-    setSigningIn(true);
-    void signIn()
-      .then((r) => {
-        if (r.ok) {
-          void webflow.notify({ type: "Success", message: "Signed in to Tower." });
-          return;
-        }
-        const action = resolveFlintSignInFailureAction(r.error);
-        if (action.kind === "tower-connect") {
-          // Can't mint a session inline. Open Tower so the user can sign in (they may already have an
-          // account) and connect Webflow — instead of dead-ending on a "try again" toast.
-          openTowerWebflowConnect();
-          return;
-        }
-        if (action.kind === "toast") {
-          void webflow.notify({ type: "Error", message: action.message });
-        }
-      })
-      .finally(() => setSigningIn(false));
-  };
-
   return (
     <Section>
       <span className="text-xs font-medium text-foreground">Sync settings across devices</span>
@@ -175,18 +132,15 @@ const SignedOutSection: React.FC = () => {
         Sign in to your Tower account to sync rule configuration and, on paid plans, share linting standards with your
         team.
       </p>
-      <Button type="button" className="w-full" disabled={signingIn || sessionPending} onClick={handleSignIn}>
-        <LogIn className="size-3.5" />
-        {signingIn || sessionPending ? "Signing in…" : "Sign in to Tower"}
-      </Button>
+      <FlintTowerSignInForm />
       <Button
         type="button"
         variant="ghost"
         size="sm"
         className="h-7 w-full text-[11px]"
-        onClick={openTowerWebflowConnect}
+        onClick={() => openTowerAppTab("/sign-up")}
       >
-        First time? Set up &amp; connect on Tower
+        No account? Create one on Tower
       </Button>
     </Section>
   );

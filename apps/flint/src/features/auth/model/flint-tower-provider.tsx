@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef } from "react";
+import type { TowerEmailSignInResult } from "@/features/auth/lib/tower-email-sign-in";
 import { type FlintTowerUser, useFlintTowerSession } from "@/features/auth/model/use-flint-tower-session";
 import { initializeRuleRegistry } from "@/features/linter/services/registry";
 import { hydrateFlintFromTower, writeRuleConfigToLocal } from "@/features/linter/services/sync/flint-settings-sync";
@@ -15,7 +16,7 @@ export type FlintTowerContextValue = {
   isTowerConfigured: boolean;
   user: FlintTowerUser | undefined;
   sessionPending: boolean;
-  signIn: () => Promise<{ ok: true } | { ok: false; error: string }>;
+  signInWithEmail: (email: string, password: string) => Promise<TowerEmailSignInResult>;
   signOut: () => void;
   entitlement: FlintEntitlement;
   syncStatus: FlintSyncStatus;
@@ -31,7 +32,7 @@ const FlintTowerContext = createContext<FlintTowerContextValue | null>(null);
 const VISIBILITY_REFRESH_MIN_INTERVAL_MS = 60_000;
 
 export function FlintTowerProvider({ children }: { children: ReactNode }) {
-  const { user, isPending: sessionPending, signInWithDesignerSession, signOut } = useFlintTowerSession();
+  const { user, isPending: sessionPending, signInWithEmail, signOut } = useFlintTowerSession();
   const effective = useFlintSyncStore((s) => s.effective);
   const syncStatus = useFlintSyncStore((s) => s.status);
   const isTowerConfigured = isFlintTowerOriginConfigured();
@@ -92,7 +93,7 @@ export function FlintTowerProvider({ children }: { children: ReactNode }) {
       isTowerConfigured,
       user,
       sessionPending,
-      signIn: signInWithDesignerSession,
+      signInWithEmail,
       signOut,
       entitlement: effective?.entitlement ?? getDefaultFlintEntitlement(),
       syncStatus,
@@ -100,17 +101,7 @@ export function FlintTowerProvider({ children }: { children: ReactNode }) {
       refresh,
       updateSettings,
     }),
-    [
-      isTowerConfigured,
-      user,
-      sessionPending,
-      signInWithDesignerSession,
-      signOut,
-      effective,
-      syncStatus,
-      refresh,
-      updateSettings,
-    ]
+    [isTowerConfigured, user, sessionPending, signInWithEmail, signOut, effective, syncStatus, refresh, updateSettings]
   );
 
   return <FlintTowerContext.Provider value={value}>{children}</FlintTowerContext.Provider>;
@@ -126,7 +117,7 @@ export function useFlintTower(): FlintTowerContextValue {
     isTowerConfigured: false,
     user: undefined,
     sessionPending: false,
-    signIn: async () => ({ ok: false, error: "tower_not_configured" }),
+    signInWithEmail: async () => ({ ok: false, error: "Cloud sync isn't available in this build." }),
     signOut: () => {},
     entitlement: getDefaultFlintEntitlement(),
     syncStatus: "idle",

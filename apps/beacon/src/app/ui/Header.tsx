@@ -16,8 +16,8 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { clearBeaconGuestChosen } from "@/features/auth/lib/beacon-guest-choice";
 import { isTowerConfigured, openTowerAppHome } from "@/features/auth/model/tower-auth-client";
-import { useBeaconTowerInlineSignIn } from "@/features/auth/model/use-beacon-tower-inline-sign-in";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import {
   BeaconTowerConnectionIndicator,
@@ -450,14 +450,15 @@ function HeaderShell(props: BeaconAppMenuProps) {
 
 function HeaderWithTower() {
   const { user, isPending, clearStoredSession } = useBeaconTowerSession();
-  const { signIn } = useBeaconTowerInlineSignIn();
 
   return (
     <HeaderShell
       towerConfigured
       user={user}
       sessionPending={isPending}
-      onSignIn={signIn}
+      // "Sign in to Tower" reveals the login gate (email/password). The Webflow session is attempted
+      // silently on load — it is never a button the user has to click.
+      onSignIn={clearBeaconGuestChosen}
       onSignOut={clearStoredSession}
     />
   );

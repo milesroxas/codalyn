@@ -212,3 +212,46 @@ export function decideDesignerResolveFailure(
       return { response: { error: "id_token_resolve_failed", status: 401 } };
   }
 }
+
+export type DesignerResolveAcrossCandidatesResult = {
+  /** Stored org tokens Webflow rejected as revoked — the caller must delete these (no refresh exists). */
+  orgIdsToPrune: string[];
+} & (
+  | { ok: true; user: WebflowResolvedDesignerUser }
+  | { ok: false; response: { error: string; status: number; hint?: string } }
+);
+
+/**
+ * Resolve a Designer ID token against each bearer candidate in turn, returning on the first success.
+ *
+ * A Webflow ID token resolves only against the Data Client token of the workspace that owns the site it
+ * was issued on; every other token 400s. So a user with multiple connected workspaces — or one on a
+ * not-yet-linked site whose workspace is connected via a different site — needs every candidate tried,
+ * not just the first. Only the last failure is surfaced; revoked stored tokens are collected for pruning.
+ *
+ * `resolve` is injectable for tests. Reusing one ID token across candidates is safe: Webflow rejects a
+ * wrong-workspace token before consuming the token, so a later correct candidate still resolves.
+ */
+export async function resolveDesignerIdTokenAcrossCandidates(
+  idToken: string,
+  candidates: WebflowResolveBearerCandidate[],
+  resolve: (idToken: string, bearer: string) => Promise<WebflowDesignerResolveResult> = resolveWebflowDesignerIdToken
+): Promise<DesignerResolveAcrossCandidatesResult> {
+  const orgIdsToPrune: string[] = [];
+  let lastFailure: { error: string; status: number; hint?: string } | null = null;
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const candidate = candidates[i];
+    const resolved = await resolve(idToken, candidate.token);
+    if (resolved.ok) {
+      return { ok: true, user: resolved.user, orgIdsToPrune };
+    }
+    const action = decideDesignerResolveFailure(resolved, candidate, i < candidates.length - 1);
+    if (action.pruneOrganizationId) {
+      orgIdsToPrune.push(action.pruneOrganizationId);
+    }
+    lastFailure = action.response;
+  }
+
+  return { ok: false, response: lastFailure ?? { error: "id_token_resolve_failed", status: 401 }, orgIdsToPrune };
+}

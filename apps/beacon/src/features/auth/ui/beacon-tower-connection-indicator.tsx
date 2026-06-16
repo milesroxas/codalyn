@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { Loader2, RadioTower } from "lucide-react";
+import { clearBeaconGuestChosen } from "@/features/auth/lib/beacon-guest-choice";
 import { openTowerAppHome } from "@/features/auth/model/tower-auth-client";
-import { useBeaconTowerInlineSignIn } from "@/features/auth/model/use-beacon-tower-inline-sign-in";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
@@ -35,8 +35,7 @@ export type BeaconTowerConnectionIndicatorProps = {
 
 export function BeaconTowerConnectionIndicator(props: BeaconTowerConnectionIndicatorProps) {
   const { status } = props;
-  const { signIn, pending: signInPending } = useBeaconTowerInlineSignIn();
-  const connecting = status === "connecting" || signInPending;
+  const connecting = status === "connecting";
 
   const tooltip =
     status === "connected"
@@ -53,7 +52,8 @@ export function BeaconTowerConnectionIndicator(props: BeaconTowerConnectionIndic
       openTowerAppHome();
       return;
     }
-    signIn();
+    // Reveal the login gate (email/password). The Webflow session is attempted silently on load.
+    clearBeaconGuestChosen();
   };
 
   return (

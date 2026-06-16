@@ -55,6 +55,15 @@ async function mintTowerHandoffToken(): Promise<string | null> {
 /** Sized popup window (not a full browser tab) for the focused Tower connect flow. */
 const TOWER_POPUP_WINDOW_FEATURES = "popup=yes,width=520,height=760,scrollbars=yes,resizable=yes";
 
+/** Opens a Tower web page in a new tab (not a popup) — used for account creation, which isn't relink. */
+export function openTowerAppTab(path: string): void {
+  const url = buildTowerAppUrl(path);
+  if (!url) {
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 /** The connection path for the Flint app, scoped to the site currently open in the Designer when known. */
 async function resolveFlintConnectionPath(): Promise<string> {
   let siteId = "";

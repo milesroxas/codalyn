@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   decideDesignerResolveFailure,
+  resolveDesignerIdTokenAcrossCandidates,
   resolveWebflowDesignerIdToken,
+  type WebflowDesignerResolveResult,
   type WebflowResolveBearerCandidate,
 } from "@/server/webflow-resolve-designer-id-token";
 
@@ -122,5 +124,62 @@ describe("decideDesignerResolveFailure", () => {
     const action = decideDesignerResolveFailure(fail("id_token_rejected", 400), ORG_CANDIDATE, true);
     expect(action.pruneOrganizationId).toBeUndefined();
     expect(action.response).toEqual({ error: "id_token_resolve_failed", status: 401 });
+  });
+});
+
+describe("resolveDesignerIdTokenAcrossCandidates", () => {
+  const user = { id: "u_1", email: "a@b.com", firstName: null, lastName: null, siteId: "s_1" };
+  const ok = (): WebflowDesignerResolveResult => ({ ok: true, user });
+  const rejected = (): WebflowDesignerResolveResult => ({
+    ok: false,
+    reason: "id_token_rejected",
+    status: 400,
+    detail: "",
+  });
+  const revoked = (): WebflowDesignerResolveResult => ({
+    ok: false,
+    reason: "bearer_invalid",
+    status: 401,
+    detail: "",
+  });
+
+  it("returns the first candidate that resolves without trying the rest", async () => {
+    const resolve = vi.fn(async () => ok());
+    const result = await resolveDesignerIdTokenAcrossCandidates("idtok", [ORG_CANDIDATE, ENV_CANDIDATE], resolve);
+    expect(result).toEqual({ ok: true, user, orgIdsToPrune: [] });
+    expect(resolve).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls through a wrong-workspace token to a later candidate that resolves (multi-workspace / unlinked site)", async () => {
+    const wrongOrg: WebflowResolveBearerCandidate = { token: "wrong", organizationId: "org_wrong" };
+    const rightOrg: WebflowResolveBearerCandidate = { token: "right", organizationId: "org_right" };
+    const resolve = vi
+      .fn<typeof resolveWebflowDesignerIdToken>()
+      .mockResolvedValueOnce(rejected())
+      .mockResolvedValueOnce(ok());
+    const result = await resolveDesignerIdTokenAcrossCandidates("idtok", [wrongOrg, rightOrg], resolve);
+    expect(result).toEqual({ ok: true, user, orgIdsToPrune: [] });
+    expect(resolve).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces the last failure when every candidate rejects the idToken", async () => {
+    const resolve = vi.fn(async () => rejected());
+    const result = await resolveDesignerIdTokenAcrossCandidates("idtok", [ORG_CANDIDATE, ENV_CANDIDATE], resolve);
+    expect(result).toEqual({
+      ok: false,
+      response: { error: "id_token_resolve_failed", status: 401 },
+      orgIdsToPrune: [],
+    });
+  });
+
+  it("collects revoked stored tokens to prune while continuing to a working candidate", async () => {
+    const revokedOrg: WebflowResolveBearerCandidate = { token: "dead", organizationId: "org_dead" };
+    const resolve = vi
+      .fn<typeof resolveWebflowDesignerIdToken>()
+      .mockResolvedValueOnce(revoked())
+      .mockResolvedValueOnce(ok());
+    const result = await resolveDesignerIdTokenAcrossCandidates("idtok", [revokedOrg, ORG_CANDIDATE], resolve);
+    expect(result).toMatchObject({ ok: true, user });
+    expect(result.orgIdsToPrune).toEqual(["org_dead"]);
   });
 });

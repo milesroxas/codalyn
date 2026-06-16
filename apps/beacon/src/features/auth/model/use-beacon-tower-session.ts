@@ -11,6 +11,7 @@ import {
   invalidateBeaconTowerSignOut,
   isBeaconTowerSignOutCurrent,
 } from "@/features/auth/lib/beacon-tower-sign-out-coordination";
+import { signInToTowerWithEmail, type TowerEmailSignInResult } from "@/features/auth/lib/tower-email-sign-in";
 import {
   clearBeaconTowerSessionToken,
   exchangeWebflowDesignerSession,
@@ -25,6 +26,12 @@ import { getTowerAuthBaseUrl, towerAuthClient } from "@/features/auth/model/towe
 let designerExchangeInFlight = false;
 /** Permanent auth failures stop silent auto-retry until an explicit sign-in clears this flag. */
 let designerExchangeBlockedAfterFailure = false;
+/**
+ * True while an inline email/password sign-in is writing its token and refetching. Guards the stale-token
+ * reaper (token is written before the session resolves) WITHOUT flipping `isPending` — the login form must
+ * stay mounted so its inline error/spinner are not lost mid-submit.
+ */
+let emailSignInInFlight = false;
 
 const DESIGNER_EXCHANGE_RETRY_DELAYS_MS = [0, 400, 1200] as const;
 
@@ -133,7 +140,7 @@ export function useBeaconTowerSession(): {
   isPending: boolean;
   refetch: () => Promise<void>;
   clearStoredSession: () => void;
-  signInWithDesignerSession: () => Promise<{ ok: true } | { ok: false; error: string }>;
+  signInWithEmail: (email: string, password: string) => Promise<TowerEmailSignInResult>;
 } {
   const { data: session, isPending: authSessionPending, refetch } = towerAuthClient.useSession();
   const hasStoredSessionToken = Boolean(readBeaconTowerSessionToken());
@@ -162,25 +169,26 @@ export function useBeaconTowerSession(): {
 
   const towerOrigin = getTowerAuthBaseUrl();
 
-  const signInWithDesignerSession = useCallback(async (): Promise<{ ok: true } | { ok: false; error: string }> => {
-    invalidateBeaconTowerSignOut();
-    setSuppressDesignerSessionExchange(false);
-    designerExchangeBlockedAfterFailure = false;
-    setBeaconTowerDesignerExchangePhase("running");
-    const result = await runSilentDesignerExchangeWithRetries();
-    if (result.ok) {
-      // Populate the session before leaving the "running" phase so the stale-token reaper never
-      // observes a freshly minted token without its user and clears it (logging the user back out).
-      await refetch();
-    } else {
-      // The ladder already retried transient failures internally; once it ultimately fails, stop silent
-      // auto-retry for the session so the UI settles into the guest gate instead of re-storming Tower.
-      // This explicit sign-in resets the flag at its start, so the button always gives a fresh attempt.
-      designerExchangeBlockedAfterFailure = true;
-    }
-    setBeaconTowerDesignerExchangePhase("settled");
-    return result;
-  }, [refetch]);
+  const signInWithEmail = useCallback(
+    async (email: string, password: string): Promise<TowerEmailSignInResult> => {
+      invalidateBeaconTowerSignOut();
+      setSuppressDesignerSessionExchange(false);
+      designerExchangeBlockedAfterFailure = false;
+      // Guard the reaper across the token write + refetch, but DON'T touch the exchange phase: that feeds
+      // `isPending`, which would hide the login gate and unmount this form before its error could show.
+      emailSignInInFlight = true;
+      try {
+        const result = await signInToTowerWithEmail(email, password);
+        if (result.ok) {
+          await refetch();
+        }
+        return result;
+      } finally {
+        emailSignInInFlight = false;
+      }
+    },
+    [refetch]
+  );
 
   useEffect(() => {
     if (!towerOrigin) {
@@ -265,10 +273,16 @@ export function useBeaconTowerSession(): {
   const user = toBridgedTowerUser(session);
 
   useEffect(() => {
-    // Only reap a stored token once an exchange has settled: while it is "running" a fresh token is
-    // written before the session refetch completes, so "token present, no user yet" is expected and
-    // must not be treated as stale (doing so would clobber a successful sign-in).
-    if (authSessionPending || designerExchangePhase === "running" || !hasStoredSessionToken || user) {
+    // Only reap a stored token once an exchange has settled: while it is "running" (designer exchange) or
+    // an email sign-in is in flight, a fresh token is written before the session refetch completes, so
+    // "token present, no user yet" is expected and must not be treated as stale (it would clobber sign-in).
+    if (
+      authSessionPending ||
+      designerExchangePhase === "running" ||
+      emailSignInInFlight ||
+      !hasStoredSessionToken ||
+      user
+    ) {
       return;
     }
     clearBeaconTowerSessionToken();
@@ -286,6 +300,6 @@ export function useBeaconTowerSession(): {
     isPending,
     refetch,
     clearStoredSession,
-    signInWithDesignerSession,
+    signInWithEmail,
   };
 }

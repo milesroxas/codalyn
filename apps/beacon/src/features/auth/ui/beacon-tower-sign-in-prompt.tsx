@@ -1,7 +1,5 @@
 import { type LucideIcon, Sparkles } from "lucide-react";
-import { openTowerAppPath } from "@/features/auth/model/tower-auth-client";
-import { BeaconTowerSignInButton } from "@/features/auth/ui/beacon-tower-sign-in-button";
-import { Button } from "@/shared/ui/button";
+import { BeaconTowerSignInForm } from "@/features/auth/ui/beacon-tower-sign-in-form";
 
 export type BeaconTowerSignInPromptProps = {
   title: string;
@@ -9,7 +7,11 @@ export type BeaconTowerSignInPromptProps = {
   icon?: LucideIcon;
 };
 
-/** Sign-in / early-access CTAs for Tower — signs in inline via the Webflow ID-token exchange (no popup). */
+/**
+ * Tower sign-in surface: an inline email + password form (no popup). The Webflow Designer session is
+ * attempted silently on load — it is never a button the user clicks — so signing in to Tower is the
+ * single, deterministic action here. Connecting Webflow happens after sign-in, as a separate step.
+ */
 export function BeaconTowerSignInPrompt(props: BeaconTowerSignInPromptProps) {
   const { title, description, icon: Icon = Sparkles } = props;
   return (
@@ -21,12 +23,7 @@ export function BeaconTowerSignInPrompt(props: BeaconTowerSignInPromptProps) {
         </h2>
         <p className="text-muted-foreground text-xs leading-snug">{description}</p>
       </div>
-      <div className="flex flex-col gap-2">
-        <BeaconTowerSignInButton />
-        <Button type="button" variant="outline" className="w-full" onClick={() => openTowerAppPath("/request-access")}>
-          Request early access
-        </Button>
-      </div>
+      <BeaconTowerSignInForm />
     </div>
   );
 }

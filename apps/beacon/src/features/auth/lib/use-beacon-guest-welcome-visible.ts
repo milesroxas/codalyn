@@ -1,5 +1,9 @@
-import { useState } from "react";
-import { readBeaconGuestChosen, writeBeaconGuestChosen } from "@/features/auth/lib/beacon-guest-choice";
+import { useSyncExternalStore } from "react";
+import {
+  readBeaconGuestChosen,
+  subscribeBeaconGuestChosen,
+  writeBeaconGuestChosen,
+} from "@/features/auth/lib/beacon-guest-choice";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 
 /**
@@ -13,12 +17,11 @@ import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-se
  */
 export function useBeaconGuestWelcomeVisible() {
   const { user: towerUser, isPending: towerSessionPending } = useBeaconTowerSession();
-  const [guestChosen, setGuestChosen] = useState(readBeaconGuestChosen);
+  const guestChosen = useSyncExternalStore(subscribeBeaconGuestChosen, readBeaconGuestChosen, readBeaconGuestChosen);
   const visible = !towerSessionPending && !towerUser && !guestChosen;
 
   const chooseGuest = () => {
     writeBeaconGuestChosen();
-    setGuestChosen(true);
   };
 
   return { visible, chooseGuest, towerSessionPending, towerUser };

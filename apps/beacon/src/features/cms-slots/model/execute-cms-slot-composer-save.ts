@@ -71,6 +71,11 @@ async function trySyncCmsSlotPageRuntime(): Promise<void> {
     await syncCmsSlotPageInlineScript();
   } catch (e) {
     console.warn("[cms-slots] runtime sync after save (non-fatal)", e);
+    const detail = e instanceof Error && e.message ? e.message : "Unknown error.";
+    void webflow.notify({
+      type: "Warning",
+      message: `Layout saved, but the page runtime script could not be synced: ${detail} Use the Sync button to retry, then republish.`,
+    });
   }
 }
 

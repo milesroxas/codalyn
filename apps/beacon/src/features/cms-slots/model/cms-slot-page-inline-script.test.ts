@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { beaconPropDebugStubSource } from "@/features/cms-slots/model/cms-slot-beacon-debug";
 import {
   CMS_SLOT_COND_ATTR,
   CMS_SLOT_CONTENT_ATTR,
@@ -57,6 +58,17 @@ describe("getCmsSlotPageInlineScriptSource", () => {
     expect(s).toContain(`querySelectorAll("[${CMS_SLOT_CONTENT_ATTR}]")`);
     expect(s).toContain(`getAttribute("${CMS_SLOT_CONTENT_ATTR}")`);
     expect(s).toContain(`getAttribute("${CMS_SLOT_COND_ATTR}")`);
+  });
+
+  it("production debug stub parses and no-ops every debug fn the runtime invokes", () => {
+    // Production ships this stub instead of the styled HUD. It must define every debug fn the runtime body calls so
+    // the runtime parses and runs without the panel; a missing one would break the live (production) runtime.
+    const stub = beaconPropDebugStubSource();
+    expect(() => new Function(stub)).not.toThrow();
+    for (const fn of ["bLog", "bDbgBump", "bDbgBindKeys", "bDbgRuntimeInfo"]) {
+      expect(stub).toContain(`function ${fn}(`);
+    }
+    expect(stub).not.toContain("#codalyn-beacon-debug");
   });
 });
 
@@ -168,8 +180,10 @@ describe("cms slot beacon runtime (published DOM)", () => {
     expect(target.children.length).toBe(0);
   });
 
-  it("falls back to cloning Designer rows when list target text is empty or invalid", () => {
-    for (const payloadJson of ["", "not-json", '{"v":2,"i":[0]}']) {
+  it("renders nothing when list target text is empty or invalid (Composer is the only clone source)", () => {
+    // Never fall back to cloning the Designer pool: a missing/garbled payload must fail safe to an empty slot, not
+    // surface wrong rows (the failure mode that masked the stale-runtime bug).
+    for (const payloadJson of ["", "not-json", '{"v":2,"i":[0]}', '{"v":3}', "[]"]) {
       const doc = document;
       const source = doc.createElement("div");
       source.setAttribute("data-target", "beacons");
@@ -185,9 +199,40 @@ describe("cms slot beacon runtime (published DOM)", () => {
       doc.body.append(source, target);
 
       runCmsSlotBeaconRuntime(doc);
-      expect(target.children.length).toBe(1);
+      expect(target.children.length).toBe(0);
       doc.body.innerHTML = "";
     }
+  });
+
+  it("is idempotent: a second runtime pass does not re-clone or stomp an already-rendered target", () => {
+    const doc = document;
+    const source = doc.createElement("div");
+    source.setAttribute("data-target", "beacons");
+    source.setAttribute("data-list", LIST);
+    const poolRow = doc.createElement("div");
+    poolRow.className = "split-content";
+    const title = doc.createElement("h2");
+    title.setAttribute(CMS_SLOT_CONTENT_ATTR, "title");
+    poolRow.appendChild(title);
+    source.appendChild(poolRow);
+
+    const target = doc.createElement("div");
+    target.setAttribute("data-beacon-target", "list");
+    target.setAttribute("data-list", LIST);
+    target.textContent = JSON.stringify({ v: 3, i: [0, 0], p: [{ title: "a" }, { title: "b" }] });
+    doc.body.append(source, target);
+
+    runCmsSlotBeaconRuntime(doc); // first runtime renders
+    runCmsSlotBeaconRuntime(doc); // a stray second runtime must be a no-op
+
+    expect(target.getAttribute("data-cb-rendered")).toBe("1");
+    expect(target.children.length).toBe(2);
+    expect(
+      Array.from(target.children).map(
+        (row) => row.querySelector<HTMLHeadingElement>(`[${CMS_SLOT_CONTENT_ATTR}='title']`)?.textContent
+      )
+    ).toEqual(["a", "b"]);
+    doc.body.innerHTML = "";
   });
 
   it("clones each component type from distinct hidden-list DOM children", () => {
@@ -223,6 +268,93 @@ describe("cms slot beacon runtime (published DOM)", () => {
     expect(target.children.length).toBe(2);
     expect(target.children[0]?.className).toBe("type-a");
     expect(target.children[1]?.className).toBe("type-b");
+  });
+
+  it("clones one pool child N times in Composer order with distinct per-row content (not limited to pool size)", () => {
+    const doc = document;
+    const source = doc.createElement("div");
+    source.setAttribute("data-target", "beacons");
+    source.setAttribute("data-list", LIST);
+
+    // Designer pool holds a SINGLE "Split Content" source child. Its name is editor-only; cloning keys off index.
+    const poolRow = doc.createElement("div");
+    poolRow.className = "split-content";
+    const title = doc.createElement("h2");
+    title.setAttribute(CMS_SLOT_CONTENT_ATTR, "title");
+    title.textContent = "Designer placeholder";
+    poolRow.appendChild(title);
+    source.appendChild(poolRow);
+
+    const target = doc.createElement("div");
+    target.setAttribute("data-beacon-target", "list");
+    target.setAttribute("data-list", LIST);
+    // Composer used the one component three times, in order, each with its own content.
+    target.textContent = JSON.stringify({
+      v: 3,
+      i: [0, 0, 0],
+      p: [{ title: "test 1" }, { title: "split 2" }, { title: "third" }],
+    });
+    doc.body.append(source, target);
+
+    runCmsSlotBeaconRuntime(doc);
+
+    // Three clones from a one-child pool: count tracks Composer layout, not pool size.
+    expect(target.children.length).toBe(3);
+    const titles = Array.from(target.children).map(
+      (row) => row.querySelector<HTMLHeadingElement>(`[${CMS_SLOT_CONTENT_ATTR}='title']`)?.textContent
+    );
+    expect(titles).toEqual(["test 1", "split 2", "third"]);
+    // Each cloned row is an independent node (deep clone), and the source pool is untouched.
+    expect(target.children[0]).not.toBe(target.children[1]);
+    expect(source.children.length).toBe(1);
+    expect(source.querySelector("h2")?.textContent).toBe("Designer placeholder");
+    doc.body.innerHTML = "";
+  });
+
+  it("clones repeated + reordered mixed types with the right per-row content", () => {
+    const doc = document;
+    const source = doc.createElement("div");
+    source.setAttribute("data-target", "beacons");
+    source.setAttribute("data-list", LIST);
+
+    const split = doc.createElement("div");
+    split.className = "split-content";
+    const splitTitle = doc.createElement("h2");
+    splitTitle.setAttribute(CMS_SLOT_CONTENT_ATTR, "title");
+    split.appendChild(splitTitle);
+
+    const banner = doc.createElement("div");
+    banner.className = "banner";
+    const bannerTitle = doc.createElement("h2");
+    bannerTitle.setAttribute(CMS_SLOT_CONTENT_ATTR, "title");
+    banner.appendChild(bannerTitle);
+
+    source.append(split, banner); // pool: split=child 0, banner=child 1
+
+    const target = doc.createElement("div");
+    target.setAttribute("data-beacon-target", "list");
+    target.setAttribute("data-list", LIST);
+    // Composer order: banner, split, split — banner cloned from child 1, split twice from child 0.
+    target.textContent = JSON.stringify({
+      v: 3,
+      i: [1, 0, 0],
+      p: [{ title: "banner copy" }, { title: "split A" }, { title: "split B" }],
+    });
+    doc.body.append(source, target);
+
+    runCmsSlotBeaconRuntime(doc);
+
+    expect(target.children.length).toBe(3);
+    expect(Array.from(target.children).map((row) => row.className)).toEqual([
+      "banner",
+      "split-content",
+      "split-content",
+    ]);
+    const titles = Array.from(target.children).map(
+      (row) => row.querySelector<HTMLHeadingElement>(`[${CMS_SLOT_CONTENT_ATTR}='title']`)?.textContent
+    );
+    expect(titles).toEqual(["banner copy", "split A", "split B"]);
+    doc.body.innerHTML = "";
   });
 
   it("deep-clones nested component markup and applies per-row props inside nested nodes", () => {

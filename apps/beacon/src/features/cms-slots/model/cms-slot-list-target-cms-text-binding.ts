@@ -37,6 +37,17 @@ function cmsSlotListCmsPlainTextFieldDisplayName(dataList: string): string {
 }
 
 /**
+ * Pre-rename Webflow Plain Text field display name. Still matched when resolving an *existing* field so slots whose
+ * field was created before the rename (and whose list block never persisted `data-beacon-cms-field-id`) keep binding
+ * to the field that actually holds their runtime JSON instead of orphaning it and creating an empty duplicate. New
+ * fields are always created under the current name; on first re-bind the field id is persisted, so this name match is
+ * only a one-time recovery path.
+ */
+function legacyCmsSlotListCmsPlainTextFieldDisplayName(dataList: string): string {
+  return `Beacon list target text · ${dataList}`;
+}
+
+/**
  * On a CMS collection template page returns that collection’s id; otherwise `null`. The Designer only resolves CMS
  * bindable sources for the collection whose template the user is currently editing — `null` here means no CMS bind
  * is possible right now.
@@ -103,7 +114,10 @@ function parseCollectionFields(data: unknown): ParsedField[] {
 }
 
 function findBeaconListTargetField(fields: readonly ParsedField[], dataList: string): ParsedField | null {
-  const wantNames = [cmsSlotListCmsPlainTextFieldDisplayName(dataList)];
+  const wantNames = [
+    cmsSlotListCmsPlainTextFieldDisplayName(dataList),
+    legacyCmsSlotListCmsPlainTextFieldDisplayName(dataList),
+  ];
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").replace(/[·•]/g, "·");
   const wantNorms = new Set(wantNames.map(norm));
   for (const f of fields) {

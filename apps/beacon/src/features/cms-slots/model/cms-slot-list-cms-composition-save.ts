@@ -1,4 +1,7 @@
-import { serializeCmsSlotListRuntimePayload } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
+import {
+  parseCmsSlotListRuntimePayload,
+  serializeCmsSlotListRuntimePayload,
+} from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import {
   getCmsSlotListTargetCmsCollectionIdFromListContainer,
   getCmsSlotListTargetCmsFieldIdFromListContainer,
@@ -11,6 +14,19 @@ import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+/**
+ * Publish-boundary guard. The footer runtime clones strictly from the Composer-saved payload and never falls back to
+ * the Designer pool, so a malformed string would publish an empty slot instead of failing loudly. Reject before any
+ * write so invalid JSON can never reach the CMS field or the list-target Text prop. {@link serializeCmsSlotListRuntimePayload}
+ * always emits valid v3, so this only trips if a future change breaks serialization — a fail-fast contract, not a
+ * runtime fallback.
+ */
+function assertValidRuntimePayloadJson(text: string): void {
+  if (parseCmsSlotListRuntimePayload(text) == null) {
+    throw new Error("Refusing to publish CMS slot layout: the serialized runtime payload is not valid v3 JSON.");
+  }
 }
 
 async function readTowerErrorDetail(res: Response): Promise<string> {
@@ -236,6 +252,7 @@ export async function saveCmsSlotListRuntimePayloadToCmsItem(options: {
     options.propValueRows,
     options.slotLabels
   );
+  assertValidRuntimePayloadJson(text);
   const id = options.cmsItemId.trim();
   const cid = options.collectionId;
   await patchBeaconListCmsTextFieldData({ collectionId: cid, cmsItemId: id, fieldSlug, text, kind: "staged" });
@@ -253,6 +270,7 @@ export async function setCmsSlotListTargetInstancesStaticRuntimeText(options: {
   preferredDefinitionId: string | null;
   text: string;
 }): Promise<void> {
+  assertValidRuntimePayloadJson(options.text);
   const def = await getCmsSlotListTargetComponentOrNull(
     options.dataList,
     options.listContainer,

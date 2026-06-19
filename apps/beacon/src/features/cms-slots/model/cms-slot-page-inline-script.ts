@@ -1,5 +1,8 @@
 import SparkMD5 from "spark-md5";
-import { beaconPropDebugRuntimeSource } from "@/features/cms-slots/model/cms-slot-beacon-debug";
+import {
+  beaconPropDebugRuntimeSource,
+  beaconPropDebugStubSource,
+} from "@/features/cms-slots/model/cms-slot-beacon-debug";
 import {
   beaconPropApplyValueRuntimeSource,
   beaconPropEmptyRuntimeSource,
@@ -43,10 +46,18 @@ const LOG_PREFIX = "[codalyn-beacon-runtime-cleanup]";
  * Minified IIFE for the Beacon runtime source uploaded as a Webflow Asset.
  */
 export function getCmsSlotPageInlineScriptSource(): string {
+  // Stable build identifier embedded in the runtime so the debug HUD can report which synced build is live.
+  // Must stay deterministic (no timestamps) — the source hash is what drift detection compares against.
+  const buildVersion = String(__APP_VERSION__ ?? "0.0.1");
+  // The styled debug HUD ships only on dev/preview channels; production gets no-op stubs so it never reaches live
+  // traffic. The source still embeds the channel + version so a synced runtime is self-identifying via its hash.
+  const debugSource =
+    String(__BUILD_CHANNEL__) === "production" ? beaconPropDebugStubSource() : beaconPropDebugRuntimeSource();
   return `(function(){
+var __bRtSrc=(typeof document!=="undefined"&&document.currentScript&&document.currentScript.src)||"";
 function listKey(el){var t=String(el.getAttribute("data-list")||"").toLowerCase();return t&&t.indexOf("beacon-")===0?t:null}
 function isSource(el){return String(el.getAttribute("data-target")||"").toLowerCase()==="beacons"&&String(el.getAttribute("data-beacon-target")||"").toLowerCase()!=="list"&&listKey(el)!=null}
-${beaconPropDebugRuntimeSource()}
+${debugSource}
 ${beaconPropApplyValueRuntimeSource()}
 function bBeaconNormHeadingTag(v){v=String(v==null?"":v).trim().toLowerCase();var m=v.match(/^h([1-6])$/);if(m)return"H"+m[1];if(/^[1-6]$/.test(v))return"H"+v;return""}
 function bBeaconResolveHeadingTagEl(el,v){var want=bBeaconNormHeadingTag(v);if(!want)return el;var cur=String(el.tagName||"").toUpperCase();var head=/^H[1-6]$/.test(cur),wrap=cur==="DIV"||cur==="SPAN";if(!head&&!wrap)return el;if(head&&cur===want)return el;var doc=el.ownerDocument,nw=doc.createElement(want),a,i;while(el.firstChild)nw.appendChild(el.firstChild);for(i=el.attributes.length-1;i>=0;i--){a=el.attributes[i];nw.setAttribute(a.name,a.value)}if(el.parentNode){el.parentNode.replaceChild(nw,el);return nw}return el}
@@ -65,6 +76,7 @@ bLog("runtime start",{sourceEls:sources.length,sourceLists:srcKeys,targetEls:tar
 for(var t=0;t<targets.length;t++){
 var target=targets[t],targetKey=listKey(target);
 if(!targetKey||String(target.getAttribute("data-beacon-target")||"").toLowerCase()!=="list"){bLog("skip target: not a list target",{key:targetKey,role:String(target.getAttribute("data-beacon-target")||"")});continue}
+if(target.getAttribute("data-cb-rendered")==="1"){bLog("skip target: already rendered",{key:targetKey});continue}
 var sourceNode=sourcesByList[targetKey];
 if(!sourceNode){for(i=0;i<sources.length;i++){source=sources[i];if(isSource(source)&&listKey(source)===targetKey){sourceNode=source;break}}}
 if(!sourceNode){bLog("skip target: no source list found",{key:targetKey,available:srcKeys});continue}
@@ -75,12 +87,14 @@ target.textContent="";
 var payload=null,ok=false,indices=null,v=0;
 try{payload=JSON.parse(raw);var vv=+payload.v;ok=!!(payload&&vv===3&&Array.isArray(payload.i));if(ok){indices=payload.i;v=vv}}catch(e){ok=false}
 var children=sourceNode.children,cloned=0;
-if(ok){for(var u=0;u<indices.length;u++){var idx=+indices[u];if(idx===idx&&idx>=0&&idx%1===0&&idx<children.length){target.appendChild(children[idx].cloneNode(true));cloned++}}}else{for(var u=0;u<children.length;u++){target.appendChild(children[u].cloneNode(true));cloned++}}
+if(ok){for(var u=0;u<indices.length;u++){var idx=+indices[u];if(idx===idx&&idx>=0&&idx%1===0&&idx<children.length){target.appendChild(children[idx].cloneNode(true));cloned++}}}
+target.setAttribute("data-cb-rendered","1");
 bDbgBump("cloned",cloned);bLog("clone list",{list:targetKey,cloned:cloned,parsed:ok,sourceChildren:children.length,indices:ok&&indices?indices.length:null,rawLen:raw.length});
 if(ok&&payload&&Array.isArray(payload.p))reapply(target,payload,bListTargetReveal);
 else{bListTargetReveal(target)}}
 }
 bDbgBindKeys();
+bDbgRuntimeInfo(${JSON.stringify(buildVersion)},__bRtSrc);
 if(document.readyState==="loading")addEventListener("DOMContentLoaded",run);else run();
 })();`;
 }
@@ -257,7 +271,7 @@ async function registerHostedAssetScript(
   sourceCode: string,
   version: string,
   options: { fileName: string; displayName: string }
-): Promise<{ id: string; version: string }> {
+): Promise<{ id: string; version: string; hostedLocation: string }> {
   const asset = await createRuntimeAsset(siteId, options.fileName, sourceCode);
   const uploadUrl = typeof asset.uploadUrl === "string" ? asset.uploadUrl : "";
   const uploadDetails = asset.uploadDetails;
@@ -269,14 +283,21 @@ async function registerHostedAssetScript(
   if (typeof hostedLocation !== "string" || hostedLocation.length === 0) {
     throw new Error("Create runtime asset: missing hosted URL.");
   }
-  return registerHostedScript(siteId, hostedLocation, await sourceSRIHash(sourceCode), version, options.displayName);
+  const registered = await registerHostedScript(
+    siteId,
+    hostedLocation,
+    await sourceSRIHash(sourceCode),
+    version,
+    options.displayName
+  );
+  return { ...registered, hostedLocation };
 }
 
 async function registerHostedRuntimeScript(
   siteId: string,
   sourceCode: string,
   version: string
-): Promise<{ id: string; version: string }> {
+): Promise<{ id: string; version: string; hostedLocation: string }> {
   const runtimeHash = hashCmsSlotRuntimeSource(sourceCode);
   return registerHostedAssetScript(siteId, sourceCode, version, {
     fileName: `codalyn-beacon-runtime-${runtimeHash}.js`,
@@ -332,6 +353,19 @@ function withoutCmsSlotMarkedScripts(scripts: PageCustomScript[]): PageCustomScr
   return scripts.filter(
     (s) => scriptAttrCI(s.attributes, CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR) !== CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE
   );
+}
+
+/**
+ * Removes every beacon runtime script from a page's custom code — both ones carrying the current marker attribute
+ * **and** any whose id is a registered `CodalynBeaconRuntime` script. The id cross-reference catches stale runtimes
+ * applied before the marker scheme (or under an older marker), which otherwise survive every sync and run alongside
+ * the new runtime, stomping each other's DOM mutations on the published page.
+ */
+function withoutAnyBeaconRuntimeScripts(
+  scripts: PageCustomScript[],
+  registeredBeaconScriptIds: ReadonlySet<string>
+): PageCustomScript[] {
+  return withoutCmsSlotMarkedScripts(scripts).filter((s) => !registeredBeaconScriptIds.has(s.id));
 }
 
 type PaginatedList = { limit: number; offset: number; total: number };
@@ -485,7 +519,26 @@ async function listRegisteredBeaconRuntimeScripts(siteId: string): Promise<Regis
       pagination: body.pagination as PaginatedList | undefined,
     })
   );
-  return scripts.filter((script) => script.displayName === REGISTER_DISPLAY_NAME);
+  return scripts.filter(
+    (script) =>
+      script.displayName === REGISTER_DISPLAY_NAME ||
+      (typeof script.hostedLocation === "string" && script.hostedLocation.includes(CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX))
+  );
+}
+
+/**
+ * Ids of every registered beacon runtime script, used to strip stale runtimes off page custom code. Best-effort: a
+ * failed registry read returns an empty set so it can never block a sync or uninstall — marker-attribute removal still
+ * covers the freshly-applied script.
+ */
+async function registeredBeaconRuntimeScriptIdSet(siteId: string): Promise<Set<string>> {
+  try {
+    const scripts = await listRegisteredBeaconRuntimeScripts(siteId);
+    return new Set(scripts.map((s) => s.id));
+  } catch (e) {
+    console.warn(LOG_PREFIX, "list registered beacon scripts failed (non-fatal)", e);
+    return new Set<string>();
+  }
 }
 
 function collectScriptIds(scripts: PageCustomScript[] | undefined, out: Set<string>): void {
@@ -546,8 +599,15 @@ async function deleteSiteAsset(assetId: string): Promise<boolean> {
 /**
  * Best-effort delete of beacon runtime JS assets that are no longer referenced by site or page custom code.
  * Also clears stale assets left behind by prior syncs on the same page.
+ *
+ * `protectedHostedUrls` guards assets we *know* are live even when the Webflow custom-code API has not yet reflected
+ * a just-applied script (read-after-write lag). Without this, a purge fired right after a sync deletes the runtime
+ * asset the page footer was pointed at, breaking the live runtime.
  */
-async function purgeUnreferencedBeaconRuntimeAssets(siteId: string): Promise<void> {
+async function purgeUnreferencedBeaconRuntimeAssets(
+  siteId: string,
+  protectedHostedUrls: Iterable<string> = []
+): Promise<void> {
   try {
     const [appliedScriptIds, registeredScripts, assets] = await Promise.all([
       collectAppliedCustomCodeScriptIds(siteId),
@@ -555,6 +615,11 @@ async function purgeUnreferencedBeaconRuntimeAssets(siteId: string): Promise<voi
       listBeaconRuntimeAssets(siteId),
     ]);
     const appliedHostedUrls = collectAppliedHostedUrls(appliedScriptIds, registeredScripts);
+    for (const url of protectedHostedUrls) {
+      if (typeof url === "string" && url.length > 0) {
+        appliedHostedUrls.add(normalizeHostedAssetUrl(url));
+      }
+    }
     const assetIds = selectBeaconRuntimeAssetIdsToPurge({ assets, appliedHostedUrls });
     for (const assetId of assetIds) {
       const ok = await deleteSiteAsset(assetId);
@@ -577,7 +642,13 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
     throw new Error("Tower is not configured (VITE_TOWER_ORIGIN). Cannot sync page custom code.");
   }
 
-  await ensureCmsSlotListTargetLayoutStyle();
+  // Best-effort: the Designer chrome/layout style is cosmetic. A Designer style failure must never abort the runtime
+  // write (asset → register → page custom code), or the page ships with no runtime at all.
+  try {
+    await ensureCmsSlotListTargetLayoutStyle();
+  } catch (e) {
+    console.warn(LOG_PREFIX, "ensure list-target layout style (non-fatal)", e);
+  }
 
   const sourceCode = getCmsSlotPageInlineScriptSource();
 
@@ -585,9 +656,12 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
   const pageId = (await webflow.getCurrentPage()).id as string;
 
   const registered = await registerHostedRuntimeScript(siteId, sourceCode, inlineScriptVersion());
-  const existing = await getPageCustomScripts(pageId);
+  const [existing, registeredBeaconScriptIds] = await Promise.all([
+    getPageCustomScripts(pageId),
+    registeredBeaconRuntimeScriptIdSet(siteId),
+  ]);
   const merged: PageCustomScript[] = [
-    ...withoutCmsSlotMarkedScripts(existing),
+    ...withoutAnyBeaconRuntimeScripts(existing, registeredBeaconScriptIds),
     {
       id: registered.id,
       location: "footer",
@@ -600,7 +674,7 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
   ];
 
   await putPageCustomScripts(pageId, merged);
-  await purgeUnreferencedBeaconRuntimeAssets(siteId);
+  await purgeUnreferencedBeaconRuntimeAssets(siteId, [registered.hostedLocation]);
 }
 
 export type CmsSlotPageRuntimeRemovalResult =
@@ -622,8 +696,11 @@ export async function removeCmsSlotPageRuntimeFromPage(): Promise<CmsSlotPageRun
   try {
     const siteId = (await webflow.getSiteInfo()).siteId;
     const pageId = (await webflow.getCurrentPage()).id as string;
-    const existing = await getPageCustomScripts(pageId);
-    const next = withoutCmsSlotMarkedScripts(existing);
+    const [existing, registeredBeaconScriptIds] = await Promise.all([
+      getPageCustomScripts(pageId),
+      registeredBeaconRuntimeScriptIdSet(siteId),
+    ]);
+    const next = withoutAnyBeaconRuntimeScripts(existing, registeredBeaconScriptIds);
     const status: CmsSlotPageRuntimeRemovalResult["status"] = next.length === existing.length ? "not_found" : "removed";
     if (status === "removed") {
       await putPageCustomScripts(pageId, next);

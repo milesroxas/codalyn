@@ -8,7 +8,10 @@ import {
   imageElementMatchesComponentImageProp,
 } from "@/features/image-editor/lib/find-image-element-for-component-instance-prop";
 import type { ComponentInstanceImageProp } from "@/features/image-editor/lib/search-component-instance-image-props";
-import { readWebflowElementChildren } from "@/features/image-editor/lib/webflow-element-structure-walk";
+import {
+  readWebflowElementChildren,
+  walkWebflowStructureBfs,
+} from "@/features/image-editor/lib/webflow-element-structure-walk";
 import {
   type CmsSlotStringComponentPropOptions,
   cmsSlotStringComponentPropOptions,
@@ -133,6 +136,62 @@ export async function clearExportDimensionDefaultValuesOnDefinition(
   propIds: ExportDimensionPropIds
 ): Promise<void> {
   await applyExportDimensionDefaultValuesOnDefinition(def, propIds, null, null);
+}
+
+async function removeExportDimensionAttributesFromImage(img: ImageElement): Promise<void> {
+  if (img.customAttributes !== true) {
+    return;
+  }
+  await img.removeCustomAttribute(BEACON_EXPORT_WIDTH_ATTR).catch(() => {});
+  await img.removeCustomAttribute(BEACON_EXPORT_HEIGHT_ATTR).catch(() => {});
+}
+
+/**
+ * Unbinds `data-beacon-export-*` custom attributes from every image in the definition subtree.
+ * Walks public children + instance slot content but does not enter nested component definitions —
+ * their props live in their own scope and are handled (or left intact) separately.
+ */
+async function unbindExportDimensionAttributesInDefinitionSubtree(definitionRoot: AnyElement): Promise<void> {
+  await walkWebflowStructureBfs([definitionRoot], async (node) => {
+    if (node.type === WEBFLOW_IMAGE_ELEMENT_TYPE) {
+      await removeExportDimensionAttributesFromImage(node as ImageElement);
+    }
+    return "continue";
+  });
+}
+
+async function removeExportPropsFromComponent(def: Component, propIds: ExportDimensionPropIds): Promise<void> {
+  const removeProp = (def as { removeProp?: (propId: string) => Promise<unknown> }).removeProp;
+  if (typeof removeProp !== "function") {
+    throw new Error("This Webflow Designer version cannot remove component props.");
+  }
+  await removeProp.call(def, propIds.widthPropId);
+  await removeProp.call(def, propIds.heightPropId);
+}
+
+/**
+ * Fully removes the two Beacon export props from `def` and unbinds the `data-beacon-export-*` custom
+ * attributes from images in its subtree. Returns `true` when props were present and removed, `false`
+ * when the definition had no Beacon export props (nothing to clean up). Caller must hold
+ * `canModifyComponents`.
+ *
+ * Counterpart to {@link ensureBeaconExportDimensionPropsOnDefinition}: used when the last preset that
+ * relied on these props is deleted, so no orphaned props or bindings are left behind.
+ */
+export async function removeBeaconExportDimensionPropsOnDefinition(
+  def: Component,
+  definitionRoot: AnyElement | null
+): Promise<boolean> {
+  await assertCanModifyComponents();
+  const propIds = await getBeaconExportDimensionPropIdsOrNull(def);
+  if (propIds == null) {
+    return false;
+  }
+  if (definitionRoot != null) {
+    await unbindExportDimensionAttributesInDefinitionSubtree(definitionRoot);
+  }
+  await removeExportPropsFromComponent(def, propIds);
+  return true;
 }
 
 const IMAGE_FIELD_NOT_FOUND_MESSAGE =

@@ -211,6 +211,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   const onDeletePreset = useCallback(
     async (id: string) => {
       const entry = presetEntriesById.get(id) ?? null;
+      const remaining = Array.from(presetEntriesById.values()).filter((e) => e.row.id !== id);
       const result = await updateSettings((prev) => ({
         imagePresetStorage: removeBeaconPresetRowById(prev.imagePresetStorage, id),
       }));
@@ -222,6 +223,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
       if (entry != null) {
         const cleanup = await cleanupDesignerTagsForPresetEntry({
           entry,
+          remaining,
           pageIdHint: pageId,
           componentInstance: temporaryPresetInstanceRef.current,
         });

@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WEBFLOW_IMAGE_ELEMENT_TYPE } from "@/features/image-editor/lib/apply-cropped-export";
 import {
+  BEACON_EXPORT_HEIGHT_ATTR,
+  BEACON_EXPORT_WIDTH_ATTR,
+} from "@/features/image-editor/lib/beacon-designer-image-export-attrs";
+import {
   BEACON_EXPORT_WIDTH_PROP_NAME,
   ensureBeaconExportDimensionPropsOnDefinition,
+  removeBeaconExportDimensionPropsOnDefinition,
 } from "@/features/image-editor/lib/ensure-beacon-export-dimension-props";
 import type { ComponentInstanceImageProp } from "@/features/image-editor/lib/search-component-instance-image-props";
 
@@ -20,6 +25,7 @@ function imageEl(boundPropId: string | null): ImageElement {
     searchSettings: vi.fn().mockResolvedValue(settings),
     getAllCustomAttributes: vi.fn().mockResolvedValue([]),
     setSettings: vi.fn().mockResolvedValue(undefined),
+    removeCustomAttribute: vi.fn().mockResolvedValue(null),
   } as unknown as ImageElement;
 }
 
@@ -47,6 +53,7 @@ function definitionMock(idPrefix: string, root: AnyElement) {
       return created;
     }),
     setProp: vi.fn().mockResolvedValue(undefined),
+    removeProp: vi.fn().mockResolvedValue(null),
   };
   return def as unknown as Component & typeof def;
 }
@@ -169,5 +176,44 @@ describe("ensureBeaconExportDimensionPropsOnDefinition", () => {
     await expect(
       ensureBeaconExportDimensionPropsOnDefinition(def, instance, "hero-image", root, [heroImageProp])
     ).rejects.toThrow(/Could not find the image field/);
+  });
+});
+
+describe("removeBeaconExportDimensionPropsOnDefinition", () => {
+  beforeEach(() => {
+    vi.stubGlobal("webflow", {
+      appModes: { canModifyComponents: "canModifyComponents" },
+      canForAppMode: vi.fn().mockResolvedValue({ canModifyComponents: true }),
+    });
+  });
+
+  it("removes the export props and unbinds the image custom attributes", async () => {
+    const img = imageEl("hero-image");
+    const root = blockEl("root", [img]);
+    const def = definitionMock("d0", root);
+    const instance = instanceEl();
+
+    // Seed props + bindings as a save would, then tear them down.
+    const ids = await ensureBeaconExportDimensionPropsOnDefinition(def, instance, "hero-image", root, [heroImageProp]);
+
+    const removed = await removeBeaconExportDimensionPropsOnDefinition(def, root);
+
+    expect(removed).toBe(true);
+    expect(img.removeCustomAttribute).toHaveBeenCalledWith(BEACON_EXPORT_WIDTH_ATTR);
+    expect(img.removeCustomAttribute).toHaveBeenCalledWith(BEACON_EXPORT_HEIGHT_ATTR);
+    expect(def.removeProp).toHaveBeenCalledWith(ids.widthPropId);
+    expect(def.removeProp).toHaveBeenCalledWith(ids.heightPropId);
+  });
+
+  it("returns false and touches nothing when the definition has no export props", async () => {
+    const img = imageEl("hero-image");
+    const root = blockEl("root", [img]);
+    const def = definitionMock("d0", root);
+
+    const removed = await removeBeaconExportDimensionPropsOnDefinition(def, root);
+
+    expect(removed).toBe(false);
+    expect(def.removeProp).not.toHaveBeenCalled();
+    expect(img.removeCustomAttribute).not.toHaveBeenCalled();
   });
 });

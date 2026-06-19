@@ -37,7 +37,7 @@ describe("cleanupDesignerTagsForPresetEntry integration", () => {
       },
     };
 
-    await expect(cleanupDesignerTagsForPresetEntry({ entry, pageIdHint: "page_1" })).resolves.toEqual({
+    await expect(cleanupDesignerTagsForPresetEntry({ entry, remaining: [], pageIdHint: "page_1" })).resolves.toEqual({
       ok: true,
       cleaned: true,
     });

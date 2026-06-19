@@ -743,6 +743,44 @@ export function listBeaconPresetStorageEntries(storage: {
   return entries;
 }
 
+/**
+ * Decides whether deleting `deleted` leaves a component definition's shared Beacon export props
+ * unused, so cleanup can fully remove them (props + image bindings) instead of only clearing values.
+ *
+ * Safe/conservative: only component-definition (`component-image`) presets are removable, and only
+ * when no remaining preset could still reference the same definition's export props. The two export
+ * props are shared by name across every preset targeting that component, so any remaining
+ * `component-image`/`component-image-element` preset for the same `componentDefinitionId` blocks
+ * removal. Instance presets key by instance element, not definition, and cannot be mapped to a
+ * definition from storage alone — so the presence of ANY remaining `component-image-instance` preset
+ * also blocks removal, rather than risk breaking a sibling's binding.
+ *
+ * Returns the component definition id whose props are safe to remove, or `null` to keep them.
+ */
+export function resolveRemovableComponentExportProps(input: {
+  deleted: BeaconPresetStorageEntry;
+  remaining: readonly BeaconPresetStorageEntry[];
+}): { componentDefinitionId: string } | null {
+  const { deleted, remaining } = input;
+  if (deleted.row.targetKey.kind !== "component-image") {
+    return null;
+  }
+  const componentDefinitionId = deleted.row.targetKey.componentDefinitionId;
+  for (const entry of remaining) {
+    const key = entry.row.targetKey;
+    if (key.kind === "component-image-instance") {
+      return null;
+    }
+    if (
+      (key.kind === "component-image" || key.kind === "component-image-element") &&
+      key.componentDefinitionId === componentDefinitionId
+    ) {
+      return null;
+    }
+  }
+  return { componentDefinitionId };
+}
+
 export type BeaconPresetSiteCatalogEntry = {
   id: string;
   displayName?: string;

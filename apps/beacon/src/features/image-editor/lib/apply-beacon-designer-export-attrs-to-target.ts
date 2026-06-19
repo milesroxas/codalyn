@@ -7,6 +7,7 @@ import {
   clearExportDimensionDefaultValuesOnDefinition,
   ensureBeaconExportDimensionPropsOnDefinition,
   getBeaconExportDimensionPropIdsOrNull,
+  removeBeaconExportDimensionPropsOnDefinition,
 } from "@/features/image-editor/lib/ensure-beacon-export-dimension-props";
 import { withPageComponentInstanceForDefinitionWork } from "@/features/image-editor/lib/page-component-instance-for-preset-work";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
@@ -93,6 +94,27 @@ export async function clearBeaconDesignerExportAttrsOnComponentDefinition(
           return;
         }
         await clearExportDimensionDefaultValuesOnDefinition(definition, propIds);
+      },
+    });
+  });
+}
+
+/**
+ * Fully removes the Beacon export props and their image attribute bindings from a component
+ * definition (via a page instance). Use when the last preset relying on these props is deleted, so no
+ * orphaned props/bindings remain. No-op when the definition has no Beacon export props.
+ */
+export async function removeBeaconDesignerExportPropsFromComponentDefinition(
+  componentDefinitionId: string,
+  options?: Pick<ComponentDefinitionExportDimensionOptions, "pageIdHint" | "instance">
+): Promise<void> {
+  await runExclusiveDesignerOp(async () => {
+    await withPageComponentInstanceForDefinitionWork({
+      componentDefinitionId,
+      pageIdHint: options?.pageIdHint ?? null,
+      instance: options?.instance ?? null,
+      fn: async ({ definition, definitionRoot }) => {
+        await removeBeaconExportDimensionPropsOnDefinition(definition, definitionRoot);
       },
     });
   });

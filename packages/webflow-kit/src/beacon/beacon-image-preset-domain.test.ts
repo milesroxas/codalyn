@@ -5,6 +5,7 @@ import {
   applySiteDefaultPresetPatch,
   type BeaconPresetRow,
   type BeaconPresetSettingsSnapshot,
+  type BeaconPresetStorageEntry,
   buildBeaconPresetSiteGroups,
   buildPresetTargetKeyForScope,
   coalesceBeaconPresetStorage,
@@ -14,10 +15,12 @@ import {
   findBeaconPresetRowByTargetKey,
   formatBeaconPresetDisplayName,
   formatBeaconPresetInstanceLocationLabel,
+  inferPresetCrudScopeFromTargetKey,
   isInstancePresetTargetKey,
   listBeaconPresetStorageEntries,
   type PresetTargetKey,
   removeBeaconPresetRowById,
+  resolveRemovableComponentExportProps,
   resolveSiteDefaultPresetRow,
   serializePresetTargetKey,
 } from "./beacon-image-preset-domain.js";
@@ -730,5 +733,66 @@ describe("multi-site preset storage helpers", () => {
     expect(groups[1]?.shortName).toBe("marketing-site");
     expect(groups[1]?.siteDefault?.id).toBe("site_1_default");
     expect(groups[1]?.scopedPresets).toHaveLength(1);
+  });
+});
+
+describe("resolveRemovableComponentExportProps", () => {
+  function entryFor(targetKey: PresetTargetKey, id: string): BeaconPresetStorageEntry {
+    const row = makeRow({ id, targetKey });
+    return { row, scope: inferPresetCrudScopeFromTargetKey(row) };
+  }
+
+  const componentKey = (componentDefinitionId: string, imagePropId: string): PresetTargetKey => ({
+    kind: "component-image",
+    siteId: "site_1",
+    componentDefinitionId,
+    imagePropId,
+  });
+
+  it("removes props when the deleted component preset was the last reference to the definition", () => {
+    const deleted = entryFor(componentKey("cmp_1", "hero-image"), "preset_1");
+    expect(resolveRemovableComponentExportProps({ deleted, remaining: [] })).toEqual({
+      componentDefinitionId: "cmp_1",
+    });
+  });
+
+  it("ignores remaining presets for a different component definition", () => {
+    const deleted = entryFor(componentKey("cmp_1", "hero-image"), "preset_1");
+    const other = entryFor(componentKey("cmp_2", "hero-image"), "preset_2");
+    expect(resolveRemovableComponentExportProps({ deleted, remaining: [other] })).toEqual({
+      componentDefinitionId: "cmp_1",
+    });
+  });
+
+  it("keeps props when a sibling component preset shares the definition (any image field)", () => {
+    const deleted = entryFor(componentKey("cmp_1", "hero-image"), "preset_1");
+    const sibling = entryFor(componentKey("cmp_1", "logo-image"), "preset_2");
+    expect(resolveRemovableComponentExportProps({ deleted, remaining: [sibling] })).toBeNull();
+  });
+
+  it("keeps props when any component-instance preset remains (cannot map to a definition offline)", () => {
+    const deleted = entryFor(componentKey("cmp_1", "hero-image"), "preset_1");
+    const instance = entryFor(
+      {
+        kind: "component-image-instance",
+        siteId: "site_1",
+        pageId: "page_9",
+        instanceElementId: "inst_9",
+        imagePropId: "card-image",
+      },
+      "preset_2"
+    );
+    expect(resolveRemovableComponentExportProps({ deleted, remaining: [instance] })).toBeNull();
+  });
+
+  it("returns null for non-component deletions (instance/site-default/bare)", () => {
+    const instance = entryFor(
+      { kind: "bare-image-instance", siteId: "site_1", pageId: "page_1", elementId: "img_1" },
+      "preset_1"
+    );
+    expect(resolveRemovableComponentExportProps({ deleted: instance, remaining: [] })).toBeNull();
+
+    const siteDefault = entryFor({ kind: "site-default", siteId: "site_1" }, "preset_2");
+    expect(resolveRemovableComponentExportProps({ deleted: siteDefault, remaining: [] })).toBeNull();
   });
 });

@@ -6,7 +6,30 @@ import { cleanupDesignerTagsForPresetEntry } from "./image-editor-preset-delete-
 vi.mock("@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target", () => ({
   clearBeaconDesignerExportAttrsOnComponentDefinition: vi.fn().mockResolvedValue(undefined),
   clearBeaconDesignerExportAttrsOnPageTarget: vi.fn().mockResolvedValue(undefined),
+  removeBeaconDesignerExportPropsFromComponentDefinition: vi.fn().mockResolvedValue(undefined),
 }));
+
+function componentPresetEntry(overrides?: {
+  componentDefinitionId?: string;
+  imagePropId?: string;
+}): BeaconPresetStorageEntry {
+  return {
+    scope: "component",
+    row: {
+      id: "preset_1",
+      name: "Hero",
+      width: 1200,
+      height: 800,
+      maxFileSizeBytes: 200_000,
+      targetKey: {
+        kind: "component-image",
+        siteId: "site_1",
+        componentDefinitionId: overrides?.componentDefinitionId ?? "cmp_1",
+        imagePropId: overrides?.imagePropId ?? "hero-image",
+      },
+    },
+  };
+}
 
 vi.mock("@/features/image-editor/lib/locate-preset-target", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./locate-preset-target")>();
@@ -58,7 +81,7 @@ describe("cleanupDesignerTagsForPresetEntry", () => {
       },
     };
 
-    await expect(cleanupDesignerTagsForPresetEntry({ entry, pageIdHint: "page_1" })).resolves.toEqual({
+    await expect(cleanupDesignerTagsForPresetEntry({ entry, remaining: [], pageIdHint: "page_1" })).resolves.toEqual({
       ok: true,
       cleaned: false,
     });
@@ -98,7 +121,7 @@ describe("cleanupDesignerTagsForPresetEntry", () => {
       },
     };
 
-    await expect(cleanupDesignerTagsForPresetEntry({ entry, pageIdHint: "page_2" })).resolves.toEqual({
+    await expect(cleanupDesignerTagsForPresetEntry({ entry, remaining: [], pageIdHint: "page_2" })).resolves.toEqual({
       ok: true,
       cleaned: true,
     });
@@ -109,78 +132,102 @@ describe("cleanupDesignerTagsForPresetEntry", () => {
     });
   });
 
-  it("clears component definition defaults via a page instance", async () => {
-    const { clearBeaconDesignerExportAttrsOnComponentDefinition } = await import(
-      "@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target"
-    );
-    const { withPageComponentInstanceForDefinitionWork } = await import(
-      "@/features/image-editor/lib/page-component-instance-for-preset-work"
-    );
+  it("removes component props when no other preset references the definition", async () => {
+    const {
+      clearBeaconDesignerExportAttrsOnComponentDefinition,
+      removeBeaconDesignerExportPropsFromComponentDefinition,
+    } = await import("@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target");
     const { findImagePageTargetForPresetOnCurrentPage } = await import(
       "@/features/image-editor/lib/locate-preset-target"
     );
 
-    const entry: BeaconPresetStorageEntry = {
-      scope: "component",
-      row: {
-        id: "preset_1",
-        name: "Hero",
-        width: 1200,
-        height: 800,
-        maxFileSizeBytes: 200_000,
-        targetKey: {
-          kind: "component-image",
-          siteId: "site_1",
-          componentDefinitionId: "cmp_1",
-          imagePropId: "hero-image",
-        },
-      },
-    };
+    const entry = componentPresetEntry();
 
-    await expect(cleanupDesignerTagsForPresetEntry({ entry, pageIdHint: "page_1" })).resolves.toEqual({
+    await expect(cleanupDesignerTagsForPresetEntry({ entry, remaining: [], pageIdHint: "page_1" })).resolves.toEqual({
       ok: true,
       cleaned: true,
     });
     expect(findImagePageTargetForPresetOnCurrentPage).not.toHaveBeenCalled();
-    expect(withPageComponentInstanceForDefinitionWork).not.toHaveBeenCalled();
-    expect(clearBeaconDesignerExportAttrsOnComponentDefinition).toHaveBeenCalledWith("cmp_1", {
+    expect(removeBeaconDesignerExportPropsFromComponentDefinition).toHaveBeenCalledWith("cmp_1", {
       pageIdHint: "page_1",
       instance: null,
     });
+    expect(clearBeaconDesignerExportAttrsOnComponentDefinition).not.toHaveBeenCalled();
   });
 
-  it("reuses a placed component instance when clearing component definition defaults", async () => {
-    const { clearBeaconDesignerExportAttrsOnComponentDefinition } = await import(
+  it("reuses a placed component instance when removing component props", async () => {
+    const { removeBeaconDesignerExportPropsFromComponentDefinition } = await import(
       "@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target"
     );
     const instance = { type: "ComponentInstance" } as ComponentElement;
 
-    const entry: BeaconPresetStorageEntry = {
-      scope: "component",
+    const entry = componentPresetEntry();
+
+    await expect(
+      cleanupDesignerTagsForPresetEntry({ entry, remaining: [], pageIdHint: "page_1", componentInstance: instance })
+    ).resolves.toEqual({
+      ok: true,
+      cleaned: true,
+    });
+    expect(removeBeaconDesignerExportPropsFromComponentDefinition).toHaveBeenCalledWith("cmp_1", {
+      pageIdHint: "page_1",
+      instance,
+    });
+  });
+
+  it("clears values (keeps props) when another preset still shares the same component definition", async () => {
+    const {
+      clearBeaconDesignerExportAttrsOnComponentDefinition,
+      removeBeaconDesignerExportPropsFromComponentDefinition,
+    } = await import("@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target");
+
+    const entry = componentPresetEntry();
+    // A sibling component preset for the same definition (different image field) still needs the props.
+    const sibling = componentPresetEntry({ imagePropId: "logo-image" });
+    sibling.row.id = "preset_2";
+
+    await expect(
+      cleanupDesignerTagsForPresetEntry({ entry, remaining: [sibling], pageIdHint: "page_1" })
+    ).resolves.toEqual({ ok: true, cleaned: true });
+    expect(clearBeaconDesignerExportAttrsOnComponentDefinition).toHaveBeenCalledWith("cmp_1", {
+      pageIdHint: "page_1",
+      instance: null,
+    });
+    expect(removeBeaconDesignerExportPropsFromComponentDefinition).not.toHaveBeenCalled();
+  });
+
+  it("clears values (keeps props) when any component-instance preset remains", async () => {
+    const {
+      clearBeaconDesignerExportAttrsOnComponentDefinition,
+      removeBeaconDesignerExportPropsFromComponentDefinition,
+    } = await import("@/features/image-editor/lib/apply-beacon-designer-export-attrs-to-target");
+
+    const entry = componentPresetEntry();
+    const instancePreset: BeaconPresetStorageEntry = {
+      scope: "instance",
       row: {
-        id: "preset_1",
-        name: "Hero",
-        width: 1200,
-        height: 800,
+        id: "preset_2",
+        name: "Card",
+        width: 600,
+        height: 400,
         maxFileSizeBytes: 200_000,
         targetKey: {
-          kind: "component-image",
+          kind: "component-image-instance",
           siteId: "site_1",
-          componentDefinitionId: "cmp_1",
-          imagePropId: "hero-image",
+          pageId: "page_9",
+          instanceElementId: "inst_9",
+          imagePropId: "card-image",
         },
       },
     };
 
     await expect(
-      cleanupDesignerTagsForPresetEntry({ entry, pageIdHint: "page_1", componentInstance: instance })
-    ).resolves.toEqual({
-      ok: true,
-      cleaned: true,
-    });
+      cleanupDesignerTagsForPresetEntry({ entry, remaining: [instancePreset], pageIdHint: "page_1" })
+    ).resolves.toEqual({ ok: true, cleaned: true });
     expect(clearBeaconDesignerExportAttrsOnComponentDefinition).toHaveBeenCalledWith("cmp_1", {
       pageIdHint: "page_1",
-      instance,
+      instance: null,
     });
+    expect(removeBeaconDesignerExportPropsFromComponentDefinition).not.toHaveBeenCalled();
   });
 });

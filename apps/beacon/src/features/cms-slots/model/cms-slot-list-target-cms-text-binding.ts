@@ -113,7 +113,7 @@ function parseCollectionFields(data: unknown): ParsedField[] {
   return out;
 }
 
-function findBeaconListTargetField(fields: readonly ParsedField[], dataList: string): ParsedField | null {
+export function findBeaconListTargetField(fields: readonly ParsedField[], dataList: string): ParsedField | null {
   const wantNames = [
     cmsSlotListCmsPlainTextFieldDisplayName(dataList),
     legacyCmsSlotListCmsPlainTextFieldDisplayName(dataList),

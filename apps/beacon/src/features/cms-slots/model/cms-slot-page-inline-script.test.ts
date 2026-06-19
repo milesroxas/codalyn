@@ -11,10 +11,28 @@ import { CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME } from "@/features/cms-slots/mod
 import {
   getCmsSlotPageInlineScriptSource,
   isBeaconRuntimeAssetFileName,
+  mergePageScriptsWithBeaconRuntime,
   normalizeBeaconRuntimeAssetRow,
   normalizeHostedAssetUrl,
   selectBeaconRuntimeAssetIdsToPurge,
+  withoutAnyBeaconRuntimeScripts,
 } from "@/features/cms-slots/model/cms-slot-page-inline-script";
+
+type PageScript = {
+  id: string;
+  location: string;
+  version: string;
+  attributes?: Record<string, string>;
+};
+
+const beaconFooter = (id: string, attrs?: Record<string, string>): PageScript => ({
+  id,
+  location: "footer",
+  version: "1.0.0",
+  attributes: attrs,
+});
+const isBeaconScript = (s: PageScript, registeredIds: Set<string>): boolean =>
+  s.attributes?.["data-codalyn-beacon"] === "runtime" || registeredIds.has(s.id);
 
 function runCmsSlotBeaconRuntime(doc: Document): void {
   const win = doc.defaultView;
@@ -134,6 +152,91 @@ describe("beacon runtime asset cleanup helpers", () => {
         appliedHostedUrls: ["https://cdn.example.com/codalyn-beacon-runtime-abc.js?cache=1"],
       })
     ).toEqual(["drop"]);
+  });
+});
+
+describe("beacon runtime page-script dedup (root-cause guard)", () => {
+  // The published-page bug was two runtime scripts co-existing and stomping each other. These lock the invariant that
+  // applying the runtime always leaves exactly one beacon footer script, no matter what was on the page before.
+  const newScript = beaconFooter("new-runtime", {
+    "data-codalyn-beacon": "runtime",
+    "data-codalyn-beacon-src-hash": "c7b4796e",
+  });
+
+  it("strips a stale beacon script that carries the current marker", () => {
+    const existing = [beaconFooter("stale-marked", { "data-codalyn-beacon": "runtime" })];
+    const merged = mergePageScriptsWithBeaconRuntime(existing, newScript, new Set());
+    expect(merged.map((s) => s.id)).toEqual(["new-runtime"]);
+  });
+
+  it("strips a stale beacon script with NO/old marker but a registered runtime id (the bug: 5617bd4d)", () => {
+    // This is exactly what survived before: applied under an older scheme so the marker filter missed it.
+    const existing = [beaconFooter("5617bd4d", undefined)];
+    const merged = mergePageScriptsWithBeaconRuntime(existing, newScript, new Set(["5617bd4d"]));
+    expect(merged.map((s) => s.id)).toEqual(["new-runtime"]);
+  });
+
+  it("preserves non-beacon scripts and their order, appending the runtime last", () => {
+    const analytics = beaconFooter("analytics", { src: "ga.js" });
+    const consent = beaconFooter("consent", undefined);
+    const merged = mergePageScriptsWithBeaconRuntime(
+      [analytics, beaconFooter("old-beacon", { "data-codalyn-beacon": "runtime" }), consent],
+      newScript,
+      new Set()
+    );
+    expect(merged.map((s) => s.id)).toEqual(["analytics", "consent", "new-runtime"]);
+  });
+
+  it("invariant: exactly one beacon footer script remains for any prior page state", () => {
+    const priorStates: PageScript[][] = [
+      [],
+      [beaconFooter("a", { "data-codalyn-beacon": "runtime" })],
+      [beaconFooter("a", { "data-codalyn-beacon": "runtime" }), beaconFooter("b", undefined)],
+      [beaconFooter("x", undefined), beaconFooter("y", { src: "third-party.js" })],
+    ];
+    const registeredIds = new Set(["b"]); // 'b' is a registered runtime with no marker
+    for (const existing of priorStates) {
+      const merged = mergePageScriptsWithBeaconRuntime(existing, newScript, registeredIds);
+      expect(merged.filter((s) => isBeaconScript(s, registeredIds)).length).toBe(1);
+      expect(merged[merged.length - 1]?.id).toBe("new-runtime");
+    }
+  });
+
+  it("withoutAnyBeaconRuntimeScripts removes by marker AND by registered id together", () => {
+    const kept = withoutAnyBeaconRuntimeScripts(
+      [
+        beaconFooter("marked", { "data-codalyn-beacon": "runtime" }),
+        beaconFooter("by-id", undefined),
+        beaconFooter("keep", { src: "x.js" }),
+      ],
+      new Set(["by-id"])
+    );
+    expect(kept.map((s) => s.id)).toEqual(["keep"]);
+  });
+});
+
+describe("runtime asset purge protects the just-synced asset", () => {
+  // Read-after-write lag once let the post-sync purge delete the freshly uploaded runtime. The just-synced URL is
+  // unioned into the applied set, so it must never be selected for deletion even if the page-applied read misses it.
+  it("keeps the just-synced asset and drops only the genuinely unreferenced stale one", () => {
+    const assets = [
+      {
+        id: "fresh",
+        hostedUrl: "https://cdn.example.com/codalyn-beacon-runtime-new.js",
+        originalFileName: "codalyn-beacon-runtime-new.js",
+      },
+      {
+        id: "stale",
+        hostedUrl: "https://cdn.example.com/codalyn-beacon-runtime-old.js",
+        originalFileName: "codalyn-beacon-runtime-old.js",
+      },
+    ];
+    // Simulate the protected union: only the just-synced URL is known-applied (page read hasn't caught up yet).
+    const toPurge = selectBeaconRuntimeAssetIdsToPurge({
+      assets,
+      appliedHostedUrls: ["https://cdn.example.com/codalyn-beacon-runtime-new.js"],
+    });
+    expect(toPurge).toEqual(["stale"]);
   });
 });
 

@@ -361,11 +361,25 @@ function withoutCmsSlotMarkedScripts(scripts: PageCustomScript[]): PageCustomScr
  * applied before the marker scheme (or under an older marker), which otherwise survive every sync and run alongside
  * the new runtime, stomping each other's DOM mutations on the published page.
  */
-function withoutAnyBeaconRuntimeScripts(
+export function withoutAnyBeaconRuntimeScripts(
   scripts: PageCustomScript[],
   registeredBeaconScriptIds: ReadonlySet<string>
 ): PageCustomScript[] {
   return withoutCmsSlotMarkedScripts(scripts).filter((s) => !registeredBeaconScriptIds.has(s.id));
+}
+
+/**
+ * Page custom-code list after applying the beacon runtime: drop every prior beacon runtime script, then append exactly
+ * one fresh footer entry. Pure and exported so the **exactly-one-runtime invariant** is unit-testable — its violation
+ * (two runtimes co-existing on a published page) was the root cause of the CMS-slot render bug, where the stale and
+ * current runtimes stomped each other's DOM mutations.
+ */
+export function mergePageScriptsWithBeaconRuntime(
+  existing: PageCustomScript[],
+  beaconScript: PageCustomScript,
+  registeredBeaconScriptIds: ReadonlySet<string>
+): PageCustomScript[] {
+  return [...withoutAnyBeaconRuntimeScripts(existing, registeredBeaconScriptIds), beaconScript];
 }
 
 type PaginatedList = { limit: number; offset: number; total: number };
@@ -660,8 +674,8 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
     getPageCustomScripts(pageId),
     registeredBeaconRuntimeScriptIdSet(siteId),
   ]);
-  const merged: PageCustomScript[] = [
-    ...withoutAnyBeaconRuntimeScripts(existing, registeredBeaconScriptIds),
+  const merged = mergePageScriptsWithBeaconRuntime(
+    existing,
     {
       id: registered.id,
       location: "footer",
@@ -671,7 +685,8 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
         [CMS_SLOT_PAGE_SCRIPT_HASH_ATTR]: hashCmsSlotRuntimeSource(sourceCode),
       },
     },
-  ];
+    registeredBeaconScriptIds
+  );
 
   await putPageCustomScripts(pageId, merged);
   await purgeUnreferencedBeaconRuntimeAssets(siteId, [registered.hostedLocation]);

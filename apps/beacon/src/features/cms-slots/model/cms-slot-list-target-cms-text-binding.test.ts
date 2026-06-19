@@ -1,6 +1,40 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { tryBindCmsSlotListTargetInstanceTextToCms } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
+import {
+  findBeaconListTargetField,
+  tryBindCmsSlotListTargetInstanceTextToCms,
+} from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import { CMS_SLOT_LIST_TARGET_TEXT_PROP_NAME } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
+
+describe("findBeaconListTargetField (binding resolves the correct CMS field)", () => {
+  const DL = "beacon-features";
+  const field = (id: string, displayName: string, type = "PlainText") => ({ id, displayName, type });
+
+  it("matches the current field name", () => {
+    const fields = [field("name", "Name"), field("f1", `CMS slot target text · ${DL}`)];
+    expect(findBeaconListTargetField(fields, DL)?.id).toBe("f1");
+  });
+
+  it("matches the legacy field name so pre-rename slots keep binding to their JSON field", () => {
+    // Regression guard: removing this fallback (commit ebd91e2) stranded the binding and broke published rendering.
+    const fields = [field("name", "Name"), field("legacy", `Beacon list target text · ${DL}`)];
+    expect(findBeaconListTargetField(fields, DL)?.id).toBe("legacy");
+  });
+
+  it("never matches the collection Name field or an unrelated PlainText field", () => {
+    const fields = [field("name", "Name"), field("body", "Body"), field("other", "Some Other Text")];
+    expect(findBeaconListTargetField(fields, DL)).toBeNull();
+  });
+
+  it("requires the field to be PlainText, not a same-named field of another type", () => {
+    const fields = [field("rich", `CMS slot target text · ${DL}`, "RichText")];
+    expect(findBeaconListTargetField(fields, DL)).toBeNull();
+  });
+
+  it("normalizes separator/casing differences in the display name", () => {
+    const fields = [field("f1", `cms slot target text • ${DL}`)];
+    expect(findBeaconListTargetField(fields, DL)?.id).toBe("f1");
+  });
+});
 
 type PropRow = Pick<Prop, "id" | "name" | "type" | "valueType">;
 

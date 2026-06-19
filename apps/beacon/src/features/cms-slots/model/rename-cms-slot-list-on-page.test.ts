@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { encodeDisplayNameAttrValue } from "./cms-slot-data-list-display";
 import { renameCmsSlotListOnPage } from "./rename-cms-slot-list-on-page";
 
 describe("renameCmsSlotListOnPage", () => {
@@ -39,6 +40,9 @@ describe("renameCmsSlotListOnPage", () => {
       otherDataListsOnPage: new Set(),
     });
     expect(result).toEqual({ ok: true, dataList: "beacon-hero" });
-    expect(container.setCustomAttribute).toHaveBeenCalledWith("data-beacon-display-name", "Hero");
+    expect(container.setCustomAttribute).toHaveBeenCalledWith(
+      "data-beacon-display-name",
+      encodeDisplayNameAttrValue("Hero")
+    );
   });
 });

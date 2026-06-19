@@ -1,4 +1,3 @@
-import { getSessionCookie } from "better-auth/cookies";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { TowerDashboard } from "@/features/tower-ui/tower-dashboard";
@@ -20,6 +19,7 @@ import {
   isMarketingHost,
   normalizeHostname,
 } from "@/server/tower-hosts";
+import { readTowerSessionCookie } from "@/server/tower-session-cookie";
 import { isProductAdminAppRole } from "@/shared/lib/membership/product-admin-role";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +48,7 @@ export default async function HomePage() {
       signedIn: summary.signedIn,
       hostSplitEnabled: isHostSplitEnabled(),
       isAppHost: isAppHost(host),
-      hasSessionCookie: Boolean(getSessionCookie(requestHeaders)),
+      hasSessionCookie: Boolean(readTowerSessionCookie(requestHeaders)),
     })
   ) {
     redirect(buildMarketingUrl("/"));

@@ -41,7 +41,7 @@ import {
   toUserAccountDeletionApiError,
   UserAccountDeletionBlockedError,
 } from "@/server/membership/user-account-deletion";
-import { resolveTowerCookieDomain } from "@/server/tower-hosts";
+import { resolveTowerCookieDomain, resolveTowerCookiePrefix } from "@/server/tower-hosts";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { resolveTowerTrustedOrigins } from "@/server/tower-trusted-origins";
 import { TOWER_SKIP_VERIFICATION_EMAIL_HEADER } from "@/shared/lib/auth/tower-email-verification-header";
@@ -52,17 +52,20 @@ const baseURL = resolveTowerPublicBaseUrl();
 
 function resolveAdvancedAuthOptions(): {
   crossSubDomainCookies?: { enabled: true; domain: string };
+  cookiePrefix?: string;
 } {
+  const options: { crossSubDomainCookies?: { enabled: true; domain: string }; cookiePrefix?: string } = {};
   const cookieDomain = resolveTowerCookieDomain();
-  if (!cookieDomain) {
-    return {};
+  if (cookieDomain) {
+    options.crossSubDomainCookies = { enabled: true, domain: cookieDomain };
   }
-  return {
-    crossSubDomainCookies: {
-      enabled: true,
-      domain: cookieDomain,
-    },
-  };
+  // Namespace prod vs preview cookies so a session minted on one Neon branch can't be read by the
+  // other when both share the `codalyn.app` cookie domain. See resolveTowerCookiePrefix.
+  const cookiePrefix = resolveTowerCookiePrefix();
+  if (cookiePrefix) {
+    options.cookiePrefix = cookiePrefix;
+  }
+  return options;
 }
 
 export const auth = betterAuth({

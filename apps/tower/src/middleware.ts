@@ -1,4 +1,3 @@
-import { getSessionCookie } from "better-auth/cookies";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { towerCorsHeadersFor } from "@/server/tower-cors";
@@ -10,6 +9,7 @@ import {
   normalizeHostname,
   sanitizeRelativePath,
 } from "@/server/tower-hosts";
+import { readTowerSessionCookie } from "@/server/tower-session-cookie";
 import { TOWER_AUTH_SURFACE_PATHS } from "@/shared/lib/navigation/tower-auth-surfaces";
 import { isTowerMarketingPublicPath } from "@/shared/lib/navigation/tower-marketing-paths";
 
@@ -91,7 +91,7 @@ function applyHostSplitRouting(request: NextRequest, pathname: string): NextResp
   }
 
   const hostname = normalizeHostname(request.headers.get("host") ?? request.nextUrl.hostname);
-  const sessionCookie = getSessionCookie(request);
+  const sessionCookie = readTowerSessionCookie(request);
 
   if (isFlintMarketingHost(hostname)) {
     return applyFlintMarketingHostRouting(request, pathname);
@@ -139,7 +139,7 @@ export function middleware(request: NextRequest) {
   const hostname = normalizeHostname(request.headers.get("host") ?? request.nextUrl.hostname);
 
   if (!isPublicPath(pathname, hostname)) {
-    const sessionCookie = getSessionCookie(request);
+    const sessionCookie = readTowerSessionCookie(request);
     if (!sessionCookie) {
       const url = request.nextUrl.clone();
       url.pathname = "/sign-in";

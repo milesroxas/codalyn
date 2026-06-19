@@ -18,6 +18,7 @@ type TowerHostConfig = {
   flintMarketingOrigin: string;
   appOrigin: string;
   cookieDomain: string | undefined;
+  cookiePrefix: string | undefined;
 };
 
 let cachedConfig: TowerHostConfig | null = null;
@@ -41,6 +42,7 @@ function envConfigKey(): string {
     process.env.TOWER_APP_HOST,
     process.env.TOWER_MARKETING_URL,
     process.env.TOWER_COOKIE_DOMAIN,
+    process.env.TOWER_COOKIE_PREFIX,
     process.env.BETTER_AUTH_URL,
     process.env.NEXT_PUBLIC_APP_URL,
     process.env.VERCEL_ENV,
@@ -194,10 +196,36 @@ function resolveCookieDomainFromEnv(appHost: string, splitEnabled: boolean): str
   return domain;
 }
 
+function sanitizeCookiePrefix(value: string): string {
+  return normalizeHostname(value).replace(/[^a-z0-9-]/g, "");
+}
+
+/**
+ * Per-host cookie prefix. Only set when the session cookie is shared across subdomains of one parent
+ * domain — Vercel production and preview both write to `.codalyn.app` (see
+ * {@link resolveCookieDomainFromEnv}). Without a prefix they share one cookie name and overwrite each
+ * other, so a session minted on one environment (and its Neon branch) is sent to the other, fails to
+ * resolve, and bounces the user to a public page. Namespacing by the app host's first label
+ * (`tower` vs `tower-preview`) keeps the two environments' sessions distinct. `TOWER_COOKIE_PREFIX`
+ * overrides the derived value.
+ */
+function resolveCookiePrefixFromEnv(appHost: string, cookieDomain: string | undefined): string | undefined {
+  if (!cookieDomain) {
+    return undefined;
+  }
+  const explicit = process.env.TOWER_COOKIE_PREFIX?.trim();
+  if (explicit) {
+    return sanitizeCookiePrefix(explicit) || undefined;
+  }
+  const label = normalizeHostname(appHost).split(".")[0] ?? "";
+  return sanitizeCookiePrefix(label) || undefined;
+}
+
 function buildTowerHostConfig(): TowerHostConfig {
   const splitEnabled = resolveSplitEnabledFromEnv();
   const appHost = resolveAppHostFromEnv();
   const appOrigin = resolveTowerPublicBaseUrl();
+  const cookieDomain = resolveCookieDomainFromEnv(appHost, splitEnabled);
   return {
     splitEnabled,
     marketingHosts: new Set(parseMarketingHosts(appOrigin)),
@@ -206,7 +234,8 @@ function buildTowerHostConfig(): TowerHostConfig {
     marketingOrigin: resolveMarketingOriginFromEnv(),
     flintMarketingOrigin: resolveFlintMarketingOriginFromEnv(appOrigin),
     appOrigin,
-    cookieDomain: resolveCookieDomainFromEnv(appHost, splitEnabled),
+    cookieDomain,
+    cookiePrefix: resolveCookiePrefixFromEnv(appHost, cookieDomain),
   };
 }
 
@@ -357,6 +386,15 @@ export function buildTowerLandingAppLinks(hostname?: string): {
 /** Parent domain for shared session cookies across codalyn.app and tower.codalyn.app (production only). */
 export function resolveTowerCookieDomain(): string | undefined {
   return getTowerHostConfig().cookieDomain;
+}
+
+/**
+ * Per-host session cookie name prefix, distinguishing production (`tower`) from preview
+ * (`tower-preview`) when both share the `codalyn.app` cookie domain. Undefined off Vercel
+ * (host-only cookies don't collide), letting Better Auth use its default name.
+ */
+export function resolveTowerCookiePrefix(): string | undefined {
+  return getTowerHostConfig().cookiePrefix;
 }
 
 /** Reset module cache — tests only. */

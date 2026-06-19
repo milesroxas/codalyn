@@ -13,6 +13,7 @@ import {
   parentDomainForCookie,
   resetTowerHostConfigCacheForTests,
   resolveTowerCookieDomain,
+  resolveTowerCookiePrefix,
   resolveTowerPublicFlintHref,
   sanitizeRelativePath,
 } from "./tower-hosts";
@@ -26,6 +27,7 @@ describe("tower-hosts", () => {
     "TOWER_APP_HOST",
     "TOWER_MARKETING_URL",
     "TOWER_COOKIE_DOMAIN",
+    "TOWER_COOKIE_PREFIX",
     "BETTER_AUTH_URL",
     "NEXT_PUBLIC_APP_URL",
     "VERCEL_ENV",
@@ -160,5 +162,37 @@ describe("tower-hosts", () => {
     process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
     process.env.TOWER_COOKIE_DOMAIN = "evil.test";
     expect(resolveTowerCookieDomain()).toBeUndefined();
+  });
+
+  it("derives distinct cookie prefixes for production and preview app hosts", () => {
+    snapshotEnv();
+    process.env.TOWER_HOST_SPLIT = "1";
+
+    process.env.VERCEL_ENV = "production";
+    process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
+    expect(resolveTowerCookiePrefix()).toBe("tower");
+
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    resetTowerHostConfigCacheForTests();
+    process.env.VERCEL_ENV = "preview";
+    expect(resolveTowerCookiePrefix()).toBe("tower-preview");
+  });
+
+  it("omits the cookie prefix when cookies are host-only (no shared domain)", () => {
+    snapshotEnv();
+    // No VERCEL_ENV → cookieDomain is undefined → host-only cookies don't collide.
+    process.env.TOWER_HOST_SPLIT = "1";
+    process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
+    expect(resolveTowerCookieDomain()).toBeUndefined();
+    expect(resolveTowerCookiePrefix()).toBeUndefined();
+  });
+
+  it("honors an explicit TOWER_COOKIE_PREFIX override when cookies are shared", () => {
+    snapshotEnv();
+    process.env.TOWER_HOST_SPLIT = "1";
+    process.env.VERCEL_ENV = "preview";
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    process.env.TOWER_COOKIE_PREFIX = "tower-pr-42";
+    expect(resolveTowerCookiePrefix()).toBe("tower-pr-42");
   });
 });

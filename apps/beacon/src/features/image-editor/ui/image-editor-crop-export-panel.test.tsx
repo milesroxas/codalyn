@@ -43,6 +43,8 @@ function baseProps(overrides: Partial<ImageEditorCropExportPanelProps> = {}): Im
     setOutputHeight: vi.fn(),
     fileBaseName: "edited",
     setFileBaseName: vi.fn(),
+    altText: "",
+    setAltText: vi.fn(),
     quality: 0.75,
     setQuality: vi.fn(),
     onQualityCommit: vi.fn(),

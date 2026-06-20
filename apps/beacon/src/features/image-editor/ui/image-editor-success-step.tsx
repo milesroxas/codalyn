@@ -6,7 +6,6 @@ import {
   IconPhoto,
   IconPointer,
 } from "@tabler/icons-react";
-import type { ReactNode } from "react";
 import {
   IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_HINT,
   IMAGE_UPLOAD_CMS_DESIGNER_REFRESH_READY,
@@ -19,7 +18,7 @@ import {
 } from "@/shared/lib/beacon-feature-route-copy";
 import { useDesignerViewReturnDetect } from "@/shared/lib/use-designer-view-return-detect";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
 import { Separator } from "@/shared/ui/separator";
 import {
   SurfaceSummaryCardIconBox,
@@ -32,27 +31,11 @@ import {
 } from "@/shared/ui/surface-summary-card";
 
 export type ImageEditorSuccessStepProps = {
-  message: string;
   showCmsDesignerRefreshHint: boolean;
   showReselectTarget: boolean;
   onUploadAnother: () => void;
   onReselectTarget: () => void;
 };
-
-const CMS_FIELD_SUCCESS_MESSAGE_PATTERN = /^Updated CMS field [\u201c"](.+?)[\u201d"]\.$/;
-
-function formatImageUploadSuccessDescription(message: string): ReactNode {
-  const fieldName = CMS_FIELD_SUCCESS_MESSAGE_PATTERN.exec(message)?.[1];
-  if (fieldName == null) {
-    return message;
-  }
-
-  return (
-    <>
-      Updated CMS field <strong>{fieldName}</strong>.
-    </>
-  );
-}
 
 function dismissExtensionForWebflowNavigation(): void {
   if (typeof webflow.closeExtension === "function") {
@@ -125,20 +108,19 @@ function ImageEditorSuccessActionRows(props: {
 }
 
 export function ImageEditorSuccessStep(props: ImageEditorSuccessStepProps) {
-  const { message, showCmsDesignerRefreshHint, showReselectTarget, onUploadAnother, onReselectTarget } = props;
+  const { showCmsDesignerRefreshHint, showReselectTarget, onUploadAnother, onReselectTarget } = props;
   const designerViewReturned = useDesignerViewReturnDetect(showCmsDesignerRefreshHint);
   const showReturnToDesigner = showCmsDesignerRefreshHint && !designerViewReturned;
   const showActionRows = !showCmsDesignerRefreshHint || !designerViewReturned;
   const showFollowUpContent = showCmsDesignerRefreshHint || showActionRows;
 
   return (
-    <Empty data-slot="image_upload_success" tone="plain">
+    <Empty data-slot="image_upload_success" tone="plain" className="justify-center">
       <EmptyHeader width="full">
         <EmptyMedia variant="icon">
           <IconCircleCheck aria-hidden stroke={1.5} />
         </EmptyMedia>
         <EmptyTitle>{IMAGE_UPLOAD_SUCCESS_TITLE}</EmptyTitle>
-        <EmptyDescription>{formatImageUploadSuccessDescription(message)}</EmptyDescription>
       </EmptyHeader>
       {showFollowUpContent ? (
         <EmptyContent layout="hint">

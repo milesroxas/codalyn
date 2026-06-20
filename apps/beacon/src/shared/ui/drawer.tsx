@@ -234,7 +234,7 @@ const drawerContentVariants = cva(
     variants: {
       maxHeight: {
         default: "max-h-[min(95vh,600px)]",
-        tall: "h-[80vh] max-h-[90vh]",
+        tall: "h-[90vh] max-h-[95vh]",
       },
       stackedTop: {
         false: "",
@@ -250,7 +250,7 @@ const drawerContentVariants = cva(
       {
         maxHeight: "tall",
         stackedTop: true,
-        class: "h-[calc(80vh-2.5rem)] max-h-[calc(90vh-2.5rem)]",
+        class: "h-[calc(90vh-2.5rem)] max-h-[calc(95vh-2.5rem)]",
       },
     ],
     defaultVariants: {

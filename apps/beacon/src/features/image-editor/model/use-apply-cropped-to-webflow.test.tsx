@@ -52,6 +52,7 @@ describe("useApplyCroppedToWebflow", () => {
       quality: 0.85,
       exportFormat: "webp" as const,
       fileBaseName: "export-name",
+      altText: "A descriptive alt text",
       ...setters,
       componentImageProps: [],
       selectedComponentImagePropId: null,
@@ -98,6 +99,7 @@ describe("useApplyCroppedToWebflow", () => {
     const arg = vi.mocked(applyCroppedImageToWebflow).mock.calls[0][0];
     expect(arg.placement).toBe("library");
     expect(arg.targetFolder).toBeDefined();
+    expect(arg.altText).toBe("A descriptive alt text");
   });
 
   it("warns when no asset folder is available for Webflow placement", async () => {

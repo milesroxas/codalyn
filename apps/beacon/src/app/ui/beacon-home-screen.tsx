@@ -6,7 +6,6 @@ import {
   IconCarouselHorizontal,
   IconClick,
   IconPhotoUp,
-  IconScan,
   IconTransitionRight,
 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
@@ -21,13 +20,11 @@ import { CmsSlotsPageInstallPrefetch } from "@/features/cms-slots/ui/cms-slots-p
 import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
 import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
 import {
-  BEACON_HOME_BETA_SECTION_LABEL,
   BEACON_HOME_COMING_SOON_SECTION_LABEL,
   BEACON_HOME_EARLY_ACCESS_SECTION_LABEL,
   BEACON_HOME_SESSION_BOOTSTRAP_DESCRIPTION,
   BEACON_HOME_SESSION_BOOTSTRAP_TITLE,
   CAROUSEL_FEATURE_NAME,
-  FRAMEWORK_LINTER_FEATURE_NAME,
   PAGE_TRANSITIONS_FEATURE_NAME,
   SMOOTH_SCROLL_FEATURE_NAME,
 } from "@/shared/lib/beacon-home-copy";
@@ -90,10 +87,6 @@ function BeaconHomeTile(props: {
 }
 
 // Roadmap tiles — disabled for now; rendered to signal what's coming next.
-const BEACON_HOME_BETA_TILES: { label: string; icon: Icon }[] = [
-  { label: FRAMEWORK_LINTER_FEATURE_NAME, icon: IconScan },
-];
-
 const BEACON_HOME_COMING_SOON_TILES: { label: string; icon: Icon }[] = [
   { label: CAROUSEL_FEATURE_NAME, icon: IconCarouselHorizontal },
   { label: SMOOTH_SCROLL_FEATURE_NAME, icon: IconArrowsMoveVertical },
@@ -184,12 +177,6 @@ export function BeaconHomeScreen() {
                     ) : undefined
                   }
                 />
-              </BeaconHomeSection>
-
-              <BeaconHomeSection label={BEACON_HOME_BETA_SECTION_LABEL}>
-                {BEACON_HOME_BETA_TILES.map((tile) => (
-                  <BeaconHomeTile key={tile.label} label={tile.label} icon={tile.icon} disabled />
-                ))}
               </BeaconHomeSection>
 
               <BeaconHomeSection label={BEACON_HOME_COMING_SOON_SECTION_LABEL}>

@@ -299,6 +299,21 @@ async function applyAssetFolder(asset: Asset, folder: AssetFolder): Promise<void
   await asset.setParent(folder);
 }
 
+/** Sets alt text on a site asset. Webflow alt text is optional, so empty/whitespace is skipped (not blanked). */
+async function applyAltText(asset: Asset, altText: string): Promise<void> {
+  const trimmed = altText.trim();
+  if (trimmed) {
+    await asset.setAltText(trimmed);
+  }
+}
+
+/** Uploads a new site asset and applies alt text in one step — the single entry point for every Assets upload. */
+async function createAssetWithAltText(file: File, altText: string): Promise<Asset> {
+  const asset = await webflow.createAsset(file);
+  await applyAltText(asset, altText);
+  return asset;
+}
+
 /** Returns a finished result if an image prop was applied; `null` if the instance has no image props. */
 async function tryApplyComponentInstanceImageProp(
   instance: ComponentElement,
@@ -358,17 +373,19 @@ async function handleReplaceWithLibraryAsset(options: {
   img: ImageElement;
   file: File;
   targetFolder: AssetFolder;
+  altText: string;
 }): Promise<ExportResult> {
-  const { img, file, targetFolder } = options;
+  const { img, file, targetFolder, altText } = options;
   const existing = await img.getAsset();
   if (!existing) {
-    const asset = await webflow.createAsset(file);
+    const asset = await createAssetWithAltText(file, altText);
     await applyAssetFolder(asset, targetFolder);
     await img.setAsset(asset);
     await webflow.setSelectedElement(img);
     return { kind: "success", message: "Image applied." };
   }
   await existing.setFile(file);
+  await applyAltText(existing, altText);
   await applyAssetFolder(existing, targetFolder);
   await webflow.setSelectedElement(img);
   return { kind: "success", message: "Asset file updated." };
@@ -380,8 +397,9 @@ async function handleReplacePlacement(options: {
   targetFolder: AssetFolder | null;
   replaceLibraryAsset: boolean;
   currentCmsItemId: string | null | undefined;
+  altText: string;
 }): Promise<ExportResult> {
-  const { selectedElement, file, targetFolder, replaceLibraryAsset, currentCmsItemId } = options;
+  const { selectedElement, file, targetFolder, replaceLibraryAsset, currentCmsItemId, altText } = options;
   if (selectedElement?.type !== WEBFLOW_IMAGE_ELEMENT_TYPE) {
     return {
       kind: "info",
@@ -395,7 +413,7 @@ async function handleReplacePlacement(options: {
     return multipleCmsBindingSelectionResult();
   }
   if (cmsBinding) {
-    const asset = await webflow.createAsset(file);
+    const asset = await createAssetWithAltText(file, altText);
     if (!currentCmsItemId) {
       if (!targetFolder) {
         return { kind: "error", message: "Create an Assets folder first." };
@@ -417,13 +435,13 @@ async function handleReplacePlacement(options: {
     if (!targetFolder) {
       return { kind: "error", message: "Create an Assets folder first." };
     }
-    return handleReplaceWithLibraryAsset({ img, file, targetFolder });
+    return handleReplaceWithLibraryAsset({ img, file, targetFolder, altText });
   }
 
   if (!targetFolder) {
     return { kind: "error", message: "Create an Assets folder first." };
   }
-  const asset = await webflow.createAsset(file);
+  const asset = await createAssetWithAltText(file, altText);
   await applyAssetFolder(asset, targetFolder);
   await img.setAsset(asset);
   await webflow.setSelectedElement(img);
@@ -436,9 +454,10 @@ async function handleSelectionPlacement(options: {
   targetFolder: AssetFolder | null;
   componentImagePropId: string | null | undefined;
   currentCmsItemId: string | null | undefined;
+  altText: string;
 }): Promise<ExportResult> {
-  const { selectedElement, file, targetFolder, componentImagePropId, currentCmsItemId } = options;
-  const asset = await webflow.createAsset(file);
+  const { selectedElement, file, targetFolder, componentImagePropId, currentCmsItemId, altText } = options;
+  const asset = await createAssetWithAltText(file, altText);
 
   if (selectedElement?.type === "ComponentInstance") {
     const applied = await tryApplyComponentInstanceImageProp(
@@ -489,9 +508,10 @@ async function handleSelectionPlacement(options: {
 async function handleComposePlacement(options: {
   file: File;
   targetFolder: AssetFolder | null;
+  altText: string;
 }): Promise<ExportResult> {
-  const { file, targetFolder } = options;
-  const asset = await webflow.createAsset(file);
+  const { file, targetFolder, altText } = options;
+  const asset = await createAssetWithAltText(file, altText);
   if (targetFolder) {
     await applyAssetFolder(asset, targetFolder);
   }
@@ -515,6 +535,8 @@ export async function applyCroppedImageToWebflow(options: {
   /** Output codec; AVIF uses Tower `/api/v1/images/optimize`; WebP is encoded in the extension. */
   exportFormat: ImageExportFormat;
   fileBaseName: string;
+  /** Alt text applied to every uploaded site asset; empty/whitespace leaves Webflow alt text unset. */
+  altText: string;
   /** When the selection has multiple image props, the prop to set (from the panel). */
   componentImagePropId?: string | null;
   /** Current CMS item id from Designer `currentcmsitem` subscription. */
@@ -533,6 +555,7 @@ export async function applyCroppedImageToWebflow(options: {
     quality,
     exportFormat,
     fileBaseName,
+    altText,
     componentImagePropId,
     currentCmsItemId,
     targetFolder,
@@ -553,7 +576,7 @@ export async function applyCroppedImageToWebflow(options: {
       if (!targetFolder) {
         return { kind: "error", message: "Create an Assets folder first." };
       }
-      const asset = await webflow.createAsset(file);
+      const asset = await createAssetWithAltText(file, altText);
       await applyAssetFolder(asset, targetFolder);
       return { kind: "success", message: "Saved to Assets." };
     }
@@ -562,14 +585,14 @@ export async function applyCroppedImageToWebflow(options: {
       if (!targetFolder) {
         return { kind: "error", message: "Create an Assets folder first." };
       }
-      const asset = await webflow.createAsset(file);
+      const asset = await createAssetWithAltText(file, altText);
       await applyAssetFolder(asset, targetFolder);
       await placeImageOnCanvasAtBody(asset);
       return { kind: "success", message: "Image added to the page." };
     }
 
     if (placement === "compose") {
-      return handleComposePlacement({ file, targetFolder });
+      return handleComposePlacement({ file, targetFolder, altText });
     }
 
     if (placement === "replace") {
@@ -579,6 +602,7 @@ export async function applyCroppedImageToWebflow(options: {
         targetFolder,
         replaceLibraryAsset,
         currentCmsItemId,
+        altText,
       });
     }
 
@@ -588,6 +612,7 @@ export async function applyCroppedImageToWebflow(options: {
       targetFolder,
       componentImagePropId,
       currentCmsItemId,
+      altText,
     });
   } catch (err) {
     return toExportErrorResult(err);

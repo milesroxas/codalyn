@@ -26,7 +26,7 @@ const buttonVariants = cva(
         /** Route step breadcrumb: upcoming step. */
         stepNavUpcoming: "pointer-events-none text-muted-foreground/50 opacity-80 shadow-none",
         headerMenu:
-          "border border-border/55 bg-muted/90 px-3 text-[0.8125rem] font-medium shadow-none hover:bg-muted dark:border-white/14 dark:bg-muted dark:hover:bg-muted/85 [&_svg]:opacity-95",
+          "border border-border/55 bg-muted/90 font-medium shadow-none hover:bg-muted dark:border-white/14 dark:bg-muted dark:hover:bg-muted/85 [&_svg]:opacity-95",
         /** Route footer dock: muted (inactive nav tab, idle action). */
         routeDockMuted:
           "border-input/65 bg-muted/35 text-muted-foreground shadow-none hover:bg-muted/50 hover:text-foreground dark:border-border dark:bg-muted/55 dark:hover:bg-muted/70 dark:hover:text-foreground",

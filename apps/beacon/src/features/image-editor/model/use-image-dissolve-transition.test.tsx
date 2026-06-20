@@ -27,6 +27,7 @@ describe("useImageDissolveTransition", () => {
   const setImageSrc = vi.fn();
   const setOriginalBytes = vi.fn();
   const setFileBaseName = vi.fn();
+  const setAltText = vi.fn();
   const createObjectUrlMock = vi.fn(() => "blob:preview");
   const revokeObjectUrlMock = vi.fn();
 
@@ -36,6 +37,7 @@ describe("useImageDissolveTransition", () => {
     setImageSrc.mockReset();
     setOriginalBytes.mockReset();
     setFileBaseName.mockReset();
+    setAltText.mockReset();
     createObjectUrlMock.mockReset();
     revokeObjectUrlMock.mockReset();
     vi.stubGlobal("webflow", { notify: vi.fn() });
@@ -50,7 +52,9 @@ describe("useImageDissolveTransition", () => {
       ok: false,
       errorCode: BEACON_IMAGE_ERROR_CODES.SOURCE_IMAGE_TYPE_NOT_ALLOWED,
     });
-    const { result } = renderHook(() => useImageDissolveTransition({ setImageSrc, setOriginalBytes, setFileBaseName }));
+    const { result } = renderHook(() =>
+      useImageDissolveTransition({ setImageSrc, setOriginalBytes, setFileBaseName, setAltText })
+    );
 
     act(() => {
       result.current.queueFile(makeImageFile("image/tiff"));
@@ -73,7 +77,9 @@ describe("useImageDissolveTransition", () => {
       height: 800,
       megapixels: 0.96,
     });
-    const { result } = renderHook(() => useImageDissolveTransition({ setImageSrc, setOriginalBytes, setFileBaseName }));
+    const { result } = renderHook(() =>
+      useImageDissolveTransition({ setImageSrc, setOriginalBytes, setFileBaseName, setAltText })
+    );
 
     act(() => {
       result.current.queueFile(makeImageFile("image/png"));

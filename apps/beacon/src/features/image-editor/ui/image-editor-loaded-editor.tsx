@@ -40,7 +40,6 @@ export function ImageEditorLoadedEditor(props: ImageEditorLoadedEditorProps) {
   if (flowStep === "success" && exportSuccess != null) {
     return (
       <ImageEditorSuccessStep
-        message={exportSuccess.message}
         showCmsDesignerRefreshHint={exportSuccess.cmsFieldUpdated && cmsCollectionTemplatePage}
         showReselectTarget={showReselectTarget}
         onUploadAnother={onUploadAnother}

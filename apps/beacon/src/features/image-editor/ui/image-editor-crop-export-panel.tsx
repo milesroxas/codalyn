@@ -47,6 +47,7 @@ import {
   DialogTrigger,
 } from "@/shared/ui/dialog";
 import { Empty, EmptyAction, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/shared/ui/empty";
+import { FieldLabelHint } from "@/shared/ui/field-label-hint";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
@@ -131,6 +132,8 @@ export type ImageEditorCropExportPanelProps = {
   setOutputHeight: (n: number) => void;
   fileBaseName: string;
   setFileBaseName: (s: string) => void;
+  altText: string;
+  setAltText: (s: string) => void;
   quality: number;
   setQuality: (q: number) => void;
   onQualityCommit: () => void;
@@ -714,6 +717,8 @@ type ExportCardProps = {
   baseId: string;
   fileBaseName: string;
   setFileBaseName: (s: string) => void;
+  altText: string;
+  setAltText: (s: string) => void;
   quality: number;
   setQuality: (q: number) => void;
   onQualityCommit: () => void;
@@ -881,6 +886,8 @@ function ExportEncodeCard(p: ExportCardProps) {
     baseId,
     fileBaseName,
     setFileBaseName,
+    altText,
+    setAltText,
     quality,
     setQuality,
     onQualityCommit,
@@ -941,6 +948,25 @@ function ExportEncodeCard(p: ExportCardProps) {
               value={fileBaseName}
               onChange={(e) => setFileBaseName(e.target.value)}
               onBlur={() => setFileBaseName(sanitizeAssetBaseName(fileBaseName))}
+            />
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Label className="text-xs font-medium" htmlFor={`${baseId}-alt`}>
+                Alt text
+              </Label>
+              <FieldLabelHint aboutLabel="Alt text">
+                Describes the image for screen readers and SEO. Applied to the uploaded Webflow asset.
+              </FieldLabelHint>
+            </div>
+            <Input
+              id={`${baseId}-alt`}
+              aria-label="Image alt text"
+              autoComplete="off"
+              value={altText}
+              onChange={(e) => setAltText(e.target.value)}
+              placeholder="e.g. Team members at a conference"
             />
           </div>
 
@@ -1587,6 +1613,8 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     setOutputHeight,
     fileBaseName,
     setFileBaseName,
+    altText,
+    setAltText,
     quality,
     setQuality,
     onQualityCommit,
@@ -1812,6 +1840,8 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         baseId={baseId}
         fileBaseName={fileBaseName}
         setFileBaseName={setFileBaseName}
+        altText={altText}
+        setAltText={setAltText}
         quality={quality}
         setQuality={setQuality}
         onQualityCommit={onQualityCommit}

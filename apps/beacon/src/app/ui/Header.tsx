@@ -135,8 +135,8 @@ function HeaderLogo({ asHeading = true, to }: HeaderLogoProps) {
   const inner = (
     <>
       <span className="sr-only">Beacon</span>
-      <img src={lightLogoSrc} alt="" aria-hidden className="h-5 w-auto dark:hidden" />
-      <img src={darkLogoSrc} alt="" aria-hidden className="hidden h-5 w-auto dark:block" />
+      <img src={lightLogoSrc} alt="" aria-hidden className="h-4 w-auto dark:hidden" />
+      <img src={darkLogoSrc} alt="" aria-hidden className="hidden h-4 w-auto dark:block" />
     </>
   );
   const block = asHeading ? <h1 className={className}>{inner}</h1> : <div className={className}>{inner}</div>;
@@ -348,8 +348,8 @@ function BeaconAppMenu({ towerConfigured, user, sessionPending, onSignIn, onSign
         }}
       >
         <DropdownMenuTrigger asChild>
-          <Button type="button" variant="headerMenu" aria-haspopup="menu">
-            <Menu aria-hidden className="size-[1.05rem]" strokeWidth={2} />
+          <Button type="button" variant="headerMenu" size="xs" className="px-2" aria-haspopup="menu">
+            <Menu aria-hidden className="size-4" strokeWidth={2} />
             Menu
           </Button>
         </DropdownMenuTrigger>
@@ -435,7 +435,7 @@ function HeaderShell(props: BeaconAppMenuProps) {
 
   return (
     <div className="shrink-0">
-      <header data-slot="beacon-app-header" className="border-border/65 border-b bg-background px-4 py-2.5">
+      <header data-slot="beacon-app-header" className="border-border/65 border-b bg-background px-3 py-1.5">
         <div className="flex items-center justify-between gap-4">
           <HeaderLogo to="/home" />
           <div className="flex shrink-0 items-center gap-2">

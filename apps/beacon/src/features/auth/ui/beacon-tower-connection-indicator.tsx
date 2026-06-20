@@ -7,7 +7,7 @@ import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 const beaconTowerConnectionIndicatorVariants = cva(
-  "size-8 shrink-0 rounded-sm border shadow-none [&_svg:not([class*='size-'])]:size-[1.05rem]",
+  "size-7 shrink-0 rounded-sm border shadow-none [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       status: {

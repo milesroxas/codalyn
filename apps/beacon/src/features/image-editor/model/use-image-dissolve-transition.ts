@@ -11,8 +11,9 @@ export function useImageDissolveTransition(options: {
   setImageSrc: Dispatch<SetStateAction<string | null>>;
   setOriginalBytes: Dispatch<SetStateAction<number | null>>;
   setFileBaseName: (name: string) => void;
+  setAltText: (text: string) => void;
 }) {
-  const { setImageSrc, setOriginalBytes, setFileBaseName } = options;
+  const { setImageSrc, setOriginalBytes, setFileBaseName, setAltText } = options;
 
   const [dissolve, setDissolve] = useState<ImageDissolveState>({ phase: "idle" });
   const [beginOutgoingFade, setBeginOutgoingFade] = useState(false);
@@ -81,6 +82,7 @@ export function useImageDissolveTransition(options: {
     const { incomingUrl, incomingFile } = d;
     setOriginalBytes(incomingFile.size);
     setFileBaseName(assetBaseNameFromFileName(incomingFile.name));
+    setAltText("");
     setImageSrc((prev) => {
       if (prev?.startsWith("blob:")) {
         URL.revokeObjectURL(prev);
@@ -91,7 +93,7 @@ export function useImageDissolveTransition(options: {
     setBeginOutgoingFade(false);
     setShowIncomingPreview(false);
     setIncomingEnter(false);
-  }, [setImageSrc, setOriginalBytes, setFileBaseName]);
+  }, [setImageSrc, setOriginalBytes, setFileBaseName, setAltText]);
 
   const handleOutgoingFadeComplete = useCallback(
     (e: TransitionEvent<HTMLDivElement>) => {

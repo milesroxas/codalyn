@@ -137,7 +137,9 @@ const surfaceSummaryCardSelectRowVariants = cva(
   {
     variants: {
       selected: {
-        true: "border-primary/55 bg-accent/35 ring-1 ring-primary/15",
+        // Active state reads from fill, not an outline: solid accent sits clearly above the muted hover for contrast
+        // on the drawer surface. Border stays (transparent) to hold the 1px box model and avoid layout shift.
+        true: "border-transparent bg-accent text-accent-foreground hover:bg-accent",
         false: "border-border/70 bg-muted/15 hover:bg-muted/30",
       },
       interactive: {

@@ -105,6 +105,7 @@ async function exportWebflowPlacement(args: {
   quality: number;
   exportFormat: ImageExportFormat;
   safeName: string;
+  altText: string;
   dimSetters: Parameters<typeof syncExportDimensionsToState>[3];
   setBusy: (v: boolean) => void;
   componentImageProps: ComponentImagePropOption[];
@@ -124,6 +125,7 @@ async function exportWebflowPlacement(args: {
     quality,
     exportFormat,
     safeName,
+    altText,
     dimSetters,
     setBusy,
     componentImageProps,
@@ -146,6 +148,7 @@ async function exportWebflowPlacement(args: {
       quality,
       exportFormat,
       fileBaseName: safeName,
+      altText,
       componentImagePropId: componentImageProps.length > 1 ? selectedComponentImagePropId : null,
       currentCmsItemId,
       targetFolder,
@@ -170,6 +173,7 @@ export function useApplyCroppedToWebflow(options: {
   exportFormat: ImageExportFormat;
   fileBaseName: string;
   setFileBaseName: (s: string) => void;
+  altText: string;
   setOutputWidth: (n: number) => void;
   setOutputHeight: (n: number) => void;
   setWidthStr: (s: string) => void;
@@ -198,6 +202,7 @@ export function useApplyCroppedToWebflow(options: {
     exportFormat,
     fileBaseName,
     setFileBaseName,
+    altText,
     setOutputWidth,
     setOutputHeight,
     setWidthStr,
@@ -292,6 +297,7 @@ export function useApplyCroppedToWebflow(options: {
       quality,
       exportFormat,
       safeName,
+      altText,
       dimSetters,
       setBusy,
       componentImageProps,
@@ -312,6 +318,7 @@ export function useApplyCroppedToWebflow(options: {
     exportFormat,
     fileBaseName,
     setFileBaseName,
+    altText,
     setOutputWidth,
     setOutputHeight,
     setWidthStr,

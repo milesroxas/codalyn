@@ -349,6 +349,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
   const [sourceNaturalSize, setSourceNaturalSize] = useState<{ width: number; height: number } | null>(null);
   const [dismissedNaturalSizeAdvisoryKey, setDismissedNaturalSizeAdvisoryKey] = useState<string | null>(null);
   const [fileBaseName, setFileBaseName] = useState("edited");
+  const [altText, setAltText] = useState("");
   const [quality, setQuality] = useState(settings.defaultExportQuality);
   const [exportFormat, setExportFormat] = useState<ImageExportFormat>(settings.defaultExportFormat);
   const [sessionMaxFileSizeBytes, setSessionMaxFileSizeBytes] = useState<number | null>(null);
@@ -699,7 +700,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     beginOutgoingFade,
     showIncomingPreview,
     incomingEnter,
-  } = useImageDissolveTransition({ setImageSrc, setOriginalBytes, setFileBaseName });
+  } = useImageDissolveTransition({ setImageSrc, setOriginalBytes, setFileBaseName, setAltText });
 
   useEffect(() => {
     exportDefaultsHydratedRef.current = !towerUser?.id;
@@ -1384,6 +1385,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     exportFormat: effectiveExportFormat,
     fileBaseName,
     setFileBaseName,
+    altText,
     setOutputWidth,
     setOutputHeight,
     setWidthStr,
@@ -1551,6 +1553,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
         estimatePending,
         estimatedBytes,
         fileBaseName,
+        altText,
         folderActionBusy,
         foldersLoading,
         heightStr,
@@ -1579,6 +1582,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
         setCrop,
         setCropFrameMode,
         setFileBaseName,
+        setAltText,
         setHeightStr,
         setOutputHeight,
         setOutputWidth,

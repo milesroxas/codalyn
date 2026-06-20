@@ -1,5 +1,6 @@
 import {
   BEACON_PRESET_DEFAULT_MAX_FILE_BYTES,
+  type BeaconPresetStorageEntry,
   formatBeaconPresetDisplayName,
   formatBeaconPresetInstanceLocationLabel,
   type ImageExportFormat,
@@ -105,9 +106,12 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   const isEditing = editingId != null;
 
   const presetEntriesById = useMemo(() => {
-    const entries = listBeaconPresetStorageEntries(settings.imagePresetStorage);
+    if (siteId == null) {
+      return new Map<string, BeaconPresetStorageEntry>();
+    }
+    const entries = listBeaconPresetStorageEntries(settings.imagePresetStorage, siteId);
     return new Map(entries.map((entry) => [entry.row.id, entry]));
-  }, [settings.imagePresetStorage]);
+  }, [settings.imagePresetStorage, siteId]);
 
   const editingEntry = useMemo(
     () => (editingId != null ? (presetEntriesById.get(editingId) ?? null) : null),
@@ -510,7 +514,10 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   }, [displayScopeOptions, editingId, presetScope]);
 
   const presetRows = useMemo<PresetListRow[]>(() => {
-    return listBeaconPresetStorageEntries(settings.imagePresetStorage).map(({ row, scope }) => ({
+    if (siteId == null) {
+      return [];
+    }
+    return listBeaconPresetStorageEntries(settings.imagePresetStorage, siteId).map(({ row, scope }) => ({
       id: row.id,
       name: row.name,
       displayName: formatBeaconPresetDisplayName(row, scope),
@@ -520,7 +527,7 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
       exportFormat: row.exportFormat,
       maxFileSizeBytes: row.maxFileSizeBytes,
     }));
-  }, [settings.imagePresetStorage]);
+  }, [settings.imagePresetStorage, siteId]);
 
   const onConfirmDeletePendingPreset = useCallback(() => {
     if (presetPendingDelete) {

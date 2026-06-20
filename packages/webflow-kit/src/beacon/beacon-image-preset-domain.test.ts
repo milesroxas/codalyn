@@ -540,6 +540,40 @@ describe("preset storage listing helpers", () => {
     expect(entries.some((entry) => entry.scope === "instance")).toBe(true);
     expect(formatBeaconPresetDisplayName(instance, "instance")).toBe(`${instance.name} (Instance)`);
   });
+
+  it("filters out presets belonging to other sites when a siteId is provided", () => {
+    const siteOneDefault = makeRow({
+      id: "one",
+      targetKey: createSiteDefaultPresetTargetKey("site_1"),
+    });
+    const siteTwoDefault = makeRow({
+      id: "two",
+      targetKey: createSiteDefaultPresetTargetKey("site_2"),
+    });
+    const storage = {
+      siteDefault: null,
+      byTargetKey: {
+        [serializePresetTargetKey(siteOneDefault.targetKey)]: siteOneDefault,
+        [serializePresetTargetKey(siteTwoDefault.targetKey)]: siteTwoDefault,
+      },
+    };
+
+    const siteOneEntries = listBeaconPresetStorageEntries(storage, "site_1");
+    expect(siteOneEntries.map((entry) => entry.row.id)).toEqual(["one"]);
+
+    // Whitespace-padded site id normalizes to the same site.
+    expect(listBeaconPresetStorageEntries(storage, "  site_2  ").map((entry) => entry.row.id)).toEqual(["two"]);
+
+    // Omitting siteId aggregates across every site (dashboard path).
+    expect(
+      listBeaconPresetStorageEntries(storage)
+        .map((entry) => entry.row.id)
+        .sort()
+    ).toEqual(["one", "two"]);
+
+    // Unknown site yields nothing rather than leaking other sites' presets.
+    expect(listBeaconPresetStorageEntries(storage, "site_missing")).toHaveLength(0);
+  });
 });
 
 describe("instance preset target helpers", () => {

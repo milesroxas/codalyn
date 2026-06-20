@@ -726,15 +726,28 @@ export type BeaconPresetStorageEntry = {
   scope: PresetCrudScope;
 };
 
-export function listBeaconPresetStorageEntries(storage: {
-  siteDefault: BeaconPresetRow | null;
-  byTargetKey: Readonly<Record<string, BeaconPresetRow>>;
-}): BeaconPresetStorageEntry[] {
+/**
+ * Lists preset rows from storage. When `siteId` is provided, only rows whose target key
+ * belongs to that site are returned — storage is shared across every site the user has
+ * touched, so management UIs MUST pass the current site id to avoid showing presets that
+ * belong to other sites. Omit `siteId` only for cross-site aggregation (e.g. dashboards).
+ */
+export function listBeaconPresetStorageEntries(
+  storage: {
+    siteDefault: BeaconPresetRow | null;
+    byTargetKey: Readonly<Record<string, BeaconPresetRow>>;
+  },
+  siteId?: string | null
+): BeaconPresetStorageEntry[] {
   const coalesced = coalesceBeaconPresetStorage(storage);
+  const normalizedSiteId = siteId == null ? null : trimSiteId(siteId);
   const entries: BeaconPresetStorageEntry[] = [];
   const seenIds = new Set<string>();
   for (const row of Object.values(coalesced.byTargetKey)) {
     if (seenIds.has(row.id)) {
+      continue;
+    }
+    if (normalizedSiteId != null && readSiteIdFromPresetTargetKey(row.targetKey) !== normalizedSiteId) {
       continue;
     }
     seenIds.add(row.id);

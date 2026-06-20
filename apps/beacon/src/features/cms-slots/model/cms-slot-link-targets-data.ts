@@ -6,7 +6,7 @@
  */
 
 import {
-  collectionTemplatePrefixFromPublishPath,
+  buildPageBasePath,
   isLinkablePageKind,
   joinCollectionItemPath,
   type LinkPickerCollection,
@@ -73,7 +73,23 @@ export async function loadCurrentPageId(): Promise<string | null> {
   return readString(page?.id);
 }
 
-/** Maps each Webflow CMS collection id to its template page's site-relative path (the detail-page URL prefix). */
+/** The page's slug plus its ancestor folder slugs (outermost first) — the preview-independent base path inputs. */
+async function readPageSlugChain(page: Page): Promise<{ pageSlug: string | null; folderSlugs: string[] }> {
+  const folderSlugs: string[] = [];
+  let parent = await page.getParent();
+  // Walk to the root, prepending each folder so the outermost ends up first; guard against any unexpected cycle.
+  for (let guard = 0; parent != null && guard < 50; guard++) {
+    folderSlugs.unshift(readString(await parent.getSlug()) ?? "");
+    parent = await parent.getParent();
+  }
+  return { pageSlug: readString(await page.getSlug()), folderSlugs };
+}
+
+/**
+ * Maps each Webflow CMS collection id to its template page's site-relative detail-page prefix. The prefix is rebuilt
+ * from the collection page's own slug + folder ancestry rather than `getPublishPath()`, which resolves against the
+ * item the Designer is currently previewing and so is unstable across collections (see {@link buildPageBasePath}).
+ */
 async function loadCollectionTemplatePaths(): Promise<Map<string, string>> {
   const items = await webflow.getAllPagesAndFolders();
   const byCollection = new Map<string, string>();
@@ -85,11 +101,11 @@ async function loadCollectionTemplatePaths(): Promise<Map<string, string>> {
       continue;
     }
     const collectionId = readString(await item.getCollectionId());
-    const path = collectionTemplatePrefixFromPublishPath(await item.getPublishPath());
-    if (collectionId == null || path == null || byCollection.has(collectionId)) {
+    if (collectionId == null || byCollection.has(collectionId)) {
       continue;
     }
-    byCollection.set(collectionId, path);
+    const { pageSlug, folderSlugs } = await readPageSlugChain(item);
+    byCollection.set(collectionId, buildPageBasePath(pageSlug, folderSlugs));
   }
   return byCollection;
 }

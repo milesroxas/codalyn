@@ -49,18 +49,18 @@ export function normalizeRelativePath(raw: string | null | undefined): string | 
 }
 
 /**
- * The CMS detail-page URL prefix for a collection, derived from a collection page's publish path by dropping the
- * trailing item-slug segment. Webflow's `Page.getPublishPath()` resolves a collection page against the item currently
- * previewed in the Designer (e.g. `/blog/the-power-of-resilience`), so the last segment is a live item slug, never
- * part of the template prefix. Returns null for a root/empty/single-segment path (no resolvable prefix).
+ * A page's static base path, built from its own slug plus its ancestor folder slugs (outermost first). This is the
+ * stable source for a CMS collection's detail-page prefix: unlike `Page.getPublishPath()` — which resolves against
+ * whichever item the Designer is currently previewing (e.g. `/blog/the-power-of-resilience` for the active page, but
+ * `/projects` for an inactive one) — the slug/folder chain never depends on preview context. Returns "/" only when no
+ * non-empty segment exists (e.g. the homepage).
  */
-export function collectionTemplatePrefixFromPublishPath(raw: string | null | undefined): string | null {
-  const norm = normalizeRelativePath(raw);
-  if (norm == null || norm === "/") {
-    return null;
-  }
-  const cut = norm.lastIndexOf("/");
-  return cut <= 0 ? "/" : norm.slice(0, cut);
+export function buildPageBasePath(
+  pageSlug: string | null | undefined,
+  folderSlugs: readonly (string | null | undefined)[]
+): string {
+  const parts = [...folderSlugs, pageSlug].map((s) => (typeof s === "string" ? s.trim() : "")).filter((s) => s !== "");
+  return normalizeRelativePath(`/${parts.join("/")}`) ?? "/";
 }
 
 /** Joins a collection template path and an item slug into a site-relative detail path, or null if either is invalid. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  collectionTemplatePrefixFromPublishPath,
+  buildPageBasePath,
   filterLinkOptions,
   isLinkablePageKind,
   joinCollectionItemPath,
@@ -48,22 +48,32 @@ describe("joinCollectionItemPath", () => {
   });
 });
 
-describe("collectionTemplatePrefixFromPublishPath", () => {
-  it("drops the live item-slug segment Webflow appends to a collection page's publish path", () => {
-    // Regression: getPublishPath resolves against the item previewed in the Designer, so the prefix must exclude it.
-    expect(collectionTemplatePrefixFromPublishPath("/blog/the-power-of-resilience")).toBe("/blog");
-    expect(collectionTemplatePrefixFromPublishPath("/resources/blog/some-post")).toBe("/resources/blog");
-    expect(collectionTemplatePrefixFromPublishPath("//blog//some-post//")).toBe("/blog");
+describe("buildPageBasePath", () => {
+  it("builds the base path from the page slug alone when there are no folders", () => {
+    expect(buildPageBasePath("blog", [])).toBe("/blog");
   });
 
-  it("yields root for a single-segment detail path (collection mounted at the site root)", () => {
-    expect(collectionTemplatePrefixFromPublishPath("/some-post")).toBe("/");
+  it("prefixes ancestor folder slugs, outermost first", () => {
+    expect(buildPageBasePath("blog", ["resources"])).toBe("/resources/blog");
+    expect(buildPageBasePath("blog", ["resources", "guides"])).toBe("/resources/guides/blog");
   });
 
-  it("returns null when there is no resolvable prefix", () => {
-    expect(collectionTemplatePrefixFromPublishPath(null)).toBeNull();
-    expect(collectionTemplatePrefixFromPublishPath("/")).toBeNull();
-    expect(collectionTemplatePrefixFromPublishPath("   ")).toBeNull();
+  it("ignores empty/blank slug segments and trims the rest", () => {
+    expect(buildPageBasePath("  blog  ", ["", "  ", "resources"])).toBe("/resources/blog");
+    expect(buildPageBasePath(null, ["resources"])).toBe("/resources");
+  });
+
+  it("returns root when no non-empty segment exists (e.g. the homepage)", () => {
+    expect(buildPageBasePath("", [])).toBe("/");
+    expect(buildPageBasePath(null, [])).toBe("/");
+  });
+
+  it("composes with joinCollectionItemPath to the full detail path, independent of preview context", () => {
+    // Regression: the prefix must come from the collection page's own slug, not its previewed item's resolved URL.
+    expect(joinCollectionItemPath(buildPageBasePath("blog", []), "embracing-challenges")).toBe(
+      "/blog/embracing-challenges"
+    );
+    expect(joinCollectionItemPath(buildPageBasePath("projects", []), "my-entry")).toBe("/projects/my-entry");
   });
 });
 

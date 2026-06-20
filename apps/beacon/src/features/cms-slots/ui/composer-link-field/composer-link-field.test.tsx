@@ -10,6 +10,7 @@ vi.mock("@/features/cms-slots/model/use-cms-slot-link-targets", () => ({
   useLinkPickerCollections: () => emptyList,
   useLinkPickerEntries: () => emptyList,
   useCurrentTemplateCollectionId: () => null,
+  useCurrentPageId: () => null,
 }));
 
 import { ComposerLinkField } from "./composer-link-field";

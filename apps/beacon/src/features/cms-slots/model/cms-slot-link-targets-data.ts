@@ -6,6 +6,7 @@
  */
 
 import {
+  collectionTemplatePrefixFromPublishPath,
   isLinkablePageKind,
   joinCollectionItemPath,
   type LinkPickerCollection,
@@ -63,6 +64,15 @@ export async function loadLinkPickerPages(): Promise<LinkPickerPage[]> {
   return sortByName(out);
 }
 
+/** Id of the page the designer is currently on, or null when unavailable (Designer API). */
+export async function loadCurrentPageId(): Promise<string | null> {
+  if (typeof webflow.getCurrentPage !== "function") {
+    return null;
+  }
+  const page = await webflow.getCurrentPage();
+  return readString(page?.id);
+}
+
 /** Maps each Webflow CMS collection id to its template page's site-relative path (the detail-page URL prefix). */
 async function loadCollectionTemplatePaths(): Promise<Map<string, string>> {
   const items = await webflow.getAllPagesAndFolders();
@@ -75,7 +85,7 @@ async function loadCollectionTemplatePaths(): Promise<Map<string, string>> {
       continue;
     }
     const collectionId = readString(await item.getCollectionId());
-    const path = normalizeRelativePath(await item.getPublishPath());
+    const path = collectionTemplatePrefixFromPublishPath(await item.getPublishPath());
     if (collectionId == null || path == null || byCollection.has(collectionId)) {
       continue;
     }

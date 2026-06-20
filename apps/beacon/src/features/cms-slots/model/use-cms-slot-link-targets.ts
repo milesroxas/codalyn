@@ -11,6 +11,7 @@ import type {
   LinkPickerPage,
 } from "@/features/cms-slots/model/cms-slot-link-targets";
 import {
+  loadCurrentPageId,
   loadLinkPickerCollections,
   loadLinkPickerEntries,
   loadLinkPickerPages,
@@ -68,6 +69,35 @@ export function useLinkPickerEntries(collection: LinkPickerCollection | null): A
     return loadLinkPickerEntries(collection.id, collection.templatePath);
   }, [collection]);
   return useAsyncList(collection != null, loader);
+}
+
+/**
+ * Id of the page the designer is currently on, loaded once `enabled`. The page picker disables this option so a page
+ * cannot link to itself.
+ */
+export function useCurrentPageId(enabled: boolean): string | null {
+  const [pageId, setPageId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+    let cancelled = false;
+    loadCurrentPageId()
+      .then((id) => {
+        if (!cancelled) {
+          setPageId(id);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPageId(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+  return pageId;
 }
 
 /**

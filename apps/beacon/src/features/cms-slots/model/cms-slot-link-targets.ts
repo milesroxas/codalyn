@@ -20,8 +20,12 @@ export type LinkPickerEntry = { id: string; name: string; path: string };
 /** Above this count a picker list shows its search input. */
 export const LINK_PICKER_SEARCH_THRESHOLD = 8;
 
-/** Webflow page kinds that represent a real, linkable URL (excludes templates and system/utility pages). */
-const LINKABLE_PAGE_KINDS: ReadonlySet<string> = new Set(["static", "cms", "ecommerce"]);
+/**
+ * Webflow page kinds the Page picker offers: pages with a single fixed URL. CMS collection (`cms`) pages are excluded
+ * — they have no standalone URL (their `getPublishPath` resolves to whichever item is previewed), so their entries are
+ * linked through the CMS tab instead. Templates and system/utility pages are excluded too.
+ */
+const LINKABLE_PAGE_KINDS: ReadonlySet<string> = new Set(["static", "ecommerce"]);
 
 export function isLinkablePageKind(kind: string): boolean {
   return LINKABLE_PAGE_KINDS.has(kind);
@@ -42,6 +46,21 @@ export function normalizeRelativePath(raw: string | null | undefined): string | 
     return "/";
   }
   return collapsed.replace(/\/+$/, "");
+}
+
+/**
+ * The CMS detail-page URL prefix for a collection, derived from a collection page's publish path by dropping the
+ * trailing item-slug segment. Webflow's `Page.getPublishPath()` resolves a collection page against the item currently
+ * previewed in the Designer (e.g. `/blog/the-power-of-resilience`), so the last segment is a live item slug, never
+ * part of the template prefix. Returns null for a root/empty/single-segment path (no resolvable prefix).
+ */
+export function collectionTemplatePrefixFromPublishPath(raw: string | null | undefined): string | null {
+  const norm = normalizeRelativePath(raw);
+  if (norm == null || norm === "/") {
+    return null;
+  }
+  const cut = norm.lastIndexOf("/");
+  return cut <= 0 ? "/" : norm.slice(0, cut);
 }
 
 /** Joins a collection template path and an item slug into a site-relative detail path, or null if either is invalid. */

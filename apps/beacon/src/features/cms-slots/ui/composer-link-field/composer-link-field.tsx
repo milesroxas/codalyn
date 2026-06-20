@@ -7,6 +7,7 @@ import {
   encodeBeaconLinkValue,
 } from "@/features/cms-slots/model/cms-slot-link-value";
 import {
+  useCurrentPageId,
   useCurrentTemplateCollectionId,
   useLinkPickerCollections,
   useLinkPickerEntries,
@@ -54,7 +55,9 @@ export function ComposerLinkField({ inputId, value, busy, onChange }: ComposerLi
   );
 
   const isCms = link.kind === "cms";
-  const pages = useLinkPickerPages(link.kind === "page");
+  const isPage = link.kind === "page";
+  const pages = useLinkPickerPages(isPage);
+  const currentPageId = useCurrentPageId(isPage);
   const collections = useLinkPickerCollections(isCms);
   const currentCollectionId = useCurrentTemplateCollectionId(isCms);
 
@@ -131,6 +134,8 @@ export function ComposerLinkField({ inputId, value, busy, onChange }: ComposerLi
           loading={pages.loading}
           error={pages.error}
           disabled={busy}
+          disabledOptionId={currentPageId}
+          disabledOptionHint="Current page"
           placeholder="Select a page…"
           searchPlaceholder="Search pages…"
           emptyText="No pages found."

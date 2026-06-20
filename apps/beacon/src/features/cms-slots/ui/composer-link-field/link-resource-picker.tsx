@@ -16,6 +16,10 @@ type LinkResourcePickerProps = {
   loading: boolean;
   error: string | null;
   disabled?: boolean;
+  /** Option that cannot be picked (e.g. the page the designer is already on). Rendered dimmed and non-interactive. */
+  disabledOptionId?: string | null;
+  /** Muted suffix shown on the disabled option to explain why it can't be picked. */
+  disabledOptionHint?: string;
   /** Trigger text shown when nothing is selected. */
   placeholder: string;
   searchPlaceholder: string;
@@ -37,6 +41,8 @@ export function LinkResourcePicker({
   loading,
   error,
   disabled = false,
+  disabledOptionId = null,
+  disabledOptionHint,
   placeholder,
   searchPlaceholder,
   emptyText,
@@ -97,23 +103,29 @@ export function LinkResourcePicker({
             <ul className="flex flex-col gap-0.5 p-1">
               {filtered.map((option) => {
                 const isSelected = option.id === selectedId;
+                const isDisabled = option.id === disabledOptionId;
                 return (
                   <li key={option.id}>
                     <button
                       type="button"
                       role="option"
                       aria-selected={isSelected}
+                      aria-disabled={isDisabled}
+                      disabled={isDisabled}
                       onClick={() => {
                         onSelect(option);
                         handleOpenChange(false);
                       }}
-                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-xs font-normal outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
+                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-xs font-normal outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
                     >
                       <Check
                         className={cn("size-3.5 shrink-0", isSelected ? "opacity-100" : "opacity-0")}
                         aria-hidden
                       />
                       <span className="min-w-0 truncate">{option.name}</span>
+                      {isDisabled && disabledOptionHint != null ? (
+                        <span className="ml-auto shrink-0 text-muted-foreground">{disabledOptionHint}</span>
+                      ) : null}
                     </button>
                   </li>
                 );

@@ -16,7 +16,7 @@ import {
   ensureCmsSlotListTargetLayoutStyle,
 } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
 import { readStringLikeValue } from "@/shared/lib/read-string-like-value";
-import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
+import { getTowerOrigin, towerFetchWithRetry } from "@/shared/lib/tower-client";
 
 /** Matches `attributes` on the applied page script so we can replace it on sync. */
 const CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR = "data-codalyn-beacon";
@@ -208,7 +208,7 @@ type CreatedWebflowAsset = {
 };
 
 async function createRuntimeAsset(siteId: string, fileName: string, sourceCode: string): Promise<CreatedWebflowAsset> {
-  const res = await towerFetch(`/api/v2/webflow/sites/${encodeURIComponent(siteId)}/assets`, {
+  const res = await towerFetchWithRetry(`/api/v2/webflow/sites/${encodeURIComponent(siteId)}/assets`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
@@ -247,17 +247,20 @@ async function registerHostedScript(
   version: string,
   displayName: string
 ): Promise<{ id: string; version: string }> {
-  const res = await towerFetch(`/api/v2/webflow/sites/${encodeURIComponent(siteId)}/registered_scripts/hosted`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({
-      hostedLocation,
-      integrityHash,
-      version,
-      displayName,
-      canCopy: true,
-    }),
-  });
+  const res = await towerFetchWithRetry(
+    `/api/v2/webflow/sites/${encodeURIComponent(siteId)}/registered_scripts/hosted`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        hostedLocation,
+        integrityHash,
+        version,
+        displayName,
+        canCopy: true,
+      }),
+    }
+  );
   await assertTowerOk(res, "Register hosted script");
   const data = await readJson<{ id?: string; version?: string }>(res);
   if (typeof data?.id !== "string" || typeof data?.version !== "string") {
@@ -306,7 +309,7 @@ async function registerHostedRuntimeScript(
 }
 
 async function getPageCustomScripts(pageId: string): Promise<PageCustomScript[]> {
-  const res = await towerFetch(`/api/v2/webflow/pages/${encodeURIComponent(pageId)}/custom_code`);
+  const res = await towerFetchWithRetry(`/api/v2/webflow/pages/${encodeURIComponent(pageId)}/custom_code`);
   /** First-time pages have no custom-code resource yet; Webflow returns 404 with "Custom code block not found". */
   if (res.status === 404) {
     return [];
@@ -332,7 +335,7 @@ async function putPageCustomScripts(pageId: string, scripts: PageCustomScript[])
     if (attempt > 0) {
       await new Promise((r) => setTimeout(r, 350 * attempt));
     }
-    const res = await towerFetch(`/api/v2/webflow/pages/${encodeURIComponent(pageId)}/custom_code`, {
+    const res = await towerFetchWithRetry(`/api/v2/webflow/pages/${encodeURIComponent(pageId)}/custom_code`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body,
@@ -465,7 +468,7 @@ async function fetchAllPaginated<T>(
 
   for (;;) {
     const sep = pathBase.includes("?") ? "&" : "?";
-    const res = await towerFetch(`${pathBase}${sep}limit=${limit}&offset=${offset}`, {
+    const res = await towerFetchWithRetry(`${pathBase}${sep}limit=${limit}&offset=${offset}`, {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) {
@@ -485,7 +488,7 @@ async function fetchAllPaginated<T>(
 }
 
 async function getSiteCustomScripts(siteId: string): Promise<PageCustomScript[]> {
-  const res = await towerFetch(`/api/v2/webflow/sites/${encodeURIComponent(siteId)}/custom_code`, {
+  const res = await towerFetchWithRetry(`/api/v2/webflow/sites/${encodeURIComponent(siteId)}/custom_code`, {
     headers: { Accept: "application/json" },
   });
   if (res.status === 404) {
@@ -571,15 +574,13 @@ async function collectAppliedCustomCodeScriptIds(siteId: string): Promise<Set<st
   const batchSize = 5;
   for (let i = 0; i < pageIds.length; i += batchSize) {
     const batch = pageIds.slice(i, i + batchSize);
-    await Promise.all(
-      batch.map(async (pageId) => {
-        try {
-          collectScriptIds(await getPageCustomScripts(pageId), ids);
-        } catch (err) {
-          console.warn(LOG_PREFIX, "Could not read page custom code", pageId, err);
-        }
-      })
-    );
+    // Fail-safe: a page read that errors (e.g. persistent 429/5xx) must abort the whole scan rather than be skipped.
+    // A partial id set makes a still-referenced asset look orphaned, so the caller would wrongly delete a live runtime.
+    // Propagating lets the caller treat the purge as not-run and retry later instead of acting on incomplete data.
+    const perPage = await Promise.all(batch.map((pageId) => getPageCustomScripts(pageId)));
+    for (const scripts of perPage) {
+      collectScriptIds(scripts, ids);
+    }
   }
 
   return ids;
@@ -603,7 +604,7 @@ function collectAppliedHostedUrls(
 }
 
 async function deleteSiteAsset(assetId: string): Promise<boolean> {
-  const res = await towerFetch(`/api/v2/webflow/assets/${encodeURIComponent(assetId)}`, {
+  const res = await towerFetchWithRetry(`/api/v2/webflow/assets/${encodeURIComponent(assetId)}`, {
     method: "DELETE",
     headers: { Accept: "application/json" },
   });
@@ -618,10 +619,26 @@ async function deleteSiteAsset(assetId: string): Promise<boolean> {
  * a just-applied script (read-after-write lag). Without this, a purge fired right after a sync deletes the runtime
  * asset the page footer was pointed at, breaking the live runtime.
  */
+/**
+ * Asset cleanup is best-effort housekeeping, not part of a sync's critical path. Scanning every page's custom code on
+ * *every* sync is what produced the request floods / 429s. A per-site cooldown collapses repeated syncs into a single
+ * scan; assets that miss a run are reclaimed on the next eligible purge. Keyed per site, scoped to this session.
+ */
+const PURGE_COOLDOWN_MS = 5 * 60 * 1000;
+const lastPurgeAtBySite = new Map<string, number>();
+
 async function purgeUnreferencedBeaconRuntimeAssets(
   siteId: string,
-  protectedHostedUrls: Iterable<string> = []
+  protectedHostedUrls: Iterable<string> = [],
+  options: { force?: boolean } = {}
 ): Promise<void> {
+  const lastPurgeAt = lastPurgeAtBySite.get(siteId);
+  if (!options.force && lastPurgeAt != null && Date.now() - lastPurgeAt < PURGE_COOLDOWN_MS) {
+    return;
+  }
+  // Stamp before the scan so a failed/aborted run still respects the cooldown — prevents a failing scan from being
+  // re-driven by every subsequent sync (which is exactly the flood we're removing).
+  lastPurgeAtBySite.set(siteId, Date.now());
   try {
     const [appliedScriptIds, registeredScripts, assets] = await Promise.all([
       collectAppliedCustomCodeScriptIds(siteId),
@@ -720,7 +737,7 @@ export async function removeCmsSlotPageRuntimeFromPage(): Promise<CmsSlotPageRun
     if (status === "removed") {
       await putPageCustomScripts(pageId, next);
     }
-    await purgeUnreferencedBeaconRuntimeAssets(siteId);
+    await purgeUnreferencedBeaconRuntimeAssets(siteId, [], { force: true });
     return { status };
   } catch (err) {
     return { status: "failed", reason: formatRuntimeStatusError(err) };

@@ -30,3 +30,40 @@ export function towerFetch(path: string, init?: RequestInit): Promise<Response> 
     credentials: init?.credentials ?? "include",
   });
 }
+
+const RATE_LIMIT_STATUS = 429;
+const MAX_RATE_LIMIT_RETRIES = 4;
+
+/**
+ * Delay before re-issuing a rate-limited request. Honors the upstream `Retry-After` header (seconds or HTTP-date)
+ * when present — Webflow sends it — and falls back to exponential backoff (500ms, 1s, 2s, 4s) otherwise.
+ */
+function rateLimitBackoffMs(res: Response, attempt: number): number {
+  const header = res.headers.get("Retry-After");
+  if (header) {
+    const seconds = Number.parseInt(header, 10);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return seconds * 1000;
+    }
+    const dateMs = Date.parse(header);
+    if (Number.isFinite(dateMs)) {
+      return Math.max(0, dateMs - Date.now());
+    }
+  }
+  return 500 * 2 ** attempt;
+}
+
+/**
+ * {@link towerFetch} that transparently retries on HTTP 429 with `Retry-After`-aware backoff. Use for Webflow Data API
+ * proxy calls, which are rate-limited (~60 req/min). Only retries 429; every other status (including the expected 404
+ * for pages without a custom-code block) is returned to the caller unchanged. Bodies must be replayable (string/Blob/
+ * ArrayBuffer, not a one-shot stream) since the same `init` is re-sent per attempt.
+ */
+export async function towerFetchWithRetry(path: string, init?: RequestInit): Promise<Response> {
+  let res = await towerFetch(path, init);
+  for (let attempt = 0; res.status === RATE_LIMIT_STATUS && attempt < MAX_RATE_LIMIT_RETRIES; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, rateLimitBackoffMs(res, attempt)));
+    res = await towerFetch(path, init);
+  }
+  return res;
+}

@@ -33,7 +33,7 @@ export function userRowIndividualPlan(u: {
 }): IndividualPaidPlan | null {
   if (
     isIndividualPaidPlan(u.subscriptionPlan) &&
-    Boolean(u.stripeSubscriptionId) &&
+    u.stripeSubscriptionId &&
     typeof u.subscriptionStatus === "string" &&
     STRIPE_PRO_ENTITLED_STATUSES.has(u.subscriptionStatus as Stripe.Subscription.Status)
   ) {

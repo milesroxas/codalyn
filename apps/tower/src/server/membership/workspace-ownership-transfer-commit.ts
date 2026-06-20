@@ -30,7 +30,7 @@ export async function commitAcceptedOwnershipTransfer(input: {
       .from(workspaceOwnershipTransfer)
       .where(eq(workspaceOwnershipTransfer.id, transfer.id))
       .limit(1);
-    if (!currentTransfer || currentTransfer.status !== "pending") {
+    if (currentTransfer?.status !== "pending") {
       throw new Error("not_pending");
     }
 

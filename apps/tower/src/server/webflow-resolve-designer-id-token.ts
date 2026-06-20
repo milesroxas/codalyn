@@ -207,7 +207,6 @@ export function decideDesignerResolveFailure(
           hint: `Webflow token/resolve returned ${result.status}.`,
         },
       };
-    case "id_token_rejected":
     default:
       return { response: { error: "id_token_resolve_failed", status: 401 } };
   }

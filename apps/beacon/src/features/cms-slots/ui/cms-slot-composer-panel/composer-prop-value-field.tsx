@@ -10,6 +10,7 @@ import {
   dateInputValue,
   parseBoolString,
 } from "@/features/cms-slots/model/cms-slot-composer-prop-input-normalize";
+import { ComposerLinkField } from "@/features/cms-slots/ui/composer-link-field/composer-link-field";
 import { CMS_SLOTS_COMPOSER_IMAGE_PROP_HINT } from "@/shared/lib/cms-slots-feature-copy";
 import { cn } from "@/shared/lib/utils";
 import { Checkbox } from "@/shared/ui/checkbox";
@@ -98,6 +99,9 @@ const COMPOSER_PROP_VALUE_BY_KIND: Record<
       disabled={busy}
       onChange={(e) => onChange(e.target.value)}
     />
+  ),
+  link: ({ inputId, value, busy, onChange }) => (
+    <ComposerLinkField inputId={inputId} value={value} busy={busy} onChange={onChange} />
   ),
   email: ({ inputId, value, busy, onChange }) => (
     <Input

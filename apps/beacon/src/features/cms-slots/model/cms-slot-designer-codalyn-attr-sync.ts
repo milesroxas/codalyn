@@ -62,6 +62,15 @@ function hasChildren(el: AnyElement): el is AnyElement & { getChildren: () => Pr
   return "children" in el && (el as { children?: boolean }).children === true;
 }
 
+/**
+ * Slot content for a component instance. `SlotInstanceElement` (from `getSlots()`) always exposes `getChildren()` and
+ * carries no `children` discriminant, so the {@link hasChildren} guard used for `AnyElement` does not apply to it —
+ * gating slots on `hasChildren` skipped every slot, leaving slot-nested elements untagged.
+ */
+async function slotChildren(slot: SlotInstanceElement): Promise<AnyElement[]> {
+  return slot.getChildren().catch(() => [] as AnyElement[]);
+}
+
 type PropAttrOps = {
   get: (name: string) => Promise<null | string>;
   set: (name: string, value: string) => Promise<null>;
@@ -337,10 +346,7 @@ async function walkTree(
     const inst = el as ComponentElement;
     const slots = await inst.getSlots().catch(() => [] as SlotInstanceElement[]);
     for (const slot of slots) {
-      if (!hasChildren(slot as unknown as AnyElement)) {
-        continue;
-      }
-      for (const ch of await slot.getChildren()) {
+      for (const ch of await slotChildren(slot)) {
         await walkTree(ch, exposedIds, nestedAlias, acc, nestedDepth);
       }
     }
@@ -442,10 +448,7 @@ async function stripTreeCmsSlotAttrs(
     const inst = el as ComponentElement;
     const slots = await inst.getSlots().catch(() => [] as SlotInstanceElement[]);
     for (const slot of slots) {
-      if (!hasChildren(slot as unknown as AnyElement)) {
-        continue;
-      }
-      for (const ch of await slot.getChildren()) {
+      for (const ch of await slotChildren(slot)) {
         await stripTreeCmsSlotAttrs(ch, out, nestedDepth, ownerExposedIds);
       }
     }

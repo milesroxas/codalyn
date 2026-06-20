@@ -53,6 +53,21 @@ function nestedInstance(
   } as unknown as ComponentElement;
 }
 
+/**
+ * A component instance whose root has no children but whose `getSlots()` returns a single slot containing
+ * `slotKids`. Mirrors the real `SlotInstanceElement`: it exposes only `getChildren()` and carries **no** `children`
+ * discriminant, which is exactly the shape the slot-walk must handle.
+ */
+function instanceWithSlotContent(root: AnyElement, slotKids: AnyElement[]): ComponentElement {
+  const slot = { getChildren: vi.fn(async () => slotKids) };
+  return {
+    type: "ComponentInstance",
+    getProps: vi.fn(async () => []),
+    getComponent: vi.fn(async () => ({ getRootElement: vi.fn(async () => root) })),
+    getSlots: vi.fn(async () => [slot]),
+  } as unknown as ComponentElement;
+}
+
 describe("syncDesignerCodalynSlotPropAttributes (re-tag after deselect)", () => {
   beforeEach(() => {
     vi.stubGlobal("webflow", {
@@ -110,6 +125,21 @@ describe("syncDesignerCodalynSlotPropAttributes (re-tag after deselect)", () => 
     expect(result.errors).toEqual([]);
     expect((innerImg as BoundDom).store.has(CMS_SLOT_CONTENT_ATTR)).toBe(false);
     expect(result.removed).toBe(1);
+  });
+
+  it("tags an element placed inside a component instance's slot", async () => {
+    // Regression: `getSlots()` returns `SlotInstanceElement`s, which expose only `getChildren()` and carry no
+    // `children` flag. The slot-walk previously gated on the `AnyElement` `hasChildren` guard, which is always false
+    // for a slot instance, so every slot was skipped and slot-nested elements never received `data-cb-c`.
+    const slotChild = boundDom({}, "title");
+    const sectionInstance = instanceWithSlotContent(boundDom({}, null), [slotChild]);
+    const root = boundDom({}, null, [sectionInstance]);
+
+    const result = await syncDesignerCodalynSlotPropAttributes(instanceForRoot(root), [exposedProp("title")]);
+
+    expect(result.errors).toEqual([]);
+    expect((slotChild as BoundDom).store.get(CMS_SLOT_CONTENT_ATTR)).toBe("title");
+    expect(result.tagged).toBe(1);
   });
 
   it("preserves a foreign component's segment inside a shared nested definition when this prop is deselected", async () => {

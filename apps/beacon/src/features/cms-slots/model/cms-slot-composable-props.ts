@@ -3,12 +3,16 @@
  * Per-row values still serialize to JSON `p` as strings (booleans `true`/`false`, numbers as text, link JSON, etc.).
  */
 
+import { beaconLinkRuntimeValue, isCmsSlotLinkValueType } from "@/features/cms-slots/model/cms-slot-link-value";
+
 export type ComposableInstancePropSelectOption = { value: string; label: string };
 
 export type ComposableInstancePropMeta = {
   propId: string;
   label: string;
   valueType: string;
+  /** Webflow props-panel group/folder the prop lives in (`display.group`); `undefined` when ungrouped. */
+  group?: string;
   /** When Webflow provides discrete choices (e.g. component variants), Composer renders a select; values are `id` strings. */
   selectOptions?: ComposableInstancePropSelectOption[];
 };
@@ -16,6 +20,11 @@ export type ComposableInstancePropMeta = {
 function labelFromInstanceProp(p: Pick<InstanceProp, "propId" | "display">): string {
   const l = p.display?.label;
   return typeof l === "string" && l.length > 0 ? l : p.propId;
+}
+
+export function groupFromInstanceProp(p: Pick<InstanceProp, "display">): string | undefined {
+  const g = p.display?.group;
+  return typeof g === "string" && g.trim().length > 0 ? g : undefined;
 }
 
 function selectOptionsFromInstanceProp(
@@ -33,6 +42,7 @@ export type CmsSlotComposerPropFieldKind =
   | "multiline"
   | "line"
   | "url"
+  | "link"
   | "email"
   | "tel"
   | "number"
@@ -59,7 +69,7 @@ const COMPOSER_FIELD_BY_VALUE_TYPE: Readonly<Partial<Record<string, CmsSlotCompo
   booleanFilter: "multiline",
   date: "date",
   url: "url",
-  link: "url",
+  link: "link",
   video: "url",
   videoUrl: "url",
   email: "email",
@@ -279,6 +289,8 @@ export function buildCmsSlotRuntimePropRow(
     let v = String(pickRemappedPropValue(ep.propId, d.propValues ?? undefined, aliasToCanonical) ?? "");
     if (ep.valueType === "headingTag") {
       v = normalizeHeadingTagForPayload(v, ep.selectOptions);
+    } else if (isCmsSlotLinkValueType(ep.valueType)) {
+      v = beaconLinkRuntimeValue(v);
     }
     o[ep.propId] = v;
   }
@@ -321,6 +333,7 @@ async function listComposablePropsForInstance(instance: ComponentElement): Promi
       propId: p.propId,
       label: labelFromInstanceProp(p),
       valueType: String(p.valueType),
+      group: groupFromInstanceProp(p),
       selectOptions: selectOptionsFromInstanceProp(p),
     });
   }

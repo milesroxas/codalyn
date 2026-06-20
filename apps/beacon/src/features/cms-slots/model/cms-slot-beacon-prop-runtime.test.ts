@@ -126,4 +126,36 @@ describe("beacon prop applyValue runtime", () => {
     expect(taggedImg.getAttribute("src")).toBe(avif);
     expect(picSource.getAttribute("srcset")).toBe(avif);
   });
+
+  it("applies link envelopes to anchors: href, new-tab target/rel, relative paths, and legacy bare urls", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+
+    // New-tab external link → href + target + rel.
+    const a1 = document.createElement("a");
+    applyValue(a1, JSON.stringify({ k: "url", h: "https://x.com", t: 1 }));
+    expect(a1.getAttribute("href")).toBe("https://x.com");
+    expect(a1.getAttribute("target")).toBe("_blank");
+    expect(a1.getAttribute("rel")).toBe("noopener noreferrer");
+
+    // Internal relative path, current tab → strips any pre-existing target.
+    const a2 = document.createElement("a");
+    a2.setAttribute("target", "_blank");
+    applyValue(a2, JSON.stringify({ k: "cms", h: "/blog/post", c: "col", e: "item" }));
+    expect(a2.getAttribute("href")).toBe("/blog/post");
+    expect(a2.getAttribute("target")).toBeNull();
+
+    // Legacy bare url string keeps the historical current-tab behavior.
+    const a3 = document.createElement("a");
+    applyValue(a3, "https://legacy.example");
+    expect(a3.getAttribute("href")).toBe("https://legacy.example");
+    expect(a3.getAttribute("target")).toBeNull();
+
+    // Malformed envelope degrades to using the raw string as href (no throw).
+    const a4 = document.createElement("a");
+    applyValue(a4, "{not json");
+    expect(a4.getAttribute("href")).toBe("{not json");
+  });
 });

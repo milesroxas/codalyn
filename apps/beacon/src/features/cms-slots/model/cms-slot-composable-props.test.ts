@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCmsSlotRuntimePropRow,
   type ComposableInstancePropMeta,
+  groupFromInstanceProp,
   mergeComposableMetaWithLiveResolved,
   normalizeHeadingTagForPayload,
   pickRemappedPropValue,
@@ -11,6 +12,18 @@ const E = (propId: string, label: string, valueType: string): ComposableInstance
   propId,
   label,
   valueType,
+});
+
+describe("groupFromInstanceProp", () => {
+  it("returns the group string when present", () => {
+    expect(groupFromInstanceProp({ display: { label: "CTA", group: "Content" } })).toBe("Content");
+  });
+
+  it("treats null/empty/whitespace group as ungrouped", () => {
+    expect(groupFromInstanceProp({ display: { label: "CTA", group: null } })).toBeUndefined();
+    expect(groupFromInstanceProp({ display: { label: "CTA", group: "" } })).toBeUndefined();
+    expect(groupFromInstanceProp({ display: { label: "CTA", group: "   " } })).toBeUndefined();
+  });
 });
 
 describe("mergeComposableMetaWithLiveResolved", () => {
@@ -95,5 +108,18 @@ describe("pickRemappedPropValue + buildCmsSlotRuntimePropRow", () => {
     expect(buildCmsSlotRuntimePropRow({ propValues: { tag: "h2" } }, metas, aliasToCanonical)).toEqual({
       tag: "h2",
     });
+  });
+
+  it("canonicalizes link prop values into the runtime row", () => {
+    const exposed = [{ propId: "cta", label: "CTA", valueType: "link" }];
+    const { metas, aliasToCanonical } = mergeComposableMetaWithLiveResolved(exposed, exposed);
+    // Plain external current-tab link stays a bare url.
+    expect(buildCmsSlotRuntimePropRow({ propValues: { cta: "https://x.com" } }, metas, aliasToCanonical)).toEqual({
+      cta: "https://x.com",
+    });
+    // A link envelope with no href collapses to "" so the runtime falls open to the authored default.
+    expect(
+      buildCmsSlotRuntimePropRow({ propValues: { cta: JSON.stringify({ k: "page", h: "" }) } }, metas, aliasToCanonical)
+    ).toEqual({ cta: "" });
   });
 });

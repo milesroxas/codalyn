@@ -34,13 +34,13 @@
     "@vitest/coverage-v8": "^4.1.4",
     "@webflow/designer-extension-typings": "^2.0.33",
     "@webflow/webflow-cli": "^1.15.0",
-    "vitest": "^4.1.4",
-    "vite": "^8.0.8",
     "jsdom": "^29.0.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "tailwindcss": "^4.2.2",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vite": "^8.0.8",
+    "vitest": "^4.1.4"
   },
   "dependencies": {
     "@codalyn/observability": "workspace:*",

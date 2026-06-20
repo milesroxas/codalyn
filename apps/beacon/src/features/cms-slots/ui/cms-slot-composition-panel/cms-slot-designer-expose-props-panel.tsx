@@ -4,13 +4,16 @@ import {
   CMS_SLOTS_DESIGNER_EXPOSE_PROPS_LIST_ARIA_LABEL,
   CMS_SLOTS_DESIGNER_EXPOSE_PROPS_LOADING,
 } from "@/shared/lib/cms-slots-feature-copy";
-import { CheckboxField } from "@/shared/ui/checkbox-field";
+import { Badge } from "@/shared/ui/badge";
+import { Checkbox } from "@/shared/ui/checkbox";
+import { DrawerScrollList, DrawerScrollListItem } from "@/shared/ui/drawer-scroll-list";
 import {
-  DrawerScrollList,
-  DrawerScrollListItem,
-  DrawerScrollListRowSurface,
-  drawerScrollListRowShellVariants,
-} from "@/shared/ui/drawer-scroll-list";
+  SurfaceSummaryCardIconRowCopy,
+  SurfaceSummaryCardMeta,
+  SurfaceSummaryCardSelectRow,
+  SurfaceSummaryCardSelectRowControl,
+  SurfaceSummaryCardTitle,
+} from "@/shared/ui/surface-summary-card";
 
 function toggleSlotExposedProp(
   slotExposed: ComposableInstancePropMeta[],
@@ -56,21 +59,28 @@ export function CmsSlotDesignerExposePropsPanel(props: CmsSlotDesignerExposeProp
 
         return (
           <DrawerScrollListItem key={prop.propId}>
-            <div className={drawerScrollListRowShellVariants()} data-vaul-no-drag="">
-              <DrawerScrollListRowSurface className="w-full justify-start">
-                <CheckboxField
+            <SurfaceSummaryCardSelectRow density="compact" htmlFor={fieldId} selected={checked} data-vaul-no-drag="">
+              <SurfaceSummaryCardIconRowCopy>
+                <SurfaceSummaryCardTitle density="compact">{prop.label}</SurfaceSummaryCardTitle>
+                {prop.group != null ? <SurfaceSummaryCardMeta>{prop.group}</SurfaceSummaryCardMeta> : null}
+              </SurfaceSummaryCardIconRowCopy>
+              <Badge variant="accent" size="sm" className="shrink-0">
+                {prop.valueType}
+              </Badge>
+              <SurfaceSummaryCardSelectRowControl>
+                <Checkbox
                   id={fieldId}
-                  className="w-full"
-                  label={prop.label}
-                  meta={prop.valueType}
                   checked={checked}
                   disabled={disabled}
-                  onCheckedChange={(want) => {
-                    onSetSlotExposed(slotIndex, toggleSlotExposedProp(slotExposed, prop, want));
+                  onCheckedChange={(value) => {
+                    if (value === "indeterminate") {
+                      return;
+                    }
+                    onSetSlotExposed(slotIndex, toggleSlotExposedProp(slotExposed, prop, value === true));
                   }}
                 />
-              </DrawerScrollListRowSurface>
-            </div>
+              </SurfaceSummaryCardSelectRowControl>
+            </SurfaceSummaryCardSelectRow>
           </DrawerScrollListItem>
         );
       })}

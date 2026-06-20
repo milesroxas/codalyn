@@ -35,11 +35,29 @@ describe("resolveElementBindingsSettings", () => {
       type: "DOM",
       elementSettings: true,
       getSettings,
-      searchSettings: vi.fn(),
+      searchSettings: vi.fn().mockResolvedValue({}),
     } as unknown as AnyElement;
 
     await resolveElementBindingsSettings(el);
     expect(getSettings).toHaveBeenCalled();
+  });
+
+  it("merges link/url bindings from searchSettings on top of getSettings", async () => {
+    // getSettings summaries omit the link binding; searchSettings surfaces it (same gap as images).
+    const getSettings = vi.fn().mockResolvedValue({ visibility: { sourceType: "static", value: true } });
+    const searchSettings = vi.fn().mockImplementation(async (opts?: { valueType?: string }) => {
+      if (opts?.valueType === "link") {
+        return { link: { valueType: "link", value: { sourceType: "prop", propId: "cta-link" } } };
+      }
+      return {};
+    });
+    const el = { type: "DOM", elementSettings: true, getSettings, searchSettings } as unknown as AnyElement;
+
+    const settings = await resolveElementBindingsSettings(el);
+    expect(settings?.link).toEqual({ valueType: "link", value: { sourceType: "prop", propId: "cta-link" } });
+    expect(settings?.visibility).toEqual({ sourceType: "static", value: true });
+    expect(searchSettings).toHaveBeenCalledWith({ valueType: "link" });
+    expect(searchSettings).toHaveBeenCalledWith({ valueType: "url" });
   });
 
   it("returns null for nodes without binding APIs", async () => {

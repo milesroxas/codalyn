@@ -215,7 +215,7 @@ const surfaceSummaryCardScanListSectionLabelClass = "text-muted-foreground text-
 const surfaceSummaryCardScanListStatusClass = "text-muted-foreground flex shrink-0 items-center gap-2 text-xs";
 const surfaceSummaryCardScanListErrorClass = "shrink-0 text-destructive text-xs";
 const surfaceSummaryCardScanListScrollRegionClass =
-  "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-sm border border-border/80 bg-card text-card-foreground shadow-sm";
+  "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-sm border border-border/80 bg-card text-card-foreground shadow-sm data-[state=loading]:min-h-18";
 const surfaceSummaryCardScanListScrollAreaClass = "min-h-0 w-full flex-1 rounded-[inherit]";
 const surfaceSummaryCardScanListScrollLoaderClass =
   "pointer-events-auto absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-card/80 px-6 backdrop-blur-[1px]";

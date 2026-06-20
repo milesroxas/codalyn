@@ -13,7 +13,7 @@ import { useBeaconGuestWelcomeVisible } from "@/features/auth/lib/use-beacon-gue
 import { isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerAccessPolicy } from "@/features/auth/model/use-beacon-tower-access-policy";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
-import type { PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
+import type { ImageExportSuccessContext, PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
 import {
   outputDimensionsMatchingCrop,
   parseOutputDimension,
@@ -72,6 +72,10 @@ import { useExportQualityPreview } from "@/features/image-editor/model/use-expor
 import { useImageDissolveTransition } from "@/features/image-editor/model/use-image-dissolve-transition";
 import { useImageEditorAssetFolders } from "@/features/image-editor/model/use-image-editor-asset-folders";
 import { useImageEditorAutoTargets } from "@/features/image-editor/model/use-image-editor-auto-targets";
+import {
+  type ImageEditorComposeSession,
+  useImageEditorComposeMode,
+} from "@/features/image-editor/model/use-image-editor-compose-mode";
 import { useImageEditorExportSuccessNavigation } from "@/features/image-editor/model/use-image-editor-export-success-navigation";
 import { useImageEditorWorkflow } from "@/features/image-editor/model/use-image-editor-workflow";
 import { useImageOutputDimensionsOnLoad } from "@/features/image-editor/model/use-image-output-dimensions-on-load";
@@ -311,7 +315,8 @@ function applySessionConstraintsFromPickerSelection(
   setters.setAspectPreset("free");
 }
 
-export function ImageEditor() {
+export function ImageEditor({ composeSession }: { composeSession?: ImageEditorComposeSession } = {}) {
+  const compose = useImageEditorComposeMode(composeSession);
   const navigate = useNavigate();
   const {
     settings,
@@ -447,7 +452,7 @@ export function ImageEditor() {
   }, []);
 
   const resolverTargetInput = useMemo(() => {
-    if (resolverSiteId == null || resolverPageId == null || imageSrc == null) {
+    if (compose.active || resolverSiteId == null || resolverPageId == null || imageSrc == null) {
       return null;
     }
     return buildResolvedTargetInput({
@@ -459,6 +464,7 @@ export function ImageEditor() {
       elementCmsBinding,
     });
   }, [
+    compose.active,
     resolverSiteId,
     resolverPageId,
     autoPageTarget,
@@ -553,8 +559,8 @@ export function ImageEditor() {
   );
 
   const uploadPresetPickerVisible = useMemo(
-    () => uploadPresetPickerOptions.length > 0 && !editorExperience,
-    [uploadPresetPickerOptions.length, editorExperience]
+    () => !compose.active && uploadPresetPickerOptions.length > 0 && !editorExperience,
+    [compose.active, uploadPresetPickerOptions.length, editorExperience]
   );
 
   const uploadPresetManualOverride = useMemo(
@@ -567,11 +573,12 @@ export function ImageEditor() {
   const effectiveExportConstraints = useMemo(
     () =>
       resolveEffectiveExportConstraints({
+        composeConstraints: compose.constraints,
         uploadPresetManualOverride,
         selectedPresetConstraints: selectedUploadPresetConstraints,
         resolvedReadout: resolvedConstraintsReadout,
       }),
-    [uploadPresetManualOverride, selectedUploadPresetConstraints, resolvedConstraintsReadout]
+    [compose.constraints, uploadPresetManualOverride, selectedUploadPresetConstraints, resolvedConstraintsReadout]
   );
 
   const showExportSizeControls = useMemo(
@@ -674,6 +681,15 @@ export function ImageEditor() {
     ]
   );
 
+  const effectivePlacement = useMemo<PlacementMode>(
+    () => (compose.active ? "compose" : placement),
+    [compose.active, placement]
+  );
+  const effectiveCmsPrimaryUpload = useMemo(
+    () => (compose.active ? true : cmsPrimaryUpload),
+    [compose.active, cmsPrimaryUpload]
+  );
+
   const {
     dissolve,
     dissolving,
@@ -701,6 +717,9 @@ export function ImageEditor() {
   }, [towerUser?.id, settingsPullSynced, settings]);
 
   useEffect(() => {
+    if (compose.active) {
+      return;
+    }
     if (skipNextPersistExportDefaultsRef.current) {
       skipNextPersistExportDefaultsRef.current = false;
       return;
@@ -712,7 +731,7 @@ export function ImageEditor() {
       defaultExportFormat: exportFormat,
       defaultExportQuality: quality,
     });
-  }, [exportFormat, quality, canPersistExportDefaults, updateSettings]);
+  }, [compose.active, exportFormat, quality, canPersistExportDefaults, updateSettings]);
 
   const sessionConstraintApplication = useMemo(
     () =>
@@ -729,7 +748,7 @@ export function ImageEditor() {
   }, [sessionConstraintApplication.taggedDimensionsActive]);
 
   useEffect(() => {
-    if (imageSrc == null) {
+    if (compose.active || imageSrc == null) {
       return;
     }
     if (!sessionConstraintApplication.shouldApply || uploadPresetManualOverride) {
@@ -768,6 +787,7 @@ export function ImageEditor() {
       }
     );
   }, [
+    compose.active,
     imageSrc,
     sessionConstraintApplication,
     uploadPresetManualOverride,
@@ -777,6 +797,9 @@ export function ImageEditor() {
   ]);
 
   useEffect(() => {
+    if (compose.active) {
+      return;
+    }
     const selectedOption = uploadPresetPickerOptionMap.get(uploadPresetOptionId) ?? null;
     const selectedConstraints = selectedOption?.constraints ?? null;
     if (selectedOption == null || isManualUploadPresetOptionId(selectedOption.id)) {
@@ -815,7 +838,39 @@ export function ImageEditor() {
         setAspectPreset,
       }
     );
-  }, [resolvedUploadTarget, uploadPresetOptionId, uploadPresetPickerOptionMap, imageSrc, imageOptimizeLimitReached]);
+  }, [
+    compose.active,
+    resolvedUploadTarget,
+    uploadPresetOptionId,
+    uploadPresetPickerOptionMap,
+    imageSrc,
+    imageOptimizeLimitReached,
+  ]);
+
+  // Compose mode: drive the session straight from the Designer per-prop preset (highest precedence, locks the UI).
+  useEffect(() => {
+    if (!compose.active || imageSrc == null || compose.constraints == null) {
+      return;
+    }
+    setSessionMaxFileSizeBytes(compose.constraints.maxFileSizeBytes);
+    skipNextPersistExportDefaultsRef.current = true;
+    applySessionConstraintsFromPickerSelection(
+      {
+        ...compose.constraints,
+        exportFormat: resolveEffectiveExportFormat(compose.constraints.exportFormat, imageOptimizeLimitReached),
+      },
+      {
+        setOutputWidth,
+        setOutputHeight,
+        setWidthStr,
+        setHeightStr,
+        setExportFormat,
+        setQuality,
+        setCropFrameMode,
+        setAspectPreset,
+      }
+    );
+  }, [compose.active, compose.constraints, imageSrc, imageOptimizeLimitReached]);
 
   useEffect(() => {
     if (uploadPresetExportFormatLocked && !avifPresetOverriddenByTowerLimit) {
@@ -833,11 +888,11 @@ export function ImageEditor() {
   ]);
 
   useEffect(() => {
-    if (towerUser && prevShowGuestOnboarding.current) {
+    if (!compose.active && towerUser && prevShowGuestOnboarding.current) {
       navigate("/home");
     }
     prevShowGuestOnboarding.current = showGuestOnboarding;
-  }, [towerUser, showGuestOnboarding, navigate]);
+  }, [compose.active, towerUser, showGuestOnboarding, navigate]);
 
   useRevokeBlobUrlOnChange(imageSrc);
 
@@ -1064,6 +1119,7 @@ export function ImageEditor() {
 
   const {
     pathMode,
+    setPathMode,
     flowStep,
     setFlowStep,
     clearImageSourceOnly,
@@ -1098,6 +1154,9 @@ export function ImageEditor() {
   });
 
   useLayoutEffect(() => {
+    if (compose.active) {
+      return;
+    }
     if (showGuestOnboarding) {
       return;
     }
@@ -1108,7 +1167,16 @@ export function ImageEditor() {
       return;
     }
     chooseAutoPath();
-  }, [showGuestOnboarding, roleReady, isWorkspaceDesigner, chooseAutoPath]);
+  }, [compose.active, showGuestOnboarding, roleReady, isWorkspaceDesigner, chooseAutoPath]);
+
+  // Compose mode skips the entry/target steps — start directly on the upload dropzone.
+  useLayoutEffect(() => {
+    if (!compose.active) {
+      return;
+    }
+    setPathMode("auto");
+    setFlowStep("upload");
+  }, [compose.active, setPathMode, setFlowStep]);
 
   useImageOutputDimensionsOnLoad(
     imageSrc,
@@ -1294,9 +1362,18 @@ export function ImageEditor() {
     }
   }, [pathMode, flowStep]);
 
-  const handleExportSuccess = useCallback(() => {
-    setFlowStep("success");
-  }, [setFlowStep]);
+  const handleExportSuccess = useCallback(
+    (context: ImageExportSuccessContext) => {
+      if (compose.active) {
+        if (context.asset) {
+          compose.onComplete?.(context.asset);
+        }
+        return;
+      }
+      setFlowStep("success");
+    },
+    [compose.active, compose.onComplete, setFlowStep]
+  );
 
   const { busy, applyToCanvas, exportSuccess, clearExportSuccess } = useApplyCroppedToWebflow({
     imageSrc,
@@ -1316,9 +1393,9 @@ export function ImageEditor() {
     currentCmsItemId,
     assetFolders,
     selectedAssetFolderId,
-    placement,
+    placement: effectivePlacement,
     replaceLibraryAsset,
-    cmsPrimaryUpload,
+    cmsPrimaryUpload: effectiveCmsPrimaryUpload,
     exportPlaceBlockedLabel: exportPlaceBlockedForApply.label,
     exportPlaceBlockedCode: exportPlaceBlockedForApply.code,
     onExportSuccess: handleExportSuccess,
@@ -1380,12 +1457,18 @@ export function ImageEditor() {
   const resolvedPlacementForPlace = useMemo(
     () =>
       resolveImageEditorPlacement({
-        placement,
+        placement: effectivePlacement,
         offerSelectionPlacement,
         offerReplacePlacement,
         guestCmsTemplateRestricted,
       }),
-    [placement, offerSelectionPlacement, offerReplacePlacement, guestCmsTemplateRestricted]
+    [effectivePlacement, offerSelectionPlacement, offerReplacePlacement, guestCmsTemplateRestricted]
+  );
+
+  const hidePlacementCard = useMemo(() => compose.active || pathMode === "auto", [compose.active, pathMode]);
+  const positionPageTarget = useMemo(
+    () => (compose.active || pathMode !== "auto" ? null : autoDisplaySurfaceTarget),
+    [compose.active, pathMode, autoDisplaySurfaceTarget]
   );
 
   const savePlaceButton = useMemo(
@@ -1397,7 +1480,7 @@ export function ImageEditor() {
         foldersLoading,
         assetFolderCount: assetFolders.length,
         selectedAssetFolderId,
-        cmsPrimaryUpload,
+        cmsPrimaryUpload: effectiveCmsPrimaryUpload,
         elementCmsBindingLoading,
         completedCrop,
         placement: resolvedPlacementForPlace,
@@ -1413,7 +1496,7 @@ export function ImageEditor() {
       foldersLoading,
       assetFolders.length,
       selectedAssetFolderId,
-      cmsPrimaryUpload,
+      effectiveCmsPrimaryUpload,
       elementCmsBindingLoading,
       completedCrop,
       resolvedPlacementForPlace,
@@ -1481,14 +1564,14 @@ export function ImageEditor() {
         previewPending,
         outputHeight,
         outputWidth,
-        placement,
+        placement: effectivePlacement,
         quality,
         replaceLibraryAsset,
         selectedAssetFolderId,
         selectedComponentImagePropId,
         selectedElementType,
         componentImagePropsResolving,
-        cmsPrimaryUpload,
+        cmsPrimaryUpload: effectiveCmsPrimaryUpload,
         elementCmsBindingLoading,
         elementCmsBinding,
         guestCmsTemplateRestricted,
@@ -1520,10 +1603,10 @@ export function ImageEditor() {
         onOpenQualityPopout: openQualityPopout,
         limitCropZoomToNativeResolution: settings.limitCropZoomToNativeResolution,
         flowPhase: flowStep === "position" ? "position" : "save",
-        hidePlacementCard: pathMode === "auto",
+        hidePlacementCard,
         frameSummary,
-        showResolvedReadout: true,
-        positionPageTarget: pathMode === "auto" ? autoDisplaySurfaceTarget : null,
+        showResolvedReadout: !compose.active,
+        positionPageTarget,
         resolvedUploadTarget,
         resolvedConstraintsReadout,
         sessionMaxFileSizeBytes,
@@ -1563,6 +1646,7 @@ export function ImageEditor() {
   return (
     <>
       <ImageEditorRouteChrome
+        headerVariant={compose.active ? "breadcrumbsOnly" : "default"}
         contentClassName={flowStep === "autoElement" ? "h-full min-h-0 overflow-hidden" : undefined}
         scrollResetKey={
           flowStep === "configurePresets" && configurePresetsScrollResetKey

@@ -318,6 +318,14 @@ export const CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_TOOLTIP =
 
 export const CMS_SLOTS_COMPOSER_IMAGE_PROP_HINT = "Copy image link from Webflow Assets.";
 
+export const CMS_SLOTS_COMPOSER_IMAGE_UPLOAD_LABEL = "Upload image";
+export const CMS_SLOTS_COMPOSER_IMAGE_REPLACE_LABEL = "Replace";
+export const CMS_SLOTS_COMPOSER_IMAGE_REMOVE_LABEL = "Remove";
+export const CMS_SLOTS_COMPOSER_IMAGE_BLOCKED_HINT = "Image size not set by Designer.";
+export const CMS_SLOTS_COMPOSER_IMAGE_DRAWER_TITLE = "Upload image";
+export const CMS_SLOTS_COMPOSER_IMAGE_DRAWER_DESCRIPTION =
+  "Upload and crop to the size the Designer set for this field.";
+
 export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DESCRIPTION = "Choose which props to include for this slot.";
 
 export const CMS_SLOTS_DESIGNER_EXPOSE_PROPS_LOADING = "Loading…";

@@ -3,12 +3,19 @@ import { parseOutputDimensionStrict } from "@/features/image-editor/lib/apply-cr
 import { aspectValue, type EditorAspectSelection } from "@/features/image-editor/lib/aspect-preset";
 import { hasValidExportConstraints } from "@/features/image-editor/lib/image-editor-upload-preset-picker";
 
-/** Preset constraints from picker selection, else resolver readout (e.g. site default fallback). */
+/**
+ * Compose-session constraints (highest precedence), else picker selection, else resolver readout (e.g. site default).
+ * Compose constraints come from a Designer per-prop preset and lock the session — they win over every other source.
+ */
 export function resolveEffectiveExportConstraints(input: {
+  composeConstraints?: ExportConstraints | null;
   uploadPresetManualOverride: boolean;
   selectedPresetConstraints: ExportConstraints | null;
   resolvedReadout: ResolverOutput | null;
 }): ExportConstraints | null {
+  if (hasValidExportConstraints(input.composeConstraints)) {
+    return input.composeConstraints ?? null;
+  }
   if (input.uploadPresetManualOverride) {
     return null;
   }

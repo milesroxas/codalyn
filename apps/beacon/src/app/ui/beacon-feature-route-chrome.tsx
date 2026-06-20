@@ -190,19 +190,33 @@ export function BeaconRouteSubheader(props: BeaconRouteSubheaderProps) {
   );
 }
 
-export type BeaconFeatureRouteSubheaderProps = {
+const beaconFeatureRouteSubheaderVariants = cva("shrink-0", {
+  variants: {
+    surface: {
+      /** Pinned strip with its own background and divider (standalone under the route header). */
+      default: "border-b border-border/50 bg-background",
+      /** Transparent strip with no background or divider (e.g. breadcrumbs sitting on a host sheet). */
+      plain: "",
+    },
+  },
+  defaultVariants: {
+    surface: "default",
+  },
+});
+
+export type BeaconFeatureRouteSubheaderProps = VariantProps<typeof beaconFeatureRouteSubheaderVariants> & {
   children: ReactNode;
   dataSlot?: string;
 };
 
 /** Pinned strip directly under the route header (e.g. step breadcrumbs). Hidden when empty. */
 export function BeaconFeatureRouteSubheader(props: BeaconFeatureRouteSubheaderProps) {
-  const { children, dataSlot = "beacon_feature_route_subheader" } = props;
+  const { children, surface, dataSlot = "beacon_feature_route_subheader" } = props;
   if (!hasBeaconRouteSubheaderContent(children)) {
     return null;
   }
   return (
-    <div className="shrink-0 border-b border-border/50 bg-background" data-slot={dataSlot}>
+    <div className={beaconFeatureRouteSubheaderVariants({ surface })} data-slot={dataSlot}>
       <div className={cn(beaconPanelContainClass, "px-3 py-2")}>{children}</div>
     </div>
   );

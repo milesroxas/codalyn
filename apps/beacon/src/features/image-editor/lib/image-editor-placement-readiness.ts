@@ -122,7 +122,12 @@ export function getImageEditorPlacementReadiness(ctx: ImageEditorPlacementContex
   if (!ctx.hasCompletedCrop) {
     return { ok: false, blocker: "missing-crop" };
   }
-  if (ctx.placement === "library" || ctx.placement === "canvas" || ctx.placement === "download") {
+  if (
+    ctx.placement === "library" ||
+    ctx.placement === "canvas" ||
+    ctx.placement === "download" ||
+    ctx.placement === "compose"
+  ) {
     return { ok: true };
   }
   if (ctx.placement === "replace") {

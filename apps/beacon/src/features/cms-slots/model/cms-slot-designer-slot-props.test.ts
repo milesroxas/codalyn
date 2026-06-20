@@ -1,8 +1,26 @@
+import type { ExportConstraints } from "@codalyn/webflow-kit";
 import { describe, expect, it } from "vitest";
 import {
   collectExposedPropIdsFromSlotFileRaw,
+  readCmsSlotDesignerSlotPropsFile,
   serializeSlotPropsFile,
 } from "@/features/cms-slots/model/cms-slot-designer-slot-props";
+
+const SLOT_PROPS_ATTR = "data-beacon-designer-slot-props";
+
+function fakeContainer(serialized: string) {
+  return {
+    getCustomAttribute: async (name: string) => (name === SLOT_PROPS_ATTR ? serialized : null),
+  } as unknown as BlockElement;
+}
+
+const VALID_EXPORT: ExportConstraints = {
+  width: 1200,
+  height: 800,
+  exportFormat: "webp",
+  maxFileSizeBytes: 500_000,
+  quality: 0.8,
+};
 
 describe("collectExposedPropIdsFromSlotFileRaw", () => {
   it("collects exposed prop ids across every slot, de-duplicated", () => {
@@ -69,5 +87,33 @@ describe("serializeSlotPropsFile (Webflow attribute encoding)", () => {
   it("still parses legacy unencoded raw JSON values", () => {
     const legacy = JSON.stringify(file);
     expect(collectExposedPropIdsFromSlotFileRaw(legacy)).toEqual(["hero-title"]);
+  });
+});
+
+describe("imageExport persistence (per-prop export constraints)", () => {
+  it("round-trips valid imageExport through serialize → read", async () => {
+    const serialized = serializeSlotPropsFile({
+      v: 1,
+      slots: [{ exposed: [{ propId: "hero-img", label: "Hero", valueType: "image", imageExport: VALID_EXPORT }] }],
+    });
+    const parsed = await readCmsSlotDesignerSlotPropsFile(fakeContainer(serialized), 1);
+    expect(parsed.slots[0].exposed[0].imageExport).toEqual(VALID_EXPORT);
+  });
+
+  it("drops a meta whose imageExport is malformed (no partial apply)", async () => {
+    const serialized = serializeSlotPropsFile({
+      v: 1,
+      slots: [
+        {
+          exposed: [
+            // width 0 → invalid ExportConstraints → whole meta rejected on read.
+            { propId: "bad-img", label: "Bad", valueType: "image", imageExport: { ...VALID_EXPORT, width: 0 } },
+            { propId: "ok-text", label: "Title", valueType: "string" },
+          ],
+        },
+      ],
+    });
+    const parsed = await readCmsSlotDesignerSlotPropsFile(fakeContainer(serialized), 1);
+    expect(parsed.slots[0].exposed.map((e) => e.propId)).toEqual(["ok-text"]);
   });
 });

@@ -3,6 +3,7 @@
  * Per-row values still serialize to JSON `p` as strings (booleans `true`/`false`, numbers as text, link JSON, etc.).
  */
 
+import { type ExportConstraints, readExportConstraints } from "@codalyn/webflow-kit";
 import { beaconLinkRuntimeValue, isCmsSlotLinkValueType } from "@/features/cms-slots/model/cms-slot-link-value";
 
 export type ComposableInstancePropSelectOption = { value: string; label: string };
@@ -15,6 +16,12 @@ export type ComposableInstancePropMeta = {
   group?: string;
   /** When Webflow provides discrete choices (e.g. component variants), Composer renders a select; values are `id` strings. */
   selectOptions?: ComposableInstancePropSelectOption[];
+  /**
+   * Designer-set export constraints for upload-capable image props (`image | imageAsset | cmsImage | imageSet`).
+   * Required before the Composer can upload; reused from `@codalyn/webflow-kit` (not a new type). Normalize reads
+   * through `readExportConstraints`.
+   */
+  imageExport?: ExportConstraints;
 };
 
 function labelFromInstanceProp(p: Pick<InstanceProp, "propId" | "display">): string {
@@ -104,6 +111,31 @@ const CMS_SLOT_IMAGE_VALUE_TYPES = new Set(["image", "imageAsset", "cmsImage", "
 /** Webflow image-capable instance prop `valueType`s (Composer stores a hosted image URL string). */
 export function isCmsSlotImageValueType(valueType: string): boolean {
   return CMS_SLOT_IMAGE_VALUE_TYPES.has(valueType);
+}
+
+/**
+ * True image value types that use the Composer upload → crop → optimize flow (and require Designer export
+ * constraints). Excludes `file` (a generic file, not necessarily an image — keeps its plain URL input).
+ */
+const CMS_SLOT_UPLOAD_IMAGE_VALUE_TYPES = new Set(["image", "imageAsset", "cmsImage", "imageSet"]);
+
+export function isCmsSlotUploadImageValueType(valueType: string): boolean {
+  return CMS_SLOT_UPLOAD_IMAGE_VALUE_TYPES.has(valueType);
+}
+
+/** True once an exposed upload-image prop carries valid Designer export constraints; gates the Composer upload. */
+export function isExposedImagePropConstrained(prop: ComposableInstancePropMeta): boolean {
+  return readExportConstraints(prop.imageExport) !== null;
+}
+
+/**
+ * Any exposed upload-image prop missing valid constraints blocks Designer save/publish — no partial config
+ * reaches the Composer (matches the "required per-prop preset" decision; no silent default).
+ */
+export function hasUnconstrainedExposedImageProps(slotExposed: readonly ComposableInstancePropMeta[]): boolean {
+  return slotExposed.some(
+    (entry) => isCmsSlotUploadImageValueType(entry.valueType) && !isExposedImagePropConstrained(entry)
+  );
 }
 
 const HEADING_LEVEL_IN_TAG_RE = /^h([1-6])$/i;

@@ -1,4 +1,10 @@
-import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
+import {
+  type ComposableInstancePropMeta,
+  isCmsSlotUploadImageValueType,
+  isExposedImagePropConstrained,
+} from "@/features/cms-slots/model/cms-slot-composable-props";
+import { ExportConstraintsFields } from "@/features/image-editor/ui/image-editor-preset-form-fields";
+import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import {
   CMS_SLOTS_DESIGNER_EXPOSE_PROPS_EMPTY,
   CMS_SLOTS_DESIGNER_EXPOSE_PROPS_LIST_ARIA_LABEL,
@@ -7,6 +13,7 @@ import {
 import { Badge } from "@/shared/ui/badge";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { DrawerScrollList, DrawerScrollListItem } from "@/shared/ui/drawer-scroll-list";
+import { StatusMessage } from "@/shared/ui/status-message";
 import {
   SurfaceSummaryCardIconRowCopy,
   SurfaceSummaryCardMeta,
@@ -29,6 +36,14 @@ function toggleSlotExposedProp(
   return [...byId.values()];
 }
 
+function setSlotExposedPropImageExport(
+  slotExposed: ComposableInstancePropMeta[],
+  propId: string,
+  imageExport: ComposableInstancePropMeta["imageExport"]
+): ComposableInstancePropMeta[] {
+  return slotExposed.map((entry) => (entry.propId === propId ? { ...entry, imageExport } : entry));
+}
+
 export type CmsSlotDesignerExposePropsPanelProps = {
   rowKey: string;
   slotIndex: number;
@@ -41,6 +56,7 @@ export type CmsSlotDesignerExposePropsPanelProps = {
 
 export function CmsSlotDesignerExposePropsPanel(props: CmsSlotDesignerExposePropsPanelProps) {
   const { rowKey, slotIndex, available, slotExposed, showComposableLoading, disabled, onSetSlotExposed } = props;
+  const { settings } = useBeaconAppSettings();
   const loading = showComposableLoading && available.length === 0;
   const isEmpty = available.length === 0 && !loading;
 
@@ -54,8 +70,12 @@ export function CmsSlotDesignerExposePropsPanel(props: CmsSlotDesignerExposeProp
       emptyMessage={CMS_SLOTS_DESIGNER_EXPOSE_PROPS_EMPTY}
     >
       {available.map((prop) => {
-        const checked = slotExposed.some((entry) => entry.propId === prop.propId);
+        const exposedEntry = slotExposed.find((entry) => entry.propId === prop.propId);
+        const checked = exposedEntry != null;
         const fieldId = `cms-slot-expose-${rowKey}-${prop.propId}`;
+        const isUploadImage = isCmsSlotUploadImageValueType(prop.valueType);
+        const showConstraints = checked && isUploadImage;
+        const constraintsMissing = showConstraints && !isExposedImagePropConstrained(exposedEntry);
 
         return (
           <DrawerScrollListItem key={prop.propId}>
@@ -81,6 +101,28 @@ export function CmsSlotDesignerExposePropsPanel(props: CmsSlotDesignerExposeProp
                 />
               </SurfaceSummaryCardSelectRowControl>
             </SurfaceSummaryCardSelectRow>
+            {showConstraints ? (
+              <div className="mt-2 space-y-2 pl-1" data-vaul-no-drag="">
+                {constraintsMissing ? (
+                  <StatusMessage tone="warning" size="sm">
+                    Set the export size for this image before saving.
+                  </StatusMessage>
+                ) : null}
+                <ExportConstraintsFields
+                  key={prop.propId}
+                  baseId={fieldId}
+                  value={exposedEntry?.imageExport ?? null}
+                  defaultQuality={settings.defaultExportQuality}
+                  disabled={disabled}
+                  onChange={(next) =>
+                    onSetSlotExposed(
+                      slotIndex,
+                      setSlotExposedPropImageExport(slotExposed, prop.propId, next ?? undefined)
+                    )
+                  }
+                />
+              </div>
+            ) : null}
           </DrawerScrollListItem>
         );
       })}

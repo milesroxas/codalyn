@@ -1,3 +1,4 @@
+import { type ImageExportFormat, isImageExportFormat } from "../image/output-formats.js";
 import { normalizeWebflowSiteShortName } from "../webflow/designer-deep-link.js";
 import { BEACON_IMAGE_ERROR_CODES } from "./beacon-image-errors.js";
 
@@ -123,6 +124,110 @@ export type ExportConstraints = {
   maxFileSizeBytes: number | null;
   quality: number;
 };
+
+/**
+ * Unwraps the common Webflow/SDK "rich value" shape (`{ value }`, `{ sourceType, value }`) to its inner value,
+ * leaving primitives untouched. Boundary values arrive as a runtime union; normalize before parsing.
+ */
+function unwrapBoundaryValue(raw: unknown): unknown {
+  if (raw !== null && typeof raw === "object" && !Array.isArray(raw) && "value" in raw) {
+    return (raw as { value: unknown }).value;
+  }
+  return raw;
+}
+
+/** Reads a non-empty string from a primitive or wrapped value; finite numbers stringify, everything else is `null`. */
+export function readStringLikeValue(raw: unknown): string | null {
+  const v = unwrapBoundaryValue(raw);
+  if (typeof v === "string") {
+    const t = v.trim();
+    return t.length > 0 ? t : null;
+  }
+  if (typeof v === "number" && Number.isFinite(v)) {
+    return String(v);
+  }
+  return null;
+}
+
+/** Parses a strictly positive integer from a string/number-like value. Decimals, zero, negatives, junk → `null`. */
+export function parsePositiveIntegerString(raw: unknown): number | null {
+  const s = readStringLikeValue(raw);
+  if (s === null || !/^\d+$/.test(s)) {
+    return null;
+  }
+  const n = Number(s);
+  if (!Number.isInteger(n) || n <= 0) {
+    return null;
+  }
+  return n;
+}
+
+function readQualityValue(raw: unknown, fallback: number | null): number | null {
+  const v = unwrapBoundaryValue(raw);
+  let n: number | null = null;
+  if (typeof v === "number" && Number.isFinite(v)) {
+    n = v;
+  } else if (typeof v === "string" && v.trim() !== "") {
+    const parsed = Number(v);
+    if (Number.isFinite(parsed)) {
+      n = parsed;
+    }
+  }
+  if (n === null || n < 0 || n > 1) {
+    return fallback;
+  }
+  return n;
+}
+
+/**
+ * Normalizes a stored/boundary value into {@link ExportConstraints}, or `null` for invalid/partial input.
+ *
+ * - `width`/`height` are a required pair (`parsePositiveIntegerString`): one missing → both treated missing → `null`.
+ * - `exportFormat` must be `"webp"`/`"avif"`, else `null`.
+ * - `maxFileSizeBytes`: `null`/absent accepted; present-but-not-positive-integer rejects the whole value.
+ * - `quality`: numeric in `[0, 1]`; when missing/out-of-range, falls back to `options.defaultQuality` only when
+ *   provided, otherwise `null`. The reader never invents a quality on its own.
+ *
+ * Never partially applies: any failed field rejects the entire value.
+ */
+export function readExportConstraints(raw: unknown, options?: { defaultQuality?: number }): ExportConstraints | null {
+  const record = unwrapBoundaryValue(raw);
+  if (record === null || typeof record !== "object" || Array.isArray(record)) {
+    return null;
+  }
+  const r = record as Record<string, unknown>;
+
+  const width = parsePositiveIntegerString(r.width);
+  const height = parsePositiveIntegerString(r.height);
+  if (width === null || height === null) {
+    return null;
+  }
+
+  const formatStr = readStringLikeValue(r.exportFormat);
+  if (formatStr === null || !isImageExportFormat(formatStr)) {
+    return null;
+  }
+  const exportFormat: ImageExportFormat = formatStr;
+
+  const rawMax = unwrapBoundaryValue(r.maxFileSizeBytes);
+  let maxFileSizeBytes: number | null;
+  if (rawMax === null || rawMax === undefined) {
+    maxFileSizeBytes = null;
+  } else {
+    const parsedMax = parsePositiveIntegerString(rawMax);
+    if (parsedMax === null) {
+      return null;
+    }
+    maxFileSizeBytes = parsedMax;
+  }
+
+  const quality = readQualityValue(r.quality, options?.defaultQuality ?? null);
+  if (quality === null) {
+    return null;
+  }
+
+  return { width, height, exportFormat, maxFileSizeBytes, quality };
+}
 
 export type ResolverOutput = {
   constraints: ExportConstraints | null;

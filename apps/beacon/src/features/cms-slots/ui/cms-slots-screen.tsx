@@ -12,6 +12,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ensureListTargetAfterAppendingSlotRow } from "@/features/cms-slots/model/append-slot-list-component-flow";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
+  hasUnconstrainedExposedImageProps,
   listComposableMetaByInstanceKey,
   mergeComposableMetaWithLive,
 } from "@/features/cms-slots/model/cms-slot-composable-props";
@@ -1771,6 +1772,16 @@ export function CmsSlotsScreen() {
 
   const handleSyncInstallEmbed = async () => {
     if (embedSyncPending) return;
+    const unconstrainedSlot = (designerListSlotFile?.slots ?? []).some((slot) =>
+      hasUnconstrainedExposedImageProps(slot.exposed)
+    );
+    if (unconstrainedSlot) {
+      void webflow.notify({
+        type: "Error",
+        message: "Set an export size for every exposed image field before syncing.",
+      });
+      return;
+    }
     setEmbedSyncPending(true);
     try {
       await syncCmsSlotsInstallEmbedOnPage();

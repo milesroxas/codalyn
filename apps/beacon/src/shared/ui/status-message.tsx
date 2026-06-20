@@ -4,15 +4,26 @@ import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-const statusMessageVariants = cva("text-sm text-muted-foreground", {
+const statusMessageVariants = cva("", {
   variants: {
     layout: {
       block: "",
       inline: "inline-flex items-center gap-1",
     },
+    tone: {
+      muted: "text-muted-foreground",
+      warning: "text-amber-600 dark:text-amber-500",
+      danger: "text-destructive",
+    },
+    size: {
+      sm: "text-xs",
+      default: "text-sm",
+    },
   },
   defaultVariants: {
     layout: "block",
+    tone: "muted",
+    size: "default",
   },
 });
 
@@ -22,14 +33,14 @@ type StatusMessageProps = React.ComponentProps<"p"> &
   };
 
 function StatusMessage(props: StatusMessageProps) {
-  const { pending = false, layout, className, children, ...rest } = props;
+  const { pending = false, layout, tone, size, className, children, ...rest } = props;
 
   return (
     <p
       role="status"
       data-slot="status-message"
       data-pending={pending ? "true" : "false"}
-      className={cn(statusMessageVariants({ layout: pending ? "inline" : layout }), className)}
+      className={cn(statusMessageVariants({ layout: pending ? "inline" : layout, tone, size }), className)}
       {...rest}
     >
       {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}

@@ -19,16 +19,39 @@ export type ImageEditorRouteChromeProps = {
   /** When false, route body fills the viewport and nested regions own vertical scroll. */
   scrollable?: boolean;
   contentClassName?: string;
+  /**
+   * - `default` — title header above a backgrounded breadcrumbs strip (standalone route).
+   * - `breadcrumbsOnly` — drop the title header and render breadcrumbs transparent (hosted in a sheet that owns its own title).
+   */
+  headerVariant?: "default" | "breadcrumbsOnly";
 };
 
 export function ImageEditorRouteChrome(props: ImageEditorRouteChromeProps) {
-  const { children, subheader, footer, scrollResetKey, scrollable = true, contentClassName } = props;
+  const {
+    children,
+    subheader,
+    footer,
+    scrollResetKey,
+    scrollable = true,
+    contentClassName,
+    headerVariant = "default",
+  } = props;
+  const breadcrumbsOnly = headerVariant === "breadcrumbsOnly";
   const routeSubheader = hasBeaconRouteSubheaderContent(subheader) ? (
-    <BeaconFeatureRouteSubheader dataSlot="image_upload_route_subheader">{subheader}</BeaconFeatureRouteSubheader>
+    <BeaconFeatureRouteSubheader
+      dataSlot="image_upload_route_subheader"
+      surface={breadcrumbsOnly ? "plain" : "default"}
+    >
+      {subheader}
+    </BeaconFeatureRouteSubheader>
   ) : null;
   return (
     <BeaconFeatureRouteChrome
-      header={<BeaconFeatureRouteHeader title={IMAGE_UPLOAD_FEATURE_NAME} dataSlot="image_upload_route_header" />}
+      header={
+        breadcrumbsOnly ? null : (
+          <BeaconFeatureRouteHeader title={IMAGE_UPLOAD_FEATURE_NAME} dataSlot="image_upload_route_header" />
+        )
+      }
       subheader={routeSubheader}
       footer={
         footer ? (

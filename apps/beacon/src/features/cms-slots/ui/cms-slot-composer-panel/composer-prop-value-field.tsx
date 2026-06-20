@@ -4,12 +4,14 @@ import {
   type ComposableInstancePropMeta,
   cmsSlotComposerFieldKindForValueType,
   isCmsSlotImageValueType,
+  isCmsSlotUploadImageValueType,
 } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
   colorInputValue,
   dateInputValue,
   parseBoolString,
 } from "@/features/cms-slots/model/cms-slot-composer-prop-input-normalize";
+import { CmsSlotImagePropField } from "@/features/cms-slots/ui/cms-slot-composer-panel/cms-slot-image-prop-field";
 import { ComposerLinkField } from "@/features/cms-slots/ui/composer-link-field/composer-link-field";
 import { CMS_SLOTS_COMPOSER_IMAGE_PROP_HINT } from "@/shared/lib/cms-slots-feature-copy";
 import { cn } from "@/shared/lib/utils";
@@ -204,6 +206,10 @@ export function ComposerPropValueField(props: ComposerPropValueFieldProps) {
   const { inputId, ep, value, busy, onChange } = props;
   const kind = cmsSlotComposerFieldKindForValueType(ep.valueType);
   const options = ep.selectOptions;
+
+  if (isCmsSlotUploadImageValueType(ep.valueType)) {
+    return <CmsSlotImagePropField ep={ep} value={value} busy={busy} onChange={onChange} />;
+  }
 
   if (options != null && options.length > 0) {
     return (

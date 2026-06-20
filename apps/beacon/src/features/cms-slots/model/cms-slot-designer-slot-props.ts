@@ -1,3 +1,4 @@
+import { readExportConstraints } from "@codalyn/webflow-kit";
 import type {
   ComposableInstancePropMeta,
   ComposableInstancePropSelectOption,
@@ -80,10 +81,11 @@ function isComposableMeta(x: unknown): x is ComposableInstancePropMeta {
     return false;
   }
   const so = (x as { selectOptions?: unknown }).selectOptions;
-  if (so === undefined) {
-    return true;
+  if (so !== undefined && (!Array.isArray(so) || so.some((o) => !isSelectOption(o)))) {
+    return false;
   }
-  if (!Array.isArray(so) || so.some((o) => !isSelectOption(o))) {
+  const ie = (x as { imageExport?: unknown }).imageExport;
+  if (ie !== undefined && readExportConstraints(ie) === null) {
     return false;
   }
   return true;

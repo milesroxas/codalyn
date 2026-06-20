@@ -169,5 +169,8 @@ export function getImageEditorPlaceButtonState(p: ImageEditorPlaceButtonInput): 
   if (placement === "replace") {
     return { disabled: false, label: "Replace image", busy: false };
   }
+  if (placement === "compose") {
+    return { disabled: false, label: "Add image", busy: false };
+  }
   return { disabled: false, label: "Place image", busy: false };
 }

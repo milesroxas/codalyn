@@ -76,7 +76,7 @@ export function outputDimensionsMatchingCrop(
 }
 
 export type ExportResult =
-  | { kind: "success"; message: string; cmsFieldUpdated?: boolean }
+  | { kind: "success"; message: string; cmsFieldUpdated?: boolean; asset?: { id: string; url: string } }
   | { kind: "info"; message: string }
   | { kind: "error"; message: string }
   | { kind: "usage-limit"; details: TowerUsageLimitDetails };
@@ -92,10 +92,15 @@ function toExportErrorResult(err: unknown): ExportResult {
 export type ImageExportSuccessContext = {
   message: string;
   cmsFieldUpdated: boolean;
+  /** Present only for `placement === "compose"`: the uploaded asset for the caller (e.g. CMS slot Composer). */
+  asset?: { id: string; url: string };
 };
 
-/** Where the export goes: Assets only, canvas placement, replace selected Image, or local WebP download. */
-export type PlacementMode = "library" | "canvas" | "selection" | "replace" | "download";
+/**
+ * Where the export goes: Assets only, canvas placement, replace selected Image, local WebP download, or `compose`
+ * (upload to the default Assets folder and hand the asset URL back to the caller — no canvas/CMS mutation).
+ */
+export type PlacementMode = "library" | "canvas" | "selection" | "replace" | "download" | "compose";
 
 /** Webflow Designer API `element.type` for Image elements. */
 export const WEBFLOW_IMAGE_ELEMENT_TYPE = "Image" as const;
@@ -476,6 +481,31 @@ async function handleSelectionPlacement(options: {
   return { kind: "success", message: "Image placed." };
 }
 
+/**
+ * `compose` placement: upload the optimized file to the default Assets folder and return its URL to the caller.
+ * No canvas placement or CMS mutation — the caller (e.g. CMS slot Composer) owns where the URL goes. An empty
+ * `getUrl()` is an explicit error, never a silent fallback.
+ */
+async function handleComposePlacement(options: {
+  file: File;
+  targetFolder: AssetFolder | null;
+}): Promise<ExportResult> {
+  const { file, targetFolder } = options;
+  const asset = await webflow.createAsset(file);
+  if (targetFolder) {
+    await applyAssetFolder(asset, targetFolder);
+  }
+  const url = await asset.getUrl();
+  if (!url?.trim()) {
+    return { kind: "error", message: "Could not resolve the uploaded image URL." };
+  }
+  return {
+    kind: "success",
+    message: "Image uploaded.",
+    asset: { id: asset.id, url: url.trim() },
+  };
+}
+
 export async function applyCroppedImageToWebflow(options: {
   imageSrc: string;
   completedCrop: Area;
@@ -536,6 +566,10 @@ export async function applyCroppedImageToWebflow(options: {
       await applyAssetFolder(asset, targetFolder);
       await placeImageOnCanvasAtBody(asset);
       return { kind: "success", message: "Image added to the page." };
+    }
+
+    if (placement === "compose") {
+      return handleComposePlacement({ file, targetFolder });
     }
 
     if (placement === "replace") {

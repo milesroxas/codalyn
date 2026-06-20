@@ -1862,7 +1862,7 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         />
       )}
 
-      {resolvedPlacement === "download" ? null : (
+      {resolvedPlacement === "download" || resolvedPlacement === "compose" ? null : (
         <AssetDestinationCard
           baseId={baseId}
           assetFolders={assetFolders}

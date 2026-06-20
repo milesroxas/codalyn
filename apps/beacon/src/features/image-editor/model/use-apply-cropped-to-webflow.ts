@@ -41,6 +41,7 @@ function toExportSuccessContext(result: Extract<ExportResult, { kind: "success" 
   return {
     message: result.message,
     cmsFieldUpdated: result.cmsFieldUpdated === true,
+    asset: result.asset,
   };
 }
 

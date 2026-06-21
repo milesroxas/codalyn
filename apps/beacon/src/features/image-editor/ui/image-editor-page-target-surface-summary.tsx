@@ -1,5 +1,6 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Loader2 } from "lucide-react";
+import type * as React from "react";
 import { imagePageTargetTablerIcon } from "@/features/image-editor/lib/image-editor-page-target-icon";
 import {
   IMAGE_TARGET_STEP_DISCOVERY_PENDING,
@@ -27,10 +28,12 @@ import {
 type ImagePageTargetSurfaceSummaryProps = {
   target: ImagePageTarget | null;
   discoveryPending?: boolean;
+  /** Optional action rendered on the card, e.g. the page-scan trigger. */
+  action?: React.ReactNode;
 };
 
 export function ImagePageTargetSurfaceSummary(props: ImagePageTargetSurfaceSummaryProps) {
-  const { target, discoveryPending = false } = props;
+  const { target, discoveryPending = false, action } = props;
   const showDiscoveryPending = useDeferredLoadingIndicator(discoveryPending);
   const SurfaceIcon = target ? imagePageTargetTablerIcon(target.kind) : imagePageTargetTablerIcon("image");
 
@@ -61,6 +64,7 @@ export function ImagePageTargetSurfaceSummary(props: ImagePageTargetSurfaceSumma
           </SurfaceSummaryCardIconRowCopy>
         </SurfaceSummaryCardSurfaceDisplay>
       )}
+      {action}
     </SurfaceSummaryCardSurfaceSummary>
   );
 }

@@ -158,7 +158,6 @@ export function ImageEditorConfigurationPresetsFormView(props: {
           onRescan={formRescan}
           onSelectTarget={formTargetSelect}
           pageScanned={formPageScanned}
-          scanButtonPlacement="trailing"
           scanError={formScanError}
           scanPending={formScanPending}
           scanProgress={formScanProgress}

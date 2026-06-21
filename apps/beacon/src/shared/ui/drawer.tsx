@@ -400,24 +400,36 @@ function DrawerHeader({
   return <div data-slot="drawer-header" className={cn(drawerHeaderVariants({ align }), className)} {...props} />;
 }
 
-const drawerFooterVariants = cva("flex shrink-0 flex-col gap-2 px-4", {
+const drawerFooterVariants = cva("flex shrink-0 gap-2 px-4", {
   variants: {
     layout: {
       default: "mt-6",
       sticky: "mt-0 border-t border-border bg-popover pt-4 pb-0",
     },
+    orientation: {
+      vertical: "flex-col",
+      horizontal: "flex-row [&>*]:flex-1",
+    },
   },
   defaultVariants: {
     layout: "default",
+    orientation: "vertical",
   },
 });
 
 function DrawerFooter({
   className,
   layout,
+  orientation,
   ...props
 }: ComponentProps<"div"> & VariantProps<typeof drawerFooterVariants>) {
-  return <div data-slot="drawer-footer" className={cn(drawerFooterVariants({ layout }), className)} {...props} />;
+  return (
+    <div
+      data-slot="drawer-footer"
+      className={cn(drawerFooterVariants({ layout, orientation }), className)}
+      {...props}
+    />
+  );
 }
 
 const drawerBodyVariants = cva("", {

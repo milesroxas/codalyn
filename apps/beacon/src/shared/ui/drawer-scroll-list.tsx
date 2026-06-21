@@ -1,4 +1,4 @@
-import { cva } from "class-variance-authority";
+import { cva, type VariantProps } from "class-variance-authority";
 import { Loader2, Plus } from "lucide-react";
 import type * as React from "react";
 
@@ -9,8 +9,20 @@ export const drawerScrollListInsetClass = "px-4";
 
 const drawerScrollListRegionClass = "relative min-h-0 min-w-0 w-full flex-1";
 const drawerScrollListScrollAreaClass = "size-full min-h-0 w-full";
-const drawerScrollListLoaderClass =
-  "pointer-events-auto absolute inset-0 z-10 flex items-center justify-center bg-popover/75 backdrop-blur-[1px]";
+const drawerScrollListLoaderVariants = cva(
+  "pointer-events-auto absolute inset-0 z-10 flex justify-center bg-popover/75 backdrop-blur-[1px]",
+  {
+    variants: {
+      align: {
+        center: "items-center",
+        top: "items-start pt-6",
+      },
+    },
+    defaultVariants: {
+      align: "center",
+    },
+  }
+);
 const drawerScrollListClass = cn(drawerScrollListInsetClass, "m-0 list-none");
 const drawerScrollListItemClass = "py-0.5";
 const drawerScrollListErrorClass = "shrink-0 text-sm text-destructive";
@@ -58,10 +70,16 @@ type DrawerScrollListProps = {
   "data-slot": string;
   loading?: boolean;
   loadingAriaLabel?: string;
+  /** Rendered in the loading overlay instead of the default spinner (e.g. a progress bar). */
+  loadingContent?: React.ReactNode;
+  /** Vertical placement of the loading overlay content. Defaults to centered. */
+  loadingAlign?: VariantProps<typeof drawerScrollListLoaderVariants>["align"];
   error?: string | null;
   isEmpty?: boolean;
   emptyMessage?: React.ReactNode;
   emptyContent?: React.ReactNode;
+  /** Render children directly (no `<ul>`) for lists that own their own semantics, e.g. a radio group. */
+  listless?: boolean;
   children: React.ReactNode;
 };
 
@@ -71,10 +89,13 @@ export function DrawerScrollList(props: DrawerScrollListProps) {
     "data-slot": dataSlot,
     loading = false,
     loadingAriaLabel,
+    loadingContent,
+    loadingAlign = "center",
     error = null,
     isEmpty = false,
     emptyMessage,
     emptyContent,
+    listless = false,
     children,
   } = props;
 
@@ -87,8 +108,13 @@ export function DrawerScrollList(props: DrawerScrollListProps) {
       ) : null}
       <div className={drawerScrollListRegionClass} data-slot={dataSlot} data-state={loading ? "loading" : "idle"}>
         {loading ? (
-          <div className={drawerScrollListLoaderClass} role="status" aria-live="polite" aria-label={loadingAriaLabel}>
-            <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
+          <div
+            className={drawerScrollListLoaderVariants({ align: loadingAlign })}
+            role="status"
+            aria-live="polite"
+            aria-label={loadingAriaLabel}
+          >
+            {loadingContent ?? <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />}
           </div>
         ) : null}
         <ScrollArea className={drawerScrollListScrollAreaClass} data-slot={`${dataSlot}_scroll`}>
@@ -102,6 +128,8 @@ export function DrawerScrollList(props: DrawerScrollListProps) {
             ) : (
               <div className={cn(drawerScrollListInsetClass, drawerScrollListEmptyClass)} aria-hidden />
             )
+          ) : listless ? (
+            <div className={drawerScrollListInsetClass}>{children}</div>
           ) : (
             <ul className={drawerScrollListClass} aria-label={ariaLabel}>
               {children}

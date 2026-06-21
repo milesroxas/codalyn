@@ -1,12 +1,10 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { Loader2, MoreVertical } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
-import { Progress } from "@/shared/ui/progress";
-import { ScrollArea } from "@/shared/ui/scroll-area";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 const surfaceSummaryCardVariants = cva("flex min-w-0 flex-col gap-2 rounded-sm border px-3 py-2.5 text-left", {
@@ -209,28 +207,7 @@ const surfaceSummaryCardActionGroupVariants = cva(
 
 const surfaceSummaryCardIconActionGroupClass = "flex shrink-0 items-center gap-1";
 
-const surfaceSummaryCardScanListSectionClass = "flex min-h-0 w-full min-w-0 flex-1 flex-col gap-2";
-const surfaceSummaryCardScanListSectionHeaderClass = "flex min-w-0 shrink-0 items-center justify-between gap-2";
-const surfaceSummaryCardScanListSectionLabelClass = "text-muted-foreground text-xs";
-const surfaceSummaryCardScanListStatusClass = "text-muted-foreground flex shrink-0 items-center gap-2 text-xs";
 const surfaceSummaryCardScanListErrorClass = "shrink-0 text-destructive text-xs";
-const surfaceSummaryCardScanListScrollRegionClass =
-  "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-sm border border-border/80 bg-card text-card-foreground shadow-sm data-[state=loading]:min-h-18";
-const surfaceSummaryCardScanListScrollAreaClass = "min-h-0 w-full flex-1 rounded-[inherit]";
-const surfaceSummaryCardScanListScrollLoaderClass =
-  "pointer-events-auto absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-card/80 px-6 backdrop-blur-[1px]";
-const surfaceSummaryCardScanListScrollInlineProgressClass =
-  "flex shrink-0 flex-col gap-1.5 border-b border-border/60 px-3 py-2";
-const surfaceSummaryCardScanListScrollInlineSpinnerClass =
-  "text-muted-foreground flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-2 text-xs";
-const surfaceSummaryCardScanListProgressPanelClass = "flex w-full min-w-0 max-w-xs flex-col gap-1.5";
-const surfaceSummaryCardScanListProgressLabelClass = "text-sm font-medium leading-none";
-const surfaceSummaryCardScanListProgressDetailClass = "text-muted-foreground text-xs leading-snug tabular-nums";
-const surfaceSummaryCardScanListScrollToolbarClass =
-  "flex shrink-0 min-w-0 items-center justify-between gap-2 border-b border-border/60 px-3 py-2";
-const surfaceSummaryCardScanListScrollTitleClass = "text-sm font-medium leading-none";
-const surfaceSummaryCardScanListScrollContentClass = "px-3 py-1.5";
-const surfaceSummaryCardScanListScrollEmptyClass = "flex min-h-16 items-center text-muted-foreground text-xs";
 
 const surfaceSummaryCardPageIntroClass = "space-y-1";
 const surfaceSummaryCardPageIntroTitleClass = "text-sm font-medium";
@@ -702,46 +679,6 @@ function SurfaceSummaryCardFormFields({ className, ...props }: React.ComponentPr
   );
 }
 
-function SurfaceSummaryCardScanListSection({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="surface-summary-card-scan-list-section"
-      className={cn(surfaceSummaryCardScanListSectionClass, className)}
-      {...props}
-    />
-  );
-}
-
-function SurfaceSummaryCardScanListSectionHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="surface-summary-card-scan-list-section-header"
-      className={cn(surfaceSummaryCardScanListSectionHeaderClass, className)}
-      {...props}
-    />
-  );
-}
-
-function SurfaceSummaryCardScanListSectionLabel({ className, ...props }: React.ComponentProps<"p">) {
-  return (
-    <p
-      data-slot="surface-summary-card-scan-list-section-label"
-      className={cn(surfaceSummaryCardScanListSectionLabelClass, className)}
-      {...props}
-    />
-  );
-}
-
-function SurfaceSummaryCardScanListStatus({ className, ...props }: React.ComponentProps<"p">) {
-  return (
-    <p
-      data-slot="surface-summary-card-scan-list-status"
-      className={cn(surfaceSummaryCardScanListStatusClass, className)}
-      {...props}
-    />
-  );
-}
-
 function SurfaceSummaryCardScanListError({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
@@ -749,139 +686,6 @@ function SurfaceSummaryCardScanListError({ className, ...props }: React.Componen
       className={cn(surfaceSummaryCardScanListErrorClass, className)}
       {...props}
     />
-  );
-}
-
-type SurfaceSummaryCardScanListLoadingProgress = {
-  value: number | null;
-  indeterminate?: boolean;
-  label: string;
-  detail?: string;
-};
-
-type SurfaceSummaryCardScanListScrollBodyProps = {
-  "data-slot": string;
-  loading?: boolean;
-  loadingAriaLabel?: string;
-  loadingProgress?: SurfaceSummaryCardScanListLoadingProgress | null;
-  inlineLoading?: boolean;
-  inlineLoadingAriaLabel?: string;
-  isEmpty?: boolean;
-  emptyMessage?: React.ReactNode;
-  toolbar?: React.ReactNode;
-  children: React.ReactNode;
-};
-
-function SurfaceSummaryCardScanListProgress(props: { progress: SurfaceSummaryCardScanListLoadingProgress }) {
-  const { progress } = props;
-  const { value, indeterminate = false, label, detail } = progress;
-  const ariaValueText = detail != null && detail.length > 0 ? `${label} ${detail}` : label;
-  const showIndeterminate = indeterminate || value == null;
-
-  return (
-    <div
-      className={surfaceSummaryCardScanListProgressPanelClass}
-      role="progressbar"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={showIndeterminate ? undefined : (value ?? undefined)}
-      aria-valuetext={ariaValueText}
-      aria-label={label}
-      aria-busy={showIndeterminate}
-    >
-      <p className={surfaceSummaryCardScanListProgressLabelClass}>{label}</p>
-      {detail ? <p className={surfaceSummaryCardScanListProgressDetailClass}>{detail}</p> : null}
-      {showIndeterminate ? <Progress indeterminate /> : <Progress value={value ?? 0} />}
-    </div>
-  );
-}
-
-function SurfaceSummaryCardScanListScrollToolbar({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="surface-summary-card-scan-list-scroll-toolbar"
-      className={cn(surfaceSummaryCardScanListScrollToolbarClass, className)}
-      {...props}
-    />
-  );
-}
-
-function SurfaceSummaryCardScanListScrollTitle({ className, ...props }: React.ComponentProps<"p">) {
-  return (
-    <p
-      data-slot="surface-summary-card-scan-list-scroll-title"
-      className={cn(surfaceSummaryCardScanListScrollTitleClass, className)}
-      {...props}
-    />
-  );
-}
-
-function SurfaceSummaryCardScanListScrollBody(props: SurfaceSummaryCardScanListScrollBodyProps) {
-  const {
-    "data-slot": dataSlot,
-    loading = false,
-    loadingAriaLabel,
-    loadingProgress = null,
-    inlineLoading = false,
-    inlineLoadingAriaLabel,
-    isEmpty = false,
-    emptyMessage,
-    toolbar,
-    children,
-  } = props;
-  const showOverlayProgress = loading && loadingProgress != null;
-  const showOverlaySpinner = loading && loadingProgress == null;
-  const showInlineProgress = loadingProgress != null && !loading;
-  const showInlineSpinner = inlineLoading && loadingProgress == null;
-  const isLoading = loading || loadingProgress != null || inlineLoading;
-
-  return (
-    <div
-      className={surfaceSummaryCardScanListScrollRegionClass}
-      data-slot={dataSlot}
-      data-state={isLoading ? "loading" : "idle"}
-    >
-      {showOverlayProgress ? (
-        <div className={surfaceSummaryCardScanListScrollLoaderClass} aria-live="polite">
-          <SurfaceSummaryCardScanListProgress progress={loadingProgress} />
-        </div>
-      ) : null}
-      {showOverlaySpinner ? (
-        <div
-          className={surfaceSummaryCardScanListScrollLoaderClass}
-          role="status"
-          aria-live="polite"
-          aria-label={loadingAriaLabel}
-        >
-          <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
-        </div>
-      ) : null}
-      {toolbar}
-      {showInlineProgress ? (
-        <div className={surfaceSummaryCardScanListScrollInlineProgressClass} aria-live="polite">
-          <SurfaceSummaryCardScanListProgress progress={loadingProgress} />
-        </div>
-      ) : null}
-      {showInlineSpinner ? (
-        <div
-          className={surfaceSummaryCardScanListScrollInlineSpinnerClass}
-          role="status"
-          aria-live="polite"
-          aria-label={inlineLoadingAriaLabel}
-        >
-          <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
-        </div>
-      ) : null}
-      <ScrollArea className={surfaceSummaryCardScanListScrollAreaClass} data-slot={`${dataSlot}_scroll`}>
-        {isEmpty && !loading ? (
-          <div className={cn(surfaceSummaryCardScanListScrollContentClass, surfaceSummaryCardScanListScrollEmptyClass)}>
-            {emptyMessage}
-          </div>
-        ) : (
-          <div className={surfaceSummaryCardScanListScrollContentClass}>{children}</div>
-        )}
-      </ScrollArea>
-    </div>
   );
 }
 
@@ -973,13 +777,6 @@ export {
   SurfaceSummaryCardPanelSectionLabel,
   SurfaceSummaryCardPending,
   SurfaceSummaryCardScanListError,
-  SurfaceSummaryCardScanListScrollBody,
-  SurfaceSummaryCardScanListScrollTitle,
-  SurfaceSummaryCardScanListScrollToolbar,
-  SurfaceSummaryCardScanListSection,
-  SurfaceSummaryCardScanListSectionHeader,
-  SurfaceSummaryCardScanListSectionLabel,
-  SurfaceSummaryCardScanListStatus,
   SurfaceSummaryCardSection,
   SurfaceSummaryCardSectionLabel,
   SurfaceSummaryCardSelectRow,

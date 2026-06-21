@@ -94,6 +94,8 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   const saveInFlightRef = useRef(false);
   const [locatePending, setLocatePending] = useState(false);
   const locateInFlightRef = useRef(false);
+  /** Designers/admins with no presets skip the list and land in the add form — once per mount, no back-bounce. */
+  const autoOpenedAddRef = useRef(false);
   const temporaryPresetInstanceRef = useRef<ComponentElement | null>(null);
   const editTargetResolveGenRef = useRef(0);
   const [formTarget, setFormTarget] = useState<ImagePageTarget | null>(null);
@@ -528,6 +530,17 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
       maxFileSizeBytes: row.maxFileSizeBytes,
     }));
   }, [settings.imagePresetStorage, siteId]);
+
+  useEffect(() => {
+    if (isGuest || siteId == null || autoOpenedAddRef.current) {
+      return;
+    }
+    // Resolve once presets have loaded: a designer/admin with none jumps straight into the add form.
+    autoOpenedAddRef.current = true;
+    if (presetRows.length === 0) {
+      openAdd();
+    }
+  }, [isGuest, openAdd, presetRows.length, siteId]);
 
   const onConfirmDeletePendingPreset = useCallback(() => {
     if (presetPendingDelete) {

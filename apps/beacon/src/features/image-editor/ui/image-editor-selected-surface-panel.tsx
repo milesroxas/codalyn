@@ -1,5 +1,6 @@
 import type { PresetCrudScope } from "@codalyn/webflow-kit";
 import { IconBox, IconChevronRight, IconComponents, IconFileStar, IconStack } from "@tabler/icons-react";
+import type * as React from "react";
 
 import type {
   PresetFormAddableScope,
@@ -39,6 +40,8 @@ type ImageEditorSelectedSurfacePanelProps = {
   addableScopes?: PresetFormAddableScope[];
   onEditPreset?: (match: PresetFormExistingMatch) => void;
   onAddScope?: (scope: PresetFormAddableScope["scope"]) => void;
+  /** Page-scan trigger rendered on the selected-surface card. */
+  scanAction?: React.ReactNode;
 };
 
 function ExistingPresetSection(props: {
@@ -142,13 +145,14 @@ export function ImageEditorSelectedSurfacePanel(props: ImageEditorSelectedSurfac
     addableScopes = [],
     onEditPreset,
     onAddScope,
+    scanAction,
   } = props;
 
   const hasPresetSections = existingPresets.length > 0 || addableScopes.length > 0;
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <ImagePageTargetSurfaceSummary discoveryPending={discoveryPending} target={target} />
+      <ImagePageTargetSurfaceSummary action={scanAction} discoveryPending={discoveryPending} target={target} />
       {hasPresetSections ? (
         <SurfaceSummaryCardPanel>
           <ExistingPresetSection existingPresets={existingPresets} onEditPreset={onEditPreset} />

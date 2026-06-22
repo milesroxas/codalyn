@@ -402,7 +402,7 @@ function DrawerContent({
         {...props}
       >
         {showDragHandle && showCloseButton ? (
-          <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-x-2 px-4 pt-3 pb-3">
+          <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-x-2 px-4 pt-2 pb-1.5">
             <span className="min-w-0" aria-hidden />
             <VaulDrawer.Handle
               aria-hidden
@@ -413,10 +413,10 @@ function DrawerContent({
         ) : showDragHandle ? (
           <VaulDrawer.Handle
             aria-hidden
-            className="mx-auto mt-3 mb-4 h-1 w-11 shrink-0 rounded-full bg-muted-foreground/30"
+            className="mx-auto mt-2 mb-2.5 h-1 w-11 shrink-0 rounded-full bg-muted-foreground/30"
           />
         ) : showCloseButton ? (
-          <div className="flex shrink-0 justify-end px-4 pt-2 pb-2">{closeControl}</div>
+          <div className="flex shrink-0 justify-end px-4 pt-1.5 pb-1.5">{closeControl}</div>
         ) : (
           <div className="mt-1 shrink-0" aria-hidden />
         )}
@@ -432,7 +432,7 @@ function DrawerContent({
   );
 }
 
-const drawerHeaderVariants = cva("relative flex shrink-0 flex-col gap-1.5 overflow-visible px-4 pb-3", {
+const drawerHeaderVariants = cva("relative flex shrink-0 flex-col gap-1 overflow-visible px-4 pb-2", {
   variants: {
     align: {
       center: "text-center",

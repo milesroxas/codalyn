@@ -182,7 +182,7 @@ export function BeaconRouteSubheader(props: BeaconRouteSubheaderProps) {
       className={cn(
         beaconPanelContainClass,
         beaconRouteBleedXClass,
-        "flex min-h-0 items-center gap-2 border-b border-border bg-muted/40 py-1.5 pr-1.5"
+        "flex min-h-0 items-center gap-2 border-b border-border bg-muted/40 py-1 pr-1.5"
       )}
     >
       {children}
@@ -219,7 +219,9 @@ export function BeaconFeatureRouteSubheader(props: BeaconFeatureRouteSubheaderPr
     <div className={beaconFeatureRouteSubheaderVariants({ surface })} data-slot={dataSlot}>
       {/* Plain (borderless) strips host the breadcrumbs on a sheet that owns its title — match the host title's
           `px-4` inset and keep them tight to the title and content. Default strips align to the route content `px-3`. */}
-      <div className={cn(beaconPanelContainClass, surface === "plain" ? "px-4 py-1" : "px-3 py-2")}>{children}</div>
+      <div className={cn(beaconPanelContainClass, surface === "plain" ? "px-4 pt-0 pb-1" : "px-3 py-1.5")}>
+        {children}
+      </div>
     </div>
   );
 }

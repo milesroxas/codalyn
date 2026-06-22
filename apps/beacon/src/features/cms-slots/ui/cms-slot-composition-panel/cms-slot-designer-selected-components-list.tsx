@@ -11,9 +11,12 @@ const cmsSlotDesignerSelectedComponentsListScrollAreaClass = "max-h-60";
 const cmsSlotDesignerSelectedComponentsListClass = "m-0 list-none divide-y divide-border/80 p-0";
 /**
  * Variants of a component, nested under its row: a single vertical guide rail (no background or separators) so they read
- * as children of the same item. The rail sits under the component name; rows indent past it.
+ * as children of the same item. `ml-4` centers the rail under the first glyph of the component name (which starts at
+ * the row's `px-3` inset), the way nested-list guides do. `pl-1` keeps the gap from the rail; the rest of the variant
+ * row's inset lives on the row button so its hover background gains breathing room without shifting the text. No
+ * negative top margin — overlapping the base row would let its full-bleed hover bleed into the first variant.
  */
-const cmsSlotDesignerNestedVariantListClass = "m-0 -mt-1 mb-1 ml-3 list-none border-l border-border/70 p-0 pr-1 pl-2";
+const cmsSlotDesignerNestedVariantListClass = "m-0 mb-1 ml-4 list-none border-l border-border/70 p-0 pr-1 pl-1";
 
 /** One displayed component: its base/top-level row plus any variant rows pinned to the same component id. */
 type SelectedComponentGroup = {

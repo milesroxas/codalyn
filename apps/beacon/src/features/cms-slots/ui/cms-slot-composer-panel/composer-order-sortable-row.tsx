@@ -3,10 +3,31 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Trash2 } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { CmsSlotComposerRowMeta } from "@/features/cms-slots/model/cms-slot-composer-row-meta";
+import type { CmsSlotSelectedVariant } from "@/features/cms-slots/model/cms-slot-instance-variant";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import { cn } from "@/shared/lib/utils";
+import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { ComposerSlotNameDialog } from "./composer-slot-name-dialog";
+
+/**
+ * Splits a draft row's display name into the base label + the pinned variant (shown as a badge, not appended text).
+ * The default name is `"Component · Variant"` (see `poolOptionLabel`); strip that suffix when present so the badge isn't
+ * duplicated, while a user-renamed name is left intact.
+ */
+export function splitComposerRowLabel(
+  name: string,
+  variant: CmsSlotSelectedVariant | null
+): { displayName: string; variantBadge: string | null } {
+  const variantBadge = variant?.variantName ?? null;
+  if (variantBadge != null) {
+    const suffix = ` · ${variantBadge}`;
+    if (name.endsWith(suffix)) {
+      return { displayName: name.slice(0, name.length - suffix.length), variantBadge };
+    }
+  }
+  return { displayName: name, variantBadge };
+}
 
 export type ComposerOrderSortableRowProps = {
   row: CmsSlotCompositionDraftRow;
@@ -31,6 +52,7 @@ export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
     onAutoOpenEditDialogConsumed,
   } = props;
   const exposed = meta?.exposed ?? [];
+  const { displayName, variantBadge } = splitComposerRowLabel(row.name, row.variant);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.key,
     disabled: busy,
@@ -49,7 +71,7 @@ export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
       data-slot="cms_slot_composer_row"
       className="relative list-none rounded-sm border border-border/70 bg-card shadow-sm"
     >
-      <div className="flex min-h-9 items-center gap-1.5 px-2 py-1.5">
+      <div className="flex min-h-8 items-center gap-0.5 px-2 py-1">
         <button
           type="button"
           className={cn(
@@ -67,11 +89,17 @@ export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
           row={row}
           exposed={exposed}
           disabled={busy}
+          triggerLabel={displayName}
           onRename={onRenameSlot}
           onChangePropValue={onChangePropValue}
           requestAutoOpen={autoOpenEditDialogRowKey === row.key}
           onAutoOpenConsumed={onAutoOpenEditDialogConsumed}
         />
+        {variantBadge != null ? (
+          <Badge variant="secondary" size="sm" className="max-w-28 shrink-0 truncate">
+            {variantBadge}
+          </Badge>
+        ) : null}
         <Button
           type="button"
           size="icon-sm"

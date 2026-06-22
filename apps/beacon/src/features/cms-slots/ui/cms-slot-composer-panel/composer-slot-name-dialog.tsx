@@ -39,6 +39,8 @@ export type ComposerSlotNameDialogProps = {
   dialogTitle?: string;
   slotNameFieldLabel?: string;
   slotNameFieldTooltip?: string;
+  /** Text shown on the trigger row (defaults to `row.name`); the pinned variant is surfaced as a badge by the caller. */
+  triggerLabel?: string;
   onRename: (rowKey: string, nextName: string) => void;
   onChangePropValue: (rowKey: string, propId: string, value: string) => void;
   /** When true once (e.g. right after adding the row), opens this edit dialog. */
@@ -72,6 +74,7 @@ export function ComposerSlotNameDialog(props: ComposerSlotNameDialogProps) {
     dialogTitle = "Edit Content",
     slotNameFieldLabel = CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_LABEL,
     slotNameFieldTooltip = CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_TOOLTIP,
+    triggerLabel,
     onRename,
     onChangePropValue,
     requestAutoOpen = false,
@@ -135,7 +138,7 @@ export function ComposerSlotNameDialog(props: ComposerSlotNameDialogProps) {
     <AlertDialog open={open} onOpenChange={handleDialogOpenChange}>
       <AlertDialogTrigger asChild>
         <Button type="button" variant="composerSlotTitle" disabled={disabled}>
-          <span className="min-w-0 truncate">{row.name}</span>
+          <span className="min-w-0 truncate">{triggerLabel ?? row.name}</span>
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent {...alertDialogScrollContentDefaults}>

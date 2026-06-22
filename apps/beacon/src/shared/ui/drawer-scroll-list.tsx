@@ -37,7 +37,10 @@ export const drawerScrollListRowButtonVariants = cva(
 export const drawerScrollListRowShellVariants = cva("block w-full min-w-0 rounded-sm");
 
 export const drawerScrollListRowSurfaceVariants = cva(
-  "-mx-1 flex min-w-0 items-center justify-between gap-3 rounded-sm px-1 py-1.5 transition-colors hover:bg-muted/50"
+  // `-mx-2`/`px-2` move together: the negative margin bleeds the hover background outward by the same amount the
+  // padding insets the text, so the text stays put in the default (no-background) state while the hover surface gains
+  // breathing room from the text instead of hugging it.
+  "-mx-2 flex min-w-0 items-center justify-between gap-3 rounded-sm px-2 py-1.5 transition-colors hover:bg-muted/50"
 );
 
 const drawerScrollListAddActionRowLabelVariants = cva("min-w-0 truncate text-sm", {
@@ -153,8 +156,13 @@ export function DrawerScrollListRowSurface(props: React.ComponentProps<"span">) 
   return <span className={cn(drawerScrollListRowSurfaceVariants(), className)} {...rest} />;
 }
 
-/** Variants nested under a component: one vertical guide rail, no separators, so they read as children of the row. */
-const drawerScrollListNestedGroupClass = "m-0 ml-4 list-none border-l border-border/70 p-0 pl-1";
+/**
+ * Variants nested under a component: one vertical guide rail, no separators, so they read as children of the row.
+ * `ml-1` centers the rail under the first glyph of the component name (which starts at the list's `px-4` inset), the
+ * way nested-list guides do, rather than indenting it past the name; `pl-3` is the clear gap from the rail to the
+ * variant rows so they never crowd the line.
+ */
+const drawerScrollListNestedGroupClass = "m-0 ml-1 list-none border-l border-border/70 p-0 pl-3";
 
 type DrawerScrollListAddActionRowProps = {
   label: React.ReactNode;

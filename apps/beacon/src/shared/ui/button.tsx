@@ -41,7 +41,7 @@ const buttonVariants = cva(
           "border-border bg-background/95 text-foreground shadow-sm hover:bg-muted dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         /** Composer row title opens slot-name drawer; reads like muted text row line. */
         composerSlotTitle:
-          "min-h-9 h-auto max-w-none w-full flex-1 justify-start truncate border-transparent bg-transparent px-1 py-1.5 text-left text-sm leading-snug font-medium shadow-none hover:bg-muted/70 focus-visible:bg-muted dark:hover:bg-muted/35 [&_svg]:size-4",
+          "min-h-8 h-auto max-w-none w-full flex-1 justify-start truncate border-transparent bg-transparent px-1 py-1 text-left text-sm leading-snug font-normal shadow-none hover:bg-muted/70 focus-visible:bg-muted dark:hover:bg-muted/35 [&_svg]:size-4",
         /** Composer palette: grid tile for adding a component type. */
         composerPaletteTile:
           "border-border/70 bg-muted/90 text-foreground shadow-none hover:bg-muted dark:bg-muted/50 dark:hover:bg-muted/65",

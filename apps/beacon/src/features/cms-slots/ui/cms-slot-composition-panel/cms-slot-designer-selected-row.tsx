@@ -92,7 +92,7 @@ const selectedRowClass = "flex items-center gap-2 px-3 py-2 text-sm";
  * Variant row nested under its component: tight spacing and smaller text. `rounded-md` keeps the hover background inset
  * from the list edges (the wrapping list adds the surrounding inset); indentation comes from the list's tree rail.
  */
-const nestedVariantRowClass = "flex items-center gap-2 rounded-md py-1 pr-2 pl-2 text-xs";
+const nestedVariantRowClass = "flex items-center gap-2 rounded-sm py-1 pr-2 pl-2 text-xs";
 /** Shared interactive affordance for a clickable row (top-level or nested): full-width hit area + hover/focus state. */
 const selectedRowButtonClass =
   "w-full text-left outline-none transition-colors hover:bg-accent/50 focus-visible:bg-accent/50 disabled:pointer-events-none disabled:opacity-60";

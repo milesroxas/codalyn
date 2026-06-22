@@ -4,6 +4,7 @@ import {
   readCmsSlotDesignerSlotPropsFile,
   writeCmsSlotDesignerSlotPropsFile,
 } from "@/features/cms-slots/model/cms-slot-designer-slot-props";
+import type { CmsSlotSelectedVariant } from "@/features/cms-slots/model/cms-slot-instance-variant";
 import {
   getCmsSlotListTargetCmsFieldIdFromListContainer,
   resolveCmsSlotListTargetCmsCollectionIdForCleanup,
@@ -13,13 +14,15 @@ import {
   removeAllCmsSlotListTargetInstancesOnPage,
   removeAllInstancesOfComponentOnPage,
 } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
-import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import {
-  filterHydratedCmsSlotRowsByComponentIds,
+  filterHydratedCmsSlotRowsByPoolKeys,
+  type HydratedCmsSlotRow,
   listInstancesInSlotListContainer,
-  resolveCmsSlotDesignerConfiguredComponentIds,
-  writeCmsSlotDesignerConfiguredComponentIds,
+  resolveCmsSlotDesignerConfiguredPoolKeys,
+  writeCmsSlotDesignerConfiguredPoolKeys,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
+import { poolOptionKey } from "@/features/cms-slots/model/cms-slot-pool-option";
+import { buildSeedPropCopyEntries } from "@/features/cms-slots/model/cms-slot-seed-prop-copy";
 import {
   CMS_SLOT_UTILITIES_COMPONENT_GROUP,
   getCmsSlotListTargetComponentOrNull,
@@ -27,8 +30,18 @@ import {
 } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { runExclusiveDesignerOp } from "@/features/cms-slots/model/exclusive-designer-style-op";
 
-/** Site component id + label for the Composer palette (types allowed by Designer for a CMS slot). */
-export type CmsSlotPaletteEntry = { id: string; name: string; group: string | null };
+/**
+ * One Composer palette option = one pool seed (component + pinned variant) the Designer allowed for a CMS slot.
+ * `poolKey` is the stable identity; `name` is the display label (includes the variant name); `variant` carries the
+ * `propId` needed to re-pin the variant when the seed is re-created on save.
+ */
+export type CmsSlotPaletteEntry = {
+  poolKey: string;
+  componentId: string;
+  variant: CmsSlotSelectedVariant | null;
+  name: string;
+  group: string | null;
+};
 
 function excludeCmsSlotUtilitiesGroup(results: ComponentSearchResult[]): ComponentSearchResult[] {
   return results.filter((r) => r.group !== CMS_SLOT_UTILITIES_COMPONENT_GROUP);
@@ -66,18 +79,61 @@ export async function listSiteComponentsForPicker(query: string): Promise<Compon
 }
 
 /**
- * Places a new instance of the given component as the last child of the target container.
+ * Places a new instance of the given component as the last child of the target container, pinning its variant when
+ * `variant` is provided. Pinning re-applies the Designer's variant selection that a destructive pool rebuild
+ * (`applyCmsSlotCompositionDraft`) or a re-created seed would otherwise reset to base. Pin failures are non-fatal: the
+ * seed still appends (it just renders on the base variant), so a save never aborts on one variant.
  */
 export async function appendComponentToSlotListContainer(
   container: BlockElement,
-  componentId: string
+  componentId: string,
+  variant?: CmsSlotSelectedVariant | null
 ): Promise<ComponentElement> {
   const component = await webflow.getComponent(componentId);
-  return (await container.append(component)) as ComponentElement;
+  const instance = (await container.append(component)) as ComponentElement;
+  if (variant != null) {
+    try {
+      await instance.setProps([{ propId: variant.propId, value: variant.variantId }]);
+    } catch (e) {
+      console.warn("[cms-slots] pin seed variant failed (non-fatal):", e);
+    }
+  }
+  return instance;
 }
 
 export async function removeComponentInstanceFromCanvas(instance: ComponentElement): Promise<void> {
   await instance.remove();
+}
+
+/**
+ * Pins (or clears, when `variantId` is the base id) the variant on a seed instance via `setProps`. Used by the Designer
+ * seed-row variant picker so the hidden pool seed renders the chosen variant — the runtime then clones that baked seed.
+ */
+export async function setSeedInstanceVariant(
+  instance: ComponentElement,
+  propId: string,
+  variantId: string
+): Promise<void> {
+  await instance.setProps([{ propId, value: variantId }]);
+}
+
+/**
+ * Copies the source seed's explicit prop overrides onto `target` so a newly-added variant seed starts identical to the
+ * one it was cloned from (the `variant` prop excluded — each seed keeps its own). Best-effort: a read/write failure is
+ * logged and never blocks the add. Returns how many props were copied.
+ */
+export async function copySeedPropOverrides(source: ComponentElement, target: ComponentElement): Promise<number> {
+  try {
+    const entries = buildSeedPropCopyEntries(await source.searchProps());
+    if (entries.length === 0) {
+      return 0;
+    }
+    await target.setProps(entries);
+    return entries.length;
+  } catch (e) {
+    console.warn("[cms-slots] copy seed prop overrides failed (non-fatal):", e);
+    return 0;
+  }
 }
 
 /**
@@ -182,6 +238,10 @@ export async function deleteCmsSlotListAndListTargetDefinition(
 export type CmsSlotCompositionDraftRow = {
   key: string;
   componentId: string;
+  /** Pool-option key (`componentId` + pinned variant) — selects which hidden seed this row clones at runtime. */
+  poolKey: string;
+  /** Variant pinned on this row's seed (carries `propId` for re-pinning), or `null` for the base seed. */
+  variant: CmsSlotSelectedVariant | null;
   name: string;
   /**
    * Composer-only values for designer-exposed component props, keyed by `propId`.
@@ -190,24 +250,34 @@ export type CmsSlotCompositionDraftRow = {
   propValues?: Record<string, string>;
 };
 
+/** Pool-option key for a draft/selected row from its component + pinned variant. */
+export function draftRowPoolKey(row: { componentId: string; variant: CmsSlotSelectedVariant | null }): string {
+  return poolOptionKey({ componentId: row.componentId, variantId: row.variant?.variantId ?? null });
+}
+
+/** Pool seed to (re-)create: a component and the variant to pin on it. */
+type CmsSlotPoolSeed = { componentId: string; variant: CmsSlotSelectedVariant | null };
+
 /**
- * Ensures the hidden Designer list has at least one instance per component type in `draft`. Appends missing
- * types (existing rows first, then first-seen draft order) and refreshes configured ids + slot props length.
+ * Ensures the hidden Designer list has at least one seed per **pool key** in `draft` (component + pinned variant).
+ * Appends missing seeds — pinning the variant so a re-created split-content image-left seed comes back as image-left,
+ * not base — and refreshes configured pool keys + slot props length.
  */
 export async function ensureDesignerPoolHasDraftComponentTypes(
   container: BlockElement,
-  draft: ReadonlyArray<{ componentId: string }>
+  draft: ReadonlyArray<CmsSlotPoolSeed>
 ): Promise<HydratedCmsSlotRow[]> {
   let rows = await listInstancesInSlotListContainer(container);
-  const configured = await resolveCmsSlotDesignerConfiguredComponentIds(container, rows);
-  let scoped = filterHydratedCmsSlotRowsByComponentIds(rows, configured);
+  const configured = await resolveCmsSlotDesignerConfiguredPoolKeys(container, rows);
+  let scoped = filterHydratedCmsSlotRowsByPoolKeys(rows, configured);
 
-  const present = new Set(scoped.map((row) => row.componentId));
-  const toAppend: string[] = [];
+  const present = new Set(scoped.map((row) => row.poolKey));
+  const toAppend: CmsSlotPoolSeed[] = [];
   for (const row of draft) {
-    if (!present.has(row.componentId)) {
-      toAppend.push(row.componentId);
-      present.add(row.componentId);
+    const key = draftRowPoolKey(row);
+    if (key.length > 0 && !present.has(key)) {
+      toAppend.push({ componentId: row.componentId, variant: row.variant });
+      present.add(key);
     }
   }
 
@@ -215,30 +285,31 @@ export async function ensureDesignerPoolHasDraftComponentTypes(
     return scoped;
   }
 
-  for (const componentId of toAppend) {
-    await appendComponentToSlotListContainer(container, componentId);
+  for (const seed of toAppend) {
+    await appendComponentToSlotListContainer(container, seed.componentId, seed.variant);
   }
 
   rows = await listInstancesInSlotListContainer(container);
-  await writeCmsSlotDesignerConfiguredComponentIds(
+  await writeCmsSlotDesignerConfiguredPoolKeys(
     container,
-    rows.map((row) => row.componentId)
+    rows.map((row) => row.poolKey)
   );
   const slotFile = await readCmsSlotDesignerSlotPropsFile(container, rows.length);
   await writeCmsSlotDesignerSlotPropsFile(container, slotFile);
 
-  const configuredAfter = await resolveCmsSlotDesignerConfiguredComponentIds(container, rows);
-  scoped = filterHydratedCmsSlotRowsByComponentIds(rows, configuredAfter);
+  const configuredAfter = await resolveCmsSlotDesignerConfiguredPoolKeys(container, rows);
+  scoped = filterHydratedCmsSlotRowsByPoolKeys(rows, configuredAfter);
   return scoped;
 }
 
 /**
- * Replaces all component instances inside a CMS slot container so their types and order match `draft`.
- * Used by Composer save so the hidden list, designer preview, and published runtime stay aligned.
+ * Replaces all component instances inside a CMS slot container so their seeds (component + pinned variant) and order
+ * match `draft`. Used by Composer save so the hidden list, designer preview, and published runtime stay aligned.
+ * Re-pins each row's variant after append so the destructive rebuild does not reset variants to base.
  */
 export async function applyCmsSlotCompositionDraft(
   container: BlockElement,
-  draft: Array<{ componentId: string }>
+  draft: Array<CmsSlotPoolSeed>
 ): Promise<HydratedCmsSlotRow[]> {
   return runExclusiveDesignerOp(async () => {
     const children = await container.getChildren();
@@ -248,7 +319,7 @@ export async function applyCmsSlotCompositionDraft(
       }
     }
     for (const row of draft) {
-      await appendComponentToSlotListContainer(container, row.componentId);
+      await appendComponentToSlotListContainer(container, row.componentId, row.variant);
     }
     return listInstancesInSlotListContainer(container);
   });

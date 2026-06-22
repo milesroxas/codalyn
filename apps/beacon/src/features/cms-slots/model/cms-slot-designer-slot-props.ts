@@ -125,6 +125,27 @@ function parseFile(raw: string | null | undefined, slotCount: number): CmsSlotDe
   return { v: FILE_VERSION, slots };
 }
 
+/**
+ * Copies the `exposed` config of an existing seed onto a newly-added seed slot, returning a new file. Used when the
+ * Designer adds a second instance of a component to pin a different variant: the new variant seed inherits the same
+ * exposed-props setup (including image export constraints) so only the variant differs. No-op when either index is out
+ * of range or there is no source seed (`sourceIndex < 0`).
+ */
+export function inheritExposedFromExistingSeed(
+  file: CmsSlotDesignerSlotPropsFile,
+  sourceIndex: number,
+  newIndex: number
+): CmsSlotDesignerSlotPropsFile {
+  const source = sourceIndex >= 0 ? file.slots[sourceIndex] : undefined;
+  if (source == null || file.slots[newIndex] == null) {
+    return file;
+  }
+  const slots = file.slots.map((slot, i) =>
+    i === newIndex ? { exposed: source.exposed.map((e) => structuredClone(e)) } : slot
+  );
+  return { v: file.v, slots };
+}
+
 export function serializeSlotPropsFile(f: CmsSlotDesignerSlotPropsFile): string {
   return encodeSlotPropsAttrValue(JSON.stringify(f satisfies CmsSlotDesignerSlotPropsFile));
 }
@@ -168,20 +189,20 @@ export async function readAllExposedPropIdsForContainer(container: BlockElement)
 }
 
 function findOldPoolIndexForRow(
-  oldPool: readonly { componentId: string; exposed: ComposableInstancePropMeta[] }[],
-  componentId: string,
+  oldPool: readonly { poolKey: string; exposed: ComposableInstancePropMeta[] }[],
+  poolKey: string,
   used: Set<number>
 ): number {
   for (let i = 0; i < oldPool.length; i++) {
     if (used.has(i)) {
       continue;
     }
-    if (oldPool[i].componentId === componentId) {
+    if (oldPool[i].poolKey === poolKey) {
       return i;
     }
   }
   for (let i = 0; i < oldPool.length; i++) {
-    if (oldPool[i].componentId === componentId) {
+    if (oldPool[i].poolKey === poolKey) {
       return i;
     }
   }
@@ -189,15 +210,15 @@ function findOldPoolIndexForRow(
 }
 
 /**
- * @param poolComponentIds — component id per hidden list slot, in child order; used to realign on rebuild.
+ * @param newPool — pool key per hidden list slot, in child order; used to realign exposed props on rebuild.
  */
 function realignExposedByPoolOrder(
-  oldPool: readonly { componentId: string; exposed: ComposableInstancePropMeta[] }[],
-  newPool: readonly { componentId: string }[]
+  oldPool: readonly { poolKey: string; exposed: ComposableInstancePropMeta[] }[],
+  newPool: readonly { poolKey: string }[]
 ): CmsSlotDesignerSlotEntry[] {
   const used = new Set<number>();
   return newPool.map((row) => {
-    const found = findOldPoolIndexForRow(oldPool, row.componentId, used);
+    const found = findOldPoolIndexForRow(oldPool, row.poolKey, used);
     if (found < 0) {
       return { exposed: [] };
     }
@@ -225,17 +246,17 @@ export async function writeCmsSlotDesignerSlotPropsFile(
 }
 
 /**
- * @param oldPoolIds — one component id per slot **before** canvas rebuild.
- * @param newPool — component ids in order after rebuild.
- * @param oldFile — slot file **before** rebuild (aligned with `oldPoolIds`).
+ * @param oldPoolKeys — one pool key (component + variant) per slot **before** canvas rebuild.
+ * @param newPool — pool keys in order after rebuild.
+ * @param oldFile — slot file **before** rebuild (aligned with `oldPoolKeys`).
  */
 export function mergeSlotFileAfterListRebuild(
-  oldPoolIds: readonly string[],
+  oldPoolKeys: readonly string[],
   oldFile: CmsSlotDesignerSlotPropsFile,
-  newPool: readonly { componentId: string }[]
+  newPool: readonly { poolKey: string }[]
 ): CmsSlotDesignerSlotPropsFile {
-  const oldCombined = oldPoolIds.map((componentId, i) => ({
-    componentId,
+  const oldCombined = oldPoolKeys.map((poolKey, i) => ({
+    poolKey,
     exposed: oldFile.slots[i]?.exposed ?? [],
   }));
   const nextSlots = realignExposedByPoolOrder(oldCombined, newPool);

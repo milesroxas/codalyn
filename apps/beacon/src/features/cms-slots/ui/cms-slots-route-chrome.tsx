@@ -112,6 +112,9 @@ export type CmsSlotsRouteChromeProps = {
   onAddComponent: (c: ComponentSearchResult) => void | Promise<void>;
   onRemoveRow: (row: HydratedCmsSlotRow) => void | Promise<void>;
   removingKey: string | null;
+  onSetSeedVariant: (row: HydratedCmsSlotRow, propId: string, variantId: string) => void | Promise<void>;
+  settingVariantKey: string | null;
+  onAddVariant: (row: HydratedCmsSlotRow) => void | Promise<void>;
   listTargetPhase: CmsSlotListTargetPhase;
   listTargetOnCanvasCount: number;
   listTargetOnCanvasCountResolved: boolean;
@@ -228,6 +231,9 @@ function CmsSlotsDesignerRouteBody(
           onAddComponent={p.onAddComponent}
           onRemove={p.onRemoveRow}
           removingKey={p.removingKey}
+          onSetSeedVariant={p.onSetSeedVariant}
+          settingVariantKey={p.settingVariantKey}
+          onAddVariant={p.onAddVariant}
           listTargetPhase={p.listTargetPhase}
           listTargetOnCanvasCount={p.listTargetOnCanvasCount}
           listTargetOnCanvasCountResolved={p.listTargetOnCanvasCountResolved}

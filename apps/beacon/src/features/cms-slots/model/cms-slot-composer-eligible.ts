@@ -9,9 +9,9 @@ import {
 } from "@/features/cms-slots/model/cms-slot-page-inline-script";
 import {
   type CmsSlotListOnPage,
-  filterHydratedCmsSlotRowsByComponentIds,
+  filterHydratedCmsSlotRowsByPoolKeys,
   listInstancesInSlotListContainer,
-  readCmsSlotDesignerConfiguredComponentIds,
+  readCmsSlotDesignerConfiguredPoolKeys,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 
 export type ComposerEligibleList = CmsSlotListOnPage;
@@ -21,11 +21,11 @@ export type ComposerEligibleList = CmsSlotListOnPage;
  * Page runtime sync is enforced separately in {@link listComposerEligibleLists}.
  */
 export function cmsSlotHasComposerReadyDesignerComponent(input: {
-  configuredComponentIds: readonly string[] | null;
+  configuredPoolKeys: readonly string[] | null;
   scopedRowCount: number;
   slotProps: CmsSlotDesignerSlotPropsFile;
 }): boolean {
-  if (input.configuredComponentIds == null || input.configuredComponentIds.length === 0) {
+  if (input.configuredPoolKeys == null || input.configuredPoolKeys.length === 0) {
     return false;
   }
   if (input.scopedRowCount === 0) {
@@ -35,12 +35,12 @@ export function cmsSlotHasComposerReadyDesignerComponent(input: {
 }
 
 async function hasComposerReadyDesignerSlot(container: BlockElement): Promise<boolean> {
-  const configuredComponentIds = await readCmsSlotDesignerConfiguredComponentIds(container);
+  const configuredPoolKeys = await readCmsSlotDesignerConfiguredPoolKeys(container);
   const rows = await listInstancesInSlotListContainer(container);
-  const scopedRows = filterHydratedCmsSlotRowsByComponentIds(rows, configuredComponentIds ?? []);
+  const scopedRows = filterHydratedCmsSlotRowsByPoolKeys(rows, configuredPoolKeys ?? []);
   const slotProps = await readCmsSlotDesignerSlotPropsFile(container, scopedRows.length);
   return cmsSlotHasComposerReadyDesignerComponent({
-    configuredComponentIds,
+    configuredPoolKeys,
     scopedRowCount: scopedRows.length,
     slotProps,
   });

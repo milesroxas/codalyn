@@ -37,7 +37,7 @@ export function ComposerPaletteList(props: ComposerPaletteListProps) {
 
         return (
           <DrawerScrollListAddActionRow
-            key={entry.id}
+            key={entry.poolKey}
             label={entry.name}
             disabled={busy}
             title={entry.group ? label : undefined}

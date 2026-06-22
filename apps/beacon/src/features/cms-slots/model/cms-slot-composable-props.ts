@@ -361,6 +361,12 @@ async function listComposablePropsForInstance(instance: ComponentElement): Promi
     if (byId.has(p.propId)) {
       continue;
     }
+    // Component variants are not per-row content: the Designer pins them on the hidden pool seed (one seed per variant),
+    // so the Composer selects a variant by choosing that seed, never by binding the variant prop. Excluding it here keeps
+    // it out of the Expose-to-Composer list and out of the runtime `p` payload (no more dumping the option id as text).
+    if (String(p.valueType) === "variant") {
+      continue;
+    }
     byId.set(p.propId, {
       propId: p.propId,
       label: labelFromInstanceProp(p),

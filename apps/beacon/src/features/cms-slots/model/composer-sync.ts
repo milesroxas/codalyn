@@ -12,16 +12,16 @@ import {
 } from "@/features/cms-slots/model/cms-slot-designer-slot-props";
 import {
   type CmsSlotListOnPage,
-  filterHydratedCmsSlotRowsByComponentIds,
+  filterHydratedCmsSlotRowsByPoolKeys,
   type HydratedCmsSlotRow,
   listInstancesInSlotListContainer,
-  resolveCmsSlotDesignerConfiguredComponentIds,
+  resolveCmsSlotDesignerConfiguredPoolKeys,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
-import { paletteForConfiguredComponentIds } from "@/features/cms-slots/model/palette-for-configured-component-ids";
+import { paletteForConfiguredPoolKeys } from "@/features/cms-slots/model/palette-for-configured-component-ids";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 
 export type ComposerSyncResult = {
-  allowedPalette: Awaited<ReturnType<typeof paletteForConfiguredComponentIds>>;
+  allowedPalette: Awaited<ReturnType<typeof paletteForConfiguredPoolKeys>>;
   designerScopedRows: HydratedCmsSlotRow[];
   composerDesignerComposable: Record<string, ComposableInstancePropMeta[]>;
   composerSlotProps: CmsSlotDesignerSlotPropsFile;
@@ -37,10 +37,10 @@ export async function loadComposerSynchronizedState(args: {
   const { slotList, currentCmsItemId, shouldAbort } = args;
   const rows = await listInstancesInSlotListContainer(slotList.container);
   if (shouldAbort()) return null;
-  const configuredComponentIds = await resolveCmsSlotDesignerConfiguredComponentIds(slotList.container, rows);
+  const configuredPoolKeys = await resolveCmsSlotDesignerConfiguredPoolKeys(slotList.container, rows);
   if (shouldAbort()) return null;
-  const designerScopedRows = filterHydratedCmsSlotRowsByComponentIds(rows, configuredComponentIds);
-  const allowedPalette = await paletteForConfiguredComponentIds(configuredComponentIds, rows);
+  const designerScopedRows = filterHydratedCmsSlotRowsByPoolKeys(rows, configuredPoolKeys);
+  const allowedPalette = await paletteForConfiguredPoolKeys(configuredPoolKeys, rows);
   if (shouldAbort()) return null;
   const composerDesignerComposable = await listComposableMetaByInstanceKey(designerScopedRows);
   if (shouldAbort()) return null;

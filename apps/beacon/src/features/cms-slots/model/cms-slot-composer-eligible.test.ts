@@ -11,14 +11,14 @@ describe("cmsSlotHasComposerReadyDesignerComponent", () => {
   it("is false when Designer palette is unset", () => {
     expect(
       cmsSlotHasComposerReadyDesignerComponent({
-        configuredComponentIds: null,
+        configuredPoolKeys: null,
         scopedRowCount: 1,
         slotProps: slotPropsWithExpose,
       })
     ).toBe(false);
     expect(
       cmsSlotHasComposerReadyDesignerComponent({
-        configuredComponentIds: [],
+        configuredPoolKeys: [],
         scopedRowCount: 1,
         slotProps: slotPropsWithExpose,
       })
@@ -28,7 +28,7 @@ describe("cmsSlotHasComposerReadyDesignerComponent", () => {
   it("is false when configured palette has no matching hidden-list rows", () => {
     expect(
       cmsSlotHasComposerReadyDesignerComponent({
-        configuredComponentIds: ["comp-1"],
+        configuredPoolKeys: ["comp-1"],
         scopedRowCount: 0,
         slotProps: slotPropsWithExpose,
       })
@@ -38,7 +38,7 @@ describe("cmsSlotHasComposerReadyDesignerComponent", () => {
   it("is false when no slot exposes Composer props", () => {
     expect(
       cmsSlotHasComposerReadyDesignerComponent({
-        configuredComponentIds: ["comp-1"],
+        configuredPoolKeys: ["comp-1"],
         scopedRowCount: 1,
         slotProps: { v: 1, slots: [{ exposed: [] }] },
       })
@@ -48,7 +48,7 @@ describe("cmsSlotHasComposerReadyDesignerComponent", () => {
   it("is true when at least one Designer slot exposes props", () => {
     expect(
       cmsSlotHasComposerReadyDesignerComponent({
-        configuredComponentIds: ["comp-1"],
+        configuredPoolKeys: ["comp-1"],
         scopedRowCount: 1,
         slotProps: slotPropsWithExpose,
       })

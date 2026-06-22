@@ -37,6 +37,9 @@ export type CmsSlotCompositionPanelProps = {
   onAddComponent: (c: ComponentSearchResult) => void;
   onRemove: (row: HydratedCmsSlotRow) => void;
   removingKey: string | null;
+  onSetSeedVariant: (row: HydratedCmsSlotRow, propId: string, variantId: string) => void | Promise<void>;
+  settingVariantKey: string | null;
+  onAddVariant: (row: HydratedCmsSlotRow) => void | Promise<void>;
   listTargetPhase: CmsSlotListTargetPhase;
   /** How many list-render target instances for this list exist on the current page. */
   listTargetOnCanvasCount: number;
@@ -81,6 +84,9 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     onAddComponent,
     onRemove,
     removingKey,
+    onSetSeedVariant,
+    settingVariantKey,
+    onAddVariant,
     listTargetPhase,
     onCreateListTarget,
     onRequestRemoveListTarget,
@@ -162,6 +168,9 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
             listTargetActionBusy={listTargetActionBusy}
             resyncingDesignerSlotKey={resyncingDesignerSlotKey}
             onRemove={onRemove}
+            onSetSeedVariant={onSetSeedVariant}
+            settingVariantKey={settingVariantKey}
+            onAddVariant={onAddVariant}
             onSetSlotExposed={onSetSlotExposed}
             onResyncDesignerSlotAttrs={onResyncDesignerSlotAttrs}
             autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}

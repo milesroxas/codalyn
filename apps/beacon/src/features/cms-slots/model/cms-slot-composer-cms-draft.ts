@@ -25,22 +25,22 @@ import {
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import { getTowerOrigin } from "@/shared/lib/tower-client";
 
-/** Prefer an unused pool slot; if the type repeats more times than slots, reuse the first matching index. */
+/** Prefer an unused pool seed with this pool key; if the key repeats more than the pool has, reuse the first match. */
 function findHiddenListPoolIndexForRow(
-  pool: ReadonlyArray<{ componentId: string }>,
-  componentId: string,
+  pool: ReadonlyArray<{ poolKey: string }>,
+  poolKey: string,
   used: Set<number>
 ): number {
   for (let i = 0; i < pool.length; i++) {
     if (used.has(i)) {
       continue;
     }
-    if (pool[i].componentId === componentId) {
+    if (pool[i].poolKey === poolKey) {
       return i;
     }
   }
   for (let i = 0; i < pool.length; i++) {
-    if (pool[i].componentId === componentId) {
+    if (pool[i].poolKey === poolKey) {
       return i;
     }
   }
@@ -65,25 +65,25 @@ export function cmsSlotCompositionSignature(draft: ReadonlyArray<CmsSlotComposit
       const keys = Object.keys(pv).sort();
       const part = keys.map((k) => `${k}:${pv[k] ?? ""}`).join("\u0001");
       const slot = sanitizeSlotLabelForPayload(r.name);
-      return `${r.componentId}\u0002${part}\u0002${slot}`;
+      return `${r.poolKey}\u0002${part}\u0002${slot}`;
     })
     .join("\u0003");
 }
 
 /**
  * Map Composer rows (in order) to indices into the hidden list block’s **published DOM children**
- * (`sourceNode.children`), matching `componentId` with greedy “next unused” Designer instances. If the
- * draft repeats a type more times than the pool has distinct children, the **same** clone source is
- * reused (published runtime clones the same child multiple times; each row still gets its own `p[]`).
+ * (`sourceNode.children`), matching `poolKey` (component + pinned variant) with greedy “next unused” Designer
+ * instances. If the draft repeats a pool key more times than the pool has distinct children, the **same** clone source
+ * is reused (published runtime clones the same child multiple times; each row still gets its own `p[]`).
  */
 export function draftToHiddenListIndices(
-  pool: ReadonlyArray<{ componentId: string; domChildIndex?: number }>,
-  draft: ReadonlyArray<{ componentId: string }>
+  pool: ReadonlyArray<{ poolKey: string; domChildIndex?: number }>,
+  draft: ReadonlyArray<{ poolKey: string }>
 ): { ok: true; indices: number[] } | { ok: false } {
   const used = new Set<number>();
   const indices: number[] = [];
   for (const row of draft) {
-    const found = findHiddenListPoolIndexForRow(pool, row.componentId, used);
+    const found = findHiddenListPoolIndexForRow(pool, row.poolKey, used);
     if (found < 0) {
       return { ok: false };
     }
@@ -154,7 +154,14 @@ function draftFromPayloadRows(
     }
     const pr = propRows[u] ?? {};
     const name = slotLabels != null ? resolveCmsSlotPublishedDisplayName(r.name, slotLabels[u]) : r.name;
-    out.push({ key: crypto.randomUUID(), componentId: r.componentId, name, propValues: { ...pr } });
+    out.push({
+      key: crypto.randomUUID(),
+      componentId: r.componentId,
+      poolKey: r.poolKey,
+      variant: r.variant,
+      name,
+      propValues: { ...pr },
+    });
   }
   return out;
 }
@@ -178,6 +185,8 @@ export async function resolveComposerTargetOrder(input: {
     const d = input.designerScopedRows.map((r) => ({
       key: r.key,
       componentId: r.componentId,
+      poolKey: r.poolKey,
+      variant: r.variant,
       name: r.name,
     }));
     return { draft: d, initialSignature: cmsSlotCompositionSignature(d), cmsSource: "static_list" };

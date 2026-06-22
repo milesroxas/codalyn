@@ -1,7 +1,9 @@
 import type { ExportConstraints } from "@codalyn/webflow-kit";
 import { describe, expect, it } from "vitest";
 import {
+  type CmsSlotDesignerSlotPropsFile,
   collectExposedPropIdsFromSlotFileRaw,
+  inheritExposedFromExistingSeed,
   readCmsSlotDesignerSlotPropsFile,
   serializeSlotPropsFile,
 } from "@/features/cms-slots/model/cms-slot-designer-slot-props";
@@ -115,5 +117,30 @@ describe("imageExport persistence (per-prop export constraints)", () => {
     });
     const parsed = await readCmsSlotDesignerSlotPropsFile(fakeContainer(serialized), 1);
     expect(parsed.slots[0].exposed.map((e) => e.propId)).toEqual(["ok-text"]);
+  });
+});
+
+describe("inheritExposedFromExistingSeed", () => {
+  const file: CmsSlotDesignerSlotPropsFile = {
+    v: 1,
+    slots: [{ exposed: [{ propId: "title", label: "Title", valueType: "string" }] }, { exposed: [] }],
+  };
+
+  it("copies the source seed's exposed config onto the new seed slot", () => {
+    const next = inheritExposedFromExistingSeed(file, 0, 1);
+    expect(next.slots[1].exposed).toEqual([{ propId: "title", label: "Title", valueType: "string" }]);
+  });
+
+  it("deep-clones so the new seed does not share entry references with the source", () => {
+    const next = inheritExposedFromExistingSeed(file, 0, 1);
+    expect(next.slots[1].exposed[0]).not.toBe(file.slots[0].exposed[0]);
+  });
+
+  it("is a no-op when there is no source seed (sourceIndex < 0)", () => {
+    expect(inheritExposedFromExistingSeed(file, -1, 1)).toBe(file);
+  });
+
+  it("is a no-op when an index is out of range", () => {
+    expect(inheritExposedFromExistingSeed(file, 0, 9)).toBe(file);
   });
 });

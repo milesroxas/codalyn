@@ -1,4 +1,9 @@
 import { readCmsSlotListDisplayName } from "@/features/cms-slots/model/cms-slot-data-list-display";
+import {
+  type CmsSlotSelectedVariant,
+  readSelectedVariantFromInstanceProps,
+} from "@/features/cms-slots/model/cms-slot-instance-variant";
+import { dedupePoolOptionKeys, poolOptionKey } from "@/features/cms-slots/model/cms-slot-pool-option";
 
 type ElementWithChildren = AnyElement & {
   getChildren: () => Promise<AnyElement[]>;
@@ -10,38 +15,29 @@ function hasGetChildren(e: AnyElement): e is ElementWithChildren {
 
 const CMS_SLOT_DESIGNER_COMPONENT_IDS_ATTR = "data-beacon-designer-component-ids";
 /** Pre-rename attribute name; read as a fallback so lists configured before the Engine→Designer rename keep their
- * configured component ids (the next save rewrites under the current name). See the slot-props file for the same issue. */
+ * configured pool keys (the next save rewrites under the current name). See the slot-props file for the same issue. */
 const CMS_SLOT_LEGACY_COMPONENT_IDS_ATTR = "data-beacon-engine-component-ids";
 const BEACON_DESIGNER_COMPONENT_IDS_EMPTY = "__none__";
 
-function uniqueComponentIds(componentIds: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const componentId of componentIds) {
-    const trimmed = componentId.trim();
-    if (trimmed.length === 0 || seen.has(trimmed)) {
-      continue;
-    }
-    seen.add(trimmed);
-    out.push(trimmed);
-  }
-  return out;
-}
-
-function serializeBeaconDesignerConfiguredComponentIds(componentIds: readonly string[]): string {
-  const unique = uniqueComponentIds(componentIds);
+/**
+ * The configured-ids attribute now stores **pool-option keys** ({@link poolOptionKey}) — `componentId` for a base seed,
+ * `componentId~variantId` for a variant-pinned seed. Pre-variant lists stored bare component ids, which decode to base
+ * pool keys, so the format is backward compatible (no migration needed).
+ */
+function serializeBeaconDesignerConfiguredPoolKeys(poolKeys: readonly string[]): string {
+  const unique = dedupePoolOptionKeys(poolKeys);
   if (unique.length === 0) {
     return BEACON_DESIGNER_COMPONENT_IDS_EMPTY;
   }
   return unique.join(",");
 }
 
-function parseBeaconDesignerConfiguredComponentIds(raw: string): string[] {
+function parseBeaconDesignerConfiguredPoolKeys(raw: string): string[] {
   const trimmed = raw.trim();
   if (trimmed.length === 0 || trimmed === BEACON_DESIGNER_COMPONENT_IDS_EMPTY) {
     return [];
   }
-  return uniqueComponentIds(trimmed.split(","));
+  return dedupePoolOptionKeys(trimmed.split(","));
 }
 
 /** Stable key for a CMS slot container (page / tree identity). */
@@ -99,10 +95,14 @@ export type HydratedCmsSlotRow = {
   instance: ComponentElement;
   /** Index in `container.getChildren()` — matches published `sourceNode.children` for runtime clone `i[]`. */
   domChildIndex: number;
+  /** Variant this seed is pinned to (read from its instance props), or `null` for the base/no-variant seed. */
+  variant: CmsSlotSelectedVariant | null;
+  /** Stable pool-option key (`componentId` + pinned variant) — pool/palette/draft identity. */
+  poolKey: string;
 };
 
-/** Designer-configured component ids for this CMS slot, or `null` when not configured yet. */
-export async function readCmsSlotDesignerConfiguredComponentIds(container: BlockElement): Promise<string[] | null> {
+/** Designer-configured pool keys for this CMS slot, or `null` when not configured yet. */
+export async function readCmsSlotDesignerConfiguredPoolKeys(container: BlockElement): Promise<string[] | null> {
   const current = await container.getCustomAttribute(CMS_SLOT_DESIGNER_COMPONENT_IDS_ATTR);
   const raw =
     current != null && current.trim().length > 0
@@ -111,46 +111,55 @@ export async function readCmsSlotDesignerConfiguredComponentIds(container: Block
   if (raw == null) {
     return null;
   }
-  return parseBeaconDesignerConfiguredComponentIds(raw);
+  return parseBeaconDesignerConfiguredPoolKeys(raw);
 }
 
-/** Persists the Designer-configured component ids for this CMS slot. */
-export async function writeCmsSlotDesignerConfiguredComponentIds(
+/** Persists the Designer-configured pool keys (component + pinned variant) for this CMS slot. */
+export async function writeCmsSlotDesignerConfiguredPoolKeys(
   container: BlockElement,
-  componentIds: readonly string[]
+  poolKeys: readonly string[]
 ): Promise<void> {
   await container.setCustomAttribute(
     CMS_SLOT_DESIGNER_COMPONENT_IDS_ATTR,
-    serializeBeaconDesignerConfiguredComponentIds(componentIds)
+    serializeBeaconDesignerConfiguredPoolKeys(poolKeys)
   );
 }
 
-/** Keeps only rows whose component id is in `allowedComponentIds` (in original row order). */
-export function filterHydratedCmsSlotRowsByComponentIds(
+/** Keeps only rows whose pool key is in `allowedPoolKeys` (in original row order). */
+export function filterHydratedCmsSlotRowsByPoolKeys(
   rows: HydratedCmsSlotRow[],
-  allowedComponentIds: readonly string[]
+  allowedPoolKeys: readonly string[]
 ): HydratedCmsSlotRow[] {
-  if (allowedComponentIds.length === 0) {
+  if (allowedPoolKeys.length === 0) {
     return [];
   }
-  const allowed = new Set(uniqueComponentIds(allowedComponentIds));
-  return rows.filter((row) => allowed.has(row.componentId));
+  const allowed = new Set(dedupePoolOptionKeys(allowedPoolKeys));
+  return rows.filter((row) => allowed.has(row.poolKey));
 }
 
 /**
- * Returns Designer-configured component ids for this CMS slot. Falls back to component ids from the
- * current hidden-list instances when the attribute is missing **or** persisted as empty (`__none__` —
- * written on new lists before any slot row exists). Non-empty stored ids always win (Designer palette).
+ * Returns Designer-configured pool keys for this CMS slot. Falls back to pool keys from the current hidden-list
+ * instances when the attribute is missing **or** persisted as empty (`__none__` — written on new lists before any slot
+ * row exists). Non-empty stored keys always win (Designer palette).
  */
-export async function resolveCmsSlotDesignerConfiguredComponentIds(
+export async function resolveCmsSlotDesignerConfiguredPoolKeys(
   container: BlockElement,
   rows: HydratedCmsSlotRow[]
 ): Promise<string[]> {
-  const configured = await readCmsSlotDesignerConfiguredComponentIds(container);
+  const configured = await readCmsSlotDesignerConfiguredPoolKeys(container);
   if (configured != null && configured.length > 0) {
     return configured;
   }
-  return uniqueComponentIds(rows.map((row) => row.componentId));
+  return dedupePoolOptionKeys(rows.map((row) => row.poolKey));
+}
+
+/** Reads the variant a seed instance is pinned to; best-effort (`searchProps` can throw on some instances). */
+async function readSeedVariant(instance: ComponentElement): Promise<CmsSlotSelectedVariant | null> {
+  try {
+    return readSelectedVariantFromInstanceProps(await instance.searchProps());
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -165,7 +174,16 @@ export async function listInstancesInSlotListContainer(container: BlockElement):
     const inst = ch as ComponentElement;
     const comp = await inst.getComponent();
     const name = await comp.getName();
-    out.push({ key: crypto.randomUUID(), componentId: comp.id, name, instance: inst, domChildIndex });
+    const variant = await readSeedVariant(inst);
+    out.push({
+      key: crypto.randomUUID(),
+      componentId: comp.id,
+      name,
+      instance: inst,
+      domChildIndex,
+      variant,
+      poolKey: poolOptionKey({ componentId: comp.id, variantId: variant?.variantId ?? null }),
+    });
   }
   return out;
 }

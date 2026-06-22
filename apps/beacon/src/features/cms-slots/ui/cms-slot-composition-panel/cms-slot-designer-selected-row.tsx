@@ -2,6 +2,10 @@ import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
+import {
+  type CmsSlotVariantControl,
+  readVariantControlFromInstanceProps,
+} from "@/features/cms-slots/model/cms-slot-instance-variant";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import { ComposerSlotNameDialog } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-slot-name-dialog";
@@ -32,6 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
+import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import {
   Drawer,
@@ -77,6 +82,9 @@ type CmsSlotDesignerSelectedRowProps = {
   listTargetActionBusy: boolean;
   resyncingDesignerSlotKey: string | null;
   onRemove: (row: HydratedCmsSlotRow) => void;
+  onSetSeedVariant: (row: HydratedCmsSlotRow, propId: string, variantId: string) => void | Promise<void>;
+  settingVariantKey: string | null;
+  onAddVariant: (row: HydratedCmsSlotRow) => void | Promise<void>;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
   onResyncDesignerSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
   /** When set to this row’s `key`, opens the expose/tag drawer once (e.g. right after adding the component). */
@@ -100,6 +108,9 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
     listTargetActionBusy,
     resyncingDesignerSlotKey,
     onRemove,
+    onSetSeedVariant,
+    settingVariantKey,
+    onAddVariant,
     onSetSlotExposed,
     onResyncDesignerSlotAttrs,
     autoOpenExposeDrawerRowKey = null,
@@ -107,6 +118,26 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
   } = props;
   const showComposableLoading = useDeferredLoadingIndicator(composableLoading);
   const routeInteractionBlocked = useCmsSlotsRouteInteractionBlocked();
+
+  const [variantControl, setVariantControl] = useState<CmsSlotVariantControl | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const instanceProps = await row.instance.searchProps();
+        if (!cancelled) {
+          setVariantControl(readVariantControlFromInstanceProps(instanceProps));
+        }
+      } catch {
+        if (!cancelled) {
+          setVariantControl(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [row.instance]);
 
   const [propsDrawerOpen, setPropsDrawerOpen] = useState(false);
   const [closeBeforeTagDialogOpen, setCloseBeforeTagDialogOpen] = useState(false);
@@ -210,6 +241,8 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
   const drawerRow: CmsSlotCompositionDraftRow = {
     key: row.key,
     componentId: row.componentId,
+    poolKey: row.poolKey,
+    variant: row.variant,
     name: publishedDisplayName,
   };
   const publishedRenameBusy = renamingPublishedSlotKey === row.key;
@@ -240,6 +273,11 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
           onRename={(key, next) => onRenamePublishedDisplayName(key, next)}
           onChangePropValue={() => {}}
         />
+        {row.variant != null ? (
+          <Badge variant="accent" size="sm" className="shrink-0">
+            {row.variant.variantName}
+          </Badge>
+        ) : null}
         <span className="shrink-0 tabular-nums text-xs text-muted-foreground">{exposedCount}</span>
         <Button
           type="button"
@@ -261,6 +299,40 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
           <DrawerHeader align="start">
             <DrawerTitle>{publishedDisplayName}</DrawerTitle>
             <DrawerDescription>{CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DESCRIPTION}</DrawerDescription>
+            {variantControl != null ? (
+              <div className="mt-2 flex items-center gap-2">
+                <label className="text-sm font-medium" htmlFor={`${row.key}-variant`}>
+                  Variant
+                </label>
+                <select
+                  id={`${row.key}-variant`}
+                  className="h-8 min-w-0 flex-1 rounded-sm border border-input bg-transparent px-2.5 py-1 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+                  value={variantControl.selectedId}
+                  disabled={settingVariantKey === row.key || removingKey !== null || listTargetActionBusy}
+                  aria-label={`Variant for ${publishedDisplayName}`}
+                  onChange={(e) => void onSetSeedVariant(row, variantControl.propId, e.target.value)}
+                >
+                  {variantControl.options.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={addPending || removingKey !== null || listTargetActionBusy}
+                  onClick={() => {
+                    setPropsDrawerOpen(false);
+                    void onAddVariant(row);
+                  }}
+                >
+                  Add variant
+                </Button>
+              </div>
+            ) : null}
           </DrawerHeader>
           <CmsSlotDesignerExposePropsPanel
             rowKey={row.key}

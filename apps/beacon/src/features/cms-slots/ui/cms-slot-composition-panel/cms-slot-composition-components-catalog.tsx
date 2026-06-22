@@ -62,6 +62,8 @@ export function CmsSlotCompositionComponentsCatalogList(
     >
       {componentCatalog.map((component) => {
         const isAlreadyAdded = selectedComponentIdSet.has(component.id);
+        // Once a component is in the pool it is disabled here; further seeds for other variants are added from the
+        // component sheet's "Add variant" action, not by re-picking from the catalog.
         const disabled = addPending || catalogLoading || isAlreadyAdded;
 
         return (

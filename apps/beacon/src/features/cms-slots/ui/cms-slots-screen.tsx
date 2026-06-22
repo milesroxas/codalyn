@@ -32,6 +32,7 @@ import { stripDesignerCodalynAttrsFromComponentInstance } from "@/features/cms-s
 import { renamePublishedSlotDisplayNameAtPoolIndex } from "@/features/cms-slots/model/cms-slot-designer-rename-published-slot";
 import {
   type CmsSlotDesignerSlotPropsFile,
+  inheritExposedFromExistingSeed,
   readCmsSlotDesignerSlotPropsFile,
   writeCmsSlotDesignerSlotPropsFile,
 } from "@/features/cms-slots/model/cms-slot-designer-slot-props";
@@ -62,12 +63,12 @@ import {
   type CmsSlotListOnPage,
   cmsSlotListKey,
   designerPoolIndexForRuntimeCloneIndex,
-  filterHydratedCmsSlotRowsByComponentIds,
+  filterHydratedCmsSlotRowsByPoolKeys,
   findCmsSlotListsOnPage,
   type HydratedCmsSlotRow,
   listInstancesInSlotListContainer,
-  resolveCmsSlotDesignerConfiguredComponentIds,
-  writeCmsSlotDesignerConfiguredComponentIds,
+  resolveCmsSlotDesignerConfiguredPoolKeys,
+  writeCmsSlotDesignerConfiguredPoolKeys,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { resolveAllowedCmsSlotsSegment } from "@/features/cms-slots/model/cms-slots-access";
 import {
@@ -90,7 +91,7 @@ import {
   syncCmsSlotsInstallEmbedOnPage,
   uninstallCmsSlotsPageInstall,
 } from "@/features/cms-slots/model/install-cms-slots-wrapper";
-import { paletteForConfiguredComponentIds } from "@/features/cms-slots/model/palette-for-configured-component-ids";
+import { paletteForConfiguredPoolKeys } from "@/features/cms-slots/model/palette-for-configured-component-ids";
 import {
   focusCmsSlotListTargetOnCanvas,
   placeCmsSlotListTargetOnCanvas,
@@ -102,9 +103,11 @@ import {
   appendComponentToSlotListContainer,
   type CmsSlotCompositionDraftRow,
   type CmsSlotPaletteEntry,
+  copySeedPropOverrides,
   deleteCmsSlotListAndListTargetDefinition,
   listSiteComponentsForPicker,
   removeComponentInstanceFromCanvas,
+  setSeedInstanceVariant,
 } from "@/features/cms-slots/model/site-components";
 import { useCmsComposerEditingContextState } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
@@ -785,6 +788,7 @@ export function CmsSlotsScreen() {
   const [autoOpenExposeDrawerRowKey, setAutoOpenExposeDrawerRowKey] = useState<string | null>(null);
   const [selected, setSelected] = useState<HydratedCmsSlotRow[]>([]);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
+  const [settingVariantKey, setSettingVariantKey] = useState<string | null>(null);
   const [resyncingDesignerSlotKey, setResyncingDesignerSlotKey] = useState<string | null>(null);
   const [designerPublishedDisplayNames, setDesignerPublishedDisplayNames] = useState<string[] | null>(null);
   const [designerSlotLabelRefreshToken, setDesignerSlotLabelRefreshToken] = useState(0);
@@ -1333,7 +1337,7 @@ export function CmsSlotsScreen() {
       const listTargetRegisteredName = await listTargetComponent.getName();
       setListTargetPhase("synced");
       setListTargetRegisteredName(listTargetRegisteredName);
-      await writeCmsSlotDesignerConfiguredComponentIds(container, []);
+      await writeCmsSlotDesignerConfiguredPoolKeys(container, []);
       await placeCmsSlotListTargetOnCanvas(dataList, container, definitionId, { resolvedCmsEnsure: cmsEnsure });
       promptCmsFieldLinkIfCreated(cmsEnsure);
       if (cmsEnsure == null) {
@@ -1442,9 +1446,9 @@ export function CmsSlotsScreen() {
     setComposerOpeningKey(beacon.key);
     try {
       const rows = await listInstancesInSlotListContainer(beacon.container);
-      const configuredComponentIds = await resolveCmsSlotDesignerConfiguredComponentIds(beacon.container, rows);
-      const designerScopedRows = filterHydratedCmsSlotRowsByComponentIds(rows, configuredComponentIds);
-      const allowedPalette = await paletteForConfiguredComponentIds(configuredComponentIds, rows);
+      const configuredPoolKeys = await resolveCmsSlotDesignerConfiguredPoolKeys(beacon.container, rows);
+      const designerScopedRows = filterHydratedCmsSlotRowsByPoolKeys(rows, configuredPoolKeys);
+      const allowedPalette = await paletteForConfiguredPoolKeys(configuredPoolKeys, rows);
       setComposerAllowedPalette(allowedPalette);
       setComposerDesignerRows(designerScopedRows);
       const liveComposable = await listComposableMetaByInstanceKey(designerScopedRows);
@@ -1594,7 +1598,17 @@ export function CmsSlotsScreen() {
 
   const handleComposerAddFromPalette = useCallback((c: CmsSlotPaletteEntry) => {
     const rowKey = crypto.randomUUID();
-    setComposerDraft((prev) => [...prev, { key: rowKey, componentId: c.id, name: c.name, propValues: {} }]);
+    setComposerDraft((prev) => [
+      ...prev,
+      {
+        key: rowKey,
+        componentId: c.componentId,
+        poolKey: c.poolKey,
+        variant: c.variant,
+        name: c.name,
+        propValues: {},
+      },
+    ]);
     setAutoOpenExposeDrawerRowKey(rowKey);
   }, []);
 
@@ -1713,15 +1727,24 @@ export function CmsSlotsScreen() {
     setComposerDraft((prev) => prev.filter((r) => r.key !== key));
   }, []);
 
-  const handleAddComponent = async (c: ComponentSearchResult) => {
-    if (selectedComponentIdSet.has(c.id)) return;
+  /**
+   * Appends a hidden-list seed for `componentId` and selects it. When `sourceRow` is given (the Designer "Add variant"
+   * action), the new seed copies that seed's prop overrides and inherits its exposed-props config so it starts
+   * identical — only the variant differs. Returns the new row key (for auto-opening its sheet), or `null` on failure.
+   */
+  const addSeedRowToPool = async (
+    componentId: string,
+    sourceRow: HydratedCmsSlotRow | null
+  ): Promise<string | null> => {
     const container = targetRef.current;
-    if (!container || addPending) return;
+    if (!container || addPending) return null;
     setAddPending(true);
     setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT);
-    let rowKeyToAutoOpen: string | null = null;
     try {
-      const instance = await appendComponentToSlotListContainer(container, c.id);
+      const instance = await appendComponentToSlotListContainer(container, componentId);
+      if (sourceRow != null) {
+        await copySeedPropOverrides(sourceRow.instance, instance);
+      }
       const freshRows = await listInstancesInSlotListContainer(container);
       const addedRow = freshRows.find((row) => row.instance === instance) ?? freshRows[freshRows.length - 1];
       if (addedRow == null) {
@@ -1731,11 +1754,16 @@ export function CmsSlotsScreen() {
       const nextSelected = [...selected, { ...addedRow, key: rowKey }];
       setSelected(nextSelected);
       setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG);
-      await writeCmsSlotDesignerConfiguredComponentIds(
+      await writeCmsSlotDesignerConfiguredPoolKeys(
         container,
-        nextSelected.map((row) => row.componentId)
+        nextSelected.map((row) => row.poolKey)
       );
-      const slotF = await readCmsSlotDesignerSlotPropsFile(container, nextSelected.length);
+      const sourceIndex = sourceRow != null ? selected.findIndex((s) => s.key === sourceRow.key) : -1;
+      const slotF = inheritExposedFromExistingSeed(
+        await readCmsSlotDesignerSlotPropsFile(container, nextSelected.length),
+        sourceIndex,
+        nextSelected.length - 1
+      );
       await writeCmsSlotDesignerSlotPropsFile(container, slotF);
       setDesignerListSlotFile(slotF);
       setDesignerListCompositionStale(true);
@@ -1757,16 +1785,27 @@ export function CmsSlotsScreen() {
         });
         promptCmsFieldLinkIfCreated(cmsEnsure);
       }
-      rowKeyToAutoOpen = rowKey;
+      return rowKey;
     } catch (err) {
-      const message = formatWebflowDesignerError(err);
-      void webflow.notify({ type: "Error", message });
+      void webflow.notify({ type: "Error", message: formatWebflowDesignerError(err) });
+      return null;
     } finally {
       setAddPending(false);
       setRouteTaskPhase(null);
     }
-    if (rowKeyToAutoOpen != null) {
-      setAutoOpenExposeDrawerRowKey(rowKeyToAutoOpen);
+  };
+
+  const handleAddComponent = async (c: ComponentSearchResult) => {
+    const rowKey = await addSeedRowToPool(c.id, null);
+    if (rowKey != null) {
+      setAutoOpenExposeDrawerRowKey(rowKey);
+    }
+  };
+
+  const handleAddVariantFromSeed = async (row: HydratedCmsSlotRow) => {
+    const rowKey = await addSeedRowToPool(row.componentId, row);
+    if (rowKey != null) {
+      setAutoOpenExposeDrawerRowKey(rowKey);
     }
   };
 
@@ -1929,9 +1968,9 @@ export function CmsSlotsScreen() {
       await removeComponentInstanceFromCanvas(row.instance);
       const nextSelected = selected.filter((p) => p.key !== row.key);
       setSelected(nextSelected);
-      await writeCmsSlotDesignerConfiguredComponentIds(
+      await writeCmsSlotDesignerConfiguredPoolKeys(
         container,
-        nextSelected.map((entry) => entry.componentId)
+        nextSelected.map((entry) => entry.poolKey)
       );
       const nextSlots = removeIdx >= 0 ? slotFileBefore.slots.filter((_, j) => j !== removeIdx) : slotFileBefore.slots;
       const out: CmsSlotDesignerSlotPropsFile = { v: 1, slots: nextSlots };
@@ -1944,6 +1983,35 @@ export function CmsSlotsScreen() {
       void webflow.notify({ type: "Error", message });
     } finally {
       setRemovingKey(null);
+    }
+  };
+
+  const handleSetSeedVariant = async (row: HydratedCmsSlotRow, propId: string, variantId: string) => {
+    if (settingVariantKey) return;
+    const container = targetRef.current;
+    if (!container) return;
+    setSettingVariantKey(row.key);
+    try {
+      await setSeedInstanceVariant(row.instance, propId, variantId);
+      // Re-read this seed so its variant/poolKey reflect the new pin (order is unchanged, so match by DOM index).
+      const fresh = await listInstancesInSlotListContainer(container);
+      const updated = fresh.find((r) => r.domChildIndex === row.domChildIndex);
+      const nextSelected = selected.map((s) =>
+        s.key === row.key && updated != null
+          ? { ...s, variant: updated.variant, poolKey: updated.poolKey, instance: updated.instance }
+          : s
+      );
+      setSelected(nextSelected);
+      await writeCmsSlotDesignerConfiguredPoolKeys(
+        container,
+        nextSelected.map((entry) => entry.poolKey)
+      );
+      setDesignerListCompositionStale(true);
+      void refreshPageBeacons();
+    } catch (err) {
+      void webflow.notify({ type: "Error", message: formatWebflowDesignerError(err) });
+    } finally {
+      setSettingVariantKey(null);
     }
   };
 
@@ -2221,6 +2289,9 @@ export function CmsSlotsScreen() {
       onAddComponent={handleAddComponent}
       onRemoveRow={handleRemove}
       removingKey={removingKey}
+      onSetSeedVariant={handleSetSeedVariant}
+      settingVariantKey={settingVariantKey}
+      onAddVariant={handleAddVariantFromSeed}
       listTargetPhase={listTargetPhase}
       listTargetOnCanvasCount={listTargetOnCanvasCount}
       listTargetOnCanvasCountResolved={listTargetOnCanvasCountResolved}

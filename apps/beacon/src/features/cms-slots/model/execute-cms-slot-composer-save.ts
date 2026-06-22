@@ -29,11 +29,11 @@ import { syncCmsSlotPageInlineScript } from "@/features/cms-slots/model/cms-slot
 import {
   type CmsSlotListOnPage,
   designerPoolIndexForRuntimeCloneIndex,
-  filterHydratedCmsSlotRowsByComponentIds,
+  filterHydratedCmsSlotRowsByPoolKeys,
   type HydratedCmsSlotRow,
   listInstancesInSlotListContainer,
-  resolveCmsSlotDesignerConfiguredComponentIds,
-  writeCmsSlotDesignerConfiguredComponentIds,
+  resolveCmsSlotDesignerConfiguredPoolKeys,
+  writeCmsSlotDesignerConfiguredPoolKeys,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import {
@@ -108,8 +108,8 @@ function buildPropValueRowsForDraft(params: {
 
 async function finalizeStaticComposerReload(beacon: CmsSlotListOnPage, setters: ComposerSaveSetters): Promise<void> {
   const rows2 = await listInstancesInSlotListContainer(beacon.container);
-  const c2 = await resolveCmsSlotDesignerConfiguredComponentIds(beacon.container, rows2);
-  const e2 = filterHydratedCmsSlotRowsByComponentIds(rows2, c2);
+  const c2 = await resolveCmsSlotDesignerConfiguredPoolKeys(beacon.container, rows2);
+  const e2 = filterHydratedCmsSlotRowsByPoolKeys(rows2, c2);
   setters.setComposerDesignerRows(e2);
   setters.setComposerDesignerComposable(await listComposableMetaByInstanceKey(e2));
   setters.setComposerSlotProps(await readCmsSlotDesignerSlotPropsFile(beacon.container, e2.length));
@@ -245,7 +245,7 @@ async function applyComposerSaveStaticPagePath(args: {
     setters,
     onProgress,
   } = args;
-  const beforePoolIds = designerScopedRows.map((r) => r.componentId);
+  const beforePoolKeys = designerScopedRows.map((r) => r.poolKey);
   const oldFile = await readCmsSlotDesignerSlotPropsFile(beacon.container, designerScopedRows.length);
   onProgress?.(CMS_SLOTS_ROUTE_TASK_APPLYING_COMPOSITION);
   const rebuiltRows = await applyCmsSlotCompositionDraft(beacon.container, draftToApply);
@@ -254,12 +254,12 @@ async function applyComposerSaveStaticPagePath(args: {
     ? rebuiltMapped.indices
     : rebuiltRows.map((r) => r.domChildIndex);
   const runtimeText = serializeCmsSlotListRuntimePayload(hiddenListIndicesForRuntime, propValueRows, slotLabels);
-  const newFile = mergeSlotFileAfterListRebuild(beforePoolIds, oldFile, draftToApply);
+  const newFile = mergeSlotFileAfterListRebuild(beforePoolKeys, oldFile, draftToApply);
   onProgress?.(CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG);
   await writeCmsSlotDesignerSlotPropsFile(beacon.container, newFile);
-  await writeCmsSlotDesignerConfiguredComponentIds(
+  await writeCmsSlotDesignerConfiguredPoolKeys(
     beacon.container,
-    rebuiltRows.map((row) => row.componentId)
+    rebuiltRows.map((row) => row.poolKey)
   );
   onProgress?.(CMS_SLOTS_ROUTE_TASK_UPDATING_LIST_TARGET);
   await setCmsSlotListTargetInstancesStaticRuntimeText({
@@ -272,6 +272,8 @@ async function applyComposerSaveStaticPagePath(args: {
   const normalizedDraft = draftToApply.map((d) => ({
     key: d.key,
     componentId: d.componentId,
+    poolKey: d.poolKey,
+    variant: d.variant,
     name: d.name,
     propValues: d.propValues,
   }));
@@ -317,8 +319,8 @@ export async function executeCmsSlotComposerSave(input: {
 
   onProgress?.(CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION);
 
-  const allowedComponentIdSet = new Set(composerAllowedPalette.map((entry) => entry.id));
-  const draftToApply = composerDraft.filter((row) => allowedComponentIdSet.has(row.componentId));
+  const allowedPoolKeySet = new Set(composerAllowedPalette.map((entry) => entry.poolKey));
+  const draftToApply = composerDraft.filter((row) => allowedPoolKeySet.has(row.poolKey));
   if (draftToApply.length === 0 && composerDraft.length > 0) {
     void webflow.notify({
       type: "Error",
@@ -328,8 +330,8 @@ export async function executeCmsSlotComposerSave(input: {
   }
 
   const rows = await listInstancesInSlotListContainer(beacon.container);
-  const configuredComponentIds = await resolveCmsSlotDesignerConfiguredComponentIds(beacon.container, rows);
-  let designerScopedRows = filterHydratedCmsSlotRowsByComponentIds(rows, configuredComponentIds);
+  const configuredPoolKeys = await resolveCmsSlotDesignerConfiguredPoolKeys(beacon.container, rows);
+  let designerScopedRows = filterHydratedCmsSlotRowsByPoolKeys(rows, configuredPoolKeys);
   designerScopedRows = await ensureDesignerPoolHasDraftComponentTypes(beacon.container, draftToApply);
   const mapped = draftToHiddenListIndices(designerScopedRows, draftToApply);
   if (!mapped.ok) {

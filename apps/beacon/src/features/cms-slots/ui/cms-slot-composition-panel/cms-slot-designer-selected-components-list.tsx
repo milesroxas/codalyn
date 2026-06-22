@@ -23,6 +23,9 @@ type CmsSlotDesignerSelectedComponentsListProps = {
   listTargetActionBusy: boolean;
   resyncingDesignerSlotKey: string | null;
   onRemove: (row: HydratedCmsSlotRow) => void;
+  onSetSeedVariant: (row: HydratedCmsSlotRow, propId: string, variantId: string) => void | Promise<void>;
+  settingVariantKey: string | null;
+  onAddVariant: (row: HydratedCmsSlotRow) => void | Promise<void>;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
   onResyncDesignerSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
   autoOpenExposeDrawerRowKey?: string | null;
@@ -43,11 +46,22 @@ export function CmsSlotDesignerSelectedComponentsList(props: CmsSlotDesignerSele
     listTargetActionBusy,
     resyncingDesignerSlotKey,
     onRemove,
+    onSetSeedVariant,
+    settingVariantKey,
+    onAddVariant,
     onSetSlotExposed,
     onResyncDesignerSlotAttrs,
     autoOpenExposeDrawerRowKey = null,
     onAutoOpenExposeDrawerConsumed,
   } = props;
+
+  // The published names are resolved asynchronously and can lag a `selected` change by a render. Using a stale array
+  // would index into a different row and show the wrong component name (e.g. "Heading"); only trust it when its length
+  // matches the current rows.
+  const publishedNames =
+    designerPublishedDisplayNames != null && designerPublishedDisplayNames.length === selected.length
+      ? designerPublishedDisplayNames
+      : null;
 
   return (
     <div className={cmsSlotDesignerSelectedComponentsListShellClass} data-slot="cms_slots_selected_components">
@@ -61,7 +75,7 @@ export function CmsSlotDesignerSelectedComponentsList(props: CmsSlotDesignerSele
               key={row.key}
               row={row}
               slotIndex={slotIndex}
-              publishedDisplayName={designerPublishedDisplayNames?.[slotIndex] ?? row.name}
+              publishedDisplayName={publishedNames?.[slotIndex] ?? row.name}
               onRenamePublishedDisplayName={onRenamePublishedDisplayName}
               renamingPublishedSlotKey={renamingPublishedSlotKey}
               available={composableByKey[row.key] ?? []}
@@ -73,6 +87,9 @@ export function CmsSlotDesignerSelectedComponentsList(props: CmsSlotDesignerSele
               listTargetActionBusy={listTargetActionBusy}
               resyncingDesignerSlotKey={resyncingDesignerSlotKey}
               onRemove={onRemove}
+              onSetSeedVariant={onSetSeedVariant}
+              settingVariantKey={settingVariantKey}
+              onAddVariant={onAddVariant}
               onSetSlotExposed={onSetSlotExposed}
               onResyncDesignerSlotAttrs={onResyncDesignerSlotAttrs}
               autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}

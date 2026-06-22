@@ -11,11 +11,11 @@ import {
 } from "@/features/cms-slots/model/cms-slot-designer-slot-props";
 import {
   cmsSlotListKey,
-  filterHydratedCmsSlotRowsByComponentIds,
+  filterHydratedCmsSlotRowsByPoolKeys,
   findCmsSlotListsOnPage,
   type HydratedCmsSlotRow,
   listInstancesInSlotListContainer,
-  resolveCmsSlotDesignerConfiguredComponentIds,
+  resolveCmsSlotDesignerConfiguredPoolKeys,
 } from "@/features/cms-slots/model/cms-slot-page-targets";
 import {
   CMS_SLOTS_DESIGNER_RESYNC_NO_FIELDS,
@@ -118,8 +118,8 @@ export async function resyncDesignerSlotPropAttributesForSlotIndex(input: {
   setResyncingDesignerSlotKey(labelRow.key);
   try {
     const freshRows = await listInstancesInSlotListContainer(container);
-    const configuredIds = await resolveCmsSlotDesignerConfiguredComponentIds(container, freshRows);
-    const scoped = filterHydratedCmsSlotRowsByComponentIds(freshRows, configuredIds);
+    const configuredKeys = await resolveCmsSlotDesignerConfiguredPoolKeys(container, freshRows);
+    const scoped = filterHydratedCmsSlotRowsByPoolKeys(freshRows, configuredKeys);
 
     const row = scoped[slotIndex];
     if (row == null) {

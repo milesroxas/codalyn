@@ -1,9 +1,10 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { MoreVertical } from "lucide-react";
+import { ChevronDown, MoreVertical } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
 import { Skeleton } from "@/shared/ui/skeleton";
 
@@ -131,14 +132,20 @@ const surfaceSummaryCardOptionRowChevronVariants = cva("shrink-0 text-muted-fore
 });
 
 const surfaceSummaryCardSelectRowVariants = cva(
-  "flex min-w-0 w-full items-center rounded-sm border text-left transition-colors has-focus-visible:outline-none has-focus-visible:ring-2 has-focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-50",
+  "flex min-w-0 w-full items-center text-left transition-colors disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
+      frame: {
+        // Standalone rows own their surface: border, fill and focus ring all live here.
+        standalone:
+          "rounded-sm border has-focus-visible:outline-none has-focus-visible:ring-2 has-focus-visible:ring-ring/50",
+        // Embedded rows are a header inside a parent surface (e.g. SurfaceSummaryCardSelectCard); the
+        // container owns border + fill so the row stays visually flush with sibling sections.
+        embedded: "",
+      },
       selected: {
-        // Active state reads from fill, not an outline: solid accent sits clearly above the muted hover for contrast
-        // on the drawer surface. Border stays (transparent) to hold the 1px box model and avoid layout shift.
-        true: "border-transparent bg-accent text-accent-foreground hover:bg-accent",
-        false: "border-border/70 bg-muted/15 hover:bg-muted/30",
+        true: "",
+        false: "",
       },
       interactive: {
         true: "cursor-pointer",
@@ -149,13 +156,57 @@ const surfaceSummaryCardSelectRowVariants = cva(
         compact: "gap-2 px-2 py-1.5",
       },
     },
+    compoundVariants: [
+      {
+        frame: "standalone",
+        selected: true,
+        // Active state reads from fill, not an outline: solid accent sits clearly above the muted hover for contrast
+        // on the drawer surface. Border stays (transparent) to hold the 1px box model and avoid layout shift.
+        class: "border-transparent bg-accent text-accent-foreground hover:bg-accent",
+      },
+      {
+        frame: "standalone",
+        selected: false,
+        class: "border-border/70 bg-muted/15 hover:bg-muted/30",
+      },
+    ],
     defaultVariants: {
+      frame: "standalone",
       selected: false,
       interactive: true,
       density: "default",
     },
   }
 );
+
+// Container that unifies a select-row header with expandable sections under one surface, so nested
+// settings (e.g. an image export accordion) read as part of the same card rather than detached below it.
+const surfaceSummaryCardSelectCardVariants = cva(
+  "flex min-w-0 w-full flex-col overflow-hidden rounded-sm border text-left transition-colors",
+  {
+    variants: {
+      selected: {
+        // Matches the standalone select-row's active fill so image cards read identically to other exposed props.
+        true: "border-transparent bg-accent text-accent-foreground",
+        false: "border-border/70 bg-muted/15 hover:bg-muted/30",
+      },
+    },
+    defaultVariants: {
+      selected: false,
+    },
+  }
+);
+
+const surfaceSummaryCardExpandableTriggerClass =
+  "group flex w-full items-center justify-between gap-2 border-t border-border/60 px-2 py-2 text-left outline-none transition-colors hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-50";
+const surfaceSummaryCardExpandableTitleClass =
+  "text-[10px] font-medium uppercase tracking-wide leading-snug text-muted-foreground";
+const surfaceSummaryCardExpandableDescriptionClass = "text-muted-foreground text-[10px] leading-snug";
+const surfaceSummaryCardExpandableChevronClass =
+  "size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180";
+const surfaceSummaryCardExpandableContentClass =
+  "overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down";
+const surfaceSummaryCardExpandableContentInnerClass = "flex min-w-0 flex-col gap-2 px-2 pt-1 pb-3";
 
 const surfaceSummaryCardSurfaceDisplayVariants = cva("flex min-w-0 w-full items-center gap-3 text-left", {
   variants: {
@@ -563,6 +614,7 @@ function SurfaceSummaryCardOptionRowChevron({
 
 function SurfaceSummaryCardSelectRow({
   className,
+  frame,
   selected = false,
   interactive = true,
   density,
@@ -576,11 +628,70 @@ function SurfaceSummaryCardSelectRow({
       data-slot="surface-summary-card-select-row"
       data-selected={selected ? "true" : "false"}
       data-density={density ?? "default"}
-      className={cn(surfaceSummaryCardSelectRowVariants({ selected, interactive, density }), className)}
+      className={cn(surfaceSummaryCardSelectRowVariants({ frame, selected, interactive, density }), className)}
       {...props}
     >
       {children}
     </label>
+  );
+}
+
+/** Single surface that groups a select-row header with expandable sections (e.g. an export-settings accordion). */
+function SurfaceSummaryCardSelectCard({
+  className,
+  selected,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof surfaceSummaryCardSelectCardVariants>) {
+  return (
+    <div
+      data-slot="surface-summary-card-select-card"
+      data-selected={selected ? "true" : "false"}
+      className={cn(surfaceSummaryCardSelectCardVariants({ selected }), className)}
+      {...props}
+    />
+  );
+}
+
+type SurfaceSummaryCardExpandableSectionProps = {
+  title: string;
+  description?: string;
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+};
+
+/** Divider-separated, collapsible section rendered inside a SurfaceSummaryCardSelectCard. */
+function SurfaceSummaryCardExpandableSection({
+  title,
+  description,
+  open,
+  defaultOpen,
+  onOpenChange,
+  disabled,
+  children,
+}: SurfaceSummaryCardExpandableSectionProps) {
+  return (
+    <Collapsible
+      open={open}
+      defaultOpen={defaultOpen}
+      onOpenChange={onOpenChange}
+      data-slot="surface-summary-card-expandable-section"
+    >
+      <CollapsibleTrigger className={surfaceSummaryCardExpandableTriggerClass} disabled={disabled}>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className={surfaceSummaryCardExpandableTitleClass}>{title}</span>
+          {description != null ? (
+            <span className={surfaceSummaryCardExpandableDescriptionClass}>{description}</span>
+          ) : null}
+        </span>
+        <ChevronDown aria-hidden strokeWidth={2} className={surfaceSummaryCardExpandableChevronClass} />
+      </CollapsibleTrigger>
+      <CollapsibleContent className={surfaceSummaryCardExpandableContentClass}>
+        <div className={surfaceSummaryCardExpandableContentInnerClass}>{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -756,6 +867,7 @@ export {
   SurfaceSummaryCardBody,
   SurfaceSummaryCardCanvasActionRow,
   SurfaceSummaryCardEmpty,
+  SurfaceSummaryCardExpandableSection,
   SurfaceSummaryCardFormFields,
   SurfaceSummaryCardIconActionGroup,
   SurfaceSummaryCardIconBox,
@@ -779,6 +891,7 @@ export {
   SurfaceSummaryCardScanListError,
   SurfaceSummaryCardSection,
   SurfaceSummaryCardSectionLabel,
+  SurfaceSummaryCardSelectCard,
   SurfaceSummaryCardSelectRow,
   SurfaceSummaryCardSelectRowControl,
   SurfaceSummaryCardSelectRowList,

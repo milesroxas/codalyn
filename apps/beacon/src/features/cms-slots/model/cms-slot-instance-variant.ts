@@ -141,6 +141,12 @@ function variantControlFromProp(prop: InstancePropForVariant): CmsSlotVariantCon
     }
     options.push({ id: o.id, name: typeof o.name === "string" && o.name.trim().length > 0 ? o.name : o.id });
   }
+  // A component with no real variants can still expose a `variant` prop whose only option is the base. A picker
+  // offering just "Base" is meaningless, so report no control — the Designer shows a picker only for components
+  // that actually have selectable variants.
+  if (options.length <= 1) {
+    return null;
+  }
   const selected = selectedVariantFromProp(prop);
   return { propId: prop.propId, options, selectedId: selected?.variantId ?? BASE_VARIANT_ID };
 }

@@ -23,9 +23,18 @@ import {
 } from "./cms-slot-composition-components-catalog";
 
 export function CmsSlotCompositionComponentsCatalogSheet(props: CmsSlotCompositionComponentsCatalogProps) {
-  const { addPending, searchFieldId, componentQuery, setComponentQuery, catalogLoading } = props;
+  const { addPending, searchFieldId, componentQuery, setComponentQuery, catalogLoading, onAddComponent } = props;
   const [open, setOpen] = useState(false);
   const dismissBlocked = useCmsSlotsDrawerDismissBlocked(catalogLoading, addPending);
+
+  // Close this sheet the moment a component is picked. The props sheet auto-opens right after the add; leaving this
+  // sheet open would stack two modal vaul roots, whose scroll-lock / pointer-events guards fight and leave the top
+  // sheet dead (no scroll, non-interactive dropdowns). Closing here keeps the props sheet the only open drawer —
+  // the same single-drawer path that already works when reopening an existing component.
+  const handleAddComponent = (component: ComponentSearchResult) => {
+    setOpen(false);
+    onAddComponent(component);
+  };
 
   return (
     <Drawer open={open} onOpenChange={setOpen} interactionBlocked={dismissBlocked}>
@@ -46,7 +55,7 @@ export function CmsSlotCompositionComponentsCatalogSheet(props: CmsSlotCompositi
             catalogLoading={catalogLoading}
           />
         </DrawerHeader>
-        <CmsSlotCompositionComponentsCatalogList {...props} />
+        <CmsSlotCompositionComponentsCatalogList {...props} onAddComponent={handleAddComponent} />
       </DrawerContent>
     </Drawer>
   );

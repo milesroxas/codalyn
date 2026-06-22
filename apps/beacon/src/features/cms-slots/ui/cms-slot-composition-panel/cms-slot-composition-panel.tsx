@@ -57,7 +57,7 @@ export type CmsSlotCompositionPanelProps = {
   designerSlotProps: CmsSlotDesignerSlotPropsFile;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
   /** Re-apply `data-cb-c` content tags on the component definition from current Designer “Expose” + bindings. */
-  onResyncDesignerSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
+  onResyncDesignerSlotAttrs: (slotIndex: number, compositionChanged?: boolean) => boolean | Promise<boolean>;
   resyncingDesignerSlotKey: string | null;
   /** Index-aligned with `selected`; from runtime JSON `n[]` (null while loading). */
   designerPublishedDisplayNames: string[] | null;
@@ -65,6 +65,9 @@ export type CmsSlotCompositionPanelProps = {
   renamingPublishedSlotKey: string | null;
   autoOpenExposeDrawerRowKey?: string | null;
   onAutoOpenExposeDrawerConsumed?: () => void;
+  /** Key of the staged (uncommitted) seed, or `null` — its row discards itself if its sheet closes before committing. */
+  pendingSeedRowKey?: string | null;
+  onDiscardPendingSeed: (row: HydratedCmsSlotRow) => void;
 };
 
 export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
@@ -108,6 +111,8 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
     renamingPublishedSlotKey,
     autoOpenExposeDrawerRowKey = null,
     onAutoOpenExposeDrawerConsumed,
+    pendingSeedRowKey = null,
+    onDiscardPendingSeed,
   } = props;
 
   const listTargetActionBusy =
@@ -175,6 +180,8 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
             onResyncDesignerSlotAttrs={onResyncDesignerSlotAttrs}
             autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
             onAutoOpenExposeDrawerConsumed={onAutoOpenExposeDrawerConsumed}
+            pendingSeedRowKey={pendingSeedRowKey}
+            onDiscardPendingSeed={onDiscardPendingSeed}
           />
         )}
         <CmsSlotCompositionComponentsCatalogSheet

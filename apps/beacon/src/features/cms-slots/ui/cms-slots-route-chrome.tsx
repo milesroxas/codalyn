@@ -9,7 +9,6 @@ import {
   BeaconFeatureRouteFooter,
   BeaconFeatureRouteHeader,
   BeaconFeatureRouteScrollBody,
-  BeaconFeatureRouteSubheader,
 } from "@/app/ui/beacon-feature-route-chrome";
 import { BeaconRouteContentTransition } from "@/app/ui/beacon-route-content-transition";
 import { BeaconRouteLoadingOverlay } from "@/app/ui/beacon-route-loading-overlay";
@@ -43,9 +42,6 @@ import { CmsSlotsRouteInteractionProvider } from "@/features/cms-slots/ui/cms-sl
 import {
   CMS_SLOTS_AREA_NAV_LABEL,
   CMS_SLOTS_DELETE_DIALOG_TITLE,
-  CMS_SLOTS_DESIGNER_EDITING_TITLE,
-  CMS_SLOTS_DESIGNER_MAIN_TITLE,
-  CMS_SLOTS_DESIGNER_STEP_NAV_ARIA_LABEL,
   CMS_SLOTS_FEATURE_NAME,
   CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION,
   CMS_SLOTS_SCAN_ARIA_LABEL,
@@ -64,7 +60,6 @@ import {
 } from "@/shared/ui/alert-dialog";
 import { Button, buttonVariants } from "@/shared/ui/button";
 import { CheckboxField } from "@/shared/ui/checkbox-field";
-import { StepNav } from "@/shared/ui/step-nav";
 
 export type CmsSlotsRouteChromeProps = {
   navigate: NavigateFunction;
@@ -129,13 +124,15 @@ export type CmsSlotsRouteChromeProps = {
   listTargetSelectedOnCanvas: boolean;
   designerListSlotFile: CmsSlotDesignerSlotPropsFile | null;
   onSetDesignerSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void | Promise<void>;
-  onResyncDesignerSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
+  onResyncDesignerSlotAttrs: (slotIndex: number, compositionChanged?: boolean) => boolean | Promise<boolean>;
   resyncingDesignerSlotKey: string | null;
   designerPublishedDisplayNames: string[] | null;
   onRenamePublishedDisplayName: (rowKey: string, nextName: string) => void | Promise<void>;
   renamingPublishedSlotKey: string | null;
   autoOpenExposeDrawerRowKey: string | null;
   onAutoOpenExposeDrawerConsumed: () => void;
+  pendingSeedRowKey: string | null;
+  onDiscardPendingSeed: (row: HydratedCmsSlotRow) => void;
   exitToList: () => void;
   composerEligibleLoading: boolean;
   composerEligibleResolved: boolean;
@@ -255,6 +252,8 @@ function CmsSlotsDesignerRouteBody(
           renamingPublishedSlotKey={p.renamingPublishedSlotKey}
           autoOpenExposeDrawerRowKey={p.autoOpenExposeDrawerRowKey}
           onAutoOpenExposeDrawerConsumed={p.onAutoOpenExposeDrawerConsumed}
+          pendingSeedRowKey={p.pendingSeedRowKey}
+          onDiscardPendingSeed={p.onDiscardPendingSeed}
         />
       </div>
     );
@@ -626,38 +625,13 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
   );
 }
 
-type CmsSlotsDesignerStepId = "designer-home" | "configure";
-
 /** Route shell/header, scroll region, dialogs, footer — splits cognitive complexity off `CmsSlotsScreen`. */
 export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
   const designerBackToListDocked = p.isDesigner && p.picking;
-  const designerStepNav =
-    p.isDesigner && p.picking ? (
-      <StepNav<CmsSlotsDesignerStepId>
-        aria-label={CMS_SLOTS_DESIGNER_STEP_NAV_ARIA_LABEL}
-        current="configure"
-        onStepSelect={(step) => {
-          if (step === "designer-home") {
-            p.exitToList();
-          }
-        }}
-        steps={[
-          { id: "designer-home", label: CMS_SLOTS_DESIGNER_MAIN_TITLE },
-          { id: "configure", label: p.activeListLabel ?? CMS_SLOTS_DESIGNER_EDITING_TITLE },
-        ]}
-      />
-    ) : null;
 
   return (
     <BeaconFeatureRouteChrome
       header={<BeaconFeatureRouteHeader title={CMS_SLOTS_FEATURE_NAME} dataSlot="cms_slots_route_header" />}
-      subheader={
-        designerStepNav ? (
-          <BeaconFeatureRouteSubheader dataSlot="cms_slots_designer_step_nav">
-            {designerStepNav}
-          </BeaconFeatureRouteSubheader>
-        ) : null
-      }
       overlays={
         <>
           <CmsSlotsBeaconDeleteDialog {...p} />

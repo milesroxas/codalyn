@@ -1,14 +1,19 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
-import { Trash2 } from "lucide-react";
+import { IconArrowBackUp, IconCheck, IconDots, IconPencil, IconTrash } from "@tabler/icons-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
+import {
+  type ComposableInstancePropMeta,
+  hasUnconstrainedExposedImageProps,
+} from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
   type CmsSlotVariantControl,
+  isBaseVariantId,
   readVariantControlFromInstanceProps,
 } from "@/features/cms-slots/model/cms-slot-instance-variant";
+import { CMS_SLOT_ROW_NAME_MAX } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
-import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
-import { ComposerSlotNameDialog } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-slot-name-dialog";
+import { ComposerRemoveDraftDialog } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-remove-draft-dialog";
+import { ComposerUnsavedChangesDialog } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-unsaved-changes-dialog";
 import { CmsSlotDesignerExposePropsPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel/cms-slot-designer-expose-props-panel";
 import {
   useCmsSlotsDrawerDismissBlocked,
@@ -22,10 +27,10 @@ import {
   CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_DESCRIPTION,
   CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_DISCARD_LABEL,
   CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DISCARD_DIALOG_TITLE,
-  CMS_SLOTS_DESIGNER_EXPOSE_PROPS_OPEN_LABEL,
   CMS_SLOTS_DESIGNER_EXPOSE_PROPS_TAG_LABEL,
   CMS_SLOTS_DESIGNER_EXPOSE_PROPS_TAG_PENDING_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
+import { cn } from "@/shared/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,8 +41,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { ButtonGroup, ButtonGroupSeparator } from "@/shared/ui/button-group";
 import {
   Drawer,
   DrawerContent,
@@ -47,15 +52,29 @@ import {
   DrawerTitle,
   drawerListSheetContentDefaults,
 } from "@/shared/ui/drawer";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
+import { Input } from "@/shared/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import {
+  SurfaceSummaryCardIconRowCopy,
+  SurfaceSummaryCardSelectRow,
+  SurfaceSummaryCardSelectRowControl,
+  SurfaceSummaryCardTitle,
+} from "@/shared/ui/surface-summary-card";
 
-function sameExposedPropSelection(a: ComposableInstancePropMeta[], b: ComposableInstancePropMeta[]): boolean {
+function sameExposedProps(a: ComposableInstancePropMeta[], b: ComposableInstancePropMeta[]): boolean {
   if (a.length !== b.length) {
     return false;
   }
-  const aa = [...a.map((x) => x.propId)].sort();
-  const bb = [...b.map((x) => x.propId)].sort();
-  for (let i = 0; i < aa.length; i++) {
-    if (aa[i] !== bb[i]) {
+  const byId = new Map(b.map((x) => [x.propId, x]));
+  for (const entry of a) {
+    const other = byId.get(entry.propId);
+    if (other == null) {
+      return false;
+    }
+    // Compare configured values too (e.g. image export constraints) so editing them counts as a pending change
+    // that must be applied — not silently written through.
+    if (JSON.stringify(entry.imageExport ?? null) !== JSON.stringify(other.imageExport ?? null)) {
       return false;
     }
   }
@@ -64,6 +83,369 @@ function sameExposedPropSelection(a: ComposableInstancePropMeta[], b: Composable
 
 function snapshotExposed(exposed: ComposableInstancePropMeta[]): ComposableInstancePropMeta[] {
   return exposed.map((x) => ({ ...x }));
+}
+
+/** Top-level component row: standard spacing, slightly larger than its nested variant rows. */
+const selectedRowClass = "flex items-center gap-2 px-3 py-2.5 text-sm";
+/** Variant row nested under its component: tighter spacing, smaller text (indentation comes from the list's tree rail). */
+const nestedVariantRowClass = "flex items-center gap-2 py-1.5 pr-3 pl-2 text-xs";
+/** Shared interactive affordance for a clickable row (top-level or nested): full-width hit area + hover/focus state. */
+const selectedRowButtonClass =
+  "w-full text-left outline-none transition-colors hover:bg-accent/50 focus-visible:bg-accent/50 disabled:pointer-events-none disabled:opacity-60";
+
+type SelectedRowBarProps = {
+  nested: boolean;
+  variantLabel: string;
+  exposedCount: number;
+  removingKey: string | null;
+  listTargetActionBusy: boolean;
+  onOpen: () => void;
+};
+
+type SelectedRowDrawerFooterProps = {
+  /** Whether this seed is the variant-capable parent (shows the "Save & add variant" action). */
+  showAddVariant: boolean;
+  applyLabel: string;
+  applyDisabled: boolean;
+  removeDisabled: boolean;
+  removeBusy: boolean;
+  addVariantDisabled: boolean;
+  tagAttrsBusy: boolean;
+  onRemove: () => void;
+  onApply: () => void;
+  onSaveAndAddVariant: () => void;
+};
+
+type FooterDisabledInputs = {
+  removing: boolean;
+  listTargetActionBusy: boolean;
+  tagAttrsBusy: boolean;
+  composableLoading: boolean;
+  addPending: boolean;
+  hasUnconstrainedImageProps: boolean;
+  hasPendingChange: boolean;
+};
+
+/** Derives the footer action disabled states from the row's busy/validity flags (kept out of the component body). */
+function computeFooterDisabledStates(i: FooterDisabledInputs) {
+  const baseBusy = i.removing || i.listTargetActionBusy || i.tagAttrsBusy;
+  return {
+    applyDisabled: baseBusy || i.composableLoading || i.hasUnconstrainedImageProps || !i.hasPendingChange,
+    removeDisabled: baseBusy,
+    addVariantDisabled: baseBusy || i.addPending || i.hasUnconstrainedImageProps,
+  };
+}
+
+/**
+ * Buttons for a selected component/variant sheet footer: destructive Remove + the expose/apply action (+ Save & add
+ * variant). Rendered inside a `DrawerFooter` by the caller — the sticky-footer layout matches `DrawerFooter` by element
+ * type, so this must not introduce its own wrapper element.
+ */
+function SelectedRowDrawerFooterButtons(props: SelectedRowDrawerFooterProps) {
+  const {
+    showAddVariant,
+    applyLabel,
+    applyDisabled,
+    removeDisabled,
+    removeBusy,
+    addVariantDisabled,
+    tagAttrsBusy,
+    onRemove,
+    onApply,
+    onSaveAndAddVariant,
+  } = props;
+
+  const applyButton = (
+    <Button
+      type="button"
+      variant="secondary"
+      size="drawerAction"
+      className="flex-1"
+      disabled={applyDisabled}
+      aria-busy={tagAttrsBusy}
+      onClick={onApply}
+    >
+      {applyLabel}
+    </Button>
+  );
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="destructive"
+        size="icon"
+        className="size-9 shrink-0"
+        aria-label="Remove"
+        disabled={removeDisabled}
+        aria-busy={removeBusy}
+        onClick={onRemove}
+      >
+        <IconTrash aria-hidden />
+      </Button>
+      {showAddVariant ? (
+        <ButtonGroup className="flex-1">
+          {applyButton}
+          <ButtonGroupSeparator />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className="size-9 shrink-0"
+                aria-label="More actions"
+                disabled={addVariantDisabled}
+              >
+                <IconDots aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuItem
+                className="flex-col items-start gap-0.5"
+                disabled={addVariantDisabled}
+                onSelect={onSaveAndAddVariant}
+              >
+                <span className="font-medium">Add Variant</span>
+                <span className="text-xs text-muted-foreground">
+                  Make this component editable and create a variant of this component
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </ButtonGroup>
+      ) : (
+        applyButton
+      )}
+    </>
+  );
+}
+
+/** The inline row in the selected-components list — compact variant form when `nested`, full component form otherwise. */
+function SelectedRowBar(props: SelectedRowBarProps) {
+  const { nested, variantLabel, exposedCount, removingKey, listTargetActionBusy, onOpen } = props;
+
+  const exposedBadge = (
+    <span className={cn("shrink-0 tabular-nums text-muted-foreground", nested ? "text-[0.6875rem]" : "text-xs")}>
+      {exposedCount} Slots
+    </span>
+  );
+
+  return (
+    <button
+      type="button"
+      className={cn(nested ? nestedVariantRowClass : selectedRowClass, selectedRowButtonClass)}
+      aria-label={nested ? `Edit ${variantLabel}` : undefined}
+      disabled={removingKey !== null || listTargetActionBusy}
+      onClick={onOpen}
+    >
+      <span className="min-w-0 flex-1 truncate font-medium">{variantLabel}</span>
+      {exposedBadge}
+    </button>
+  );
+}
+
+type SelectedRowDrawerHeaderProps = {
+  /** Variant sheets are not renamable; only the published parent slot can be renamed. */
+  nested: boolean;
+  title: string;
+  description: string;
+  open: boolean;
+  removingKey: string | null;
+  listTargetActionBusy: boolean;
+  renameBusy: boolean;
+  onRename: (next: string) => void;
+};
+
+/**
+ * Props-sheet header. For a published parent row a pencil swaps the title for an inline rename field with check/cancel
+ * controls (Enter saves, Escape cancels); the edit reverts whenever the sheet closes.
+ */
+function SelectedRowDrawerHeader(props: SelectedRowDrawerHeaderProps) {
+  const { nested, title, description, open, removingKey, listTargetActionBusy, renameBusy, onRename } = props;
+  const renameDisabled = renameBusy || removingKey !== null || listTargetActionBusy;
+  const [renaming, setRenaming] = useState(false);
+  const [draft, setDraft] = useState(title);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close the sheet → drop any in-progress rename so reopening starts from the persisted title.
+  useEffect(() => {
+    if (!open) {
+      setRenaming(false);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!renaming) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [renaming]);
+
+  const startRename = useCallback(() => {
+    setDraft(title);
+    setRenaming(true);
+  }, [title]);
+
+  const commitRename = useCallback(() => {
+    const clipped = draft.slice(0, CMS_SLOT_ROW_NAME_MAX).trim();
+    const next = clipped !== "" ? clipped : title;
+    if (next !== title) {
+      onRename(next);
+    }
+    setRenaming(false);
+  }, [draft, onRename, title]);
+
+  return (
+    <DrawerHeader align="start">
+      {!nested && renaming ? (
+        // -my-0.5 keeps the header height compact despite the taller field; overflow-visible + the row padding give the
+        // input's focus ring room so it is never clipped by the header edge.
+        <div className="-my-0.5 flex items-center gap-1 overflow-visible px-0.5 py-0.5" data-vaul-no-drag="">
+          <Input
+            ref={inputRef}
+            value={draft}
+            maxLength={CMS_SLOT_ROW_NAME_MAX}
+            aria-label="Slot name"
+            className="h-7 min-w-0 flex-1"
+            disabled={renameBusy}
+            autoComplete="off"
+            onChange={(e) => setDraft(e.target.value)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitRename();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                setRenaming(false);
+              }
+            }}
+          />
+          <ButtonGroup className="shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-xs"
+              aria-label="Save name"
+              aria-busy={renameBusy}
+              disabled={renameBusy}
+              onClick={commitRename}
+            >
+              <IconCheck aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-xs"
+              aria-label="Cancel rename"
+              disabled={renameBusy}
+              onClick={() => setRenaming(false)}
+            >
+              <IconArrowBackUp aria-hidden />
+            </Button>
+          </ButtonGroup>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <DrawerTitle className="min-w-0 truncate">{title}</DrawerTitle>
+          {!nested ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="shrink-0"
+              aria-label="Rename slot"
+              disabled={renameDisabled}
+              onClick={startRename}
+            >
+              <IconPencil aria-hidden className="size-3.5" />
+            </Button>
+          ) : null}
+        </div>
+      )}
+      <DrawerDescription>{description}</DrawerDescription>
+    </DrawerHeader>
+  );
+}
+
+/**
+ * Local staging for the seed's variant picker. The dropdown only updates a draft id — the real write (and any
+ * on-canvas placement it triggers) is deferred until a commit button calls {@link applyStagedVariantIfChanged}. This is
+ * why picking a variant while adding a component no longer kicks off a place-on-canvas pass on its own. `draftVariantId`
+ * falls back to the persisted selection; it re-syncs whenever the control reloads so a backed-out pick never lingers.
+ */
+function useStagedVariantPicker(
+  variantControl: CmsSlotVariantControl | null,
+  row: HydratedCmsSlotRow,
+  onSetSeedVariant: (row: HydratedCmsSlotRow, propId: string, variantId: string) => void | Promise<void>
+) {
+  const [draftVariantId, setDraftVariantId] = useState<string | null>(null);
+  useEffect(() => {
+    setDraftVariantId(variantControl?.selectedId ?? null);
+  }, [variantControl]);
+
+  const resetVariantDraft = useCallback(() => {
+    setDraftVariantId(variantControl?.selectedId ?? null);
+  }, [variantControl]);
+
+  const hasVariantDraftChange =
+    variantControl != null && draftVariantId != null && draftVariantId !== variantControl.selectedId;
+
+  const applyStagedVariantIfChanged = useCallback(async () => {
+    if (variantControl == null || draftVariantId == null || draftVariantId === variantControl.selectedId) {
+      return;
+    }
+    await onSetSeedVariant(row, variantControl.propId, draftVariantId);
+  }, [variantControl, draftVariantId, onSetSeedVariant, row]);
+
+  return { draftVariantId, setDraftVariantId, hasVariantDraftChange, resetVariantDraft, applyStagedVariantIfChanged };
+}
+
+type SelectedRowVariantPickerProps = {
+  variantControl: CmsSlotVariantControl;
+  draftVariantId: string | null;
+  onDraftChange: (variantId: string) => void;
+  rowKey: string;
+  publishedDisplayName: string;
+  disabled: boolean;
+  /** Disables the base option — a variant seed must resolve to a real variant, never the parent's base. */
+  disableBase?: boolean;
+};
+
+/**
+ * The seed's variant dropdown, rendered as the expose-panel's leading item. It only stages a draft selection — the
+ * pinned variant is written when a commit button runs ({@link useStagedVariantPicker}).
+ */
+function SelectedRowVariantPicker(props: SelectedRowVariantPickerProps) {
+  const { variantControl, draftVariantId, onDraftChange, rowKey, publishedDisplayName, disabled, disableBase } = props;
+  return (
+    <SurfaceSummaryCardSelectRow density="compact" htmlFor={`${rowKey}-variant`} data-vaul-no-drag="">
+      <SurfaceSummaryCardIconRowCopy>
+        <SurfaceSummaryCardTitle density="compact">Variant</SurfaceSummaryCardTitle>
+      </SurfaceSummaryCardIconRowCopy>
+      <SurfaceSummaryCardSelectRowControl>
+        <Select value={draftVariantId ?? variantControl.selectedId} disabled={disabled} onValueChange={onDraftChange}>
+          <SelectTrigger id={`${rowKey}-variant`} size="sm" aria-label={`Variant for ${publishedDisplayName}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {variantControl.options.map((o) => (
+              <SelectItem key={o.id} value={o.id} disabled={disableBase === true && isBaseVariantId(o.id)}>
+                {o.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </SurfaceSummaryCardSelectRowControl>
+    </SurfaceSummaryCardSelectRow>
+  );
 }
 
 type CmsSlotDesignerSelectedRowProps = {
@@ -86,10 +468,16 @@ type CmsSlotDesignerSelectedRowProps = {
   settingVariantKey: string | null;
   onAddVariant: (row: HydratedCmsSlotRow) => void | Promise<void>;
   onSetSlotExposed: (slotIndex: number, exposed: ComposableInstancePropMeta[]) => void;
-  onResyncDesignerSlotAttrs: (slotIndex: number) => boolean | Promise<boolean>;
+  onResyncDesignerSlotAttrs: (slotIndex: number, compositionChanged?: boolean) => boolean | Promise<boolean>;
   /** When set to this row’s `key`, opens the expose/tag drawer once (e.g. right after adding the component). */
   autoOpenExposeDrawerRowKey?: string | null;
   onAutoOpenExposeDrawerConsumed?: () => void;
+  /** True when this seed is staged but not yet committed to the slot list (closing its sheet discards it). */
+  pending?: boolean;
+  /** Discards a staged seed — removes its instance and drops it from the selection. */
+  onDiscardPendingSeed?: (row: HydratedCmsSlotRow) => void;
+  /** Renders the row as a variant nested under its component: compact, indented, variant-name-only, no Add-variant. */
+  nested?: boolean;
 };
 
 export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProps) {
@@ -115,6 +503,9 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
     onResyncDesignerSlotAttrs,
     autoOpenExposeDrawerRowKey = null,
     onAutoOpenExposeDrawerConsumed,
+    pending = false,
+    onDiscardPendingSeed,
+    nested = false,
   } = props;
   const showComposableLoading = useDeferredLoadingIndicator(composableLoading);
   const routeInteractionBlocked = useCmsSlotsRouteInteractionBlocked();
@@ -139,8 +530,14 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
     };
   }, [row.instance]);
 
+  const { draftVariantId, setDraftVariantId, hasVariantDraftChange, resetVariantDraft, applyStagedVariantIfChanged } =
+    useStagedVariantPicker(variantControl, row, onSetSeedVariant);
+
   const [propsDrawerOpen, setPropsDrawerOpen] = useState(false);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [closeBeforeTagDialogOpen, setCloseBeforeTagDialogOpen] = useState(false);
+  // Confirmation shown when the user dismisses a staged seed's sheet without committing it.
+  const [pendingLeaveDialogOpen, setPendingLeaveDialogOpen] = useState(false);
   const [tagAttrsPending, setTagAttrsPending] = useState(false);
   // Captured when the drawer opens: a slot that already has exposed props is being updated, not set up.
   const [editingExistingSelection, setEditingExistingSelection] = useState(false);
@@ -151,13 +548,27 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
   const tagAttrsBusy = tagAttrsPending || resyncingDesignerSlotKey === row.key;
   const exposeDrawerDismissBlocked = useCmsSlotsDrawerDismissBlocked(tagAttrsBusy);
 
-  const hasNewExposeSelections = propsDrawerOpen && !sameExposedPropSelection(slotExposed, exposeBaselineRef.current);
+  const hasNewExposeSelections = propsDrawerOpen && !sameExposedProps(slotExposed, exposeBaselineRef.current);
+  const footerDisabled = computeFooterDisabledStates({
+    removing: removingKey !== null,
+    listTargetActionBusy,
+    tagAttrsBusy,
+    composableLoading,
+    addPending,
+    // Block applying / spawning a variant while any exposed image prop is still missing export constraints.
+    hasUnconstrainedImageProps: hasUnconstrainedExposedImageProps(slotExposed),
+    // The apply action is the commit point. A staged seed (just added — e.g. via "Add Variant") always needs it enabled
+    // so it can be saved into the slot; an already-committed seed only enables it once its exposed props or variant
+    // actually changed.
+    hasPendingChange: pending || hasNewExposeSelections || hasVariantDraftChange,
+  });
 
   const openExposeDrawer = useCallback(() => {
     exposeBaselineRef.current = snapshotExposed(slotExposed);
     setEditingExistingSelection(slotExposed.length > 0);
+    resetVariantDraft();
     setPropsDrawerOpen(true);
-  }, [slotExposed]);
+  }, [slotExposed, resetVariantDraft]);
 
   const applyActionLabel = editingExistingSelection
     ? CMS_SLOTS_DESIGNER_EXPOSE_PROPS_APPLY_LABEL
@@ -173,11 +584,26 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
     if (addPending || listTargetActionBusy || composableLoading || !composableMetaReady || routeInteractionBlocked) {
       return;
     }
-    const frame = requestAnimationFrame(() => {
+    // The palette sheet that triggered the add closes itself as the row is added, so its vaul exit
+    // animation (~500ms) is still running. Opening this drawer on top of a closing modal drawer leaves
+    // two overlapping scroll-locks fighting, and the fresh sheet ends up non-interactive (no scroll,
+    // dead dropdowns) until it is reopened. Wait for any closing drawer to leave the DOM first.
+    let cancelled = false;
+    const deadline = performance.now() + 1200;
+    let frame = requestAnimationFrame(function openWhenClear() {
+      if (cancelled) {
+        return;
+      }
+      const closingDrawer = document.querySelector('[data-vaul-drawer][data-state="closed"]');
+      if (closingDrawer != null && performance.now() < deadline) {
+        frame = requestAnimationFrame(openWhenClear);
+        return;
+      }
       openExposeDrawer();
       onAutoOpenExposeDrawerConsumed?.();
     });
     return () => {
+      cancelled = true;
       cancelAnimationFrame(frame);
     };
   }, [
@@ -204,14 +630,28 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
       if (tagAttrsPendingRef.current || resyncingDesignerSlotKey === row.key) {
         return;
       }
-      if (sameExposedPropSelection(slotExposed, exposeBaselineRef.current)) {
+      if (pending) {
+        // A staged seed is committed only by a footer commit button (“Make editable” / “Add Variant”). Closing the
+        // sheet any other way (X, backdrop, Escape) would discard the just-added seed, so prompt first — mirroring the
+        // Composer's leave-with-unsaved-changes dialog — rather than dropping the work silently.
+        setPendingLeaveDialogOpen(true);
+        return;
+      }
+      if (sameExposedProps(slotExposed, exposeBaselineRef.current)) {
         setPropsDrawerOpen(false);
         return;
       }
       setCloseBeforeTagDialogOpen(true);
     },
-    [exposeDrawerDismissBlocked, resyncingDesignerSlotKey, row.key, slotExposed]
+    [exposeDrawerDismissBlocked, resyncingDesignerSlotKey, row.key, slotExposed, pending]
   );
+
+  // Discards the staged seed (the "Discard" choice in the leave dialog): drop it from the slot as if never added.
+  const handleDiscardPendingFromLeaveDialog = useCallback(() => {
+    setPendingLeaveDialogOpen(false);
+    setPropsDrawerOpen(false);
+    onDiscardPendingSeed?.(row);
+  }, [onDiscardPendingSeed, row]);
 
   const handleDiscardExposeChangesClose = useCallback(() => {
     onSetSlotExposed(slotIndex, snapshotExposed(exposeBaselineRef.current));
@@ -220,75 +660,99 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
   }, [onSetSlotExposed, slotIndex]);
 
   const applyTagAttrsAndCloseDrawer = useCallback(async () => {
-    if (tagAttrsPendingRef.current) {
+    if (tagAttrsPendingRef.current || hasUnconstrainedExposedImageProps(slotExposed)) {
       return;
     }
+    const variantChanged = hasVariantDraftChange;
     tagAttrsPendingRef.current = true;
     setTagAttrsPending(true);
     try {
-      const ok = await onResyncDesignerSlotAttrs(slotIndex);
-      if (ok !== true) {
-        return;
+      await applyStagedVariantIfChanged();
+      // A staged seed must always re-tag (that re-tag is its commit point); an already-committed seed only re-tags when
+      // its exposed props changed. A variant-only change on a committed seed skips the re-tag and relies on the variant
+      // write's own "needs Sync" mark. When both changed, the flag keeps that mark set through the re-tag.
+      if (pending || hasNewExposeSelections) {
+        const ok = await onResyncDesignerSlotAttrs(slotIndex, variantChanged);
+        if (ok !== true) {
+          return;
+        }
+        exposeBaselineRef.current = snapshotExposed(slotExposed);
       }
-      exposeBaselineRef.current = snapshotExposed(slotExposed);
       setCloseBeforeTagDialogOpen(false);
       setPropsDrawerOpen(false);
     } finally {
       tagAttrsPendingRef.current = false;
       setTagAttrsPending(false);
     }
-  }, [onResyncDesignerSlotAttrs, slotIndex, slotExposed]);
-  const drawerRow: CmsSlotCompositionDraftRow = {
-    key: row.key,
-    componentId: row.componentId,
-    poolKey: row.poolKey,
-    variant: row.variant,
-    name: publishedDisplayName,
-  };
+  }, [
+    applyStagedVariantIfChanged,
+    hasNewExposeSelections,
+    hasVariantDraftChange,
+    onResyncDesignerSlotAttrs,
+    pending,
+    slotIndex,
+    slotExposed,
+  ]);
+
+  const handleRemoveFromDrawer = useCallback(() => {
+    setRemoveConfirmOpen(true);
+  }, []);
+
+  const handleConfirmRemove = useCallback(() => {
+    setRemoveConfirmOpen(false);
+    setPropsDrawerOpen(false);
+    void onRemove(row);
+  }, [onRemove, row]);
+
+  // Persists any pending expose changes for this parent seed, then spawns a variant that copies its configured props.
+  const saveAndAddVariant = useCallback(async () => {
+    if (tagAttrsPendingRef.current || hasUnconstrainedExposedImageProps(slotExposed)) {
+      return;
+    }
+    const variantChanged = hasVariantDraftChange;
+    tagAttrsPendingRef.current = true;
+    setTagAttrsPending(true);
+    try {
+      await applyStagedVariantIfChanged();
+      // Only re-tag attributes when the exposed props changed; the new variant seed commits itself via onAddVariant.
+      if (hasNewExposeSelections) {
+        const ok = await onResyncDesignerSlotAttrs(slotIndex, variantChanged);
+        if (ok !== true) {
+          return;
+        }
+        exposeBaselineRef.current = snapshotExposed(slotExposed);
+      }
+    } finally {
+      tagAttrsPendingRef.current = false;
+      setTagAttrsPending(false);
+    }
+    setPropsDrawerOpen(false);
+    void onAddVariant(row);
+  }, [
+    applyStagedVariantIfChanged,
+    hasNewExposeSelections,
+    hasVariantDraftChange,
+    onAddVariant,
+    onResyncDesignerSlotAttrs,
+    row,
+    slotExposed,
+    slotIndex,
+  ]);
+
   const publishedRenameBusy = renamingPublishedSlotKey === row.key;
 
+  const variantLabel = row.variant != null ? row.variant.variantName : publishedDisplayName;
+
   return (
-    <li>
-      <div className="flex items-center gap-2 px-3 py-2.5">
-        <Button
-          type="button"
-          size="icon-sm"
-          variant="ghost"
-          className="shrink-0"
-          aria-label={`Remove ${publishedDisplayName}`}
-          disabled={removingKey !== null || listTargetActionBusy}
-          onClick={() => void onRemove(row)}
-        >
-          {removingKey === row.key ? <span className="text-xs">…</span> : <Trash2 aria-hidden className="size-3.5" />}
-        </Button>
-        <ComposerSlotNameDialog
-          row={drawerRow}
-          exposed={[]}
-          renameCommit="persist"
-          disabled={
-            removingKey !== null || listTargetActionBusy || resyncingDesignerSlotKey !== null || publishedRenameBusy
-          }
-          dialogTitle="Rename published slot"
-          slotNameFieldLabel="Published name"
-          onRename={(key, next) => onRenamePublishedDisplayName(key, next)}
-          onChangePropValue={() => {}}
-        />
-        {row.variant != null ? (
-          <Badge variant="accent" size="sm" className="shrink-0">
-            {row.variant.variantName}
-          </Badge>
-        ) : null}
-        <span className="shrink-0 tabular-nums text-xs text-muted-foreground">{exposedCount}</span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={removingKey !== null || listTargetActionBusy}
-          onClick={openExposeDrawer}
-        >
-          {CMS_SLOTS_DESIGNER_EXPOSE_PROPS_OPEN_LABEL}
-        </Button>
-      </div>
+    <>
+      <SelectedRowBar
+        nested={nested}
+        variantLabel={variantLabel}
+        exposedCount={exposedCount}
+        removingKey={removingKey}
+        listTargetActionBusy={listTargetActionBusy}
+        onOpen={openExposeDrawer}
+      />
 
       <Drawer
         open={propsDrawerOpen}
@@ -296,44 +760,16 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
         onOpenChange={handlePropsDrawerOpenChange}
       >
         <DrawerContent {...drawerListSheetContentDefaults}>
-          <DrawerHeader align="start">
-            <DrawerTitle>{publishedDisplayName}</DrawerTitle>
-            <DrawerDescription>{CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DESCRIPTION}</DrawerDescription>
-            {variantControl != null ? (
-              <div className="mt-2 flex items-center gap-2">
-                <label className="text-sm font-medium" htmlFor={`${row.key}-variant`}>
-                  Variant
-                </label>
-                <select
-                  id={`${row.key}-variant`}
-                  className="h-8 min-w-0 flex-1 rounded-sm border border-input bg-transparent px-2.5 py-1 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
-                  value={variantControl.selectedId}
-                  disabled={settingVariantKey === row.key || removingKey !== null || listTargetActionBusy}
-                  aria-label={`Variant for ${publishedDisplayName}`}
-                  onChange={(e) => void onSetSeedVariant(row, variantControl.propId, e.target.value)}
-                >
-                  {variantControl.options.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  disabled={addPending || removingKey !== null || listTargetActionBusy}
-                  onClick={() => {
-                    setPropsDrawerOpen(false);
-                    void onAddVariant(row);
-                  }}
-                >
-                  Add variant
-                </Button>
-              </div>
-            ) : null}
-          </DrawerHeader>
+          <SelectedRowDrawerHeader
+            nested={nested}
+            title={nested ? variantLabel : publishedDisplayName}
+            description={CMS_SLOTS_DESIGNER_EXPOSE_PROPS_DESCRIPTION}
+            open={propsDrawerOpen}
+            removingKey={removingKey}
+            listTargetActionBusy={listTargetActionBusy}
+            renameBusy={publishedRenameBusy}
+            onRename={(next) => onRenamePublishedDisplayName(row.key, next)}
+          />
           <CmsSlotDesignerExposePropsPanel
             rowKey={row.key}
             slotIndex={slotIndex}
@@ -342,24 +778,37 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
             showComposableLoading={showComposableLoading}
             disabled={removingKey !== null || tagAttrsBusy}
             onSetSlotExposed={onSetSlotExposed}
+            leadingItem={
+              // Shown for variant seeds too (nested): the seed's whole identity is its variant, so its sheet must let
+              // you pick one — that pick is what enables the save/commit action when adding a variant.
+              variantControl != null ? (
+                <SelectedRowVariantPicker
+                  variantControl={variantControl}
+                  draftVariantId={draftVariantId}
+                  onDraftChange={setDraftVariantId}
+                  rowKey={row.key}
+                  publishedDisplayName={nested ? variantLabel : publishedDisplayName}
+                  disableBase={nested}
+                  disabled={
+                    settingVariantKey === row.key || removingKey !== null || listTargetActionBusy || tagAttrsBusy
+                  }
+                />
+              ) : null
+            }
           />
-          <DrawerFooter layout="sticky">
-            <Button
-              type="button"
-              variant="secondary"
-              size="drawerAction"
-              disabled={
-                removingKey !== null ||
-                listTargetActionBusy ||
-                tagAttrsBusy ||
-                composableLoading ||
-                !hasNewExposeSelections
-              }
-              aria-busy={tagAttrsBusy}
-              onClick={() => void applyTagAttrsAndCloseDrawer()}
-            >
-              {tagAttrsBusy ? CMS_SLOTS_DESIGNER_EXPOSE_PROPS_TAG_PENDING_LABEL : applyActionLabel}
-            </Button>
+          <DrawerFooter layout="sticky" className="flex-row items-center">
+            <SelectedRowDrawerFooterButtons
+              showAddVariant={!nested && variantControl != null}
+              applyLabel={tagAttrsBusy ? CMS_SLOTS_DESIGNER_EXPOSE_PROPS_TAG_PENDING_LABEL : applyActionLabel}
+              applyDisabled={footerDisabled.applyDisabled}
+              removeDisabled={footerDisabled.removeDisabled}
+              removeBusy={removingKey === row.key}
+              addVariantDisabled={footerDisabled.addVariantDisabled}
+              tagAttrsBusy={tagAttrsBusy}
+              onRemove={handleRemoveFromDrawer}
+              onApply={() => void applyTagAttrsAndCloseDrawer()}
+              onSaveAndAddVariant={() => void saveAndAddVariant()}
+            />
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
@@ -405,6 +854,33 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </li>
+
+      <ComposerRemoveDraftDialog
+        open={removeConfirmOpen}
+        componentName={variantLabel}
+        busy={removingKey === row.key}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemoveConfirmOpen(false);
+          }
+        }}
+        onConfirm={handleConfirmRemove}
+      />
+
+      <ComposerUnsavedChangesDialog
+        open={pendingLeaveDialogOpen}
+        busy={tagAttrsBusy}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingLeaveDialogOpen(false);
+          }
+        }}
+        onDiscard={handleDiscardPendingFromLeaveDialog}
+        onSave={async () => {
+          setPendingLeaveDialogOpen(false);
+          await applyTagAttrsAndCloseDrawer();
+        }}
+      />
+    </>
   );
 }

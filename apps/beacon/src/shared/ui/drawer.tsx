@@ -87,6 +87,50 @@ function syncDrawerStackMembership(id: string, open: boolean) {
   unregisterOpenDrawer(id);
 }
 
+// vaul wraps Radix Dialog, which locks background interaction by setting `pointer-events: none`
+// on <body>. When one drawer opens while another is mid-close, Radix's open/close races leave the
+// lock stuck — killing scroll and portaled Select dropdowns inside the freshly opened sheet
+// ("dead" sheet). Our DrawerOverlay (fixed inset-0) already blocks the background, so <body> never
+// needs the lock: while any drawer is open we observe <body> and immediately revert a stuck `none`.
+let bodyPointerEventsGuardCount = 0;
+let bodyPointerEventsObserver: MutationObserver | null = null;
+
+function clearStuckBodyPointerEvents() {
+  if (document.body.style.pointerEvents === "none") {
+    document.body.style.pointerEvents = "";
+  }
+}
+
+function acquireBodyPointerEventsGuard() {
+  bodyPointerEventsGuardCount += 1;
+  if (bodyPointerEventsObserver != null) {
+    return;
+  }
+  clearStuckBodyPointerEvents();
+  bodyPointerEventsObserver = new MutationObserver(clearStuckBodyPointerEvents);
+  bodyPointerEventsObserver.observe(document.body, { attributes: true, attributeFilter: ["style"] });
+}
+
+function releaseBodyPointerEventsGuard() {
+  bodyPointerEventsGuardCount = Math.max(0, bodyPointerEventsGuardCount - 1);
+  if (bodyPointerEventsGuardCount > 0) {
+    return;
+  }
+  bodyPointerEventsObserver?.disconnect();
+  bodyPointerEventsObserver = null;
+  clearStuckBodyPointerEvents();
+}
+
+function useClearStuckBodyPointerEvents(open: boolean) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    acquireBodyPointerEventsGuard();
+    return releaseBodyPointerEventsGuard;
+  }, [open]);
+}
+
 function useDrawerStackState(id: string, open: boolean): DrawerStackState {
   const [, rerender] = useReducer((count: number) => count + 1, 0);
 
@@ -128,6 +172,7 @@ function Drawer(props: DrawerProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
   const open = openProp ?? uncontrolledOpen;
   const stackState = useDrawerStackState(drawerId, open);
+  useClearStuckBodyPointerEvents(open);
   const effectiveDismissible = dismissible && !interactionBlocked;
 
   return (
@@ -167,6 +212,7 @@ function DrawerNested(props: DrawerProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
   const open = openProp ?? uncontrolledOpen;
   const stackState = useDrawerStackState(drawerId, open);
+  useClearStuckBodyPointerEvents(open);
   const effectiveDismissible = dismissible && !interactionBlocked;
 
   return (

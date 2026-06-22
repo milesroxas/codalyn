@@ -141,6 +141,13 @@ describe("readVariantControlFromInstanceProps", () => {
   it("returns null when the component has no variant prop", () => {
     expect(readVariantControlFromInstanceProps([{ propId: "title", valueType: "string", value: "hi" }])).toBeNull();
   });
+
+  it("returns null for a variant prop whose only option is the base (no real variants)", () => {
+    expect(readVariantControlFromInstanceProps([variantProp({ display: { options: [] } })])).toBeNull();
+    expect(
+      readVariantControlFromInstanceProps([variantProp({ display: { options: [{ id: "base", name: "Base" }] } })])
+    ).toBeNull();
+  });
 });
 
 describe("poolOptionLabel", () => {

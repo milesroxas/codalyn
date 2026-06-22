@@ -786,6 +786,12 @@ export function CmsSlotsScreen() {
   const [slotPropsWritePending, setSlotPropsWritePending] = useState(false);
   /** Opens the expose/tag drawer on the row with this `key` once after add-from-catalog. */
   const [autoOpenExposeDrawerRowKey, setAutoOpenExposeDrawerRowKey] = useState<string | null>(null);
+  /**
+   * Key of a just-added seed that is staged but not yet committed to the slot list. Its instance + props sheet exist,
+   * but pool keys / list target are deferred until the user clicks “Make editable” or picks a non-base variant.
+   * Closing the sheet without committing discards it (instance removed). `null` when nothing is staged.
+   */
+  const [pendingSeedRowKey, setPendingSeedRowKey] = useState<string | null>(null);
   const [selected, setSelected] = useState<HydratedCmsSlotRow[]>([]);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [settingVariantKey, setSettingVariantKey] = useState<string | null>(null);
@@ -874,6 +880,17 @@ export function CmsSlotsScreen() {
   /** Latest designer rows — avoids stale closures inside queued slot-prop writes. */
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+
+  /** Latest staged-seed key — read inside async commit handlers without a stale closure. */
+  const pendingSeedRowKeyRef = useRef(pendingSeedRowKey);
+  pendingSeedRowKeyRef.current = pendingSeedRowKey;
+
+  /** Stable handle to the latest staged-seed commit — lets the memoized resync handler commit without a dep on it. */
+  const commitPendingSeedRowRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
+  /** Latest “composition stale” value — discarding a staged seed restores it (the net change is zero). */
+  const designerListCompositionStaleRef = useRef(designerListCompositionStale);
+  designerListCompositionStaleRef.current = designerListCompositionStale;
 
   /**
    * Serializes `data-beacon-designer-slot-props` writes so “Make editable” reads the same exposed props the UI
@@ -1151,6 +1168,7 @@ export function CmsSlotsScreen() {
     setComponentCatalog([]);
     setSelected([]);
     setAutoOpenExposeDrawerRowKey(null);
+    setPendingSeedRowKey(null);
     setCatalogError(null);
     setBeaconName("");
     setCreateFormOpen(false);
@@ -1245,6 +1263,7 @@ export function CmsSlotsScreen() {
       setActiveDataList(beacon.dataList);
       setActiveBeaconKey(beacon.key);
       setSelected(rows);
+      setPendingSeedRowKey(null);
       const f = await readCmsSlotDesignerSlotPropsFile(beacon.container, rows.length);
       setDesignerListSlotFile(f);
       setListTargetPhase("loading");
@@ -1646,28 +1665,43 @@ export function CmsSlotsScreen() {
   );
 
   const handleResyncDesignerSlotAttrs = useCallback(
-    async (slotIndex: number) => {
+    // `compositionChanged` is set when the caller also pinned a new variant alongside the re-tag: a variant pin changes
+    // the pool composition, so the runtime payload stays out of sync (Sync still pending) even though the attrs are now
+    // tagged. A plain expose re-tag leaves it `false` — re-tagging brings the composition back in sync.
+    async (slotIndex: number, compositionChanged = false) => {
       await awaitSlotPropsWritesIdle();
       setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_TAGGING_DATA_ATTRIBUTES);
       try {
         const ok = await resyncDesignerSlotPropAttributesForSlotIndex({
           slotIndex,
-          selected,
+          // Read the live selection: a variant commit chained right before this updates `selected` async, so the
+          // captured closure value would be a render stale.
+          selected: selectedRef.current,
           container: targetRef.current,
           setResyncingDesignerSlotKey,
           setSelected,
           onProgress: setRouteTaskPhase,
         });
         if (ok) {
-          setDesignerListCompositionStale(false);
-          await refreshPageBeacons();
+          // “Make editable” is the commit point for a staged seed: persist pool keys + sync the list target. For an
+          // already-committed slot it is just a re-tag, so the composition is back in sync — unless a variant was also
+          // pinned, which leaves the runtime payload needing a Sync.
+          const committingStagedSeed =
+            pendingSeedRowKeyRef.current != null &&
+            selectedRef.current[slotIndex]?.key === pendingSeedRowKeyRef.current;
+          if (committingStagedSeed) {
+            await commitPendingSeedRowRef.current();
+          } else {
+            setDesignerListCompositionStale(compositionChanged);
+            await refreshPageBeacons();
+          }
         }
         return ok;
       } finally {
         setRouteTaskPhase(null);
       }
     },
-    [selected, awaitSlotPropsWritesIdle, refreshPageBeacons]
+    [awaitSlotPropsWritesIdle, refreshPageBeacons]
   );
 
   const handleRenamePublishedDisplayName = useCallback(
@@ -1738,6 +1772,10 @@ export function CmsSlotsScreen() {
   ): Promise<string | null> => {
     const container = targetRef.current;
     if (!container || addPending) return null;
+    // Cancel any still-pending auto-open from a prior add: its drawer-open is gated behind async
+    // meta loading, so an unconsumed key would otherwise fire mid-add and pop the previous
+    // component's (variant) sheet. The just-added row reassigns its own key on success.
+    setAutoOpenExposeDrawerRowKey(null);
     setAddPending(true);
     setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT);
     try {
@@ -1754,10 +1792,6 @@ export function CmsSlotsScreen() {
       const nextSelected = [...selected, { ...addedRow, key: rowKey }];
       setSelected(nextSelected);
       setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_SAVING_SLOT_CONFIG);
-      await writeCmsSlotDesignerConfiguredPoolKeys(
-        container,
-        nextSelected.map((row) => row.poolKey)
-      );
       const sourceIndex = sourceRow != null ? selected.findIndex((s) => s.key === sourceRow.key) : -1;
       const slotF = inheritExposedFromExistingSeed(
         await readCmsSlotDesignerSlotPropsFile(container, nextSelected.length),
@@ -1766,25 +1800,11 @@ export function CmsSlotsScreen() {
       );
       await writeCmsSlotDesignerSlotPropsFile(container, slotF);
       setDesignerListSlotFile(slotF);
-      setDesignerListCompositionStale(true);
-      void refreshPageBeacons();
-
-      const dataList = activeDataList;
-      if (dataList != null) {
-        const cmsEnsure = await ensureListTargetAfterAppendingSlotRow({
-          dataList,
-          container,
-          listTargetDefinitionIdRef,
-          activeBeaconKey,
-          listTargetReconcileCacheRef,
-          setListTargetPhase,
-          setListTargetRegisteredName,
-          setListTargetOnCanvasCount,
-          setListTargetOnCanvasCountResolved,
-          onProgress: setRouteTaskPhase,
-        });
-        promptCmsFieldLinkIfCreated(cmsEnsure);
-      }
+      // Stage, don't commit: the instance + slot-props seed exist so the props sheet can render, but pool keys and the
+      // on-canvas list target are deferred until the user makes the seed editable or pins a non-base variant
+      // ({@link commitPendingSeedRow}). Closing the sheet first discards it ({@link discardPendingSeedRow}). This keeps
+      // a just-browsed component out of the slot list.
+      setPendingSeedRowKey(rowKey);
       return rowKey;
     } catch (err) {
       void webflow.notify({ type: "Error", message: formatWebflowDesignerError(err) });
@@ -1793,6 +1813,63 @@ export function CmsSlotsScreen() {
       setAddPending(false);
       setRouteTaskPhase(null);
     }
+  };
+
+  /** Ensures the on-canvas list target reflects the current slot composition, prompting a CMS field link if one was made. */
+  const ensureActiveListTargetAfterCompositionChange = async () => {
+    const container = targetRef.current;
+    const dataList = activeDataList;
+    if (container == null || dataList == null) {
+      return;
+    }
+    const cmsEnsure = await ensureListTargetAfterAppendingSlotRow({
+      dataList,
+      container,
+      listTargetDefinitionIdRef,
+      activeBeaconKey,
+      listTargetReconcileCacheRef,
+      setListTargetPhase,
+      setListTargetRegisteredName,
+      setListTargetOnCanvasCount,
+      setListTargetOnCanvasCountResolved,
+      onProgress: setRouteTaskPhase,
+    });
+    promptCmsFieldLinkIfCreated(cmsEnsure);
+  };
+
+  /**
+   * Commits the staged seed to the slot list: persists pool keys for the current selection, marks the composition stale
+   * (footer Sync still pending), and brings the on-canvas list target up to date. Invoked when the user makes the seed
+   * editable or pins a non-base variant.
+   */
+  const commitPendingSeedRow = async () => {
+    const container = targetRef.current;
+    if (container == null) {
+      return;
+    }
+    await writeCmsSlotDesignerConfiguredPoolKeys(
+      container,
+      selectedRef.current.map((row) => row.poolKey)
+    );
+    setDesignerListCompositionStale(true);
+    setPendingSeedRowKey(null);
+    void refreshPageBeacons();
+    await ensureActiveListTargetAfterCompositionChange();
+  };
+  commitPendingSeedRowRef.current = commitPendingSeedRow;
+
+  /** Discards a staged (uncommitted) seed: removes its instance and drops it from the selection — as if never added. */
+  const discardPendingSeedRow = (row: HydratedCmsSlotRow) => {
+    // The stage→discard cycle is net-zero, so restore the prior “stale” value rather than leaving handleRemove’s
+    // sync hint set for a change the user backed out of.
+    const staleBeforeDiscard = designerListCompositionStaleRef.current;
+    if (pendingSeedRowKeyRef.current === row.key) {
+      setPendingSeedRowKey(null);
+    }
+    void (async () => {
+      await handleRemove(row);
+      setDesignerListCompositionStale(staleBeforeDiscard);
+    })();
   };
 
   const handleAddComponent = async (c: ComponentSearchResult) => {
@@ -1986,6 +2063,10 @@ export function CmsSlotsScreen() {
     }
   };
 
+  // Applies a staged variant pin to a seed: writes the variant prop on the instance, re-reads the seed, and persists the
+  // updated pool keys. This is a pure variant write — the caller (a commit button) is responsible for committing a
+  // staged seed / syncing the on-canvas list target. The variant picker only stages a draft locally; nothing here runs
+  // until the user presses a commit button, so picking a variant never kicks off a place-on-canvas pass on its own.
   const handleSetSeedVariant = async (row: HydratedCmsSlotRow, propId: string, variantId: string) => {
     if (settingVariantKey) return;
     const container = targetRef.current;
@@ -1996,12 +2077,15 @@ export function CmsSlotsScreen() {
       // Re-read this seed so its variant/poolKey reflect the new pin (order is unchanged, so match by DOM index).
       const fresh = await listInstancesInSlotListContainer(container);
       const updated = fresh.find((r) => r.domChildIndex === row.domChildIndex);
-      const nextSelected = selected.map((s) =>
+      const nextSelected = selectedRef.current.map((s) =>
         s.key === row.key && updated != null
           ? { ...s, variant: updated.variant, poolKey: updated.poolKey, instance: updated.instance }
           : s
       );
       setSelected(nextSelected);
+      // Keep the ref fresh so a commit button chained right after this (e.g. "Make editable") writes pool keys from the
+      // variant-updated selection rather than the pre-render snapshot.
+      selectedRef.current = nextSelected;
       await writeCmsSlotDesignerConfiguredPoolKeys(
         container,
         nextSelected.map((entry) => entry.poolKey)
@@ -2313,6 +2397,8 @@ export function CmsSlotsScreen() {
       renamingPublishedSlotKey={renamingPublishedSlotKey}
       autoOpenExposeDrawerRowKey={autoOpenExposeDrawerRowKey}
       onAutoOpenExposeDrawerConsumed={() => setAutoOpenExposeDrawerRowKey(null)}
+      pendingSeedRowKey={pendingSeedRowKey}
+      onDiscardPendingSeed={discardPendingSeedRow}
       exitToList={exitToList}
       composerEligibleLoading={composerEligibleLoading}
       composerEligibleResolved={composerEligibleResolved}

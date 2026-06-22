@@ -204,8 +204,6 @@ export const CMS_SLOTS_DESIGNER_EDITING_TITLE = "Configure Slot Settings";
 
 export const CMS_SLOTS_DESIGNER_EDITING_DESCRIPTION = "Add components and expose props for this slot list.";
 
-export const CMS_SLOTS_DESIGNER_STEP_NAV_ARIA_LABEL = `${CMS_SLOTS_FEATURE_NAME} designer steps`;
-
 export const CMS_SLOTS_DESIGNER_SLOT_COMPONENT_LABEL = "Slot component";
 
 export const CMS_SLOTS_DESIGNER_LIST_TARGET_ON_CANVAS_TITLE = "On canvas";

@@ -151,6 +151,9 @@ export function DrawerScrollListRowSurface(props: React.ComponentProps<"span">) 
   return <span className={cn(drawerScrollListRowSurfaceVariants(), className)} {...rest} />;
 }
 
+/** Variants nested under a component: one vertical guide rail, no separators, so they read as children of the row. */
+const drawerScrollListNestedGroupClass = "m-0 ml-4 list-none border-l border-border/70 p-0 pl-1";
+
 type DrawerScrollListAddActionRowProps = {
   label: React.ReactNode;
   ariaLabel: string;
@@ -160,27 +163,54 @@ type DrawerScrollListAddActionRowProps = {
   onClick: () => void;
 };
 
-export function DrawerScrollListAddActionRow(props: DrawerScrollListAddActionRowProps) {
+function DrawerScrollListAddActionButton(props: DrawerScrollListAddActionRowProps) {
   const { label, ariaLabel, disabled = false, added = false, title, onClick } = props;
 
   return (
+    <button
+      type="button"
+      className={drawerScrollListRowButtonVariants()}
+      onClick={() => void onClick()}
+      disabled={disabled}
+      aria-disabled={added}
+      aria-label={ariaLabel}
+      title={title}
+    >
+      <DrawerScrollListRowSurface>
+        <span className={drawerScrollListAddActionRowLabelVariants({ added })}>{label}</span>
+        <span className={drawerScrollListAddActionRowBadgeVariants({ added })} aria-hidden>
+          <Plus className="size-2.5 stroke-[1.5]" />
+        </span>
+      </DrawerScrollListRowSurface>
+    </button>
+  );
+}
+
+export function DrawerScrollListAddActionRow(props: DrawerScrollListAddActionRowProps) {
+  return (
     <DrawerScrollListItem>
-      <button
-        type="button"
-        className={drawerScrollListRowButtonVariants()}
-        onClick={() => void onClick()}
-        disabled={disabled}
-        aria-disabled={added}
-        aria-label={ariaLabel}
-        title={title}
-      >
-        <DrawerScrollListRowSurface>
-          <span className={drawerScrollListAddActionRowLabelVariants({ added })}>{label}</span>
-          <span className={drawerScrollListAddActionRowBadgeVariants({ added })} aria-hidden>
-            <Plus className="size-2.5 stroke-[1.5]" />
-          </span>
-        </DrawerScrollListRowSurface>
-      </button>
+      <DrawerScrollListAddActionButton {...props} />
+    </DrawerScrollListItem>
+  );
+}
+
+/** A component row plus its variant rows, nested under it with a vertical guide rail. */
+export function DrawerScrollListAddActionGroup(props: {
+  base: DrawerScrollListAddActionRowProps;
+  variants: Array<DrawerScrollListAddActionRowProps & { id: string }>;
+}) {
+  const { base, variants } = props;
+  if (variants.length === 0) {
+    return <DrawerScrollListAddActionRow {...base} />;
+  }
+  return (
+    <DrawerScrollListItem>
+      <DrawerScrollListAddActionButton {...base} />
+      <ul className={drawerScrollListNestedGroupClass}>
+        {variants.map(({ id, ...variant }) => (
+          <DrawerScrollListAddActionRow key={id} {...variant} />
+        ))}
+      </ul>
     </DrawerScrollListItem>
   );
 }

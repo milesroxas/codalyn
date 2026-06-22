@@ -6,6 +6,8 @@ import { cn } from "@/shared/lib/utils";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
 export const drawerScrollListInsetClass = "px-4";
+/** Trailing scroll-end breathing room: matches the drawer header's `pb-3` so the last row clears the sticky footer. */
+const drawerScrollListEndPadClass = "pb-3";
 
 const drawerScrollListRegionClass = "relative min-h-0 min-w-0 w-full flex-1";
 const drawerScrollListScrollAreaClass = "size-full min-h-0 w-full";
@@ -23,7 +25,7 @@ const drawerScrollListLoaderVariants = cva(
     },
   }
 );
-const drawerScrollListClass = cn(drawerScrollListInsetClass, "m-0 list-none");
+const drawerScrollListClass = cn(drawerScrollListInsetClass, drawerScrollListEndPadClass, "m-0 list-none");
 const drawerScrollListItemClass = "py-0.5";
 const drawerScrollListErrorClass = "shrink-0 text-sm text-destructive";
 const drawerScrollListEmptyClass = "min-h-24 text-sm text-muted-foreground";
@@ -129,7 +131,7 @@ export function DrawerScrollList(props: DrawerScrollListProps) {
               <div className={cn(drawerScrollListInsetClass, drawerScrollListEmptyClass)} aria-hidden />
             )
           ) : listless ? (
-            <div className={drawerScrollListInsetClass}>{children}</div>
+            <div className={cn(drawerScrollListInsetClass, drawerScrollListEndPadClass)}>{children}</div>
           ) : (
             <ul className={drawerScrollListClass} aria-label={ariaLabel}>
               {children}

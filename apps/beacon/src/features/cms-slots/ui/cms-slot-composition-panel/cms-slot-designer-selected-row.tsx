@@ -41,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
+import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/shared/ui/button-group";
 import {
@@ -86,16 +87,22 @@ function snapshotExposed(exposed: ComposableInstancePropMeta[]): ComposableInsta
 }
 
 /** Top-level component row: standard spacing, slightly larger than its nested variant rows. */
-const selectedRowClass = "flex items-center gap-2 px-3 py-2.5 text-sm";
-/** Variant row nested under its component: tighter spacing, smaller text (indentation comes from the list's tree rail). */
-const nestedVariantRowClass = "flex items-center gap-2 py-1.5 pr-3 pl-2 text-xs";
+const selectedRowClass = "flex items-center gap-2 px-3 py-2 text-sm";
+/**
+ * Variant row nested under its component: tight spacing and smaller text. `rounded-md` keeps the hover background inset
+ * from the list edges (the wrapping list adds the surrounding inset); indentation comes from the list's tree rail.
+ */
+const nestedVariantRowClass = "flex items-center gap-2 rounded-md py-1 pr-2 pl-2 text-xs";
 /** Shared interactive affordance for a clickable row (top-level or nested): full-width hit area + hover/focus state. */
 const selectedRowButtonClass =
   "w-full text-left outline-none transition-colors hover:bg-accent/50 focus-visible:bg-accent/50 disabled:pointer-events-none disabled:opacity-60";
 
 type SelectedRowBarProps = {
   nested: boolean;
-  variantLabel: string;
+  /** What the row shows as its name: the component name for the top-level row, the variant name for a nested row. */
+  displayName: string;
+  /** Top-level row only: the pinned variant's name, shown as a badge beside the slot count (null on the base variant). */
+  variantBadge?: string | null;
   exposedCount: number;
   removingKey: string | null;
   listTargetActionBusy: boolean;
@@ -125,6 +132,22 @@ type FooterDisabledInputs = {
   hasUnconstrainedImageProps: boolean;
   hasPendingChange: boolean;
 };
+
+/**
+ * Resolves the row's visible name and optional variant badge. The top-level row always shows the component name (with a
+ * pinned non-base variant surfaced as a badge); a nested row shows the variant name itself.
+ */
+function resolveSelectedRowLabels(
+  nested: boolean,
+  variantLabel: string,
+  publishedDisplayName: string,
+  rowVariant: { variantName: string } | null
+): { displayName: string; variantBadge: string | null } {
+  if (nested) {
+    return { displayName: variantLabel, variantBadge: null };
+  }
+  return { displayName: publishedDisplayName, variantBadge: rowVariant?.variantName ?? null };
+}
 
 /** Derives the footer action disabled states from the row's busy/validity flags (kept out of the component body). */
 function computeFooterDisabledStates(i: FooterDisabledInputs) {
@@ -223,24 +246,37 @@ function SelectedRowDrawerFooterButtons(props: SelectedRowDrawerFooterProps) {
 
 /** The inline row in the selected-components list — compact variant form when `nested`, full component form otherwise. */
 function SelectedRowBar(props: SelectedRowBarProps) {
-  const { nested, variantLabel, exposedCount, removingKey, listTargetActionBusy, onOpen } = props;
-
-  const exposedBadge = (
-    <span className={cn("shrink-0 tabular-nums text-muted-foreground", nested ? "text-[0.6875rem]" : "text-xs")}>
-      {exposedCount} Slots
-    </span>
-  );
+  const { nested, displayName, variantBadge, exposedCount, removingKey, listTargetActionBusy, onOpen } = props;
 
   return (
     <button
       type="button"
       className={cn(nested ? nestedVariantRowClass : selectedRowClass, selectedRowButtonClass)}
-      aria-label={nested ? `Edit ${variantLabel}` : undefined}
+      aria-label={nested ? `Edit ${displayName}` : undefined}
       disabled={removingKey !== null || listTargetActionBusy}
       onClick={onOpen}
     >
-      <span className="min-w-0 flex-1 truncate font-medium">{variantLabel}</span>
-      {exposedBadge}
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate",
+          // Nested variant names read as children of the component: lighter weight + muted, against the top-level
+          // component name's bolder foreground. The size step (text-xs vs text-sm) comes from the row class.
+          nested ? "font-normal text-muted-foreground" : "font-medium"
+        )}
+      >
+        {displayName}
+      </span>
+      {/* The variant badge + slot count are only shown on the top-level component row; variant rows stay compact. */}
+      {nested ? null : (
+        <>
+          {variantBadge != null ? (
+            <Badge variant="secondary" size="sm" className="max-w-28 shrink-0 truncate">
+              {variantBadge}
+            </Badge>
+          ) : null}
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{exposedCount} Slots</span>
+        </>
+      )}
     </button>
   );
 }
@@ -742,12 +778,20 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
   const publishedRenameBusy = renamingPublishedSlotKey === row.key;
 
   const variantLabel = row.variant != null ? row.variant.variantName : publishedDisplayName;
+  // Top-level row keeps its component name even when pinned to a variant; the variant shows as a badge instead.
+  const { displayName: rowDisplayName, variantBadge } = resolveSelectedRowLabels(
+    nested,
+    variantLabel,
+    publishedDisplayName,
+    row.variant
+  );
 
   return (
     <>
       <SelectedRowBar
         nested={nested}
-        variantLabel={variantLabel}
+        displayName={rowDisplayName}
+        variantBadge={variantBadge}
         exposedCount={exposedCount}
         removingKey={removingKey}
         listTargetActionBusy={listTargetActionBusy}

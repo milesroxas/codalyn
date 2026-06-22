@@ -13,7 +13,7 @@ const cmsSlotDesignerSelectedComponentsListClass = "m-0 list-none divide-y divid
  * Variants of a component, nested under its row: a single vertical guide rail (no background or separators) so they read
  * as children of the same item. The rail sits under the component name; rows indent past it.
  */
-const cmsSlotDesignerNestedVariantListClass = "m-0 ml-6 list-none border-l border-border/70 p-0 pl-1";
+const cmsSlotDesignerNestedVariantListClass = "m-0 -mt-1 mb-1 ml-3 list-none border-l border-border/70 p-0 pr-1 pl-2";
 
 /** One displayed component: its base/top-level row plus any variant rows pinned to the same component id. */
 type SelectedComponentGroup = {

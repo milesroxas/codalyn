@@ -2,13 +2,21 @@ import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-function Card({ className, size = "default", ...props }: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+function Card({
+  className,
+  size = "default",
+  tone = "default",
+  ...props
+}: React.ComponentProps<"div"> & { size?: "default" | "sm"; tone?: "default" | "warning" }) {
   return (
     <div
       data-slot="card"
       data-size={size}
+      data-tone={tone}
       className={cn(
         "group/card flex min-w-0 flex-col gap-4 overflow-hidden rounded-sm bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-sm *:[img:last-child]:rounded-b-sm",
+        // Subtle warning notice — amber wash + ring, never a heavy fill.
+        "data-[tone=warning]:bg-amber-500/10 data-[tone=warning]:ring-amber-500/30",
         className
       )}
       {...props}

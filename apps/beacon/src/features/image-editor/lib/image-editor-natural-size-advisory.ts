@@ -7,12 +7,9 @@ type Dimensions = {
   height: number;
 };
 
-type AdvisoryComparison = "source-larger" | "source-smaller";
-
 export type ImageEditorNaturalSizeAdvisory = {
   natural: Dimensions;
   comparison: Dimensions;
-  comparisonKind: AdvisoryComparison;
   canApplySuggestion: boolean;
   suggestedSessionWidth: number;
   suggestedSessionHeight: number;
@@ -27,21 +24,18 @@ export type ApplyNaturalSizeSuggestionResult = {
   aspectPreset: "free";
 };
 
-const LARGER_THRESHOLD_RATIO = 1.5;
 const SMALLER_THRESHOLD_RATIO = 0.75;
 
 function isPositiveInt(value: number): boolean {
   return Number.isInteger(value) && value > 0;
 }
 
-function shouldShowLargerAdvisory(natural: Dimensions, comparison: Dimensions): boolean {
-  return (
-    natural.width >= Math.round(comparison.width * LARGER_THRESHOLD_RATIO) ||
-    natural.height >= Math.round(comparison.height * LARGER_THRESHOLD_RATIO)
-  );
-}
-
-function shouldShowSmallerAdvisory(natural: Dimensions, comparison: Dimensions): boolean {
+/**
+ * Advisory fires only when the export size is meaningfully larger than the source (upscaling),
+ * since that is the case that degrades quality. Downscaling (source larger than export) is harmless
+ * and intentionally produces no advisory.
+ */
+function shouldShowAdvisory(natural: Dimensions, comparison: Dimensions): boolean {
   return (
     natural.width <= Math.round(comparison.width * SMALLER_THRESHOLD_RATIO) ||
     natural.height <= Math.round(comparison.height * SMALLER_THRESHOLD_RATIO)
@@ -80,13 +74,7 @@ export function resolveImageEditorNaturalSizeAdvisory(input: {
     return null;
   }
 
-  const comparisonKind = shouldShowLargerAdvisory(naturalSize, comparisonSize)
-    ? "source-larger"
-    : shouldShowSmallerAdvisory(naturalSize, comparisonSize)
-      ? "source-smaller"
-      : null;
-
-  if (comparisonKind == null) {
+  if (!shouldShowAdvisory(naturalSize, comparisonSize)) {
     return null;
   }
 
@@ -101,7 +89,6 @@ export function resolveImageEditorNaturalSizeAdvisory(input: {
   return {
     natural: naturalSize,
     comparison: comparisonSize,
-    comparisonKind,
     canApplySuggestion,
     suggestedSessionWidth,
     suggestedSessionHeight,

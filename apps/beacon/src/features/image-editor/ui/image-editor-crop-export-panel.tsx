@@ -34,7 +34,7 @@ import { QualityComparePreview } from "@/features/image-editor/ui/quality-compar
 import { beaconPanelContainClass } from "@/shared/lib/beacon-app-route-surface";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardContent, CardDescription, CardTitle } from "@/shared/ui/card";
 import { Checkbox } from "@/shared/ui/checkbox";
 import {
   Dialog,
@@ -328,18 +328,16 @@ function NaturalSizeAdvisoryCard(props: {
   onApply: () => void;
 }) {
   const { advisory, onDismiss, onApply } = props;
-  const comparisonLabel =
-    advisory.comparisonKind === "source-larger"
-      ? "Source image is much larger than current export size."
-      : "Source image is much smaller than current export size.";
   return (
-    <Card size="sm">
-      <CardHeader className="space-y-1 pb-2">
-        <CardTitle className="text-sm font-medium">Advisory sizing</CardTitle>
-        <CardDescription className="text-xs leading-snug">{comparisonLabel}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 pt-0">
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+    <Card size="sm" tone="warning">
+      <CardContent className="flex flex-col gap-2.5 pt-0">
+        <div className="flex flex-col gap-0.5">
+          <CardTitle className="text-sm font-medium">Advisory sizing</CardTitle>
+          <CardDescription className="text-xs leading-snug">
+            Source image is much smaller than current export size.
+          </CardDescription>
+        </div>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
           <p className="text-muted-foreground">Source natural size</p>
           <p className="tabular-nums">{formatDimensionPair(advisory.natural)}</p>
           <p className="text-muted-foreground">Current export size</p>
@@ -626,82 +624,80 @@ function CropStageSection(p: CropStageProps) {
   }, [zoom, cropMaxZoom, setZoom]);
 
   return (
-    <section className="mt-4 flex flex-col gap-3" aria-labelledby={`${baseId}-step-crop`}>
+    <section className="mt-1 flex flex-col gap-3" aria-labelledby={`${baseId}-step-crop`}>
       <h2 className="sr-only" id={`${baseId}-step-crop`}>
         {positionOnly ? "Position image" : "Crop"}
       </h2>
-      <Card size="sm">
-        <CardHeader className="space-y-1 pb-2">
-          <CardTitle className="text-sm font-medium">{positionOnly ? "Position" : "Crop area"}</CardTitle>
-          <CardDescription className="min-w-0 text-xs leading-relaxed wrap-break-word">
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="text-sm font-medium leading-snug">{positionOnly ? "Position" : "Crop area"}</p>
+          <p className="min-w-0 text-xs leading-relaxed text-muted-foreground wrap-break-word">
             {positionOnly ? frameSummary : "Drag to frame what you export."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex min-w-0 flex-col gap-4 pt-0">
-          <div
-            data-slot="image-editor-cropper"
-            className="relative h-64 w-full min-w-0 overflow-hidden rounded-sm border-2 border-dashed border-border bg-muted/30"
-          >
-            <Cropper
-              aspect={cropAspect}
-              image={imageSrc}
-              crop={crop}
-              zoom={zoom}
-              minZoom={1}
-              maxZoom={cropMaxZoom}
-              zoomWithScroll={false}
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onCropComplete={onCropComplete}
-              onMediaLoaded={setCropMediaSize}
-              objectFit="contain"
-              style={{ containerStyle: { width: "100%", height: "100%" } }}
-            />
-          </div>
+          </p>
+        </div>
+        <div
+          data-slot="image-editor-cropper"
+          className="relative h-64 w-full min-w-0 overflow-hidden rounded-sm border-2 border-dashed border-border bg-muted/30"
+        >
+          <Cropper
+            aspect={cropAspect}
+            image={imageSrc}
+            crop={crop}
+            zoom={zoom}
+            minZoom={1}
+            maxZoom={cropMaxZoom}
+            zoomWithScroll={false}
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onCropComplete={onCropComplete}
+            onMediaLoaded={setCropMediaSize}
+            objectFit="contain"
+            style={{ containerStyle: { width: "100%", height: "100%" } }}
+          />
+        </div>
 
-          <div className={staggerBelowCropClass(belowCropEntered, 0)}>
-            <div className="flex min-w-0 flex-col gap-2.5 rounded-sm border border-border/70 bg-muted/20 p-3">
-              <div className="flex min-w-0 items-center justify-between gap-2">
-                <Label className="text-xs font-medium" htmlFor={`${baseId}-zoom`}>
-                  Zoom
-                </Label>
-                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">{Math.round(zoom * 100)}%</span>
-              </div>
-              <Slider
-                id={`${baseId}-zoom`}
-                min={1}
-                max={cropMaxZoom}
-                step={0.01}
-                value={[zoom]}
-                onValueChange={(v) => setZoom(Math.min(cropMaxZoom, v[0] ?? 1))}
-              />
+        <div className={staggerBelowCropClass(belowCropEntered, 0)}>
+          <div className="flex min-w-0 flex-col gap-2.5 rounded-sm border border-border/70 bg-muted/20 p-3">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <Label className="text-xs font-medium" htmlFor={`${baseId}-zoom`}>
+                Zoom
+              </Label>
+              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">{Math.round(zoom * 100)}%</span>
             </div>
-          </div>
-
-          {showExportSizeControls ? (
-            <CropShapeControlsSection
-              baseId={baseId}
-              belowCropEntered={belowCropEntered}
-              exportSizeUsesAspectAndMaxWidth={exportSizeUsesAspectAndMaxWidth}
-              cropFrameMode={cropFrameMode}
-              setCropFrameMode={setCropFrameMode}
-              aspectPreset={aspectPreset}
-              setAspectPreset={setAspectPreset}
-              visibleBuiltinAspectPresets={visibleBuiltinAspectPresets}
-              widthStr={widthStr}
-              setWidthStr={setWidthStr}
-              outputWidth={outputWidth}
-              setOutputWidth={setOutputWidth}
-              heightStr={heightStr}
-              setHeightStr={setHeightStr}
-              outputHeight={outputHeight}
-              setOutputHeight={setOutputHeight}
-              onExportMaxWidthBlur={onExportMaxWidthBlur}
-              strictOutputDimensionInputs={strictOutputDimensionInputs}
+            <Slider
+              id={`${baseId}-zoom`}
+              min={1}
+              max={cropMaxZoom}
+              step={0.01}
+              value={[zoom]}
+              onValueChange={(v) => setZoom(Math.min(cropMaxZoom, v[0] ?? 1))}
             />
-          ) : null}
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+
+        {showExportSizeControls ? (
+          <CropShapeControlsSection
+            baseId={baseId}
+            belowCropEntered={belowCropEntered}
+            exportSizeUsesAspectAndMaxWidth={exportSizeUsesAspectAndMaxWidth}
+            cropFrameMode={cropFrameMode}
+            setCropFrameMode={setCropFrameMode}
+            aspectPreset={aspectPreset}
+            setAspectPreset={setAspectPreset}
+            visibleBuiltinAspectPresets={visibleBuiltinAspectPresets}
+            widthStr={widthStr}
+            setWidthStr={setWidthStr}
+            outputWidth={outputWidth}
+            setOutputWidth={setOutputWidth}
+            heightStr={heightStr}
+            setHeightStr={setHeightStr}
+            outputHeight={outputHeight}
+            setOutputHeight={setOutputHeight}
+            onExportMaxWidthBlur={onExportMaxWidthBlur}
+            strictOutputDimensionInputs={strictOutputDimensionInputs}
+          />
+        ) : null}
+      </div>
       {naturalSizeAdvisory ? (
         <NaturalSizeAdvisoryCard
           advisory={naturalSizeAdvisory}
@@ -761,14 +757,14 @@ function UploadPresetPickerCard(props: {
   } = props;
 
   return (
-    <Card size="sm">
-      <CardHeader className="space-y-1 pb-2">
-        <CardTitle className="text-sm font-medium">Upload preset</CardTitle>
-        <CardDescription className="text-xs leading-snug">
+    <section className="mt-1 flex min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="text-sm font-medium leading-snug">Upload preset</p>
+        <p className="min-w-0 text-xs leading-snug text-muted-foreground wrap-break-word">
           Choose the resolved preset, site default, or manual override.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2 pt-0">
+        </p>
+      </div>
+      <div className="flex flex-col gap-2">
         <Select
           value={uploadPresetPickerValue}
           onValueChange={(value) => onUploadPresetPickerChange?.(value)}
@@ -786,8 +782,8 @@ function UploadPresetPickerCard(props: {
           </SelectContent>
         </Select>
         {showAvifLimitNotice ? <AvifTowerLimitFallbackNotice /> : null}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -918,143 +914,141 @@ function ExportEncodeCard(p: ExportCardProps) {
   const exportH = completedCrop ? effectiveExportHeight : parsedExportHeight;
 
   return (
-    <section className="mt-4 flex flex-col gap-3" aria-labelledby={`${baseId}-step-export`}>
+    <section className="mt-1 flex min-w-0 flex-col gap-4" aria-labelledby={`${baseId}-step-export`}>
       <h2 className="sr-only" id={`${baseId}-step-export`}>
         Encode
       </h2>
-      <Card size="sm">
-        <CardHeader className="space-y-1 pb-3">
-          <CardTitle className="text-sm font-medium">Encode & save</CardTitle>
-          <CardDescription className="min-w-0 text-xs leading-snug wrap-break-word">
-            Choose a format, check the preview, then tune quality. Estimates appear once the crop is set.
-          </CardDescription>
-          <p className="text-muted-foreground pt-0.5 text-[11px] tabular-nums leading-snug" aria-live="polite">
-            Output{" "}
-            <span className="text-foreground font-medium">
-              {exportW}×{exportH}px
-            </span>
-            {completedCrop ? null : <span className="text-muted-foreground"> · finalize in crop step</span>}
-          </p>
-        </CardHeader>
-        <CardContent className="flex min-w-0 flex-col gap-5 pt-0">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label className="text-xs font-medium" htmlFor={`${baseId}-fn`}>
-              File name
-            </Label>
-            <Input
-              id={`${baseId}-fn`}
-              aria-label="Exported file base name"
-              autoComplete="off"
-              value={fileBaseName}
-              onChange={(e) => setFileBaseName(e.target.value)}
-              onBlur={() => setFileBaseName(sanitizeAssetBaseName(fileBaseName))}
-            />
-          </div>
-
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <Label className="text-xs font-medium" htmlFor={`${baseId}-alt`}>
-                Alt text
-              </Label>
-              <FieldLabelHint aboutLabel="Alt text">
-                Describes the image for screen readers and SEO. Applied to the uploaded Webflow asset.
-              </FieldLabelHint>
-            </div>
-            <Input
-              id={`${baseId}-alt`}
-              aria-label="Image alt text"
-              autoComplete="off"
-              value={altText}
-              onChange={(e) => setAltText(e.target.value)}
-              placeholder="e.g. Team members at a conference"
-            />
-          </div>
-
-          <ExportFormatFields
-            baseId={baseId}
-            exportFormat={exportFormat}
-            allowAvifEncoding={allowAvifEncoding}
-            setExportFormat={setExportFormat}
-            onExportFormatCommit={onExportFormatCommit}
-            exportFormatLocked={exportFormatLocked}
-            avifPresetOverriddenByTowerLimit={avifPresetOverriddenByTowerLimit}
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="text-sm font-medium leading-snug">Encode & save</p>
+        <p className="min-w-0 text-xs leading-snug text-muted-foreground wrap-break-word">
+          Choose a format, check the preview, then tune quality. Estimates appear once the crop is set.
+        </p>
+        <p className="text-muted-foreground pt-0.5 text-[11px] tabular-nums leading-snug" aria-live="polite">
+          Output{" "}
+          <span className="text-foreground font-medium">
+            {exportW}×{exportH}px
+          </span>
+          {completedCrop ? null : <span className="text-muted-foreground"> · finalize in crop step</span>}
+        </p>
+      </div>
+      <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <Label className="text-xs font-medium" htmlFor={`${baseId}-fn`}>
+            File name
+          </Label>
+          <Input
+            id={`${baseId}-fn`}
+            aria-label="Exported file base name"
+            autoComplete="off"
+            value={fileBaseName}
+            onChange={(e) => setFileBaseName(e.target.value)}
+            onBlur={() => setFileBaseName(sanitizeAssetBaseName(fileBaseName))}
           />
+        </div>
 
-          <div className="flex flex-col gap-2">
-            {completedCrop && exportPreviewReady ? (
-              <QualityComparePreview
-                originalSrc={originalPreviewUrl}
-                compressedSrc={compressedPreviewUrl}
-                pending={previewPending}
-                exportWidth={effectiveExportWidth}
-                exportHeight={effectiveExportHeight}
-                onOpenQualityPopout={onOpenQualityPopout}
-              />
-            ) : completedCrop ? (
-              <div className="flex min-h-[120px] flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-border/70 bg-muted/15 px-4 py-6 text-center">
-                <p className="text-muted-foreground text-xs font-medium">Set export size to preview</p>
-                <p className="text-muted-foreground max-w-[16rem] text-[10px] leading-snug">
-                  Choose an aspect ratio and max width, or enter custom width and height in the crop step.
-                </p>
-              </div>
-            ) : (
-              <div className="flex min-h-[120px] flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-border/70 bg-muted/15 px-4 py-6 text-center">
-                <p className="text-muted-foreground text-xs font-medium">Preview after crop</p>
-                <p className="text-muted-foreground max-w-[16rem] text-[10px] leading-snug">
-                  After you finish positioning, the preview and quality compare are available here.
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-3.5">
-            <Label className="text-xs font-medium" htmlFor={`${baseId}-quality`}>
-              Quality
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <Label className="text-xs font-medium" htmlFor={`${baseId}-alt`}>
+              Alt text
             </Label>
-            <div className="flex items-center gap-3 py-1.5">
-              <div className="min-w-0 flex-1">
-                <Slider
-                  id={`${baseId}-quality`}
-                  min={0.05}
-                  max={1}
-                  step={0.01}
-                  value={[quality]}
-                  onValueChange={(v) => setQuality(v[0] ?? 0.75)}
-                  onValueCommit={onQualityCommit}
-                  className="[&_[data-slot=slider-track]]:h-2 [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:min-h-4 [&_[data-slot=slider-thumb]]:min-w-4 [&_[data-slot=slider-thumb]]:after:-inset-3"
-                />
-              </div>
-              <span
-                className="text-muted-foreground min-w-[2.75rem] shrink-0 text-right text-xs tabular-nums"
-                aria-live="polite"
-              >
-                {Math.round(quality * 100)}%
-              </span>
-            </div>
-            <ExportEncodeSizeFootnote
-              completedCrop={completedCrop}
-              estimatePending={estimatePending}
-              estimatedBytes={estimatedBytes}
-              originalBytes={originalBytes}
-              showQualityCommitHint={completedCrop !== null && estimateNonce === 0}
-            />
-            {presetFileLimitBlocker ? (
-              <div className="rounded-sm border border-destructive/30 bg-destructive/10 px-3 py-2">
-                <p className="text-sm font-medium text-destructive">Over active preset file-size limit.</p>
-                <p className="text-muted-foreground mt-1 text-xs leading-snug">
-                  Estimated {formatFileSize(presetFileLimitBlocker.estimatedBytes)} exceeds cap{" "}
-                  {formatFileSize(presetFileLimitBlocker.maxFileSizeBytes)}. Reduce quality or dimensions.
-                </p>
-                <ExportPresetLimitBar
-                  className="mt-2"
-                  estimatedBytes={presetFileLimitBlocker.estimatedBytes}
-                  maxBytes={presetFileLimitBlocker.maxFileSizeBytes}
-                />
-              </div>
-            ) : null}
+            <FieldLabelHint aboutLabel="Alt text">
+              Describes the image for screen readers and SEO. Applied to the uploaded Webflow asset.
+            </FieldLabelHint>
           </div>
-        </CardContent>
-      </Card>
+          <Input
+            id={`${baseId}-alt`}
+            aria-label="Image alt text"
+            autoComplete="off"
+            value={altText}
+            onChange={(e) => setAltText(e.target.value)}
+            placeholder="e.g. Team members at a conference"
+          />
+        </div>
+
+        <ExportFormatFields
+          baseId={baseId}
+          exportFormat={exportFormat}
+          allowAvifEncoding={allowAvifEncoding}
+          setExportFormat={setExportFormat}
+          onExportFormatCommit={onExportFormatCommit}
+          exportFormatLocked={exportFormatLocked}
+          avifPresetOverriddenByTowerLimit={avifPresetOverriddenByTowerLimit}
+        />
+
+        <div className="flex flex-col gap-2">
+          {completedCrop && exportPreviewReady ? (
+            <QualityComparePreview
+              originalSrc={originalPreviewUrl}
+              compressedSrc={compressedPreviewUrl}
+              pending={previewPending}
+              exportWidth={effectiveExportWidth}
+              exportHeight={effectiveExportHeight}
+              onOpenQualityPopout={onOpenQualityPopout}
+            />
+          ) : completedCrop ? (
+            <div className="flex min-h-[120px] flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-border/70 bg-muted/15 px-4 py-6 text-center">
+              <p className="text-muted-foreground text-xs font-medium">Set export size to preview</p>
+              <p className="text-muted-foreground max-w-[16rem] text-[10px] leading-snug">
+                Choose an aspect ratio and max width, or enter custom width and height in the crop step.
+              </p>
+            </div>
+          ) : (
+            <div className="flex min-h-[120px] flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-border/70 bg-muted/15 px-4 py-6 text-center">
+              <p className="text-muted-foreground text-xs font-medium">Preview after crop</p>
+              <p className="text-muted-foreground max-w-[16rem] text-[10px] leading-snug">
+                After you finish positioning, the preview and quality compare are available here.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3.5">
+          <Label className="text-xs font-medium" htmlFor={`${baseId}-quality`}>
+            Quality
+          </Label>
+          <div className="flex items-center gap-3 py-1.5">
+            <div className="min-w-0 flex-1">
+              <Slider
+                id={`${baseId}-quality`}
+                min={0.05}
+                max={1}
+                step={0.01}
+                value={[quality]}
+                onValueChange={(v) => setQuality(v[0] ?? 0.75)}
+                onValueCommit={onQualityCommit}
+                className="[&_[data-slot=slider-track]]:h-2 [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:min-h-4 [&_[data-slot=slider-thumb]]:min-w-4 [&_[data-slot=slider-thumb]]:after:-inset-3"
+              />
+            </div>
+            <span
+              className="text-muted-foreground min-w-[2.75rem] shrink-0 text-right text-xs tabular-nums"
+              aria-live="polite"
+            >
+              {Math.round(quality * 100)}%
+            </span>
+          </div>
+          <ExportEncodeSizeFootnote
+            completedCrop={completedCrop}
+            estimatePending={estimatePending}
+            estimatedBytes={estimatedBytes}
+            originalBytes={originalBytes}
+            showQualityCommitHint={completedCrop !== null && estimateNonce === 0}
+          />
+          {presetFileLimitBlocker ? (
+            <div className="rounded-sm border border-destructive/30 bg-destructive/10 px-3 py-2">
+              <p className="text-sm font-medium text-destructive">Over active preset file-size limit.</p>
+              <p className="text-muted-foreground mt-1 text-xs leading-snug">
+                Estimated {formatFileSize(presetFileLimitBlocker.estimatedBytes)} exceeds cap{" "}
+                {formatFileSize(presetFileLimitBlocker.maxFileSizeBytes)}. Reduce quality or dimensions.
+              </p>
+              <ExportPresetLimitBar
+                className="mt-2"
+                estimatedBytes={presetFileLimitBlocker.estimatedBytes}
+                maxBytes={presetFileLimitBlocker.maxFileSizeBytes}
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
     </section>
   );
 }
@@ -1068,40 +1062,38 @@ function ResolvedConstraintsReadOnlyCard(props: {
   const constraints = readout?.constraints ?? null;
   const blockers = readout?.blockers ?? [];
   return (
-    <section className="mt-4 flex flex-col gap-3" aria-labelledby="resolved-export-constraints-readonly">
+    <section className="mt-1 flex min-w-0 flex-col gap-4" aria-labelledby="resolved-export-constraints-readonly">
       <h2 className="sr-only" id="resolved-export-constraints-readonly">
         Resolved constraints
       </h2>
-      <Card size="sm">
-        <CardHeader className="space-y-1 pb-2">
-          <CardTitle className="text-sm font-medium">Resolved constraints (read-only)</CardTitle>
-          <CardDescription className="text-xs leading-snug">
-            Debug view only. Current export fields remain unchanged in this phase.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-x-3 gap-y-1.5 pt-0 text-xs">
-          <p className="text-muted-foreground">Target</p>
-          <p className="tabular-nums">{target?.kind ?? "none"}</p>
-          <p className="text-muted-foreground">Source</p>
-          <p className="tabular-nums">{readout?.source ?? "manual"}</p>
-          <p className="text-muted-foreground">Size</p>
-          <p className="tabular-nums">{constraints ? `${constraints.width}×${constraints.height}` : "—"}</p>
-          <p className="text-muted-foreground">Format</p>
-          <p className="tabular-nums">{constraints?.exportFormat ?? "—"}</p>
-          <p className="text-muted-foreground">Max file size</p>
-          <p className="tabular-nums">
-            {constraints?.maxFileSizeBytes == null ? "—" : `${constraints.maxFileSizeBytes.toLocaleString()} B`}
-          </p>
-          <p className="text-muted-foreground">Session max file size</p>
-          <p className="tabular-nums">
-            {sessionMaxFileSizeBytes == null ? "—" : `${sessionMaxFileSizeBytes.toLocaleString()} B`}
-          </p>
-          <p className="text-muted-foreground">Preset id</p>
-          <p className="tabular-nums">{readout?.presetId ?? "—"}</p>
-          <p className="text-muted-foreground">Blockers</p>
-          <p className="tabular-nums">{blockers.length === 0 ? "none" : blockers.join(", ")}</p>
-        </CardContent>
-      </Card>
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="text-sm font-medium leading-snug">Resolved constraints (read-only)</p>
+        <p className="min-w-0 text-xs leading-snug text-muted-foreground wrap-break-word">
+          Debug view only. Current export fields remain unchanged in this phase.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+        <p className="text-muted-foreground">Target</p>
+        <p className="tabular-nums">{target?.kind ?? "none"}</p>
+        <p className="text-muted-foreground">Source</p>
+        <p className="tabular-nums">{readout?.source ?? "manual"}</p>
+        <p className="text-muted-foreground">Size</p>
+        <p className="tabular-nums">{constraints ? `${constraints.width}×${constraints.height}` : "—"}</p>
+        <p className="text-muted-foreground">Format</p>
+        <p className="tabular-nums">{constraints?.exportFormat ?? "—"}</p>
+        <p className="text-muted-foreground">Max file size</p>
+        <p className="tabular-nums">
+          {constraints?.maxFileSizeBytes == null ? "—" : `${constraints.maxFileSizeBytes.toLocaleString()} B`}
+        </p>
+        <p className="text-muted-foreground">Session max file size</p>
+        <p className="tabular-nums">
+          {sessionMaxFileSizeBytes == null ? "—" : `${sessionMaxFileSizeBytes.toLocaleString()} B`}
+        </p>
+        <p className="text-muted-foreground">Preset id</p>
+        <p className="tabular-nums">{readout?.presetId ?? "—"}</p>
+        <p className="text-muted-foreground">Blockers</p>
+        <p className="tabular-nums">{blockers.length === 0 ? "none" : blockers.join(", ")}</p>
+      </div>
     </section>
   );
 }
@@ -1426,34 +1418,30 @@ function AssetDestinationCard(p: AssetFolderCardProps) {
   const cardTitle = "Asset library location";
 
   return (
-    <section className="mt-4 flex flex-col gap-3" aria-labelledby={`${baseId}-step-assets`}>
+    <section className="mt-1 flex min-w-0 flex-col gap-4" aria-labelledby={`${baseId}-step-assets`}>
       <h2 className="sr-only" id={`${baseId}-step-assets`}>
         Assets folder
       </h2>
-      <Card size="sm">
-        <CardHeader className="space-y-1 pb-2">
-          <CardTitle className="text-sm font-medium">{cardTitle}</CardTitle>
-          <CardDescription className="min-w-0 text-xs leading-snug wrap-break-word">
-            <AssetLibraryLocationDescription
-              cmsPrimaryUpload={cmsPrimaryUpload}
-              selectedAssetFolderId={selectedAssetFolderId}
-              defaultFolderPathLabel={defaultFolderPathLabel}
-            />
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex min-w-0 flex-col gap-4 pt-0">
-          <AssetFolderToolbar
-            baseId={baseId}
-            assetFolders={assetFolders}
-            foldersLoading={foldersLoading}
-            folderActionBusy={folderActionBusy}
-            busy={busy}
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="text-sm font-medium leading-snug">{cardTitle}</p>
+        <p className="min-w-0 text-xs leading-snug text-muted-foreground wrap-break-word">
+          <AssetLibraryLocationDescription
+            cmsPrimaryUpload={cmsPrimaryUpload}
             selectedAssetFolderId={selectedAssetFolderId}
-            setSelectedAssetFolderId={setSelectedAssetFolderId}
-            onCreateAssetFolder={onCreateAssetFolder}
+            defaultFolderPathLabel={defaultFolderPathLabel}
           />
-        </CardContent>
-      </Card>
+        </p>
+      </div>
+      <AssetFolderToolbar
+        baseId={baseId}
+        assetFolders={assetFolders}
+        foldersLoading={foldersLoading}
+        folderActionBusy={folderActionBusy}
+        busy={busy}
+        selectedAssetFolderId={selectedAssetFolderId}
+        setSelectedAssetFolderId={setSelectedAssetFolderId}
+        onCreateAssetFolder={onCreateAssetFolder}
+      />
     </section>
   );
 }
@@ -1508,82 +1496,82 @@ function PlacementCard(p: PlacementCardProps) {
     : resolvePlacementWhenOptionHidden(placement, offerSelectionPlacement, offerReplacePlacement);
 
   return (
-    <section className="mt-4 flex flex-col gap-3" aria-labelledby={`${baseId}-step-place`}>
+    <section className="mt-1 flex min-w-0 flex-col gap-4" aria-labelledby={`${baseId}-step-place`}>
       <h2 className="sr-only" id={`${baseId}-step-place`}>
         Placement
       </h2>
-      <Card size="sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Placement</CardTitle>
-          <CardDescription className="min-w-0 wrap-break-word">Choose how to use this export.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex min-w-0 flex-col gap-4 pt-0">
-          <RadioGroup
-            className="flex flex-col gap-2"
-            value={placementRadioValue}
-            onValueChange={(v) => setPlacement(v as PlacementMode)}
-          >
-            {placementOptions.map((opt) => (
-              <label
-                key={opt.value}
-                htmlFor={`${baseId}-place-${opt.value}`}
-                className={cn(
-                  "flex min-w-0 cursor-pointer items-center gap-3 rounded-sm border border-transparent p-2.5 ring-1 ring-foreground/10 transition-colors",
-                  placementRadioValue === opt.value ? "bg-accent/50 border-primary/30" : "hover:bg-muted/40"
-                )}
-              >
-                <RadioGroupItem id={`${baseId}-place-${opt.value}`} value={opt.value} />
-                <span className="min-w-0 flex-1 text-sm font-medium leading-none">{opt.title}</span>
-                <InfoTip ariaLabel={`About ${opt.title}`} text={opt.description} />
-              </label>
-            ))}
-          </RadioGroup>
-
-          {placementRadioValue === "replace" ? (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id={`${baseId}-lib-replace`}
-                checked={replaceLibraryAsset}
-                onCheckedChange={(v) => setReplaceLibraryAsset(v === true)}
-              />
-              <Label className="cursor-pointer font-normal" htmlFor={`${baseId}-lib-replace`}>
-                Overwrite file in Assets
-              </Label>
-            </div>
-          ) : null}
-
-          {placementRadioValue === "selection" && componentImageProps.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              <Label className="text-muted-foreground text-xs" htmlFor={`${baseId}-comp-prop`}>
-                Component field
-              </Label>
-              {componentImageProps.length === 1 ? (
-                <p className="text-xs leading-snug" id={`${baseId}-comp-prop`}>
-                  {componentImageProps[0].label}
-                </p>
-              ) : (
-                <ScrollArea className="max-h-[min(32vh,12rem)] w-full min-h-0 rounded-sm border border-border/60 pr-0.5">
-                  <RadioGroup
-                    className="flex flex-col gap-2 p-1.5"
-                    id={`${baseId}-comp-prop`}
-                    value={selectedComponentImagePropId ?? ""}
-                    onValueChange={(v) => setSelectedComponentImagePropId(v)}
-                  >
-                    {componentImageProps.map((o) => (
-                      <div key={o.propId} className="flex min-w-0 items-center gap-2">
-                        <RadioGroupItem value={o.propId} id={`${baseId}-comp-${o.propId}`} className="shrink-0" />
-                        <Label className="min-w-0 font-normal" htmlFor={`${baseId}-comp-${o.propId}`}>
-                          {o.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </ScrollArea>
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="text-sm font-medium leading-snug">Placement</p>
+        <p className="min-w-0 text-xs leading-snug text-muted-foreground wrap-break-word">
+          Choose how to use this export.
+        </p>
+      </div>
+      <div className="flex min-w-0 flex-col gap-4">
+        <RadioGroup
+          className="flex flex-col gap-2"
+          value={placementRadioValue}
+          onValueChange={(v) => setPlacement(v as PlacementMode)}
+        >
+          {placementOptions.map((opt) => (
+            <label
+              key={opt.value}
+              htmlFor={`${baseId}-place-${opt.value}`}
+              className={cn(
+                "flex min-w-0 cursor-pointer items-center gap-3 rounded-sm border border-transparent p-2.5 ring-1 ring-foreground/10 transition-colors",
+                placementRadioValue === opt.value ? "bg-accent/50 border-primary/30" : "hover:bg-muted/40"
               )}
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+            >
+              <RadioGroupItem id={`${baseId}-place-${opt.value}`} value={opt.value} />
+              <span className="min-w-0 flex-1 text-sm font-medium leading-none">{opt.title}</span>
+              <InfoTip ariaLabel={`About ${opt.title}`} text={opt.description} />
+            </label>
+          ))}
+        </RadioGroup>
+
+        {placementRadioValue === "replace" ? (
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={`${baseId}-lib-replace`}
+              checked={replaceLibraryAsset}
+              onCheckedChange={(v) => setReplaceLibraryAsset(v === true)}
+            />
+            <Label className="cursor-pointer font-normal" htmlFor={`${baseId}-lib-replace`}>
+              Overwrite file in Assets
+            </Label>
+          </div>
+        ) : null}
+
+        {placementRadioValue === "selection" && componentImageProps.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            <Label className="text-muted-foreground text-xs" htmlFor={`${baseId}-comp-prop`}>
+              Component field
+            </Label>
+            {componentImageProps.length === 1 ? (
+              <p className="text-xs leading-snug" id={`${baseId}-comp-prop`}>
+                {componentImageProps[0].label}
+              </p>
+            ) : (
+              <ScrollArea className="max-h-[min(32vh,12rem)] w-full min-h-0 rounded-sm border border-border/60 pr-0.5">
+                <RadioGroup
+                  className="flex flex-col gap-2 p-1.5"
+                  id={`${baseId}-comp-prop`}
+                  value={selectedComponentImagePropId ?? ""}
+                  onValueChange={(v) => setSelectedComponentImagePropId(v)}
+                >
+                  {componentImageProps.map((o) => (
+                    <div key={o.propId} className="flex min-w-0 items-center gap-2">
+                      <RadioGroupItem value={o.propId} id={`${baseId}-comp-${o.propId}`} className="shrink-0" />
+                      <Label className="min-w-0 font-normal" htmlFor={`${baseId}-comp-${o.propId}`}>
+                        {o.label}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </ScrollArea>
+            )}
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -1805,36 +1793,34 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         />
       ) : null}
       {showExportSizeControls ? (
-        <Card size="sm">
-          <CardHeader className="space-y-1 pb-2">
-            <CardTitle className="text-sm font-medium">Export size</CardTitle>
-            <CardDescription className="text-xs leading-snug">
+        <section className="mt-1 flex min-w-0 flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-sm font-medium leading-snug">Export size</p>
+            <p className="min-w-0 text-xs leading-snug text-muted-foreground wrap-break-word">
               Set aspect ratio and output dimensions for this upload.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <CropShapeControlsSection
-              baseId={baseId}
-              belowCropEntered
-              exportSizeUsesAspectAndMaxWidth={exportSizeUsesAspectAndMaxWidth}
-              cropFrameMode={cropFrameMode}
-              setCropFrameMode={setCropFrameMode}
-              aspectPreset={aspectPreset}
-              setAspectPreset={setAspectPreset}
-              visibleBuiltinAspectPresets={visibleBuiltinAspectPresets}
-              widthStr={widthStr}
-              setWidthStr={setWidthStr}
-              outputWidth={outputWidth}
-              setOutputWidth={setOutputWidth}
-              heightStr={heightStr}
-              setHeightStr={setHeightStr}
-              outputHeight={outputHeight}
-              setOutputHeight={setOutputHeight}
-              onExportMaxWidthBlur={onExportMaxWidthBlur}
-              strictOutputDimensionInputs={strictOutputDimensionInputs}
-            />
-          </CardContent>
-        </Card>
+            </p>
+          </div>
+          <CropShapeControlsSection
+            baseId={baseId}
+            belowCropEntered
+            exportSizeUsesAspectAndMaxWidth={exportSizeUsesAspectAndMaxWidth}
+            cropFrameMode={cropFrameMode}
+            setCropFrameMode={setCropFrameMode}
+            aspectPreset={aspectPreset}
+            setAspectPreset={setAspectPreset}
+            visibleBuiltinAspectPresets={visibleBuiltinAspectPresets}
+            widthStr={widthStr}
+            setWidthStr={setWidthStr}
+            outputWidth={outputWidth}
+            setOutputWidth={setOutputWidth}
+            heightStr={heightStr}
+            setHeightStr={setHeightStr}
+            outputHeight={outputHeight}
+            setOutputHeight={setOutputHeight}
+            onExportMaxWidthBlur={onExportMaxWidthBlur}
+            strictOutputDimensionInputs={strictOutputDimensionInputs}
+          />
+        </section>
       ) : null}
       <ExportEncodeCard
         baseId={baseId}

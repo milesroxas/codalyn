@@ -32,7 +32,9 @@ const stepNavLabelVariants = cva("inline-flex h-7 min-w-0 items-center px-1.5 te
   },
 });
 
-const stepNavRootClass = "min-w-0";
+// `-ml-1.5` cancels the first step button's leading `px-1.5` so the first label sits flush with the nav's
+// container edge — the container inset alone then controls horizontal alignment.
+const stepNavRootClass = "-ml-1.5 min-w-0";
 const stepNavListClass = "flex flex-wrap items-center gap-0.5 text-[11px]";
 const stepNavItemClass = "flex min-w-0 items-center gap-0.5";
 const stepNavSeparatorClass = "size-3 shrink-0 text-muted-foreground/70";

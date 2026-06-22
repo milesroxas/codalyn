@@ -101,12 +101,11 @@ describe("ImageEditorCropExportPanel advisory sizing UI", () => {
       <ImageEditorCropExportPanel
         {...baseProps({
           naturalSizeAdvisory: {
-            natural: { width: 3000, height: 2000 },
+            natural: { width: 400, height: 300 },
             comparison: { width: 1200, height: 800 },
-            comparisonKind: "source-larger",
             canApplySuggestion: false,
-            suggestedSessionWidth: 3000,
-            suggestedSessionHeight: 2000,
+            suggestedSessionWidth: 400,
+            suggestedSessionHeight: 300,
           },
           onDismissNaturalSizeAdvisory,
         })}
@@ -124,7 +123,6 @@ describe("ImageEditorCropExportPanel advisory sizing UI", () => {
           naturalSizeAdvisory: {
             natural: { width: 600, height: 400 },
             comparison: { width: 1200, height: 800 },
-            comparisonKind: "source-smaller",
             canApplySuggestion: true,
             suggestedSessionWidth: 600,
             suggestedSessionHeight: 400,

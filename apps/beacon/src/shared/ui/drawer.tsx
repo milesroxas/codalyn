@@ -357,6 +357,7 @@ function DrawerContent({
   showDragHandle = true,
   stickyFooter = false,
   stickyMainScroll = true,
+  flushBottom = false,
   maxHeight,
   style,
   ...props
@@ -368,6 +369,11 @@ function DrawerContent({
     stickyFooter?: boolean;
     /** When false with `stickyFooter`, the main slot does not scroll; use a nested `ScrollArea` instead. */
     stickyMainScroll?: boolean;
+    /**
+     * Drops the content's bottom inset so a child that owns its own footer (e.g. a route chrome) sits flush with
+     * the drawer edge. The child footer is responsible for its own safe-area padding.
+     */
+    flushBottom?: boolean;
   }) {
   const { isStackedTop, stackIndex, useNativeNestedStacking } = useContext(DrawerStackContext);
   const stackedTop = isStackedTop && !useNativeNestedStacking;
@@ -392,7 +398,7 @@ function DrawerContent({
       <VaulDrawer.Content
         data-slot="drawer-content"
         style={{ zIndex: DRAWER_BASE_Z_INDEX + stackIndex, ...style }}
-        className={cn(drawerContentVariants({ maxHeight, stackedTop }), className)}
+        className={cn(drawerContentVariants({ maxHeight, stackedTop }), flushBottom && "pb-0", className)}
         {...props}
       >
         {showDragHandle && showCloseButton ? (

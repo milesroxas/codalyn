@@ -22,9 +22,10 @@ export type ImageEditorStepOrderOptions = {
 
 type NavItem = { id: ImageEditorFlowStep; label: string };
 
-function navAuto(): NavItem[] {
+function navAuto(options: ImageEditorNavStepOptions): NavItem[] {
+  const target: NavItem[] = options.includeTarget ? [{ id: "autoElement", label: "Target" }] : [];
   return [
-    { id: "autoElement", label: "Target" },
+    ...target,
     { id: "upload", label: "Add" },
     { id: "position", label: "Position" },
     { id: "save", label: "Save" },
@@ -35,12 +36,25 @@ function navConfigurations(): NavItem[] {
   return [{ id: "configurePresets", label: "Presets" }];
 }
 
-export function getImageEditorNavSteps(pathMode: ImageEditorPathMode): NavItem[] {
+export type ImageEditorNavStepOptions = {
+  /**
+   * When false, the `autoElement` ("Target") step is dropped from the strip — used in compose mode where the
+   * target is fixed by the caller (e.g. a CMS prop) and the user must not navigate back to re-select it.
+   */
+  includeTarget: boolean;
+};
+
+const DEFAULT_NAV_STEP_OPTIONS: ImageEditorNavStepOptions = { includeTarget: true };
+
+export function getImageEditorNavSteps(
+  pathMode: ImageEditorPathMode,
+  options: ImageEditorNavStepOptions = DEFAULT_NAV_STEP_OPTIONS
+): NavItem[] {
   if (pathMode === "unset") {
     return [];
   }
   if (pathMode === "auto") {
-    return navAuto();
+    return navAuto(options);
   }
   if (pathMode === "configurations") {
     return navConfigurations();

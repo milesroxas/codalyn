@@ -155,6 +155,7 @@ function imageEditorRouteChromeSlots(options: {
   currentStepForNav: ImageEditorFlowStep;
   imageSrc: string | null;
   pathMode: ImageEditorPathMode;
+  composeActive: boolean;
   goToStep: (step: ImageEditorFlowStep) => void;
   showGuestOnboarding: boolean;
   flowStep: ImageEditorFlowStep;
@@ -183,6 +184,7 @@ function imageEditorRouteChromeSlots(options: {
     stepExitFade,
     savePlaceAction,
     configurePresetsFooter,
+    composeActive,
   } = options;
 
   const subheader =
@@ -195,7 +197,7 @@ function imageEditorRouteChromeSlots(options: {
         aria-label="Image editor steps"
         current={currentStepForNav}
         onStepSelect={goToStep}
-        steps={getImageEditorNavSteps(pathMode).map((step) => ({
+        steps={getImageEditorNavSteps(pathMode, { includeTarget: !composeActive }).map((step) => ({
           id: step.id,
           label: step.label,
           restartHint: imageEditorStepRestartHint(step.id, imageSrc != null),
@@ -1634,6 +1636,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     currentStepForNav,
     imageSrc,
     pathMode,
+    composeActive: compose.active,
     goToStep,
     showGuestOnboarding,
     flowStep,

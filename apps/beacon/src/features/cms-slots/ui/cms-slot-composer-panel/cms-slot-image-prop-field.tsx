@@ -48,7 +48,7 @@ function ComposeImageDrawer(props: {
   return (
     <DrawerNested open={open} onOpenChange={setOpen} interactionBlocked={dismissBlocked}>
       <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-      <DrawerContent {...drawerListSheetContentDefaults} maxHeight="tall">
+      <DrawerContent {...drawerListSheetContentDefaults} maxHeight="tall" flushBottom>
         <DrawerHeader align="start">
           <DrawerTitle>{CMS_SLOTS_COMPOSER_IMAGE_DRAWER_TITLE}</DrawerTitle>
           {/* Kept for dialog a11y (aria-describedby) but visually hidden — the title + breadcrumbs carry the context. */}

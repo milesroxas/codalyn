@@ -6,25 +6,7 @@ import {
 } from "./image-editor-natural-size-advisory";
 
 describe("resolveImageEditorNaturalSizeAdvisory", () => {
-  it("shows advisory when source image is much larger than resolved constraints", () => {
-    const result = resolveImageEditorNaturalSizeAdvisory({
-      enabled: true,
-      dismissed: false,
-      naturalSize: { width: 2400, height: 1600 },
-      comparisonSize: { width: 1200, height: 800 },
-      resolverSource: "manual",
-      taggedDimensionsActive: false,
-      canEditSessionDimensions: true,
-    });
-    expect(result).toMatchObject({
-      comparisonKind: "source-larger",
-      canApplySuggestion: true,
-      suggestedSessionWidth: 2400,
-      suggestedSessionHeight: 1600,
-    });
-  });
-
-  it("shows advisory when source image is much smaller than resolved constraints", () => {
+  it("shows advisory only when export size is much larger than the source (upscaling)", () => {
     const result = resolveImageEditorNaturalSizeAdvisory({
       enabled: true,
       dismissed: false,
@@ -35,11 +17,23 @@ describe("resolveImageEditorNaturalSizeAdvisory", () => {
       canEditSessionDimensions: true,
     });
     expect(result).toMatchObject({
-      comparisonKind: "source-smaller",
       canApplySuggestion: true,
       suggestedSessionWidth: 600,
       suggestedSessionHeight: 400,
     });
+  });
+
+  it("does not show advisory when the source is larger than the export (downscaling is harmless)", () => {
+    const result = resolveImageEditorNaturalSizeAdvisory({
+      enabled: true,
+      dismissed: false,
+      naturalSize: { width: 2400, height: 1600 },
+      comparisonSize: { width: 1200, height: 800 },
+      resolverSource: "manual",
+      taggedDimensionsActive: false,
+      canEditSessionDimensions: true,
+    });
+    expect(result).toBeNull();
   });
 
   it("does not show advisory when difference is not meaningful", () => {
@@ -59,7 +53,7 @@ describe("resolveImageEditorNaturalSizeAdvisory", () => {
     const result = resolveImageEditorNaturalSizeAdvisory({
       enabled: true,
       dismissed: true,
-      naturalSize: { width: 2400, height: 1600 },
+      naturalSize: { width: 400, height: 300 },
       comparisonSize: { width: 1200, height: 800 },
       resolverSource: "manual",
       taggedDimensionsActive: false,
@@ -72,14 +66,13 @@ describe("resolveImageEditorNaturalSizeAdvisory", () => {
     const result = resolveImageEditorNaturalSizeAdvisory({
       enabled: true,
       dismissed: false,
-      naturalSize: { width: 3000, height: 2000 },
+      naturalSize: { width: 400, height: 300 },
       comparisonSize: { width: 1200, height: 800 },
       resolverSource: "tagged",
       taggedDimensionsActive: true,
       canEditSessionDimensions: true,
     });
     expect(result).toMatchObject({
-      comparisonKind: "source-larger",
       canApplySuggestion: false,
     });
   });
@@ -88,14 +81,13 @@ describe("resolveImageEditorNaturalSizeAdvisory", () => {
     const result = resolveImageEditorNaturalSizeAdvisory({
       enabled: true,
       dismissed: false,
-      naturalSize: { width: 3000, height: 2000 },
+      naturalSize: { width: 400, height: 300 },
       comparisonSize: { width: 1200, height: 800 },
       resolverSource: "instance",
       taggedDimensionsActive: false,
       canEditSessionDimensions: true,
     });
     expect(result).toMatchObject({
-      comparisonKind: "source-larger",
       canApplySuggestion: false,
     });
   });
@@ -104,14 +96,13 @@ describe("resolveImageEditorNaturalSizeAdvisory", () => {
     const result = resolveImageEditorNaturalSizeAdvisory({
       enabled: true,
       dismissed: false,
-      naturalSize: { width: 3000, height: 2000 },
+      naturalSize: { width: 400, height: 300 },
       comparisonSize: { width: 1200, height: 800 },
       resolverSource: "site-default",
       taggedDimensionsActive: false,
       canEditSessionDimensions: true,
     });
     expect(result).toMatchObject({
-      comparisonKind: "source-larger",
       canApplySuggestion: false,
     });
   });
@@ -120,7 +111,7 @@ describe("resolveImageEditorNaturalSizeAdvisory", () => {
     const result = resolveImageEditorNaturalSizeAdvisory({
       enabled: true,
       dismissed: false,
-      naturalSize: { width: 3000, height: 2000 },
+      naturalSize: { width: 400, height: 300 },
       comparisonSize: { width: 1200, height: 800 },
       resolverSource: "manual",
       taggedDimensionsActive: false,

@@ -11,6 +11,7 @@ import {
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { resolveMembershipSeatCapFromOrg } from "@/server/billing/team-billing-config";
 import { sendOrganizationInvitationEmail } from "@/server/email/organization-invitation-email";
+import { clearAccountDeletedInvitationGhosts } from "@/server/membership/invitation-hygiene";
 import { markEmailVerifiedForUserId } from "@/server/membership/team-invitation-email-trust";
 import { resolveUserWorkspaceCreationEligibility } from "@/server/membership/user-workspace-creation-eligibility";
 import {
@@ -117,6 +118,11 @@ export const towerOrganization = organization({
     },
     afterCreateInvitation: async ({ invitation, organization: org }) => {
       await assertSeatCapNotExceededAfterCreate(org.id, { kind: "invitation", id: invitation.id });
+      await clearAccountDeletedInvitationGhosts({
+        organizationId: org.id,
+        email: invitation.email,
+        exceptInvitationId: invitation.id,
+      });
       await syncOrganizationSeatQuantityWithStripe(org.id);
     },
     beforeAcceptInvitation: async ({ invitation, user, organization: org }) => {

@@ -2,6 +2,7 @@ import { APIError } from "better-auth/api";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
+import { cancelPendingInvitationsForEmail } from "@/server/membership/invitation-hygiene";
 import { db } from "@/shared/lib/db";
 import { invitation, member, organization, user } from "@/shared/lib/db/auth-schema";
 import { TOWER_INVITATION_STATUS } from "@/shared/lib/membership/tower-invitation-status";
@@ -162,5 +163,11 @@ export async function prepareUserAccountDeletion(userId: string): Promise<UserAc
     .map((org) => org.organizationId);
 
   await releaseSharedTeamMembershipsForAccountDeletion(userId, ownedOrganizationIds);
+
+  const [userRow] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1);
+  if (userRow) {
+    await cancelPendingInvitationsForEmail(userRow.email);
+  }
+
   return plan;
 }

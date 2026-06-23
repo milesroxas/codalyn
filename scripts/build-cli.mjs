@@ -118,7 +118,14 @@ async function resolveBuildChannel(channelArg, appName) {
   if (isNonInteractive) return "production";
   // Only beacon bakes a Tower origin into its bundle (see beacon vite.config resolveTowerOrigin);
   // for other apps the channel only selects the output dir, so omit the Tower host from the hint.
-  const towerHost = appName === "beacon" ? { production: " — tower.codalyn.app", preview: " — tower-preview.codalyn.app", development: " — local Tower default" } : { production: "", preview: "", development: "" };
+  const towerHost =
+    appName === "beacon"
+      ? {
+          production: " — tower.codalyn.app",
+          preview: " — tower-preview.codalyn.app",
+          development: " — local Tower default",
+        }
+      : { production: "", preview: "", development: "" };
   const picked = await p.select({
     message: "Build channel",
     options: [

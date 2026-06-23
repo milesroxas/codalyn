@@ -5,6 +5,7 @@
   "globalEnv": ["NODE_ENV", "CI"],
   "globalPassThroughEnv": [
     "BLOB_READ_WRITE_TOKEN",
+    "BUILD_RECIPIENT",
     "DATABASE_URL_UNPOOLED",
     "NEON_PROJECT_ID",
     "PGDATABASE",

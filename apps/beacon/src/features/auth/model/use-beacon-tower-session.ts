@@ -57,7 +57,7 @@ function handleTowerMessage(event: MessageEvent, towerOrigin: string, onSessionC
     return;
   }
   const data = event.data as Record<string, unknown> | null;
-  if (!data || data.status !== "success") {
+  if (data?.status !== "success") {
     return;
   }
   if (data.type !== "codalyn:tower-auth") {

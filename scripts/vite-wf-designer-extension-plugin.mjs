@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 /**
  * Shared Vite plugin for Webflow Designer Extensions (Beacon, Flint).

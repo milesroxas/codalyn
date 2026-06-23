@@ -317,6 +317,11 @@ function applySessionConstraintsFromPickerSelection(
   setters.setAspectPreset("free");
 }
 
+// Debug-only readout: tree-shaken out of production builds via import.meta.env.DEV.
+function shouldShowResolvedReadout(composeActive: boolean): boolean {
+  return import.meta.env.DEV && !composeActive;
+}
+
 export function ImageEditor({ composeSession }: { composeSession?: ImageEditorComposeSession } = {}) {
   const compose = useImageEditorComposeMode(composeSession);
   const navigate = useNavigate();
@@ -1611,7 +1616,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
         flowPhase: flowStep === "position" ? "position" : "save",
         hidePlacementCard,
         frameSummary,
-        showResolvedReadout: !compose.active,
+        showResolvedReadout: shouldShowResolvedReadout(compose.active),
         positionPageTarget,
         resolvedUploadTarget,
         resolvedConstraintsReadout,

@@ -1,4 +1,5 @@
 import {
+  CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR,
   CMS_SLOT_LIST_TARGET_DESIGNER_CHROME,
   CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL,
 } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
@@ -35,6 +36,7 @@ async function applyBeaconListTargetChromeStyleProperties(style: Style): Promise
   try {
     await style.setProperties(
       {
+        // Static prefix is the safe baseline; the per-slot name is appended below via attr().
         content: `"${CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL}"`,
         position: "absolute",
         top: "50%",
@@ -54,6 +56,17 @@ async function applyBeaconListTargetChromeStyleProperties(style: Style): Promise
       },
       { pseudo: "before" }
     );
+    try {
+      // Append each slot's own name from a per-element attribute, so the shared chrome class still shows per-slot text.
+      // Done as a separate set so a Designer that rejects attr() keeps the static prefix instead of dropping the chip.
+      await style.setProperty(
+        "content",
+        `"${CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL}" attr(${CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR})`,
+        { pseudo: "before" }
+      );
+    } catch {
+      /* attr() in content may be unsupported in some Designer contexts; keep the static label */
+    }
     await style.setProperty("position", "relative");
   } catch {
     /* ::before pseudo may be unavailable in some Designer contexts */

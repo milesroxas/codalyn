@@ -1,9 +1,50 @@
+import {
+  displayLabelForDataList,
+  readCmsSlotListDisplayName,
+} from "@/features/cms-slots/model/cms-slot-data-list-display";
 import { verifyCmsSlotListTargetDomRoot } from "@/features/cms-slots/model/cms-slot-list-target-instance-surface";
 import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import { CMS_SLOTS_LIST_TARGET_DESIGNER_LABEL } from "@/shared/lib/cms-slots-feature-copy";
 
 /** Visible in the Designer only; stripped on the published page by the beacon runtime. */
 export const CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL = CMS_SLOTS_LIST_TARGET_DESIGNER_LABEL;
+
+/**
+ * Per-element attribute carrying the user-facing slot name. The shared `beacon_list_render` chrome class appends it to
+ * the canvas chip via `attr()`, so a single shared style still shows each slot's own name. Designer-only; stripped on
+ * the published page in {@link cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource}'s sibling reveal step.
+ */
+export const CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR = "data-beacon-list-label";
+
+/** Drops characters the Webflow attribute setter rejects (double quotes) and trims. */
+function sanitizeCanvasLabelName(name: string): string {
+  return name.replace(/"/g, "").trim();
+}
+
+/**
+ * Canvas chip suffix for a slot, e.g. ` · Hero CTA`. Prefers the user-specified display name on the hidden list
+ * container and falls back to the slug-derived label. Returns `""` when nothing usable so the chip stays prefix-only.
+ * The leading separator lives in the value (not the CSS) so legacy targets without the attribute render cleanly.
+ */
+export function cmsSlotListTargetCanvasLabelSuffix(displayName: string | null, dataList: string): string {
+  const source = displayName != null && displayName.trim() !== "" ? displayName : displayLabelForDataList(dataList);
+  const name = sanitizeCanvasLabelName(source);
+  return name === "" ? "" : ` · ${name}`;
+}
+
+/** Writes (or clears) the canvas-label attribute on a list-target DOM root from the slot's display name. */
+export async function applyCmsSlotListTargetCanvasLabelToDom(
+  dom: DOMElement,
+  dataList: string,
+  listContainer: BlockElement
+): Promise<void> {
+  const suffix = cmsSlotListTargetCanvasLabelSuffix(await readCmsSlotListDisplayName(listContainer), dataList);
+  if (suffix === "") {
+    await dom.removeAttribute(CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR);
+    return;
+  }
+  await dom.setAttribute(CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR, suffix);
+}
 
 /**
  * Designer-only list-target chrome tuned for legibility on light and dark section backgrounds. Shared by inline

@@ -54,6 +54,7 @@ export type CmsSlotComposerPropFieldKind =
   | "tel"
   | "number"
   | "boolean"
+  | "visibility"
   | "image"
   | "color"
   | "date";
@@ -96,7 +97,7 @@ const COMPOSER_FIELD_BY_VALUE_TYPE: Readonly<Partial<Record<string, CmsSlotCompo
   variant: "line",
   altText: "line",
   id: "line",
-  visibility: "boolean",
+  visibility: "visibility",
 };
 
 /**

@@ -170,13 +170,23 @@ function AlertDialogScrollSection({
   );
 }
 
-function AlertDialogFormField(props: { label: React.ReactNode; labelHtmlFor: string; children: React.ReactNode }) {
-  const { label, labelHtmlFor, children } = props;
+function AlertDialogFormField(props: {
+  label: React.ReactNode;
+  labelHtmlFor: string;
+  meta?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const { label, labelHtmlFor, meta, children } = props;
 
   return (
     <div className="space-y-0.5" data-slot="alert-dialog-form-field">
       <Label className="text-xs text-muted-foreground" htmlFor={labelHtmlFor}>
-        {label}
+        <span className="min-w-0 truncate">{label}</span>
+        {meta != null ? (
+          <span className="ml-auto text-[10px] text-muted-foreground/70" data-slot="alert-dialog-form-field-meta">
+            {meta}
+          </span>
+        ) : null}
       </Label>
       {children}
     </div>

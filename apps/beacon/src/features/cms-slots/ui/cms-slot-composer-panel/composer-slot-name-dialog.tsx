@@ -163,7 +163,7 @@ export function ComposerSlotNameDialog(props: ComposerSlotNameDialogProps) {
                 const v = row.propValues?.[ep.propId] ?? "";
                 const propFieldId = `cms-slot-composer-${row.key}-${ep.propId}`;
                 return (
-                  <AlertDialogFormField key={ep.propId} label={ep.label} labelHtmlFor={propFieldId}>
+                  <AlertDialogFormField key={ep.propId} label={ep.label} meta={ep.group} labelHtmlFor={propFieldId}>
                     <ComposerPropValueField
                       inputId={propFieldId}
                       ep={ep}

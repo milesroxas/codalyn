@@ -9,7 +9,10 @@ import {
   beaconPropPickRuntimeSource,
   beaconPropVisibilityRuntimeSource,
 } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
-import { cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
+import {
+  CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR,
+  cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource,
+} from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
 import {
   CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME,
   cmsSlotListTargetRuntimeLayoutRevealSource,
@@ -64,7 +67,7 @@ function bBeaconResolveHeadingTagEl(el,v){var want=bBeaconNormHeadingTag(v);if(!
 ${beaconPropPickRuntimeSource()}
 ${beaconPropEmptyRuntimeSource()}
 ${beaconPropVisibilityRuntimeSource()}
-function bListTargetReveal(target){target.classList.remove("${CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");${cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource()}${cmsSlotListTargetRuntimeLayoutRevealSource()}target.style.removeProperty("visibility");target.removeAttribute("aria-label")}
+function bListTargetReveal(target){target.classList.remove("${CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");${cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource()}${cmsSlotListTargetRuntimeLayoutRevealSource()}target.style.removeProperty("visibility");target.removeAttribute("aria-label");target.removeAttribute("${CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR}")}
 function applyProps(target,payload){var vn=payload?+payload.v:NaN;if(!payload||!isFinite(vn)||vn<3)return;var pc=payload.p;if(!Array.isArray(pc))return;var rows=target.children,i,j,k,row,props,nodes,cands,node,rawP,isCond,segs,si,seg,pv,anyV,totA=0,totH=0,nLen=rows.length<pc.length?rows.length:pc.length;for(i=0;i<nLen;i++){row=rows[i];props=pc[i];if(!row||props===null||typeof props!=="object"){continue}nodes=row.querySelectorAll("[data-cb-c]");cands=[];if(row.getAttribute&&(row.getAttribute("data-cb-c")||"")!=="")cands.push(row);for(k=0;k<nodes.length;k++)cands.push(nodes[k]);for(j=0;j<cands.length;j++){node=cands[j];rawP=node.getAttribute("data-cb-c")||"";if(!rawP)continue;isCond=node.getAttribute("data-cb-v")==="1";segs=String(rawP).split("|");anyV=false;for(si=0;si<segs.length;si++){seg=segs[si].trim();if(!seg)continue;pv=pickP(props,seg);if(bPropEmpty(pv))continue;anyV=true;if(bBeaconNormHeadingTag(String(pv))){node=bBeaconResolveHeadingTagEl(node,String(pv));continue}if(bLooksLikeImageUrl(String(pv)))bLog("apply image",seg,String(pv).slice(0,80));applyValue(node,String(pv))}if(anyV){bPropReveal(node,row);totA++;continue}if(isCond){bPropClearPublishPlaceholder(node);bPropConceal(node,row);bLog("conceal empty conditional",rawP);totH++}}}bLog("applyProps",{rows:nLen,applied:totA,concealed:totH});bDbgBump("applied",totA);bDbgBump("concealed",totH)}
 function reapply(target,payload,done){applyProps(target,payload);setTimeout(function(){applyProps(target,payload);setTimeout(function(){applyProps(target,payload);if(typeof done==="function")done(target)},100)},0)}
 function run(){

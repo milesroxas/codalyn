@@ -1,6 +1,10 @@
+import { readCmsSlotListDisplayName } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import {
+  applyCmsSlotListTargetCanvasLabelToDom,
   applyCmsSlotListTargetDesignerPlaceholderToDom,
+  CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR,
   CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL,
+  cmsSlotListTargetCanvasLabelSuffix,
   cmsSlotListTargetDesignerPlaceholderInlineStyle,
 } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
 import {
@@ -246,6 +250,7 @@ export async function applyCmsSlotListTargetSync(
     const slotStyle = await ensureCmsSlotListTargetSlotStyle();
     await dom.setStyles([slotStyle]);
     await applyCmsSlotListTargetDesignerPlaceholderToDom(dom);
+    await applyCmsSlotListTargetCanvasLabelToDom(dom, dataList, listContainer);
   });
 }
 
@@ -290,6 +295,13 @@ export async function createCmsSlotListTargetComponent(input: {
     root.setStyles([slotStyle]);
     root.setAttribute("style", cmsSlotListTargetDesignerPlaceholderInlineStyle());
     root.setAttribute("aria-label", CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_LABEL);
+    const canvasLabelSuffix = cmsSlotListTargetCanvasLabelSuffix(
+      await readCmsSlotListDisplayName(listContainer),
+      dataList
+    );
+    if (canvasLabelSuffix !== "") {
+      root.setAttribute(CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR, canvasLabelSuffix);
+    }
     root.setTextContent("");
 
     const registered = await webflow.registerComponent(

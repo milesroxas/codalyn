@@ -64,3 +64,7 @@ When reading Webflow Designer API values (or any SDK returning rich value object
 - When a visual change is needed, update or extend variants/component APIs at the owning primitive (for example under `shared/ui`) and consume that API.
 - Only allow call-site overrides when absolutely necessary for non-visual layout placement constraints; keep them minimal.
 - Treat call-site visual styling as a DRY and single-source-of-truth violation.
+
+## Reference Docs
+
+- [Agent Teams guide](docs/agent-teams.md) — how to spin up effective Claude Code agent teams (enable flag, teams vs subagents, spawn templates, monorepo patterns).

@@ -28,6 +28,22 @@ import { formatWebflowDesignerError } from "@/shared/lib/webflow-designer-error"
 export type ResyncNotice = { type: "Warning" | "Success" | "Info"; message: string };
 
 /**
+ * Pool keys allowed to survive when scoping the live DOM rows for a re-tag. Unions the persisted configured keys with
+ * the **live selection's** keys.
+ *
+ * A just-staged seed (Add component) lives in `selected` but is **not** yet written to the configured attribute — its
+ * re-tag here is the commit point. Scoping by the stale attribute alone drops the staged seed, pushing `slotIndex` past
+ * the end of the scoped rows: a false "slot no longer matches" error, and the seed is never committed (it lingers in the
+ * Designer component list but is absent from the composer). The union is what {@link commitPendingSeedRow} persists.
+ */
+export function resolveResyncAllowedPoolKeys(
+  configuredKeys: readonly string[],
+  selected: readonly { poolKey: string }[]
+): string[] {
+  return [...configuredKeys, ...selected.map((row) => row.poolKey)];
+}
+
+/**
  * Decides the user-facing notice for an Apply run. Pure so the branch logic is unit-tested without the Designer.
  *
  * The key affordance: a run that changes nothing is **not** a failure when fields are already wired
@@ -119,7 +135,8 @@ export async function resyncDesignerSlotPropAttributesForSlotIndex(input: {
   try {
     const freshRows = await listInstancesInSlotListContainer(container);
     const configuredKeys = await resolveCmsSlotDesignerConfiguredPoolKeys(container, freshRows);
-    const scoped = filterHydratedCmsSlotRowsByPoolKeys(freshRows, configuredKeys);
+    const allowedKeys = resolveResyncAllowedPoolKeys(configuredKeys, selected);
+    const scoped = filterHydratedCmsSlotRowsByPoolKeys(freshRows, allowedKeys);
 
     const row = scoped[slotIndex];
     if (row == null) {

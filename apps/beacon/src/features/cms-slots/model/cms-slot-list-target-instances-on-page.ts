@@ -152,6 +152,44 @@ export async function removeAllInstancesOfComponentOnPage(definition: Component)
 }
 
 /**
+ * Counts list-target instances on the page by **name + group identity only** — no `enterComponent` /
+ * `exitComponent` surface check.
+ *
+ * The surface check ({@link listCmsSlotListTargetInstancesOnPage}) leaves the entered instance **selected**: Webflow
+ * selects the component instance on `exitComponent`. Driving the on-open "is it placed?" gate through it therefore
+ * contaminates the Designer selection — the "Select on canvas" button then falsely reads as already selected even
+ * though the user selected nothing. A presence/count gate only needs identity; precise collision filtering (the
+ * surface check) is for mutation targeting, where a selection change is acceptable.
+ */
+export async function countCmsSlotListTargetInstancesOnPageByName(
+  dataList: string,
+  listContainer: BlockElement,
+  options?: ListCmsSlotListTargetInstancesOnPageOptions
+): Promise<number> {
+  const listTarget = await getCmsSlotListTargetComponentOrNull(dataList, listContainer, options?.preferredDefinitionId);
+  if (listTarget == null) {
+    return 0;
+  }
+  const expectedName = await listTarget.getName();
+  const expectedGroup = (await listTarget.getSettings()).group;
+  if (expectedGroup !== CMS_SLOT_UTILITIES_COMPONENT_GROUP) {
+    return 0;
+  }
+
+  const all = await webflow.getAllElements();
+  let count = 0;
+  for (const el of all) {
+    if (el.type !== "ComponentInstance") {
+      continue;
+    }
+    if (await instanceMatchesRegisteredCmsSlotListTargetIdentity(el as ComponentElement, expectedName, expectedGroup)) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
  * True when a component instance on the current page matches the list-target by name/group.
  * Skips the mirror-surface check (no `enterComponent` / `exitComponent`) — for Composer list eligibility
  * and other read-only gating. Designer flows that need a precise match use

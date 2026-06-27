@@ -50,6 +50,7 @@ import {
 } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import { clearAllCmsSlotListTargetDesignerPreviewsOnPage } from "@/features/cms-slots/model/cms-slot-list-target-designer-preview";
 import {
+  countCmsSlotListTargetInstancesOnPageByName,
   isCmsSlotListTargetInstanceSelected,
   listCmsSlotListTargetInstancesOnPage,
   removeAllCmsSlotListTargetInstancesOnPage,
@@ -622,11 +623,14 @@ function useListTargetOnCanvasCountWhenSynced(
     setListTargetOnCanvasCountResolved(false);
     void (async () => {
       try {
-        const list = await listCmsSlotListTargetInstancesOnPage(activeDataList, listContainer, {
+        // Identity-only count (no enterComponent/exitComponent surface check): the surface check leaves the entered
+        // instance selected, which would falsely flip the "Select on canvas" button to "Selected" on open. A
+        // presence gate only needs identity. See countCmsSlotListTargetInstancesOnPageByName.
+        const count = await countCmsSlotListTargetInstancesOnPageByName(activeDataList, listContainer, {
           preferredDefinitionId: listTargetDefinitionIdRef.current,
         });
         if (!cancelled) {
-          setListTargetOnCanvasCount(list.length);
+          setListTargetOnCanvasCount(count);
           setListTargetOnCanvasCountResolved(true);
         }
       } catch {

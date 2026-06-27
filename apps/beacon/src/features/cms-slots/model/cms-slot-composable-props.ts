@@ -4,6 +4,7 @@
  */
 
 import { type ExportConstraints, readExportConstraints } from "@codalyn/webflow-kit";
+import { isBeaconPublishPlaceholderValue } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import { beaconLinkRuntimeValue, isCmsSlotLinkValueType } from "@/features/cms-slots/model/cms-slot-link-value";
 
 export type ComposableInstancePropSelectOption = { value: string; label: string };
@@ -22,11 +23,68 @@ export type ComposableInstancePropMeta = {
    * through `readExportConstraints`.
    */
   imageExport?: ExportConstraints;
+  /**
+   * The seed instance's authored **static** value (Designer override or component default), as a string. Used as the
+   * per-row default when the Composer field is left empty, so a value set on the component in the Designer (e.g. an
+   * icon `class` of `ph-feather`) is what the runtime applies. Absent for bindings, complex/empty values, publish
+   * placeholders, and value types where empty has its own meaning (see {@link staticDefaultFromInstanceProp}).
+   */
+  defaultValue?: string;
 };
 
 function labelFromInstanceProp(p: Pick<InstanceProp, "propId" | "display">): string {
   const l = p.display?.label;
   return typeof l === "string" && l.length > 0 ? l : p.propId;
+}
+
+/**
+ * Value types where an empty Composer field carries its own meaning (toggle off / hide), so we must NOT silently fall
+ * back to a seed default — doing so would, e.g., reveal a conditionally-hidden element. `variant` is never per-row.
+ */
+const SEED_DEFAULT_SKIP_VALUE_TYPES = new Set(["visibility", "boolean", "variant"]);
+
+/** A primitive Webflow `ResolvedValue` (string/number/boolean) as a string; `undefined` for objects/null. */
+function primitiveResolvedToString(raw: unknown): string | undefined {
+  if (typeof raw === "string") {
+    return raw;
+  }
+  if (typeof raw === "number") {
+    return Number.isFinite(raw) ? String(raw) : undefined;
+  }
+  if (typeof raw === "boolean") {
+    return raw ? "true" : "false";
+  }
+  return undefined;
+}
+
+/**
+ * The seed instance's authored **static** value for a prop, as a Composer-default string: the instance override
+ * (`value` when `sourceType === "static"`) or, failing that, the component default (`defaultValue`).
+ *
+ * Boundary normalizer (CLAUDE.md): the incoming `value` is a runtime union (`StaticPropValue | BindingValue`). Returns
+ * `undefined` — never a partial/invented value — for bindings, complex shapes (link/video/richText objects), empty
+ * strings, publish-placeholder seeds (so the Composer never inherits a placeholder), and `SEED_DEFAULT_SKIP_VALUE_TYPES`.
+ */
+export function staticDefaultFromInstanceProp(p: {
+  valueType: string;
+  value?: unknown;
+  defaultValue?: unknown;
+}): string | undefined {
+  if (SEED_DEFAULT_SKIP_VALUE_TYPES.has(String(p.valueType))) {
+    return undefined;
+  }
+  let raw: string | undefined;
+  const v = p.value;
+  if (v != null && typeof v === "object" && (v as { sourceType?: unknown }).sourceType === "static") {
+    raw = primitiveResolvedToString((v as { value?: unknown }).value);
+  }
+  if (raw == null) {
+    raw = primitiveResolvedToString(p.defaultValue);
+  }
+  if (raw == null || raw.trim() === "" || isBeaconPublishPlaceholderValue(raw)) {
+    return undefined;
+  }
+  return raw;
 }
 
 export function groupFromInstanceProp(p: Pick<InstanceProp, "display">): string | undefined {
@@ -320,6 +378,12 @@ export function buildCmsSlotRuntimePropRow(
   const o: Record<string, string> = {};
   for (const ep of metas) {
     let v = String(pickRemappedPropValue(ep.propId, d.propValues ?? undefined, aliasToCanonical) ?? "");
+    if (v.trim() === "" && ep.defaultValue != null && ep.defaultValue !== "") {
+      // Composer field left empty → inherit the seed instance's authored static value (e.g. a Designer-set icon
+      // class). Conditional-visibility seeds are publish placeholders, which `defaultValue` already excludes, so this
+      // never reveals a conditionally-hidden node.
+      v = ep.defaultValue;
+    }
     if (ep.valueType === "headingTag") {
       v = normalizeHeadingTagForPayload(v, ep.selectOptions);
     } else if (isCmsSlotLinkValueType(ep.valueType)) {
@@ -374,6 +438,7 @@ async function listComposablePropsForInstance(instance: ComponentElement): Promi
       valueType: String(p.valueType),
       group: groupFromInstanceProp(p),
       selectOptions: selectOptionsFromInstanceProp(p),
+      defaultValue: staticDefaultFromInstanceProp(p),
     });
   }
   const out = [...byId.values()];

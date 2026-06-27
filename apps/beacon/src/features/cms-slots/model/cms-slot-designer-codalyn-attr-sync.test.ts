@@ -1,14 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CMS_SLOT_CONTENT_ATTR } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
+import { CMS_SLOT_CLASS_ATTR, CMS_SLOT_CONTENT_ATTR } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import { syncDesignerCodalynSlotPropAttributes } from "@/features/cms-slots/model/cms-slot-designer-codalyn-attr-sync";
 
 type BoundDom = AnyElement & { store: Map<string, string> };
 
-/** A DOM node carrying CMS slot attrs and (optionally) a content binding to one instance prop. */
-function boundDom(attrs: Record<string, string>, boundPropId: string | null, children: AnyElement[] = []): BoundDom {
+type DomBindingOptions = {
+  /** Content binding (`getSettings().text`) to this prop id. */
+  boundPropId?: string | null;
+  /** `class` attribute (`getSettings().attributes`) bound to this prop id (Webflow Attributes panel). */
+  classBoundPropId?: string | null;
+};
+
+/** A DOM node carrying CMS slot attrs and (optionally) a content and/or `class`-attribute binding to instance props. */
+function boundDomWith(attrs: Record<string, string>, opts: DomBindingOptions, children: AnyElement[] = []): BoundDom {
   const store = new Map(Object.entries(attrs));
-  const settings = boundPropId == null ? {} : { text: { sourceType: "prop", propId: boundPropId } };
+  const settings: Record<string, unknown> = {};
+  if (opts.boundPropId != null) {
+    settings.text = { sourceType: "prop", propId: opts.boundPropId };
+  }
+  if (opts.classBoundPropId != null) {
+    settings.attributes = [{ name: "class", value: { sourceType: "prop", propId: opts.classBoundPropId } }];
+  }
   return {
     type: "DOM",
     children: true,
@@ -26,6 +39,11 @@ function boundDom(attrs: Record<string, string>, boundPropId: string | null, chi
     getChildren: vi.fn(async () => children),
     store,
   } as unknown as BoundDom;
+}
+
+/** A DOM node carrying CMS slot attrs and (optionally) a content binding to one instance prop. */
+function boundDom(attrs: Record<string, string>, boundPropId: string | null, children: AnyElement[] = []): BoundDom {
+  return boundDomWith(attrs, { boundPropId }, children);
 }
 
 function exposedProp(propId: string): ComposableInstancePropMeta {
@@ -156,5 +174,56 @@ describe("syncDesignerCodalynSlotPropAttributes (re-tag after deselect)", () => 
 
     expect(result.errors).toEqual([]);
     expect((innerImg as BoundDom).store.get(CMS_SLOT_CONTENT_ATTR)).toBe("card-image");
+  });
+
+  it("tags data-cb-cls (not data-cb-c) when a `class` attribute is bound to an exposed prop", async () => {
+    // Webflow Attributes panel: an element's `class` attribute is bound to the exposed `row-class` prop. The binding
+    // surfaces only inside getSettings().attributes, so it must be tagged for runtime class-append, never as content.
+    const el = boundDomWith({}, { classBoundPropId: "row-class" });
+    const root = boundDom({}, null, [el]);
+
+    const result = await syncDesignerCodalynSlotPropAttributes(instanceForRoot(root), [exposedProp("row-class")]);
+
+    expect(result.errors).toEqual([]);
+    expect((el as BoundDom).store.get(CMS_SLOT_CLASS_ATTR)).toBe("row-class");
+    expect((el as BoundDom).store.has(CMS_SLOT_CONTENT_ATTR)).toBe(false);
+    expect(result.tagged).toBe(1);
+  });
+
+  it("tags both content and class streams independently on one element", async () => {
+    const el = boundDomWith({}, { boundPropId: "title", classBoundPropId: "row-class" });
+    const root = boundDom({}, null, [el]);
+
+    const result = await syncDesignerCodalynSlotPropAttributes(instanceForRoot(root), [
+      exposedProp("title"),
+      exposedProp("row-class"),
+    ]);
+
+    expect(result.errors).toEqual([]);
+    expect((el as BoundDom).store.get(CMS_SLOT_CONTENT_ATTR)).toBe("title");
+    expect((el as BoundDom).store.get(CMS_SLOT_CLASS_ATTR)).toBe("row-class");
+  });
+
+  it("preserves a foreign component's class segment on a shared element when this slot's class prop is deselected", async () => {
+    // Shared element class-bound by this slot (`card-cls`) and another CMS slot (`hero-cls`). Deselecting `card-cls`
+    // here must keep the foreign `hero-cls` class segment — the same last-write-safe merge as data-cb-c.
+    const sharedEl = boundDomWith({ [CMS_SLOT_CLASS_ATTR]: "card-cls|hero-cls" }, {});
+    const root = boundDom({}, null, [sharedEl]);
+
+    const result = await syncDesignerCodalynSlotPropAttributes(instanceForRoot(root), [], new Set(["hero-cls"]));
+
+    expect(result.errors).toEqual([]);
+    expect((sharedEl as BoundDom).store.get(CMS_SLOT_CLASS_ATTR)).toBe("hero-cls");
+  });
+
+  it("strips a stale class tag whose prop was deselected with no foreign owner", async () => {
+    const staleEl = boundDomWith({ [CMS_SLOT_CLASS_ATTR]: "row-class" }, {});
+    const root = boundDom({}, null, [staleEl]);
+
+    const result = await syncDesignerCodalynSlotPropAttributes(instanceForRoot(root), []);
+
+    expect(result.errors).toEqual([]);
+    expect((staleEl as BoundDom).store.has(CMS_SLOT_CLASS_ATTR)).toBe(false);
+    expect(result.removed).toBe(1);
   });
 });

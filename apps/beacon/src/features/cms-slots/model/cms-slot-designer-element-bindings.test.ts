@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   CMS_SLOT_WEBFLOW_IMAGE_ELEMENT_TYPE,
+  classAttributeBoundPropIds,
   classifyElementBindings,
   imageSearchSettingsRecord,
   isConditionalVisibilityValue,
@@ -82,6 +83,68 @@ describe("classifyElementBindings", () => {
   it("returns null for nodes without binding APIs", async () => {
     const el = { type: "Block" } as unknown as AnyElement;
     await expect(classifyElementBindings(el)).resolves.toBeNull();
+  });
+});
+
+describe("classAttributeBoundPropIds", () => {
+  it("reads the prop id from a `class` attribute bound to a component prop (canonical shape)", () => {
+    const content = {
+      attributes: [{ name: "class", value: { sourceType: "prop", propId: "row-class" } }],
+    };
+    expect(classAttributeBoundPropIds(content)).toEqual(["row-class"]);
+  });
+
+  it("accepts the wrapped `{ value: { sourceType, propId } }` binding shape", () => {
+    const content = {
+      attributes: [{ name: "class", value: { value: { sourceType: "prop", propId: "row-class" } } }],
+    };
+    expect(classAttributeBoundPropIds(content)).toEqual(["row-class"]);
+  });
+
+  it("matches the attribute name case-insensitively and ignores non-class attributes", () => {
+    const content = {
+      attributes: [
+        { name: "Class", value: { sourceType: "prop", propId: "themed" } },
+        { name: "data-foo", value: { sourceType: "prop", propId: "other" } },
+        { name: "id", value: { sourceType: "prop", propId: "ignored-id" } },
+      ],
+    };
+    expect(classAttributeBoundPropIds(content)).toEqual(["themed"]);
+  });
+
+  it("ignores a static (string-valued) class attribute — only prop bindings are runtime work", () => {
+    const content = { attributes: [{ name: "class", value: "is-static base" }] };
+    expect(classAttributeBoundPropIds(content)).toEqual([]);
+  });
+
+  it("ignores a class attribute whose name itself is bound (only the literal string `class` qualifies)", () => {
+    const content = {
+      attributes: [{ name: { sourceType: "prop", propId: "attr-name" }, value: { sourceType: "prop", propId: "v" } }],
+    };
+    expect(classAttributeBoundPropIds(content)).toEqual([]);
+  });
+
+  it("ignores malformed entries and a missing/empty attributes list", () => {
+    expect(classAttributeBoundPropIds({})).toEqual([]);
+    expect(classAttributeBoundPropIds({ attributes: [] })).toEqual([]);
+    expect(classAttributeBoundPropIds({ attributes: [null, "x", 7] as unknown[] })).toEqual([]);
+    // class attr present but value carries no resolvable prop id (CMS/locale source, empty id).
+    expect(
+      classAttributeBoundPropIds({ attributes: [{ name: "class", value: { sourceType: "cms", fieldId: "f" } }] })
+    ).toEqual([]);
+    expect(
+      classAttributeBoundPropIds({ attributes: [{ name: "class", value: { sourceType: "prop", propId: "" } }] })
+    ).toEqual([]);
+  });
+
+  it("collects every class-bound prop when multiple class attributes resolve", () => {
+    const content = {
+      attributes: [
+        { name: "class", value: { sourceType: "prop", propId: "a" } },
+        { name: "class", value: { sourceType: "prop", propId: "b" } },
+      ],
+    };
+    expect(classAttributeBoundPropIds(content)).toEqual(["a", "b"]);
   });
 });
 

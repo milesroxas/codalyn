@@ -1,3 +1,5 @@
+import { bindingPropIdFromSettingValue } from "@/shared/lib/nested-component-prop-alias";
+
 /** Webflow Designer `Image` nodes expose bindings via `searchSettings`, not `getSettings`. */
 export const CMS_SLOT_WEBFLOW_IMAGE_ELEMENT_TYPE = "Image" as const;
 
@@ -102,6 +104,51 @@ export async function classifyElementBindings(el: AnyElement): Promise<ElementBi
     return null;
   }
   return splitVisibilityFromSettings(settings);
+}
+
+/** Webflow attribute name we treat as a runtime class-append binding (the literal `class` HTML attribute). */
+const CMS_SLOT_BINDABLE_CLASS_ATTRIBUTE_NAME = "class";
+
+/** Reads the element's full attribute list (`ElementAttribute[]`) out of its split content settings, if present. */
+function elementAttributeEntries(content: Record<string, unknown>): unknown[] {
+  for (const [key, value] of Object.entries(content)) {
+    if (key.toLowerCase() === "attributes" && Array.isArray(value)) {
+      return value;
+    }
+  }
+  return [];
+}
+
+/**
+ * Prop ids bound to an element's `class` attribute via the Webflow Attributes panel (attribute name `class`, value
+ * bound to a component prop). These bindings surface **only** inside `getSettings().attributes` as an
+ * `ElementAttribute[]` — never as a top-level setting key — so the content-binding scan misses them. The Designer
+ * tags such elements with `data-cb-cls` and the footer runtime appends the resolved per-row value to the class list.
+ *
+ * Per the runtime value-shape rule: the attribute name is matched only as the literal string `class`
+ * (case-insensitive); bound attribute names and static string values are ignored. The value is read through
+ * {@link bindingPropIdFromSettingValue}, which accepts both the flat `{ sourceType, propId }` and `{ value: {…} }`
+ * wrapped shapes.
+ */
+export function classAttributeBoundPropIds(content: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  for (const entry of elementAttributeEntries(content)) {
+    if (entry == null || typeof entry !== "object") {
+      continue;
+    }
+    const attribute = entry as { name?: unknown; value?: unknown };
+    if (
+      typeof attribute.name !== "string" ||
+      attribute.name.trim().toLowerCase() !== CMS_SLOT_BINDABLE_CLASS_ATTRIBUTE_NAME
+    ) {
+      continue;
+    }
+    const propId = bindingPropIdFromSettingValue(attribute.value);
+    if (propId != null) {
+      out.push(propId);
+    }
+  }
+  return out;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

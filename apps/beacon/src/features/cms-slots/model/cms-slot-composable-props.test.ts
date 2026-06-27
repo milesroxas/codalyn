@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CMS_SLOT_PUBLISH_PLACEHOLDER_URL } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import {
   buildCmsSlotRuntimePropRow,
   type ComposableInstancePropMeta,
@@ -6,6 +7,7 @@ import {
   mergeComposableMetaWithLiveResolved,
   normalizeHeadingTagForPayload,
   pickRemappedPropValue,
+  staticDefaultFromInstanceProp,
 } from "@/features/cms-slots/model/cms-slot-composable-props";
 
 const E = (propId: string, label: string, valueType: string): ComposableInstancePropMeta => ({
@@ -49,6 +51,80 @@ describe("mergeComposableMetaWithLiveResolved", () => {
     const { metas, aliasToCanonical } = mergeComposableMetaWithLiveResolved(exposed, live);
     expect(metas[0].propId).toBe("gone");
     expect(aliasToCanonical.get("gone")).toBe("gone");
+  });
+});
+
+describe("staticDefaultFromInstanceProp", () => {
+  it("reads a Designer-set static string value (e.g. an icon class)", () => {
+    expect(
+      staticDefaultFromInstanceProp({ valueType: "string", value: { sourceType: "static", value: "ph-feather" } })
+    ).toBe("ph-feather");
+  });
+
+  it("falls back to the component defaultValue when there is no instance override", () => {
+    expect(
+      staticDefaultFromInstanceProp({ valueType: "string", value: null as unknown, defaultValue: "ph-star" })
+    ).toBe("ph-star");
+  });
+
+  it("stringifies primitive number / boolean statics", () => {
+    expect(staticDefaultFromInstanceProp({ valueType: "number", value: { sourceType: "static", value: 3 } })).toBe("3");
+    // boolean valueType itself is skipped, but a non-boolean prop carrying a boolean static still stringifies.
+    expect(staticDefaultFromInstanceProp({ valueType: "string", value: { sourceType: "static", value: true } })).toBe(
+      "true"
+    );
+  });
+
+  it("returns undefined for bindings, empty, complex, and publish-placeholder values", () => {
+    expect(
+      staticDefaultFromInstanceProp({ valueType: "string", value: { sourceType: "prop", propId: "x" } as unknown })
+    ).toBeUndefined();
+    expect(
+      staticDefaultFromInstanceProp({ valueType: "string", value: { sourceType: "static", value: "   " } })
+    ).toBeUndefined();
+    expect(
+      staticDefaultFromInstanceProp({ valueType: "string", value: { sourceType: "static", value: { url: "/x" } } })
+    ).toBeUndefined();
+    expect(
+      staticDefaultFromInstanceProp({
+        valueType: "image",
+        value: { sourceType: "static", value: CMS_SLOT_PUBLISH_PLACEHOLDER_URL },
+      })
+    ).toBeUndefined();
+  });
+
+  it("skips value types where empty has its own meaning (visibility, boolean, variant)", () => {
+    for (const valueType of ["visibility", "boolean", "variant"]) {
+      expect(
+        staticDefaultFromInstanceProp({ valueType, value: { sourceType: "static", value: "true" } })
+      ).toBeUndefined();
+    }
+  });
+});
+
+describe("buildCmsSlotRuntimePropRow seed-default fallback", () => {
+  it("uses the meta defaultValue when the Composer value is empty/absent", () => {
+    const metas: ComposableInstancePropMeta[] = [
+      { propId: "icon", label: "Icon", valueType: "string", defaultValue: "ph-feather" },
+    ];
+    // absent in propValues → default applies
+    expect(buildCmsSlotRuntimePropRow({ propValues: {} }, metas, new Map())).toEqual({ icon: "ph-feather" });
+    // present-but-empty → default applies
+    expect(buildCmsSlotRuntimePropRow({ propValues: { icon: "" } }, metas, new Map())).toEqual({ icon: "ph-feather" });
+  });
+
+  it("lets an explicit Composer value win over the seed default", () => {
+    const metas: ComposableInstancePropMeta[] = [
+      { propId: "icon", label: "Icon", valueType: "string", defaultValue: "ph-feather" },
+    ];
+    expect(buildCmsSlotRuntimePropRow({ propValues: { icon: "ph-star" } }, metas, new Map())).toEqual({
+      icon: "ph-star",
+    });
+  });
+
+  it("emits empty when there is neither a Composer value nor a default", () => {
+    const metas = [E("icon", "Icon", "string")];
+    expect(buildCmsSlotRuntimePropRow({ propValues: {} }, metas, new Map())).toEqual({ icon: "" });
   });
 });
 

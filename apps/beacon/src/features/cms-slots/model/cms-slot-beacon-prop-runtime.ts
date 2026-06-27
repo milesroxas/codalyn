@@ -16,8 +16,22 @@ export const CMS_SLOT_CONTENT_ATTR = "data-cb-c";
  */
 export const CMS_SLOT_COND_ATTR = "data-cb-v";
 
+/**
+ * Class-append tag. Holds the same `|`-separated segment list as {@link CMS_SLOT_CONTENT_ATTR} (duplicate sites use
+ * `propId@N`), but the resolved value is **appended to the element's class list** at runtime instead of replacing its
+ * content. Set when a `class` attribute (Webflow Attributes panel) is bound to an exposed component prop — that
+ * binding surfaces only inside `getSettings().attributes`, so the content scan never tags it.
+ */
+export const CMS_SLOT_CLASS_ATTR = "data-cb-cls";
+
+/**
+ * Records the class tokens the runtime appended on a prior pass so re-runs (the runtime applies three times) replace
+ * those tokens instead of duplicating them. Removed when nothing is applied.
+ */
+export const CMS_SLOT_CLASS_APPLIED_ATTR = "data-cb-cls-applied";
+
 /** Tag attributes the Designer writes onto bound elements (and that cleanup removes). */
-const CMS_SLOT_WRITTEN_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR] as const;
+const CMS_SLOT_WRITTEN_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR, CMS_SLOT_CLASS_ATTR] as const;
 
 /** Canonical exposed prop id from a `data-cb-c` segment (strips the `@N` / `@…` suffix). */
 export function canonicalPropIdFromContentAttrSegment(segment: string): string {
@@ -140,10 +154,34 @@ export function removeOwnedContentAttrSegments(
   return parseContentAttrSegments(existing).filter((seg) => !contentAttrSegmentOwnedBy(seg, ownerExposedIds));
 }
 
+/** Drops `ownerExposedIds`-owned segments from one `|`-separated attr; clears the attr when none remain. */
+async function rewriteOwnedSegmentAttr(
+  attr: BeaconCmsSlotAttrOps,
+  name: string,
+  ownerExposedIds: ReadonlySet<string>
+): Promise<{ changed: number; remaining: number }> {
+  const existing = await attr.get(name);
+  const had = parseContentAttrSegments(existing);
+  if (had.length === 0) {
+    return { changed: 0, remaining: 0 };
+  }
+  const remaining = removeOwnedContentAttrSegments(existing, ownerExposedIds);
+  if (remaining.length === had.length) {
+    return { changed: 0, remaining: remaining.length };
+  }
+  if (remaining.length === 0) {
+    await attr.remove(name);
+    return { changed: 1, remaining: 0 };
+  }
+  await attr.set(name, remaining.join("|"));
+  return { changed: 1, remaining: remaining.length };
+}
+
 /**
- * Strips one Designer component's tags from a (possibly shared) element. Rewrites `data-cb-c` to the segments owned by
- * other components; when none remain also removes `data-cb-v`. `ownerExposedIds` empty
- * ⇒ removes all tags (single-owner / legacy). Returns the number of attributes changed.
+ * Strips one Designer component's tags from a (possibly shared) element. Rewrites `data-cb-c` **and** `data-cb-cls`
+ * to the segments owned by other components, each independently; when no content segment remains also removes
+ * `data-cb-v` (the conditional flag belongs to the content stream). `ownerExposedIds` empty ⇒ removes all tags
+ * (single-owner / legacy). Returns the number of attributes changed.
  */
 export async function removeOwnedCmsSlotTagAttrs(
   attr: BeaconCmsSlotAttrOps,
@@ -152,20 +190,17 @@ export async function removeOwnedCmsSlotTagAttrs(
   if (ownerExposedIds.size === 0) {
     return removeCmsSlotTagAttrsIfPresent(attr);
   }
-  const existing = await attr.get(CMS_SLOT_CONTENT_ATTR);
-  const had = parseContentAttrSegments(existing);
-  if (had.length === 0) {
-    return removeCmsSlotTagAttrsIfPresent(attr);
+  const content = await rewriteOwnedSegmentAttr(attr, CMS_SLOT_CONTENT_ATTR, ownerExposedIds);
+  const cls = await rewriteOwnedSegmentAttr(attr, CMS_SLOT_CLASS_ATTR, ownerExposedIds);
+  let changed = content.changed + cls.changed;
+  if (content.remaining === 0) {
+    const cond = await attr.get(CMS_SLOT_COND_ATTR);
+    if (cond != null && cond.length > 0) {
+      await attr.remove(CMS_SLOT_COND_ATTR);
+      changed += 1;
+    }
   }
-  const remaining = removeOwnedContentAttrSegments(existing, ownerExposedIds);
-  if (remaining.length === had.length) {
-    return 0;
-  }
-  if (remaining.length === 0) {
-    return removeCmsSlotTagAttrsIfPresent(attr);
-  }
-  await attr.set(CMS_SLOT_CONTENT_ATTR, remaining.join("|"));
-  return 1;
+  return changed;
 }
 
 /** Webflow conditional visibility class on published elements when “Keep in HTML when hidden” is enabled. */
@@ -234,6 +269,21 @@ export function beaconPropApplyValueRuntimeSource(): string {
     'function bApplyImageToContainer(el,v){var pic=el.tagName&&String(el.tagName).toUpperCase()==="PICTURE"?el:(el.querySelector&&el.querySelector("picture"));if(pic){var sources=pic.querySelectorAll("source"),i;for(i=0;i<sources.length;i++)bApplyImageSrc(sources[i],v);var pimg=pic.querySelector("img");if(pimg)bApplyImageSrc(pimg,v);return true}var img=el.querySelector&&el.querySelector("img");if(img){bApplyImageSrc(img,v);return true}var src=el.querySelector&&el.querySelector("source");if(src){bApplyImageSrc(src,v);return true}var tag=String(el.tagName||"").toUpperCase();if(tag==="DIV"||tag==="SPAN"||tag==="FIGURE"){el.style.setProperty("background-image","url(\\""+bEscapeCssUrl(v)+"\\")");el.style.setProperty("background-size","cover");return true}return false}',
     'function bApplyLink(el,v){var h=v,nt=false;if(v&&v.charAt(0)==="{"){try{var o=JSON.parse(v);if(o&&typeof o==="object"&&typeof o.h==="string"){h=o.h;nt=o.t===1||o.t===true}}catch(e){}}el.setAttribute("href",h);if(nt){el.setAttribute("target","_blank");el.setAttribute("rel","noopener noreferrer")}else{el.removeAttribute("target")}}',
     'function applyValue(el,v){v=String(v==null?"":v);var tag=String(el.tagName||"").toUpperCase();if(tag==="IMG"||tag==="SOURCE"){bApplyImageSrc(el,v);return}if(tag==="PICTURE"){bApplyImageToContainer(el,v);return}if(bLooksLikeImageUrl(v)&&bApplyImageToContainer(el,v))return;if(tag==="A"&&bLooksLikeImageUrl(v)&&el.querySelector&&el.querySelector("img")){bApplyImageToContainer(el,v);return}if(tag==="A"){bApplyLink(el,v);return}if(tag==="IFRAME"||tag==="EMBED"){el.setAttribute("src",v);return}if(tag==="INPUT"){var type=String(el.type||"").toLowerCase();if(type==="checkbox"||type==="radio"){el.checked=!!(v&&v!=="0"&&v!=="false"&&v.toLowerCase()!=="off")}else{el.value=v}return}if(tag==="TEXTAREA"||tag==="SELECT"){el.value=v;return}el.textContent=v}',
+  ].join("");
+}
+
+/**
+ * Minified class-append helpers for the footer runtime. A `data-cb-cls` element gets the resolved per-row prop value's
+ * whitespace-separated tokens **appended** to its class list (existing Webflow classes are kept). The
+ * `data-cb-cls-applied` marker makes the three reapply passes idempotent: tokens added on a prior pass are removed
+ * before the new set is added, so re-runs never duplicate or strand classes. Depends on `pickP` + `bPropEmpty`.
+ */
+export function beaconPropApplyClassRuntimeSource(): string {
+  const applied = JSON.stringify(CMS_SLOT_CLASS_APPLIED_ATTR);
+  const attr = JSON.stringify(CMS_SLOT_CLASS_ATTR);
+  return [
+    'function bClsTokens(v){v=String(v==null?"":v);var parts=v.split(/\\s+/),out=[],i,t;for(i=0;i<parts.length;i++){t=parts[i];if(t&&!bPropEmpty(t)&&out.indexOf(t)<0)out.push(t)}return out}',
+    `function bApplyClassBinding(node,props){if(!node||!node.classList)return[];var raw=node.getAttribute(${attr})||"";if(!raw)return[];var segs=String(raw).split("|"),add=[],si,seg,pv,tk,i;for(si=0;si<segs.length;si++){seg=segs[si].trim();if(!seg)continue;pv=pickP(props,seg);if(bPropEmpty(pv))continue;tk=bClsTokens(pv);for(i=0;i<tk.length;i++)if(add.indexOf(tk[i])<0)add.push(tk[i])}var prev=node.getAttribute(${applied});if(prev){var pt=prev.split(/\\s+/),x;for(x=0;x<pt.length;x++)if(pt[x]&&add.indexOf(pt[x])<0)node.classList.remove(pt[x])}for(i=0;i<add.length;i++)node.classList.add(add[i]);if(add.length)node.setAttribute(${applied},add.join(" "));else node.removeAttribute(${applied});return add}`,
   ].join("");
 }
 

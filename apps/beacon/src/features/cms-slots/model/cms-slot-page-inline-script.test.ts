@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { beaconPropDebugStubSource } from "@/features/cms-slots/model/cms-slot-beacon-debug";
 import {
+  CMS_SLOT_CLASS_ATTR,
   CMS_SLOT_COND_ATTR,
   CMS_SLOT_CONTENT_ATTR,
   CMS_SLOT_PUBLISH_PLACEHOLDER_URL,
@@ -335,6 +336,75 @@ describe("cms slot beacon runtime (published DOM)", () => {
         (row) => row.querySelector<HTMLHeadingElement>(`[${CMS_SLOT_CONTENT_ATTR}='title']`)?.textContent
       )
     ).toEqual(["a", "b"]);
+    doc.body.innerHTML = "";
+  });
+
+  it("appends per-row class names from a class-bound prop to each cloned row, independently", () => {
+    const doc = document;
+    const source = doc.createElement("div");
+    source.setAttribute("data-target", "beacons");
+    source.setAttribute("data-list", LIST);
+
+    // Single pool child: a card whose `class` attribute is bound to a prop (tagged data-cb-cls on the inner block).
+    const poolRow = doc.createElement("div");
+    poolRow.className = "card";
+    const themed = doc.createElement("div");
+    themed.className = "card_inner";
+    themed.setAttribute(CMS_SLOT_CLASS_ATTR, "row-class");
+    poolRow.appendChild(themed);
+    source.appendChild(poolRow);
+
+    const target = doc.createElement("div");
+    target.setAttribute("data-beacon-target", "list");
+    target.setAttribute("data-list", LIST);
+    target.textContent = JSON.stringify({
+      v: 3,
+      i: [0, 0],
+      p: [{ "row-class": "is-featured accent" }, { "row-class": "is-muted" }],
+    });
+    doc.body.append(source, target);
+
+    runCmsSlotBeaconRuntime(doc);
+
+    expect(target.children.length).toBe(2);
+    const inners = Array.from(target.children).map((row) =>
+      row.querySelector<HTMLDivElement>(`[${CMS_SLOT_CLASS_ATTR}='row-class']`)
+    );
+    // Existing Webflow class is kept; per-row tokens appended; rows do not leak into each other.
+    expect(inners[0]?.classList.contains("card_inner")).toBe(true);
+    expect(inners[0]?.classList.contains("is-featured")).toBe(true);
+    expect(inners[0]?.classList.contains("accent")).toBe(true);
+    expect(inners[0]?.classList.contains("is-muted")).toBe(false);
+    expect(inners[1]?.classList.contains("card_inner")).toBe(true);
+    expect(inners[1]?.classList.contains("is-muted")).toBe(true);
+    expect(inners[1]?.classList.contains("is-featured")).toBe(false);
+    // The source pool child is untouched (deep clone).
+    expect(source.querySelector(`[${CMS_SLOT_CLASS_ATTR}='row-class']`)?.className).toBe("card_inner");
+    doc.body.innerHTML = "";
+  });
+
+  it("appends a class-bound prop when the cloned row root itself carries the tag", () => {
+    const doc = document;
+    const source = doc.createElement("div");
+    source.setAttribute("data-target", "beacons");
+    source.setAttribute("data-list", LIST);
+
+    const row = doc.createElement("div");
+    row.className = "card";
+    row.setAttribute(CMS_SLOT_CLASS_ATTR, "row-class");
+    source.appendChild(row);
+
+    const target = doc.createElement("div");
+    target.setAttribute("data-beacon-target", "list");
+    target.setAttribute("data-list", LIST);
+    target.textContent = JSON.stringify({ v: 3, i: [0], p: [{ "row-class": "is-active" }] });
+    doc.body.append(source, target);
+
+    runCmsSlotBeaconRuntime(doc);
+
+    const clonedRoot = target.children[0] as HTMLDivElement;
+    expect(clonedRoot.classList.contains("card")).toBe(true);
+    expect(clonedRoot.classList.contains("is-active")).toBe(true);
     doc.body.innerHTML = "";
   });
 

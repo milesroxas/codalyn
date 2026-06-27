@@ -30,21 +30,27 @@ function ToggleGroup({
     spacing?: number;
     orientation?: "horizontal" | "vertical";
   }) {
+  /**
+   * The segmented look needs a small inset gap between items (so the active pill reads as raised inside the track) and
+   * a non-zero `data-spacing` so items keep their individual rounded corners instead of collapsing into a bordered row.
+   */
+  const resolvedSpacing = variant === "segmented" && spacing === 0 ? 0.5 : spacing;
   return (
     <ToggleGroupPrimitive.Root
       data-slot="toggle-group"
       data-variant={variant}
       data-size={size}
-      data-spacing={spacing}
+      data-spacing={resolvedSpacing}
       data-orientation={orientation}
-      style={{ "--gap": spacing } as React.CSSProperties}
+      style={{ "--gap": resolvedSpacing } as React.CSSProperties}
       className={cn(
         "group/toggle-group flex min-w-0 w-full max-w-full items-center gap-[--spacing(var(--gap))] rounded-sm data-[size=sm]:rounded-sm data-vertical:flex-col data-vertical:items-stretch",
+        "data-[variant=segmented]:w-fit data-[variant=segmented]:rounded-sm data-[variant=segmented]:border data-[variant=segmented]:border-input data-[variant=segmented]:bg-background data-[variant=segmented]:p-[3px]",
         className
       )}
       {...props}
     >
-      <ToggleGroupContext.Provider value={{ variant, size, spacing, orientation }}>
+      <ToggleGroupContext.Provider value={{ variant, size, spacing: resolvedSpacing, orientation }}>
         {children}
       </ToggleGroupContext.Provider>
     </ToggleGroupPrimitive.Root>

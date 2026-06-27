@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
-import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
+import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  type ComposableInstancePropMeta,
+  cmsSlotPropFolder,
+  cmsSlotPropSubgroupLabel,
+} from "@/features/cms-slots/model/cms-slot-composable-props";
 import { CMS_SLOT_ROW_NAME_MAX } from "@/features/cms-slots/model/cms-slot-list-runtime-payload";
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import { CmsSlotDisplayNameField } from "@/features/cms-slots/ui/cms-slot-display-name-field";
@@ -15,6 +19,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogFormField,
+  AlertDialogFormGroupLabel,
   AlertDialogHeader,
   AlertDialogScrollBody,
   AlertDialogScrollSection,
@@ -159,19 +164,28 @@ export function ComposerSlotNameDialog(props: ComposerSlotNameDialogProps) {
           />
           {exposed.length > 0 ? (
             <AlertDialogScrollSection divider data-slot="cms_slot_composer_prop_fields">
-              {exposed.map((ep) => {
+              {exposed.map((ep, i) => {
                 const v = row.propValues?.[ep.propId] ?? "";
                 const propFieldId = `cms-slot-composer-${row.key}-${ep.propId}`;
+                // Props arrive folder-clustered (see orderComposablePropsForComposer); render one compact header per
+                // folder. The row meta then shows only the sub-group, so the folder name isn't repeated on every field.
+                const folder = cmsSlotPropFolder(ep.group);
+                const prevFolder = i > 0 ? cmsSlotPropFolder(exposed[i - 1]?.group) : null;
+                const showFolderHeader = folder != null && folder !== prevFolder;
+                const rowMeta = folder != null ? cmsSlotPropSubgroupLabel(ep.group) : ep.group;
                 return (
-                  <AlertDialogFormField key={ep.propId} label={ep.label} meta={ep.group} labelHtmlFor={propFieldId}>
-                    <ComposerPropValueField
-                      inputId={propFieldId}
-                      ep={ep}
-                      value={v}
-                      busy={Boolean(disabled)}
-                      onChange={(next) => onChangePropValue(row.key, ep.propId, next)}
-                    />
-                  </AlertDialogFormField>
+                  <Fragment key={ep.propId}>
+                    {showFolderHeader ? <AlertDialogFormGroupLabel>{folder}</AlertDialogFormGroupLabel> : null}
+                    <AlertDialogFormField label={ep.label} meta={rowMeta ?? undefined} labelHtmlFor={propFieldId}>
+                      <ComposerPropValueField
+                        inputId={propFieldId}
+                        ep={ep}
+                        value={v}
+                        busy={Boolean(disabled)}
+                        onChange={(next) => onChangePropValue(row.key, ep.propId, next)}
+                      />
+                    </AlertDialogFormField>
+                  </Fragment>
                 );
               })}
             </AlertDialogScrollSection>

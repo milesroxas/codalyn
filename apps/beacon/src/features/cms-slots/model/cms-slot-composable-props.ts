@@ -34,6 +34,36 @@ export function groupFromInstanceProp(p: Pick<InstanceProp, "display">): string 
   return typeof g === "string" && g.trim().length > 0 ? g : undefined;
 }
 
+/**
+ * Top **folder** of a Webflow group. Groups can nest as `Element/Folder` (`Heading/Settings`,
+ * `Heading/Advanced`); the Composer clusters by the segment before the first `/` so every prop from the
+ * same source element renders together. Returns `null` for ungrouped/empty groups.
+ */
+export function cmsSlotPropFolder(group: string | undefined): string | null {
+  if (typeof group !== "string") {
+    return null;
+  }
+  const head = group.split("/")[0]?.trim();
+  return head != null && head.length > 0 ? head : null;
+}
+
+/**
+ * Sub-group portion of a Webflow group (everything after the first `/`), shown as the compact row meta once a
+ * {@link cmsSlotPropFolder} header is rendered. Returns `null` when there is no sub-group (the folder header
+ * already conveys the whole group) or the group is ungrouped/empty.
+ */
+export function cmsSlotPropSubgroupLabel(group: string | undefined): string | null {
+  if (typeof group !== "string") {
+    return null;
+  }
+  const idx = group.indexOf("/");
+  if (idx < 0) {
+    return null;
+  }
+  const tail = group.slice(idx + 1).trim();
+  return tail.length > 0 ? tail : null;
+}
+
 function selectOptionsFromInstanceProp(
   p: Pick<InstanceProp, "display">
 ): ComposableInstancePropSelectOption[] | undefined {
@@ -348,7 +378,81 @@ export async function listComposableMetaByInstanceKey(
 }
 
 /**
- * All bindable instance props (full `InstanceProp` from `searchProps`), for Designer “Expose to Composer”.
+ * Composer prop order: **Webflow props-panel order, clustered by {@link cmsSlotPropFolder}**.
+ *
+ * `orderedPropIds` is Webflow’s panel order from `Component.getProps()` (“ungrouped first, then grouped”); pass
+ * `undefined` when the order is unavailable and props fall back to alphabetical by label. Props are first placed
+ * in panel order (ids absent from `orderedPropIds` sink to the end, alpha by label as a stable tiebreak), then
+ * **stably reclustered by top folder** so sub-groups of one element (`Heading/Settings` + `Heading/Advanced`)
+ * render under a single folder. Folders follow first-appearance order; ungrouped props always lead.
+ *
+ * Pure + order is presentation-only (the runtime `p` payload is keyed by `propId`, never positional), so this is
+ * safe to reorder freely.
+ */
+export function orderComposablePropsForComposer(
+  metas: readonly ComposableInstancePropMeta[],
+  orderedPropIds?: readonly string[]
+): ComposableInstancePropMeta[] {
+  const rank = new Map<string, number>();
+  if (orderedPropIds != null) {
+    orderedPropIds.forEach((id, i) => {
+      if (!rank.has(id)) {
+        rank.set(id, i);
+      }
+    });
+  }
+  const ranked = [...metas].sort((a, b) => {
+    const ra = rank.get(a.propId);
+    const rb = rank.get(b.propId);
+    if (ra != null && rb != null) {
+      return ra - rb;
+    }
+    if (ra != null) {
+      return -1;
+    }
+    if (rb != null) {
+      return 1;
+    }
+    return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+  });
+  // Ungrouped props lead (matches Webflow's "ungrouped first"); folders follow in first-appearance order.
+  const ungrouped: ComposableInstancePropMeta[] = [];
+  const folderOrder: string[] = [];
+  const byFolder = new Map<string, ComposableInstancePropMeta[]>();
+  for (const m of ranked) {
+    const folder = cmsSlotPropFolder(m.group);
+    if (folder == null) {
+      ungrouped.push(m);
+      continue;
+    }
+    let bucket = byFolder.get(folder);
+    if (bucket == null) {
+      bucket = [];
+      byFolder.set(folder, bucket);
+      folderOrder.push(folder);
+    }
+    bucket.push(m);
+  }
+  return [...ungrouped, ...folderOrder.flatMap((k) => byFolder.get(k) ?? [])];
+}
+
+/**
+ * Webflow props-panel order for an instance’s component (`Component.getProps()`, Beta). Returns prop ids in panel
+ * display order, or `undefined` when unavailable so the Composer falls back to alphabetical. Read-only; never throws.
+ */
+async function panelPropOrderForInstance(instance: ComponentElement): Promise<string[] | undefined> {
+  try {
+    const component = await instance.getComponent();
+    const defs = await component.getProps();
+    return defs.map((d) => d.id);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * All bindable instance props (full `InstanceProp` from `searchProps`), for Designer “Expose to Composer”, ordered
+ * to match the Webflow props panel and clustered by folder via {@link orderComposablePropsForComposer}.
  */
 async function listComposablePropsForInstance(instance: ComponentElement): Promise<ComposableInstancePropMeta[]> {
   let rows: InstanceProp[];
@@ -376,7 +480,6 @@ async function listComposablePropsForInstance(instance: ComponentElement): Promi
       selectOptions: selectOptionsFromInstanceProp(p),
     });
   }
-  const out = [...byId.values()];
-  out.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
-  return out;
+  const orderedPropIds = await panelPropOrderForInstance(instance);
+  return orderComposablePropsForComposer([...byId.values()], orderedPropIds);
 }

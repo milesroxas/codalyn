@@ -84,7 +84,7 @@ const COMPOSER_PROP_VALUE_BY_KIND: Record<
     <ToggleGroup
       id={inputId}
       type="single"
-      variant="outline"
+      variant="segmented"
       size="xs"
       value={parseBoolString(value) ? "visible" : "hidden"}
       onValueChange={(v) => {

@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildCmsSlotRuntimePropRow,
   type ComposableInstancePropMeta,
+  cmsSlotPropFolder,
+  cmsSlotPropSubgroupLabel,
   groupFromInstanceProp,
   mergeComposableMetaWithLiveResolved,
   normalizeHeadingTagForPayload,
+  orderComposablePropsForComposer,
   pickRemappedPropValue,
 } from "@/features/cms-slots/model/cms-slot-composable-props";
 
@@ -13,6 +16,15 @@ const E = (propId: string, label: string, valueType: string): ComposableInstance
   label,
   valueType,
 });
+
+const M = (propId: string, label: string, group?: string): ComposableInstancePropMeta => ({
+  propId,
+  label,
+  valueType: "string",
+  group,
+});
+
+const ids = (metas: readonly ComposableInstancePropMeta[]): string[] => metas.map((m) => m.propId);
 
 describe("groupFromInstanceProp", () => {
   it("returns the group string when present", () => {
@@ -121,5 +133,97 @@ describe("pickRemappedPropValue + buildCmsSlotRuntimePropRow", () => {
     expect(
       buildCmsSlotRuntimePropRow({ propValues: { cta: JSON.stringify({ k: "page", h: "" }) } }, metas, aliasToCanonical)
     ).toEqual({ cta: "" });
+  });
+});
+
+describe("cmsSlotPropFolder", () => {
+  it("returns the segment before the first slash", () => {
+    expect(cmsSlotPropFolder("Heading/Settings")).toBe("Heading");
+    expect(cmsSlotPropFolder("Heading/Advanced")).toBe("Heading");
+    expect(cmsSlotPropFolder("Rich Text/Advanced")).toBe("Rich Text");
+  });
+
+  it("uses only the top folder for deeper nesting", () => {
+    expect(cmsSlotPropFolder("A/B/C")).toBe("A");
+  });
+
+  it("treats a slash-less group as its own folder", () => {
+    expect(cmsSlotPropFolder("Content")).toBe("Content");
+  });
+
+  it("returns null for ungrouped/empty/whitespace groups", () => {
+    expect(cmsSlotPropFolder(undefined)).toBeNull();
+    expect(cmsSlotPropFolder("")).toBeNull();
+    expect(cmsSlotPropFolder("   ")).toBeNull();
+    expect(cmsSlotPropFolder("/Settings")).toBeNull();
+  });
+});
+
+describe("cmsSlotPropSubgroupLabel", () => {
+  it("returns everything after the first slash", () => {
+    expect(cmsSlotPropSubgroupLabel("Heading/Settings")).toBe("Settings");
+    expect(cmsSlotPropSubgroupLabel("A/B/C")).toBe("B/C");
+  });
+
+  it("returns null when there is no sub-group (folder header conveys it)", () => {
+    expect(cmsSlotPropSubgroupLabel("Content")).toBeNull();
+    expect(cmsSlotPropSubgroupLabel("Heading/")).toBeNull();
+    expect(cmsSlotPropSubgroupLabel("Heading/   ")).toBeNull();
+    expect(cmsSlotPropSubgroupLabel(undefined)).toBeNull();
+  });
+});
+
+describe("orderComposablePropsForComposer", () => {
+  it("follows Webflow panel order and clusters props by folder", () => {
+    const metas = [
+      M("link", "Link", "Button/Button"),
+      M("textH", "Text", "Heading/Settings"),
+      M("textB", "Text", "Button/Button"),
+      M("visH", "Visibility", "Heading/Advanced"),
+      M("visRT", "Visibility", "Rich Text/Advanced"),
+      M("visB", "Visibility", "Button/Advanced"),
+    ];
+    const panelOrder = ["textH", "visH", "link", "textB", "visB", "visRT"];
+    expect(ids(orderComposablePropsForComposer(metas, panelOrder))).toEqual([
+      "textH",
+      "visH",
+      "link",
+      "textB",
+      "visB",
+      "visRT",
+    ]);
+  });
+
+  it("merges a folder's sub-groups even when panel order interleaves another folder", () => {
+    const metas = [
+      M("headingA", "Text", "Heading/Settings"),
+      M("buttonX", "Link", "Button/Button"),
+      M("headingB", "Visibility", "Heading/Advanced"),
+    ];
+    // Webflow lists Heading/Settings, then Button, then Heading/Advanced — the Heading sub-groups must rejoin.
+    const panelOrder = ["headingA", "buttonX", "headingB"];
+    expect(ids(orderComposablePropsForComposer(metas, panelOrder))).toEqual(["headingA", "headingB", "buttonX"]);
+  });
+
+  it("floats ungrouped props to the top, keeping their panel order", () => {
+    const metas = [M("g1", "A", "Heading/Settings"), M("u1", "B"), M("g2", "C", "Heading/Advanced"), M("u2", "D")];
+    const panelOrder = ["g1", "u1", "g2", "u2"];
+    expect(ids(orderComposablePropsForComposer(metas, panelOrder))).toEqual(["u1", "u2", "g1", "g2"]);
+  });
+
+  it("falls back to alphabetical-by-label when no panel order is given, still clustered by folder", () => {
+    const metas = [
+      M("zebra", "Zebra", "Heading/Settings"),
+      M("apple", "Apple", "Heading/Settings"),
+      M("mango", "Mango", "Button/Button"),
+    ];
+    // Alpha by label: Apple, Mango, Zebra → folders in first-appearance order (Heading, then Button).
+    expect(ids(orderComposablePropsForComposer(metas))).toEqual(["apple", "zebra", "mango"]);
+  });
+
+  it("sinks props missing from panel order to the end, ordered alphabetically", () => {
+    const metas = [M("a", "Alpha", "Tools"), M("z", "Zed", "Tools"), M("m", "Mid", "Tools")];
+    // Only `a` is ranked by panel order; `m` and `z` are unranked and fall back to alpha within the same folder.
+    expect(ids(orderComposablePropsForComposer(metas, ["a"]))).toEqual(["a", "m", "z"]);
   });
 });

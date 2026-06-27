@@ -193,6 +193,23 @@ function AlertDialogFormField(props: {
   );
 }
 
+/**
+ * Compact section heading above a run of {@link AlertDialogFormField}s — used to cluster fields by group/folder
+ * inside a scroll section. Tight vertical rhythm (no top pad on the first label) keeps grouped forms compact.
+ */
+function AlertDialogFormGroupLabel({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="alert-dialog-form-group-label"
+      className={cn(
+        "pt-1.5 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80 first:pt-0",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
 function AlertDialogMedia({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -308,6 +325,7 @@ export {
   AlertDialogFactValue,
   AlertDialogFooter,
   AlertDialogFormField,
+  AlertDialogFormGroupLabel,
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogOverlay,

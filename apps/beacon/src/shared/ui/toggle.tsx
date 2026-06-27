@@ -9,6 +9,12 @@ const toggleVariants = cva(
       variant: {
         default: "bg-transparent",
         outline: "border border-input bg-transparent hover:bg-muted",
+        /**
+         * Inset segmented control: inactive items are quiet text on the recessed track (see the track styling in
+         * `ToggleGroup`); the active item is a raised pill that sits inside the track with padding around it.
+         */
+        segmented:
+          "bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground data-[state=on]:bg-muted data-[state=on]:text-foreground data-[state=on]:shadow-sm data-[state=on]:hover:bg-muted",
       },
       size: {
         default: "h-8 min-w-8 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
@@ -18,6 +24,10 @@ const toggleVariants = cva(
         lg: "h-9 min-w-9 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
       },
     },
+    compoundVariants: [
+      // Segmented labels read as a quiet control, so they sit a notch below the size's default label size.
+      { variant: "segmented", class: "text-[0.7rem]" },
+    ],
     defaultVariants: {
       variant: "default",
       size: "default",

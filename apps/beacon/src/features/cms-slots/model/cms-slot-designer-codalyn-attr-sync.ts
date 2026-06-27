@@ -1,5 +1,4 @@
 import {
-  CMS_SLOT_CLASS_ATTR,
   CMS_SLOT_COND_ATTR,
   CMS_SLOT_CONTENT_ATTR,
   contentAttrSegmentOwnedBy,
@@ -10,7 +9,6 @@ import {
 } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
-  classAttributeBoundPropIds,
   classifyElementBindings,
   type ElementBindingClassification,
   isConditionalVisibilityValue,
@@ -130,22 +128,6 @@ function collectExposedContentPropIds(
   return ids;
 }
 
-/** Exposed prop ids bound to the element's `class` attribute (Webflow Attributes panel → runtime class append). */
-function collectExposedClassPropIds(
-  contentSettings: Record<string, unknown>,
-  exposedIds: ReadonlySet<string>,
-  nestedAlias: ReadonlyMap<string, string>
-): string[] {
-  const ids: string[] = [];
-  for (const pid of classAttributeBoundPropIds(contentSettings)) {
-    const canonical = canonicalExposedId(pid, exposedIds, nestedAlias);
-    if (canonical != null) {
-      ids.push(canonical);
-    }
-  }
-  return ids;
-}
-
 /**
  * Resolves the prop id (on the **placed instance**) to seed so a conditionally-visible element survives publish.
  * Root-depth bindings seed their own prop; nested bindings seed the canonical parent prop they are wired to.
@@ -170,8 +152,6 @@ type WalkAcc = {
   out: Pick<DesignerCodalynAttrSyncResult, "tagged" | "removed" | "errors">;
   taggedPropIds: Set<string>;
   contentBindingCounts: Map<string, number>;
-  /** Per-prop ordinal counter for `data-cb-cls` segments, kept separate from content so class `@N` ids are independent. */
-  classBindingCounts: Map<string, number>;
   conditionalControllerPropIds: Set<string>;
   /** Exposed prop ids of the **other** Designer components in this list; their `data-cb-c` segments are preserved. */
   foreignExposedIds: ReadonlySet<string>;
@@ -214,19 +194,18 @@ async function resolveConditionalTarget(
   return prev != null && prev.length > 0 ? "1" : null;
 }
 
-/** This component's content + class prop ids + conditional flag for one element; records its conditional controller seed. */
+/** This component's content prop ids + conditional flag for one element; records its conditional controller seed. */
 function deriveOwnedBindingForElement(
   classification: ElementBindingClassification | null,
   exposedIds: ReadonlySet<string>,
   nestedAlias: ReadonlyMap<string, string>,
   acc: WalkAcc,
   nestedDepth: number
-): { contentIds: string[]; classIds: string[]; conditional: boolean } {
+): { contentIds: string[]; conditional: boolean } {
   if (classification == null) {
-    return { contentIds: [], classIds: [], conditional: false };
+    return { contentIds: [], conditional: false };
   }
   const contentIds = [...new Set(collectExposedContentPropIds(classification.content, exposedIds, nestedAlias))].sort();
-  const classIds = [...new Set(collectExposedClassPropIds(classification.content, exposedIds, nestedAlias))].sort();
   const conditional = isConditionalVisibilityValue(classification.visibility);
   const controllerPropId = bindingPropIdFromSettingValue(classification.visibility);
   if (conditional && controllerPropId != null) {
@@ -235,30 +214,20 @@ function deriveOwnedBindingForElement(
       acc.conditionalControllerPropIds.add(seedable);
     }
   }
-  return { contentIds, classIds, conditional };
+  return { contentIds, conditional };
 }
 
-/** Writes the merged `data-cb-c`, its companion `data-cb-v`, and `data-cb-cls`; counts a tag when anything changed. */
+/** Writes the merged `data-cb-c` and its companion `data-cb-v`; counts a tag when anything changed. */
 async function writeMergedTagAttrs(
   attr: PropAttrOps,
-  contentMerged: readonly string[],
-  classMerged: readonly string[],
+  merged: readonly string[],
   conditional: boolean,
   acc: WalkAcc
 ): Promise<void> {
-  const contentChanged = await setOrClearAttr(
-    attr,
-    CMS_SLOT_CONTENT_ATTR,
-    contentMerged.length > 0 ? contentMerged.join("|") : null
-  );
-  const condTarget = await resolveConditionalTarget(attr, conditional, contentMerged, acc.foreignExposedIds);
+  const contentChanged = await setOrClearAttr(attr, CMS_SLOT_CONTENT_ATTR, merged.join("|"));
+  const condTarget = await resolveConditionalTarget(attr, conditional, merged, acc.foreignExposedIds);
   const condChanged = await setOrClearAttr(attr, CMS_SLOT_COND_ATTR, condTarget);
-  const classChanged = await setOrClearAttr(
-    attr,
-    CMS_SLOT_CLASS_ATTR,
-    classMerged.length > 0 ? classMerged.join("|") : null
-  );
-  if (contentChanged || condChanged || classChanged) {
+  if (contentChanged || condChanged) {
     acc.out.tagged += 1;
   }
 }
@@ -277,7 +246,7 @@ async function applyMergedCmsSlotAttrsForElement(
   nestedDepth: number
 ): Promise<void> {
   try {
-    const { contentIds, classIds, conditional } = deriveOwnedBindingForElement(
+    const { contentIds, conditional } = deriveOwnedBindingForElement(
       classification,
       exposedIds,
       nestedAlias,
@@ -286,24 +255,16 @@ async function applyMergedCmsSlotAttrsForElement(
     );
     const newSegments =
       contentIds.length > 0 ? formatContentAttrSegmentsForBindings(contentIds, acc.contentBindingCounts) : [];
-    const contentMerged = mergeContentAttrSegments({
+    const merged = mergeContentAttrSegments({
       existing: await attr.get(CMS_SLOT_CONTENT_ATTR),
       foreignExposedIds: acc.foreignExposedIds,
       newSegments,
     });
 
-    const newClassSegments =
-      classIds.length > 0 ? formatContentAttrSegmentsForBindings(classIds, acc.classBindingCounts) : [];
-    const classMerged = mergeContentAttrSegments({
-      existing: await attr.get(CMS_SLOT_CLASS_ATTR),
-      foreignExposedIds: acc.foreignExposedIds,
-      newSegments: newClassSegments,
-    });
-
-    if (contentMerged.length === 0 && classMerged.length === 0) {
-      // An empty merge on both streams means no foreign-owned segment survived and this sync added none, so nothing
-      // on this element should stay tagged. Strip every Designer tag (covers a just-deselected prop whose stale
-      // segment is no longer in `exposedIds`); ownership-scoped removal would wrongly preserve that orphaned segment.
+    if (merged.length === 0) {
+      // An empty merge means no foreign-owned segment survived and this sync added none, so nothing on this
+      // element should stay tagged. Strip every Designer tag (covers a just-deselected prop whose stale segment is
+      // no longer in `exposedIds`); ownership-scoped removal would wrongly preserve that orphaned segment.
       acc.out.removed += await removeCmsSlotTagAttrsIfPresent(attr);
       return;
     }
@@ -312,12 +273,7 @@ async function applyMergedCmsSlotAttrsForElement(
         acc.taggedPropIds.add(pid);
       }
     }
-    if (newClassSegments.length > 0) {
-      for (const pid of classIds) {
-        acc.taggedPropIds.add(pid);
-      }
-    }
-    await writeMergedTagAttrs(attr, contentMerged, classMerged, conditional, acc);
+    await writeMergedTagAttrs(attr, merged, conditional, acc);
   } catch (e) {
     acc.out.errors.push(String(e instanceof Error ? e.message : e));
   }
@@ -420,7 +376,6 @@ async function enterComponentDefinitionsAndWalk(
     out,
     taggedPropIds: new Set<string>(),
     contentBindingCounts: new Map<string, number>(),
-    classBindingCounts: new Map<string, number>(),
     conditionalControllerPropIds: new Set<string>(),
     foreignExposedIds,
   };

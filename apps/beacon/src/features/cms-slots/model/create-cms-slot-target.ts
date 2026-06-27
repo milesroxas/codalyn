@@ -29,10 +29,10 @@ const BEACON_WRAPPER_LIST_BLOCK_STYLE_NAME = "beacon_list";
 function ensureBeaconWrapperListBlockHiddenStyle(): Promise<Style> {
   return runExclusiveDesignerOp(async () => {
     const all = await webflow.getAllStyles();
-    for (const s of all) {
-      if ((await s.getName()) === BEACON_WRAPPER_LIST_BLOCK_STYLE_NAME) {
-        return s;
-      }
+    const names = await Promise.all(all.map((s) => s.getName()));
+    const idx = names.indexOf(BEACON_WRAPPER_LIST_BLOCK_STYLE_NAME);
+    if (idx >= 0) {
+      return all[idx];
     }
     const created = await webflow.createStyle(BEACON_WRAPPER_LIST_BLOCK_STYLE_NAME);
     await created.setProperty("display", "none");

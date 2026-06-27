@@ -121,6 +121,8 @@ import {
   CMS_SLOTS_DESIGNER_LIST_CHANGED_SYNC_REASON,
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
   CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
+  CMS_SLOTS_ROUTE_TASK_CREATING_LIST,
+  CMS_SLOTS_ROUTE_TASK_CREATING_LIST_TARGET,
   CMS_SLOTS_ROUTE_TASK_FINISHING,
   CMS_SLOTS_ROUTE_TASK_FOCUSING_ON_CANVAS,
   CMS_SLOTS_ROUTE_TASK_PLACING_ON_CANVAS,
@@ -1348,10 +1350,13 @@ export function CmsSlotsScreen() {
       return;
     }
     setCreatePending(true);
+    // Drive the route overlay through each create phase so the user sees progress instead of a static
+    // "Creating slot list…" for the whole run. Placement emits its own sub-phases via onProgress below.
+    setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_CREATING_LIST);
     try {
       listTargetDefinitionIdRef.current = null;
       const { container, dataList } = await createCmsSlotListOnPage(trimmed);
-      const cmsEnsure = await ensureCmsSlotListCmsTextFieldOnList(container, dataList);
+      setRouteTaskPhase(CMS_SLOTS_ROUTE_TASK_CREATING_LIST_TARGET);
       const { component: listTargetComponent, definitionId } = await createCmsSlotListTargetComponent({
         dataList,
         listContainer: container,
@@ -1361,7 +1366,16 @@ export function CmsSlotsScreen() {
       setListTargetPhase("synced");
       setListTargetRegisteredName(listTargetRegisteredName);
       await writeCmsSlotDesignerConfiguredPoolKeys(container, []);
-      await placeCmsSlotListTargetOnCanvas(dataList, container, definitionId, { resolvedCmsEnsure: cmsEnsure });
+      // Placement runs first; the CMS field ensure (Data API create + visibility poll, several seconds) now happens
+      // inside placement *after* the list target is on the canvas instead of blocking before any visible action.
+      const { cmsEnsure, instancesOnPageCount } = await placeCmsSlotListTargetOnCanvas(
+        dataList,
+        container,
+        definitionId,
+        {
+          onProgress: setRouteTaskPhase,
+        }
+      );
       promptCmsFieldLinkIfCreated(cmsEnsure);
       if (cmsEnsure == null) {
         void webflow.notify({
@@ -1370,9 +1384,6 @@ export function CmsSlotsScreen() {
             "CMS Plain Text field was not created. Open a CMS collection template page, or ensure another beacon on this page already has a CMS field.",
         });
       }
-      const listTargetOnPage = await listCmsSlotListTargetInstancesOnPage(dataList, container, {
-        preferredDefinitionId: definitionId,
-      });
       targetRef.current = container;
       setActiveDataList(dataList);
       const beaconKey = cmsSlotListKey(container);
@@ -1380,7 +1391,7 @@ export function CmsSlotsScreen() {
       setSelected([]);
       setPicking(true);
       setCreateFormOpen(false);
-      setListTargetOnCanvasCount(listTargetOnPage.length);
+      setListTargetOnCanvasCount(instancesOnPageCount);
       setListTargetOnCanvasCountResolved(true);
       listTargetReconcileCacheRef.current = {
         beaconKey,
@@ -1395,6 +1406,7 @@ export function CmsSlotsScreen() {
       void webflow.notify({ type: "Error", message });
     } finally {
       setCreatePending(false);
+      setRouteTaskPhase(null);
     }
   };
 

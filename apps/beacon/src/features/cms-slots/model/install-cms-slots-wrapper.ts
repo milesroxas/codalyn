@@ -42,22 +42,21 @@ function getBodyElement(all: AnyElement[]): BodyWithAppend | null {
 
 export async function findCmsSlotsWrapperOnPage(): Promise<BlockElement | null> {
   const all = await webflow.getAllElements();
-  for (const el of all) {
-    if (el.type !== "Block") continue;
-    const block = el as BlockElement;
-    const v = await block.getCustomAttribute(CMS_SLOT_WRAPPER_ATTR);
-    if (v === CMS_SLOT_WRAPPER_ATTR_VALUE) return block;
-  }
-  return null;
+  const blocks = all.filter((el): el is BlockElement => el.type === "Block");
+  // Read the wrapper attr for every block concurrently — each getCustomAttribute is a Designer bridge round-trip, so
+  // a serial loop costs N × latency on large pages. (This finder runs many times across the create/place flow.)
+  const values = await Promise.all(blocks.map((b) => b.getCustomAttribute(CMS_SLOT_WRAPPER_ATTR)));
+  const idx = values.indexOf(CMS_SLOT_WRAPPER_ATTR_VALUE);
+  return idx >= 0 ? blocks[idx] : null;
 }
 
 function ensureBeaconsWrapperHiddenStyle(): Promise<Style> {
   return runExclusiveDesignerOp(async () => {
     const all = await webflow.getAllStyles();
-    for (const s of all) {
-      if ((await s.getName()) === BEACON_WRAPPER_STYLE_NAME) {
-        return s;
-      }
+    const names = await Promise.all(all.map((s) => s.getName()));
+    const idx = names.indexOf(BEACON_WRAPPER_STYLE_NAME);
+    if (idx >= 0) {
+      return all[idx];
     }
     const created = await webflow.createStyle(BEACON_WRAPPER_STYLE_NAME);
     await created.setProperty("display", "none");

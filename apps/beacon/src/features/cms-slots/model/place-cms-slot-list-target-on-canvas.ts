@@ -182,11 +182,18 @@ export type PlaceCmsSlotListTargetOnCanvasResult = {
   alreadyExisted: boolean;
   cmsFieldWasCreated: boolean;
   cmsBindSucceeded: boolean;
+  /** Resolved CMS field ensure (binding + whether the field was newly created), or `null` when no bind is possible. */
+  cmsEnsure: CmsSlotListCmsTextFieldEnsureResult | null;
+  /** List-target instances on the page after placement — lets callers skip a redundant re-scan for the count. */
+  instancesOnPageCount: number;
 };
 
 export type PlaceCmsSlotListTargetOnCanvasOptions = {
-  /** When the caller already ran {@link ensureCmsSlotListCmsTextFieldOnList}, pass the result to skip a second ensure. */
-  resolvedCmsEnsure?: CmsSlotListCmsTextFieldEnsureResult | null;
+  /**
+   * When the caller already ran (or kicked off) {@link ensureCmsSlotListCmsTextFieldOnList}, pass the result — or the
+   * still-pending promise — to skip a second ensure. Omit to ensure internally **after** placement.
+   */
+  resolvedCmsEnsure?: CmsSlotListCmsTextFieldEnsureResult | null | Promise<CmsSlotListCmsTextFieldEnsureResult | null>;
   onProgress?: (message: string) => void;
 };
 
@@ -266,7 +273,8 @@ async function resolveCmsEnsureForPlacement(
   options?: PlaceCmsSlotListTargetOnCanvasOptions
 ): Promise<CmsSlotListCmsTextFieldEnsureResult | null> {
   if (options?.resolvedCmsEnsure !== undefined) {
-    return options.resolvedCmsEnsure;
+    // Value, `null`, or a pending promise — `await` resolves all three.
+    return await options.resolvedCmsEnsure;
   }
   return ensureCmsSlotListCmsTextFieldOnList(listContainer, dataList);
 }
@@ -339,13 +347,6 @@ export async function placeCmsSlotListTargetOnCanvas(
   const report = options?.onProgress;
   await exitToPageCanvas();
 
-  if (options?.resolvedCmsEnsure === undefined) {
-    report?.(CMS_SLOTS_ROUTE_TASK_CHECKING_CMS_FIELD);
-  }
-  const cmsEnsure = await resolveCmsEnsureForPlacement(listContainer, dataList, options);
-  const cmsBinding: CmsSlotListCmsBinding | null = cmsEnsure?.binding ?? null;
-  const cmsFieldWasCreated = cmsEnsure?.fieldWasCreated ?? false;
-
   const { resolvedDef, placementDef } = await resolveListTargetDefAndPlacementDef(
     dataList,
     listContainer,
@@ -367,23 +368,38 @@ export async function placeCmsSlotListTargetOnCanvas(
   }
   await exitToPageCanvas();
 
-  if (cmsBinding != null) {
-    report?.(CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD);
+  // Resolve the CMS field **after** the visible canvas placement. Its Data API create + visibility poll can take
+  // several seconds; running it first kept the user staring at a frozen canvas before the list target appeared. The
+  // bind below is the only consumer, so this never needs to gate placement.
+  if (options?.resolvedCmsEnsure === undefined) {
+    report?.(CMS_SLOTS_ROUTE_TASK_CHECKING_CMS_FIELD);
   }
-  const cmsBindSucceeded =
-    cmsBinding == null
-      ? true
-      : await tryBindListTargetInstancesToCmsText({
-          dataList,
-          listContainer,
-          preferredDefinitionId,
-          resolvedDef,
-          instance,
-          existing,
-          firstExisting,
-          cmsBinding,
-          cmsFieldWasCreated,
-        });
+  const cmsEnsure = await resolveCmsEnsureForPlacement(listContainer, dataList, options);
+  const cmsBinding: CmsSlotListCmsBinding | null = cmsEnsure?.binding ?? null;
+  const cmsFieldWasCreated = cmsEnsure?.fieldWasCreated ?? false;
+
+  // A *freshly created* CMS field cannot be bound from the Designer until the user toggles to CMS view and back —
+  // the bind loop is guaranteed to fail (and burns several seconds retrying). Skip it; `promptCmsFieldLinkIfCreated`
+  // already tells the user to reopen on the template, and the retry path binds successfully then.
+  let cmsBindSucceeded: boolean;
+  if (cmsBinding == null) {
+    cmsBindSucceeded = true;
+  } else if (cmsFieldWasCreated) {
+    cmsBindSucceeded = false;
+  } else {
+    report?.(CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD);
+    cmsBindSucceeded = await tryBindListTargetInstancesToCmsText({
+      dataList,
+      listContainer,
+      preferredDefinitionId,
+      resolvedDef,
+      instance,
+      existing,
+      firstExisting,
+      cmsBinding,
+      cmsFieldWasCreated,
+    });
+  }
 
   report?.(CMS_SLOTS_ROUTE_TASK_FINISHING);
   try {
@@ -392,7 +408,16 @@ export async function placeCmsSlotListTargetOnCanvas(
     console.warn(PLACE_LIST_TARGET_LOG_PREFIX, "Designer placeholder apply failed:", err);
   }
 
-  return { instance, alreadyExisted: firstExisting != null, cmsFieldWasCreated, cmsBindSucceeded };
+  // We placed at most one new instance; reuse the pre-place scan instead of forcing callers to re-enumerate.
+  const instancesOnPageCount = firstExisting != null ? existing.length : existing.length + 1;
+  return {
+    instance,
+    alreadyExisted: firstExisting != null,
+    cmsFieldWasCreated,
+    cmsBindSucceeded,
+    cmsEnsure,
+    instancesOnPageCount,
+  };
 }
 
 /** Selects the first list-target instance on the current page (does not create or bind). */

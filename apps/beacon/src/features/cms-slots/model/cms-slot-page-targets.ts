@@ -65,27 +65,37 @@ export async function findCmsSlotListsOnPage(): Promise<CmsSlotListOnPage[]> {
     return [];
   }
 
-  const out: CmsSlotListOnPage[] = [];
-
-  const visit = async (el: AnyElement) => {
-    if (el.type === "Block") {
-      const block = el as BlockElement;
-      const target = await block.getCustomAttribute("data-target");
-      const list = await block.getCustomAttribute("data-list");
-      if (target === "beacons" && list != null && list.startsWith("beacon-")) {
-        const displayName = await readCmsSlotListDisplayName(block);
-        out.push({ dataList: list, displayName, container: block, key: cmsSlotListKey(block) });
-      }
+  // Collect every Block in DOM (pre-order) order, fetching each level's children concurrently across the tree
+  // breadth — a serial DFS pays one Designer bridge round-trip per node in sequence.
+  const collectBlocks = async (el: AnyElement): Promise<BlockElement[]> => {
+    const here: BlockElement[] = el.type === "Block" ? [el as BlockElement] : [];
+    if (!hasGetChildren(el)) {
+      return here;
     }
-    if (!hasGetChildren(el)) return;
     const children = await el.getChildren();
-    for (const c of children) {
-      await visit(c);
+    const childBlocks = await Promise.all(children.map(collectBlocks));
+    for (const group of childBlocks) {
+      here.push(...group);
     }
+    return here;
   };
+  const blocks = await collectBlocks(body);
 
-  await visit(body);
-  return out;
+  // Read target/list (and the display name for matches) for every candidate block in parallel.
+  const rows = await Promise.all(
+    blocks.map(async (block): Promise<CmsSlotListOnPage | null> => {
+      const [target, list] = await Promise.all([
+        block.getCustomAttribute("data-target"),
+        block.getCustomAttribute("data-list"),
+      ]);
+      if (target !== "beacons" || list == null || !list.startsWith("beacon-")) {
+        return null;
+      }
+      const displayName = await readCmsSlotListDisplayName(block);
+      return { dataList: list, displayName, container: block, key: cmsSlotListKey(block) };
+    })
+  );
+  return rows.filter((row): row is CmsSlotListOnPage => row != null);
 }
 
 export type HydratedCmsSlotRow = {

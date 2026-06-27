@@ -1,9 +1,5 @@
 import type { MutableRefObject } from "react";
-import {
-  type CmsSlotListCmsTextFieldEnsureResult,
-  ensureCmsSlotListCmsTextFieldOnList,
-} from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
-import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
+import type { CmsSlotListCmsTextFieldEnsureResult } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
 import type { CmsSlotListTargetPhase } from "@/features/cms-slots/model/cms-slot-list-target-phase";
 import {
   createCmsSlotListTargetComponent,
@@ -11,7 +7,6 @@ import {
 } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { placeCmsSlotListTargetOnCanvas } from "@/features/cms-slots/model/place-cms-slot-list-target-on-canvas";
 import {
-  CMS_SLOTS_ROUTE_TASK_CHECKING_CMS_FIELD,
   CMS_SLOTS_ROUTE_TASK_CREATING_LIST_TARGET,
   CMS_SLOTS_ROUTE_TASK_FINISHING,
 } from "@/shared/lib/cms-slots-feature-copy";
@@ -48,8 +43,6 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
     onProgress,
   } = options;
   try {
-    onProgress?.(CMS_SLOTS_ROUTE_TASK_CHECKING_CMS_FIELD);
-    const cmsEnsure = await ensureCmsSlotListCmsTextFieldOnList(container, dataList);
     const comp = await getCmsSlotListTargetComponentOrNull(dataList, container, listTargetDefinitionIdRef.current);
     if (comp == null) {
       onProgress?.(CMS_SLOTS_ROUTE_TASK_CREATING_LIST_TARGET);
@@ -70,21 +63,16 @@ export async function ensureListTargetAfterAppendingSlotRow(options: {
         };
       }
     }
-    await placeCmsSlotListTargetOnCanvas(dataList, container, listTargetDefinitionIdRef.current, {
-      resolvedCmsEnsure: cmsEnsure,
-      onProgress,
-    });
+    // CMS field ensure runs inside placement, after the list target is on the canvas (off the visible critical path).
+    const { cmsEnsure, instancesOnPageCount } = await placeCmsSlotListTargetOnCanvas(
+      dataList,
+      container,
+      listTargetDefinitionIdRef.current,
+      { onProgress }
+    );
     onProgress?.(CMS_SLOTS_ROUTE_TASK_FINISHING);
-    try {
-      const list = await listCmsSlotListTargetInstancesOnPage(dataList, container, {
-        preferredDefinitionId: listTargetDefinitionIdRef.current,
-      });
-      setListTargetOnCanvasCount(list.length);
-    } catch {
-      setListTargetOnCanvasCount(0);
-    } finally {
-      setListTargetOnCanvasCountResolved(true);
-    }
+    setListTargetOnCanvasCount(instancesOnPageCount);
+    setListTargetOnCanvasCountResolved(true);
     return cmsEnsure;
   } catch (e) {
     console.warn("[cms-slots] list target after add component:", e);

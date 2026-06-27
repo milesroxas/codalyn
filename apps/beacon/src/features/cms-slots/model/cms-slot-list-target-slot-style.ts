@@ -85,11 +85,14 @@ async function applyBeaconListTargetLayoutStyleProperties(style: Style): Promise
 export function ensureCmsSlotListTargetSlotStyle(): Promise<Style> {
   return runExclusiveDesignerOp(async () => {
     const all = await webflow.getAllStyles();
-    for (const s of all) {
-      if ((await s.getName()) === CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME) {
-        await applyBeaconListTargetChromeStyleProperties(s);
-        return s;
-      }
+    // Read every style name concurrently — a serial `for…await getName()` is one bridge round-trip per style and
+    // dominated create-slot latency on sites with hundreds of styles.
+    const names = await Promise.all(all.map((s) => s.getName()));
+    const idx = names.indexOf(CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME);
+    if (idx >= 0) {
+      const existing = all[idx];
+      await applyBeaconListTargetChromeStyleProperties(existing);
+      return existing;
     }
     const created = await webflow.createStyle(CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME);
     await applyBeaconListTargetChromeStyleProperties(created);
@@ -109,10 +112,10 @@ export function cmsSlotListTargetRuntimeLayoutRevealSource(): string {
 export function ensureCmsSlotListTargetLayoutStyle(): Promise<Style> {
   return runExclusiveDesignerOp(async () => {
     const all = await webflow.getAllStyles();
-    for (const s of all) {
-      if ((await s.getName()) === CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME) {
-        return s;
-      }
+    const names = await Promise.all(all.map((s) => s.getName()));
+    const idx = names.indexOf(CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME);
+    if (idx >= 0) {
+      return all[idx];
     }
     const created = await webflow.createStyle(CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME);
     await applyBeaconListTargetLayoutStyleProperties(created);

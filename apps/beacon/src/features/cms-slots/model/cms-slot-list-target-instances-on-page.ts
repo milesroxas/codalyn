@@ -152,41 +152,53 @@ export async function removeAllInstancesOfComponentOnPage(definition: Component)
 }
 
 /**
- * Counts list-target instances on the page by **name + group identity only** — no `enterComponent` /
- * `exitComponent` surface check.
+ * List-target instances on the page by **name + group identity only** — no `enterComponent` / `exitComponent`
+ * surface check.
  *
  * The surface check ({@link listCmsSlotListTargetInstancesOnPage}) leaves the entered instance **selected**: Webflow
- * selects the component instance on `exitComponent`. Driving the on-open "is it placed?" gate through it therefore
- * contaminates the Designer selection — the "Select on canvas" button then falsely reads as already selected even
- * though the user selected nothing. A presence/count gate only needs identity; precise collision filtering (the
- * surface check) is for mutation targeting, where a selection change is acceptable.
+ * selects the component instance on `exitComponent`. Driving on-open gates or read-only inspection through it
+ * contaminates the Designer selection and visibly flickers the canvas (entering/exiting each instance) — the
+ * "Select on canvas" button then falsely reads as already selected even though the user selected nothing. Identity is
+ * enough for presence/count and for reading instance props (`searchProps` reads from the page-level instance without
+ * entering); precise collision filtering (the surface check) is only for mutation targeting, where a selection
+ * change is acceptable.
  */
+export async function listCmsSlotListTargetInstancesOnPageByName(
+  dataList: string,
+  listContainer: BlockElement,
+  options?: ListCmsSlotListTargetInstancesOnPageOptions
+): Promise<ComponentElement[]> {
+  const listTarget = await getCmsSlotListTargetComponentOrNull(dataList, listContainer, options?.preferredDefinitionId);
+  if (listTarget == null) {
+    return [];
+  }
+  const expectedName = await listTarget.getName();
+  const expectedGroup = (await listTarget.getSettings()).group;
+  if (expectedGroup !== CMS_SLOT_UTILITIES_COMPONENT_GROUP) {
+    return [];
+  }
+
+  const all = await webflow.getAllElements();
+  const out: ComponentElement[] = [];
+  for (const el of all) {
+    if (el.type !== "ComponentInstance") {
+      continue;
+    }
+    const inst = el as ComponentElement;
+    if (await instanceMatchesRegisteredCmsSlotListTargetIdentity(inst, expectedName, expectedGroup)) {
+      out.push(inst);
+    }
+  }
+  return out;
+}
+
+/** Count of {@link listCmsSlotListTargetInstancesOnPageByName} — identity only, no surface check / selection change. */
 export async function countCmsSlotListTargetInstancesOnPageByName(
   dataList: string,
   listContainer: BlockElement,
   options?: ListCmsSlotListTargetInstancesOnPageOptions
 ): Promise<number> {
-  const listTarget = await getCmsSlotListTargetComponentOrNull(dataList, listContainer, options?.preferredDefinitionId);
-  if (listTarget == null) {
-    return 0;
-  }
-  const expectedName = await listTarget.getName();
-  const expectedGroup = (await listTarget.getSettings()).group;
-  if (expectedGroup !== CMS_SLOT_UTILITIES_COMPONENT_GROUP) {
-    return 0;
-  }
-
-  const all = await webflow.getAllElements();
-  let count = 0;
-  for (const el of all) {
-    if (el.type !== "ComponentInstance") {
-      continue;
-    }
-    if (await instanceMatchesRegisteredCmsSlotListTargetIdentity(el as ComponentElement, expectedName, expectedGroup)) {
-      count++;
-    }
-  }
-  return count;
+  return (await listCmsSlotListTargetInstancesOnPageByName(dataList, listContainer, options)).length;
 }
 
 /**

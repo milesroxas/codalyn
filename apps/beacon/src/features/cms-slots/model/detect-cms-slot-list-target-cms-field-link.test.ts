@@ -28,14 +28,14 @@ function makeInstance(value: unknown): ComponentElement {
 }
 
 vi.mock("@/features/cms-slots/model/cms-slot-list-target-instances-on-page", () => ({
-  listCmsSlotListTargetInstancesOnPage: vi.fn(),
+  listCmsSlotListTargetInstancesOnPageByName: vi.fn(),
 }));
 
 vi.mock("@/features/cms-slots/model/create-cms-slot-list-target-component", () => ({
   getCmsSlotListTargetComponentOrNull: vi.fn(),
 }));
 
-import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
+import { listCmsSlotListTargetInstancesOnPageByName } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 
 describe("detectCmsSlotListTargetCmsFieldLink", () => {
@@ -50,7 +50,7 @@ describe("detectCmsSlotListTargetCmsFieldLink", () => {
       return null;
     });
     vi.mocked(getCmsSlotListTargetComponentOrNull).mockResolvedValue(def);
-    vi.mocked(listCmsSlotListTargetInstancesOnPage).mockResolvedValue([
+    vi.mocked(listCmsSlotListTargetInstancesOnPageByName).mockResolvedValue([
       makeInstance({ sourceType: "cms", collectionId: "collection-1", fieldId: "field-1" }),
     ]);
   });
@@ -68,7 +68,7 @@ describe("detectCmsSlotListTargetCmsFieldLink", () => {
   });
 
   it("returns unlinked when Text prop is empty", async () => {
-    vi.mocked(listCmsSlotListTargetInstancesOnPage).mockResolvedValue([makeInstance("")]);
+    vi.mocked(listCmsSlotListTargetInstancesOnPageByName).mockResolvedValue([makeInstance("")]);
     const result = await detectCmsSlotListTargetCmsFieldLink({
       dataList: "slot-a",
       listContainer,
@@ -80,7 +80,7 @@ describe("detectCmsSlotListTargetCmsFieldLink", () => {
   });
 
   it("returns unlinked when Text prop binds to a different CMS field", async () => {
-    vi.mocked(listCmsSlotListTargetInstancesOnPage).mockResolvedValue([
+    vi.mocked(listCmsSlotListTargetInstancesOnPageByName).mockResolvedValue([
       makeInstance({ sourceType: "cms", collectionId: "collection-1", fieldId: "other-field" }),
     ]);
     const result = await detectCmsSlotListTargetCmsFieldLink({
@@ -100,7 +100,7 @@ describe("detectCmsSlotListTargetCmsFieldLink", () => {
   });
 
   it("returns skipped when no list-target instances are on the page", async () => {
-    vi.mocked(listCmsSlotListTargetInstancesOnPage).mockResolvedValue([]);
+    vi.mocked(listCmsSlotListTargetInstancesOnPageByName).mockResolvedValue([]);
     const result = await detectCmsSlotListTargetCmsFieldLink({
       dataList: "slot-a",
       listContainer,

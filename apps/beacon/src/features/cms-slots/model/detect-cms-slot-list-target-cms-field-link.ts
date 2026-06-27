@@ -3,7 +3,7 @@ import {
   isListTargetTextPropValueLinkedToCms,
   readCmsSlotListTargetCmsBindingFromListContainer,
 } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
-import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
+import { listCmsSlotListTargetInstancesOnPageByName } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import { getCmsSlotListTargetTextProp } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 
@@ -26,7 +26,10 @@ export async function detectCmsSlotListTargetCmsFieldLink(options: {
     return { status: "skipped" };
   }
 
-  const instances = await listCmsSlotListTargetInstancesOnPage(options.dataList, options.listContainer, {
+  // Identity-only list: detection reads each instance's props via `searchProps` (page-level, no `enterComponent`).
+  // The surface-check variant would enter/exit each instance, flickering the canvas and selecting an instance right
+  // as the create-flow CMS field link dialog opens.
+  const instances = await listCmsSlotListTargetInstancesOnPageByName(options.dataList, options.listContainer, {
     preferredDefinitionId: options.preferredDefinitionId,
   });
   if (instances.length === 0) {

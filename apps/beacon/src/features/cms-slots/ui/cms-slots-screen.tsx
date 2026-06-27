@@ -696,6 +696,30 @@ async function refreshListTargetOnCanvasCount(
   }
 }
 
+/**
+ * After deleting a CMS slot list, rewrite the page runtime script so the user doesn't have to press Sync manually.
+ * Reachable only from the designer route's delete (the composer exposes none). Skipped when the page was just
+ * uninstalled — the wrapper is gone, so `syncCmsSlotsInstallEmbedOnPage` would throw and there is nothing left to
+ * sync. On sync failure, leave the Sync button emphasized so the user can retry manually.
+ */
+async function autoSyncPageRuntimeAfterSlotDelete(args: {
+  shouldUninstallPage: boolean;
+  setDesignerListCompositionStale: (v: boolean) => void;
+}): Promise<void> {
+  const { shouldUninstallPage, setDesignerListCompositionStale } = args;
+  if (shouldUninstallPage) {
+    setDesignerListCompositionStale(true);
+    return;
+  }
+  try {
+    await syncCmsSlotsInstallEmbedOnPage();
+    setDesignerListCompositionStale(false);
+  } catch (syncErr) {
+    setDesignerListCompositionStale(true);
+    console.warn("[beacon] auto-sync after slot delete (non-fatal):", syncErr);
+  }
+}
+
 async function promptCmsFieldLinkWhenVerified(
   ensure: CmsSlotListCmsTextFieldEnsureResult | null | undefined,
   openCmsFieldLinkPrompt: (binding: { collectionId: string; fieldId: string }) => void
@@ -2033,7 +2057,10 @@ export function CmsSlotsScreen() {
         uninstallResult,
       });
       void webflow.notify({ type: notify.type, message: notify.message });
-      setDesignerListCompositionStale(true);
+      await autoSyncPageRuntimeAfterSlotDelete({
+        shouldUninstallPage,
+        setDesignerListCompositionStale,
+      });
       void refreshPageBeacons();
     } catch (err) {
       const message = formatWebflowDesignerError(err);

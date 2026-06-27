@@ -362,10 +362,6 @@ export async function placeCmsSlotListTargetOnCanvas(
   }
 
   await ensureTextPropOnDefs(resolvedDef, placementDef);
-  if (firstExisting == null) {
-    report?.(CMS_SLOTS_ROUTE_TASK_OPENING_LIST_TARGET);
-    await forceOpenAndCloseListTargetEditor(instance);
-  }
   await exitToPageCanvas();
 
   // Resolve the CMS field **after** the visible canvas placement. Its Data API create + visibility poll can take
@@ -378,15 +374,21 @@ export async function placeCmsSlotListTargetOnCanvas(
   const cmsBinding: CmsSlotListCmsBinding | null = cmsEnsure?.binding ?? null;
   const cmsFieldWasCreated = cmsEnsure?.fieldWasCreated ?? false;
 
-  // A *freshly created* CMS field cannot be bound from the Designer until the user toggles to CMS view and back —
-  // the bind loop is guaranteed to fail (and burns several seconds retrying). Skip it; `promptCmsFieldLinkIfCreated`
-  // already tells the user to reopen on the template, and the retry path binds successfully then.
+  // Bind only when there is a bindable field that is NOT freshly created. A just-created field cannot be bound from
+  // the Designer until the user toggles to CMS view and back (the bind loop would just fail after burning seconds);
+  // `promptCmsFieldLinkIfCreated` drives that retry. The forced editor open/close exists *only* to prime the Designer
+  // cache before `setProps`, so run it solely on the bind path — skipping it removes a wasteful component enter/exit
+  // flash on the common create-with-new-field path.
   let cmsBindSucceeded: boolean;
   if (cmsBinding == null) {
     cmsBindSucceeded = true;
   } else if (cmsFieldWasCreated) {
     cmsBindSucceeded = false;
   } else {
+    if (firstExisting == null) {
+      report?.(CMS_SLOTS_ROUTE_TASK_OPENING_LIST_TARGET);
+      await forceOpenAndCloseListTargetEditor(instance);
+    }
     report?.(CMS_SLOTS_ROUTE_TASK_LINKING_CMS_FIELD);
     cmsBindSucceeded = await tryBindListTargetInstancesToCmsText({
       dataList,

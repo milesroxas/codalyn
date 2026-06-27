@@ -24,13 +24,8 @@ async function instanceMatchesRegisteredCmsSlotListTargetIdentity(
     return false;
   }
   const c = await inst.getComponent();
-  if ((await c.getName()) !== expectedName) {
-    return false;
-  }
-  if ((await c.getSettings()).group !== expectedGroup) {
-    return false;
-  }
-  return true;
+  const [name, settings] = await Promise.all([c.getName(), c.getSettings()]);
+  return name === expectedName && settings.group === expectedGroup;
 }
 
 async function instanceMatchesRegisteredCmsSlotListTarget(
@@ -179,17 +174,12 @@ export async function listCmsSlotListTargetInstancesOnPageByName(
   }
 
   const all = await webflow.getAllElements();
-  const out: ComponentElement[] = [];
-  for (const el of all) {
-    if (el.type !== "ComponentInstance") {
-      continue;
-    }
-    const inst = el as ComponentElement;
-    if (await instanceMatchesRegisteredCmsSlotListTargetIdentity(inst, expectedName, expectedGroup)) {
-      out.push(inst);
-    }
-  }
-  return out;
+  const instances = all.filter((el): el is ComponentElement => el.type === "ComponentInstance");
+  // Identity-match every instance concurrently — each match is getComponent/getName/getSettings round-trips.
+  const matches = await Promise.all(
+    instances.map((inst) => instanceMatchesRegisteredCmsSlotListTargetIdentity(inst, expectedName, expectedGroup))
+  );
+  return instances.filter((_, i) => matches[i]);
 }
 
 /** Count of {@link listCmsSlotListTargetInstancesOnPageByName} — identity only, no surface check / selection change. */

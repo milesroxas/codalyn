@@ -329,10 +329,9 @@ export async function executeCmsSlotComposerSave(input: {
     return false;
   }
 
-  const rows = await listInstancesInSlotListContainer(beacon.container);
-  const configuredPoolKeys = await resolveCmsSlotDesignerConfiguredPoolKeys(beacon.container, rows);
-  let designerScopedRows = filterHydratedCmsSlotRowsByPoolKeys(rows, configuredPoolKeys);
-  designerScopedRows = await ensureDesignerPoolHasDraftComponentTypes(beacon.container, draftToApply);
+  // `ensureDesignerPoolHasDraftComponentTypes` already lists instances, resolves configured pool keys, and filters to
+  // the scoped rows — computing them here first only to overwrite was a redundant full container hydration per save.
+  const designerScopedRows = await ensureDesignerPoolHasDraftComponentTypes(beacon.container, draftToApply);
   const mapped = draftToHiddenListIndices(designerScopedRows, draftToApply);
   if (!mapped.ok) {
     void webflow.notify({

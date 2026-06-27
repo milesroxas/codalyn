@@ -177,25 +177,28 @@ async function readSeedVariant(instance: ComponentElement): Promise<CmsSlotSelec
  */
 export async function listInstancesInSlotListContainer(container: BlockElement): Promise<HydratedCmsSlotRow[]> {
   const children = await container.getChildren();
-  const out: HydratedCmsSlotRow[] = [];
-  for (let domChildIndex = 0; domChildIndex < children.length; domChildIndex++) {
-    const ch = children[domChildIndex];
-    if (ch.type !== "ComponentInstance") continue;
-    const inst = ch as ComponentElement;
-    const comp = await inst.getComponent();
-    const name = await comp.getName();
-    const variant = await readSeedVariant(inst);
-    out.push({
-      key: crypto.randomUUID(),
-      componentId: comp.id,
-      name,
-      instance: inst,
-      domChildIndex,
-      variant,
-      poolKey: poolOptionKey({ componentId: comp.id, variantId: variant?.variantId ?? null }),
-    });
-  }
-  return out;
+  // Hydrate each component-instance child concurrently — getComponent/getName/searchProps are bridge round-trips, so a
+  // serial loop costs N × latency. `domChildIndex` (the original child index) preserves DOM order.
+  const rows = await Promise.all(
+    children.map(async (ch, domChildIndex): Promise<HydratedCmsSlotRow | null> => {
+      if (ch.type !== "ComponentInstance") {
+        return null;
+      }
+      const inst = ch as ComponentElement;
+      const comp = await inst.getComponent();
+      const [name, variant] = await Promise.all([comp.getName(), readSeedVariant(inst)]);
+      return {
+        key: crypto.randomUUID(),
+        componentId: comp.id,
+        name,
+        instance: inst,
+        domChildIndex,
+        variant,
+        poolKey: poolOptionKey({ componentId: comp.id, variantId: variant?.variantId ?? null }),
+      };
+    })
+  );
+  return rows.filter((row): row is HydratedCmsSlotRow => row != null);
 }
 
 /** Resolves a published runtime clone index (`payload.i[]`) to the matching Designer pool row. */

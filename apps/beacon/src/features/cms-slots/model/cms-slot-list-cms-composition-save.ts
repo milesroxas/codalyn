@@ -7,7 +7,7 @@ import {
   getCmsSlotListTargetCmsFieldIdFromListContainer,
   getCmsTemplateCollectionIdFromCurrentPage,
 } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
-import { listCmsSlotListTargetInstancesOnPage } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
+import { listCmsSlotListTargetInstancesOnPageByName } from "@/features/cms-slots/model/cms-slot-list-target-instances-on-page";
 import { getCmsSlotListTargetTextPropId } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
@@ -127,7 +127,10 @@ async function readCmsSlotListStaticListTargetRuntimeText(options: {
   if (def == null) {
     return null;
   }
-  const instances = await listCmsSlotListTargetInstancesOnPage(options.dataList, options.listContainer, {
+  // Identity-only list (no surface check): we only read/write the list-target Text by prop id on each instance, which
+  // does not require entering the component — the surface check's per-instance enterComponent/exitComponent flickers
+  // the canvas and contaminates the Designer selection mid-save.
+  const instances = await listCmsSlotListTargetInstancesOnPageByName(options.dataList, options.listContainer, {
     preferredDefinitionId: options.preferredDefinitionId,
   });
   if (instances.length === 0) {
@@ -279,7 +282,10 @@ export async function setCmsSlotListTargetInstancesStaticRuntimeText(options: {
   if (def == null) {
     return;
   }
-  const instances = await listCmsSlotListTargetInstancesOnPage(options.dataList, options.listContainer, {
+  // Identity-only list (no surface check): we only read/write the list-target Text by prop id on each instance, which
+  // does not require entering the component — the surface check's per-instance enterComponent/exitComponent flickers
+  // the canvas and contaminates the Designer selection mid-save.
+  const instances = await listCmsSlotListTargetInstancesOnPageByName(options.dataList, options.listContainer, {
     preferredDefinitionId: options.preferredDefinitionId,
   });
   let instDef: Component | undefined;

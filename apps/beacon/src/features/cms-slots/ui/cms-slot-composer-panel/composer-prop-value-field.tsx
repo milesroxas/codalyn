@@ -17,8 +17,8 @@ import { CMS_SLOTS_COMPOSER_IMAGE_PROP_HINT } from "@/shared/lib/cms-slots-featu
 import { cn } from "@/shared/lib/utils";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Input } from "@/shared/ui/input";
-import { Switch } from "@/shared/ui/switch";
 import { Textarea } from "@/shared/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group";
 
 type ComposerPropValueFieldProps = {
   inputId: string;
@@ -80,16 +80,27 @@ const COMPOSER_PROP_VALUE_BY_KIND: Record<
       <span className="text-xs text-muted-foreground">{parseBoolString(value) ? "Yes" : "No"}</span>
     </div>
   ),
-  visibility: ({ inputId, value, busy, onChange }) => (
-    <div className="flex items-center gap-2 py-0.5">
-      <Switch
-        id={inputId}
-        checked={parseBoolString(value)}
-        disabled={busy}
-        onCheckedChange={(c) => onChange(c ? "true" : "false")}
-      />
-      <span className="text-xs text-muted-foreground">{parseBoolString(value) ? "Visible" : "Hidden"}</span>
-    </div>
+  visibility: ({ inputId, ep, value, busy, onChange }) => (
+    <ToggleGroup
+      id={inputId}
+      type="single"
+      variant="outline"
+      size="xs"
+      value={parseBoolString(value) ? "visible" : "hidden"}
+      onValueChange={(v) => {
+        if (v) {
+          onChange(v === "visible" ? "true" : "false");
+        }
+      }}
+      aria-label={ep.label}
+    >
+      <ToggleGroupItem value="visible" disabled={busy}>
+        Visible
+      </ToggleGroupItem>
+      <ToggleGroupItem value="hidden" disabled={busy}>
+        Hidden
+      </ToggleGroupItem>
+    </ToggleGroup>
   ),
   number: ({ inputId, value, busy, onChange }) => (
     <Input

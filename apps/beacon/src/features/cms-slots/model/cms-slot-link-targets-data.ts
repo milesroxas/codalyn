@@ -13,6 +13,7 @@ import {
   type LinkPickerEntry,
   type LinkPickerPage,
   normalizeRelativePath,
+  stripCmsDetailPagePrefix,
 } from "@/features/cms-slots/model/cms-slot-link-targets";
 import { towerFetch } from "@/shared/lib/tower-client";
 
@@ -105,7 +106,8 @@ async function loadCollectionTemplatePaths(): Promise<Map<string, string>> {
       continue;
     }
     const { pageSlug, folderSlugs } = await readPageSlugChain(item);
-    byCollection.set(collectionId, buildPageBasePath(pageSlug, folderSlugs));
+    // Webflow returns the detail page's own slug with a `detail_` prefix; the published URL drops it (see helper).
+    byCollection.set(collectionId, buildPageBasePath(stripCmsDetailPagePrefix(pageSlug), folderSlugs));
   }
   return byCollection;
 }

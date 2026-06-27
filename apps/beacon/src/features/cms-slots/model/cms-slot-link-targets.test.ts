@@ -5,6 +5,7 @@ import {
   isLinkablePageKind,
   joinCollectionItemPath,
   normalizeRelativePath,
+  stripCmsDetailPagePrefix,
 } from "@/features/cms-slots/model/cms-slot-link-targets";
 
 describe("isLinkablePageKind", () => {
@@ -74,6 +75,39 @@ describe("buildPageBasePath", () => {
       "/blog/embracing-challenges"
     );
     expect(joinCollectionItemPath(buildPageBasePath("projects", []), "my-entry")).toBe("/projects/my-entry");
+  });
+});
+
+describe("stripCmsDetailPagePrefix", () => {
+  it("strips Webflow's `detail_` collection-page prefix so the path matches the published URL", () => {
+    // Regression: Webflow returns `detail_event`, but the item URL is `/event/<slug>`, not `/detail_event/<slug>`.
+    expect(stripCmsDetailPagePrefix("detail_event")).toBe("event");
+    expect(stripCmsDetailPagePrefix("  detail_event  ")).toBe("event");
+  });
+
+  it("leaves a slug without the prefix unchanged (older sites / non-CMS callers)", () => {
+    expect(stripCmsDetailPagePrefix("event")).toBe("event");
+    expect(stripCmsDetailPagePrefix("blog")).toBe("blog");
+  });
+
+  it("strips only one leading prefix, preserving a slug that itself starts with `detail_`", () => {
+    expect(stripCmsDetailPagePrefix("detail_detail_pages")).toBe("detail_pages");
+  });
+
+  it("returns null for missing / blank / prefix-only input (no partial application)", () => {
+    expect(stripCmsDetailPagePrefix(null)).toBeNull();
+    expect(stripCmsDetailPagePrefix(undefined)).toBeNull();
+    expect(stripCmsDetailPagePrefix("   ")).toBeNull();
+    expect(stripCmsDetailPagePrefix("detail_")).toBeNull();
+  });
+
+  it("composes to the corrected full detail path", () => {
+    expect(
+      joinCollectionItemPath(
+        buildPageBasePath(stripCmsDetailPagePrefix("detail_event"), []),
+        "design-thinking-symposium-2023"
+      )
+    ).toBe("/event/design-thinking-symposium-2023");
   });
 });
 

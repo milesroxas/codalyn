@@ -63,6 +63,23 @@ export function buildPageBasePath(
   return normalizeRelativePath(`/${parts.join("/")}`) ?? "/";
 }
 
+/**
+ * Webflow's Designer API names a CMS collection's detail/template page with an internal `detail_` slug prefix
+ * (e.g. `detail_event`), but the published item URL uses the bare collection slug (`/event/<item>`). Strip exactly
+ * one leading `detail_` so the rebuilt detail-page prefix matches the real URL. Anchored + single-shot, so a
+ * collection whose own slug legitimately starts with `detail_` (page slug `detail_detail_pages`) keeps the inner
+ * one; slugs without the prefix pass through unchanged (older sites / non-CMS callers). Returns null when nothing
+ * usable remains. Only the collection page's *own* slug carries this prefix — folder slugs never do.
+ */
+export function stripCmsDetailPagePrefix(slug: string | null | undefined): string | null {
+  const trimmed = typeof slug === "string" ? slug.trim() : "";
+  if (trimmed === "") {
+    return null;
+  }
+  const stripped = trimmed.replace(/^detail_/, "");
+  return stripped === "" ? null : stripped;
+}
+
 /** Joins a collection template path and an item slug into a site-relative detail path, or null if either is invalid. */
 export function joinCollectionItemPath(
   templatePath: string | null | undefined,

@@ -278,47 +278,64 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
   const pendingTowerPatchesRef = useRef<Partial<BeaconAppSettings>[]>([]);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  /** Latest syncState for closures (catch handler) without re-creating the pull callback on every change. */
+  const syncStateRef = useRef(syncState);
+  syncStateRef.current = syncState;
 
-  const pullSettingsFromTower = useCallback(() => {
-    if (!user?.id) {
-      return;
-    }
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-    setSyncState("loading");
+  const pullSettingsFromTower = useCallback(
+    (options?: { background?: boolean }) => {
+      if (!user?.id) {
+        return;
+      }
+      const background = options?.background === true;
+      abortRef.current?.abort();
+      const ac = new AbortController();
+      abortRef.current = ac;
+      // Background refresh (tab focus / visibilitychange) must NOT flip to "loading": that makes
+      // `settingsPullPending` true, which unmounts the working route subtree (BeaconSiteLinkGuard /
+      // CmsSlotsAccessGate) and wipes unsaved in-screen state. Refresh silently, commit only on success.
+      if (!background) {
+        setSyncState("loading");
+      }
 
-    void towerFetch("/api/v1/beacon/settings", { signal: ac.signal })
-      .then(async (r) => {
-        if (!r.ok) {
-          throw new Error(`settings ${r.status}`);
-        }
-        return r.json() as Promise<TowerBeaconApiEnvelope & { settings: BeaconAppSettings }>;
-      })
-      .then((data) => {
-        applyTowerBeaconEnvelope(data, {
-          setSettings,
-          setEditorExperience,
-          setCanManageTeamBeaconSettings,
-          setRestrictToEditorExperience,
-          setWorkspaceMemberRole,
-          setAppUserRole,
-          setHasActiveWorkspace,
-          setBeaconWorkspaces,
-          setActiveOrganizationId,
-          setActiveOrganizationName,
-          setWebflowSites,
+      void towerFetch("/api/v1/beacon/settings", { signal: ac.signal })
+        .then(async (r) => {
+          if (!r.ok) {
+            throw new Error(`settings ${r.status}`);
+          }
+          return r.json() as Promise<TowerBeaconApiEnvelope & { settings: BeaconAppSettings }>;
+        })
+        .then((data) => {
+          applyTowerBeaconEnvelope(data, {
+            setSettings,
+            setEditorExperience,
+            setCanManageTeamBeaconSettings,
+            setRestrictToEditorExperience,
+            setWorkspaceMemberRole,
+            setAppUserRole,
+            setHasActiveWorkspace,
+            setBeaconWorkspaces,
+            setActiveOrganizationId,
+            setActiveOrganizationName,
+            setWebflowSites,
+          });
+          setSyncState("synced");
+          lastVisibilityPullAtRef.current = Date.now();
+        })
+        .catch(() => {
+          if (ac.signal.aborted) {
+            return;
+          }
+          // A failed background refresh must not tear down a working session: keep the last-good synced
+          // state instead of surfacing "error" (which the access gate renders as a full-screen retry).
+          if (background && syncStateRef.current === "synced") {
+            return;
+          }
+          setSyncState("error");
         });
-        setSyncState("synced");
-        lastVisibilityPullAtRef.current = Date.now();
-      })
-      .catch(() => {
-        if (ac.signal.aborted) {
-          return;
-        }
-        setSyncState("error");
-      });
-  }, [user?.id]);
+    },
+    [user?.id]
+  );
 
   useEffect(() => {
     if (!user?.id) {
@@ -360,7 +377,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
       if (last > 0 && now - last < minIntervalMs) {
         return;
       }
-      pullSettingsFromTower();
+      pullSettingsFromTower({ background: true });
     };
     document.addEventListener("visibilitychange", onResume);
     return () => {

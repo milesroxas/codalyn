@@ -258,4 +258,15 @@ describe("ImageEditorCropExportPanel export format lock", () => {
     renderSavePanel({ exportFormatLocked: false, allowAvifEncoding: false });
     expect(screen.getByText("File type")).toBeInTheDocument();
   });
+
+  it("surfaces the WebP fallback notice when a locked AVIF preset is overridden by the Tower limit", () => {
+    renderSavePanel({
+      exportFormatLocked: true,
+      avifPresetOverriddenByTowerLimit: true,
+      allowAvifEncoding: true,
+    });
+    // Locked, yet the override still renders the format section so the silent AVIF→WebP fallback is visible.
+    expect(screen.getByText("File type")).toBeInTheDocument();
+    expect(screen.getByText("Image optimization credits used up")).toBeInTheDocument();
+  });
 });

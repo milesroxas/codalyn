@@ -10,11 +10,16 @@ import {
   CMS_SLOTS_COMPOSER_IMAGE_BLOCKED_HINT,
   CMS_SLOTS_COMPOSER_IMAGE_DRAWER_DESCRIPTION,
   CMS_SLOTS_COMPOSER_IMAGE_DRAWER_TITLE,
+  CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_CANCEL,
+  CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_CONFIRM,
+  CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_DESCRIPTION,
+  CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_TITLE,
   CMS_SLOTS_COMPOSER_IMAGE_REMOVE_LABEL,
   CMS_SLOTS_COMPOSER_IMAGE_REPLACE_LABEL,
   CMS_SLOTS_COMPOSER_IMAGE_UPLOAD_LABEL,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { Button } from "@/shared/ui/button";
+import { ConfirmDestructiveDialog } from "@/shared/ui/confirm-destructive-dialog";
 import {
   DrawerContent,
   DrawerDescription,
@@ -82,6 +87,7 @@ function ComposeImageDrawer(props: {
 export function CmsSlotImagePropField(props: CmsSlotImagePropFieldProps) {
   const { ep, value, busy, onChange } = props;
   const { settings } = useBeaconAppSettings();
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const constraints = readExportConstraints(ep.imageExport, { defaultQuality: settings.defaultExportQuality });
   const hasValue = value.trim() !== "";
 
@@ -123,11 +129,24 @@ export function CmsSlotImagePropField(props: CmsSlotImagePropFieldProps) {
               </Button>
             }
           />
-          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => onChange("")}>
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setRemoveConfirmOpen(true)}>
             <Trash2 data-icon="inline-start" aria-hidden strokeWidth={2.25} />
             {CMS_SLOTS_COMPOSER_IMAGE_REMOVE_LABEL}
           </Button>
         </div>
+        <ConfirmDestructiveDialog
+          open={removeConfirmOpen}
+          onOpenChange={setRemoveConfirmOpen}
+          busy={busy}
+          title={CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_TITLE}
+          description={CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_DESCRIPTION}
+          cancelLabel={CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_CANCEL}
+          confirmLabel={CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_CONFIRM}
+          onConfirm={() => {
+            onChange("");
+            setRemoveConfirmOpen(false);
+          }}
+        />
       </div>
     );
   }

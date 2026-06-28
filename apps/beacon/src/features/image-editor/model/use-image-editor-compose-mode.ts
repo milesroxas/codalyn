@@ -7,7 +7,11 @@ import { useMemo } from "react";
  * placement that hands the uploaded asset back to the caller — no canvas/CMS mutation, no route navigation.
  */
 export type ImageEditorComposeSession = {
-  /** Designer per-prop preset — locks dimensions/format/quality and hides the resolver/picker UI. */
+  /**
+   * Designer per-prop preset. Locks output dimensions and export format and hides the resolver/picker UI; quality is
+   * seeded from the preset (the workspace default — the Designer form has no quality control) but stays adjustable per
+   * upload, like the `/images` editor, so the composer can trim quality to satisfy the preset's max file size.
+   */
   constraints: ExportConstraints;
   /** Fired on a successful `compose` upload with the new Webflow asset. */
   onComplete: (asset: { id: string; url: string }) => void;

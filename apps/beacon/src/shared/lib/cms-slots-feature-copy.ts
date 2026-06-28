@@ -319,6 +319,11 @@ export const CMS_SLOTS_COMPOSER_IMAGE_PROP_HINT = "Copy image link from Webflow 
 export const CMS_SLOTS_COMPOSER_IMAGE_UPLOAD_LABEL = "Upload image";
 export const CMS_SLOTS_COMPOSER_IMAGE_REPLACE_LABEL = "Replace";
 export const CMS_SLOTS_COMPOSER_IMAGE_REMOVE_LABEL = "Remove";
+export const CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_TITLE = "Remove this image?";
+export const CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_DESCRIPTION =
+  "This clears the image from this field. You can upload a new one anytime.";
+export const CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_CANCEL = "Keep image";
+export const CMS_SLOTS_COMPOSER_IMAGE_REMOVE_DIALOG_CONFIRM = "Remove image";
 export const CMS_SLOTS_COMPOSER_IMAGE_BLOCKED_HINT = "Image size not set by Designer.";
 export const CMS_SLOTS_COMPOSER_IMAGE_DRAWER_TITLE = "Upload image";
 export const CMS_SLOTS_COMPOSER_IMAGE_DRAWER_DESCRIPTION =

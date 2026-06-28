@@ -394,6 +394,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
   const userPickedUploadPresetRef = useRef(false);
   const lastAppliedUploadPresetOptionIdRef = useRef<string | null>(null);
   const lastAppliedResolverConstraintsKeyRef = useRef<string | null>(null);
+  const lastAppliedComposeConstraintsKeyRef = useRef<string | null>(null);
   const skipNextPersistExportDefaultsRef = useRef(false);
   const [uploadPresetOptionId, setUploadPresetOptionId] = useState<string>("");
   const {
@@ -545,6 +546,12 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     [uploadPresetOptionId, uploadPresetPickerOptionMap]
   );
 
+  // Compose mode locks the format to the Designer per-prop preset; the upload-preset path locks when its row sets one.
+  const exportFormatLocked = useMemo(
+    () => compose.active || uploadPresetExportFormatLocked,
+    [compose.active, uploadPresetExportFormatLocked]
+  );
+
   const selectedUploadPresetConstraints = uploadPresetPickerOptionMap.get(uploadPresetOptionId)?.constraints ?? null;
 
   const effectiveExportFormat = useMemo(
@@ -556,9 +563,12 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     () =>
       isAvifPresetOverriddenByTowerLimit({
         imageOptimizeLimitReached,
-        presetExportFormat: selectedUploadPresetConstraints?.exportFormat,
+        // The format the session is locked to: a Designer compose preset (highest precedence) else the upload preset.
+        presetExportFormat: compose.active
+          ? compose.constraints?.exportFormat
+          : selectedUploadPresetConstraints?.exportFormat,
       }),
-    [selectedUploadPresetConstraints?.exportFormat, imageOptimizeLimitReached]
+    [compose.active, compose.constraints, selectedUploadPresetConstraints?.exportFormat, imageOptimizeLimitReached]
   );
 
   const uploadPresetPickerReadOnly = useMemo(
@@ -856,10 +866,18 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
   ]);
 
   // Compose mode: drive the session straight from the Designer per-prop preset (highest precedence, locks the UI).
+  // Seed once per (constraints value, image) — the CMS composer recreates `constraints` each render, so key by value
+  // like the resolver/upload-preset effects above; keying by identity would re-seed and clobber the user's quality edits.
   useEffect(() => {
     if (!compose.active || imageSrc == null || compose.constraints == null) {
+      lastAppliedComposeConstraintsKeyRef.current = null;
       return;
     }
+    const applyKey = JSON.stringify({ constraints: compose.constraints, imageSrc });
+    if (lastAppliedComposeConstraintsKeyRef.current === applyKey) {
+      return;
+    }
+    lastAppliedComposeConstraintsKeyRef.current = applyKey;
     setSessionMaxFileSizeBytes(compose.constraints.maxFileSizeBytes);
     skipNextPersistExportDefaultsRef.current = true;
     applySessionConstraintsFromPickerSelection(
@@ -1630,7 +1648,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
         uploadPresetPickerValue: uploadPresetOptionId,
         uploadPresetPickerOptions,
         onUploadPresetPickerChange: handleUploadPresetPickerChange,
-        exportFormatLocked: uploadPresetExportFormatLocked,
+        exportFormatLocked,
         avifPresetOverriddenByTowerLimit,
       }}
     />

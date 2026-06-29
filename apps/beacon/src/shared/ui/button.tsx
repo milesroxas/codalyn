@@ -32,7 +32,7 @@ const buttonVariants = cva(
           "border-input/65 bg-muted/35 text-muted-foreground shadow-none hover:bg-muted/50 hover:text-foreground dark:border-border dark:bg-muted/55 dark:hover:bg-muted/70 dark:hover:text-foreground",
         /** Route footer dock: active (selected tab, emphasized action; `--beacon-route-dock-*` in globals.css). */
         routeDockActive:
-          "border-[color-mix(in_oklab,var(--beacon-route-dock-accent-line)_48%,var(--border))] text-foreground shadow-[inset_0_-2px_10px_-3px_color-mix(in_oklab,var(--beacon-route-dock-accent-line)_35%,transparent),inset_0_-1px_0_0_var(--beacon-route-dock-accent-line)] [background-image:linear-gradient(to_bottom,var(--beacon-route-dock-active-top)_0%,var(--beacon-route-dock-active-bottom)_100%)] hover:brightness-[1.04]",
+          "border-input/45 text-foreground shadow-[inset_0_-2px_10px_-3px_color-mix(in_oklab,var(--beacon-route-dock-accent-line)_35%,transparent)] [background-image:linear-gradient(to_bottom,var(--beacon-route-dock-active-top)_0%,var(--beacon-route-dock-active-bottom)_100%)] hover:brightness-[1.04] dark:border-border/65",
         /** Full-width action row (e.g. Add Slot / Scan page). */
         actionCard:
           "border-border/65 bg-muted/50 text-foreground shadow-none hover:bg-muted/65 dark:bg-muted/35 dark:hover:bg-muted/50",

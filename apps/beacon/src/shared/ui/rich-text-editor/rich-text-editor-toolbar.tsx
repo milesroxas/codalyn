@@ -3,17 +3,30 @@ import {
   Heading2,
   Heading3,
   Italic,
+  Link as LinkIcon,
   List,
   ListOrdered,
   type LucideIcon,
+  MoreHorizontal,
   Quote,
   RemoveFormatting,
   Underline,
 } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/shared/lib/utils";
-import { RichTextLinkButton } from "@/shared/ui/rich-text-editor/plugins/link-plugin";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
+import { useToolbarOverflow } from "@/shared/ui/rich-text-editor/lib/use-toolbar-overflow";
+import { RichTextLinkButton, RichTextLinkMenuItem } from "@/shared/ui/rich-text-editor/plugins/link-plugin";
 import {
   richTextCommands,
+  type ToolbarState,
   useRichTextEditor,
   useToolbarState,
 } from "@/shared/ui/rich-text-editor/plugins/toolbar-state-plugin";
@@ -54,25 +67,102 @@ function RichTextToolbarButton({ icon: Icon, label, active, disabled, onClick }:
   );
 }
 
-/** Logical cluster for a feature; a vertical separator is drawn whenever the cluster changes between two features. */
-function featureGroup(feature: RichTextFeature): string {
+/** Static presentation metadata per feature; the logical `group` drives separator placement (block↔inline↔list). */
+const FEATURE_META: Record<RichTextFeature, { icon: LucideIcon; label: string; group: string }> = {
+  bold: { icon: Bold, label: "Bold", group: "inline" },
+  italic: { icon: Italic, label: "Italic", group: "inline" },
+  underline: { icon: Underline, label: "Underline", group: "inline" },
+  h2: { icon: Heading2, label: "Heading 2", group: "block" },
+  h3: { icon: Heading3, label: "Heading 3", group: "block" },
+  bulletList: { icon: List, label: "Bullet list", group: "list" },
+  orderedList: { icon: ListOrdered, label: "Numbered list", group: "list" },
+  link: { icon: LinkIcon, label: "Link", group: "link" },
+  quote: { icon: Quote, label: "Quote", group: "block" },
+  clear: { icon: RemoveFormatting, label: "Clear formatting", group: "clear" },
+};
+
+type ToolbarItem = {
+  feature: RichTextFeature;
+  icon: LucideIcon;
+  label: string;
+  group: string;
+  active: boolean;
+  disabled: boolean;
+  /** Command to run on activation; `undefined` for `link`, which is rendered as its own popover/submenu surface. */
+  run?: () => void;
+};
+
+/**
+ * Resolves the live state of one feature (active + disabled + command) so the inline button, the overflow menu item,
+ * and the measurement mirror all derive from a single source — the one place the toolbar reads {@link ToolbarState}.
+ */
+function buildItem(
+  feature: RichTextFeature,
+  state: ToolbarState,
+  editor: ReturnType<typeof useRichTextEditor>,
+  disabled: boolean
+): ToolbarItem {
+  const meta = FEATURE_META[feature];
+  // Inline marks stay available even with a collapsed selection; block toggles need an editable range.
+  const off = disabled || !state.canEdit;
+  const base = { feature, icon: meta.icon, label: meta.label, group: meta.group };
   switch (feature) {
     case "bold":
+      return { ...base, active: state.bold, disabled, run: () => richTextCommands.toggleInline(editor, "bold") };
     case "italic":
+      return { ...base, active: state.italic, disabled, run: () => richTextCommands.toggleInline(editor, "italic") };
     case "underline":
-      return "inline";
+      return {
+        ...base,
+        active: state.underline,
+        disabled,
+        run: () => richTextCommands.toggleInline(editor, "underline"),
+      };
     case "h2":
+      return {
+        ...base,
+        active: state.blockType === "h2",
+        disabled: off,
+        run: () => richTextCommands.toggleHeading(editor, "h2", state.blockType === "h2"),
+      };
     case "h3":
-    case "quote":
-      return "block";
+      return {
+        ...base,
+        active: state.blockType === "h3",
+        disabled: off,
+        run: () => richTextCommands.toggleHeading(editor, "h3", state.blockType === "h3"),
+      };
     case "bulletList":
+      return {
+        ...base,
+        active: state.blockType === "bullet",
+        disabled: off,
+        run: () => richTextCommands.toggleBulletList(editor, state.blockType === "bullet"),
+      };
     case "orderedList":
-      return "list";
-    case "link":
-      return "link";
+      return {
+        ...base,
+        active: state.blockType === "number",
+        disabled: off,
+        run: () => richTextCommands.toggleOrderedList(editor, state.blockType === "number"),
+      };
+    case "quote":
+      return {
+        ...base,
+        active: state.blockType === "quote",
+        disabled: off,
+        run: () => richTextCommands.toggleQuote(editor, state.blockType === "quote"),
+      };
     case "clear":
-      return "clear";
+      return { ...base, active: false, disabled: off, run: () => richTextCommands.clearFormatting(editor) };
+    case "link":
+      return { ...base, active: state.isLink, disabled: off };
   }
+}
+
+/** Vertical rule drawn before an item whenever the feature cluster changes from the previous rendered item. */
+function GroupSeparator(): React.JSX.Element {
+  return <Separator orientation="vertical" className="mx-0.5 h-5" />;
 }
 
 type RichTextToolbarProps = {
@@ -81,133 +171,153 @@ type RichTextToolbarProps = {
 };
 
 /**
- * Toolbar built from shared/ui primitives only (no new chrome): standalone toggle buttons styled with
- * {@link toggleVariants}, `Separator` between clusters, `Tooltip` on each, lucide icons. Pressed state comes from
- * {@link useToolbarState} — the single source of truth (plan §6.4). Must render inside a `LexicalComposer`.
+ * Toolbar built from shared/ui primitives only: standalone toggle buttons styled with {@link toggleVariants},
+ * `Separator` between clusters, `Tooltip` on each, lucide icons. Pressed state comes from {@link useToolbarState} —
+ * the single source of truth.
+ *
+ * To avoid wrapping onto a second line on narrow surfaces, the toolbar measures itself (see
+ * {@link useToolbarOverflow}) and keeps only the leading items that fit on one row; the remainder collapse into a
+ * "More" dropdown that mirrors each control as a menu item. Must render inside a `LexicalComposer`.
  */
 export function RichTextToolbar({ features, disabled = false }: RichTextToolbarProps): React.JSX.Element {
   const editor = useRichTextEditor();
   const state = useToolbarState();
-  const off = disabled || !state.canEdit;
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  const renderFeature = (feature: RichTextFeature) => {
-    switch (feature) {
-      case "bold":
-        return (
-          <RichTextToolbarButton
-            key={feature}
-            icon={Bold}
-            label="Bold"
-            active={state.bold}
-            disabled={disabled}
-            onClick={() => richTextCommands.toggleInline(editor, "bold")}
-          />
-        );
-      case "italic":
-        return (
-          <RichTextToolbarButton
-            key={feature}
-            icon={Italic}
-            label="Italic"
-            active={state.italic}
-            disabled={disabled}
-            onClick={() => richTextCommands.toggleInline(editor, "italic")}
-          />
-        );
-      case "underline":
-        return (
-          <RichTextToolbarButton
-            key={feature}
-            icon={Underline}
-            label="Underline"
-            active={state.underline}
-            disabled={disabled}
-            onClick={() => richTextCommands.toggleInline(editor, "underline")}
-          />
-        );
-      case "h2":
-        return (
-          <RichTextToolbarButton
-            key={feature}
-            icon={Heading2}
-            label="Heading 2"
-            active={state.blockType === "h2"}
-            disabled={off}
-            onClick={() => richTextCommands.toggleHeading(editor, "h2", state.blockType === "h2")}
-          />
-        );
-      case "h3":
-        return (
-          <RichTextToolbarButton
-            key={feature}
-            icon={Heading3}
-            label="Heading 3"
-            active={state.blockType === "h3"}
-            disabled={off}
-            onClick={() => richTextCommands.toggleHeading(editor, "h3", state.blockType === "h3")}
-          />
-        );
-      case "bulletList":
-        return (
-          <RichTextToolbarButton
-            key={feature}
-            icon={List}
-            label="Bullet list"
-            active={state.blockType === "bullet"}
-            disabled={off}
-            onClick={() => richTextCommands.toggleBulletList(editor, state.blockType === "bullet")}
-          />
-        );
-      case "orderedList":
-        return (
-          <RichTextToolbarButton
-            key={feature}
-            icon={ListOrdered}
-            label="Numbered list"
-            active={state.blockType === "number"}
-            disabled={off}
-            onClick={() => richTextCommands.toggleOrderedList(editor, state.blockType === "number")}
-          />
-        );
-      case "quote":
-        return (
-          <RichTextToolbarButton
-            key={feature}
-            icon={Quote}
-            label="Quote"
-            active={state.blockType === "quote"}
-            disabled={off}
-            onClick={() => richTextCommands.toggleQuote(editor, state.blockType === "quote")}
-          />
-        );
-      case "link":
-        return <RichTextLinkButton key={feature} active={state.isLink} currentUrl={state.linkUrl} disabled={off} />;
-      case "clear":
-        return (
-          <RichTextToolbarButton
-            key={feature}
-            icon={RemoveFormatting}
-            label="Clear formatting"
-            active={false}
-            disabled={off}
-            onClick={() => richTextCommands.clearFormatting(editor)}
-          />
-        );
+  const items = features.map((feature) => buildItem(feature, state, editor, disabled));
+  const { containerRef, mirrorRef, triggerRef, visibleCount } = useToolbarOverflow(items.length);
+
+  const visible = items.slice(0, visibleCount);
+  const overflow = items.slice(visibleCount);
+
+  const renderControl = (item: ToolbarItem) => {
+    if (item.feature === "link") {
+      return <RichTextLinkButton active={item.active} currentUrl={state.linkUrl} disabled={item.disabled} />;
     }
+    return (
+      <RichTextToolbarButton
+        icon={item.icon}
+        label={item.label}
+        active={item.active}
+        disabled={item.disabled}
+        onClick={() => item.run?.()}
+      />
+    );
+  };
+
+  const renderOverflowItem = (item: ToolbarItem) => {
+    if (item.feature === "link") {
+      return (
+        <RichTextLinkMenuItem
+          key={item.feature}
+          active={item.active}
+          currentUrl={state.linkUrl}
+          disabled={item.disabled}
+          onApplied={() => setMenuOpen(false)}
+        />
+      );
+    }
+    const Icon = item.icon;
+    // Clear is a one-shot action; everything else is a toggle, so it reflects its pressed state with a checkmark.
+    if (item.feature === "clear") {
+      return (
+        <DropdownMenuItem
+          key={item.feature}
+          disabled={item.disabled}
+          // Keep the menu open so several formats can be applied in one visit.
+          onSelect={(e) => {
+            e.preventDefault();
+            item.run?.();
+          }}
+        >
+          <Icon aria-hidden />
+          {item.label}
+        </DropdownMenuItem>
+      );
+    }
+    return (
+      <DropdownMenuCheckboxItem
+        key={item.feature}
+        checked={item.active}
+        disabled={item.disabled}
+        className="pr-8 pl-1.5"
+        onSelect={(e) => {
+          e.preventDefault();
+          item.run?.();
+        }}
+      >
+        <Icon aria-hidden />
+        {item.label}
+      </DropdownMenuCheckboxItem>
+    );
   };
 
   return (
     <TooltipProvider>
-      <div data-slot="rich-text-toolbar" className="flex flex-wrap items-center gap-0.5 border-b border-input p-1">
-        {features.map((feature, index) => {
-          const needsSeparator = index > 0 && featureGroup(feature) !== featureGroup(features[index - 1]);
-          return (
-            <span key={feature} className="contents">
-              {needsSeparator ? <Separator orientation="vertical" className="mx-0.5 h-5" /> : null}
-              {renderFeature(feature)}
-            </span>
-          );
-        })}
+      <div
+        ref={containerRef}
+        data-slot="rich-text-toolbar"
+        className="relative flex items-center gap-0.5 overflow-hidden border-b border-input p-1"
+      >
+        {visible.map((item, index) => (
+          <div key={item.feature} className="flex items-center">
+            {index > 0 && item.group !== visible[index - 1].group ? <GroupSeparator /> : null}
+            {renderControl(item)}
+          </div>
+        ))}
+
+        {overflow.length > 0 ? (
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger
+                  type="button"
+                  // Same caret-preservation reason as the toolbar buttons: keep the editor's selection intact.
+                  onMouseDown={(e) => e.preventDefault()}
+                  data-state={menuOpen ? "on" : "off"}
+                  aria-label="More formatting"
+                  className={cn(toggleVariants({ variant: "segmented", size: "xs" }), "ml-auto")}
+                >
+                  <MoreHorizontal aria-hidden />
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>More</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="w-auto min-w-44" onCloseAutoFocus={(e) => e.preventDefault()}>
+              {overflow.map((item, index) => (
+                <span key={item.feature} className="contents">
+                  {index > 0 && item.group !== overflow[index - 1].group ? <DropdownMenuSeparator /> : null}
+                  {renderOverflowItem(item)}
+                </span>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+
+        {/* Hidden mirrors: a full-size copy of every item plus the trigger, measured by useToolbarOverflow. They are
+            inert (aria-hidden, no focusable controls) so they never reach the accessibility tree or steal the caret. */}
+        <div
+          ref={mirrorRef}
+          aria-hidden
+          className="pointer-events-none invisible absolute top-0 left-0 flex flex-nowrap items-center gap-0.5"
+        >
+          {items.map((item, index) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.feature} className="flex shrink-0 items-center">
+                {index > 0 && item.group !== items[index - 1].group ? <GroupSeparator /> : null}
+                <span className={cn(toggleVariants({ variant: "segmented", size: "xs" }))}>
+                  <Icon aria-hidden />
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div ref={triggerRef} aria-hidden className="pointer-events-none invisible absolute top-0 left-0">
+          <span className={cn(toggleVariants({ variant: "segmented", size: "xs" }))}>
+            <MoreHorizontal aria-hidden />
+          </span>
+        </div>
       </div>
     </TooltipProvider>
   );

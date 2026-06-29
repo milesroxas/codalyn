@@ -8,7 +8,6 @@ import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site
 import { cn } from "@/shared/lib/utils";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { ComposerSlotNameDialog } from "./composer-slot-name-dialog";
 
 /**
  * Splits a draft row's display name into the base label + the pinned variant (shown as a badge, not appended text).
@@ -33,25 +32,12 @@ export type ComposerOrderSortableRowProps = {
   row: CmsSlotCompositionDraftRow;
   meta: CmsSlotComposerRowMeta | undefined;
   busy: boolean;
-  onChangePropValue: (rowKey: string, propId: string, value: string) => void;
-  onRenameSlot: (rowKey: string, name: string) => void;
+  onEditRow: (rowKey: string) => void;
   onRemove: (key: string) => void;
-  autoOpenEditDialogRowKey?: string | null;
-  onAutoOpenEditDialogConsumed?: () => void;
 };
 
 export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
-  const {
-    row,
-    meta,
-    busy,
-    onChangePropValue,
-    onRenameSlot,
-    onRemove,
-    autoOpenEditDialogRowKey = null,
-    onAutoOpenEditDialogConsumed,
-  } = props;
-  const exposed = meta?.exposed ?? [];
+  const { row, busy, onEditRow, onRemove } = props;
   const { displayName, variantBadge } = splitComposerRowLabel(row.name, row.variant);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.key,
@@ -85,16 +71,9 @@ export function ComposerOrderSortableRow(props: ComposerOrderSortableRowProps) {
         >
           <GripVertical className="pointer-events-none size-4" aria-hidden />
         </button>
-        <ComposerSlotNameDialog
-          row={row}
-          exposed={exposed}
-          disabled={busy}
-          triggerLabel={displayName}
-          onRename={onRenameSlot}
-          onChangePropValue={onChangePropValue}
-          requestAutoOpen={autoOpenEditDialogRowKey === row.key}
-          onAutoOpenConsumed={onAutoOpenEditDialogConsumed}
-        />
+        <Button type="button" variant="composerSlotTitle" disabled={busy} onClick={() => onEditRow(row.key)}>
+          <span className="min-w-0 truncate">{displayName}</span>
+        </Button>
         {variantBadge != null ? (
           <Badge variant="secondary" size="sm" className="max-w-28 shrink-0 truncate">
             {variantBadge}

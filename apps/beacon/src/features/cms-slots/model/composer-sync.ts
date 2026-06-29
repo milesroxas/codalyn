@@ -1,3 +1,4 @@
+import { clearCmsSlotComponentDefCache } from "@/features/cms-slots/model/cms-slot-component-def-cache";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import { listComposableMetaByInstanceKey } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
@@ -35,22 +36,25 @@ export async function loadComposerSynchronizedState(args: {
   shouldAbort: () => boolean;
 }): Promise<ComposerSyncResult | null> {
   const { slotList, currentCmsItemId, shouldAbort } = args;
+  // Refresh semantics: drop cached component definitions so this sync reflects the current Designer state.
+  clearCmsSlotComponentDefCache();
   const rows = await listInstancesInSlotListContainer(slotList.container);
   if (shouldAbort()) return null;
   const configuredPoolKeys = await resolveCmsSlotDesignerConfiguredPoolKeys(slotList.container, rows);
   if (shouldAbort()) return null;
   const designerScopedRows = filterHydratedCmsSlotRowsByPoolKeys(rows, configuredPoolKeys);
-  const allowedPalette = await paletteForConfiguredPoolKeys(configuredPoolKeys, rows);
-  if (shouldAbort()) return null;
-  const composerDesignerComposable = await listComposableMetaByInstanceKey(designerScopedRows);
-  if (shouldAbort()) return null;
-  const composerSlotProps = await readCmsSlotDesignerSlotPropsFile(slotList.container, designerScopedRows.length);
-  if (shouldAbort()) return null;
-  const { draft: rawDraft } = await resolveComposerTargetOrder({
-    listContainer: slotList.container,
-    designerScopedRows,
-    currentCmsItemId,
-  });
+  // Palette, composable metas, slot-props file, and target order are independent reads off the same designer-scoped
+  // rows — fan them out so the sync cost is the slowest call, not their sum.
+  const [allowedPalette, composerDesignerComposable, composerSlotProps, { draft: rawDraft }] = await Promise.all([
+    paletteForConfiguredPoolKeys(configuredPoolKeys, rows),
+    listComposableMetaByInstanceKey(designerScopedRows),
+    readCmsSlotDesignerSlotPropsFile(slotList.container, designerScopedRows.length),
+    resolveComposerTargetOrder({
+      listContainer: slotList.container,
+      designerScopedRows,
+      currentCmsItemId,
+    }),
+  ]);
   if (shouldAbort()) return null;
   const mapped = draftToHiddenListIndices(designerScopedRows, rawDraft);
   const draft = mapped.ok

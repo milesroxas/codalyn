@@ -6,10 +6,12 @@ import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-pag
 import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
 import { CmsSlotsComposerEditingContextCard } from "@/features/cms-slots/ui/cms-slots-composer-editing-context-card";
 import {
+  CMS_SLOTS_DESIGNER_BACK_TO_LIST_LABEL,
   CMS_SLOTS_DESIGNER_COMPONENTS_LABEL,
   CMS_SLOTS_DESIGNER_EDITING_DESCRIPTION,
   CMS_SLOTS_DESIGNER_EDITING_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
+import { Button } from "@/shared/ui/button";
 import {
   SurfaceSummaryCardPageIntro,
   SurfaceSummaryCardPanelSectionLabel,
@@ -23,6 +25,8 @@ import { useCompositionComposableMeta } from "./use-composition-composable-meta"
 
 export type CmsSlotCompositionPanelProps = {
   composerEditingContext: CmsComposerEditingContextViewModel;
+  /** Return to the Designer slot-list view (rendered to the right of the editing-view heading). */
+  onBackToList: () => void;
   activeListLabel: string | null;
   searchFieldId: string;
   activeDataList: string | null;
@@ -73,6 +77,7 @@ export type CmsSlotCompositionPanelProps = {
 export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
   const {
     composerEditingContext,
+    onBackToList,
     activeListLabel,
     searchFieldId,
     activeDataList,
@@ -129,6 +134,11 @@ export function CmsSlotCompositionPanel(props: CmsSlotCompositionPanelProps) {
       <SurfaceSummaryCardPageIntro
         title={CMS_SLOTS_DESIGNER_EDITING_TITLE}
         description={CMS_SLOTS_DESIGNER_EDITING_DESCRIPTION}
+        action={
+          <Button type="button" variant="outline" size="xs" onClick={() => onBackToList()}>
+            {CMS_SLOTS_DESIGNER_BACK_TO_LIST_LABEL}
+          </Button>
+        }
       />
 
       <CmsSlotsComposerEditingContextCard

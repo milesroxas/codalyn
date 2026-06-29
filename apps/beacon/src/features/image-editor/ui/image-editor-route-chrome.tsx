@@ -4,11 +4,9 @@ import {
   BeaconFeatureRouteChrome,
   BeaconFeatureRouteDockButton,
   BeaconFeatureRouteFooter,
-  BeaconFeatureRouteHeader,
   BeaconFeatureRouteScrollBody,
   BeaconFeatureRouteSubheader,
 } from "@/app/ui/beacon-feature-route-chrome";
-import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
 import { hasBeaconRouteSubheaderContent } from "@/shared/ui/step-nav";
 
 export type ImageEditorRouteChromeProps = {
@@ -47,11 +45,6 @@ export function ImageEditorRouteChrome(props: ImageEditorRouteChromeProps) {
   ) : null;
   return (
     <BeaconFeatureRouteChrome
-      header={
-        breadcrumbsOnly ? null : (
-          <BeaconFeatureRouteHeader title={IMAGE_UPLOAD_FEATURE_NAME} dataSlot="image_upload_route_header" />
-        )
-      }
       subheader={routeSubheader}
       footer={
         footer ? (

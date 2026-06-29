@@ -9,7 +9,9 @@ import {
   useState,
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useRegisterRouteLeaveGuard } from "@/app/beacon-route-leave-guard";
 import { ensureListTargetAfterAppendingSlotRow } from "@/features/cms-slots/model/append-slot-list-component-flow";
+import { clearCmsSlotComponentDefCache } from "@/features/cms-slots/model/cms-slot-component-def-cache";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import {
   hasUnconstrainedExposedImageProps,
@@ -891,8 +893,11 @@ export function CmsSlotsScreen() {
   const [designerListSlotFile, setDesignerListSlotFile] = useState<CmsSlotDesignerSlotPropsFile | null>(null);
   const [composerSavePending, setComposerSavePending] = useState(false);
   const [composerLeaveDialogOpen, setComposerLeaveDialogOpen] = useState(false);
-  type ComposerLeaveDestination = "composer-list" | "designer";
+  // "external" routes the confirmed leave to a navigation owned outside this screen (e.g. the header back
+  // button), which is stashed in `pendingExternalLeaveRef` and run after the user saves or discards.
+  type ComposerLeaveDestination = "composer-list" | "designer" | "external";
   const composerLeaveDestinationRef = useRef<ComposerLeaveDestination>("composer-list");
+  const pendingExternalLeaveRef = useRef<(() => void) | null>(null);
   const [currentCmsItemId, setCurrentCmsItemId] = useState<string | null>(null);
   const composerEditingContext = useCmsComposerEditingContextState({
     enabled: isComposer || isDesigner,
@@ -1479,6 +1484,23 @@ export function CmsSlotsScreen() {
     return cmsSlotCompositionSignature(composerDraft) !== activeComposer.initialSignature;
   }, [composerDraft, activeComposer]);
 
+  // Guard app-chrome navigation (the header back button) the same way the in-route Designer/Composer controls
+  // are guarded: when the composer holds unsaved edits, stash the pending navigation and surface the
+  // unsaved-changes dialog instead of leaving. `finishComposerLeave` runs the stashed navigation on confirm.
+  const guardLeaveWhileComposerDirty = useCallback(
+    (proceed: () => void) => {
+      if (activeComposer == null || !composerDirty) {
+        proceed();
+        return;
+      }
+      pendingExternalLeaveRef.current = proceed;
+      composerLeaveDestinationRef.current = "external";
+      setComposerLeaveDialogOpen(true);
+    },
+    [activeComposer, composerDirty]
+  );
+  useRegisterRouteLeaveGuard(guardLeaveWhileComposerDirty);
+
   const composerRowMeta = useMemo((): CmsSlotComposerRowMeta[] => {
     if (composerSlotProps == null || composerDesignerRows.length === 0) {
       return composerDraft.map((row) => ({ row, exposed: [] as ComposableInstancePropMeta[] }));
@@ -1504,26 +1526,34 @@ export function CmsSlotsScreen() {
   const handleOpenComposer = async (beacon: CmsSlotListOnPage) => {
     setComposerOpeningKey(beacon.key);
     try {
+      // Fresh per open: dedupe this open's component-definition reads while never serving a definition from a prior
+      // open (so a prop newly exposed in the Designer always shows up here).
+      clearCmsSlotComponentDefCache();
       const rows = await listInstancesInSlotListContainer(beacon.container);
       const configuredPoolKeys = await resolveCmsSlotDesignerConfiguredPoolKeys(beacon.container, rows);
       const designerScopedRows = filterHydratedCmsSlotRowsByPoolKeys(rows, configuredPoolKeys);
-      const allowedPalette = await paletteForConfiguredPoolKeys(configuredPoolKeys, rows);
-      setComposerAllowedPalette(allowedPalette);
-      setComposerDesignerRows(designerScopedRows);
-      const liveComposable = await listComposableMetaByInstanceKey(designerScopedRows);
-      setComposerDesignerComposable(liveComposable);
-      const sp = await readCmsSlotDesignerSlotPropsFile(beacon.container, designerScopedRows.length);
-      setComposerSlotProps(sp);
-      const { draft: rawDraft } = await resolveComposerTargetOrder({
-        listContainer: beacon.container,
-        designerScopedRows,
-        currentCmsItemId,
-      });
+      // Palette, live composable metas, the slot-props file, and the target order are independent reads over the
+      // same designer-scoped rows — fan them out so the open cost is the slowest call, not their sum. State is
+      // committed once below so the panel mounts in a single render (React batches these async setters).
+      const [allowedPalette, liveComposable, sp, { draft: rawDraft }] = await Promise.all([
+        paletteForConfiguredPoolKeys(configuredPoolKeys, rows),
+        listComposableMetaByInstanceKey(designerScopedRows),
+        readCmsSlotDesignerSlotPropsFile(beacon.container, designerScopedRows.length),
+        resolveComposerTargetOrder({
+          listContainer: beacon.container,
+          designerScopedRows,
+          currentCmsItemId,
+        }),
+      ]);
       const mapped = draftToHiddenListIndices(designerScopedRows, rawDraft);
       const draft = mapped.ok
         ? normalizeComposerDraftPropValues(rawDraft, mapped.indices, designerScopedRows, sp, liveComposable)
         : rawDraft;
       const initialSignature = cmsSlotCompositionSignature(draft);
+      setComposerAllowedPalette(allowedPalette);
+      setComposerDesignerRows(designerScopedRows);
+      setComposerDesignerComposable(liveComposable);
+      setComposerSlotProps(sp);
       setComposerDraft(draft);
       setActiveComposer({ beacon, initialSignature });
     } catch (err) {
@@ -1552,15 +1582,22 @@ export function CmsSlotsScreen() {
   const finishComposerLeave = useCallback(() => {
     const destination = composerLeaveDestinationRef.current;
     composerLeaveDestinationRef.current = "composer-list";
+    const pendingExternalLeave = pendingExternalLeaveRef.current;
+    pendingExternalLeaveRef.current = null;
     handleComposerBack();
     if (destination === "designer") {
       void navigate("/cms-slots/designer");
+    } else if (destination === "external") {
+      pendingExternalLeave?.();
     }
   }, [handleComposerBack, navigate]);
 
   const handleComposerLeaveDialogOpenChange = useCallback((open: boolean) => {
     if (!open) {
+      // Dialog dismissed without confirming (Continue editing / Esc): drop any stashed external navigation
+      // so a later in-route leave doesn't inherit it.
       composerLeaveDestinationRef.current = "composer-list";
+      pendingExternalLeaveRef.current = null;
     }
     setComposerLeaveDialogOpen(open);
   }, []);

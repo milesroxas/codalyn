@@ -2,6 +2,7 @@ import type { TowerSupportRequestKind } from "@codalyn/webflow-kit";
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { IconLayoutGrid } from "@tabler/icons-react";
 import {
+  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useRequestRouteLeave } from "@/app/beacon-route-leave-guard";
 import { clearBeaconGuestChosen } from "@/features/auth/lib/beacon-guest-choice";
 import { isTowerConfigured, openTowerAppHome } from "@/features/auth/model/tower-auth-client";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
@@ -154,6 +156,56 @@ function HeaderLogo({ asHeading = true, to }: HeaderLogoProps) {
   }
 
   return block;
+}
+
+/**
+ * Flat feature routes surface their name (and a back-to-home control) in the app header in place of
+ * the Beacon logo. Home, Settings, and unknown routes keep the logo and return `null`.
+ */
+function resolveBeaconHeaderFeature(pathname: string): { title: string } | null {
+  if (pathname.startsWith("/cms-slots")) {
+    return { title: CMS_SLOTS_FEATURE_NAME };
+  }
+  if (pathname.startsWith("/images")) {
+    return { title: IMAGE_UPLOAD_FEATURE_NAME };
+  }
+  return null;
+}
+
+/** Route-aware back control + feature name shown in the app header while inside a flat feature route. */
+function HeaderFeatureTitle({ title }: { title: string }) {
+  const navigate = useNavigate();
+  const requestLeave = useRequestRouteLeave();
+  // Return to the previous in-app route when history holds one, otherwise the home surface. React Router
+  // (v7 HashRouter) stamps the current history index onto `history.state.idx`; idx 0 means this is the first
+  // in-app entry (the index → /home redirect replaces it), so there is nothing to pop back to. Route through
+  // the leave guard first so a feature with unsaved work (e.g. the CMS Slots composer) can confirm before we go.
+  const handleBack = useCallback(() => {
+    requestLeave(() => {
+      const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+      if (idx > 0) {
+        navigate(-1);
+      } else {
+        navigate("/home");
+      }
+    });
+  }, [navigate, requestLeave]);
+
+  return (
+    <div className="flex min-w-0 items-center gap-1">
+      <Button
+        type="button"
+        size="icon-xs"
+        variant="ghost"
+        className="-ml-1 shrink-0"
+        onClick={handleBack}
+        aria-label="Go back"
+      >
+        <ArrowLeft aria-hidden className="size-4" />
+      </Button>
+      <h1 className="m-0 min-w-0 truncate font-medium text-foreground text-sm leading-none tracking-tight">{title}</h1>
+    </div>
+  );
 }
 
 function routeActiveClass(path: string, pathname: string) {
@@ -432,12 +484,14 @@ function resolveTowerConnectionStatus(props: {
 
 function HeaderShell(props: BeaconAppMenuProps) {
   const towerConnectionStatus = resolveTowerConnectionStatus(props);
+  const { pathname } = useLocation();
+  const feature = resolveBeaconHeaderFeature(pathname);
 
   return (
     <div className="shrink-0">
       <header data-slot="beacon-app-header" className="border-border/65 border-b bg-background px-3 py-1.5">
         <div className="flex items-center justify-between gap-4">
-          <HeaderLogo to="/home" />
+          {feature ? <HeaderFeatureTitle title={feature.title} /> : <HeaderLogo to="/home" />}
           <div className="flex shrink-0 items-center gap-2">
             {towerConnectionStatus ? <BeaconTowerConnectionIndicator status={towerConnectionStatus} /> : null}
             <BeaconAppMenu {...props} />

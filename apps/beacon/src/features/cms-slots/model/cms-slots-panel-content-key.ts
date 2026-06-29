@@ -110,15 +110,16 @@ export function cmsSlotsComposerRouteContentKey(input: {
 }
 
 export function cmsSlotsComposerRouteContentReady(input: CmsSlotsComposerRouteSurfaceInput): boolean {
-  if (input.composerOpeningKey != null) {
-    return false;
-  }
   if (input.composerEditingContextPhase === "loading") {
     return false;
   }
   if (input.activeComposer != null) {
     return true;
   }
+  // While a slot is opening (composerOpeningKey set, activeComposer not yet resolved) the content key stays "list"
+  // and the list itself is ready — keep it visible so the clicked tile's busy spinner shows instead of fading the
+  // whole panel to blank. Tiles disable themselves during the open, so no second open can race. Readiness then
+  // flips to the "composer" key in one batch when the open completes (activeComposer set + opening key cleared).
   return cmsSlotsComposerListDataReady(input);
 }
 

@@ -7,7 +7,6 @@ import {
   BeaconFeatureRouteChrome,
   BeaconFeatureRouteDockButton,
   BeaconFeatureRouteFooter,
-  BeaconFeatureRouteHeader,
   BeaconFeatureRouteScrollBody,
 } from "@/app/ui/beacon-feature-route-chrome";
 import { BeaconRouteContentTransition } from "@/app/ui/beacon-route-content-transition";
@@ -31,7 +30,6 @@ import { CmsSlotComposerListPanel } from "@/features/cms-slots/ui/cms-slot-compo
 import { CmsSlotComposerPanel } from "@/features/cms-slots/ui/cms-slot-composer-panel";
 import { ComposerUnsavedChangesDialog } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-unsaved-changes-dialog";
 import { CmsSlotCompositionPanel } from "@/features/cms-slots/ui/cms-slot-composition-panel";
-import { CmsSlotDesignerBackToListDock } from "@/features/cms-slots/ui/cms-slot-composition-panel/cms-slot-designer-back-to-list-dock";
 import { CmsSlotHomePanel } from "@/features/cms-slots/ui/cms-slot-home-panel";
 import {
   CmsSlotsCmsFieldLinkDialog,
@@ -42,7 +40,6 @@ import { CmsSlotsRouteInteractionProvider } from "@/features/cms-slots/ui/cms-sl
 import {
   CMS_SLOTS_AREA_NAV_LABEL,
   CMS_SLOTS_DELETE_DIALOG_TITLE,
-  CMS_SLOTS_FEATURE_NAME,
   CMS_SLOTS_ROUTE_TASK_SAVING_COMPOSITION,
   CMS_SLOTS_SCAN_ARIA_LABEL,
   CMS_SLOTS_UNINSTALL_PAGE_HINT,
@@ -214,6 +211,7 @@ function CmsSlotsDesignerRouteBody(
       <div className="space-y-4" data-route="cms-slots-designer-composition">
         <CmsSlotCompositionPanel
           composerEditingContext={p.composerEditingContext}
+          onBackToList={p.exitToList}
           activeListLabel={p.activeListLabel}
           searchFieldId={p.searchFieldId}
           activeDataList={p.activeDataList}
@@ -400,7 +398,10 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
   return (
     <BeaconFeatureRouteScrollBody
       scrollable={!composerEditorFill}
-      contentClassName={composerEditorFill ? "h-full min-h-0 overflow-hidden" : undefined}
+      flushX={composerEditorFill}
+      // pb-0 drops the route's bottom inset so the editor's scroll region meets the footer (no gap); the scroll
+      // content keeps its own pb-3 scroll-end breathing room inside the viewport.
+      contentClassName={composerEditorFill ? "h-full min-h-0 overflow-hidden pb-0" : undefined}
       overlay={
         <BeaconRouteLoadingOverlay
           visible={routeBlocking}
@@ -627,11 +628,8 @@ function CmsSlotsRouteDock(p: CmsSlotsRouteChromeProps) {
 
 /** Route shell/header, scroll region, dialogs, footer — splits cognitive complexity off `CmsSlotsScreen`. */
 export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
-  const designerBackToListDocked = p.isDesigner && p.picking;
-
   return (
     <BeaconFeatureRouteChrome
-      header={<BeaconFeatureRouteHeader title={CMS_SLOTS_FEATURE_NAME} dataSlot="cms_slots_route_header" />}
       overlays={
         <>
           <CmsSlotsBeaconDeleteDialog {...p} />
@@ -653,12 +651,7 @@ export function CmsSlotsRouteChrome(p: CmsSlotsRouteChromeProps) {
           />
         </>
       }
-      footer={
-        <>
-          {designerBackToListDocked ? <CmsSlotDesignerBackToListDock onBackToList={p.exitToList} /> : null}
-          <CmsSlotsRouteDock {...p} />
-        </>
-      }
+      footer={<CmsSlotsRouteDock {...p} />}
     >
       <CmsSlotsRouteScrollBody {...p} />
     </BeaconFeatureRouteChrome>

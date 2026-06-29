@@ -4,6 +4,10 @@
  */
 
 import { type ExportConstraints, readExportConstraints } from "@codalyn/webflow-kit";
+import {
+  cachedComponentPropOrder,
+  getCachedComponentById,
+} from "@/features/cms-slots/model/cms-slot-component-def-cache";
 import { beaconLinkRuntimeValue, isCmsSlotLinkValueType } from "@/features/cms-slots/model/cms-slot-link-value";
 
 export type ComposableInstancePropSelectOption = { value: string; label: string };
@@ -364,15 +368,23 @@ export function buildCmsSlotRuntimePropRow(
  * `searchProps()` for each list row — keyed by `HydratedCmsSlotRow.key` (matches hidden list instances).
  */
 export async function listComposableMetaByInstanceKey(
-  rows: ReadonlyArray<{ key: string; instance: ComponentElement }>
+  rows: ReadonlyArray<{ key: string; instance: ComponentElement; componentId: string }>
 ): Promise<Record<string, ComposableInstancePropMeta[]>> {
+  // searchProps/getProps are bridge round-trips; a serial loop costs N × latency. Each instance is independent, so
+  // hydrate them concurrently and assemble the record from the resolved pairs (matches the Promise.all pattern in
+  // listInstancesInSlotListContainer). The per-component prop order is shared via the component-def cache.
+  const entries = await Promise.all(
+    rows.map(async (row): Promise<[string, ComposableInstancePropMeta[]]> => {
+      try {
+        return [row.key, await listComposablePropsForInstance(row.instance, row.componentId)];
+      } catch {
+        return [row.key, []];
+      }
+    })
+  );
   const next: Record<string, ComposableInstancePropMeta[]> = {};
-  for (const row of rows) {
-    try {
-      next[row.key] = await listComposablePropsForInstance(row.instance);
-    } catch {
-      next[row.key] = [];
-    }
+  for (const [key, metas] of entries) {
+    next[key] = metas;
   }
   return next;
 }
@@ -440,11 +452,12 @@ export function orderComposablePropsForComposer(
  * Webflow props-panel order for an instance’s component (`Component.getProps()`, Beta). Returns prop ids in panel
  * display order, or `undefined` when unavailable so the Composer falls back to alphabetical. Read-only; never throws.
  */
-async function panelPropOrderForInstance(instance: ComponentElement): Promise<string[] | undefined> {
+async function panelPropOrderForComponent(componentId: string): Promise<string[] | undefined> {
   try {
-    const component = await instance.getComponent();
-    const defs = await component.getProps();
-    return defs.map((d) => d.id);
+    // Component-level read shared by every instance of this component — cached by id so a list of N identical
+    // instances fetches the order once, not N times.
+    const component = await getCachedComponentById(componentId);
+    return await cachedComponentPropOrder(component);
   } catch {
     return undefined;
   }
@@ -454,13 +467,16 @@ async function panelPropOrderForInstance(instance: ComponentElement): Promise<st
  * All bindable instance props (full `InstanceProp` from `searchProps`), for Designer “Expose to Composer”, ordered
  * to match the Webflow props panel and clustered by folder via {@link orderComposablePropsForComposer}.
  */
-async function listComposablePropsForInstance(instance: ComponentElement): Promise<ComposableInstancePropMeta[]> {
-  let rows: InstanceProp[];
-  try {
-    rows = await instance.searchProps();
-  } catch {
-    return [];
-  }
+async function listComposablePropsForInstance(
+  instance: ComponentElement,
+  componentId: string
+): Promise<ComposableInstancePropMeta[]> {
+  // searchProps (per-instance values) and the props-panel order (per-component, cached) are independent bridge reads
+  // — fetch concurrently to halve round-trip latency. A failed searchProps yields no rows, matching prior behavior.
+  const [rows, orderedPropIds] = await Promise.all([
+    instance.searchProps().catch((): InstanceProp[] => []),
+    panelPropOrderForComponent(componentId),
+  ]);
   const byId = new Map<string, ComposableInstancePropMeta>();
   for (const p of rows) {
     if (byId.has(p.propId)) {
@@ -480,6 +496,5 @@ async function listComposablePropsForInstance(instance: ComponentElement): Promi
       selectOptions: selectOptionsFromInstanceProp(p),
     });
   }
-  const orderedPropIds = await panelPropOrderForInstance(instance);
   return orderComposablePropsForComposer([...byId.values()], orderedPropIds);
 }

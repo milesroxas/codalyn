@@ -1,3 +1,8 @@
+import {
+  cachedComponentName,
+  cachedComponentSettings,
+  getCachedComponentById,
+} from "@/features/cms-slots/model/cms-slot-component-def-cache";
 import { poolOptionLabel } from "@/features/cms-slots/model/cms-slot-instance-variant";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
 import { parsePoolOptionKey } from "@/features/cms-slots/model/cms-slot-pool-option";
@@ -20,33 +25,37 @@ export async function paletteForConfiguredPoolKeys(
     }
   }
 
-  const out: CmsSlotPaletteEntry[] = [];
-  for (const poolKey of poolKeys) {
-    const option = parsePoolOptionKey(poolKey);
-    if (option === null) {
-      continue;
-    }
-    const fromRows = rowByPoolKey.get(poolKey);
-    if (fromRows != null) {
-      out.push({
-        poolKey,
-        componentId: fromRows.componentId,
-        variant: fromRows.variant,
-        name: poolOptionLabel(fromRows.name, fromRows.variant),
-        group: null,
-      });
-      continue;
-    }
-    try {
-      const comp = await webflow.getComponent(option.componentId);
-      const name = await comp.getName();
-      const group = (await comp.getSettings()).group;
-      const label = option.variantId != null ? `${name} · ${option.variantId}` : name;
-      // Variant prop id is unknown without a live seed, so a stale key can't be re-pinned; treat as base.
-      out.push({ poolKey, componentId: option.componentId, variant: null, name: label, group });
-    } catch {
-      /* component deleted; skip stale keys */
-    }
-  }
-  return out;
+  // getComponent/getName/getSettings are bridge round-trips; resolve each key concurrently so stale keys don't
+  // serialize. Live-seed keys are resolved synchronously from rows. Order is preserved by Promise.all.
+  const out = await Promise.all(
+    poolKeys.map(async (poolKey): Promise<CmsSlotPaletteEntry | null> => {
+      const option = parsePoolOptionKey(poolKey);
+      if (option === null) {
+        return null;
+      }
+      const fromRows = rowByPoolKey.get(poolKey);
+      if (fromRows != null) {
+        return {
+          poolKey,
+          componentId: fromRows.componentId,
+          variant: fromRows.variant,
+          name: poolOptionLabel(fromRows.name, fromRows.variant),
+          group: null,
+        };
+      }
+      try {
+        // Cached by component id and shared with the instance reads in the same open — a palette key whose component
+        // also appears as a live seed resolves its name/settings without an extra round-trip.
+        const comp = await getCachedComponentById(option.componentId);
+        const [name, settings] = await Promise.all([cachedComponentName(comp), cachedComponentSettings(comp)]);
+        const label = option.variantId != null ? `${name} · ${option.variantId}` : name;
+        // Variant prop id is unknown without a live seed, so a stale key can't be re-pinned; treat as base.
+        return { poolKey, componentId: option.componentId, variant: null, name: label, group: settings.group };
+      } catch {
+        /* component deleted; skip stale keys */
+        return null;
+      }
+    })
+  );
+  return out.filter((entry): entry is CmsSlotPaletteEntry => entry !== null);
 }

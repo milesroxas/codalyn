@@ -8,31 +8,13 @@ import {
   beaconPanelContainClass,
   beaconRouteBleedXClass,
   beaconRouteScrollContentClass,
+  beaconRouteScrollContentFlushXClass,
   beaconRouteScrollViewportFillClass,
 } from "@/shared/lib/beacon-app-route-surface";
 import { cn } from "@/shared/lib/utils";
 import { Button, type buttonVariants } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import { hasBeaconRouteSubheaderContent } from "@/shared/ui/step-nav";
-
-export type BeaconFeatureRouteHeaderProps = {
-  title: string;
-  dataSlot?: string;
-};
-
-export function BeaconFeatureRouteHeader(props: BeaconFeatureRouteHeaderProps) {
-  const { title, dataSlot = "beacon_feature_route_header" } = props;
-
-  return (
-    <div className="shrink-0 border-b border-border/65 bg-background" data-slot={dataSlot}>
-      <div className={cn(beaconPanelContainClass, "flex h-8 items-center justify-center px-3")}>
-        <h2 className="min-w-0 w-full truncate text-center text-sm font-medium leading-none tracking-tight text-foreground">
-          {title}
-        </h2>
-      </div>
-    </div>
-  );
-}
 
 export type BeaconFeatureRouteBackHeaderProps = {
   title: string;
@@ -65,12 +47,17 @@ export type BeaconFeatureRouteScrollBodyProps = {
   contentClassName?: string;
   /** When false, children fill the body without a route-level ScrollArea (use for nested scroll regions). */
   scrollable?: boolean;
+  /**
+   * Drop the route's horizontal inset so children own their own padding. Pair with a nested scroll region that
+   * spans edge-to-edge (drawer-style) so its scrollbar sits in the window gutter, not inside the route inset.
+   */
+  flushX?: boolean;
   /** When this value changes, the scroll viewport resets to the top (e.g. image editor flow step). */
   scrollResetKey?: string | number | boolean | null;
 };
 
 export function BeaconFeatureRouteScrollBody(props: BeaconFeatureRouteScrollBodyProps) {
-  const { children, overlay, className, contentClassName, scrollable = true, scrollResetKey } = props;
+  const { children, overlay, className, contentClassName, scrollable = true, flushX = false, scrollResetKey } = props;
   const viewportRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -85,7 +72,7 @@ export function BeaconFeatureRouteScrollBody(props: BeaconFeatureRouteScrollBody
   }, [scrollResetKey, scrollable]);
 
   const contentClass = cn(
-    beaconRouteScrollContentClass,
+    flushX ? beaconRouteScrollContentFlushXClass : beaconRouteScrollContentClass,
     beaconRouteScrollViewportFillClass,
     !scrollable && "min-h-0 flex-1 overflow-hidden",
     contentClassName
@@ -94,7 +81,13 @@ export function BeaconFeatureRouteScrollBody(props: BeaconFeatureRouteScrollBody
   const content = <div className={contentClass}>{children}</div>;
 
   return (
-    <div className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", !scrollable && "overflow-hidden", className)}>
+    <div
+      className={cn(
+        "relative flex min-h-0 min-w-0 flex-1 flex-col bg-background",
+        !scrollable && "overflow-hidden",
+        className
+      )}
+    >
       {overlay}
       {scrollable ? (
         <ScrollArea className="h-full min-h-0 min-w-0 flex-1" viewportRef={viewportRef}>
@@ -227,7 +220,8 @@ export function BeaconFeatureRouteSubheader(props: BeaconFeatureRouteSubheaderPr
 }
 
 export type BeaconFeatureRouteChromeProps = {
-  header: ReactNode;
+  /** Optional in-route header strip. Flat feature routes now surface their name in the app header instead. */
+  header?: ReactNode;
   subheader?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;

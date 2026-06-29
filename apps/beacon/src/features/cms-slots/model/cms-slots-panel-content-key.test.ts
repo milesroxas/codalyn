@@ -143,4 +143,22 @@ describe("cmsSlotsComposerRouteSurface", () => {
     expect(cmsSlotsComposerListDataReady({ ...idleList })).toBe(true);
     expect(cmsSlotsComposerListDataReady({ ...idleList, pageBootBlocking: true })).toBe(false);
   });
+
+  it("keeps the list visible while a slot is opening so the tile spinner shows (no blank)", () => {
+    expect(
+      cmsSlotsComposerRouteContentReady({
+        ...idleList,
+        composerOpeningKey: "beacon-1",
+      })
+    ).toBe(true);
+  });
+
+  it("is ready once the open completes (activeComposer set)", () => {
+    expect(
+      cmsSlotsComposerRouteContentReady({
+        ...idleList,
+        activeComposer: { beacon: {}, initialSignature: "sig" },
+      })
+    ).toBe(true);
+  });
 });

@@ -800,13 +800,29 @@ function SurfaceSummaryCardScanListError({ className, ...props }: React.Componen
   );
 }
 
-function SurfaceSummaryCardPageIntro(props: { title: string; description?: string }) {
-  const { title, description } = props;
+function SurfaceSummaryCardPageIntro(props: {
+  title: string;
+  description?: string;
+  /** Optional trailing control rendered to the right of the heading block, top-aligned (e.g. Back to list). */
+  action?: React.ReactNode;
+}) {
+  const { title, description, action } = props;
 
-  return (
-    <div data-slot="surface-summary-card-page-intro" className={surfaceSummaryCardPageIntroClass}>
+  const heading = (
+    <div className={surfaceSummaryCardPageIntroClass}>
       <h3 className={surfaceSummaryCardPageIntroTitleClass}>{title}</h3>
       {description ? <p className={surfaceSummaryCardPageIntroDescriptionClass}>{description}</p> : null}
+    </div>
+  );
+
+  if (action == null) {
+    return <div data-slot="surface-summary-card-page-intro">{heading}</div>;
+  }
+
+  return (
+    <div data-slot="surface-summary-card-page-intro" className="flex items-start justify-between gap-2">
+      <div className="min-w-0">{heading}</div>
+      <div className="shrink-0">{action}</div>
     </div>
   );
 }

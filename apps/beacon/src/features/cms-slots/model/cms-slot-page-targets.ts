@@ -1,3 +1,4 @@
+import { cachedComponentName, seedCachedComponent } from "@/features/cms-slots/model/cms-slot-component-def-cache";
 import { readCmsSlotListDisplayName } from "@/features/cms-slots/model/cms-slot-data-list-display";
 import {
   type CmsSlotSelectedVariant,
@@ -186,7 +187,10 @@ export async function listInstancesInSlotListContainer(container: BlockElement):
       }
       const inst = ch as ComponentElement;
       const comp = await inst.getComponent();
-      const [name, variant] = await Promise.all([comp.getName(), readSeedVariant(inst)]);
+      // Seed the by-id cache so the props-order read in the composer reuses this handle, and dedupe getName across
+      // repeated components (a list is often many instances of one component).
+      seedCachedComponent(comp);
+      const [name, variant] = await Promise.all([cachedComponentName(comp), readSeedVariant(inst)]);
       return {
         key: crypto.randomUUID(),
         componentId: comp.id,

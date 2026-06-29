@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { clearCmsSlotComponentDefCache } from "@/features/cms-slots/model/cms-slot-component-def-cache";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import { listComposableMetaByInstanceKey } from "@/features/cms-slots/model/cms-slot-composable-props";
 import type { HydratedCmsSlotRow } from "@/features/cms-slots/model/cms-slot-page-targets";
@@ -14,6 +15,8 @@ export function useCompositionComposableMeta(selected: HydratedCmsSlotRow[]) {
     let cancel = false;
     setComposableLoading(true);
     void (async () => {
+      // Designer is where component definitions get edited (e.g. exposing a prop), so read fresh each time.
+      clearCmsSlotComponentDefCache();
       const next = await listComposableMetaByInstanceKey(selected);
       if (cancel) return;
       setComposableByKey(next);

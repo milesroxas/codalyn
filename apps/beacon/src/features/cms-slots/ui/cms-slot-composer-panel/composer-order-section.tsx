@@ -29,27 +29,14 @@ const composerOrderListClass = "m-0 list-none space-y-2 p-2 pb-3";
 type ComposerOrderSectionProps = {
   draft: CmsSlotCompositionDraftRow[];
   rowMeta: CmsSlotComposerRowMeta[];
-  onChangePropValue: (rowKey: string, propId: string, value: string) => void;
   busy: boolean;
   onReorder: (fromIndex: number, toIndex: number) => void;
-  onRenameSlot: (rowKey: string, name: string) => void;
+  onEditRow: (rowKey: string) => void;
   onRemove: (key: string) => void;
-  autoOpenEditDialogRowKey?: string | null;
-  onAutoOpenEditDialogConsumed?: () => void;
 };
 
 export function ComposerOrderSection(props: ComposerOrderSectionProps) {
-  const {
-    draft,
-    rowMeta,
-    onChangePropValue,
-    busy,
-    onReorder,
-    onRenameSlot,
-    onRemove,
-    autoOpenEditDialogRowKey = null,
-    onAutoOpenEditDialogConsumed,
-  } = props;
+  const { draft, rowMeta, busy, onReorder, onEditRow, onRemove } = props;
 
   const [removeConfirmKey, setRemoveConfirmKey] = useState<string | null>(null);
   const removeConfirmRow = draft.find((row) => row.key === removeConfirmKey) ?? null;
@@ -124,11 +111,8 @@ export function ComposerOrderSection(props: ComposerOrderSectionProps) {
                           row={row}
                           meta={meta}
                           busy={busy}
-                          onChangePropValue={onChangePropValue}
-                          onRenameSlot={onRenameSlot}
+                          onEditRow={onEditRow}
                           onRemove={handleRequestRemove}
-                          autoOpenEditDialogRowKey={autoOpenEditDialogRowKey}
-                          onAutoOpenEditDialogConsumed={onAutoOpenEditDialogConsumed}
                         />
                       );
                     })}

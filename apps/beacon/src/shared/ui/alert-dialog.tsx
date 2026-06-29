@@ -6,8 +6,6 @@ import type * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
-import { Label } from "@/shared/ui/label";
-import { ScrollArea } from "@/shared/ui/scroll-area";
 
 function AlertDialog({ ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />;
@@ -112,101 +110,6 @@ function AlertDialogFooter({
 }: React.ComponentProps<"div"> & VariantProps<typeof alertDialogFooterVariants>) {
   return (
     <div data-slot="alert-dialog-footer" className={cn(alertDialogFooterVariants({ layout }), className)} {...props} />
-  );
-}
-
-const alertDialogScrollBodyRegionClass = "h-full min-h-0 overflow-hidden";
-const alertDialogScrollBodyScrollAreaClass = "h-full min-h-0 w-full";
-
-const alertDialogScrollBodyVariants = cva("px-4 pb-2", {
-  variants: {
-    spacing: {
-      default: "space-y-3",
-      form: "space-y-4",
-    },
-  },
-  defaultVariants: {
-    spacing: "default",
-  },
-});
-
-function AlertDialogScrollBody({
-  className,
-  spacing,
-  ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof alertDialogScrollBodyVariants>) {
-  return (
-    <div className={alertDialogScrollBodyRegionClass} data-slot="alert-dialog-scroll-body">
-      <ScrollArea className={alertDialogScrollBodyScrollAreaClass} data-slot="alert-dialog-scroll-body_scroll">
-        <div className={cn(alertDialogScrollBodyVariants({ spacing }), className)} {...props} />
-      </ScrollArea>
-    </div>
-  );
-}
-
-const alertDialogScrollSectionVariants = cva("", {
-  variants: {
-    divider: {
-      true: "space-y-3 border-t border-border/50 pt-3",
-      false: "",
-    },
-  },
-  defaultVariants: {
-    divider: false,
-  },
-});
-
-function AlertDialogScrollSection({
-  className,
-  divider,
-  ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof alertDialogScrollSectionVariants>) {
-  return (
-    <div
-      data-slot="alert-dialog-scroll-section"
-      className={cn(alertDialogScrollSectionVariants({ divider }), className)}
-      {...props}
-    />
-  );
-}
-
-function AlertDialogFormField(props: {
-  label: React.ReactNode;
-  labelHtmlFor: string;
-  meta?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const { label, labelHtmlFor, meta, children } = props;
-
-  return (
-    <div className="space-y-0.5" data-slot="alert-dialog-form-field">
-      <Label className="text-xs text-muted-foreground" htmlFor={labelHtmlFor}>
-        <span className="min-w-0 truncate">{label}</span>
-        {meta != null ? (
-          <span className="ml-auto text-[10px] text-muted-foreground/70" data-slot="alert-dialog-form-field-meta">
-            {meta}
-          </span>
-        ) : null}
-      </Label>
-      {children}
-    </div>
-  );
-}
-
-/**
- * Compact section heading above a run of {@link AlertDialogFormField}s — used to cluster fields by group/folder
- * inside a scroll section. Tight vertical rhythm (no top pad on the first label) keeps grouped forms compact.
- */
-function AlertDialogFormGroupLabel({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="alert-dialog-form-group-label"
-      className={cn(
-        "pt-1.5 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80 first:pt-0",
-        className
-      )}
-      {...props}
-    />
   );
 }
 
@@ -324,14 +227,10 @@ export {
   AlertDialogFactPanel,
   AlertDialogFactValue,
   AlertDialogFooter,
-  AlertDialogFormField,
-  AlertDialogFormGroupLabel,
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogOverlay,
   AlertDialogPortal,
-  AlertDialogScrollBody,
-  AlertDialogScrollSection,
   AlertDialogTitle,
   AlertDialogTrigger,
   alertDialogScrollContentDefaults,

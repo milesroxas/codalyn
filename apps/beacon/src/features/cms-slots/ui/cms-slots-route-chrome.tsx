@@ -384,7 +384,6 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
         openingBeaconKey: p.openingBeaconKey,
         routeStateKnown: p.routeStateKnown,
         pageBootBlocking: p.pageBootBlocking,
-        listTargetPhase: p.listTargetPhase,
         editingContextPhase: p.composerEditingContext.phase,
       })
     : null;

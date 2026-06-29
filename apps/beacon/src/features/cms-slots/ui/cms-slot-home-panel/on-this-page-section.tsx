@@ -11,6 +11,7 @@ import {
   CMS_SLOTS_PUBLISHED_SECTION_LABEL,
   CMS_SLOTS_RENAME_SLOT_DIALOG_TITLE,
 } from "@/shared/lib/cms-slots-feature-copy";
+import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { SurfaceSummaryCardPanelSectionLabel } from "@/shared/ui/surface-summary-card";
 
@@ -56,6 +57,8 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
   const [renameDraft, setRenameDraft] = useState("");
 
   const hasBeacons = pageBeacons.length > 0;
+  // Dense lists (3+ published slots) switch to the slim row tile; one or two keep the full upload-card look.
+  const compactTiles = pageBeacons.length >= 3;
   const renameBaseline = renameTarget != null ? displayLabelForCmsSlotList(renameTarget).trim() : "";
   const renameDraftTrimmed = renameDraft.trim();
   const renameSaveDisabled =
@@ -107,7 +110,10 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
       {hasBeacons ? (
         <div className="space-y-3">
           <SurfaceSummaryCardPanelSectionLabel>{CMS_SLOTS_PUBLISHED_SECTION_LABEL}</SurfaceSummaryCardPanelSectionLabel>
-          <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0" aria-label={CMS_SLOTS_PAGE_LIST_ARIA_LABEL}>
+          <ul
+            className={cn("m-0 grid list-none grid-cols-1 p-0", compactTiles ? "gap-2" : "gap-3")}
+            aria-label={CMS_SLOTS_PAGE_LIST_ARIA_LABEL}
+          >
             {pageBeacons.map((b) => (
               <CmsSlotPublishedSlotTile
                 key={b.key}
@@ -117,6 +123,7 @@ export function OnThisPageSection(props: OnThisPageSectionProps) {
                 opening={openingBeaconKey === b.key}
                 deleting={deletePendingKey === b.key}
                 renaming={renamePendingKey === b.key}
+                compact={compactTiles}
                 onOpen={() => void onOpenBeacon(b)}
                 onRequestDelete={() => onRequestDelete(b)}
                 onRequestRename={() => openRenameDialog(b)}

@@ -15,8 +15,3 @@ export function cmsSlotListTargetPhaseUnsettled(
 export function cmsSlotListTargetSettled(phase: CmsSlotListTargetPhase, onCanvasCountResolved: boolean): boolean {
   return !cmsSlotListTargetPhaseUnsettled(phase, onCanvasCountResolved);
 }
-
-/** True once list-target reconcile finished — canvas count may still resolve in-panel. */
-export function cmsSlotListTargetPhaseSettledForRouteSurface(phase: CmsSlotListTargetPhase): boolean {
-  return phase !== "loading" && phase !== "updating";
-}

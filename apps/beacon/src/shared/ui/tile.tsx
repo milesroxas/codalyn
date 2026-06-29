@@ -10,6 +10,8 @@ const tileVariants = cva("min-w-0 border", {
     variant: {
       cmsUpload:
         "relative flex min-h-[6.75rem] w-full cursor-pointer flex-col rounded-xl border-border/80 bg-card text-left shadow-sm outline-none transition-[border-color,background-color,opacity] hover:border-border hover:bg-muted/25 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed",
+      cmsUploadCompact:
+        "relative flex min-h-11 w-full cursor-pointer flex-row items-center gap-2 rounded-lg border-border/80 bg-card py-2 pr-11 pl-3.5 text-left shadow-sm outline-none transition-[border-color,background-color,opacity] hover:border-border hover:bg-muted/25 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed",
       presetListInteractive:
         "relative flex min-h-[6.75rem] w-full cursor-pointer flex-col items-start justify-end gap-0.5 rounded-xl border-border/80 bg-card p-3.5 text-left shadow-sm outline-none transition-[border-color,background-color,opacity] hover:border-border hover:bg-muted/25 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed",
       presetListReadonly:
@@ -23,15 +25,20 @@ const tileVariants = cva("min-w-0 border", {
 
 export type TileVariantProps = VariantProps<typeof tileVariants>;
 
-const tileOverlayButtonVariants = cva("absolute top-1.5 right-1.5 z-10", {
+const tileOverlayButtonVariants = cva("absolute right-1.5 z-10", {
   variants: {
     intent: {
       menu: "text-foreground/90 hover:bg-muted/60 hover:text-foreground",
       destructive: "text-muted-foreground hover:text-destructive",
     },
+    align: {
+      top: "top-1.5",
+      center: "top-1/2 -translate-y-1/2",
+    },
   },
   defaultVariants: {
     intent: "menu",
+    align: "top",
   },
 });
 
@@ -102,7 +109,7 @@ function TileButton(props: TileButtonProps) {
 
 function TileBusyOverlay() {
   return (
-    <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-card/80">
+    <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[inherit] bg-card/80">
       <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
     </span>
   );
@@ -111,14 +118,14 @@ function TileBusyOverlay() {
 type TileOverlayButtonProps = React.ComponentProps<typeof Button> & VariantProps<typeof tileOverlayButtonVariants>;
 
 function TileOverlayButton(props: TileOverlayButtonProps) {
-  const { intent = "menu", className, ...rest } = props;
+  const { intent = "menu", align = "top", className, ...rest } = props;
 
   return (
     <Button
       type="button"
       size="icon-sm"
       variant="ghost"
-      className={cn(tileOverlayButtonVariants({ intent }), className)}
+      className={cn(tileOverlayButtonVariants({ intent, align }), className)}
       {...rest}
     />
   );
@@ -128,6 +135,13 @@ function TileBottomPinnedLabel(props: { children: React.ReactNode; reserveAction
   const { children, reserveActionSpace = false } = props;
 
   return <span className={tileBottomPinnedLabelVariants({ reserveActionSpace })}>{children}</span>;
+}
+
+/** Single-line label that flows inline within a row-layout (compact) tile and truncates before the action slot. */
+function TileInlineLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="pointer-events-none min-w-0 flex-1 truncate text-sm font-medium text-foreground">{children}</span>
+  );
 }
 
 function TilePresetContent(props: { title: string; meta: string }) {
@@ -146,6 +160,7 @@ export {
   TileBusyOverlay,
   TileButton,
   TileGridListItem,
+  TileInlineLabel,
   TileOverlayButton,
   TilePanel,
   TilePresetContent,

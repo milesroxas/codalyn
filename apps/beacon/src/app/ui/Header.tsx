@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { beaconParentRouteLabel, useNavigateUp } from "@/app/beacon-navigation-history";
+import { resolveBeaconRouteParent } from "@/app/beacon-route-hierarchy";
 import { useRequestRouteLeave } from "@/app/beacon-route-leave-guard";
 import { clearBeaconGuestChosen } from "@/features/auth/lib/beacon-guest-choice";
 import { isTowerConfigured, openTowerAppHome } from "@/features/auth/model/tower-auth-client";
@@ -172,24 +174,21 @@ function resolveBeaconHeaderFeature(pathname: string): { title: string } | null 
   return null;
 }
 
-/** Route-aware back control + feature name shown in the app header while inside a flat feature route. */
+/** Route-aware up control + feature name shown in the app header while inside a flat feature route. */
 function HeaderFeatureTitle({ title }: { title: string }) {
-  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const navigateUp = useNavigateUp();
   const requestLeave = useRequestRouteLeave();
-  // Return to the previous in-app route when history holds one, otherwise the home surface. React Router
-  // (v7 HashRouter) stamps the current history index onto `history.state.idx`; idx 0 means this is the first
-  // in-app entry (the index → /home redirect replaces it), so there is nothing to pop back to. Route through
-  // the leave guard first so a feature with unsaved work (e.g. the CMS Slots composer) can confirm before we go.
+  // Hierarchical "up", not temporal "back": a flat feature's parent is always the Home hub, so this control
+  // is deterministic and can never ping-pong through earlier tool-to-tool jumps. `useNavigateUp` pops to an
+  // existing Home entry when one is in the back stack (preserving its state) and otherwise pushes Home. Route
+  // through the leave guard first so a feature with unsaved work (e.g. the CMS Slots composer) can confirm.
   const handleBack = useCallback(() => {
-    requestLeave(() => {
-      const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
-      if (idx > 0) {
-        navigate(-1);
-      } else {
-        navigate("/home");
-      }
-    });
-  }, [navigate, requestLeave]);
+    requestLeave(navigateUp);
+  }, [navigateUp, requestLeave]);
+
+  const parent = resolveBeaconRouteParent(pathname);
+  const backLabel = parent ? `Back to ${beaconParentRouteLabel(parent)}` : "Go back";
 
   return (
     <div className="flex min-w-0 items-center gap-1">
@@ -199,7 +198,7 @@ function HeaderFeatureTitle({ title }: { title: string }) {
         variant="ghost"
         className="-ml-1 shrink-0"
         onClick={handleBack}
-        aria-label="Go back"
+        aria-label={backLabel}
       >
         <ArrowLeft aria-hidden className="size-4" />
       </Button>

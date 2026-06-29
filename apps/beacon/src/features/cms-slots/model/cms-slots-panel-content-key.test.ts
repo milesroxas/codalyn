@@ -39,7 +39,6 @@ describe("cmsSlotsDesignerRouteSurface", () => {
     openingBeaconKey: null,
     routeStateKnown: true,
     pageBootBlocking: false,
-    listTargetPhase: "synced" as const,
     editingContextPhase: "ready" as const,
   };
 
@@ -61,8 +60,8 @@ describe("cmsSlotsDesignerRouteSurface", () => {
     ).toBe("composition");
   });
 
-  it("stays hidden while opening", () => {
-    expect(cmsSlotsDesignerRouteContentReady({ ...idleHome, openingBeaconKey: "beacon-1" })).toBe(false);
+  it("keeps home visible while opening a slot so the tile spinner shows (no blank)", () => {
+    expect(cmsSlotsDesignerRouteContentReady({ ...idleHome, openingBeaconKey: "beacon-1" })).toBe(true);
   });
 
   it("does not hide home on background rescans", () => {
@@ -70,24 +69,15 @@ describe("cmsSlotsDesignerRouteSurface", () => {
     expect(cmsSlotsDesignerRouteContentReady({ ...idleHome, pageBootBlocking: true })).toBe(false);
   });
 
-  it("waits for list target reconcile before showing composition", () => {
+  it("shows composition immediately when picking, with inline list-target loading (no blank/overlay)", () => {
+    // The composition panel renders its slot rows and its own inline list-target spinner, so opening a slot must
+    // not blank the route behind a full-screen overlay while the list-target reconcile runs.
     expect(
       resolveCmsSlotsDesignerRouteSurface({
         ...idleHome,
         picking: true,
-        listTargetPhase: "loading",
       })
-    ).toEqual({ contentKey: "composition", contentReady: false });
-  });
-
-  it("shows composition once list target phase is synced", () => {
-    expect(
-      cmsSlotsDesignerRouteContentReady({
-        ...idleHome,
-        picking: true,
-        listTargetPhase: "synced",
-      })
-    ).toBe(true);
+    ).toEqual({ contentKey: "composition", contentReady: true });
   });
 
   it("waits for editing context on designer routes", () => {
@@ -158,6 +148,19 @@ describe("cmsSlotsComposerRouteSurface", () => {
       cmsSlotsComposerRouteContentReady({
         ...idleList,
         activeComposer: { beacon: {}, initialSignature: "sig" },
+      })
+    ).toBe(true);
+  });
+
+  it("keeps the list surface visible while eligibility is still scanning (inline loading, no blank)", () => {
+    // Crossing designer -> composer must crossfade over real content, not strand a blank panel behind the
+    // route overlay while the eligible-list scan runs. The panel renders its intro/card and fills the list inline.
+    expect(
+      cmsSlotsComposerRouteContentReady({
+        ...idleList,
+        composerEligibleResolved: false,
+        composerEligibleLoading: true,
+        pageRuntimeStatusLoading: true,
       })
     ).toBe(true);
   });

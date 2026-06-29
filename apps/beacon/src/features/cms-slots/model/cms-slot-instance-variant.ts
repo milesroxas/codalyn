@@ -118,9 +118,6 @@ export type CmsSlotVariantControl = {
   selectedId: string;
 };
 
-/** Display name for the synthetic base option in a variant picker. */
-export const CMS_SLOT_BASE_VARIANT_LABEL = "Base";
-
 /**
  * Reads the editable variant control from a seed's instance props: the first `variant` prop with defined options, its
  * choices (base prepended), and the current selection. Returns `null` when the component has no variant prop, so the
@@ -134,7 +131,7 @@ function variantControlFromProp(prop: InstancePropForVariant): CmsSlotVariantCon
   if (defined == null || defined.length === 0) {
     return null;
   }
-  const options: Array<{ id: string; name: string }> = [{ id: BASE_VARIANT_ID, name: CMS_SLOT_BASE_VARIANT_LABEL }];
+  const options: Array<{ id: string; name: string }> = [{ id: BASE_VARIANT_ID, name: "Base" }];
   for (const o of defined) {
     if (o.id === BASE_VARIANT_ID) {
       continue;

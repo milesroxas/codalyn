@@ -12,8 +12,7 @@
 
 # Neon CLI context
 **/.neon
-.neon
 
 # Local agent / editor config
-.claude/settings.local.json
+**/.claude/settings.local.json
 .cursor/mcp.json

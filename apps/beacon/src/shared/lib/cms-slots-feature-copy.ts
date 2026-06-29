@@ -3,8 +3,6 @@ export const CMS_SLOTS_FEATURE_NAME = "CMS Slots";
 /** Designer canvas label on the list render target (stripped at runtime). */
 export const CMS_SLOTS_LIST_TARGET_DESIGNER_LABEL = "Beacon - CMS Slot Target";
 
-export const CMS_SLOTS_HOME_TILE_DESCRIPTION = "Unique layouts in collection templates";
-
 export const CMS_SLOTS_AREA_NAV_LABEL = `${CMS_SLOTS_FEATURE_NAME} area`;
 
 export const CMS_SLOTS_ADD_SLOT_LABEL = "Add Slot";

@@ -130,17 +130,17 @@ export function ComposerSlotEditView(props: ComposerSlotEditViewProps) {
           {CMS_SLOTS_COMPOSER_SLOT_EDIT_TITLE}
         </h2>
         <div className="flex shrink-0 items-center gap-1.5">
-          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={handleCancel}>
+          <Button type="button" variant="outline" size="xs" disabled={busy} onClick={handleCancel}>
             {CMS_SLOTS_COMPOSER_SLOT_EDIT_CANCEL}
           </Button>
-          <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={handleDone}>
+          <Button type="button" variant="secondary" size="xs" disabled={busy} onClick={handleDone}>
             {CMS_SLOTS_COMPOSER_SLOT_EDIT_DONE}
           </Button>
         </div>
       </div>
 
       <ScrollArea viewportRef={viewportRef} className="min-h-0 w-full flex-1 basis-0">
-        <div className="space-y-4 px-3 pb-3">
+        <div className="space-y-4 px-3 pb-6">
           <CmsSlotDisplayNameField
             fieldId={fieldId}
             fieldLabel={CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_LABEL}
@@ -180,11 +180,25 @@ export function ComposerSlotEditView(props: ComposerSlotEditViewProps) {
           {/* Mirrors the header controls at the end of the fields, but only once the content scrolls — when it
               all fits, the pinned header keeps Cancel/Done in reach without the extra row. */}
           {overflowing ? (
-            <div className="flex items-center justify-end gap-1.5 pt-1">
-              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={handleCancel}>
+            <div className="flex items-center gap-1.5 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={handleCancel}
+                className="flex-1"
+              >
                 {CMS_SLOTS_COMPOSER_SLOT_EDIT_CANCEL}
               </Button>
-              <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={handleDone}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={busy}
+                onClick={handleDone}
+                className="flex-1"
+              >
                 {CMS_SLOTS_COMPOSER_SLOT_EDIT_DONE}
               </Button>
             </div>

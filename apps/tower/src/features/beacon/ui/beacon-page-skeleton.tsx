@@ -30,8 +30,8 @@ function BeaconPageSkeleton() {
           <PageHeaderSkeleton descriptionLines={2} />
         </header>
         <div className="space-y-6">
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <Skeleton className="h-48 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-sm" />
+          <Skeleton className="h-48 w-full rounded-sm" />
         </div>
       </TowerPageMain>
     </SkeletonStatus>

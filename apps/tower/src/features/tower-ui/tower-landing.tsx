@@ -104,7 +104,7 @@ export function TowerLanding(props: { earlyAccessRequired?: boolean; appLinks?: 
               />
               <ul className="grid gap-6 pt-10 sm:grid-cols-3">
                 <li className="tl-landing-enter flex gap-4 [--tl-enter-delay:3910ms] [--tl-enter-duration:0.75s]">
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-background/70 shadow-sm backdrop-blur-sm dark:bg-background/40">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-sm border border-border/80 bg-background/70 shadow-sm backdrop-blur-sm dark:bg-background/40">
                     <IconUsers aria-hidden className="size-5 text-primary" stroke={1.5} />
                   </span>
                   <div>
@@ -113,7 +113,7 @@ export function TowerLanding(props: { earlyAccessRequired?: boolean; appLinks?: 
                   </div>
                 </li>
                 <li className="tl-landing-enter flex gap-4 [--tl-enter-delay:4030ms] [--tl-enter-duration:0.75s]">
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-background/70 shadow-sm backdrop-blur-sm dark:bg-background/40">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-sm border border-border/80 bg-background/70 shadow-sm backdrop-blur-sm dark:bg-background/40">
                     <IconPlug aria-hidden className="size-5 text-primary" stroke={1.5} />
                   </span>
                   <div>
@@ -122,7 +122,7 @@ export function TowerLanding(props: { earlyAccessRequired?: boolean; appLinks?: 
                   </div>
                 </li>
                 <li className="tl-landing-enter flex gap-4 [--tl-enter-delay:4150ms] [--tl-enter-duration:0.75s]">
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-background/70 shadow-sm backdrop-blur-sm dark:bg-background/40">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-sm border border-border/80 bg-background/70 shadow-sm backdrop-blur-sm dark:bg-background/40">
                     <IconRadar2 aria-hidden className="size-5 text-primary" stroke={1.5} />
                   </span>
                   <div>

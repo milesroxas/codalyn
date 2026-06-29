@@ -111,10 +111,10 @@ function OperatorShellContent({ userEmail, userName, children }: OperatorShellPr
   const brand = (
     <Link
       href="/console"
-      className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/50"
+      className="flex items-center gap-2 rounded-sm px-1 py-1 hover:bg-muted/50"
       aria-label="Operator console home"
     >
-      <span className="flex size-7 items-center justify-center rounded-md bg-foreground text-background">
+      <span className="flex size-7 items-center justify-center rounded-sm bg-foreground text-background">
         <IconShieldCheck className="size-4" aria-hidden />
       </span>
       <div className="flex flex-col leading-tight">
@@ -135,7 +135,7 @@ function OperatorShellContent({ userEmail, userName, children }: OperatorShellPr
             href={href}
             onClick={onNavigate}
             className={cn(
-              "group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors",
+              "group flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-medium transition-colors",
               active ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
             )}
           >
@@ -188,7 +188,7 @@ function OperatorShellContent({ userEmail, userName, children }: OperatorShellPr
           >
             <IconSearch className="size-4" aria-hidden />
             <span>Search…</span>
-            <kbd className="ml-2 hidden items-center gap-0.5 rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground md:inline-flex">
+            <kbd className="ml-2 hidden items-center gap-0.5 rounded-sm bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground md:inline-flex">
               ⌘K
             </kbd>
           </Button>

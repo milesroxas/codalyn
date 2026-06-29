@@ -11,17 +11,20 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardFooter } from "@/shared/ui/card";
 
-const presetCardVariants = cva("overflow-hidden py-0 ring-1 ring-foreground/10", {
-  variants: {
-    density: {
-      default: "gap-0",
-      compact: "gap-0",
+const presetCardVariants = cva(
+  "overflow-hidden py-0 gap-0 data-[size=sm]:py-0 data-[size=sm]:gap-0 ring-1 ring-foreground/10",
+  {
+    variants: {
+      density: {
+        default: "gap-0",
+        compact: "gap-0",
+      },
     },
-  },
-  defaultVariants: {
-    density: "default",
-  },
-});
+    defaultVariants: {
+      density: "default",
+    },
+  }
+);
 
 const presetCardBodyVariants = cva("space-y-2", {
   variants: {

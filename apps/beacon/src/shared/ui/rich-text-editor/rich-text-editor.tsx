@@ -22,7 +22,7 @@ import { RichTextToolbar } from "@/shared/ui/rich-text-editor/rich-text-editor-t
 
 const richTextEditorVariants = cva(
   // Matches Input/Textarea surface: input border, focus ring driven by focus-within (the caret lives in a child).
-  "rounded-sm border border-input bg-transparent text-sm text-foreground shadow-sm transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 has-disabled:cursor-not-allowed has-disabled:opacity-60 dark:bg-input/30",
+  "rounded-sm border border-input bg-transparent text-sm text-foreground shadow-sm transition-colors focus-within:border-ring focus-within:ring-1 focus-within:ring-ring/40 has-disabled:cursor-not-allowed has-disabled:opacity-60 dark:bg-input/30",
   {
     variants: {
       variant: {

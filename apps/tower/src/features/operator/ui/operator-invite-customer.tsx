@@ -134,7 +134,7 @@ export function OperatorInviteCustomer({ onInvited, trigger }: OperatorInviteCus
           ) : null}
           {inviteLink ? (
             <div className="space-y-2">
-              <pre className="max-h-32 overflow-auto break-all rounded-md border border-border bg-muted/40 p-2 font-mono text-xs">
+              <pre className="max-h-32 overflow-auto break-all rounded-sm border border-border bg-muted/40 p-2 font-mono text-xs">
                 {inviteLink}
               </pre>
               <Button

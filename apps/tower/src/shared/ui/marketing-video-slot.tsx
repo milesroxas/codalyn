@@ -38,7 +38,7 @@ function MarketingVideoSlotPlayback({
     <div
       data-slot="marketing-video-slot"
       className={cn(
-        "relative flex min-h-80 flex-1 self-stretch overflow-hidden rounded-[10px]",
+        "relative flex min-h-80 flex-1 self-stretch overflow-hidden rounded-sm",
         showPlaceholder && "bg-[#464646]",
         showShader && "bg-black",
         className

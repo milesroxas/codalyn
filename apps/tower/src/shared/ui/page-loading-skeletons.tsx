@@ -12,8 +12,8 @@ function AcceptInvitationSkeleton() {
           <Skeleton className="h-4 w-5/6" />
         </CardHeader>
         <CardContent className="space-y-3 pt-2">
-          <Skeleton className="h-10 w-full rounded-lg" />
-          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-sm" />
+          <Skeleton className="h-10 w-full rounded-sm" />
         </CardContent>
         <CardFooter className="flex-col border-t border-border/60 bg-muted/20 px-6 py-4">
           <Skeleton className="h-4 w-48" />

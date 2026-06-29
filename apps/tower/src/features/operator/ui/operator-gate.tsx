@@ -69,9 +69,9 @@ export function OperatorGate({ children }: { children: ReactNode }) {
   if (!isProductAdmin) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-background px-4">
-        <div className="max-w-md rounded-xl border border-border bg-card p-6">
+        <div className="max-w-md rounded-sm border border-border bg-card p-6">
           <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-sm bg-muted">
               <IconShieldLock className="size-5 text-muted-foreground" aria-hidden />
             </span>
             <div className="min-w-0 space-y-2">

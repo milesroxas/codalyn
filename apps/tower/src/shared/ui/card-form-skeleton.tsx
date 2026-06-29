@@ -50,7 +50,7 @@ function CardFormSkeleton({
                 labelWidth={field.labelWidth}
               />
             ))}
-            {submit ? <Skeleton className="h-10 w-full rounded-lg" /> : null}
+            {submit ? <Skeleton className="h-10 w-full rounded-sm" /> : null}
           </div>
         </CardContent>
         {footer ? (

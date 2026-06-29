@@ -390,7 +390,7 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
             <SheetTitle>Workspace details</SheetTitle>
           </SheetHeader>
           <SheetBody>
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <div className="rounded-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               {error}
             </div>
           </SheetBody>
@@ -409,7 +409,7 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
     <>
       <SheetHeader>
         <div className="flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-sm bg-muted text-muted-foreground">
             <IconBuilding className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -439,7 +439,7 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
 
       <SheetBody className="space-y-6">
         {error ? (
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <div className="rounded-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
             {error}
           </div>
         ) : null}
@@ -505,7 +505,7 @@ function OperatorWorkspaceDetailSheetBody(props: OperatorWorkspaceDetailSheetBod
 
         <section className="space-y-3">
           <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Metadata</h3>
-          <dl className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-3 text-xs">
+          <dl className="grid grid-cols-2 gap-3 rounded-sm border border-border bg-card p-3 text-xs">
             <div>
               <dt className="text-muted-foreground">Workspace ID</dt>
               <dd className="truncate font-mono text-foreground" title={detail.id}>
@@ -630,7 +630,7 @@ function IdentitySection({
   return (
     <section className="space-y-3">
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Identity</h3>
-      <div className="space-y-3 rounded-lg border border-border bg-card p-3">
+      <div className="space-y-3 rounded-sm border border-border bg-card p-3">
         <FormField>
           <Label htmlFor="workspace-name">Name</Label>
           <FormFieldRow>
@@ -668,7 +668,7 @@ function MembersSection({
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
         Members ({members.length})
       </h3>
-      <div className="rounded-lg border border-border">
+      <div className="rounded-sm border border-border">
         {members.length === 0 ? (
           <p className="p-3 text-xs text-muted-foreground">No members yet.</p>
         ) : (
@@ -705,14 +705,14 @@ function InvitationsSection({ invitations }: { invitations: OperatorWorkspaceDet
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
         Invitations ({invitations.length})
       </h3>
-      <div className="rounded-lg border border-border">
+      <div className="rounded-sm border border-border">
         {invitations.length === 0 ? (
           <p className="p-3 text-xs text-muted-foreground">No invitations.</p>
         ) : (
           <ul className="divide-y divide-border">
             {invitations.map((inv) => (
               <li key={inv.id} className="flex items-center gap-3 p-3">
-                <span className="flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <span className="flex size-7 items-center justify-center rounded-sm bg-muted text-muted-foreground">
                   <IconUserPlus className="size-4" />
                 </span>
                 <div className="min-w-0 flex-1">

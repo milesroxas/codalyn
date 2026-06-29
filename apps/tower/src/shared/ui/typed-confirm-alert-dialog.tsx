@@ -24,7 +24,7 @@ function confirmTextMatches(input: string, expected: string): boolean {
 }
 
 function ConfirmPromptValue({ children }: { children: React.ReactNode }) {
-  return <code className="rounded bg-muted px-1 font-mono text-xs">{children}</code>;
+  return <code className="rounded-sm bg-muted px-1 font-mono text-xs">{children}</code>;
 }
 
 type TypedConfirmSecondaryConfirm = {

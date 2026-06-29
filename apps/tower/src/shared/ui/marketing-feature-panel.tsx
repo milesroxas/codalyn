@@ -6,7 +6,7 @@ import { MarketingFeaturePanelShader } from "@/shared/ui/marketing-feature-panel
 import type { MarketingFeaturePanelAccent } from "@/shared/ui/marketing-shader-presets";
 
 const marketingFeaturePanelVariants = cva(
-  "relative flex w-full shrink-0 flex-col gap-8 overflow-hidden rounded-[10px] p-8 lg:w-[32rem] lg:max-w-[32rem]",
+  "relative flex w-full shrink-0 flex-col gap-8 overflow-hidden rounded-sm p-8 lg:w-[32rem] lg:max-w-[32rem]",
   {
     variants: {
       accent: {
@@ -21,7 +21,7 @@ const marketingFeaturePanelVariants = cva(
 );
 
 const marketingFeatureIconVariants = cva(
-  "relative flex size-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-neutral-950 shadow-sm drop-shadow-[0_1px_1px_rgba(0,0,0,0.05)] [&_svg]:size-5 [&_svg]:text-white"
+  "relative flex size-10 shrink-0 items-center justify-center rounded-sm border border-white/10 bg-neutral-950 shadow-sm drop-shadow-[0_1px_1px_rgba(0,0,0,0.05)] [&_svg]:size-5 [&_svg]:text-white"
 );
 
 type MarketingFeaturePanelProps = React.ComponentProps<"article"> &

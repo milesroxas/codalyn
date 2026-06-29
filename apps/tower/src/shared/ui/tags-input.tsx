@@ -92,7 +92,7 @@ export function TagsInput({
       disabled={disabled}
       aria-invalid={ariaInvalid}
       className={cn(
-        "flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-lg border border-input px-2 py-1.5 text-sm transition-colors",
+        "flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-sm border border-input px-2 py-1.5 text-sm transition-colors",
         formFieldSurfaceClass[surface ?? "elevated"],
         formFieldFocusWithinClass,
         disabled && "pointer-events-none cursor-not-allowed opacity-50",
@@ -101,7 +101,7 @@ export function TagsInput({
       )}
     >
       {value.map((tag) => (
-        <Badge key={tag} variant="secondary" className="h-7 gap-1 rounded-md px-2 py-0 font-normal">
+        <Badge key={tag} variant="secondary" className="h-7 gap-1 rounded-sm px-2 py-0 font-normal">
           <span className="max-w-[14rem] truncate">{tag}</span>
           <button
             type="button"

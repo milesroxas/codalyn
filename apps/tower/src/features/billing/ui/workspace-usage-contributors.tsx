@@ -22,7 +22,7 @@ export function WorkspaceUsageContributorsTable({ contributors }: WorkspaceUsage
 
   return (
     <div className="space-y-3">
-      <div className="overflow-hidden rounded-lg border border-border">
+      <div className="overflow-hidden rounded-sm border border-border">
         <Table>
           <TableHeader>
             <TableRow>

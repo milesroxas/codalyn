@@ -131,12 +131,12 @@ export function OperatorSupportRequests() {
       </div>
 
       {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-sm border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-border bg-card">
+      <div className="rounded-sm border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow>

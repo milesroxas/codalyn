@@ -104,6 +104,7 @@ body {
   --color-foreground: var(--foreground);
   --color-background: var(--background);
   /* Tightened radius scale (base 0.5rem = 8px): even 2px steps so the app reads crisp, not pill-soft. */
+  --radius-xs: calc(var(--radius) * 0.25); /* 2px — pill nested in a rounded track (segmented toggle) */
   --radius-sm: calc(var(--radius) * 0.5); /* 4px — buttons, inputs, cards, badges */
   --radius-md: calc(var(--radius) * 0.75); /* 6px */
   --radius-lg: var(--radius); /* 8px — compact tiles */

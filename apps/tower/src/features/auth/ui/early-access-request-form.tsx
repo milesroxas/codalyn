@@ -144,7 +144,7 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
         <p className="text-sm leading-relaxed text-muted-foreground">{EARLY_ACCESS_REQUEST_PAGE_DESCRIPTION}</p>
       </div>
 
-      <div className="rounded-xl border border-border/80 bg-card p-6 shadow-lg shadow-black/4 dark:shadow-black/25">
+      <div className="rounded-sm border border-border/80 bg-card p-6 shadow-lg shadow-black/4 dark:shadow-black/25">
         {success ? (
           <p className="text-sm text-foreground" role="status">
             {success}

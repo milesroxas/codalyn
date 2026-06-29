@@ -8,7 +8,7 @@ import { cn } from "@/shared/lib/utils";
 import { Badge } from "@/shared/ui/badge";
 
 const placeholderCanvasVariants = cva(
-  "relative flex w-full items-center justify-center overflow-hidden rounded-lg border border-border/60 bg-muted/30",
+  "relative flex w-full items-center justify-center overflow-hidden rounded-sm border border-border/60 bg-muted/30",
   {
     variants: {
       density: {
@@ -23,7 +23,7 @@ const placeholderCanvasVariants = cva(
 );
 
 const placeholderAssetVariants = cva(
-  "relative max-w-full overflow-hidden rounded-md border border-dashed border-border/80 bg-card/90 shadow-sm ring-1 ring-foreground/5",
+  "relative max-w-full overflow-hidden rounded-sm border border-dashed border-border/80 bg-card/90 shadow-sm ring-1 ring-foreground/5",
   {
     variants: {
       density: {

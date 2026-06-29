@@ -54,7 +54,7 @@ export function TeamWorkspacePanel(props: {
       {activeOrgPending ? <TeamWorkspacePanelSkeleton /> : null}
 
       {!activeOrgPending && !activeOrg ? (
-        <div className="rounded-xl border border-dashed bg-muted/20 p-10 text-center">
+        <div className="rounded-sm border border-dashed bg-muted/20 p-10 text-center">
           <p className="text-sm font-medium text-foreground">No workspace selected</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Pick a workspace from the menu above to manage people and invitations.

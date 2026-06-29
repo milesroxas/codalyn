@@ -29,7 +29,7 @@ function FormFieldSkeleton({
   return (
     <div className={cn("space-y-1.5", className)}>
       <Skeleton className={cn("h-4", labelWidth)} />
-      <Skeleton className={cn("w-full rounded-lg", multiline ? "h-20" : fieldHeightClass[fieldSize])} />
+      <Skeleton className={cn("w-full rounded-sm", multiline ? "h-20" : fieldHeightClass[fieldSize])} />
       {hint ? <Skeleton className="h-3 w-full max-w-xs" /> : null}
     </div>
   );

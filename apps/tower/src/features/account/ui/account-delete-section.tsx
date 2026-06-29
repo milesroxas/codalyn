@@ -150,7 +150,7 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
           <p className="text-sm text-muted-foreground">Checking workspace ownership and billing responsibilities…</p>
         ) : null}
         {!deleteEligibilityPending && deleteBlockedMessage ? (
-          <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+          <div className="space-y-3 rounded-sm border border-destructive/30 bg-destructive/5 p-3">
             <p className="text-sm text-destructive">{deleteBlockedMessage}</p>
             <Button asChild variant="outline" size="sm">
               <Link href={buildTeamPageHref({ tab: "settings" })}>Open Team settings</Link>

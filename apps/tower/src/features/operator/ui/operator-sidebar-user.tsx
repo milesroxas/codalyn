@@ -36,7 +36,7 @@ export function OperatorSidebarUser() {
   const user = session?.user ?? (signingOut ? lastUserRef.current : null);
 
   if (showSkeleton && !user) {
-    return <Skeleton className="h-12 w-full rounded-lg" aria-hidden />;
+    return <Skeleton className="h-12 w-full rounded-sm" aria-hidden />;
   }
   if (isPending && !user) {
     return null;
@@ -61,8 +61,8 @@ export function OperatorSidebarUser() {
           variant="ghost"
           className="h-12 w-full justify-start gap-2 px-2 data-[state=open]:bg-muted"
         >
-          <Avatar className="size-8 rounded-lg">
-            <AvatarFallback className="rounded-lg text-xs font-medium">{avatarFallback}</AvatarFallback>
+          <Avatar className="size-8 rounded-sm">
+            <AvatarFallback className="rounded-sm text-xs font-medium">{avatarFallback}</AvatarFallback>
           </Avatar>
           <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
             <span className="truncate font-medium">{displayName}</span>
@@ -71,11 +71,11 @@ export function OperatorSidebarUser() {
           <EllipsisVerticalIcon className="ml-auto size-4 shrink-0 opacity-60" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="min-w-56 rounded-lg" side="top" align="start" sideOffset={8}>
+      <DropdownMenuContent className="min-w-56 rounded-sm" side="top" align="start" sideOffset={8}>
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-            <Avatar className="size-8 rounded-lg">
-              <AvatarFallback className="rounded-lg text-xs font-medium">{avatarFallback}</AvatarFallback>
+            <Avatar className="size-8 rounded-sm">
+              <AvatarFallback className="rounded-sm text-xs font-medium">{avatarFallback}</AvatarFallback>
             </Avatar>
             <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{displayName}</span>

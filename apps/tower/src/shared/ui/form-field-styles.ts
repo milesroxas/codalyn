@@ -24,7 +24,7 @@ export const formFieldSurfaceClass = {
 } as const;
 
 export const formFieldSharedClass = cn(
-  "w-full min-w-0 rounded-lg border border-input text-foreground placeholder:text-muted-foreground",
+  "w-full min-w-0 rounded-sm border border-input text-foreground placeholder:text-muted-foreground",
   formFieldFocusClass,
   formFieldInvalidClass,
   formFieldDisabledClass

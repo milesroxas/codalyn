@@ -6,7 +6,7 @@ import { Children, type ComponentProps, type ComponentType } from "react";
 import { cn } from "@/shared/lib/utils";
 
 const actionTileVariants = cva(
-  "group/action-tile relative flex h-full flex-col gap-3 rounded-xl bg-card p-4 text-card-foreground ring-1 ring-foreground/10 transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+  "group/action-tile relative flex h-full flex-col gap-3 rounded-sm bg-card p-4 text-card-foreground ring-1 ring-foreground/10 transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
   {
     variants: {
       variant: {
@@ -20,7 +20,7 @@ const actionTileVariants = cva(
   }
 );
 
-const actionTileIconVariants = cva("flex size-9 shrink-0 items-center justify-center rounded-lg [&_svg]:size-[18px]", {
+const actionTileIconVariants = cva("flex size-9 shrink-0 items-center justify-center rounded-sm [&_svg]:size-[18px]", {
   variants: {
     variant: {
       default:

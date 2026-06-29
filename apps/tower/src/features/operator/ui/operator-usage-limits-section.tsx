@@ -111,7 +111,7 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
   return (
     <section className="space-y-3">
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Usage limits</h3>
-      <div className="space-y-4 rounded-lg border border-border bg-card p-3">
+      <div className="space-y-4 rounded-sm border border-border bg-card p-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={status === "Metered" ? "outline" : "secondary"}>{status}</Badge>
           <Badge variant="outline">Tier: {usage.tier}</Badge>
@@ -180,7 +180,7 @@ export function OperatorUsageLimitsSection(props: OperatorUsageLimitsSectionProp
           </dl>
         )}
 
-        <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-muted/20 p-3">
+        <div className="flex items-start justify-between gap-3 rounded-sm border border-border bg-muted/20 p-3">
           <div className="space-y-0.5">
             <Label htmlFor={`${scope}-metering-enabled`} className="text-sm font-medium">
               Enforce monthly limits

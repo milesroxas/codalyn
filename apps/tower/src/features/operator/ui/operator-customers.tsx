@@ -150,7 +150,7 @@ export function OperatorCustomers() {
         <OperatorInviteCustomer onInvited={() => void load()} />
       </div>
 
-      <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="flex flex-col gap-2 rounded-sm border border-border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="relative flex-1 min-w-64">
           <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -216,12 +216,12 @@ export function OperatorCustomers() {
       </div>
 
       {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-sm border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="overflow-hidden rounded-sm border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -348,7 +348,7 @@ function CustomersTableBody({
       <TableRow>
         <TableCell colSpan={7}>
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-muted">
+            <span className="flex size-10 items-center justify-center rounded-sm bg-muted">
               <IconUsers className="size-5" />
             </span>
             <p className="text-sm font-medium text-foreground">No customers match these filters.</p>

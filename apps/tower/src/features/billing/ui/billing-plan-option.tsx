@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/shared/lib/utils";
 import { Badge } from "@/shared/ui/badge";
 
-const billingPlanOptionVariants = cva("flex items-start gap-2 rounded-md p-3", {
+const billingPlanOptionVariants = cva("flex items-start gap-2 rounded-sm p-3", {
   variants: {
     state: {
       current: "bg-muted/40",

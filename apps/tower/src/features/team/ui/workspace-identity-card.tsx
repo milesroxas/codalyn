@@ -17,7 +17,7 @@ export function WorkspaceIdentityCard(props: {
   const [slugCopied, setSlugCopied] = useState(false);
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-sm ring-1 ring-border/60 sm:flex-row sm:items-start sm:justify-between">
+    <section className="flex flex-col gap-4 rounded-sm border bg-card p-5 shadow-sm ring-1 ring-border/60 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="truncate text-xl font-semibold tracking-tight">{activeOrg.name}</h2>

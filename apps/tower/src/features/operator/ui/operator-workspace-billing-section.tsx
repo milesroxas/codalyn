@@ -62,7 +62,7 @@ function StripeBillingReferences(props: { detail: OperatorWorkspaceDetail }) {
     return null;
   }
   return (
-    <dl className="grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
+    <dl className="grid gap-2 rounded-sm border border-border bg-muted/30 p-3 text-xs">
       <div>
         <dt className="text-muted-foreground">Stripe customer</dt>
         <dd className="truncate font-mono text-foreground" title={detail.stripeCustomerId ?? undefined}>
@@ -217,7 +217,7 @@ export function OperatorWorkspaceBillingSection(props: OperatorWorkspaceBillingS
         <IconCreditCard className="size-4 text-muted-foreground" aria-hidden />
         <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Team & billing</h3>
       </div>
-      <div className="space-y-4 rounded-lg border border-border bg-card p-3">
+      <div className="space-y-4 rounded-sm border border-border bg-card p-3">
         <WorkspaceBillingSummary detail={detail} />
         <p className="text-xs text-muted-foreground">{operatorWorkspaceBillingModeDescription(detail.billingMode)}</p>
 

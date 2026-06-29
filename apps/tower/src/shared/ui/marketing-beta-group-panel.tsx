@@ -47,7 +47,7 @@ function MarketingBetaGroupPanel({ title, description }: MarketingBetaGroupPanel
   return (
     <section
       data-slot="marketing-beta-group-panel"
-      className="mx-auto flex w-full max-w-xl flex-col gap-6 rounded-[10px] border border-white/10 bg-neutral-950/80 p-8"
+      className="mx-auto flex w-full max-w-xl flex-col gap-6 rounded-sm border border-white/10 bg-neutral-950/80 p-8"
     >
       <div className="flex flex-col gap-3">
         <h2 className="text-3xl font-semibold tracking-tight text-neutral-50">{title}</h2>

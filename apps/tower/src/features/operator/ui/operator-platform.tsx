@@ -121,7 +121,7 @@ function HealthCard({ health, loading }: { health: HealthState; loading: boolean
           ) : null}
         </div>
         <CardDescription>
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">GET /api/health</code>
+          <code className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs">GET /api/health</code>
           {health.loadedAt ? (
             <span className="ml-2 text-muted-foreground">· updated {health.loadedAt.toLocaleTimeString()}</span>
           ) : null}
@@ -149,7 +149,7 @@ function HealthBody({ loading, raw }: { loading: boolean; raw: string | null }) 
   }
   if (raw) {
     return (
-      <pre className="max-h-64 overflow-auto rounded-lg border border-border bg-muted/30 p-3 font-mono text-xs leading-relaxed">
+      <pre className="max-h-64 overflow-auto rounded-sm border border-border bg-muted/30 p-3 font-mono text-xs leading-relaxed">
         {raw}
       </pre>
     );
@@ -199,7 +199,7 @@ function IntegrationsCard({
       </CardHeader>
       <CardContent className="space-y-3">
         {error ? (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <div className="rounded-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {error}
           </div>
         ) : null}
@@ -226,7 +226,7 @@ function IntegrationRow({
 }) {
   const showPlaceholder = useDeferredLoadingIndicator(loading);
   return (
-    <div className="flex items-baseline justify-between rounded-lg border border-border bg-card px-3 py-2.5">
+    <div className="flex items-baseline justify-between rounded-sm border border-border bg-card px-3 py-2.5">
       <div>
         <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">{label}</dt>
         <dd className="text-xs text-muted-foreground">{suffix}</dd>

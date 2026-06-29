@@ -86,7 +86,7 @@ export function OperatorOverview() {
       </div>
 
       {error ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-sm border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       ) : null}
@@ -352,7 +352,7 @@ function RecentWorkspacesBody({
         {Array.from({ length: 4 }).map((_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: static skeletons
           <div key={i} className="flex items-center gap-3 py-2">
-            <Skeleton className="size-8 rounded-md" />
+            <Skeleton className="size-8 rounded-sm" />
             <div className="flex-1 space-y-1">
               <Skeleton className="h-3 w-40" />
               <Skeleton className="h-3 w-24" />
@@ -373,7 +373,7 @@ function RecentWorkspacesBody({
           href={`/console/workspaces?id=${encodeURIComponent(w.id)}`}
           className="flex items-center gap-3 py-2 transition-colors hover:bg-muted/30 -mx-4 px-4"
         >
-          <span className="flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          <span className="flex size-8 items-center justify-center rounded-sm bg-muted text-muted-foreground">
             <IconBuilding className="size-4" />
           </span>
           <div className="min-w-0 flex-1">
@@ -403,7 +403,7 @@ function HealthCard({ healthOk }: { healthOk: boolean | null }) {
         <div>
           <CardTitle className="text-sm">Platform health</CardTitle>
           <CardDescription>
-            Quick probe against <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">/api/health</code>
+            Quick probe against <code className="rounded-sm bg-muted px-1 py-0.5 font-mono text-xs">/api/health</code>
             {". "}Open{" "}
             <Link href="/console/platform" className="underline underline-offset-4">
               Platform

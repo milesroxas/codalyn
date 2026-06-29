@@ -52,7 +52,7 @@ function TowerPublicHeaderAuthActionsSkeleton({ className }: { className?: strin
   return (
     <>
       <div className={cn("hidden items-center gap-2 md:flex", className)} aria-hidden>
-        <div className="h-8 w-16 rounded-md bg-white/20" />
+        <div className="h-8 w-16 rounded-sm bg-white/20" />
         <div className="h-8 w-24 rounded-sm bg-white/30" />
       </div>
       <div className={cn("h-7 w-16 rounded-sm bg-white/30 md:hidden", className)} aria-hidden />

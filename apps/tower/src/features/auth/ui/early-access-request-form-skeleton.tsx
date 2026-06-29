@@ -13,7 +13,7 @@ function EarlyAccessRequestFormSkeleton() {
         <Skeleton className="h-4 w-5/6 max-w-sm" />
       </div>
 
-      <div className="rounded-xl border border-border/80 bg-card p-6 shadow-lg shadow-black/4 dark:shadow-black/25">
+      <div className="rounded-sm border border-border/80 bg-card p-6 shadow-lg shadow-black/4 dark:shadow-black/25">
         <div className="flex flex-col gap-5">
           <FormFieldGrid>
             <FormFieldSkeleton fieldSize="lg" />
@@ -21,7 +21,7 @@ function EarlyAccessRequestFormSkeleton() {
           </FormFieldGrid>
           <FormFieldSkeleton fieldSize="lg" />
           <FormFieldSkeleton fieldSize="lg" />
-          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-sm" />
         </div>
       </div>
 

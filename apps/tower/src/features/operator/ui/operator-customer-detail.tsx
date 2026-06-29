@@ -278,7 +278,7 @@ function OperatorCustomerDetailSheetBody(props: OperatorCustomerDetailSheetBodyP
             <SheetTitle>Customer details</SheetTitle>
           </SheetHeader>
           <SheetBody>
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <div className="rounded-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               {state.error}
             </div>
           </SheetBody>
@@ -339,7 +339,7 @@ function OperatorCustomerDetailSheetBody(props: OperatorCustomerDetailSheetBodyP
 
       <SheetBody className="space-y-6">
         {state.error ? (
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <div className="rounded-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
             {state.error}
           </div>
         ) : null}
@@ -421,7 +421,7 @@ function CustomerBillingSection({ detail }: { detail: OperatorUserDetail }) {
         <IconCreditCard className="size-4 text-muted-foreground" aria-hidden />
         <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Individual billing</h3>
       </div>
-      <div className="space-y-3 rounded-lg border border-border bg-card p-3">
+      <div className="space-y-3 rounded-sm border border-border bg-card p-3">
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-xs text-muted-foreground">Plan</dt>
@@ -466,7 +466,7 @@ function AccessSection({
   return (
     <section className="space-y-3">
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Access</h3>
-      <div className="space-y-3 rounded-lg border border-border bg-card p-3">
+      <div className="space-y-3 rounded-sm border border-border bg-card p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-0.5">
             <Label className="text-sm font-medium">App role</Label>
@@ -528,7 +528,7 @@ function ModerationSection({
   return (
     <section className="space-y-3">
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Moderation</h3>
-      <div className="space-y-3 rounded-lg border border-border bg-card p-3">
+      <div className="space-y-3 rounded-sm border border-border bg-card p-3">
         {detail.banned ? (
           <BannedBlock detail={detail} patchBusy={patchBusy} onUnban={onUnban} />
         ) : (
@@ -615,14 +615,14 @@ function WorkspacesSection({ detail, onCloseSheet }: { detail: OperatorUserDetai
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
         Workspaces ({detail.memberOf.length})
       </h3>
-      <div className="rounded-lg border border-border">
+      <div className="rounded-sm border border-border">
         {detail.memberOf.length === 0 ? (
           <p className="p-3 text-xs text-muted-foreground">Not a member of any workspace.</p>
         ) : (
           <ul className="divide-y divide-border">
             {detail.memberOf.map((m) => (
               <li key={m.memberId} className="flex items-center gap-3 p-3">
-                <span className="flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <span className="flex size-7 items-center justify-center rounded-sm bg-muted text-muted-foreground">
                   <IconBuilding className="size-4" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -652,14 +652,14 @@ function SessionsSection({ detail }: { detail: OperatorUserDetail }) {
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
         Active sessions ({detail.activeSessions.length})
       </h3>
-      <div className="rounded-lg border border-border">
+      <div className="rounded-sm border border-border">
         {detail.activeSessions.length === 0 ? (
           <p className="p-3 text-xs text-muted-foreground">No active sessions.</p>
         ) : (
           <ul className="divide-y divide-border">
             {detail.activeSessions.map((s) => (
               <li key={s.id} className="flex items-center gap-3 p-3">
-                <span className="flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <span className="flex size-7 items-center justify-center rounded-sm bg-muted text-muted-foreground">
                   <IconDeviceDesktop className="size-4" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -683,7 +683,7 @@ function MetadataSection({ detail }: { detail: OperatorUserDetail }) {
   return (
     <section className="space-y-3">
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Metadata</h3>
-      <dl className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-3 text-xs">
+      <dl className="grid grid-cols-2 gap-3 rounded-sm border border-border bg-card p-3 text-xs">
         <div>
           <dt className="text-muted-foreground">User ID</dt>
           <dd className="truncate font-mono text-foreground" title={detail.id}>

@@ -13,7 +13,7 @@ import type * as React from "react";
 import { cn } from "@/shared/lib/utils";
 
 const tooltipContentVariants = cva(
-  "z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-md bg-foreground text-xs text-background data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+  "z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-sm bg-foreground text-xs text-background data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
   {
     variants: {
       variant: {
@@ -22,7 +22,7 @@ const tooltipContentVariants = cva(
           "flex max-w-[18rem] flex-col gap-3 px-3 py-2.5 text-left font-normal leading-relaxed shadow-md *:data-[slot=tooltip-detail-summary]:text-background/90 *:data-[slot=tooltip-detail-heading]:text-[0.6875rem] *:data-[slot=tooltip-detail-heading]:font-semibold *:data-[slot=tooltip-detail-heading]:uppercase *:data-[slot=tooltip-detail-heading]:tracking-[0.08em] *:data-[slot=tooltip-detail-heading]:text-background/55 *:data-[slot=tooltip-detail-note]:border-t *:data-[slot=tooltip-detail-note]:border-background/15 *:data-[slot=tooltip-detail-note]:pt-2.5 *:data-[slot=tooltip-detail-note]:text-[0.6875rem] *:data-[slot=tooltip-detail-note]:leading-relaxed *:data-[slot=tooltip-detail-note]:text-background/60",
         usageMeter: [
           usageMeterTooltipMaxWidthClass,
-          "rounded-lg border border-background/10 px-3 py-2.5 text-left font-normal leading-relaxed shadow-md",
+          "rounded-sm border border-background/10 px-3 py-2.5 text-left font-normal leading-relaxed shadow-md",
           "*:data-[slot=tooltip-detail-summary]:text-background/90",
           "*:data-[slot=tooltip-detail-heading]:text-[0.6875rem]",
           "*:data-[slot=tooltip-detail-heading]:font-semibold",

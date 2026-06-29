@@ -81,7 +81,7 @@ export function UsageLimitsTable(props: UsageLimitsTableProps) {
                     <p className="text-sm font-medium text-foreground">{group.label}</p>
                     <p className="text-xs leading-relaxed text-muted-foreground">{group.description}</p>
                   </div>
-                  <div className="overflow-hidden rounded-lg border border-border">
+                  <div className="overflow-hidden rounded-sm border border-border">
                     <Table>
                       <TableHeader>
                         <TableRow>

@@ -380,7 +380,7 @@ export function TeamDashboard(props: {
       />
 
       {error ? (
-        <div className="mb-6 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="mb-6 rounded-sm border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       ) : null}

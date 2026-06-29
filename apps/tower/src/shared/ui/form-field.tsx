@@ -54,7 +54,7 @@ function FormFieldInset({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="form-field-inset"
       className={cn(
-        "@container/form-inset space-y-3 rounded-lg border border-dashed border-border/80 bg-background/50 p-3",
+        "@container/form-inset space-y-3 rounded-sm border border-dashed border-border/80 bg-background/50 p-3",
         className
       )}
       {...props}

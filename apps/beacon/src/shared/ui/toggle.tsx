@@ -26,7 +26,9 @@ const toggleVariants = cva(
     },
     compoundVariants: [
       // Segmented labels read as a quiet control, so they sit a notch below the size's default label size.
-      { variant: "segmented", class: "text-[0.7rem]" },
+      // Active pill radius (2px) nests concentrically inside the track's rounded-sm (4px) + 3px padding — a smaller
+      // inner radius reads as a raised pill seated in the track instead of a flush, disjoint block.
+      { variant: "segmented", class: "rounded-xs text-[0.7rem]" },
     ],
     defaultVariants: {
       variant: "default",

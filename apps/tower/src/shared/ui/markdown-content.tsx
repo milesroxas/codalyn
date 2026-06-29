@@ -65,7 +65,7 @@ const markdownComponents: Components = {
   ),
   hr: () => <hr className="my-8 border-border" />,
   table: ({ children }) => (
-    <div className="overflow-x-auto rounded-lg ring-1 ring-foreground/10">
+    <div className="overflow-x-auto rounded-sm ring-1 ring-foreground/10">
       <table className="w-full min-w-[32rem] border-collapse text-left text-sm">{children}</table>
     </div>
   ),
@@ -77,7 +77,7 @@ const markdownComponents: Components = {
   ),
   td: ({ children }) => <td className="px-4 py-3 align-top text-muted-foreground">{children}</td>,
   code: ({ children }) => (
-    <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{children}</code>
+    <code className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{children}</code>
   ),
 };
 

@@ -19,7 +19,7 @@ export function WorkspaceInvitesUpsellState(props: {
     <TabsContent value="invites" className="space-y-6">
       <Card size="sm">
         <CardContent className="flex flex-col items-center gap-4 px-6 py-14 text-center">
-          <span className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <span className="flex size-12 items-center justify-center rounded-sm bg-primary/10 text-primary">
             <IconUsers className="size-6" aria-hidden />
           </span>
           <div className="max-w-md space-y-2">

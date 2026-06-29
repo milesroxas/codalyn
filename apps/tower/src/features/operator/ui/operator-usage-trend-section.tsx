@@ -16,7 +16,7 @@ export function OperatorUsageTrendSection({ trend }: OperatorUsageTrendSectionPr
   return (
     <section className="space-y-3">
       <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Usage trend</h3>
-      <div className="space-y-3 rounded-lg border border-border bg-card p-3">
+      <div className="space-y-3 rounded-sm border border-border bg-card p-3">
         {hasUsage ? (
           <>
             <UsageTrendChart data={trend} compact />

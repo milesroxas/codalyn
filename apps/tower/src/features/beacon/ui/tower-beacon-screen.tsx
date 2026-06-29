@@ -222,12 +222,12 @@ function TowerBeaconScreenLoaded(props: {
       <TowerPageHeader title="Beacon App" description="Configure settings for the designer extension." />
 
       {error ? (
-        <div className="mb-6 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="mb-6 rounded-sm border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       ) : null}
 
-      {showPayloadSkeleton ? <Skeleton className="mb-6 h-48 w-full rounded-xl" aria-hidden /> : null}
+      {showPayloadSkeleton ? <Skeleton className="mb-6 h-48 w-full rounded-sm" aria-hidden /> : null}
 
       {showBeaconConnectState ? (
         <TowerBeaconConnectEmptyState

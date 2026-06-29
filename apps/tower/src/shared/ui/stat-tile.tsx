@@ -8,7 +8,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/sh
 type StatTileTone = "default" | "warn" | "positive";
 type StatTileValueVariant = "status" | "metric";
 
-const statTileIconVariants = cva("flex size-7 shrink-0 items-center justify-center rounded-md [&_svg]:size-4", {
+const statTileIconVariants = cva("flex size-7 shrink-0 items-center justify-center rounded-sm [&_svg]:size-4", {
   variants: {
     tone: {
       default: "bg-muted text-muted-foreground",
@@ -99,7 +99,7 @@ function StatTile(props: StatTileProps) {
     <Link
       href={href}
       className={cn(
-        "group/stat-tile block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "group/stat-tile block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "transition-colors hover:[&_[data-slot=card]]:bg-muted/30 hover:[&_[data-slot=card]]:ring-foreground/15"
       )}
     >

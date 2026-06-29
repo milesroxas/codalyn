@@ -23,12 +23,12 @@ const placeholderCanvasVariants = cva(
 );
 
 const placeholderAssetVariants = cva(
-  "relative flex max-h-full max-w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border/80 bg-card/90 shadow-sm ring-1 ring-foreground/5",
+  "relative max-w-full overflow-hidden rounded-md border border-dashed border-border/80 bg-card/90 shadow-sm ring-1 ring-foreground/5",
   {
     variants: {
       density: {
-        default: "min-w-16 px-3 py-2.5",
-        compact: "min-w-12 px-2 py-1.5",
+        default: "",
+        compact: "",
       },
     },
     defaultVariants: {
@@ -36,6 +36,18 @@ const placeholderAssetVariants = cva(
     },
   }
 );
+
+const placeholderAssetContentVariants = cva("absolute inset-0 flex flex-col items-center justify-center gap-1", {
+  variants: {
+    density: {
+      default: "p-2",
+      compact: "p-1.5",
+    },
+  },
+  defaultVariants: {
+    density: "default",
+  },
+});
 
 const placeholderIconVariants = cva("text-muted-foreground/70", {
   variants: {
@@ -74,7 +86,6 @@ export function BeaconPresetExportPlaceholder(
   const layout = resolveBeaconPresetPreviewLayout({ width, height });
   const formatLabel = (exportFormat ?? defaultExportFormat ?? "webp").toUpperCase();
   const maxAssetHeight = density === "compact" ? "4rem" : "5.5rem";
-  const isLandscape = layout.aspectRatio >= 1;
 
   return (
     <div
@@ -86,14 +97,15 @@ export function BeaconPresetExportPlaceholder(
         className={placeholderAssetVariants({ density })}
         style={{
           aspectRatio: layout.aspectRatio,
-          maxHeight: maxAssetHeight,
+          height: maxAssetHeight,
+          width: "auto",
           maxWidth: "100%",
-          width: isLandscape ? "100%" : "auto",
-          height: isLandscape ? "auto" : maxAssetHeight,
         }}
       >
-        <IconPhoto className={placeholderIconVariants({ density })} aria-hidden stroke={1.5} />
-        <span className={placeholderDimensionsVariants({ density })}>{layout.dimensionsLabel}</span>
+        <div className={placeholderAssetContentVariants({ density })}>
+          <IconPhoto className={placeholderIconVariants({ density })} aria-hidden stroke={1.5} />
+          <span className={placeholderDimensionsVariants({ density })}>{layout.dimensionsLabel}</span>
+        </div>
       </div>
       <Badge variant="secondary" className="absolute top-2 right-2 font-mono text-[10px] uppercase tracking-wide">
         {formatLabel}

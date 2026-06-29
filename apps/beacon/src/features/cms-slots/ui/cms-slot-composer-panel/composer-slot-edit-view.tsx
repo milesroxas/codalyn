@@ -8,6 +8,7 @@ import { CMS_SLOT_ROW_NAME_MAX } from "@/features/cms-slots/model/cms-slot-list-
 import type { CmsSlotCompositionDraftRow } from "@/features/cms-slots/model/site-components";
 import { CmsSlotDisplayNameField } from "@/features/cms-slots/ui/cms-slot-display-name-field";
 import {
+  CMS_SLOTS_COMPOSER_SLOT_EDIT_CANCEL,
   CMS_SLOTS_COMPOSER_SLOT_EDIT_DONE,
   CMS_SLOTS_COMPOSER_SLOT_EDIT_TITLE,
   CMS_SLOTS_COMPOSER_SLOT_NAME_FIELD_LABEL,
@@ -57,6 +58,9 @@ export function ComposerSlotEditView(props: ComposerSlotEditViewProps) {
   const [draft, setDraft] = useState(row.name);
   const fieldId = useId();
 
+  /** First-viewed values, snapshot once on open so Cancel can revert the live prop-value edits. */
+  const [original] = useState(() => ({ name: row.name, propValues: { ...(row.propValues ?? {}) } }));
+
   /** Latest values read by the flush-on-unmount cleanup without re-running it on every keystroke. */
   const flushRef = useRef({ draft, row, onRenameSlot, committed: false });
   flushRef.current.draft = draft;
@@ -69,6 +73,23 @@ export function ComposerSlotEditView(props: ComposerSlotEditViewProps) {
     onDone();
   }, [draft, onDone, onRenameSlot, row]);
 
+  const handleCancel = useCallback(() => {
+    // Prop values commit live, so restore each exposed field to its first-viewed value.
+    for (const ep of exposed) {
+      const current = row.propValues?.[ep.propId] ?? "";
+      const initial = original.propValues[ep.propId] ?? "";
+      if (current !== initial) {
+        onChangePropValue(row.key, ep.propId, initial);
+      }
+    }
+    // Discard the deferred display-name draft (don't flush it) and undo any committed rename.
+    flushRef.current.committed = true;
+    if (row.name !== original.name) {
+      onRenameSlot(row.key, original.name);
+    }
+    onDone();
+  }, [exposed, original, row, onChangePropValue, onRenameSlot, onDone]);
+
   useEffect(() => {
     return () => {
       if (flushRef.current.committed) {
@@ -77,6 +98,26 @@ export function ComposerSlotEditView(props: ComposerSlotEditViewProps) {
       const { draft: latestDraft, row: latestRow, onRenameSlot: latestRename } = flushRef.current;
       flushComposerSlotDisplayName(latestDraft, latestRow, latestRename);
     };
+  }, []);
+
+  // Show the in-content button group only when the fields overflow into a scroll; the pinned header keeps the
+  // controls reachable when they don't.
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (viewport == null) {
+      return;
+    }
+    const measure = () => setOverflowing(viewport.scrollHeight - viewport.clientHeight > 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    const content = viewport.firstElementChild;
+    if (content != null) {
+      observer.observe(content);
+    }
+    return () => observer.disconnect();
   }, []);
 
   return (
@@ -88,12 +129,17 @@ export function ComposerSlotEditView(props: ComposerSlotEditViewProps) {
         <h2 className="min-w-0 truncate font-heading text-base font-medium text-foreground">
           {CMS_SLOTS_COMPOSER_SLOT_EDIT_TITLE}
         </h2>
-        <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={handleDone}>
-          {CMS_SLOTS_COMPOSER_SLOT_EDIT_DONE}
-        </Button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={handleCancel}>
+            {CMS_SLOTS_COMPOSER_SLOT_EDIT_CANCEL}
+          </Button>
+          <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={handleDone}>
+            {CMS_SLOTS_COMPOSER_SLOT_EDIT_DONE}
+          </Button>
+        </div>
       </div>
 
-      <ScrollArea className="min-h-0 w-full flex-1 basis-0">
+      <ScrollArea viewportRef={viewportRef} className="min-h-0 w-full flex-1 basis-0">
         <div className="space-y-4 px-3 pb-3">
           <CmsSlotDisplayNameField
             fieldId={fieldId}
@@ -130,6 +176,18 @@ export function ComposerSlotEditView(props: ComposerSlotEditViewProps) {
                 );
               })}
             </ComposerEditFieldSection>
+          ) : null}
+          {/* Mirrors the header controls at the end of the fields, but only once the content scrolls — when it
+              all fits, the pinned header keeps Cancel/Done in reach without the extra row. */}
+          {overflowing ? (
+            <div className="flex items-center justify-end gap-1.5 pt-1">
+              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={handleCancel}>
+                {CMS_SLOTS_COMPOSER_SLOT_EDIT_CANCEL}
+              </Button>
+              <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={handleDone}>
+                {CMS_SLOTS_COMPOSER_SLOT_EDIT_DONE}
+              </Button>
+            </div>
           ) : null}
         </div>
       </ScrollArea>

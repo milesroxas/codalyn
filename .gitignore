@@ -63,3 +63,4 @@ yarn.lock
 
 # Webflow bundle artifacts
 public/**/*.zip
+.vercel

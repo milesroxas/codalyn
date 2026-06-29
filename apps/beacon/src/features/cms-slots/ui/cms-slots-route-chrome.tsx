@@ -384,7 +384,6 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
         openingBeaconKey: p.openingBeaconKey,
         routeStateKnown: p.routeStateKnown,
         pageBootBlocking: p.pageBootBlocking,
-        editingContextPhase: p.composerEditingContext.phase,
       })
     : null;
   const composerSurface = p.isComposer
@@ -396,7 +395,6 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
         pageRuntimeStatusLoading: p.pageRuntimeStatusLoading,
         composerEligibleLoading: p.composerEligibleLoading,
         composerEligibleResolved: p.composerEligibleResolved,
-        composerEditingContextPhase: p.composerEditingContext.phase,
       })
     : null;
   const surfaceReady = designerSurface?.contentReady ?? composerSurface?.contentReady ?? true;

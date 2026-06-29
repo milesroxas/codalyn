@@ -8,12 +8,17 @@ import {
   IconPhotoUp,
   IconTransitionRight,
 } from "@tabler/icons-react";
-import type { ReactNode } from "react";
+import { Loader2 } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import { useBeaconGuestWelcomeVisible } from "@/features/auth/lib/use-beacon-guest-welcome-visible";
 import { isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerAccessPolicy } from "@/features/auth/model/use-beacon-tower-access-policy";
+import {
+  peekCmsSlotsPageInstallCache,
+  prefetchCmsSlotsPageInstall,
+} from "@/features/cms-slots/model/cms-slots-page-install-cache";
 import { promptOpenCmsCollectionTemplateInDesigner } from "@/features/cms-slots/model/prompt-open-cms-collection-template";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotsPageInstallPrefetch } from "@/features/cms-slots/ui/cms-slots-page-install-prefetch";
@@ -60,17 +65,21 @@ function BeaconHomeTile(props: {
   icon: Icon;
   onClick?: () => void;
   disabled?: boolean;
+  /** Shows a spinner in the trailing lane and blocks re-entry while the tile's action is in flight. */
+  busy?: boolean;
   /** Fixed-width trailing slot (e.g. a status indicator) kept on its own vertical lane. */
   trailing?: ReactNode;
   ariaLabel?: string;
 }) {
-  const { label, icon: TileIcon, onClick, disabled = false, trailing, ariaLabel } = props;
+  const { label, icon: TileIcon, onClick, disabled = false, busy = false, trailing, ariaLabel } = props;
+  const interactionDisabled = disabled || busy;
   return (
     <button
       type="button"
-      aria-disabled={disabled}
+      aria-disabled={interactionDisabled}
+      aria-busy={busy}
       aria-label={ariaLabel}
-      onClick={disabled ? undefined : onClick}
+      onClick={interactionDisabled ? undefined : onClick}
       className={beaconHomeTileClass}
     >
       <TileIcon
@@ -81,7 +90,13 @@ function BeaconHomeTile(props: {
         )}
       />
       <span className="min-w-0 flex-1 truncate text-base font-semibold text-foreground">{label}</span>
-      {trailing ? <span className="flex shrink-0 items-center">{trailing}</span> : null}
+      {busy ? (
+        <span className="flex shrink-0 items-center">
+          <Loader2 aria-hidden className="size-5 animate-spin text-muted-foreground" />
+        </span>
+      ) : trailing ? (
+        <span className="flex shrink-0 items-center">{trailing}</span>
+      ) : null}
     </button>
   );
 }
@@ -104,6 +119,22 @@ export function BeaconHomeScreen() {
   const { visible: showWelcomeGate, chooseGuest, towerSessionPending } = useBeaconGuestWelcomeVisible();
   const { earlyAccessRequired } = useBeaconTowerAccessPolicy();
   const showSessionBootstrap = useDeferredLoadingIndicator(towerSessionPending);
+
+  // Opening CMS Slots warms the page-install scan first, so the route mounts already-known (no boot overlay).
+  // The wait shows as a spinner on this tile — never an instant nav into a full-screen loader. Deferred so a
+  // warm cache (the common case, prefetched on mount) navigates immediately with no spinner flash.
+  const [cmsSlotsOpening, setCmsSlotsOpening] = useState(false);
+  const showCmsSlotsOpening = useDeferredLoadingIndicator(cmsSlotsOpening);
+  const openCmsSlots = () => {
+    if (peekCmsSlotsPageInstallCache() != null) {
+      navigate(`/cms-slots/${defaultSegment}`);
+      return;
+    }
+    setCmsSlotsOpening(true);
+    void prefetchCmsSlotsPageInstall().finally(() => {
+      navigate(`/cms-slots/${defaultSegment}`);
+    });
+  };
 
   // While the Tower session is unresolved, hold on the loading surface — never fall through to home.
   // The spinner itself is deferred (showSessionBootstrap) so fast resolves show a blank surface, not a
@@ -153,14 +184,11 @@ export function BeaconHomeScreen() {
                   label={CMS_SLOTS_FEATURE_NAME}
                   icon={IconClick}
                   disabled={!cmsSlotsSurfaceEnabled || !cmsPageKindReady}
+                  busy={showCmsSlotsOpening}
                   ariaLabel={
                     cmsSlotsNeedsCollectionTemplate ? CMS_SLOTS_REQUIRES_COLLECTION_TEMPLATE_ARIA_LABEL : undefined
                   }
-                  onClick={
-                    cmsSlotsNeedsCollectionTemplate
-                      ? promptOpenCmsCollectionTemplateInDesigner
-                      : () => navigate(`/cms-slots/${defaultSegment}`)
-                  }
+                  onClick={cmsSlotsNeedsCollectionTemplate ? promptOpenCmsCollectionTemplateInDesigner : openCmsSlots}
                   trailing={
                     cmsSlotsNeedsCollectionTemplate ? (
                       <Tooltip>

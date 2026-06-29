@@ -2,7 +2,6 @@ import {
   shouldShowCmsSlotsComposerInstallInDesignerEmpty,
   shouldShowCmsSlotsPreInstall,
 } from "@/features/cms-slots/model/cms-slots-access";
-import type { CmsComposerEditingContextViewModel } from "@/features/cms-slots/model/use-cms-composer-editing-context-state";
 
 export type CmsSlotsHomePanelContentKey = "install" | "installed";
 
@@ -28,7 +27,6 @@ export type CmsSlotsDesignerRouteSurfaceInput = {
   openingBeaconKey: string | null;
   routeStateKnown: boolean;
   pageBootBlocking: boolean;
-  editingContextPhase: CmsComposerEditingContextViewModel["phase"];
 };
 
 export function cmsSlotsDesignerRouteContentKey(input: {
@@ -42,13 +40,10 @@ export function cmsSlotsDesignerRouteContentKey(input: {
 }
 
 export function cmsSlotsDesignerRouteContentReady(input: CmsSlotsDesignerRouteSurfaceInput): boolean {
-  if (input.editingContextPhase === "loading") {
-    return false;
-  }
-  // Home stays visible while a beacon opens (openingBeaconKey set) so the clicked tile shows its own busy spinner —
-  // never the full-screen overlay. Composition shows the moment picking flips: the panel renders its slot rows
-  // immediately and its own inline list-target loading, so opening never blanks the panel behind an overlay. Boot
-  // (first page scan) is the only thing that holds the surface hidden.
+  // Surface shows as soon as the first page scan is known. The clicked tile spins during open (openingBeaconKey
+  // keeps the home key), composition renders slot rows + inline list-target loading, and the editing-context card
+  // renders its own inline skeleton — so nothing here blanks the panel behind the full-screen overlay. Only the
+  // first page scan (pageBootBlocking) holds it hidden, and that is prefetched before navigating in from home.
   return input.routeStateKnown && !input.pageBootBlocking;
 }
 
@@ -75,7 +70,6 @@ export type CmsSlotsComposerRouteSurfaceInput = {
   pageRuntimeStatusLoading: boolean;
   composerEligibleLoading: boolean;
   composerEligibleResolved: boolean;
-  composerEditingContextPhase: CmsComposerEditingContextViewModel["phase"];
 };
 
 export function cmsSlotsComposerListDataReady(input: {
@@ -105,18 +99,14 @@ export function cmsSlotsComposerRouteContentKey(input: {
 }
 
 export function cmsSlotsComposerRouteContentReady(input: CmsSlotsComposerRouteSurfaceInput): boolean {
-  if (input.composerEditingContextPhase === "loading") {
-    return false;
-  }
   if (input.activeComposer != null) {
     return true;
   }
   // The list surface is visible as soon as the route is known. The panel renders its intro + editing-context card
-  // immediately and fills the eligible list inline once the scan resolves, so crossing into the composer (and
-  // opening a slot — opening key keeps this key as "list") is a clean crossfade over real content, never a blank
-  // panel stranded behind a full-screen overlay. Empty states stay gated on `cmsSlotsComposerListDataReady` inside
-  // the panel, so "no slots" never flashes mid-scan. Flips to the "composer" key in one batch when the open
-  // completes (activeComposer set + opening key cleared).
+  // (with its own inline skeleton) immediately and fills the eligible list inline once the scan resolves, so
+  // crossing into the composer (and opening a slot — opening key keeps this key as "list") is a clean crossfade
+  // over real content, never a blank panel stranded behind a full-screen overlay. Empty states stay gated on
+  // `cmsSlotsComposerListDataReady` inside the panel, so "no slots" never flashes mid-scan.
   return input.routeStateKnown && !input.pageBootBlocking;
 }
 

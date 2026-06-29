@@ -39,7 +39,6 @@ describe("cmsSlotsDesignerRouteSurface", () => {
     openingBeaconKey: null,
     routeStateKnown: true,
     pageBootBlocking: false,
-    editingContextPhase: "ready" as const,
   };
 
   it("keeps home key while opening a slot", () => {
@@ -79,15 +78,6 @@ describe("cmsSlotsDesignerRouteSurface", () => {
       })
     ).toEqual({ contentKey: "composition", contentReady: true });
   });
-
-  it("waits for editing context on designer routes", () => {
-    expect(
-      cmsSlotsDesignerRouteContentReady({
-        ...idleHome,
-        editingContextPhase: "loading",
-      })
-    ).toBe(false);
-  });
 });
 
 describe("cmsSlotsComposerRouteSurface", () => {
@@ -99,7 +89,6 @@ describe("cmsSlotsComposerRouteSurface", () => {
     pageRuntimeStatusLoading: false,
     composerEligibleLoading: false,
     composerEligibleResolved: true,
-    composerEditingContextPhase: "ready" as const,
   };
 
   it("keeps list key while opening a composer entry", () => {
@@ -118,15 +107,6 @@ describe("cmsSlotsComposerRouteSurface", () => {
         composerOpeningKey: null,
       })
     ).toBe("composer");
-  });
-
-  it("waits for editing context on list", () => {
-    expect(
-      cmsSlotsComposerRouteContentReady({
-        ...idleList,
-        composerEditingContextPhase: "loading",
-      })
-    ).toBe(false);
   });
 
   it("does not hide list on background rescans", () => {

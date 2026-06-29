@@ -51,6 +51,9 @@ Thumbs.db
 .cursor/mcp.json
 **/settings.local.json
 
+# Claude Code parallel session worktrees (see .worktreeinclude)
+.claude/worktrees/
+
 # Legacy migration folder
 _legacy/
 

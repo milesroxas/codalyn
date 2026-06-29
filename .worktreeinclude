@@ -1,0 +1,19 @@
+# Gitignored local files copied into Claude Code worktrees on creation.
+# Uses .gitignore syntax; only gitignored files matching these patterns are copied.
+
+# App environment (Tower, Beacon, Flint)
+**/.env
+**/.env.local
+**/.env.development
+**/.env.production
+**/.env.docker
+**/.env.compose
+**/.env.migrate.pull
+
+# Neon CLI context
+**/.neon
+.neon
+
+# Local agent / editor config
+.claude/settings.local.json
+.cursor/mcp.json

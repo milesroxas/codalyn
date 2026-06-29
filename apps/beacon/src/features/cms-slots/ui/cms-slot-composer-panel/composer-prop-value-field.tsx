@@ -12,6 +12,7 @@ import {
   parseBoolString,
 } from "@/features/cms-slots/model/cms-slot-composer-prop-input-normalize";
 import { CmsSlotImagePropField } from "@/features/cms-slots/ui/cms-slot-composer-panel/cms-slot-image-prop-field";
+import { ComposerRichTextField } from "@/features/cms-slots/ui/cms-slot-composer-panel/composer-rich-text-field";
 import { ComposerLinkField } from "@/features/cms-slots/ui/composer-link-field/composer-link-field";
 import { CMS_SLOTS_COMPOSER_IMAGE_PROP_HINT } from "@/shared/lib/cms-slots-feature-copy";
 import { cn } from "@/shared/lib/utils";
@@ -204,6 +205,7 @@ const COMPOSER_PROP_VALUE_BY_KIND: Record<
       />
     </div>
   ),
+  richText: (p) => <ComposerRichTextField {...p} />,
   multiline: ({ inputId, value, busy, onChange }) => (
     <Textarea
       id={inputId}

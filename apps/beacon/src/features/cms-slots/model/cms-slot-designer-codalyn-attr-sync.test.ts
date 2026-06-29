@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CMS_SLOT_CONTENT_ATTR } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
+import { CMS_SLOT_CONTENT_ATTR, CMS_SLOT_HTML_ATTR } from "@/features/cms-slots/model/cms-slot-beacon-prop-runtime";
 import type { ComposableInstancePropMeta } from "@/features/cms-slots/model/cms-slot-composable-props";
 import { syncDesignerCodalynSlotPropAttributes } from "@/features/cms-slots/model/cms-slot-designer-codalyn-attr-sync";
 
@@ -94,6 +94,23 @@ describe("syncDesignerCodalynSlotPropAttributes (re-tag after deselect)", () => 
     expect((titleEl as BoundDom).store.has(CMS_SLOT_CONTENT_ATTR)).toBe(false);
     expect((bodyEl as BoundDom).store.get(CMS_SLOT_CONTENT_ATTR)).toBe("body");
     expect(result.removed).toBe(1);
+  });
+
+  it("marks a richText-bound element with data-cb-html, leaving plain-text binds unmarked", async () => {
+    const bodyEl = boundDom({}, "body");
+    const titleEl = boundDom({}, "title");
+    const root = boundDom({}, null, [bodyEl, titleEl]);
+
+    const result = await syncDesignerCodalynSlotPropAttributes(instanceForRoot(root), [
+      { propId: "body", label: "body", valueType: "richText" },
+      exposedProp("title"),
+    ]);
+
+    expect(result.errors).toEqual([]);
+    expect((bodyEl as BoundDom).store.get(CMS_SLOT_CONTENT_ATTR)).toBe("body");
+    expect((bodyEl as BoundDom).store.get(CMS_SLOT_HTML_ATTR)).toBe("1");
+    expect((titleEl as BoundDom).store.get(CMS_SLOT_CONTENT_ATTR)).toBe("title");
+    expect((titleEl as BoundDom).store.has(CMS_SLOT_HTML_ATTR)).toBe(false);
   });
 
   it("preserves a foreign Designer component's segment on a shared element when this slot's prop is deselected", async () => {

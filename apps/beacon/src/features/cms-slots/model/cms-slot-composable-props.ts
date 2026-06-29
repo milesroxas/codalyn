@@ -9,6 +9,7 @@ import {
   getCachedComponentById,
 } from "@/features/cms-slots/model/cms-slot-component-def-cache";
 import { beaconLinkRuntimeValue, isCmsSlotLinkValueType } from "@/features/cms-slots/model/cms-slot-link-value";
+import { sanitizeBeaconRichTextHtml } from "@/features/cms-slots/model/cms-slot-rich-text-html";
 
 export type ComposableInstancePropSelectOption = { value: string; label: string };
 
@@ -80,6 +81,7 @@ function selectOptionsFromInstanceProp(
 
 /** Which control Composer renders for props the designer enabled in Designer. */
 export type CmsSlotComposerPropFieldKind =
+  | "richText"
   | "multiline"
   | "line"
   | "url"
@@ -99,7 +101,7 @@ export type CmsSlotComposerPropFieldKind =
  */
 const COMPOSER_FIELD_BY_VALUE_TYPE: Readonly<Partial<Record<string, CmsSlotComposerPropFieldKind>>> = {
   string: "line",
-  richText: "multiline",
+  richText: "richText",
   text: "multiline",
   textContent: "multiline",
   slot: "multiline",
@@ -358,6 +360,8 @@ export function buildCmsSlotRuntimePropRow(
       v = normalizeHeadingTagForPayload(v, ep.selectOptions);
     } else if (isCmsSlotLinkValueType(ep.valueType)) {
       v = beaconLinkRuntimeValue(v);
+    } else if (ep.valueType === "richText") {
+      v = sanitizeBeaconRichTextHtml(v);
     }
     o[ep.propId] = v;
   }

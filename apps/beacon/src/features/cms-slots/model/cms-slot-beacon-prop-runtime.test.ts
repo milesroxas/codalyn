@@ -158,4 +158,59 @@ describe("beacon prop applyValue runtime", () => {
     applyValue(a4, "{not json");
     expect(a4.getAttribute("href")).toBe("{not json");
   });
+
+  it("rich text: data-cb-html marked node applies HTML via innerHTML (markup preserved)", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+
+    const marked = document.createElement("div");
+    marked.setAttribute("data-cb-html", "1");
+    applyValue(marked, "<p><strong>Hi</strong> there</p>");
+    expect(marked.querySelector("strong")?.textContent).toBe("Hi");
+    expect(marked.querySelector("p")).not.toBeNull();
+  });
+
+  it("rich text: .w-richtext is a structural fallback for innerHTML", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+
+    const wrap = document.createElement("div");
+    wrap.className = "w-richtext";
+    applyValue(wrap, "<ul><li>a</li></ul>");
+    expect(wrap.querySelector("li")?.textContent).toBe("a");
+  });
+
+  it("rich text: unmarked node still uses textContent (existing behavior unregressed)", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+
+    const plain = document.createElement("div");
+    applyValue(plain, "<p>hi</p>");
+    expect(plain.querySelector("p")).toBeNull();
+    expect(plain.textContent).toBe("<p>hi</p>");
+  });
+
+  it("rich text: bSafeHtml guard strips <script>, on* handlers and javascript: hrefs", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+
+    const marked = document.createElement("div");
+    marked.setAttribute("data-cb-html", "1");
+    applyValue(
+      marked,
+      '<p>ok</p><script>alert(1)</script><img onerror="evil()" src="x"><a href="javascript:evil()">x</a>'
+    );
+    expect(marked.textContent).toContain("ok");
+    expect(marked.querySelector("script")).toBeNull();
+    expect(marked.innerHTML.toLowerCase()).not.toContain("onerror");
+    expect(marked.innerHTML.toLowerCase()).not.toContain("javascript:");
+  });
 });

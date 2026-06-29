@@ -16,8 +16,16 @@ export const CMS_SLOT_CONTENT_ATTR = "data-cb-c";
  */
 export const CMS_SLOT_COND_ATTR = "data-cb-v";
 
+/**
+ * Rich-text marker. `"1"` when a bound element carries a `richText` content prop, so the runtime applies its value via
+ * `innerHTML` (rendering formatting) instead of `textContent`. The published Webflow rich-text wrapper (`.w-richtext`)
+ * is a structural fallback in the runtime, so this marker is the preferred, stable signal (CLAUDE.md: match by stable
+ * markers, not presentation text).
+ */
+export const CMS_SLOT_HTML_ATTR = "data-cb-html";
+
 /** Tag attributes the Designer writes onto bound elements (and that cleanup removes). */
-const CMS_SLOT_WRITTEN_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR] as const;
+const CMS_SLOT_WRITTEN_TAG_ATTRS = [CMS_SLOT_CONTENT_ATTR, CMS_SLOT_COND_ATTR, CMS_SLOT_HTML_ATTR] as const;
 
 /** Canonical exposed prop id from a `data-cb-c` segment (strips the `@N` / `@…` suffix). */
 export function canonicalPropIdFromContentAttrSegment(segment: string): string {
@@ -233,7 +241,11 @@ export function beaconPropApplyValueRuntimeSource(): string {
     'function bApplyImageSrc(el,v){var tag=String(el.tagName||"").toUpperCase();if(tag==="SOURCE"){el.setAttribute("srcset",v);if(/\\.avif(\\?|$)/i.test(v))el.setAttribute("type","image/avif");else if(/\\.webp(\\?|$)/i.test(v))el.setAttribute("type","image/webp");el.removeAttribute("src");return}el.setAttribute("src",v);if(el.removeAttribute){el.removeAttribute("srcset");el.removeAttribute("sizes")}var par=el.parentElement;if(par&&String(par.tagName||"").toUpperCase()==="PICTURE"){var sources=par.querySelectorAll("source"),i;for(i=0;i<sources.length;i++)bApplyImageSrc(sources[i],v)}}',
     'function bApplyImageToContainer(el,v){var pic=el.tagName&&String(el.tagName).toUpperCase()==="PICTURE"?el:(el.querySelector&&el.querySelector("picture"));if(pic){var sources=pic.querySelectorAll("source"),i;for(i=0;i<sources.length;i++)bApplyImageSrc(sources[i],v);var pimg=pic.querySelector("img");if(pimg)bApplyImageSrc(pimg,v);return true}var img=el.querySelector&&el.querySelector("img");if(img){bApplyImageSrc(img,v);return true}var src=el.querySelector&&el.querySelector("source");if(src){bApplyImageSrc(src,v);return true}var tag=String(el.tagName||"").toUpperCase();if(tag==="DIV"||tag==="SPAN"||tag==="FIGURE"){el.style.setProperty("background-image","url(\\""+bEscapeCssUrl(v)+"\\")");el.style.setProperty("background-size","cover");return true}return false}',
     'function bApplyLink(el,v){var h=v,nt=false;if(v&&v.charAt(0)==="{"){try{var o=JSON.parse(v);if(o&&typeof o==="object"&&typeof o.h==="string"){h=o.h;nt=o.t===1||o.t===true}}catch(e){}}el.setAttribute("href",h);if(nt){el.setAttribute("target","_blank");el.setAttribute("rel","noopener noreferrer")}else{el.removeAttribute("target")}}',
-    'function applyValue(el,v){v=String(v==null?"":v);var tag=String(el.tagName||"").toUpperCase();if(tag==="IMG"||tag==="SOURCE"){bApplyImageSrc(el,v);return}if(tag==="PICTURE"){bApplyImageToContainer(el,v);return}if(bLooksLikeImageUrl(v)&&bApplyImageToContainer(el,v))return;if(tag==="A"&&bLooksLikeImageUrl(v)&&el.querySelector&&el.querySelector("img")){bApplyImageToContainer(el,v);return}if(tag==="A"){bApplyLink(el,v);return}if(tag==="IFRAME"||tag==="EMBED"){el.setAttribute("src",v);return}if(tag==="INPUT"){var type=String(el.type||"").toLowerCase();if(type==="checkbox"||type==="radio"){el.checked=!!(v&&v!=="0"&&v!=="false"&&v.toLowerCase()!=="off")}else{el.value=v}return}if(tag==="TEXTAREA"||tag==="SELECT"){el.value=v;return}el.textContent=v}',
+    // Belt-and-suspenders strip before innerHTML (the boundary sanitizer in cms-slot-rich-text-html.ts is authoritative;
+    // this guard ensures the footer never blindly trusts the payload string). \\x27 matches a single quote inside the regex.
+    'function bSafeHtml(v){v=String(v==null?"":v);v=v.replace(/<(script|style)\\b[\\s\\S]*?<\\/\\1>/gi,"");v=v.replace(/<\\/?(?:iframe|object|embed|form|link|meta|base)\\b[^>]*>/gi,"");v=v.replace(/\\son[a-z]+\\s*=\\s*("[^"]*"|\\x27[^\\x27]*\\x27|[^\\s>]+)/gi,"");v=v.replace(/(href|src|xlink:href)(\\s*=\\s*)("|\\x27|)\\s*javascript:[^"\\x27>\\s]*/gi,"$1$2$3#");return v}',
+    'function bIsRichTextEl(el){return!!(el.getAttribute&&(el.getAttribute("data-cb-html")==="1"||(el.classList&&el.classList.contains("w-richtext"))))}',
+    'function applyValue(el,v){v=String(v==null?"":v);var tag=String(el.tagName||"").toUpperCase();if(bIsRichTextEl(el)){el.innerHTML=bSafeHtml(v);return}if(tag==="IMG"||tag==="SOURCE"){bApplyImageSrc(el,v);return}if(tag==="PICTURE"){bApplyImageToContainer(el,v);return}if(bLooksLikeImageUrl(v)&&bApplyImageToContainer(el,v))return;if(tag==="A"&&bLooksLikeImageUrl(v)&&el.querySelector&&el.querySelector("img")){bApplyImageToContainer(el,v);return}if(tag==="A"){bApplyLink(el,v);return}if(tag==="IFRAME"||tag==="EMBED"){el.setAttribute("src",v);return}if(tag==="INPUT"){var type=String(el.type||"").toLowerCase();if(type==="checkbox"||type==="radio"){el.checked=!!(v&&v!=="0"&&v!=="false"&&v.toLowerCase()!=="off")}else{el.value=v}return}if(tag==="TEXTAREA"||tag==="SELECT"){el.value=v;return}el.textContent=v}',
   ].join("");
 }
 

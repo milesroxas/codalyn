@@ -1,6 +1,7 @@
 import {
   CMS_SLOT_COND_ATTR,
   CMS_SLOT_CONTENT_ATTR,
+  CMS_SLOT_HTML_ATTR,
   contentAttrSegmentOwnedBy,
   formatContentAttrSegmentsForBindings,
   mergeContentAttrSegments,
@@ -155,6 +156,8 @@ type WalkAcc = {
   conditionalControllerPropIds: Set<string>;
   /** Exposed prop ids of the **other** Designer components in this list; their `data-cb-c` segments are preserved. */
   foreignExposedIds: ReadonlySet<string>;
+  /** Exposed prop ids whose `valueType` is `richText`; an element bound to one gets `data-cb-html="1"`. */
+  richTextExposedIds: ReadonlySet<string>;
 };
 
 async function setOrClearAttr(attr: PropAttrOps, name: string, value: string | null): Promise<boolean> {
@@ -217,17 +220,42 @@ function deriveOwnedBindingForElement(
   return { contentIds, conditional };
 }
 
-/** Writes the merged `data-cb-c` and its companion `data-cb-v`; counts a tag when anything changed. */
+/**
+ * `data-cb-html` target for a shared element: `"1"` when this component binds a rich-text content prop here; otherwise
+ * keep the existing flag while another Designer component still owns a segment here; else clear. Mirrors
+ * {@link resolveConditionalTarget} so shared definitions stay multi-component safe.
+ */
+async function resolveHtmlTarget(
+  attr: PropAttrOps,
+  hasRichText: boolean,
+  mergedSegments: readonly string[],
+  foreignExposedIds: ReadonlySet<string>
+): Promise<string | null> {
+  if (hasRichText) {
+    return "1";
+  }
+  const foreignRemains = mergedSegments.some((seg) => contentAttrSegmentOwnedBy(seg, foreignExposedIds));
+  if (!foreignRemains) {
+    return null;
+  }
+  const prev = await attr.get(CMS_SLOT_HTML_ATTR);
+  return prev != null && prev.length > 0 ? "1" : null;
+}
+
+/** Writes the merged `data-cb-c` and its companions `data-cb-v` / `data-cb-html`; counts a tag when anything changed. */
 async function writeMergedTagAttrs(
   attr: PropAttrOps,
   merged: readonly string[],
   conditional: boolean,
+  hasRichText: boolean,
   acc: WalkAcc
 ): Promise<void> {
   const contentChanged = await setOrClearAttr(attr, CMS_SLOT_CONTENT_ATTR, merged.join("|"));
   const condTarget = await resolveConditionalTarget(attr, conditional, merged, acc.foreignExposedIds);
   const condChanged = await setOrClearAttr(attr, CMS_SLOT_COND_ATTR, condTarget);
-  if (contentChanged || condChanged) {
+  const htmlTarget = await resolveHtmlTarget(attr, hasRichText, merged, acc.foreignExposedIds);
+  const htmlChanged = await setOrClearAttr(attr, CMS_SLOT_HTML_ATTR, htmlTarget);
+  if (contentChanged || condChanged || htmlChanged) {
     acc.out.tagged += 1;
   }
 }
@@ -273,7 +301,8 @@ async function applyMergedCmsSlotAttrsForElement(
         acc.taggedPropIds.add(pid);
       }
     }
-    await writeMergedTagAttrs(attr, merged, conditional, acc);
+    const hasRichText = contentIds.some((id) => acc.richTextExposedIds.has(id));
+    await writeMergedTagAttrs(attr, merged, conditional, hasRichText, acc);
   } catch (e) {
     acc.out.errors.push(String(e instanceof Error ? e.message : e));
   }
@@ -372,12 +401,14 @@ async function enterComponentDefinitionsAndWalk(
   onProgress?: (message: string) => void
 ): Promise<DesignerTagWalkResult> {
   const exposedIds = new Set(exposed.map((e) => e.propId));
+  const richTextExposedIds = new Set(exposed.filter((e) => e.valueType === "richText").map((e) => e.propId));
   const acc: WalkAcc = {
     out,
     taggedPropIds: new Set<string>(),
     contentBindingCounts: new Map<string, number>(),
     conditionalControllerPropIds: new Set<string>(),
     foreignExposedIds,
+    richTextExposedIds,
   };
   await exitUntilPageForComponentEnter();
   onProgress?.(CMS_SLOTS_ROUTE_TASK_ENTERING_COMPONENT);

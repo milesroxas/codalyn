@@ -70,7 +70,7 @@ export function openQualityComparePopout(options: {
     padding: 14px 16px;
     background: #171717;
     border: 1px solid #262626;
-    border-radius: 10px;
+    border-radius: 8px;
   }
   .quality-field { flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .quality-field label { font-size: 11px; font-weight: 600; color: #a3a3a3; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -85,7 +85,7 @@ export function openQualityComparePopout(options: {
     color: #0a0a0a;
     background: #fafafa;
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
   }
   .save-btn:hover { filter: brightness(0.95); }
@@ -99,7 +99,7 @@ export function openQualityComparePopout(options: {
     aspect-ratio: ${ar};
     max-height: min(75vh, 900px);
     background: #171717;
-    border-radius: 10px;
+    border-radius: 8px;
     overflow: hidden;
     border: 1px solid #262626;
   }

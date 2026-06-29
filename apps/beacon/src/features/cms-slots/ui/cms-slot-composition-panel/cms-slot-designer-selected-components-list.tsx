@@ -6,7 +6,7 @@ import { ScrollArea } from "@/shared/ui/scroll-area";
 import { CmsSlotDesignerSelectedRow } from "./cms-slot-designer-selected-row";
 
 const cmsSlotDesignerSelectedComponentsListShellClass =
-  "overflow-hidden rounded-[10px] border border-border/70 bg-card text-card-foreground shadow-sm";
+  "overflow-hidden rounded-sm border border-border/70 bg-card text-card-foreground shadow-sm";
 const cmsSlotDesignerSelectedComponentsListScrollAreaClass = "max-h-60";
 const cmsSlotDesignerSelectedComponentsListClass = "m-0 list-none divide-y divide-border/80 p-0";
 /**

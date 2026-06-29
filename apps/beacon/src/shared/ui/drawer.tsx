@@ -275,7 +275,8 @@ function DrawerOverlay({ className, style, ...props }: ComponentProps<typeof Vau
 }
 
 const drawerContentVariants = cva(
-  "fixed inset-x-0 bottom-0 flex min-h-0 flex-col rounded-t-sm border-x border-t border-border bg-popover pb-[max(1rem,env(safe-area-inset-bottom))] ring-1 ring-foreground/10 outline-none duration-200",
+  // Bottom-sheet top corners pinned to 6px (pre-radius-tighten value); intentionally exempt from the reduced scale.
+  "fixed inset-x-0 bottom-0 flex min-h-0 flex-col rounded-t-[0.375rem] border-x border-t border-border bg-popover pb-[max(1rem,env(safe-area-inset-bottom))] ring-1 ring-foreground/10 outline-none duration-200",
   {
     variants: {
       maxHeight: {

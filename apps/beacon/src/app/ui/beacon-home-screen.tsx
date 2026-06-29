@@ -171,7 +171,7 @@ export function BeaconHomeScreen() {
     <>
       <CmsSlotsPageInstallPrefetch />
       <ScrollArea className="min-h-0 min-w-0 flex-1">
-        <div className="flex min-h-full min-w-0 flex-col justify-center px-4 py-8">
+        <div className="flex min-h-full min-w-0 flex-col px-3 py-3">
           <TooltipProvider delayDuration={200}>
             <div className="mx-auto flex w-full max-w-md flex-col gap-6">
               <BeaconHomeSection label={BEACON_HOME_EARLY_ACCESS_SECTION_LABEL}>

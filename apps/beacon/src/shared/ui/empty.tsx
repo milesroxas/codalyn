@@ -10,7 +10,7 @@ const emptyVariants = cva("group/empty flex min-w-0 flex-1 text-balance", {
       default: "",
       plain: "",
       /** Inset panel empty state (CMS Slots Designer / Composer sections). */
-      insetPanel: "rounded-[10px] border border-border bg-muted/10",
+      insetPanel: "rounded-sm border border-border bg-muted/10",
     },
     layout: {
       vertical: "flex-col",

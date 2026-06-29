@@ -47,14 +47,23 @@ function applyContentKeyChange(args: {
   visible: boolean;
   pendingRef: { current: PendingSwap | null };
   commitPendingSwap: (ready: boolean) => void;
-  setVisible: (visible: boolean) => void;
+  beginExit: () => void;
 }) {
+  // A non-null pending swap means a fade-out is already animating from a prior key change.
+  const fadeOutInFlight = args.pendingRef.current != null;
   args.pendingRef.current = { key: args.contentKey, child: args.children };
-  if (!args.visible) {
-    args.commitPendingSwap(args.contentReady);
+  if (args.visible) {
+    args.beginExit();
     return;
   }
-  args.setVisible(false);
+  if (fadeOutInFlight) {
+    // Visible is already false because a fade-out is mid-flight (this effect re-runs the moment `setVisible(false)`
+    // flips the `visible` dep, before the swap commits). Committing here would abort the exit ~0ms in and swap
+    // instantly. Leave the running fade-out alone — its transitionEnd (or fallback timer) commits the latest pending.
+    return;
+  }
+  // Content is genuinely idle and already hidden — there is no exit to play, so swap straight to the pending child.
+  args.commitPendingSwap(args.contentReady);
 }
 
 /**
@@ -70,6 +79,10 @@ export function BeaconRouteContentTransition(props: BeaconRouteContentTransition
   const prevContentReadyRef = useRef(false);
   const enterRafRef = useRef<number | null>(null);
   const enterFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exitFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Latest readiness, read by the exit fallback timer without re-creating it each render.
+  const contentReadyRef = useRef(contentReady);
+  contentReadyRef.current = contentReady;
 
   const clearEnterFallback = useCallback(() => {
     if (enterFallbackRef.current != null) {
@@ -78,8 +91,16 @@ export function BeaconRouteContentTransition(props: BeaconRouteContentTransition
     }
   }, []);
 
+  const clearExitFallback = useCallback(() => {
+    if (exitFallbackRef.current != null) {
+      clearTimeout(exitFallbackRef.current);
+      exitFallbackRef.current = null;
+    }
+  }, []);
+
   const beginEnter = useCallback(() => {
     clearEnterFallback();
+    clearExitFallback();
     setVisible(false);
     const id = requestAnimationFrame(() => {
       enterRafRef.current = requestAnimationFrame(() => {
@@ -95,10 +116,11 @@ export function BeaconRouteContentTransition(props: BeaconRouteContentTransition
       },
       BEACON_ROUTE_CONTENT_ENTER_DELAY_MS + BEACON_ROUTE_CONTENT_ENTER_TRANSITION_MS + 48
     );
-  }, [clearEnterFallback]);
+  }, [clearEnterFallback, clearExitFallback]);
 
   const commitPendingSwap = useCallback(
     (ready: boolean) => {
+      clearExitFallback();
       const pending = pendingRef.current;
       if (pending == null) {
         return;
@@ -111,8 +133,20 @@ export function BeaconRouteContentTransition(props: BeaconRouteContentTransition
         beginEnter();
       }
     },
-    [beginEnter]
+    [beginEnter, clearExitFallback]
   );
+
+  // Starts the outgoing fade. The opacity transitionEnd normally commits the swap; the fallback guarantees a
+  // commit even when no transition fires (prefers-reduced-motion, a hidden/detached node, an interrupted fade).
+  const beginExit = useCallback(() => {
+    clearEnterFallback();
+    setVisible(false);
+    clearExitFallback();
+    exitFallbackRef.current = setTimeout(() => {
+      exitFallbackRef.current = null;
+      commitPendingSwap(contentReadyRef.current);
+    }, BEACON_ROUTE_CONTENT_ENTER_TRANSITION_MS + 48);
+  }, [clearEnterFallback, clearExitFallback, commitPendingSwap]);
 
   useLayoutEffect(() => {
     if (contentKey === renderedKey) {
@@ -134,9 +168,9 @@ export function BeaconRouteContentTransition(props: BeaconRouteContentTransition
       visible,
       pendingRef,
       commitPendingSwap,
-      setVisible,
+      beginExit,
     });
-  }, [contentKey, renderedKey, contentReady, visible, beginEnter, commitPendingSwap, children]);
+  }, [contentKey, renderedKey, contentReady, visible, beginEnter, commitPendingSwap, beginExit, children]);
 
   useLayoutEffect(() => {
     return () => {
@@ -146,6 +180,10 @@ export function BeaconRouteContentTransition(props: BeaconRouteContentTransition
       if (enterFallbackRef.current != null) {
         clearTimeout(enterFallbackRef.current);
         enterFallbackRef.current = null;
+      }
+      if (exitFallbackRef.current != null) {
+        clearTimeout(exitFallbackRef.current);
+        exitFallbackRef.current = null;
       }
     };
   }, []);

@@ -202,7 +202,6 @@ function cmsSlotsRouteTaskInputFromChromeProps(p: CmsSlotsRouteChromeProps): Cms
 function CmsSlotsDesignerRouteBody(
   p: CmsSlotsRouteChromeProps & {
     contentKey: ReturnType<typeof resolveCmsSlotsDesignerRouteSurface>["contentKey"];
-    contentReady: boolean;
   }
 ) {
   let panel: ReactNode;
@@ -284,19 +283,12 @@ function CmsSlotsDesignerRouteBody(
     );
   }
 
-  return (
-    <div data-route="cms-slots-designer">
-      <BeaconRouteContentTransition contentKey={p.contentKey} contentReady={p.contentReady}>
-        {panel}
-      </BeaconRouteContentTransition>
-    </div>
-  );
+  return <div data-route="cms-slots-designer">{panel}</div>;
 }
 
 function CmsSlotsComposerRouteBody(
   p: CmsSlotsRouteChromeProps & {
     contentKey: ReturnType<typeof resolveCmsSlotsComposerRouteSurface>["contentKey"];
-    contentReady: boolean;
   }
 ) {
   const { composerOnly } = useCmsSlotsAccess();
@@ -351,17 +343,39 @@ function CmsSlotsComposerRouteBody(
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-route="cms-slots-composer">
-      <BeaconRouteContentTransition contentKey={p.contentKey} contentReady={p.contentReady}>
-        {panel}
-      </BeaconRouteContentTransition>
+      {panel}
     </div>
   );
+}
+
+/**
+ * Picks the active route body and a transition key that encodes both the segment and the in-segment content
+ * key (e.g. `composer:list`). Keeping the key segment-qualified lets the single content transition treat a
+ * designer→composer move as an ordinary keyed swap (fade out, then in) instead of an instant unmount.
+ */
+function resolveCmsSlotsRouteContent(
+  p: CmsSlotsRouteChromeProps,
+  designerSurface: ReturnType<typeof resolveCmsSlotsDesignerRouteSurface> | null,
+  composerSurface: ReturnType<typeof resolveCmsSlotsComposerRouteSurface> | null
+): { contentKey: string; body: ReactNode } {
+  if (designerSurface != null) {
+    return {
+      contentKey: `designer:${designerSurface.contentKey}`,
+      body: <CmsSlotsDesignerRouteBody {...p} contentKey={designerSurface.contentKey} />,
+    };
+  }
+  if (composerSurface != null) {
+    return {
+      contentKey: `composer:${composerSurface.contentKey}`,
+      body: <CmsSlotsComposerRouteBody {...p} contentKey={composerSurface.contentKey} />,
+    };
+  }
+  return { contentKey: "empty", body: null };
 }
 
 function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
   const routeTask = resolveCmsSlotsRouteTask(cmsSlotsRouteTaskInputFromChromeProps(p));
   const routeBlocking = routeTask != null;
-  const showRouteBlocking = useDeferredLoadingIndicator(routeBlocking);
   const [overlayBlocking, setOverlayBlocking] = useState(false);
 
   const designerSurface = p.isDesigner
@@ -387,6 +401,11 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
       })
     : null;
   const surfaceReady = designerSurface?.contentReady ?? composerSurface?.contentReady ?? true;
+  // Never strand the user on a blank panel: the loader covers explicit route tasks AND any surface still
+  // resolving (content held at opacity 0 by the transition). Deferred 200ms so fast swaps fade silently —
+  // only a genuinely slow load (segment data scan, beacon open) ever surfaces chrome instead of blank.
+  const overlayBusy = routeBlocking || !surfaceReady;
+  const showOverlay = useDeferredLoadingIndicator(overlayBusy);
   const routeInteractionBlocked = cmsSlotsRouteInteractionBlocked({
     routeBlocking,
     surfaceReady,
@@ -394,6 +413,15 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
   });
 
   const composerEditorFill = p.isComposer && p.activeComposer != null;
+
+  // One transition surface drives every panel swap — home↔composition, list↔editor, and crossing the
+  // designer/composer segments. A segment change fades out the outgoing panel before mounting the incoming
+  // one, instead of unmounting it instantly (which flashed a blank/wrong view between the two route bodies).
+  const { contentKey: routeContentKey, body: routeBody } = resolveCmsSlotsRouteContent(
+    p,
+    designerSurface,
+    composerSurface
+  );
 
   return (
     <BeaconFeatureRouteScrollBody
@@ -404,8 +432,8 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
       contentClassName={composerEditorFill ? "h-full min-h-0 overflow-hidden pb-0" : undefined}
       overlay={
         <BeaconRouteLoadingOverlay
-          visible={routeBlocking}
-          deferredVisible={showRouteBlocking}
+          visible={overlayBusy}
+          deferredVisible={showOverlay}
           onOccupancyChange={setOverlayBlocking}
           ariaLabel={routeTask?.ariaLabel ?? CMS_SLOTS_SCAN_ARIA_LABEL}
           message={routeTask?.message}
@@ -417,19 +445,9 @@ function CmsSlotsRouteScrollBody(p: CmsSlotsRouteChromeProps) {
           className={cn("flex min-h-0 min-w-0 flex-1 flex-col", routeInteractionBlocked && "pointer-events-none")}
           aria-hidden={routeInteractionBlocked}
         >
-          {p.isDesigner && designerSurface != null ? (
-            <CmsSlotsDesignerRouteBody
-              {...p}
-              contentKey={designerSurface.contentKey}
-              contentReady={designerSurface.contentReady}
-            />
-          ) : p.isComposer && composerSurface != null ? (
-            <CmsSlotsComposerRouteBody
-              {...p}
-              contentKey={composerSurface.contentKey}
-              contentReady={composerSurface.contentReady}
-            />
-          ) : null}
+          <BeaconRouteContentTransition contentKey={routeContentKey} contentReady={surfaceReady}>
+            {routeBody}
+          </BeaconRouteContentTransition>
         </div>
       </CmsSlotsRouteInteractionProvider>
     </BeaconFeatureRouteScrollBody>

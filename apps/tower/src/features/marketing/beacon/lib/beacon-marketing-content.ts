@@ -7,7 +7,7 @@ export const BEACON_MARKETING_COPY = {
   description: "Extending Webflow capabilities and providing tools for scaling websites with confidence",
   heroVideo: {
     // Cloudflare Stream video UID (same account as the milesroxas project).
-    streamUid: "531ca03673bc9742a645b1d9ffbed7dd",
+    streamUid: "e652512a1aec7357bd78d18c594534d3",
     // Cloudflare Images id used as the hero poster.
     posterImageId: "006b443c-5326-4f8e-fa75-ff5ff1511000",
   },

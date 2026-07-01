@@ -66,7 +66,9 @@ function MarketingVideoSlotPlayback({
       data-slot="marketing-video-slot"
       className={cn(
         // 16:9 box so the video fills without cropping, at any width (responsive).
-        "relative aspect-video w-full overflow-hidden rounded-sm lg:flex-1",
+        // min-w-0 lets the flex item shrink below the <video> intrinsic width so the
+        // row never forces horizontal overflow (double / flashing scrollbars).
+        "relative aspect-video w-full min-w-0 overflow-hidden rounded-sm lg:flex-1",
         showPlaceholder && "bg-[#464646]",
         showShader && "bg-black",
         className

@@ -40,15 +40,22 @@ export function attachHlsSource(
       if (autoPlay) void video.play();
       return;
     }
-    const instance = new Hls();
+    const instance = new Hls({
+      // Assume a broadband connection so ABR opens at a sharp rendition instead of
+      // ramping up from Cloudflare's 240p floor — the default low estimate reads as
+      // "blurry on load." ABR still downshifts if the connection can't keep up.
+      abrEwmaDefaultEstimate: 4_000_000,
+    });
     hls = instance;
+    instance.on(Hls.Events.MANIFEST_PARSED, () => {
+      // Open on the highest rendition so playback starts crisp instead of ramping
+      // up over the first few seconds. `startLevel` only governs the first fragment;
+      // ABR takes over from the second onward and downshifts if bandwidth drops.
+      instance.startLevel = instance.levels.length - 1;
+      if (autoPlay) void video.play();
+    });
     instance.loadSource(manifestUrl);
     instance.attachMedia(video);
-    if (autoPlay) {
-      instance.on(Hls.Events.MANIFEST_PARSED, () => {
-        void video.play();
-      });
-    }
   });
 
   return () => {

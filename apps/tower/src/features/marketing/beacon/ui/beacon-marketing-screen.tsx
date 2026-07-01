@@ -6,6 +6,7 @@ import {
 } from "@/features/marketing/beacon/lib/beacon-marketing-content";
 import type { TowerLandingAppLinks } from "@/features/tower-ui/tower-landing";
 import { TOWER_PRODUCT_MARKETING_PATH } from "@/shared/lib/navigation/tower-marketing-paths";
+import { CloudflareStreamVideo } from "@/shared/ui/cloudflare-stream-video";
 import { MarketingFeatureRow } from "@/shared/ui/marketing-feature-row";
 import { MarketingFeatureList, MarketingPageShell, MarketingProductHero } from "@/shared/ui/marketing-page-shell";
 
@@ -34,7 +35,19 @@ function BeaconMarketingScreen({ earlyAccessRequired = false, appLinks }: Beacon
       primaryCtaLabel={primaryCtaLabel}
       towerHref={towerHref}
     >
-      <MarketingProductHero title={BEACON_MARKETING_COPY.title} description={BEACON_MARKETING_COPY.description} />
+      <MarketingProductHero
+        align="center"
+        title={BEACON_MARKETING_COPY.title}
+        description={BEACON_MARKETING_COPY.description}
+        media={
+          <CloudflareStreamVideo
+            uid={BEACON_MARKETING_COPY.heroVideo.streamUid}
+            posterImageId={BEACON_MARKETING_COPY.heroVideo.posterImageId}
+            label="Beacon product demo"
+            className="mx-auto max-w-[60rem]"
+          />
+        }
+      />
       <MarketingFeatureList>
         {BEACON_MARKETING_FEATURES.map((feature) => {
           const Icon = BEACON_MARKETING_FEATURE_ICONS[feature.id as BeaconMarketingFeatureId];
@@ -49,6 +62,7 @@ function BeaconMarketingScreen({ earlyAccessRequired = false, appLinks }: Beacon
               videoLabel={`${feature.title} demo`}
               videoPoster={feature.videoPoster}
               videoSrc={feature.videoSrc}
+              videoStreamUid={feature.videoStreamUid}
               mediaShader={feature.mediaShader}
             />
           );

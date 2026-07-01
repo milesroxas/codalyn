@@ -5,6 +5,12 @@ import type { MarketingFeaturePanelAccent, MarketingVideoSlotShader } from "@/sh
 export const BEACON_MARKETING_COPY = {
   title: "Beacon",
   description: "Extending Webflow capabilities and providing tools for scaling websites with confidence",
+  heroVideo: {
+    // Cloudflare Stream video UID (same account as the milesroxas project).
+    streamUid: "531ca03673bc9742a645b1d9ffbed7dd",
+    // Cloudflare Images id used as the hero poster.
+    posterImageId: "006b443c-5326-4f8e-fa75-ff5ff1511000",
+  },
 } as const;
 
 type BeaconMarketingFeature = {
@@ -14,6 +20,7 @@ type BeaconMarketingFeature = {
   mediaPosition: "start" | "end";
   roles: readonly MarketingFeatureRole[];
   videoSrc?: string;
+  videoStreamUid?: string;
   videoPoster?: string;
   mediaShader?: MarketingVideoSlotShader;
 };
@@ -25,6 +32,7 @@ export const BEACON_MARKETING_FEATURES: readonly BeaconMarketingFeature[] = [
     accent: "magenta",
     mediaPosition: "end",
     mediaShader: "cmsSlots",
+    videoStreamUid: "413f760f22c5e0637539f53f95bcfff1",
     roles: [
       {
         label: "Designer",
@@ -42,6 +50,7 @@ export const BEACON_MARKETING_FEATURES: readonly BeaconMarketingFeature[] = [
     accent: "violet",
     mediaPosition: "start",
     mediaShader: "imageUpload",
+    videoStreamUid: "f8ba09f719ccd61e13da07bae73ab163",
     roles: [
       {
         label: "Designer",

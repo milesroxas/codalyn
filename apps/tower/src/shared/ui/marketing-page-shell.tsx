@@ -6,17 +6,31 @@ import { TowerPublicMarketingPageShell } from "@/shared/ui/tower-public-marketin
 type MarketingProductHeroProps = {
   title: string;
   description: string;
+  /** Text alignment. `start` (default) keeps the left-aligned product heading; `center` stacks and centers it. */
+  align?: "start" | "center";
+  /** Optional media (e.g. a hero video) rendered beneath the heading. */
+  media?: React.ReactNode;
   className?: string;
 };
 
-function MarketingProductHero({ title, description, className }: MarketingProductHeroProps) {
+function MarketingProductHero({ title, description, align = "start", media, className }: MarketingProductHeroProps) {
+  const centered = align === "center";
   return (
     <header
       data-slot="marketing-product-hero"
-      className={cn("tl-marketing-enter flex flex-col gap-4 pb-8 [--tl-enter-delay:40ms]", className)}
+      className={cn(
+        "tl-marketing-enter flex flex-col [--tl-enter-delay:40ms]",
+        centered ? "items-center gap-20 text-center" : "gap-4 pb-8",
+        className
+      )}
     >
-      <h1 className="text-5xl font-semibold tracking-tight text-neutral-50">{title}</h1>
-      <p className="max-w-4xl text-[32px] font-light leading-10 text-neutral-400">{description}</p>
+      <div className={cn("flex flex-col gap-4", centered && "items-center")}>
+        <h1 className="text-5xl font-semibold tracking-tight text-neutral-50">{title}</h1>
+        <p className={cn("text-[32px] font-light leading-10 text-neutral-400", centered ? "max-w-2xl" : "max-w-4xl")}>
+          {description}
+        </p>
+      </div>
+      {media ? <div className="w-full">{media}</div> : null}
     </header>
   );
 }

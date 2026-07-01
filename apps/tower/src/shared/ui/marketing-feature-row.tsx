@@ -16,6 +16,7 @@ type MarketingFeatureRowProps = {
   roles: readonly MarketingFeatureRole[];
   accent: MarketingFeaturePanelAccent;
   videoSrc?: string;
+  videoStreamUid?: string;
   videoPoster?: string;
   videoLabel?: string;
   mediaShader?: MarketingVideoSlotShader;
@@ -29,6 +30,7 @@ function MarketingFeatureRow({
   roles,
   accent,
   videoSrc,
+  videoStreamUid,
   videoPoster,
   videoLabel,
   mediaShader,
@@ -45,12 +47,20 @@ function MarketingFeatureRow({
     </MarketingFeaturePanel>
   );
 
-  const media = <MarketingVideoSlot src={videoSrc} poster={videoPoster} label={videoLabel} shader={mediaShader} />;
+  const media = (
+    <MarketingVideoSlot
+      src={videoSrc}
+      streamUid={videoStreamUid}
+      poster={videoPoster}
+      label={videoLabel}
+      shader={mediaShader}
+    />
+  );
 
   return (
     <div
       data-slot="marketing-feature-row"
-      className={cn("flex flex-col gap-6 lg:flex-row lg:items-stretch lg:min-h-0", className)}
+      className={cn("flex flex-col gap-6 lg:flex-row lg:items-start lg:min-h-0", className)}
     >
       {mediaPosition === "start" ? (
         <>

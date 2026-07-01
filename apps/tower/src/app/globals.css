@@ -46,18 +46,21 @@
 
 /* Native scrollbars own the affordance. No `scrollbar-gutter` reservation: pages
    that scroll show the browser scrollbar; pages that lock to the viewport
-   (homepage on desktop, auth) sit flush to the edge. `overflow-x: hidden` only
-   clips stray horizontal overflow from decorative art — vertical scroll is native. */
+   (homepage on desktop, auth) sit flush to the edge. `overflow-x: clip` (not
+   `hidden`) clips stray horizontal overflow from decorative art without making
+   body a scroll container — `hidden` forces computed `overflow-y: auto`, which
+   pops a second vertical scrollbar on body while marketing enter animations
+   translate content past its bottom edge. Vertical scroll is native. */
 html {
   margin: 0;
   min-height: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
   margin: 0;
   min-height: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 @theme inline {

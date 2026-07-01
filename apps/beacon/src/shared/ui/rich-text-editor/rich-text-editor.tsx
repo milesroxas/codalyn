@@ -116,7 +116,7 @@ export function RichTextEditor({
                 id={id}
                 aria-label={ariaLabel}
                 data-slot="rich-text-content"
-                className={richTextContentVariants({ variant })}
+                className={cn(richTextContentVariants({ variant }), disabled ? "cursor-not-allowed" : "cursor-text")}
                 onBlur={onBlur}
               />
             }

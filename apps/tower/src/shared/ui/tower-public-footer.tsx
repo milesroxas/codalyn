@@ -44,7 +44,10 @@ function TowerPublicFooter({ variant = "default", placement = "static", classNam
     <footer
       className={cn(
         "border-t",
-        placement === "fixed" ? "fixed inset-x-0 bottom-0 z-[5] bg-background" : "relative",
+        // `fixed` anchors the footer to the viewport bottom on desktop (immersive,
+        // non-scrolling homepage); on mobile it stays in flow so it sits at the end
+        // of the natural page scroll rather than overlapping content.
+        placement === "fixed" ? "relative lg:fixed lg:inset-x-0 lg:bottom-0 lg:z-5 lg:bg-background" : "relative",
         variant === "marketing" ? "border-white/10" : "border-border/60",
         className
       )}

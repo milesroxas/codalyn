@@ -42,7 +42,7 @@ export function TowerLandingEntrance({ children, main }: { children: React.React
   }, []);
 
   return (
-    <div className="tl-landing-root relative h-dvh w-full min-w-0 overflow-hidden">
+    <div className="relative w-full min-w-0 min-h-dvh overflow-x-clip lg:h-dvh lg:overflow-hidden">
       <TowerLenisRoot enabled={!reduceMotion} />
       <div
         aria-hidden

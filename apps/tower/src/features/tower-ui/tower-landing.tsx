@@ -1,5 +1,6 @@
 import { IconPlug, IconRadar2, IconUsers } from "@tabler/icons-react";
 import Link from "next/link";
+import type * as React from "react";
 import { TowerLandingEntrance } from "@/features/tower-ui/tower-landing-entrance";
 import { TowerLandingGraphic } from "@/features/tower-ui/tower-landing-graphic";
 import { TOWER_PRODUCT_MARKETING_PATH } from "@/shared/lib/navigation/tower-marketing-paths";
@@ -48,10 +49,12 @@ export function TowerLanding(props: { earlyAccessRequired?: boolean; appLinks?: 
           />
           <TowerPublicHeaderSpacer />
           <main
-            className="relative z-10 mx-auto flex max-w-6xl flex-col justify-center px-4 py-16 sm:px-6 lg:py-24"
-            style={{
-              height: `calc(100dvh - ${TOWER_PUBLIC_HEADER_HEIGHT_PX}px - ${TOWER_PUBLIC_FOOTER_HEIGHT_PX}px)`,
-            }}
+            className="relative z-10 mx-auto flex max-w-6xl flex-col px-4 py-16 sm:px-6 lg:h-[var(--tl-landing-main-h)] lg:justify-center lg:py-24"
+            style={
+              {
+                "--tl-landing-main-h": `calc(100dvh - ${TOWER_PUBLIC_HEADER_HEIGHT_PX}px - ${TOWER_PUBLIC_FOOTER_HEIGHT_PX}px)`,
+              } as React.CSSProperties
+            }
           >
             <div>
               <p className="tl-landing-enter mb-4 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground [--tl-enter-delay:1680ms]">

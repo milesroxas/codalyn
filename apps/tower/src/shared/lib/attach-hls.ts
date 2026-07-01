@@ -14,6 +14,23 @@ export type DetachHls = () => void;
 
 const NATIVE_HLS_MIME = "application/vnd.apple.mpegurl";
 
+/**
+ * Start playback, swallowing the expected AbortError.
+ *
+ * `play()` returns a promise that rejects with an AbortError ("The play() request
+ * was interrupted by a new load request") whenever a new load — cleanup calling
+ * `load()`, hls.js `attachMedia` resetting `src`, or a React Strict Mode remount —
+ * lands before playback starts. That interruption is benign here (the element is
+ * being detached or re-attached), so ignore it and re-raise anything else. See
+ * https://goo.gl/LdLk22.
+ */
+function safePlay(video: HTMLVideoElement): void {
+  video.play().catch((error: unknown) => {
+    if (error instanceof DOMException && error.name === "AbortError") return;
+    throw error;
+  });
+}
+
 export function attachHlsSource(
   video: HTMLVideoElement,
   manifestUrl: string,
@@ -23,7 +40,7 @@ export function attachHlsSource(
 
   if (video.canPlayType(NATIVE_HLS_MIME) !== "") {
     video.src = manifestUrl;
-    if (autoPlay) void video.play();
+    if (autoPlay) safePlay(video);
     return () => {
       video.removeAttribute("src");
       video.load();
@@ -37,7 +54,7 @@ export function attachHlsSource(
     if (cancelled) return;
     if (!Hls.isSupported()) {
       video.src = manifestUrl;
-      if (autoPlay) void video.play();
+      if (autoPlay) safePlay(video);
       return;
     }
     const instance = new Hls({
@@ -52,7 +69,7 @@ export function attachHlsSource(
       // up over the first few seconds. `startLevel` only governs the first fragment;
       // ABR takes over from the second onward and downshifts if bandwidth drops.
       instance.startLevel = instance.levels.length - 1;
-      if (autoPlay) void video.play();
+      if (autoPlay) safePlay(video);
     });
     instance.loadSource(manifestUrl);
     instance.attachMedia(video);

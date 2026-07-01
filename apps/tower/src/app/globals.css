@@ -44,18 +44,14 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* Native scrollbars own the affordance. No `scrollbar-gutter` reservation: pages
+   that scroll show the browser scrollbar; pages that lock to the viewport
+   (homepage on desktop, auth) sit flush to the edge. `overflow-x: hidden` only
+   clips stray horizontal overflow from decorative art — vertical scroll is native. */
 html {
   margin: 0;
   min-height: 100%;
   overflow-x: hidden;
-  scrollbar-gutter: stable;
-}
-
-/* Landing fills the viewport and never scrolls (h-dvh + overflow-hidden), so
-   the reserved scrollbar gutter would show as an empty strip on the right.
-   Opt this route out; other (scrolling) pages keep `stable` to avoid jank. */
-html:has(.tl-landing-root) {
-  scrollbar-gutter: auto;
 }
 
 body {

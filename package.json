@@ -19,6 +19,18 @@
       "import-in-the-middle": "3.0.1",
       "@types/react": "19.2.17",
       "@types/react-dom": "19.2.3"
+    },
+    "packageExtensions": {
+      "next-themes": {
+        "peerDependencies": {
+          "@types/react": "*"
+        },
+        "peerDependenciesMeta": {
+          "@types/react": {
+            "optional": true
+          }
+        }
+      }
     }
   },
   "simple-git-hooks": {

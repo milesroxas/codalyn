@@ -1,3 +1,4 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import { Tabs as TabsPrimitive } from "radix-ui";
 import type * as React from "react";
 
@@ -7,16 +8,27 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
   return <TabsPrimitive.Root data-slot="tabs" className={cn("flex flex-col gap-6", className)} {...props} />;
 }
 
-function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.List>) {
+const tabsListVariants = cva("inline-flex items-center gap-1 rounded-sm bg-muted/80 p-1 text-muted-foreground", {
+  variants: {
+    variant: {
+      default: "h-9 w-fit flex-wrap justify-start",
+      // Full-width segmented toggle with equal-width, larger triggers.
+      segmented:
+        "h-11 w-full [&>[data-slot=tabs-trigger]]:h-9 [&>[data-slot=tabs-trigger]]:flex-1 [&>[data-slot=tabs-trigger]]:text-sm",
+    },
+  },
+  defaultVariants: {
+    variant: "default",
+  },
+});
+
+function TabsList({
+  className,
+  variant,
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.List> & VariantProps<typeof tabsListVariants>) {
   return (
-    <TabsPrimitive.List
-      data-slot="tabs-list"
-      className={cn(
-        "inline-flex h-9 w-fit flex-wrap items-center justify-start gap-1 rounded-sm bg-muted/80 p-1 text-muted-foreground",
-        className
-      )}
-      {...props}
-    />
+    <TabsPrimitive.List data-slot="tabs-list" className={cn(tabsListVariants({ variant }), className)} {...props} />
   );
 }
 

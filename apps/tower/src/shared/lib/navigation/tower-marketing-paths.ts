@@ -1,6 +1,7 @@
 export const TOWER_TERMS_PATH = "/terms";
 export const TOWER_PRIVACY_PATH = "/privacy";
 export const TOWER_PRODUCT_MARKETING_PATH = "/tower";
+export const TOWER_SUPPORT_PATH = "/support";
 
 /** Paths served on the marketing host (codalyn.app) without redirecting to the Tower app host. */
 export const TOWER_MARKETING_PUBLIC_PATHS = [
@@ -8,6 +9,7 @@ export const TOWER_MARKETING_PUBLIC_PATHS = [
   TOWER_PRODUCT_MARKETING_PATH,
   "/beacon",
   "/flint",
+  TOWER_SUPPORT_PATH,
   TOWER_TERMS_PATH,
   TOWER_PRIVACY_PATH,
 ] as const;

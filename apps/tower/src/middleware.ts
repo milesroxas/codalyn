@@ -11,7 +11,7 @@ import {
 } from "@/server/tower-hosts";
 import { readTowerSessionCookie } from "@/server/tower-session-cookie";
 import { TOWER_AUTH_SURFACE_PATHS } from "@/shared/lib/navigation/tower-auth-surfaces";
-import { isTowerMarketingPublicPath } from "@/shared/lib/navigation/tower-marketing-paths";
+import { isTowerMarketingPublicPath, TOWER_SUPPORT_PATH } from "@/shared/lib/navigation/tower-marketing-paths";
 
 function needsCors(pathname: string): boolean {
   return (
@@ -26,6 +26,7 @@ function needsCors(pathname: string): boolean {
 const PUBLIC_PREFIXES = [
   "/",
   ...TOWER_AUTH_SURFACE_PATHS,
+  TOWER_SUPPORT_PATH,
   "/terms",
   "/privacy",
   "/integrations/webflow/success",

@@ -12,6 +12,7 @@ import { isTowerAuthSurfacePath } from "@/shared/lib/navigation/tower-auth-surfa
 import {
   isTowerMarketingInnerPagePath,
   isTowerMarketingSelfContainedPath,
+  TOWER_SUPPORT_PATH,
 } from "@/shared/lib/navigation/tower-marketing-paths";
 import { cn } from "@/shared/lib/utils";
 import { ScrollArea } from "@/shared/ui/scroll-area";
@@ -99,13 +100,15 @@ export function TowerAppShell({
 
   const authenticated = isPending ? signedIn : Boolean(session?.user);
   const showAuthenticatedChrome = authenticated || signingOut;
+  // Full-bleed surfaces that render their own layout (AuthShell) in both auth states.
+  const isBareSurface = isTowerAuthSurfacePath(pathname) || pathname === TOWER_SUPPORT_PATH;
 
   if (isTowerMarketingSelfContainedPath(pathname) && !showAuthenticatedChrome) {
     return children;
   }
 
   if (!showAuthenticatedChrome) {
-    if (isTowerAuthSurfacePath(pathname)) {
+    if (isBareSurface) {
       return children;
     }
 
@@ -128,7 +131,7 @@ export function TowerAppShell({
     );
   }
 
-  if (isTowerAuthSurfacePath(pathname) && !signingOut) {
+  if (isBareSurface && !signingOut) {
     return children;
   }
 

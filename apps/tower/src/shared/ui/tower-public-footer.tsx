@@ -1,7 +1,11 @@
 import Link from "next/link";
 import type * as React from "react";
 
-import { TOWER_PRIVACY_PATH, TOWER_TERMS_PATH } from "@/shared/lib/navigation/tower-marketing-paths";
+import {
+  TOWER_PRIVACY_PATH,
+  TOWER_SUPPORT_PATH,
+  TOWER_TERMS_PATH,
+} from "@/shared/lib/navigation/tower-marketing-paths";
 import { cn } from "@/shared/lib/utils";
 
 type TowerPublicFooterVariant = "default" | "marketing";
@@ -61,7 +65,10 @@ function TowerPublicFooter({ variant = "default", placement = "static", classNam
         <p className={cn("text-xs", variant === "marketing" ? "text-neutral-500" : "text-muted-foreground")}>
           © {year} Codalyn
         </p>
-        <nav aria-label="Legal" className="flex items-center gap-4">
+        <nav aria-label="Footer" className="flex items-center gap-4">
+          <TowerPublicFooterLink href={TOWER_SUPPORT_PATH} variant={variant}>
+            Support
+          </TowerPublicFooterLink>
           <TowerPublicFooterLink href={TOWER_TERMS_PATH} variant={variant}>
             Terms
           </TowerPublicFooterLink>

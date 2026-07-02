@@ -58,6 +58,19 @@ describe("middleware host split", () => {
     expect(response?.status).not.toBe(307);
   });
 
+  it("allows marketing host /support when logged out", () => {
+    process.env.TOWER_HOST_SPLIT = "1";
+    process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";
+    const response = middleware(makeRequest("codalyn.app", "/support"));
+    expect(response?.status).not.toBe(307);
+  });
+
+  it("allows logged-out access to /support on the app host", () => {
+    process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
+    const response = middleware(makeRequest("tower.codalyn.app", "/support"));
+    expect(response?.status).not.toBe(307);
+  });
+
   it("rewrites flint marketing host / to the flint landing page", () => {
     process.env.TOWER_HOST_SPLIT = "1";
     process.env.BETTER_AUTH_URL = "https://tower-preview.codalyn.app";

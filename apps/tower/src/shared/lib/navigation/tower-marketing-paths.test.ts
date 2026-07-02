@@ -13,6 +13,7 @@ describe("tower marketing paths", () => {
     expect(isTowerMarketingPublicPath("/beacon")).toBe(true);
     expect(isTowerMarketingPublicPath("/flint")).toBe(true);
     expect(isTowerMarketingPublicPath("/tower")).toBe(true);
+    expect(isTowerMarketingPublicPath("/support")).toBe(true);
     expect(isTowerMarketingPublicPath("/terms")).toBe(true);
     expect(isTowerMarketingPublicPath("/privacy")).toBe(true);
     expect(isTowerMarketingPublicPath("/account")).toBe(false);

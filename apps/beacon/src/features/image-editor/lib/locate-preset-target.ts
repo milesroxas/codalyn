@@ -165,9 +165,54 @@ export function resolvePageIdForInstancePresetWork(
   return pageIdHint ?? null;
 }
 
+export type ComponentPresetPlacementCheck =
+  | { ok: true; needsPlacement: false; instance: ComponentElement | null }
+  | { ok: true; needsPlacement: true; componentName: string }
+  | { ok: false; error: string };
+
+/**
+ * Answers "would locating this preset place a temporary component instance on the page?"
+ * without mutating the canvas, so the UI can ask for consent before {@link locatePresetTarget} places one.
+ *
+ * A found instance is returned so the follow-up locate can reuse it — skipping a second page scan
+ * and preventing an unconsented placement if the instance disappears between check and locate.
+ */
+export async function checkComponentPresetPlacementNeeded(input: {
+  targetKey: PresetTargetKey;
+  siteId: string | null;
+  /** Last known page id — used to leave a component canvas before the page scan. */
+  pageIdHint?: string | null;
+}): Promise<ComponentPresetPlacementCheck> {
+  const targetKey = input.targetKey;
+  if (targetKey.kind !== "component-image") {
+    return { ok: true, needsPlacement: false, instance: null };
+  }
+  const siteError = siteMismatchError(input.siteId, targetKey);
+  if (siteError != null) {
+    return { ok: false, error: siteError };
+  }
+  const pageId = resolvePageIdForInstancePresetWork(targetKey, input.pageIdHint);
+  try {
+    return await runExclusiveDesignerOp(async () => {
+      await preparePageCanvasForWork(pageId);
+      const existing = await findComponentInstanceByDefinitionIdOnPage(targetKey.componentDefinitionId);
+      if (existing != null) {
+        return { ok: true, needsPlacement: false, instance: existing } as const;
+      }
+      const definition = await webflow.getComponent(targetKey.componentDefinitionId);
+      const componentName = (await definition.getName().catch(() => null)) || "this component";
+      return { ok: true, needsPlacement: true, componentName } as const;
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not scan the page for this component.";
+    return { ok: false, error: message };
+  }
+}
+
 async function locateComponentImagePresetTarget(
   targetKey: Extract<PresetTargetKey, { kind: "component-image" }>,
-  pageIdHint: string | null | undefined
+  pageIdHint: string | null | undefined,
+  knownInstance: ComponentElement | null
 ): Promise<LocatePresetTargetResult> {
   const pageId = resolvePageIdForInstancePresetWork(targetKey, pageIdHint);
   let instance: ComponentElement;
@@ -176,6 +221,7 @@ async function locateComponentImagePresetTarget(
     ({ instance, temporary } = await ensureComponentInstanceOnPage({
       componentDefinitionId: targetKey.componentDefinitionId,
       pageIdHint: pageId,
+      instance: knownInstance,
     }));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not place this component on the page.";
@@ -226,6 +272,8 @@ export async function locatePresetTarget(input: {
   siteId: string | null;
   /** Last known page id — used to leave a component canvas before page-scoped locate work. */
   pageIdHint?: string | null;
+  /** Instance found by {@link checkComponentPresetPlacementNeeded} — reused instead of re-scanning the page. */
+  knownComponentInstance?: ComponentElement | null;
 }): Promise<LocatePresetTargetResult> {
   const siteError = siteMismatchError(input.siteId, input.targetKey);
   if (siteError != null) {
@@ -242,7 +290,11 @@ export async function locatePresetTarget(input: {
   try {
     return await runExclusiveDesignerOp(async () => {
       if (input.targetKey.kind === "component-image") {
-        return await locateComponentImagePresetTarget(input.targetKey, pageIdHint);
+        return await locateComponentImagePresetTarget(
+          input.targetKey,
+          pageIdHint,
+          input.knownComponentInstance ?? null
+        );
       }
       if (
         input.targetKey.kind === "component-image-element" ||

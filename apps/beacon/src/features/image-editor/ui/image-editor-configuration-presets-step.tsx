@@ -29,14 +29,21 @@ import {
 } from "@/features/image-editor/lib/image-editor-preset-form-existing";
 import { buildPresetScopeOptions } from "@/features/image-editor/lib/image-editor-preset-scope-options";
 import {
+  checkComponentPresetPlacementNeeded,
   findImagePageTargetForPresetOnCurrentPage,
   getPresetLocateAction,
+  type LocatePresetTargetResult,
   locatePresetTarget,
 } from "@/features/image-editor/lib/locate-preset-target";
 import { removeTemporaryPageComponentInstance } from "@/features/image-editor/lib/page-component-instance-for-preset-work";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import { usePresetFormTargets } from "@/features/image-editor/model/use-image-editor-auto-targets";
 import { useResolvedImagePageTarget } from "@/features/image-editor/model/use-resolved-image-page-target";
+import {
+  type ComponentPlacementConsentRequest,
+  type ComponentPlacementSearchState,
+  ImageEditorComponentPlacementConsentDialog,
+} from "@/features/image-editor/ui/image-editor-component-placement-consent-dialog";
 import { ImageEditorConfigurationPresetsFormView } from "@/features/image-editor/ui/image-editor-preset-form-view";
 import {
   buildPresetConfigurationFooter,
@@ -44,10 +51,7 @@ import {
   type PresetListRow,
 } from "@/features/image-editor/ui/image-editor-preset-list-view";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
-import {
-  IMAGE_UPLOAD_PRESET_EDIT_OPENING_LOCATION_MESSAGE,
-  IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
-} from "@/shared/lib/beacon-feature-route-copy";
+import { IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE } from "@/shared/lib/beacon-feature-route-copy";
 import { runExclusiveDesignerOp } from "@/shared/lib/exclusive-designer-op";
 import { useDesignerCurrentPageId } from "@/shared/lib/use-designer-current-page-id";
 import { cn } from "@/shared/lib/utils";
@@ -63,6 +67,13 @@ import {
 } from "@/shared/ui/alert-dialog";
 
 type View = "list" | "form";
+
+type PlacementConsentState = ComponentPlacementConsentRequest & {
+  targetKey: BeaconPresetStorageEntry["row"]["targetKey"];
+  notifyOnSuccess: boolean;
+  /** Preset row to open in the form once its component is resolved (list-open flow); null = in-form locate. */
+  advanceRow: PresetListRow | null;
+};
 
 type ImageEditorConfigurationPresetsStepProps = {
   isGuest: boolean;
@@ -101,6 +112,10 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
   const [formTarget, setFormTarget] = useState<ImagePageTarget | null>(null);
   const [formSubStep, setFormSubStep] = useState<PresetFormSubStep>(1);
   const [presetPendingDelete, setPresetPendingDelete] = useState<PresetListRow | null>(null);
+  const [placementConsent, setPlacementConsent] = useState<PlacementConsentState | null>(null);
+  const [presetSearch, setPresetSearch] = useState<ComponentPlacementSearchState | null>(null);
+  /** Bumped when the user cancels the preset-open flow — in-flight locate results are then discarded. */
+  const presetOpenGenRef = useRef(0);
   const [siteId, setSiteId] = useState<string | null>(null);
   const { pageId } = useDesignerCurrentPageId();
 
@@ -294,50 +309,8 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
     }
   }, []);
 
-  const runPresetLocate = useCallback(
-    async (input: { targetKey: NonNullable<typeof editingEntry>["row"]["targetKey"]; notifyOnSuccess?: boolean }) => {
-      if (locateInFlightRef.current) {
-        return;
-      }
-      locateInFlightRef.current = true;
-      setLocatePending(true);
-      setFormError(null);
-      try {
-        const result = await locatePresetTarget({
-          siteId,
-          targetKey: input.targetKey,
-          pageIdHint: pageId,
-        });
-        if (!result.ok) {
-          setFormError(result.error);
-          void webflow.notify({ type: "Error", message: result.error });
-          return;
-        }
-        await cleanupTemporaryPresetInstance();
-        if (result.temporaryInstance != null) {
-          temporaryPresetInstanceRef.current = result.temporaryInstance;
-        }
-        if (result.target != null) {
-          editTargetResolveGenRef.current += 1;
-          await applyFormTarget(result.target);
-          if (input.notifyOnSuccess) {
-            void webflow.notify({
-              type: "Success",
-              message: IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
-            });
-          }
-        }
-      } finally {
-        locateInFlightRef.current = false;
-        setLocatePending(false);
-      }
-    },
-    [applyFormTarget, cleanupTemporaryPresetInstance, pageId, siteId]
-  );
-
-  const openEdit = useCallback(
-    (p: PresetListRow, options?: { pageTarget?: ImagePageTarget | null; skipAutoLocate?: boolean }) => {
-      const entry = presetEntriesById.get(p.id) ?? null;
+  const populatePresetForm = useCallback(
+    (p: PresetListRow) => {
       setEditingId(p.id);
       setNameDraft(p.name);
       setWStr(String(p.width));
@@ -349,27 +322,201 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
       setMaxSizeUnit(maxDraft.unit);
       setPresetScope(p.scope);
       setFormError(null);
-      setFormTarget(options?.pageTarget ?? null);
+    },
+    [settings.defaultExportFormat]
+  );
+
+  const enterPresetForm = useCallback(
+    (p: PresetListRow, pageTarget: ImagePageTarget | null) => {
+      populatePresetForm(p);
+      setFormTarget(pageTarget);
+      setView("form");
+    },
+    [populatePresetForm]
+  );
+
+  /** Consent gate before locate work may place a temporary instance: proceed=false when the dialog is shown, an error occurred, or the flow was cancelled. */
+  const resolvePlacementConsent = useCallback(
+    async (input: {
+      targetKey: NonNullable<typeof editingEntry>["row"]["targetKey"];
+      notifyOnSuccess: boolean;
+      fromConsentScan: boolean;
+      advanceRow: PresetListRow | null;
+      gen: number;
+    }): Promise<{ proceed: false } | { proceed: true; knownInstance: ComponentElement | null }> => {
+      const check = await checkComponentPresetPlacementNeeded({
+        siteId,
+        targetKey: input.targetKey,
+        pageIdHint: pageId,
+      });
+      if (input.gen !== presetOpenGenRef.current) {
+        return { proceed: false };
+      }
+      if (!check.ok) {
+        setFormError(check.error);
+        void webflow.notify({ type: "Error", message: check.error });
+        return { proceed: false };
+      }
+      if (check.needsPlacement) {
+        setPlacementConsent({
+          targetKey: input.targetKey,
+          componentName: check.componentName,
+          pageId,
+          scanFoundNothing: input.fromConsentScan,
+          notifyOnSuccess: input.notifyOnSuccess,
+          advanceRow: input.advanceRow,
+        });
+        return { proceed: false };
+      }
+      return { proceed: true, knownInstance: check.instance };
+    },
+    [pageId, siteId]
+  );
+
+  /** Applies a located target: opens the form first when the locate came from the preset list. */
+  const handleLocatedTarget = useCallback(
+    async (input: { target: ImagePageTarget; advanceRow: PresetListRow | null; notifyOnSuccess: boolean }) => {
+      editTargetResolveGenRef.current += 1;
+      if (input.advanceRow != null) {
+        enterPresetForm(input.advanceRow, input.target);
+      }
+      await applyFormTarget(input.target);
+      if (input.notifyOnSuccess) {
+        void webflow.notify({
+          type: "Success",
+          message: IMAGE_UPLOAD_PRESET_LOCATE_SELECTED_TARGET_MESSAGE,
+        });
+      }
+    },
+    [applyFormTarget, enterPresetForm]
+  );
+
+  /** Processes a locate result unless the user cancelled the open flow while it ran. */
+  const handleLocateResult = useCallback(
+    async (
+      result: LocatePresetTargetResult,
+      ctx: { gen: number; advanceRow: PresetListRow | null; notifyOnSuccess: boolean }
+    ) => {
+      if (ctx.gen !== presetOpenGenRef.current) {
+        return;
+      }
+      if (!result.ok) {
+        setFormError(result.error);
+        void webflow.notify({ type: "Error", message: result.error });
+        return;
+      }
+      await cleanupTemporaryPresetInstance();
+      if (result.temporaryInstance != null) {
+        temporaryPresetInstanceRef.current = result.temporaryInstance;
+      }
+      if (result.target != null) {
+        await handleLocatedTarget({
+          target: result.target,
+          advanceRow: ctx.advanceRow,
+          notifyOnSuccess: ctx.notifyOnSuccess,
+        });
+      }
+    },
+    [cleanupTemporaryPresetInstance, handleLocatedTarget]
+  );
+
+  const runPresetLocate = useCallback(
+    async (input: {
+      targetKey: NonNullable<typeof editingEntry>["row"]["targetKey"];
+      notifyOnSuccess?: boolean;
+      /** User already confirmed Beacon may place a temporary instance — skip the consent check. */
+      placementApproved?: boolean;
+      /** Re-check triggered from the consent dialog's scan action — a miss reports "found nothing". */
+      fromConsentScan?: boolean;
+      /** Preset row to open in the form once the target is located (list-open flow). */
+      advanceRow?: PresetListRow | null;
+    }) => {
+      if (locateInFlightRef.current) {
+        return;
+      }
+      locateInFlightRef.current = true;
+      setLocatePending(true);
+      setFormError(null);
+      const gen = presetOpenGenRef.current;
+      const advanceRow = input.advanceRow ?? null;
+      try {
+        let knownInstance: ComponentElement | null = null;
+        if (input.placementApproved !== true) {
+          const consent = await resolvePlacementConsent({
+            targetKey: input.targetKey,
+            notifyOnSuccess: input.notifyOnSuccess === true,
+            fromConsentScan: input.fromConsentScan === true,
+            advanceRow,
+            gen,
+          });
+          if (!consent.proceed) {
+            return;
+          }
+          knownInstance = consent.knownInstance;
+        }
+        setPlacementConsent(null);
+        if (advanceRow != null) {
+          setPresetSearch({ placing: input.placementApproved === true });
+        }
+        const result = await locatePresetTarget({
+          siteId,
+          targetKey: input.targetKey,
+          pageIdHint: pageId,
+          knownComponentInstance: knownInstance,
+        });
+        await handleLocateResult(result, { gen, advanceRow, notifyOnSuccess: input.notifyOnSuccess === true });
+      } finally {
+        locateInFlightRef.current = false;
+        setLocatePending(false);
+        setPresetSearch(null);
+      }
+    },
+    [handleLocateResult, pageId, resolvePlacementConsent, siteId]
+  );
+
+  const onConfirmComponentPlacement = useCallback(() => {
+    if (placementConsent == null) {
+      return;
+    }
+    const { targetKey, notifyOnSuccess, advanceRow } = placementConsent;
+    setPlacementConsent(null);
+    void runPresetLocate({ targetKey, notifyOnSuccess, placementApproved: true, advanceRow });
+  }, [placementConsent, runPresetLocate]);
+
+  const onScanPageForComponentPlacement = useCallback(() => {
+    if (placementConsent == null) {
+      return;
+    }
+    const { targetKey, notifyOnSuccess, advanceRow } = placementConsent;
+    void runPresetLocate({ targetKey, notifyOnSuccess, fromConsentScan: true, advanceRow });
+  }, [placementConsent, runPresetLocate]);
+
+  const onCancelComponentPlacement = useCallback(() => {
+    presetOpenGenRef.current += 1;
+    setPresetSearch(null);
+    setPlacementConsent(null);
+  }, []);
+
+  const openEdit = useCallback(
+    (p: PresetListRow, options?: { pageTarget?: ImagePageTarget | null; skipAutoLocate?: boolean }) => {
+      const entry = presetEntriesById.get(p.id) ?? null;
       const willAutoLocate =
         !options?.skipAutoLocate &&
         options?.pageTarget == null &&
         entry != null &&
         getPresetLocateAction(entry.row.targetKey).kind !== "none";
-      if (willAutoLocate) {
-        setLocatePending(true);
-      }
-      setView("form");
-
       if (!willAutoLocate || entry == null) {
+        enterPresetForm(p, options?.pageTarget ?? null);
         return;
       }
-      void webflow.notify({
-        type: "Info",
-        message: IMAGE_UPLOAD_PRESET_EDIT_OPENING_LOCATION_MESSAGE,
-      });
-      void runPresetLocate({ targetKey: entry.row.targetKey, notifyOnSuccess: true });
+      if (locateInFlightRef.current) {
+        return;
+      }
+      // Resolve the canvas target from the list first — the form opens only once the component is found.
+      setPresetSearch({ placing: false });
+      void runPresetLocate({ targetKey: entry.row.targetKey, notifyOnSuccess: true, advanceRow: p });
     },
-    [presetEntriesById, runPresetLocate, settings.defaultExportFormat]
+    [enterPresetForm, presetEntriesById, runPresetLocate]
   );
 
   const onLocatePresetTarget = useCallback(() => {
@@ -688,6 +835,15 @@ export function ImageEditorConfigurationPresetsStep(props: ImageEditorConfigurat
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ImageEditorComponentPlacementConsentDialog
+        searching={presetSearch}
+        request={placementConsent}
+        currentPageId={pageId}
+        scanPending={locatePending}
+        onConfirmPlacement={onConfirmComponentPlacement}
+        onScanPage={onScanPageForComponentPlacement}
+        onCancel={onCancelComponentPlacement}
+      />
     </div>
   );
 }

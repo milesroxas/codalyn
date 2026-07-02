@@ -2,6 +2,7 @@ import type { PresetTargetKey } from "@codalyn/webflow-kit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  checkComponentPresetPlacementNeeded,
   findImagePageTargetForPresetOnCurrentPage,
   getPresetLocateAction,
   locatePresetTarget,
@@ -371,5 +372,152 @@ describe("locatePresetTarget", () => {
     });
 
     expect(result).toEqual({ ok: false, error: "This preset belongs to a different site." });
+  });
+});
+
+describe("checkComponentPresetPlacementNeeded", () => {
+  const componentImageKey = {
+    kind: "component-image",
+    siteId: "site_1",
+    componentDefinitionId: "cmp_1",
+    imagePropId: "hero-image",
+  } satisfies PresetTargetKey;
+
+  it("reports no placement needed for non-component-definition keys without scanning", async () => {
+    const getAllElements = vi.fn();
+    installWebflow({ getAllElements });
+
+    const result = await checkComponentPresetPlacementNeeded({
+      siteId: "site_1",
+      targetKey: {
+        kind: "bare-image-instance",
+        siteId: "site_1",
+        pageId: "page_1",
+        elementId: "img_1",
+      },
+    });
+
+    expect(result).toEqual({ ok: true, needsPlacement: false, instance: null });
+    expect(getAllElements).not.toHaveBeenCalled();
+  });
+
+  it("reports no placement needed and returns the instance when a match is on the page", async () => {
+    const instance = {
+      type: "ComponentInstance",
+      id: { component: "page_1", element: "inst_1" },
+      getComponent: vi.fn().mockResolvedValue({ id: "cmp_1", getName: vi.fn().mockResolvedValue("Hero") }),
+      getChildren: vi.fn().mockResolvedValue([]),
+      getSlots: vi.fn().mockResolvedValue([]),
+    };
+    installWebflowPage([instance], {
+      getCurrentPage: vi.fn().mockResolvedValue({ id: "page_1" }),
+      openCanvas: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const result = await checkComponentPresetPlacementNeeded({
+      siteId: "site_1",
+      targetKey: componentImageKey,
+      pageIdHint: "page_1",
+    });
+
+    expect(result).toEqual({ ok: true, needsPlacement: false, instance });
+  });
+
+  it("locate reuses a known instance from the check without re-scanning the page", async () => {
+    const instance = {
+      type: "ComponentInstance",
+      id: { component: "page_1", element: "inst_1" },
+      getComponent: vi.fn().mockResolvedValue({ id: "cmp_1", getName: vi.fn().mockResolvedValue("Hero") }),
+      searchProps: vi.fn().mockImplementation(({ valueType }: { valueType: string }) => {
+        if (valueType === "imageAsset") {
+          return Promise.resolve([{ propId: "hero-image", value: null, display: { label: "Hero image" } }]);
+        }
+        return Promise.resolve([]);
+      }),
+      getChildren: vi.fn().mockResolvedValue([]),
+      getSlots: vi.fn().mockResolvedValue([]),
+    };
+    const getAllElements = vi.fn().mockResolvedValue([]);
+    const setSelectedElement = vi.fn().mockResolvedValue(undefined);
+    installWebflow({
+      getCurrentPage: vi.fn().mockResolvedValue({ id: "page_1" }),
+      openCanvas: vi.fn().mockResolvedValue(undefined),
+      getAllElements,
+      setSelectedElement,
+    });
+
+    const result = await locatePresetTarget({
+      siteId: "site_1",
+      pageIdHint: "page_1",
+      targetKey: componentImageKey,
+      knownComponentInstance: instance as unknown as ComponentElement,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.target?.element).toBe(instance);
+      expect(result.temporaryInstance).toBeNull();
+    }
+    expect(getAllElements).not.toHaveBeenCalled();
+    expect(setSelectedElement).toHaveBeenCalledWith(instance);
+  });
+
+  it("reports placement needed with the component name when no instance is on the page", async () => {
+    installWebflowPage([], {
+      getCurrentPage: vi.fn().mockResolvedValue({ id: "page_1" }),
+      openCanvas: vi.fn().mockResolvedValue(undefined),
+      getComponent: vi.fn().mockResolvedValue({ id: "cmp_1", getName: vi.fn().mockResolvedValue("Hero") }),
+    });
+
+    const result = await checkComponentPresetPlacementNeeded({
+      siteId: "site_1",
+      targetKey: componentImageKey,
+      pageIdHint: "page_1",
+    });
+
+    expect(result).toEqual({ ok: true, needsPlacement: true, componentName: "Hero" });
+  });
+
+  it("falls back to a generic name when the definition name cannot be read", async () => {
+    installWebflowPage([], {
+      getCurrentPage: vi.fn().mockResolvedValue({ id: "page_1" }),
+      openCanvas: vi.fn().mockResolvedValue(undefined),
+      getComponent: vi
+        .fn()
+        .mockResolvedValue({ id: "cmp_1", getName: vi.fn().mockRejectedValue(new Error("no name")) }),
+    });
+
+    const result = await checkComponentPresetPlacementNeeded({
+      siteId: "site_1",
+      targetKey: componentImageKey,
+      pageIdHint: "page_1",
+    });
+
+    expect(result).toEqual({ ok: true, needsPlacement: true, componentName: "this component" });
+  });
+
+  it("rejects presets from another site", async () => {
+    const result = await checkComponentPresetPlacementNeeded({
+      siteId: "site_2",
+      targetKey: componentImageKey,
+    });
+
+    expect(result).toEqual({ ok: false, error: "This preset belongs to a different site." });
+  });
+
+  it("returns an error when the page scan fails", async () => {
+    installWebflow({
+      getCurrentPage: vi.fn().mockResolvedValue({ id: "page_1" }),
+      openCanvas: vi.fn().mockResolvedValue(undefined),
+      getAllElements: vi.fn().mockRejectedValue(new Error("scan failed")),
+    });
+
+    const result = await checkComponentPresetPlacementNeeded({
+      siteId: "site_1",
+      targetKey: componentImageKey,
+      pageIdHint: "page_1",
+    });
+
+    expect(result).toEqual({ ok: false, error: "scan failed" });
   });
 });

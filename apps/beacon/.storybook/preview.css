@@ -1,0 +1,14 @@
+/*
+ * Storybook-only overrides of globals.css.
+ *
+ * globals.css locks the viewport (`html, body { height: 100%; overflow: hidden }`) because the
+ * real app lives in a fixed 350×800 Designer panel. Storybook docs pages and tall story canvases
+ * must scroll, so relax the lock here. The panel experience is reproduced instead via the
+ * "Webflow panel" viewport preset (see preview.tsx).
+ */
+html,
+body {
+  height: auto;
+  min-height: 100%;
+  overflow: auto;
+}

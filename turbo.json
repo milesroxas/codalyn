@@ -76,6 +76,15 @@
       "cache": false,
       "persistent": true
     },
+    "storybook": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "storybook:build": {
+      "dependsOn": ["^build"],
+      "outputs": ["storybook-static/**"]
+    },
     "lint": {
       "dependsOn": ["^lint"]
     },

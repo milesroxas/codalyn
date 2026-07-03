@@ -68,3 +68,4 @@ When reading Webflow Designer API values (or any SDK returning rich value object
 ## Reference Docs
 
 - [Agent Teams guide](docs/agent-teams.md) — how to spin up effective Claude Code agent teams (enable flag, teams vs subagents, spawn templates, monorepo patterns).
+- [Storybook guide](docs/storybook.md) — Beacon UI catalog for designers (runs without the Webflow Designer runtime); story conventions and architecture rationale.

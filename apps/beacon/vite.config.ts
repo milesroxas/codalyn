@@ -91,7 +91,14 @@ export default defineConfig(({ mode }) => ({
       provider: "v8",
       reporter: ["text", "html"],
       include: ["src/**/*.{ts,tsx}"],
-      exclude: ["**/*.d.ts", "**/__tests__/**", "**/vite-env.d.ts", "**/*.test.{ts,tsx}", "**/test/**"],
+      exclude: [
+        "**/*.d.ts",
+        "**/__tests__/**",
+        "**/vite-env.d.ts",
+        "**/*.test.{ts,tsx}",
+        "**/test/**",
+        "**/*.stories.tsx",
+      ],
     },
   },
 }));

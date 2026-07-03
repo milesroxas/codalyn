@@ -1,0 +1,52 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Overview" />
+
+# Beacon UI
+
+Browser-viewable catalog of the Beacon Webflow Designer Extension UI. Nothing here talks to
+Webflow or Tower — every component renders standalone so designs can be reviewed and refined
+without running the extension inside Webflow.
+
+## How to use this
+
+- **Theme** — the toolbar theme switcher toggles the `dark` / `light` class on `<html>`, exactly
+  like the in-app theme setting. Default is dark, matching the Designer.
+- **Viewport** — stories default to **Webflow panel (350×800)**, the fixed size the extension
+  requests from the Designer. Judge layout at that width; anything wider is not what ships.
+- **Docs pages** — every component has an auto-generated Docs page listing its props and
+  variants. The Controls panel on each story lets you flip variants live.
+- **Accessibility** — the a11y panel runs axe checks per story.
+
+## Where things live
+
+- Components: `apps/beacon/src/shared/ui/*` — stories are colocated as `*.stories.tsx` next to
+  each component.
+- Design tokens: `apps/beacon/src/styles/globals.css` (Tailwind v4, CSS-first — light tokens on
+  `:root`, dark on `.dark`, all oklch).
+- Storybook config: `apps/beacon/.storybook/`.
+
+## Running locally
+
+```bash
+pnpm app beacon storybook                 # dev server on :6006 (repo app launcher)
+pnpm storybook                            # from repo root via turbo
+pnpm --filter @codalyn/beacon storybook:build
+```
+
+## Adding a story
+
+Create `<component>.stories.tsx` next to the component. Follow the pattern in
+`src/shared/ui/button.stories.tsx`: CSF3, typed with `Meta`/`StoryObj` from
+`@storybook/react-vite`, title `UI/<ComponentName>`, variants driven exclusively through the
+component's own props — never restyle a shared component at the call site (repo rule; wrappers
+may only carry layout classes like flex/grid/gap).
+
+## What is deliberately absent
+
+- The `webflow` Designer global. A logging no-op stub is installed (`.storybook/webflow-stub.ts`)
+  so accidental calls fail soft. Feature-level stories that need Designer data must mock it in a
+  story decorator.
+- App providers that fetch on mount (`BeaconAppSettingsProvider`, auth/site-link gates). Stories
+  render components directly with only `TooltipProvider` + theme, mirroring `src/index.tsx`
+  bootstrap side effects (global CSS, background CSS vars).

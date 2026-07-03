@@ -64,3 +64,7 @@ yarn.lock
 # Webflow bundle artifacts
 public/**/*.zip
 .vercel
+
+# Storybook
+storybook-static/
+*storybook.log

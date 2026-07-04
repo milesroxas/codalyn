@@ -4,7 +4,8 @@
     "typeRoots": ["./node_modules/@types", "../../node_modules/@types", "../../node_modules/@webflow"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "~sb/*": [".storybook/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", ".storybook/**/*.ts", ".storybook/**/*.tsx"],

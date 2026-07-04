@@ -29,16 +29,21 @@ Design decisions a reviewer should know:
   are wrong for a standalone browser catalog. The Storybook config reproduces only the
   browser-relevant pieces (Tailwind v4 plugin, React plugin, `@` alias, `define` globals) and must
   be kept in sync with the app config when those change.
-- **`__BEACON_TOWER_ORIGIN__` is defined as `""`** — same convention as the Vitest run: no Tower
-  backend. Components must not fetch in Storybook.
+- **`__BEACON_TOWER_ORIGIN__` is defined as `"https://tower.mock"`** — a fake origin no server
+  answers. MSW (`msw-storybook-addon`) intercepts every request to it; `.storybook/tower-mock.ts`
+  provides per-persona handlers and a catch-all 404 for unmocked paths. This keeps
+  `isTowerConfigured()` true so signed-in UI states are reachable, while the real
+  `BeaconAppSettingsProvider` / Better Auth hooks run unmodified. The MSW service worker lives in
+  `.storybook/public/` (extra `staticDirs` entry) so it never ships in the extension bundle.
 - **No `webflow` runtime.** `shared/ui` never touches it (verified). A logging no-op stub
-  (`.storybook/webflow-stub.ts`) is installed so accidental calls in future feature-level stories
-  fail soft instead of throwing `ReferenceError`. Stories needing real Designer data must mock the
-  global in a story decorator.
-- **App bootstrap is mirrored, app providers are not.** Preview replicates `src/index.tsx` side
+  (`.storybook/webflow-stub.ts`) is installed so accidental calls fail soft instead of throwing
+  `ReferenceError`. Feature-level stories layer canned per-story returns over it (see below);
+  anything not overridden logs and resolves `null`.
+- **App bootstrap is mirrored, app providers are opt-in.** Preview replicates `src/index.tsx` side
   effects (`globals.css`, `injectBeaconAppBackgroundCssVars()`) and the app-level
-  `TooltipProvider`. It deliberately does NOT mount `BeaconAppSettingsProvider` or the auth/site
-  gates — those fetch Tower and require a Designer session on mount.
+  `TooltipProvider`. `BeaconAppSettingsProvider`, the router, and the app-shell contexts are
+  mounted only for stories that opt in via `beaconScreen()` — plain UI stories keep rendering
+  provider-free with zero fetches.
 - **Theme** via `@storybook/addon-themes` toggling `dark`/`light` on `<html>` (same mechanism as
   the app's ThemeProvider; covers Radix portals). Dark is default.
 - **Viewport** defaults to `Webflow panel (350×800)` — the size the app pins via
@@ -52,6 +57,42 @@ Follow `src/shared/ui/button.stories.tsx` (canonical pattern): CSF3, `Meta`/`Sto
 `@storybook/react-vite`, `fn()` from `storybook/test` for handlers, title `UI/<ComponentName>`.
 Autodocs is enabled globally — do not repeat the tag. Respect the UI Styling Ownership rule:
 variants via component props only; wrappers carry layout-only classes.
+
+## Feature-level stories (app screens)
+
+Screens that read Tower state or the Designer runtime opt into the app-shell harness with one
+parameters call (see `src/app/ui/Header.stories.tsx` / `beacon-home-screen.stories.tsx`):
+
+```tsx
+import { beaconScreen } from "~sb/beacon-app";
+import { fakePage } from "~sb/webflow-fixtures";
+
+export const TeamAdmin: Story = { parameters: beaconScreen("teamAdmin") };
+export const OnCmsTemplate: Story = {
+  parameters: beaconScreen("teamAdmin", { page: fakePage("cms"), route: "/home" }),
+};
+```
+
+`beaconScreen(persona, opts)` bundles everything one coherent app state needs:
+
+- **Personas** (`.storybook/tower-mock.ts`): `guest`, `freeUser`, `teamEditor`, `teamAdmin`.
+  Each is a matched set of MSW handlers (Better Auth session, `/api/v1/beacon/settings`
+  envelope), a bearer token seeded into localStorage, and Webflow sites that authorize the fake
+  Designer site.
+- **Designer scene** (`.storybook/webflow-fixtures.ts`): canned `getCurrentPage`/`getSiteInfo`
+  returns layered over the stub. Override per story via `{ page: fakePage("cms") }` or
+  `{ webflow: { getAllElements: async () => [...] } }`. Fixtures implement only the methods
+  storied screens call — extend them when a story visibly needs a method, not before.
+- **App providers** (`.storybook/beacon-app.tsx`): the `withBeaconApp` decorator mirrors
+  `src/app/app.tsx` nesting (router → settings → CMS-template-page → nav history → leave guard)
+  for opted-in stories only.
+
+Conventions: title `App/<ScreenName>`, `layout: "fullscreen"` for screens. Prefer storying the
+presentational layer (`*-view`, panels, empty states — plain props, no harness) and keep
+screen-level stories to a persona/state matrix like Home's.
+
+Caveat: Better Auth caches its session in a module-level store; if a persona looks stale after
+switching stories, reload the preview iframe.
 
 Story files are excluded from Vitest coverage (`vite.config.ts`) and `storybook-static/` is
 git-ignored.

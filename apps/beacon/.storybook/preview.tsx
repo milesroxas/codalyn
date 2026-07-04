@@ -1,9 +1,11 @@
 import { withThemeByClassName } from "@storybook/addon-themes";
 import type { Preview, ReactRenderer } from "@storybook/react-vite";
+import { initialize as initializeMsw, mswLoader } from "msw-storybook-addon";
 import { injectBeaconAppBackgroundCssVars } from "@/shared/lib/beacon-app-backgrounds";
 import { TooltipProvider } from "@/shared/ui/tooltip";
 import "@/styles/globals.css";
 import "./preview.css";
+import { beaconAppLoader, withBeaconApp } from "./beacon-app";
 import { installWebflowStub } from "./webflow-stub";
 
 // The real app performs both of these in `src/index.tsx` before mounting. Reproduce them so
@@ -11,7 +13,14 @@ import { installWebflowStub } from "./webflow-stub";
 installWebflowStub();
 injectBeaconAppBackgroundCssVars();
 
+// Tower is mocked at the network layer (see `tower-mock.ts`); requests to other origins
+// (fonts, story assets) pass through untouched.
+initializeMsw({ onUnhandledRequest: "bypass" });
+
 const preview: Preview = {
+  // Order matters: `beaconAppLoader` seeds storage/Designer overrides before `mswLoader`
+  // starts intercepting, so the first provider fetch already hits the persona handlers.
+  loaders: [beaconAppLoader, mswLoader],
   decorators: [
     // The design system keys every dark token off `.dark` on <html> (see globals.css), which
     // also covers Radix portals that render outside the story root.
@@ -26,6 +35,8 @@ const preview: Preview = {
         <Story />
       </TooltipProvider>
     ),
+    // Outermost: wraps stories opted in via `beaconScreen()` in the real app providers.
+    withBeaconApp,
   ],
   parameters: {
     layout: "padded",
@@ -54,7 +65,7 @@ const preview: Preview = {
     },
     options: {
       storySort: {
-        order: ["Overview", "UI"],
+        order: ["Overview", "App", "UI"],
       },
     },
   },

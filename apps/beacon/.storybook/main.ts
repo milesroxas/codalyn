@@ -16,7 +16,9 @@ const config: StorybookConfig = {
     },
   },
   // Serves `public/images/*` so the injected `--beacon-*` background URL vars resolve.
-  staticDirs: ["../public"],
+  // `.storybook/public` holds the MSW service worker only — kept out of the app's `public/`
+  // so the worker never ships inside the extension bundle.
+  staticDirs: ["../public", "./public"],
 };
 
 export default config;

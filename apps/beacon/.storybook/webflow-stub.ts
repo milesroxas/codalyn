@@ -10,7 +10,17 @@
 
 type AnyFn = (...args: unknown[]) => unknown;
 
+/** Canned per-story Designer API returns, e.g. `{ getCurrentPage: async () => fakePage("cms") }`. */
+export type WebflowStoryOverrides = Partial<Record<string, AnyFn>>;
+
 const LOG_PREFIX = "[storybook webflow stub]";
+
+/** Swapped per story by the preview loader (see `beacon-app.tsx`); checked before the base stub. */
+let storyOverrides: WebflowStoryOverrides = {};
+
+export function setWebflowStoryOverrides(overrides: WebflowStoryOverrides | undefined): void {
+  storyOverrides = overrides ?? {};
+}
 
 function createWebflowStub(): typeof webflow {
   const explicit: Record<string, AnyFn> = {
@@ -27,8 +37,14 @@ function createWebflowStub(): typeof webflow {
 
   return new Proxy(explicit, {
     get(target, prop) {
-      if (typeof prop === "string" && prop in target) {
-        return target[prop];
+      if (typeof prop === "string") {
+        const override = storyOverrides[prop];
+        if (override !== undefined) {
+          return override;
+        }
+        if (prop in target) {
+          return target[prop];
+        }
       }
       // Unknown Designer API: log the call and resolve to null so callers fail soft.
       return (...args: unknown[]) => {

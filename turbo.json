@@ -85,6 +85,11 @@
       "dependsOn": ["^build"],
       "outputs": ["storybook-static/**"]
     },
+    "chromatic": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "env": ["CHROMATIC_PROJECT_TOKEN"]
+    },
     "lint": {
       "dependsOn": ["^lint"]
     },

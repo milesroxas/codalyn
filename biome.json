@@ -20,7 +20,8 @@
       "!**/*.config.js",
       "!**/*.config.mjs",
       "!**/scripts/post-build.js",
-      "!**/public/**/*.svg"
+      "!**/public/**/*.svg",
+      "!**/.storybook/public/mockServiceWorker.js"
     ]
   },
   "formatter": {
@@ -32,7 +33,13 @@
     "lineWidth": 120,
     "attributePosition": "auto"
   },
-  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
   "linter": {
     "enabled": true,
     "rules": {

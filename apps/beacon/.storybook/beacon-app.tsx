@@ -12,7 +12,7 @@
  * flipping stories, reload the preview iframe.
  */
 import { type BeaconAppSettings, getDefaultBeaconAppSettings } from "@codalyn/webflow-kit";
-import type { Decorator, LoaderFunction, Parameters as SBParameters } from "@storybook/react-vite";
+import type { Decorator, Parameters as SBParameters } from "@storybook/react-vite";
 import type { RequestHandler } from "msw";
 import { MemoryRouter } from "react-router-dom";
 import { BeaconNavigationHistoryProvider } from "@/app/beacon-navigation-history";
@@ -68,12 +68,18 @@ export function beaconScreen(persona: TowerPersonaName = "guest", opts: BeaconSc
   };
 }
 
+/** Structural view of the loader context — Storybook doesn't export a standalone loader type. */
+type StoryContextLike = {
+  parameters: Record<string, unknown>;
+  globals?: Record<string, unknown>;
+};
+
 /**
  * Runs before every story (registered globally in `preview.tsx`): installs the story's Designer
  * overrides and resets/seeds the storage the app providers read on mount. Loaders run before
  * render, so `BeaconAppSettingsProvider`'s `useState(() => readLocal())` sees the seeded value.
  */
-export const beaconAppLoader: LoaderFunction = (context) => {
+export const beaconAppLoader = async (context: StoryContextLike) => {
   setWebflowStoryOverrides(context.parameters.webflow as WebflowStoryOverrides | undefined);
 
   // Always reset so a shell story can't leak auth/settings state into a plain UI story.

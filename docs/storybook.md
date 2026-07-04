@@ -88,8 +88,9 @@ export const OnCmsTemplate: Story = {
   for opted-in stories only.
 
 Conventions: title `App/<ScreenName>`, `layout: "fullscreen"` for screens. Prefer storying the
-presentational layer (`*-view`, panels, empty states — plain props, no harness) and keep
-screen-level stories to a persona/state matrix like Home's.
+presentational layer — title `CmsSlots/<Component>` / `ImageEditor/<Component>`, plain props, no
+harness import (these components are context-free by design) — and keep screen-level stories to
+a persona/state matrix like Home's. Sidebar order: Overview → App → CmsSlots → ImageEditor → UI.
 
 Caveat: Better Auth caches its session in a module-level store; if a persona looks stale after
 switching stories, reload the preview iframe.

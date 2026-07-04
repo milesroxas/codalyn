@@ -65,7 +65,7 @@ const preview: Preview = {
     },
     options: {
       storySort: {
-        order: ["Overview", "App", "UI"],
+        order: ["Overview", "App", "CmsSlots", "ImageEditor", "UI"],
       },
     },
   },

@@ -12,3 +12,17 @@ body {
   min-height: 100%;
   overflow: auto;
 }
+
+/*
+ * globals.css paints the app shell art (`--app-bg-image`) on <body>. The top 48px of the
+ * 525×1200 asset (≈32px at the 350px panel width) is a baked-in header band that the real
+ * app hides behind the opaque app header (src/app/ui/Header.tsx). Storybook renders no app
+ * header, so without this offset every story canvas draws its component on top of that band.
+ * The band's rendered height tracks the background's `cover` scale, which is width-limited
+ * at every shipped viewport preset (they are all at least as wide as the 525:1200 aspect) —
+ * hence the vw-based offset. Docs pages hide `#storybook-root`, so this only affects the
+ * story canvas.
+ */
+#storybook-root {
+  padding-top: calc(100vw * 48 / 525);
+}

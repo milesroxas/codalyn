@@ -49,7 +49,9 @@ Design decisions a reviewer should know:
 - **Viewport** defaults to `Webflow panel (350×800)` — the size the app pins via
   `webflow.setExtensionSize`. Review layouts at that width.
 - **`.storybook/preview.css`** relaxes the app's `html, body { overflow: hidden }` viewport lock so
-  docs pages scroll.
+  docs pages scroll, and pads `#storybook-root` past the header band baked into the top of the
+  app background art (the real app hides that band behind the opaque app header; Storybook
+  renders no header, so without the offset stories draw on top of it).
 
 ## Adding stories
 

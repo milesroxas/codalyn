@@ -1,0 +1,60 @@
+# Chromatic visual regression (Beacon Storybook). Publishes on every push so Chromatic keeps an
+# unbroken baseline history; kept out of ci.yml so snapshotting never blocks the verify graph.
+# Requires repo secret CHROMATIC_PROJECT_TOKEN (Beacon-only project — Tower gets its own project
+# and workflow later). Options like TurboSnap live in apps/beacon/chromatic.config.json so local
+# `pnpm chromatic` runs behave the same. See: https://www.chromatic.com/docs/ci/
+name: Chromatic
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: chromatic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromatic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full history — Chromatic walks ancestry for baseline detection and TurboSnap diffs.
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The Chromatic action runs `storybook:build` directly in apps/beacon (not through turbo),
+      # so the workspace packages Storybook imports need fresh dist/ first.
+      - name: Build workspace dependencies
+        run: pnpm exec turbo run build --filter=@codalyn/beacon^...
+
+      - name: Publish to Chromatic
+        uses: chromaui/action@latest
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: apps/beacon
+          # Project is GitHub-linked: Chromatic posts UI Tests / UI Review checks itself,
+          # so don't hold the runner waiting for snapshot results.
+          exitOnceUploaded: true

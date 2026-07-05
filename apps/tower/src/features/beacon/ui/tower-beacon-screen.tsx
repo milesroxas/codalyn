@@ -10,7 +10,6 @@ import {
   removeBeaconPresetRowById,
 } from "@codalyn/webflow-kit";
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useRequireTowerSession } from "@/features/auth/model/use-require-tower-session";
@@ -22,7 +21,6 @@ import {
   type TowerBeaconWebflowSite,
 } from "@/features/beacon/ui/tower-beacon-presets-panel";
 import { isTowerTeamAdminRole } from "@/shared/lib/membership/tower-organization-access";
-import { TOWER_CONNECTION_PATH } from "@/shared/lib/navigation/tower-app-paths";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { TowerPageHeader, TowerPageMain } from "@/shared/ui/tower-page-shell";
 
@@ -65,7 +63,6 @@ function TowerBeaconScreenLoaded(props: {
   session: NonNullable<ReturnType<typeof useRequireTowerSession>["session"]>;
 }) {
   const { oauthConfigured, session } = props;
-  const router = useRouter();
   const baseId = useId();
 
   const [payload, setPayload] = useState<BeaconApiPayload | null>(null);
@@ -238,8 +235,7 @@ function TowerBeaconScreenLoaded(props: {
           oauthConfigured={oauthConfigured}
           canConnectWebflow={canConnectWebflow}
           onConnectSuccess={() => {
-            // Land the user on the connection page after OAuth so they see the linked sites.
-            router.push(TOWER_CONNECTION_PATH);
+            void refresh();
           }}
         />
       ) : null}

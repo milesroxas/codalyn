@@ -210,6 +210,9 @@ export const TOWER_WEBFLOW_CONNECTED_TOAST = {
   description: "This workspace is linked to Webflow.",
 } as const;
 
+export const TOWER_WEBFLOW_POPUP_BLOCKED_MESSAGE =
+  "Your browser blocked the Webflow window. Use the Connect Webflow button to continue." as const;
+
 export const TOWER_WEBFLOW_CONNECTION_NOT_SAVED_TOAST = {
   title: "Connection not saved",
   description: "Authorization finished, but this workspace has no Webflow token. Connect again or switch workspace.",

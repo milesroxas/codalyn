@@ -9,13 +9,7 @@ import {
   towerWebflowQueryStatusCopy,
 } from "@/features/tower-ui/lib/tower-workspace-onboarding";
 
-export function notifyWebflowOAuthPopupResult(status: "success" | "error", error?: string): void {
-  if (status === "success") {
-    toast.success(TOWER_WEBFLOW_CONNECTED_TOAST.title, {
-      description: TOWER_WEBFLOW_CONNECTED_TOAST.description,
-    });
-    return;
-  }
+export function notifyWebflowOAuthPopupError(error?: string): void {
   toast.error(messageForWebflowOAuthCallbackError(error));
 }
 

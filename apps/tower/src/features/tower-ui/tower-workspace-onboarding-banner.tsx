@@ -3,7 +3,7 @@
 import { IconAlertCircle, IconCircleCheck } from "@tabler/icons-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { createWorkspaceOrganization } from "@/features/team/api/create-workspace-organization";
 import { useActiveTowerOrganizations } from "@/features/team/model/use-active-tower-organizations";
@@ -23,6 +23,7 @@ import {
   towerWorkspaceOnboardingCopy,
 } from "@/features/tower-ui/lib/tower-workspace-onboarding";
 import { TowerWebflowOAuthPopupButton } from "@/features/tower-ui/tower-webflow-oauth-popup-button";
+import { useTowerWebflowOAuthPopup } from "@/features/tower-ui/use-tower-webflow-oauth-popup";
 import type { TowerOnboardingBannerSummary } from "@/server/tower-onboarding-banner-summary";
 import { TOWER_CONNECTION_PATH, TOWER_CONNECTION_STATUS_QUERY } from "@/shared/lib/navigation/tower-app-paths";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
@@ -60,7 +61,6 @@ function OnboardingAlertActions({
   billingEnabled,
   oauthConfigured,
   onOpenCreate,
-  onWebflowConnectSuccess,
 }: {
   blocker: TowerWorkspaceOnboardingBlocker;
   canCreateWorkspace: boolean;
@@ -68,7 +68,6 @@ function OnboardingAlertActions({
   billingEnabled: boolean;
   oauthConfigured: boolean;
   onOpenCreate: () => void;
-  onWebflowConnectSuccess: () => void;
 }) {
   if (blocker === "needs_workspace" && canCreateWorkspace) {
     return (
@@ -96,7 +95,8 @@ function OnboardingAlertActions({
     }
 
     return (
-      <TowerWebflowOAuthPopupButton variant="default" size="sm" onSuccess={onWebflowConnectSuccess}>
+      // Post-connect navigation + tree refresh are owned by useTowerWebflowOAuthPopup.
+      <TowerWebflowOAuthPopupButton variant="default" size="sm">
         Connect Webflow
       </TowerWebflowOAuthPopupButton>
     );
@@ -118,16 +118,15 @@ function TowerWorkspaceCreateWorkspacePanel({
   billingEnabled,
   oauthConfigured,
   blocker,
-  onWebflowConnectSuccess,
 }: {
   canCreateWorkspace: boolean;
   billingEnabled: boolean;
   oauthConfigured: boolean;
   blocker: TowerWorkspaceOnboardingBlocker;
-  onWebflowConnectSuccess: () => void;
 }) {
   const router = useRouter();
   const { refetchOrgs, refetchActiveOrg } = useActiveTowerOrganizations();
+  const { openPopup } = useTowerWebflowOAuthPopup();
   const [createOpen, setCreateOpen] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -174,13 +173,19 @@ function TowerWorkspaceCreateWorkspacePanel({
     } catch {
       // ignore storage failures
     }
-    await Promise.all([refetchOrgs(), refetchActiveOrg()]);
-    router.refresh();
-    if (!result.activated) {
+    if (result.activated && oauthConfigured) {
+      toast.success("Workspace created");
+      // Chain straight into Webflow connect. Started before the org refetches: window.open
+      // must stay close to the submit gesture or popup blockers eat it. If it is blocked
+      // anyway, the onboarding banner's Connect Webflow button remains as the fallback.
+      void openPopup();
+    } else if (!result.activated) {
       toast.warning("Workspace created. Switch to it from the workspace menu to see your own usage limits.");
     } else {
       toast.success("Workspace created");
     }
+    await Promise.all([refetchOrgs(), refetchActiveOrg()]);
+    router.refresh();
     return true;
   }
 
@@ -196,7 +201,6 @@ function TowerWorkspaceCreateWorkspacePanel({
             billingEnabled={billingEnabled}
             oauthConfigured={oauthConfigured}
             onOpenCreate={() => setCreateOpen(true)}
-            onWebflowConnectSuccess={onWebflowConnectSuccess}
           />
         }
       />
@@ -223,7 +227,6 @@ function TowerWorkspaceOnboardingBannerInner({
   oauthConfigured = false,
   includeWebflowConnect = false,
 }: TowerWorkspaceOnboardingBannerProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { orgs, activeOrg, orgsPending } = useActiveTowerOrganizations();
   const membershipCount = effectiveWorkspaceMembershipCount(
@@ -236,11 +239,6 @@ function TowerWorkspaceOnboardingBannerInner({
     serverCanCreate: summary.canCreateOrganization,
     refetchKey: `${membershipCount}:${orgs?.length ?? 0}:${activeOrg?.id ?? ""}`,
   });
-  const onWebflowConnectSuccess = useCallback(() => {
-    // Land the user on the connection page after OAuth so they see the linked sites.
-    router.push(TOWER_CONNECTION_PATH);
-    router.refresh();
-  }, [router]);
   const blocker = resolveTowerWorkspaceOnboardingBlocker(gateSummary, { includeWebflowConnect });
   const queryStatus = parseTowerWebflowQueryStatus(
     searchParams.get(TOWER_CONNECTION_STATUS_QUERY) ?? searchParams.get("webflow")
@@ -257,7 +255,6 @@ function TowerWorkspaceOnboardingBannerInner({
         billingEnabled={billingEnabled}
         oauthConfigured={oauthConfigured}
         blocker={blocker}
-        onWebflowConnectSuccess={onWebflowConnectSuccess}
       />
     );
   }
@@ -274,7 +271,6 @@ function TowerWorkspaceOnboardingBannerInner({
           billingEnabled={billingEnabled}
           oauthConfigured={oauthConfigured}
           onOpenCreate={() => undefined}
-          onWebflowConnectSuccess={onWebflowConnectSuccess}
         />
       }
     />
@@ -301,24 +297,31 @@ function TowerWebflowQueryBannerInner({ webflowOAuthConnected }: TowerWebflowQue
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifiedRef = useRef<string | null>(null);
-  const [status] = useState(() =>
+  // State (not derived) so the rendered alert survives the query strip below.
+  const [status, setStatus] = useState(() =>
     parseTowerWebflowQueryStatus(searchParams.get(TOWER_CONNECTION_STATUS_QUERY) ?? searchParams.get("webflow"))
   );
 
   useEffect(() => {
-    if (!status || (!searchParams.has(TOWER_CONNECTION_STATUS_QUERY) && !searchParams.has("webflow"))) {
+    const queryStatus = parseTowerWebflowQueryStatus(
+      searchParams.get(TOWER_CONNECTION_STATUS_QUERY) ?? searchParams.get("webflow")
+    );
+    if (!queryStatus) {
+      // Query stripped: allow the same status (e.g. a relink) to notify again next time.
+      notifiedRef.current = null;
       return;
     }
-    const notifyKey = connectionStatusQueryKey(status, webflowOAuthConnected);
+    setStatus(queryStatus);
+    const notifyKey = connectionStatusQueryKey(queryStatus, webflowOAuthConnected);
     if (notifiedRef.current !== notifyKey) {
       notifiedRef.current = notifyKey;
-      notifyWebflowConnectionQueryStatus(status, webflowOAuthConnected);
+      notifyWebflowConnectionQueryStatus(queryStatus, webflowOAuthConnected);
     }
     const url = new URL(window.location.href);
     url.searchParams.delete(TOWER_CONNECTION_STATUS_QUERY);
     url.searchParams.delete("webflow");
     router.replace(`${url.pathname}${url.search}`, { scroll: false });
-  }, [status, router, searchParams, webflowOAuthConnected]);
+  }, [router, searchParams, webflowOAuthConnected]);
 
   if (!status) {
     return null;

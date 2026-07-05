@@ -13,6 +13,7 @@ import { useBeaconGuestWelcomeVisible } from "@/features/auth/lib/use-beacon-gue
 import { isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerAccessPolicy } from "@/features/auth/model/use-beacon-tower-access-policy";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import { BeaconOnboarding } from "@/features/auth/ui/beacon-onboarding";
 import type { ImageExportSuccessContext, PlacementMode } from "@/features/image-editor/lib/apply-cropped-export";
 import {
   outputDimensionsMatchingCrop,
@@ -88,7 +89,6 @@ import type {
   UploadPresetPickerOption,
 } from "@/features/image-editor/ui/image-editor-crop-export-panel";
 import { ImageEditorLoadedEditor } from "@/features/image-editor/ui/image-editor-loaded-editor";
-import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
 import { ImageEditorPreimageColumn } from "@/features/image-editor/ui/image-editor-preimage-column";
 import {
   ImageEditorRouteChrome,
@@ -1690,7 +1690,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
         <ImageEditorWorkspace
           emptyStateContent={
             showGuestOnboarding ? (
-              <ImageEditorOnboarding
+              <BeaconOnboarding
                 towerConfigured={towerConfigured}
                 earlyAccessRequired={earlyAccessRequired}
                 onContinueAsGuest={() => {

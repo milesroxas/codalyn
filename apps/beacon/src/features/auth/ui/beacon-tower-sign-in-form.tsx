@@ -1,6 +1,7 @@
 import { Loader2 } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
 import { openTowerAppPath } from "@/features/auth/model/tower-auth-client";
+import { useBeaconTowerAccessPolicy } from "@/features/auth/model/use-beacon-tower-access-policy";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -13,6 +14,9 @@ import { Label } from "@/shared/ui/label";
  */
 export function BeaconTowerSignInForm() {
   const { signInWithEmail } = useBeaconTowerSession();
+  const { earlyAccessRequired } = useBeaconTowerAccessPolicy();
+  // Early access gate on (or unknown): account creation is invite-only, so hide "Create account".
+  const publicSignUpOpen = earlyAccessRequired === false;
   const emailId = useId();
   const passwordId = useId();
   const [email, setEmail] = useState("");
@@ -71,18 +75,22 @@ export function BeaconTowerSignInForm() {
         {pending ? "Signing in…" : "Sign in"}
       </Button>
       <div className="flex items-center justify-center gap-2 text-xs">
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="h-auto px-0 text-xs"
-          onClick={() => openTowerAppPath("/sign-up")}
-        >
-          Create account
-        </Button>
-        <span aria-hidden className="text-muted-foreground">
-          ·
-        </span>
+        {publicSignUpOpen ? (
+          <>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto px-0 text-xs"
+              onClick={() => openTowerAppPath("/sign-up")}
+            >
+              Create account
+            </Button>
+            <span aria-hidden className="text-muted-foreground">
+              ·
+            </span>
+          </>
+        ) : null}
         <Button
           type="button"
           variant="link"

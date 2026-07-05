@@ -1,9 +1,9 @@
-import { Check, Sparkles } from "lucide-react";
+import { Check } from "lucide-react";
 import { openTowerAppPath } from "@/features/auth/model/tower-auth-client";
 import { BeaconTowerSignInForm } from "@/features/auth/ui/beacon-tower-sign-in-form";
 import { Button } from "@/shared/ui/button";
 
-type ImageEditorOnboardingProps = {
+type BeaconOnboardingProps = {
   towerConfigured: boolean;
   /** True early access gate on (Request early access), false gate off (public Sign up), null unknown (defaults to early access). */
   earlyAccessRequired: boolean | null;
@@ -12,7 +12,11 @@ type ImageEditorOnboardingProps = {
 
 const TOWER_BENEFITS = ["AVIF compression", "CMS-connected assets", "Synced sessions"] as const;
 
-export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
+/**
+ * App-level welcome/auth screen: Tower sign-in (recommended) vs continue as guest.
+ * Rendered by the home screen and the image editor before a session or guest choice exists.
+ */
+export function BeaconOnboarding(props: BeaconOnboardingProps) {
   const { towerConfigured, earlyAccessRequired, onContinueAsGuest } = props;
   const publicSignUpOpen = earlyAccessRequired === false;
 
@@ -31,10 +35,6 @@ export function ImageEditorOnboarding(props: ImageEditorOnboardingProps) {
       </header>
 
       <article className="rounded-sm border border-primary/30 bg-card p-4 ring-1 ring-primary/15">
-        <div className="flex items-center gap-1.5">
-          <Sparkles aria-hidden className="size-3.5 text-primary" />
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">Recommended</span>
-        </div>
         <h3 className="mt-1.5 text-base font-semibold text-foreground">Sign in to Tower</h3>
         <p className="mt-1 text-xs leading-snug text-muted-foreground">
           {towerConfigured

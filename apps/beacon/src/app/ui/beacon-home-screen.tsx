@@ -15,6 +15,7 @@ import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import { useBeaconGuestWelcomeVisible } from "@/features/auth/lib/use-beacon-guest-welcome-visible";
 import { isTowerConfigured } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerAccessPolicy } from "@/features/auth/model/use-beacon-tower-access-policy";
+import { BeaconOnboarding } from "@/features/auth/ui/beacon-onboarding";
 import {
   peekCmsSlotsPageInstallCache,
   prefetchCmsSlotsPageInstall,
@@ -22,7 +23,6 @@ import {
 import { promptOpenCmsCollectionTemplateInDesigner } from "@/features/cms-slots/model/prompt-open-cms-collection-template";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { CmsSlotsPageInstallPrefetch } from "@/features/cms-slots/ui/cms-slots-page-install-prefetch";
-import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
 import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
 import {
   BEACON_HOME_COMING_SOON_SECTION_LABEL,
@@ -157,7 +157,7 @@ export function BeaconHomeScreen() {
     return (
       <ScrollArea className="min-h-0 min-w-0 flex-1">
         <div className="flex min-h-full min-w-0 flex-col items-center justify-center px-3 py-6">
-          <ImageEditorOnboarding
+          <BeaconOnboarding
             towerConfigured={towerConfigured}
             earlyAccessRequired={earlyAccessRequired}
             onContinueAsGuest={chooseGuest}

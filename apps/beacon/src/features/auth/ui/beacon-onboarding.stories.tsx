@@ -1,16 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
-import { ImageEditorOnboarding } from "@/features/image-editor/ui/image-editor-onboarding";
+import { BeaconOnboarding } from "@/features/auth/ui/beacon-onboarding";
 
 const meta = {
-  title: "ImageEditor/ImageEditorOnboarding",
-  component: ImageEditorOnboarding,
+  title: "Auth/BeaconOnboarding",
+  component: BeaconOnboarding,
   args: {
     towerConfigured: true,
     earlyAccessRequired: true,
     onContinueAsGuest: fn(),
   },
-} satisfies Meta<typeof ImageEditorOnboarding>;
+} satisfies Meta<typeof BeaconOnboarding>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

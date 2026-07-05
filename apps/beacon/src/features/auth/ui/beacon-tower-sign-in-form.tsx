@@ -53,7 +53,18 @@ export function BeaconTowerSignInForm() {
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor={passwordId}>Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor={passwordId}>Password</Label>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto px-0 text-xs"
+            onClick={() => openTowerAppPath("/forgot-password")}
+          >
+            Forgot password?
+          </Button>
+        </div>
         <Input
           id={passwordId}
           name="password"
@@ -74,33 +85,19 @@ export function BeaconTowerSignInForm() {
         {pending ? <Loader2 aria-hidden data-icon="inline-start" className="animate-spin" /> : null}
         {pending ? "Signing in…" : "Sign in"}
       </Button>
-      <div className="flex items-center justify-center gap-2 text-xs">
-        {publicSignUpOpen ? (
-          <>
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="h-auto px-0 text-xs"
-              onClick={() => openTowerAppPath("/sign-up")}
-            >
-              Create account
-            </Button>
-            <span aria-hidden className="text-muted-foreground">
-              ·
-            </span>
-          </>
-        ) : null}
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="h-auto px-0 text-xs"
-          onClick={() => openTowerAppPath("/forgot-password")}
-        >
-          Forgot password?
-        </Button>
-      </div>
+      {publicSignUpOpen ? (
+        <div className="flex items-center justify-center text-xs">
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto px-0 text-xs"
+            onClick={() => openTowerAppPath("/sign-up")}
+          >
+            Create account
+          </Button>
+        </div>
+      ) : null}
     </form>
   );
 }

@@ -16,8 +16,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Early-access gate on: inline Tower email sign-in plus a "Request early access" escape hatch.
- * The embedded sign-in form is live — submitting hits the mocked Tower origin and fails soft.
+ * Early-access gate on: inline Tower email sign-in plus a "Request early access" escape hatch
+ * that swaps the card to the inline request form (no new window). The embedded sign-in form is
+ * live — submitting hits the mocked Tower origin and fails soft.
  */
 export const EarlyAccessGate: Story = {};
 

@@ -11,7 +11,7 @@ type AuthSurfaceLegalNoticeProps = {
 
 export function AuthSurfaceLegalNotice({ variant = "generic" }: AuthSurfaceLegalNoticeProps) {
   return (
-    <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
+    <p className="mt-6 text-left text-xs leading-relaxed text-muted-foreground">
       {AUTH_SURFACE_LEGAL_NOTICE_PREFIX[variant]}
       <Link href={TOWER_TERMS_PATH} className="underline underline-offset-2 hover:text-foreground">
         Terms

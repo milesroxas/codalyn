@@ -29,7 +29,7 @@ export function useBeaconTowerAccessPolicy(): BeaconTowerAccessPolicyState {
     }
 
     const ac = new AbortController();
-    void towerFetch("/api/account/access-policy", { signal: ac.signal })
+    void towerFetch("/api/v1/beacon/access-policy", { signal: ac.signal })
       .then(async (response) => {
         if (!response.ok) {
           throw new Error(`access-policy ${response.status}`);

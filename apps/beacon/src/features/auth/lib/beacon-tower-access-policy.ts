@@ -1,4 +1,4 @@
-/** Normalized form of Tower's public access policy (`GET /api/account/access-policy`). */
+/** Normalized form of Tower's public access policy (`GET /api/v1/beacon/access-policy`). */
 export type BeaconTowerAccessPolicy = {
   /** True when sign-up/sign-in require early access; show "Request early access". False opens public "Sign up". */
   earlyAccessRequired: boolean;

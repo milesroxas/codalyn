@@ -145,7 +145,10 @@ export function towerHandlers(name: TowerPersonaName): RequestHandler[] {
         : HttpResponse.json({ error: "unauthorized" }, { status: 401 })
     ),
     http.post(towerUrl("/api/v1/beacon/active-workspace"), () => HttpResponse.json({ ok: true })),
-    http.get(towerUrl("/api/account/access-policy"), () => HttpResponse.json({ earlyAccessRequired: false })),
+    http.get(towerUrl("/api/v1/beacon/access-policy"), () => HttpResponse.json({ earlyAccessRequired: false })),
+    http.post(towerUrl("/api/v1/beacon/early-access-request"), () =>
+      HttpResponse.json({ ok: true, outcome: "created" })
+    ),
     // Anything not mocked above (billing, usage, CMS proxy…) gets a deterministic 404 so
     // components exercise their error/empty paths instead of hanging on a dead origin.
     http.all(`${TOWER_MOCK_ORIGIN}/*`, () => HttpResponse.json({ error: "not mocked in storybook" }, { status: 404 })),

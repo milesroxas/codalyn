@@ -237,6 +237,8 @@ function TowerWorkspaceOnboardingBannerInner({
     refetchKey: `${membershipCount}:${orgs?.length ?? 0}:${activeOrg?.id ?? ""}`,
   });
   const onWebflowConnectSuccess = useCallback(() => {
+    // Land the user on the connection page after OAuth so they see the linked sites.
+    router.push(TOWER_CONNECTION_PATH);
     router.refresh();
   }, [router]);
   const blocker = resolveTowerWorkspaceOnboardingBlocker(gateSummary, { includeWebflowConnect });

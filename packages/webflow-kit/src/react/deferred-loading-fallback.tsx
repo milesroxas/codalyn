@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { useDeferredLoadingIndicator } from "./use-deferred-loading-indicator.js";
 

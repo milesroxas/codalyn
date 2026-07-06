@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { CODALYN_LOADING_INDICATOR_DELAY_MS } from "./loading-indicator-delay.js";
 

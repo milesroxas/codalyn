@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, isNull } from "drizzle-orm";
 import { cache } from "react";
 import { db } from "@/shared/lib/db";
 import { member, organization, session as sessionTable, user } from "@/shared/lib/db/auth-schema";
@@ -36,10 +36,20 @@ export const resolveActiveOrganizationId = cache(async function resolveActiveOrg
     }
   }
 
+  // Only sessions that actually hold a workspace count here: a just-minted session (e.g. the
+  // Designer id-token exchange) is the newest row but has a null org, and without this filter it
+  // shadows the Tower browser session the user opened the Designer from — sending them to the
+  // preferred/alphabetical fallback instead of the workspace they came from.
   const recentSessionRows = await db
     .select({ activeOrganizationId: sessionTable.activeOrganizationId })
     .from(sessionTable)
-    .where(and(eq(sessionTable.userId, userId), gt(sessionTable.expiresAt, new Date())))
+    .where(
+      and(
+        eq(sessionTable.userId, userId),
+        gt(sessionTable.expiresAt, new Date()),
+        isNotNull(sessionTable.activeOrganizationId)
+      )
+    )
     .orderBy(desc(sessionTable.updatedAt))
     .limit(1);
   const recentSessionActiveOrgId = recentSessionRows[0]?.activeOrganizationId ?? null;

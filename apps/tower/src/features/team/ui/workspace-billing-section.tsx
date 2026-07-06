@@ -1,14 +1,17 @@
-import { IconCreditCard } from "@tabler/icons-react";
+import { IconCalendarX, IconCreditCard } from "@tabler/icons-react";
 import { WorkspaceSeatUsageBlock } from "@/features/billing/ui/workspace-seat-usage-block";
 import { WorkspaceManageSubscriptionButton } from "@/features/team/ui/workspace-manage-subscription-button";
 import { WorkspaceTeamSubscribeUpsell } from "@/features/team/ui/workspace-team-checkout-form";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
+import { formatCancelDate } from "@/shared/lib/billing/cancel-date";
 import { cn } from "@/shared/lib/utils";
+import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 
 function WorkspaceBillingPlanStatus(props: { billing: WorkspaceBillingView }) {
   const { billing } = props;
   const planLabel = billing.isPaid ? (billing.billingPlan ?? "Team") : "Free";
+  const pendingCancellation = billing.pendingCancelAt !== null;
 
   return (
     <div className="space-y-3">
@@ -20,13 +23,23 @@ function WorkspaceBillingPlanStatus(props: { billing: WorkspaceBillingView }) {
             : "Solo free workspace. Subscribe to Team to invite collaborators."}
         </p>
       </div>
-      {billing.billingEnabled && billing.subscriptionStatus ? (
+      {billing.pendingCancelAt ? (
+        <Alert variant="warning">
+          <IconCalendarX aria-hidden />
+          <AlertTitle>Team plan canceled — active until {formatCancelDate(billing.pendingCancelAt)}</AlertTitle>
+          <AlertDescription>
+            Seats and Team usage limits stay until then; after that the workspace returns to Free limits. Resume the
+            plan anytime from Manage subscription.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {billing.billingEnabled && billing.subscriptionStatus && !pendingCancellation ? (
         <p className="text-xs text-muted-foreground">
           Subscription status:{" "}
           <span className="font-mono text-foreground">{billing.subscriptionStatus.replaceAll("_", " ")}</span>
         </p>
       ) : null}
-      <WorkspaceSeatUsageBlock usage={billing} />
+      <WorkspaceSeatUsageBlock usage={billing} pendingCancellation={pendingCancellation} />
     </div>
   );
 }

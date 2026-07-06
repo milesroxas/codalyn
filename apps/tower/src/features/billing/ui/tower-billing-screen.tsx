@@ -18,6 +18,7 @@ import type { TowerEntitlement } from "@/server/billing/entitlements";
 import type { IndividualPaidPlan } from "@/server/billing/stripe-subscription-status";
 import type { WorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import type { WorkspaceUsageContributor } from "@/server/billing/workspace-usage-contributors";
+import { formatCancelDate } from "@/shared/lib/billing/cancel-date";
 import { usageLimitsKindBadgeLabel, usageLimitsKindDetailLine, usagePlanBadgeLabel } from "@/shared/lib/usage-display";
 import { Button } from "@/shared/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -167,10 +168,6 @@ function individualPlanOptionAction(option: IndividualPlanOptionModel): ReactNod
   }
 }
 
-function formatCancelDate(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "long" }).format(date);
-}
-
 /** Free-row caption while on a paid plan: the cancel path, or the scheduled end of the plan. */
 function freePlanDowngradeCaption(currentPlanLabel: string, cancelAtLabel: string | null): string {
   if (cancelAtLabel) {
@@ -269,6 +266,20 @@ function NoActiveWorkspaceBillingCard() {
   );
 }
 
+/** Metadata rows for the workspace card; a pending cancellation replaces the raw status line. */
+function workspaceSubscriptionMetadata(
+  workspaceBilling: WorkspaceBillingView | null,
+  cancelAt: Date | null
+): BillingMetadataItem[] {
+  if (cancelAt) {
+    return [{ label: "Team plan canceled", value: `Active until ${formatCancelDate(cancelAt)}` }];
+  }
+  if (workspaceBilling?.isPaid && workspaceBilling.subscriptionStatus) {
+    return [{ label: "Subscription status", value: formatSubscriptionStatus(workspaceBilling.subscriptionStatus) }];
+  }
+  return [];
+}
+
 function ActiveWorkspaceBillingDetails(props: {
   organizationId: string;
   activeOrganizationName: string | null;
@@ -282,12 +293,8 @@ function ActiveWorkspaceBillingDetails(props: {
   const workspacePlanCaption = workspaceBilling?.isPaid
     ? "Paid Team billing covers seats and Team usage limits for this workspace."
     : "Add Team billing for seats and Team limits.";
-  const subscriptionStatus = workspaceBilling?.subscriptionStatus
-    ? formatSubscriptionStatus(workspaceBilling.subscriptionStatus)
-    : null;
-
-  const metadata: BillingMetadataItem[] =
-    workspaceBilling?.isPaid && subscriptionStatus ? [{ label: "Subscription status", value: subscriptionStatus }] : [];
+  const workspaceCancelAt = workspaceBilling?.isPaid ? (workspaceBilling.pendingCancelAt ?? null) : null;
+  const metadata = workspaceSubscriptionMetadata(workspaceBilling, workspaceCancelAt);
 
   return (
     <CardContent className="space-y-4">
@@ -307,7 +314,7 @@ function ActiveWorkspaceBillingDetails(props: {
       {workspaceBilling?.billingEnabled ? (
         <>
           <Separator />
-          <WorkspaceSeatUsageBlock usage={workspaceBilling} />
+          <WorkspaceSeatUsageBlock usage={workspaceBilling} pendingCancellation={workspaceCancelAt !== null} />
         </>
       ) : null}
 

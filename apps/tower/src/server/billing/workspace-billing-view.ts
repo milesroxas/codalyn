@@ -3,7 +3,9 @@ import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
 import { isOrganizationTeamEntitled, organizationBillingPlanLabel } from "@/server/billing/organization-billing";
 import { countOrganizationSeatsUsed } from "@/server/billing/organization-seat-count";
 import { shouldBumpStripeTeamQuantityToMinimum } from "@/server/billing/organization-seat-override";
+import { getStripe } from "@/server/billing/stripe-client";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
+import { fetchSubscriptionCancelAt } from "@/server/billing/stripe-subscription-cancellation";
 import {
   getTeamMaxSeats,
   getTeamMinSeats,
@@ -24,6 +26,12 @@ export type WorkspaceBillingView = {
   isPaid: boolean;
   billingPlan: string | null;
   subscriptionStatus: string | null;
+  /**
+   * Scheduled end of the Team subscription after a portal cancel, or null when none is pending.
+   * Read live from Stripe (not the DB row) because a cancel-at-period-end subscription stays
+   * `active` until the period ends, so persisted status alone never reveals the cancellation.
+   */
+  pendingCancelAt: Date | null;
   seatLimit: number | null;
   seatsUsed: number;
   /** Minimum seats a Team checkout must purchase (team minimum or current usage, whichever is larger). */
@@ -86,8 +94,10 @@ export async function fetchWorkspaceBillingView(
     stripeSubscriptionId: org.stripeSubscriptionId,
   };
 
+  const isPaid = isOrganizationTeamEntitled(billingRow);
+
   if (
-    isOrganizationTeamEntitled(billingRow) &&
+    isPaid &&
     org.stripeSubscriptionId &&
     shouldBumpStripeTeamQuantityToMinimum(true, org, org.stripeSeatQuantity ?? null)
   ) {
@@ -110,13 +120,18 @@ export async function fetchWorkspaceBillingView(
 
   const seatUsage = buildWorkspaceSeatUsage(seatsUsed, org);
 
+  const stripe = isPaid && org.stripeSubscriptionId && isTowerBillingEnabled() ? getStripe() : null;
+  const pendingCancelAt =
+    stripe && org.stripeSubscriptionId ? await fetchSubscriptionCancelAt(stripe, org.stripeSubscriptionId) : null;
+
   return {
     billingEnabled: isTowerBillingEnabled(),
     teamCheckoutConfigured: isTeamBillingCheckoutConfigured(),
     canManageBilling: isTowerTeamAdminRole(memberRow.role),
-    isPaid: isOrganizationTeamEntitled(billingRow),
+    isPaid,
     billingPlan: organizationBillingPlanLabel(billingRow),
     subscriptionStatus: org.subscriptionStatus,
+    pendingCancelAt,
     seatLimit: seatUsage.seatLimit,
     seatsUsed: seatUsage.seatsUsed,
     checkoutSeatFloor: resolveSeatFloor(getTeamMinSeats(), seatUsage.seatsUsed),

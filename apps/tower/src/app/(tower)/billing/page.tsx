@@ -9,8 +9,8 @@ import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-
 import { isStripeCheckoutConfigured, isStudioCheckoutConfigured } from "@/server/billing/stripe-billing-routes";
 import { syncStripeCheckoutSessionForUser } from "@/server/billing/stripe-checkout-sync";
 import { getStripe } from "@/server/billing/stripe-client";
-import { fetchIndividualPlanCancelAt } from "@/server/billing/stripe-individual-cancellation";
 import { resolveUserIndividualPlan } from "@/server/billing/stripe-individual-pro";
+import { fetchSubscriptionCancelAt } from "@/server/billing/stripe-subscription-cancellation";
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { fetchWorkspaceBillingView } from "@/server/billing/workspace-billing-view";
 import {
@@ -42,7 +42,7 @@ async function resolveIndividualCancelAt(subscriptionId: string | null | undefin
     return null;
   }
   const stripe = getStripe();
-  return stripe ? fetchIndividualPlanCancelAt(stripe, subscriptionId) : null;
+  return stripe ? fetchSubscriptionCancelAt(stripe, subscriptionId) : null;
 }
 
 export default async function BillingPage({ searchParams }: BillingPageProps) {

@@ -13,13 +13,20 @@ export type WorkspaceSeatUsageBlockProps = {
     WorkspaceSeatUsage,
     "seatsUsed" | "effectiveSeatLimit" | "stripeSeatQuantity" | "operatorSeatLimitOverride"
   >;
+  /**
+   * When the subscription is scheduled to cancel, the "reduce seats to stop paying" nudge is
+   * suppressed — billing already ends on its own, so the nudge would mislead.
+   */
+  pendingCancellation?: boolean;
 };
 
 /** Canonical seat usage line + optional billed vs effective breakdown. */
 export function WorkspaceSeatUsageBlock(props: WorkspaceSeatUsageBlockProps) {
-  const { usage } = props;
+  const { usage, pendingCancellation = false } = props;
   const breakdown = workspaceSeatBillingBreakdownLines(usage);
-  const paidSeatsAvailableLabel = workspacePaidSeatsAvailableLabel(workspacePaidSeatsAvailable(usage));
+  const paidSeatsAvailableLabel = pendingCancellation
+    ? null
+    : workspacePaidSeatsAvailableLabel(workspacePaidSeatsAvailable(usage));
 
   return (
     <div data-slot="workspace-seat-usage" className="space-y-1">

@@ -22,6 +22,7 @@ function billingView(overrides: Partial<WorkspaceBillingView> = {}): WorkspaceBi
     hasStripeCustomer: false,
     billingPlan: null,
     subscriptionStatus: null,
+    pendingCancelAt: null,
     canManagePaidBilling: true,
     ...overrides,
   };

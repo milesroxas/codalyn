@@ -1,5 +1,6 @@
 "use client";
 
+import { cva, type VariantProps } from "class-variance-authority";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { Accordion as AccordionPrimitive } from "radix-ui";
 import type * as React from "react";
@@ -15,15 +16,33 @@ function AccordionItem({ className, ...props }: React.ComponentProps<typeof Acco
   );
 }
 
-function AccordionTrigger({ className, children, ...props }: React.ComponentProps<typeof AccordionPrimitive.Trigger>) {
+const accordionTriggerVariants = cva(
+  "group/accordion-trigger relative flex flex-1 cursor-pointer items-center gap-3 rounded-sm border border-transparent px-2 -mx-2 text-left font-medium transition-colors outline-none hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:after:border-ring disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+  {
+    variants: {
+      size: {
+        default: "py-2.5 text-sm",
+        /** Compact trigger for dense surfaces (plan rows, card metadata). */
+        sm: "py-1.5 text-xs",
+      },
+    },
+    defaultVariants: {
+      size: "default",
+    },
+  }
+);
+
+function AccordionTrigger({
+  className,
+  children,
+  size,
+  ...props
+}: React.ComponentProps<typeof AccordionPrimitive.Trigger> & VariantProps<typeof accordionTriggerVariants>) {
   return (
     <AccordionPrimitive.Header className="flex">
       <AccordionPrimitive.Trigger
         data-slot="accordion-trigger"
-        className={cn(
-          "group/accordion-trigger relative flex flex-1 cursor-pointer items-center gap-3 rounded-sm border border-transparent px-2 py-2.5 -mx-2 text-left text-sm font-medium transition-colors outline-none hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:after:border-ring disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
-          className
-        )}
+        className={cn(accordionTriggerVariants({ size }), className)}
         {...props}
       >
         <span className="min-w-0 flex-1">{children}</span>

@@ -2,6 +2,7 @@ import type { TowerUsageStatusSnapshot } from "@codalyn/webflow-kit";
 import { towerPlanName } from "@codalyn/webflow-kit";
 import { IconBuilding, IconUser } from "@tabler/icons-react";
 import type { ReactNode } from "react";
+import { INDIVIDUAL_PLAN_COPY } from "@/features/billing/lib/individual-plan-copy";
 import { BillingPlanHero, BillingPlanHeroRow } from "@/features/billing/ui/billing-plan-hero";
 import { BillingPlanOption, BillingPlanOptionsList } from "@/features/billing/ui/billing-plan-option";
 import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
@@ -97,12 +98,9 @@ function IndividualPlanCheckoutButton(props: { plan: IndividualPaidPlan; variant
   );
 }
 
-const INDIVIDUAL_UPGRADE_CAPTION =
-  "Higher limits on workspaces you own, plus the ability to create additional workspaces.";
-
 function individualPlanCaption(planLabel: string, hasIndividualPlan: boolean, teamWorkspaceActive: boolean): string {
   if (!hasIndividualPlan) {
-    return INDIVIDUAL_UPGRADE_CAPTION;
+    return "Free limits apply on workspaces you own.";
   }
   if (teamWorkspaceActive) {
     return "Active on this account. Team workspace limits take precedence while that workspace is selected.";
@@ -175,13 +173,19 @@ function IndividualSubscriptionCard(props: {
       </CardHeader>
       <CardContent>
         <BillingPlanOptionsList>
-          <BillingPlanOption plan={currentPlanLabel} caption={currentCaptionWithStatus} state="current" />
+          <BillingPlanOption
+            plan={currentPlanLabel}
+            caption={currentCaptionWithStatus}
+            state="current"
+            details={INDIVIDUAL_PLAN_COPY[individualPlan ?? "free"].details}
+          />
           {upgradePlans.map((plan) => (
             <BillingPlanOption
               key={plan}
               plan={towerPlanName(plan)}
-              caption={INDIVIDUAL_UPGRADE_CAPTION}
+              caption={INDIVIDUAL_PLAN_COPY[plan].bestFor}
               state="upgrade"
+              details={INDIVIDUAL_PLAN_COPY[plan].details}
               action={<IndividualPlanCheckoutButton plan={plan} variant={plan === "studio" ? "outline" : "default"} />}
             />
           ))}

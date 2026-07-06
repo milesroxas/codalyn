@@ -82,9 +82,10 @@ delay and local dev when webhooks are not forwarded to localhost
 Seat *policy* is documented in the pricing doc; the Stripe mechanics are:
 
 - Checkout quantity = the admin-selected seat count, clamped up to a floor of
-  `max(TOWER_TEAM_MIN_SEATS, members + pending invitations)` (so a workspace can buy spare seats to
-  invite into; it can never buy below the minimum or below current usage). Defaults to the floor when
-  no seat count is submitted (`team-seat-quantity.ts`).
+  `max(TOWER_TEAM_MIN_SEATS, members + pending invitations)` and capped at `TOWER_TEAM_MAX_SEATS`
+  (default 500; fat-finger/abuse guard). A workspace can buy spare seats to invite into; it can never
+  buy below the minimum or below current usage. Defaults to the floor when no seat count is submitted
+  (`team-seat-quantity.ts`).
 - Webhooks set `organization.seat_limit` from the Stripe subscription quantity.
 - Member/invitation Better Auth hooks (`beforeCreateInvitation`, `beforeAcceptInvitation`,
   `beforeAddMember`) call `syncOrganizationSeatQuantityWithStripe` to keep Stripe quantity and
@@ -119,6 +120,7 @@ Documented in `../.env.example`. Summary:
 | `STRIPE_PRICE_TEAM_SEAT` | Yes (team billing) | **Per-seat recurring** Price id for workspace Team plan. |
 | `TOWER_STRIPE_REQUIRE_LIVE_IN_PRODUCTION` | No | Set to `1` on Vercel **Production** at go-live to reject `sk_test_` keys. Omit while prod still uses test mode. |
 | `TOWER_TEAM_MIN_SEATS` | No | Minimum seats on team checkout and Stripe sync (default `6`). |
+| `TOWER_TEAM_MAX_SEATS` | No | Maximum seats a single team checkout may request (default `500`). |
 | `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` | Yes | Origins for Checkout success/cancel and Portal return URL. |
 | `TOWER_METERING_DISABLED` | No | `1` disables **usage** caps only (emergency); unrelated to Stripe. |
 | `TOWER_{FREE,PRO,STUDIO,TEAM}_*` | No | Optional seed overrides for monthly limits (Operator Platform UI is runtime source of truth after migrate). |

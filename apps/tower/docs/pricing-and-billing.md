@@ -64,8 +64,10 @@ overrides as the user row.
 
 - `owner_user_id` — canonical owner (must reference an active member).
 - `billing_owner_user_id` — who is responsible for paid Team billing.
-- Soft delete via `deleted_at` / `purge_scheduled_at`; ownership can be handed off via
-  `workspace_ownership_transfer` (with optional Stripe billing-handoff gating).
+- Soft delete via `deleted_at` / `purge_scheduled_at`, with a **30-day** recovery window
+  (`WORKSPACE_SOFT_DELETE_RECOVERY_DAYS`). User-initiated deletion requires slug confirmation +
+  password re-auth; operator purges require the `PURGE` phrase (`delete-workspace.ts`). Ownership can
+  be handed off via `workspace_ownership_transfer` (with optional Stripe billing-handoff gating).
 - One Webflow OAuth token per workspace (`organization_webflow_oauth_token`): an admin connects once,
   all members use it.
 
@@ -193,11 +195,14 @@ Source: `src/shared/lib/billing/organization-seat-cap.ts`, `workspace-seat-usage
   `TOWER_TEAM_MIN_SEATS` (default **6**, `TOWER_TEAM_DEFAULT_SEAT_MINIMUM`).
 - A "seat" is consumed by **members + pending invitations**. Invite creation is blocked at the cap
   (dynamic Better Auth `invitationLimit`).
-- Checkout quantity = the admin-selected seat count, clamped up to a floor of
-  `max(min seats, members + pending invitations)` — admins can buy spare seats to invite into, but
-  never below the minimum or current usage (defaults to the floor when unspecified). Membership/invitation
-  hooks then sync the quantity back to Stripe **grow-only** (member churn never reduces purchased seats;
-  reductions go through the Customer Portal).
+- Checkout quantity = the admin-selected seat count, clamped into `[floor, max]` where the floor is
+  `max(min seats, members + pending invitations)` and the max is `TOWER_TEAM_MAX_SEATS` (default
+  **500**, `TOWER_TEAM_DEFAULT_SEAT_MAXIMUM` — fat-finger/abuse guard). Admins can buy spare seats to
+  invite into, but never below the minimum or current usage (defaults to the floor when unspecified).
+  Membership/invitation hooks then sync the quantity back to Stripe **grow-only** (member churn never
+  reduces purchased seats; reductions go through the Customer Portal).
+- Deleting a user account auto-cancels every pending invitation addressed to that email and releases
+  those seats back to each workspace (`invitation-hygiene.ts`).
 - **Over-cap** workspaces (e.g. after a cancel) keep existing members but block new invites/accepts
   until resolved.
 - `operator_seat_limit_override`: operator-granted seats; Stripe quantity sync must not change billing

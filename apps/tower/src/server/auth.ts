@@ -27,6 +27,7 @@ import { resolveAuthSecret } from "@/server/auth-secret";
 import { sendChangeEmailConfirmationEmail } from "@/server/email/change-email-confirmation-email";
 import { sendChangeEmailNewAddressVerificationEmail } from "@/server/email/change-email-new-address-email";
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
+import { sendExistingAccountSignUpEmail } from "@/server/email/existing-account-sign-up-email";
 import { sendPasswordResetEmail } from "@/server/email/password-reset-email";
 import {
   readTeamInvitationIdFromAuthContext,
@@ -77,6 +78,14 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: true,
     revokeSessionsOnPasswordReset: true,
+    // Sign-up with an existing email returns a synthetic "check your email" success (enumeration
+    // protection), so route the real account holder to sign-in via email instead of leaving them
+    // waiting for a verification link that never arrives.
+    onExistingUserSignUp: async ({ user }) => {
+      await sendExistingAccountSignUpEmail({
+        user: { email: user.email, name: user.name },
+      });
+    },
     sendResetPassword: async ({ user, url }) => {
       void sendPasswordResetEmail({
         user: { email: user.email, name: user.name },

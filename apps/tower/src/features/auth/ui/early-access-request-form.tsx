@@ -89,7 +89,7 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
   const [referralOther, setReferralOther] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ message: string; outcome: RequestOutcome } | null>(null);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -122,7 +122,7 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
         return;
       }
       const outcome = body?.outcome ?? "created";
-      setSuccess(messageForOutcome(outcome));
+      setSuccess({ message: messageForOutcome(outcome), outcome });
       if (outcome === "already_has_access") {
         return;
       }
@@ -146,9 +146,16 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
 
       <div className="rounded-sm border border-border/80 bg-card p-6 shadow-lg shadow-black/4 dark:shadow-black/25">
         {success ? (
-          <p className="text-sm text-foreground" role="status">
-            {success}
-          </p>
+          <div className="space-y-4">
+            <p className="text-sm text-foreground" role="status">
+              {success.message}
+            </p>
+            {success.outcome === "already_has_access" ? (
+              <Button asChild size="form" width="full">
+                <Link href={signInHref}>{EARLY_ACCESS_REQUEST_SIGN_IN_LABEL}</Link>
+              </Button>
+            ) : null}
+          </div>
         ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
             <FormFieldGrid>

@@ -5,6 +5,7 @@ import {
   EARLY_ACCESS_REQUEST_SUBMIT_ERROR,
   EARLY_ACCESS_REQUEST_SUCCESS_MESSAGES,
   type EarlyAccessReferralSource,
+  type EarlyAccessRequestOutcome,
   earlyAccessSubmitErrorMessage,
   normalizeEarlyAccessSubmitResponse,
 } from "@/features/auth/lib/early-access-request";
@@ -38,7 +39,7 @@ export function BeaconEarlyAccessRequestForm(props: BeaconEarlyAccessRequestForm
   const [referralOther, setReferralOther] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ message: string; outcome: EarlyAccessRequestOutcome } | null>(null);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -71,7 +72,8 @@ export function BeaconEarlyAccessRequestForm(props: BeaconEarlyAccessRequestForm
         setError(earlyAccessSubmitErrorMessage(body.error));
         return;
       }
-      setSuccess(EARLY_ACCESS_REQUEST_SUCCESS_MESSAGES[body.outcome ?? "created"]);
+      const outcome = body.outcome ?? "created";
+      setSuccess({ message: EARLY_ACCESS_REQUEST_SUCCESS_MESSAGES[outcome], outcome });
     } catch {
       setError(EARLY_ACCESS_REQUEST_SUBMIT_ERROR);
     } finally {
@@ -80,13 +82,19 @@ export function BeaconEarlyAccessRequestForm(props: BeaconEarlyAccessRequestForm
   }
 
   if (success) {
+    const alreadyHasAccess = success.outcome === "already_has_access";
     return (
       <div className="flex flex-col gap-3">
         <p className="text-xs leading-snug text-foreground" role="status">
-          {success}
+          {success.message}
         </p>
-        <Button type="button" variant="outline" className="w-full" onClick={onBackToSignIn}>
-          Back to sign in
+        <Button
+          type="button"
+          variant={alreadyHasAccess ? "default" : "outline"}
+          className="w-full"
+          onClick={onBackToSignIn}
+        >
+          {alreadyHasAccess ? "Sign in" : "Back to sign in"}
         </Button>
       </div>
     );

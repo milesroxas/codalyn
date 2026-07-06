@@ -39,22 +39,28 @@ type QuantityFieldProps = {
   min: number;
   max: number;
   disabled?: boolean;
-} & Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "type" | "min" | "max" | "disabled" | "onBlur">;
+} & Omit<
+  React.ComponentProps<typeof Input>,
+  "value" | "onChange" | "type" | "min" | "max" | "disabled" | "onBlur" | "onKeyDown" | "role"
+>;
 
 export function QuantityField(props: QuantityFieldProps) {
   const { id, name, value, onValueChange, min, max, disabled = false, required, ...inputProps } = props;
   const parsed = parseQuantity(value);
   const effective = parsed === null ? min : clampQuantity(parsed, min, max);
 
+  const stepBy = (delta: number) => onValueChange(String(clampQuantity(effective + delta, min, max)));
+
   return (
     <ButtonGroup layout="quantity">
       <Button
         type="button"
-        variant="secondary"
-        size="icon-sm"
+        variant="outline"
+        size="icon"
         disabled={disabled || effective <= min}
         aria-label="Decrease quantity"
-        onClick={() => onValueChange(String(clampQuantity(effective - 1, min, max)))}
+        tabIndex={-1}
+        onClick={() => stepBy(-1)}
       >
         <IconMinus aria-hidden />
       </Button>
@@ -70,20 +76,31 @@ export function QuantityField(props: QuantityFieldProps) {
         required={required}
         numeric
         stepperHidden
+        role="spinbutton"
         aria-valuemin={min}
         aria-valuemax={max}
         aria-valuenow={effective}
         onChange={(event) => onValueChange(sanitizeQuantityInput(event.target.value))}
         onBlur={() => onValueChange(normalizeQuantityValue(value, min, max))}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowUp") {
+            event.preventDefault();
+            stepBy(1);
+          } else if (event.key === "ArrowDown") {
+            event.preventDefault();
+            stepBy(-1);
+          }
+        }}
         {...inputProps}
       />
       <Button
         type="button"
-        variant="secondary"
-        size="icon-sm"
+        variant="outline"
+        size="icon"
         disabled={disabled || effective >= max}
         aria-label="Increase quantity"
-        onClick={() => onValueChange(String(clampQuantity(effective + 1, min, max)))}
+        tabIndex={-1}
+        onClick={() => stepBy(1)}
       >
         <IconPlus aria-hidden />
       </Button>

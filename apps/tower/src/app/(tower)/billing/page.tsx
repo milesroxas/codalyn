@@ -9,6 +9,7 @@ import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-
 import { isStripeCheckoutConfigured, isStudioCheckoutConfigured } from "@/server/billing/stripe-billing-routes";
 import { syncStripeCheckoutSessionForUser } from "@/server/billing/stripe-checkout-sync";
 import { getStripe } from "@/server/billing/stripe-client";
+import { fetchIndividualPlanCancelAt } from "@/server/billing/stripe-individual-cancellation";
 import { resolveUserIndividualPlan } from "@/server/billing/stripe-individual-pro";
 import { fetchEndUserUsageStatus } from "@/server/billing/usage-status";
 import { fetchWorkspaceBillingView } from "@/server/billing/workspace-billing-view";
@@ -34,6 +35,14 @@ function readQueryParam(value: string | string[] | undefined): string | null {
     return readQueryParam(value[0]);
   }
   return null;
+}
+
+async function resolveIndividualCancelAt(subscriptionId: string | null | undefined): Promise<Date | null> {
+  if (!subscriptionId) {
+    return null;
+  }
+  const stripe = getStripe();
+  return stripe ? fetchIndividualPlanCancelAt(stripe, subscriptionId) : null;
 }
 
 export default async function BillingPage({ searchParams }: BillingPageProps) {
@@ -73,6 +82,8 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   const individualPlan = row ? await resolveUserIndividualPlan(row) : null;
   const hasIndividualPro = individualPlan !== null;
 
+  const individualCancelAt = hasIndividualPro ? await resolveIndividualCancelAt(row?.stripeSubscriptionId) : null;
+
   const [activeOrganizationName, workspaceBilling] = activeOrg
     ? await Promise.all([
         db
@@ -98,6 +109,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       entitlement={ent}
       usageStatus={usageStatus}
       individualSubscriptionStatus={hasIndividualPro ? row?.subscriptionStatus : null}
+      individualCancelAt={individualCancelAt}
       checkoutAvailable={isStripeCheckoutConfigured()}
       studioCheckoutAvailable={isStudioCheckoutConfigured()}
       showIndividualPortal={hasIndividualPro && Boolean(row?.stripeCustomerId)}

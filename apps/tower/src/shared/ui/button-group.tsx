@@ -15,7 +15,7 @@ const buttonGroupVariants = cva(
       },
       layout: {
         default: "",
-        quantity: "[&>input]:w-16 [&>input]:shrink-0 [&>input]:flex-none [&>input]:text-center",
+        quantity: "[&>input]:w-14 [&>input]:shrink-0 [&>input]:flex-none [&>input]:text-center",
       },
     },
     defaultVariants: {

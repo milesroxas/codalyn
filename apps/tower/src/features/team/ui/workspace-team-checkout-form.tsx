@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { formatTeamSeatCostPreview, type TeamSeatPrice } from "@/shared/lib/billing/team-seat-price";
+import {
+  getTeamSeatCostPreviewParts,
+  type TeamSeatCostPreviewParts,
+  type TeamSeatPrice,
+} from "@/shared/lib/billing/team-seat-price";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
@@ -37,7 +41,7 @@ function TeamCheckoutSeatField(props: {
   max: number;
   seatsInput: string;
   onSeatsInputChange: (next: string) => void;
-  costPreview: string | null;
+  costPreview: TeamSeatCostPreviewParts | null;
 }) {
   const { seatFloor, max, seatsInput, onSeatsInputChange, costPreview } = props;
 
@@ -53,7 +57,17 @@ function TeamCheckoutSeatField(props: {
         required
         onValueChange={onSeatsInputChange}
       />
-      {costPreview ? <FormFieldHint size="md">{costPreview}</FormFieldHint> : null}
+      {costPreview ? (
+        <FormFieldHint size="md">
+          <span className="tabular-nums">
+            {costPreview.perSeat}/seat × {costPreview.seats}
+          </span>{" "}
+          ={" "}
+          <span className="font-medium text-foreground tabular-nums">
+            {costPreview.total}/{costPreview.interval}
+          </span>
+        </FormFieldHint>
+      ) : null}
       {seatFloor > 1 ? <FormFieldHint>Minimum {seatFloor} seats based on current members.</FormFieldHint> : null}
     </FormField>
   );
@@ -71,7 +85,7 @@ type WorkspaceTeamCheckoutFormProps = {
 export function WorkspaceTeamCheckoutForm(props: WorkspaceTeamCheckoutFormProps) {
   const { organizationId, seatFloor, seatMax, seatPrice, layout = "centered" } = props;
   const { max, seatsInput, setSeatsInput, billedSeats } = useTeamCheckoutSeats(seatFloor, seatMax);
-  const costPreview = formatTeamSeatCostPreview(seatPrice, billedSeats);
+  const costPreview = getTeamSeatCostPreviewParts(seatPrice, billedSeats);
 
   const seatField = (
     <TeamCheckoutSeatField

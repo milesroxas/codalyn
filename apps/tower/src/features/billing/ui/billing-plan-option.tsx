@@ -18,6 +18,7 @@ const billingPlanOptionVariants = cva("flex items-start gap-2 rounded-sm p-3", {
     state: {
       current: "bg-muted/40",
       upgrade: "border border-border",
+      downgrade: "border border-dashed border-border",
     },
   },
   defaultVariants: {

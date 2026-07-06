@@ -3,6 +3,10 @@ import { towerPlanName } from "@codalyn/webflow-kit";
 import { IconBuilding, IconUser } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { INDIVIDUAL_PLAN_COPY } from "@/features/billing/lib/individual-plan-copy";
+import {
+  buildIndividualPlanOptions,
+  type IndividualPlanOptionModel,
+} from "@/features/billing/lib/individual-plan-options";
 import { BillingPlanHero, BillingPlanHeroRow } from "@/features/billing/ui/billing-plan-hero";
 import { BillingPlanOption, BillingPlanOptionsList } from "@/features/billing/ui/billing-plan-option";
 import { TowerUsageSection } from "@/features/billing/ui/tower-usage-section";
@@ -34,6 +38,8 @@ type TowerBillingScreenProps = {
   usageStatus: TowerUsageStatusSnapshot;
   /** Individual subscription status from `user` row; omit when the user has no individual subscription. */
   individualSubscriptionStatus?: string | null;
+  /** When the individual subscription is scheduled to cancel (from Stripe), or null. */
+  individualCancelAt?: Date | null;
   checkoutAvailable: boolean;
   studioCheckoutAvailable: boolean;
   showIndividualPortal: boolean;
@@ -122,28 +128,61 @@ function IndividualSubscriptionActions(props: { showIndividualPortal: boolean })
   );
 }
 
-function individualUpgradePlans(
-  individualPlan: IndividualPaidPlan | null,
-  checkoutAvailable: boolean,
-  studioCheckoutAvailable: boolean
-): IndividualPaidPlan[] {
-  if (individualPlan === "studio") {
-    return [];
-  }
+function IndividualPlanSwitchButton(props: { plan: IndividualPaidPlan; direction: "upgrade" | "downgrade" }) {
+  const { plan, direction } = props;
+  return (
+    <Button asChild variant={direction === "upgrade" ? "default" : "outline"}>
+      <a href={`/api/billing/portal?flow=switch&plan=${plan}`}>Switch to {towerPlanName(plan)}</a>
+    </Button>
+  );
+}
 
-  const plans: IndividualPaidPlan[] = [];
-  if (individualPlan === null && checkoutAvailable) {
-    plans.push("pro");
+function IndividualPlanCancelButton() {
+  return (
+    <Button asChild variant="ghost">
+      <a href="/api/billing/portal?flow=cancel">Downgrade to Free</a>
+    </Button>
+  );
+}
+
+function individualPlanOptionAction(option: IndividualPlanOptionModel): ReactNode | undefined {
+  const { action } = option;
+  if (!action) {
+    return undefined;
   }
-  if (studioCheckoutAvailable) {
-    plans.push("studio");
+  switch (action.kind) {
+    case "subscribe":
+      return (
+        <IndividualPlanCheckoutButton plan={action.plan} variant={action.plan === "studio" ? "outline" : "default"} />
+      );
+    case "switch":
+      return (
+        <IndividualPlanSwitchButton
+          plan={action.plan}
+          direction={option.state === "upgrade" ? "upgrade" : "downgrade"}
+        />
+      );
+    case "cancel":
+      return <IndividualPlanCancelButton />;
   }
-  return plans;
+}
+
+function formatCancelDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "long" }).format(date);
+}
+
+/** Free-row caption while on a paid plan: the cancel path, or the scheduled end of the plan. */
+function freePlanDowngradeCaption(currentPlanLabel: string, cancelAtLabel: string | null): string {
+  if (cancelAtLabel) {
+    return `Your ${currentPlanLabel} plan ends on ${cancelAtLabel}. Free limits apply after that.`;
+  }
+  return `Cancel ${currentPlanLabel} to move to Free at the end of your billing period.`;
 }
 
 function IndividualSubscriptionCard(props: {
   individualPlan: IndividualPaidPlan | null;
   individualSubscriptionStatus?: string | null;
+  individualCancelAt: Date | null;
   checkoutAvailable: boolean;
   studioCheckoutAvailable: boolean;
   showIndividualPortal: boolean;
@@ -152,6 +191,7 @@ function IndividualSubscriptionCard(props: {
   const {
     individualPlan,
     individualSubscriptionStatus,
+    individualCancelAt,
     checkoutAvailable,
     studioCheckoutAvailable,
     showIndividualPortal,
@@ -160,10 +200,34 @@ function IndividualSubscriptionCard(props: {
 
   const hasIndividualPlan = individualPlan !== null;
   const currentPlanLabel = individualPlan ? towerPlanName(individualPlan) : "Free";
+  const cancelAtLabel = hasIndividualPlan && individualCancelAt ? formatCancelDate(individualCancelAt) : null;
   const statusLine = hasIndividualPlan ? formatSubscriptionStatus(individualSubscriptionStatus) : null;
   const currentCaption = individualPlanCaption(currentPlanLabel, hasIndividualPlan, teamWorkspaceActive);
-  const currentCaptionWithStatus = statusLine ? `${currentCaption} Status: ${statusLine}.` : currentCaption;
-  const upgradePlans = individualUpgradePlans(individualPlan, checkoutAvailable, studioCheckoutAvailable);
+  const currentCaptionWithStatus = [
+    currentCaption,
+    statusLine ? `Status: ${statusLine}.` : null,
+    cancelAtLabel ? `Cancels on ${cancelAtLabel}.` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const planOptions = buildIndividualPlanOptions({
+    individualPlan,
+    proCheckoutAvailable: checkoutAvailable,
+    studioCheckoutAvailable,
+    portalAvailable: showIndividualPortal,
+    cancelPending: cancelAtLabel !== null,
+  });
+
+  const optionCaption = (option: IndividualPlanOptionModel): string => {
+    if (option.state === "current") {
+      return currentCaptionWithStatus;
+    }
+    if (option.key === "free") {
+      return freePlanDowngradeCaption(currentPlanLabel, cancelAtLabel);
+    }
+    return INDIVIDUAL_PLAN_COPY[option.key].bestFor;
+  };
 
   return (
     <Card>
@@ -173,20 +237,14 @@ function IndividualSubscriptionCard(props: {
       </CardHeader>
       <CardContent>
         <BillingPlanOptionsList>
-          <BillingPlanOption
-            plan={currentPlanLabel}
-            caption={currentCaptionWithStatus}
-            state="current"
-            details={INDIVIDUAL_PLAN_COPY[individualPlan ?? "free"].details}
-          />
-          {upgradePlans.map((plan) => (
+          {planOptions.map((option) => (
             <BillingPlanOption
-              key={plan}
-              plan={towerPlanName(plan)}
-              caption={INDIVIDUAL_PLAN_COPY[plan].bestFor}
-              state="upgrade"
-              details={INDIVIDUAL_PLAN_COPY[plan].details}
-              action={<IndividualPlanCheckoutButton plan={plan} variant={plan === "studio" ? "outline" : "default"} />}
+              key={option.key}
+              plan={towerPlanName(option.key)}
+              caption={optionCaption(option)}
+              state={option.state}
+              details={INDIVIDUAL_PLAN_COPY[option.key].details}
+              action={individualPlanOptionAction(option)}
             />
           ))}
         </BillingPlanOptionsList>
@@ -368,6 +426,7 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
     studioCheckoutAvailable,
     showIndividualPortal,
     individualSubscriptionStatus,
+    individualCancelAt,
     activeOrganizationId,
     activeOrganizationName,
     workspaceBilling,
@@ -398,6 +457,7 @@ export function TowerBillingScreen(props: TowerBillingScreenProps) {
           <IndividualSubscriptionCard
             individualPlan={individualPlan}
             individualSubscriptionStatus={individualSubscriptionStatus}
+            individualCancelAt={individualCancelAt ?? null}
             checkoutAvailable={checkoutAvailable}
             studioCheckoutAvailable={studioCheckoutAvailable}
             showIndividualPortal={showIndividualPortal}

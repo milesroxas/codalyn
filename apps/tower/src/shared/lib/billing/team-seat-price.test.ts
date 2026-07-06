@@ -1,7 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { formatTeamSeatCostPreview, type TeamSeatPrice } from "@/shared/lib/billing/team-seat-price";
+import {
+  formatTeamSeatCostPreview,
+  getTeamSeatCostPreviewParts,
+  type TeamSeatPrice,
+} from "@/shared/lib/billing/team-seat-price";
 
 const USD_MONTHLY: TeamSeatPrice = { unitAmount: 1500, currency: "usd", interval: "month" };
+
+describe("getTeamSeatCostPreviewParts", () => {
+  it("splits the preview into per-seat, count, total, and interval", () => {
+    expect(getTeamSeatCostPreviewParts(USD_MONTHLY, 3)).toEqual({
+      perSeat: "$15.00",
+      seats: 3,
+      total: "$45.00",
+      interval: "mo",
+    });
+  });
+
+  it("returns null when no price is available", () => {
+    expect(getTeamSeatCostPreviewParts(null, 3)).toBeNull();
+  });
+
+  it("returns null for non-positive or non-integer seat counts", () => {
+    expect(getTeamSeatCostPreviewParts(USD_MONTHLY, 0)).toBeNull();
+    expect(getTeamSeatCostPreviewParts(USD_MONTHLY, 1.5)).toBeNull();
+  });
+});
 
 describe("formatTeamSeatCostPreview", () => {
   it("builds a per-seat × count = total line for a monthly USD price", () => {

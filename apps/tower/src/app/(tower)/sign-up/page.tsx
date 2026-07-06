@@ -22,7 +22,10 @@ import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { resolveTowerEarlyAccessRequired } from "@/shared/lib/access/access-policy";
 import { isTeamInvitationAcceptPath } from "@/shared/lib/membership/team-invitation-accept";
-import { readTeamInvitationIdFromCallbackPath } from "@/shared/lib/membership/team-invitation-header";
+import {
+  readTeamInvitationIdFromCallbackPath,
+  readTeamInviteAcceptTokenFromCallbackPath,
+} from "@/shared/lib/membership/team-invitation-header";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { TowerDeferredLoadingFallback } from "@/shared/ui/deferred-loading";
 
@@ -61,6 +64,7 @@ function SignUpForm() {
   const [earlyAccessRequired, setEarlyAccessRequired] = useState<boolean | null>(null);
   const joiningViaTeamInvite = isTeamInvitationAcceptPath(callbackUrl);
   const teamInvitationId = readTeamInvitationIdFromCallbackPath(callbackUrl);
+  const teamInviteAcceptToken = readTeamInviteAcceptTokenFromCallbackPath(callbackUrl);
   const invitePrefill = useAuthInviteSignUpPrefill({
     operatorInviteToken: operatorInviteParam,
     teamInvitationId,
@@ -129,6 +133,7 @@ function SignUpForm() {
       verificationCallback,
       operatorInviteToken: inviteToken,
       teamInvitationId,
+      teamInviteAcceptToken,
       joiningViaTeamInvite,
     });
     setPending(false);

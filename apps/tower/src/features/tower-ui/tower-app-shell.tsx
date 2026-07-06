@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import type * as React from "react";
-import { authClient } from "@/features/auth/model/auth-client";
 import { useTowerSignOutTransition } from "@/features/auth/model/tower-sign-out-transition";
 import { TowerAppSidebar } from "@/features/tower-ui/tower-app-sidebar";
 import type { TowerLandingAppLinks } from "@/features/tower-ui/tower-landing";
@@ -26,7 +25,11 @@ const shellStyle = {
 
 type TowerAppShellProps = {
   billingEnabled: boolean;
-  /** Server session hint — keeps authenticated chrome stable while client session hydrates. */
+  /**
+   * Server-rendered session state. Chrome follows this exclusively so it always matches the
+   * server-rendered `children`; client-session divergence (for example sign-out in another
+   * tab) is reconciled by `TowerSessionSync` via a server round-trip, never a chrome swap.
+   */
   signedIn: boolean;
   canCreateWorkspace?: boolean;
   usageBanner?: React.ReactNode;
@@ -95,11 +98,9 @@ export function TowerAppShell({
   children,
 }: TowerAppShellProps) {
   const pathname = usePathname();
-  const { data: session, isPending } = authClient.useSession();
   const signingOut = useTowerSignOutTransition();
 
-  const authenticated = isPending ? signedIn : Boolean(session?.user);
-  const showAuthenticatedChrome = authenticated || signingOut;
+  const showAuthenticatedChrome = signedIn || signingOut;
   // Full-bleed surfaces that render their own layout (AuthShell) in both auth states.
   const isBareSurface = isTowerAuthSurfacePath(pathname) || pathname === TOWER_SUPPORT_PATH;
 

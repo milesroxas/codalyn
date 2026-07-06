@@ -2,8 +2,12 @@ import { isEmailVerificationRedirectError } from "@/shared/lib/auth/tower-email-
 
 export const TEAM_INVITATION_ACCEPT_PATH = "/invitations/accept";
 
-export function buildTeamInvitationAcceptPath(invitationId: string): string {
-  return `${TEAM_INVITATION_ACCEPT_PATH}?invitationId=${encodeURIComponent(invitationId)}`;
+/** Query param carrying the secret acceptance token in the accept-link URL. */
+export const TEAM_INVITATION_ACCEPT_TOKEN_PARAM = "t";
+
+export function buildTeamInvitationAcceptPath(invitationId: string, acceptToken?: string | null): string {
+  const base = `${TEAM_INVITATION_ACCEPT_PATH}?invitationId=${encodeURIComponent(invitationId)}`;
+  return acceptToken ? `${base}&${TEAM_INVITATION_ACCEPT_TOKEN_PARAM}=${encodeURIComponent(acceptToken)}` : base;
 }
 
 export function isTeamInvitationAcceptPath(path: string): boolean {
@@ -13,6 +17,11 @@ export function isTeamInvitationAcceptPath(path: string): boolean {
 export function readTeamInvitationIdFromSearchParams(searchParams: URLSearchParams): string | null {
   const invitationId = searchParams.get("invitationId")?.trim();
   return invitationId || null;
+}
+
+export function readTeamInvitationAcceptTokenFromSearchParams(searchParams: URLSearchParams): string | null {
+  const token = searchParams.get(TEAM_INVITATION_ACCEPT_TOKEN_PARAM)?.trim();
+  return token || null;
 }
 
 export type TeamInvitationPreviewReason = "not_found" | "expired" | "no_longer_pending";

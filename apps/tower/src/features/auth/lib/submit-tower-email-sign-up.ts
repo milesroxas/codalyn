@@ -13,6 +13,7 @@ type TowerEmailSignUpInput = {
   verificationCallback: string;
   operatorInviteToken: string | null;
   teamInvitationId: string | null;
+  teamInviteAcceptToken: string | null;
   joiningViaTeamInvite: boolean;
 };
 
@@ -21,8 +22,12 @@ export type TowerEmailSignUpResult =
   | { kind: "awaiting_verification"; email: string }
   | { kind: "session"; data: NonNullable<Awaited<ReturnType<typeof authClient.signUp.email>>["data"]> };
 
+// Only take the auto-sign-in fallback when the account is actually auto-verified at sign-up — i.e.
+// there's real inbox proof (operator token or the secret team-invite acceptance token). A bare team
+// invitation (no token) leaves the account unverified, so we must fall through to "check your email"
+// instead of attempting a sign-in that requireEmailVerification would reject.
 function hasOnboardingEmailLinkTrust(input: TowerEmailSignUpInput): boolean {
-  return input.joiningViaTeamInvite || Boolean(input.operatorInviteToken);
+  return Boolean(input.operatorInviteToken) || Boolean(input.teamInviteAcceptToken);
 }
 
 async function signUpWithEmailLinkFallback(input: TowerEmailSignUpInput): Promise<TowerEmailSignUpResult> {
@@ -32,6 +37,7 @@ async function signUpWithEmailLinkFallback(input: TowerEmailSignUpInput): Promis
     verificationCallback: input.verificationCallback,
     operatorInviteToken: input.operatorInviteToken,
     teamInvitationId: input.teamInvitationId,
+    teamInviteAcceptToken: input.teamInviteAcceptToken,
   });
   if (signInResult.error) {
     return { kind: "error", message: signInResult.error.message ?? "Sign in failed" };
@@ -53,6 +59,7 @@ export async function submitTowerEmailSignUp(input: TowerEmailSignUpInput): Prom
     fetchOptions: resolveTowerSignUpFetchOptions({
       operatorInviteToken: input.operatorInviteToken,
       teamInvitationId: input.teamInvitationId,
+      teamInviteAcceptToken: input.teamInviteAcceptToken,
       joiningViaTeamInvite: input.joiningViaTeamInvite,
     }),
   });

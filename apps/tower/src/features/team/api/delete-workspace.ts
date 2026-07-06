@@ -12,6 +12,9 @@ export function formatTeamWorkspaceDeleteError(error: TeamWorkspaceApiError): st
   if (error.message === "confirm_mismatch") {
     return "Slug does not match.";
   }
+  if (error.message === "not_found") {
+    return "Workspace not found. It may already be deleted — refresh and try again.";
+  }
   if (error.message === "forbidden") {
     return "You do not have permission to delete this workspace.";
   }
@@ -24,12 +27,13 @@ export function formatTeamWorkspaceDeleteError(error: TeamWorkspaceApiError): st
   return error.message;
 }
 
-export async function deleteTeamWorkspace(
+async function postOwnerWorkspaceDeleteEndpoint(
+  path: "/api/team/workspace/delete" | "/api/team/workspace/purge",
   organizationId: string,
   confirmSlug: string,
   password: string
 ): Promise<{ ok: true }> {
-  const res = await fetch("/api/team/workspace/delete", {
+  const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -40,4 +44,22 @@ export async function deleteTeamWorkspace(
     throw new TeamWorkspaceApiError(payload?.error ?? "delete_failed", res.status);
   }
   return { ok: true };
+}
+
+/** Schedules deletion; the workspace stays recoverable for the recovery window. */
+export async function deleteTeamWorkspace(
+  organizationId: string,
+  confirmSlug: string,
+  password: string
+): Promise<{ ok: true }> {
+  return postOwnerWorkspaceDeleteEndpoint("/api/team/workspace/delete", organizationId, confirmSlug, password);
+}
+
+/** Permanently deletes right away — no recovery window. */
+export async function purgeTeamWorkspaceNow(
+  organizationId: string,
+  confirmSlug: string,
+  password: string
+): Promise<{ ok: true }> {
+  return postOwnerWorkspaceDeleteEndpoint("/api/team/workspace/purge", organizationId, confirmSlug, password);
 }

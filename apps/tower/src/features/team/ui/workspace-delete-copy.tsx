@@ -41,3 +41,15 @@ export function buildWorkspaceDeletePanelDescription(input: {
     </>
   );
 }
+
+export function buildWorkspacePurgeNowPanelDescription(input: {
+  organizationName: string;
+  recoveryDays: number;
+}): ReactNode {
+  return (
+    <>
+      Permanently deletes <strong>{input.organizationName}</strong> and all of its data right away, skipping the{" "}
+      {input.recoveryDays}-day recovery window. This cannot be undone.
+    </>
+  );
+}

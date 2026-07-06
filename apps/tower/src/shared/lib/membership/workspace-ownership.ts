@@ -110,6 +110,15 @@ export function computeAccountDeletionBlockers(
   return blockers;
 }
 
+/**
+ * Blockers the account owner can resolve in place by permanently deleting the workspace:
+ * personal workspaces (no other members affected) and workspaces already scheduled for deletion.
+ * Shared workspaces and billing-only responsibilities require Team settings (transfer/cancel/delete).
+ */
+export function canPurgeBlockedWorkspaceNow(blocker: AccountDeletionBlocker): boolean {
+  return blocker.reason === "sole_owner_workspace" || blocker.reason === "workspace_pending_deletion";
+}
+
 function formatBlockerResolution(blocker: AccountDeletionBlocker): string {
   const memberLabel = blocker.otherMemberCount === 1 ? "member" : "members";
 
@@ -117,11 +126,11 @@ function formatBlockerResolution(blocker: AccountDeletionBlocker): string {
     case "workspace_owner":
       return `“${blocker.organizationName}” has ${blocker.otherMemberCount} other ${memberLabel}. Transfer workspace ownership to another member, or delete the workspace through Team settings.`;
     case "sole_owner_workspace":
-      return `“${blocker.organizationName}” is your personal workspace. Delete it through Team settings before deleting your account.`;
+      return `“${blocker.organizationName}” is your personal workspace. Permanently delete it now, or delete it through Team settings to keep the ${WORKSPACE_SOFT_DELETE_RECOVERY_DAYS}-day recovery option.`;
     case "billing_owner":
       return `“${blocker.organizationName}” has an active Team subscription billed to you. Transfer billing ownership, cancel billing in Team settings, or delete the workspace.`;
     case "workspace_pending_deletion":
-      return `“${blocker.organizationName}” is scheduled for deletion. Wait until it is fully removed (${WORKSPACE_SOFT_DELETE_RECOVERY_DAYS} days) before deleting your account.`;
+      return `“${blocker.organizationName}” is scheduled for deletion and is removed automatically after ${WORKSPACE_SOFT_DELETE_RECOVERY_DAYS} days. To delete your account sooner, permanently delete the workspace now.`;
   }
 }
 

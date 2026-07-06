@@ -17,6 +17,7 @@ describe("user-account-deletion re-exports", () => {
         hasTeamSubscription: false,
       },
     ];
-    expect(formatAccountDeletionBlockedMessage(blockers)).toContain("Delete it through Team settings");
+    expect(formatAccountDeletionBlockedMessage(blockers)).toContain("Permanently delete it now");
+    expect(formatAccountDeletionBlockedMessage(blockers)).toContain("Team settings");
   });
 });

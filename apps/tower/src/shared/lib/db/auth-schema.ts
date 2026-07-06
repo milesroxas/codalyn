@@ -594,6 +594,31 @@ export const stripeWebhookEvent = pgTable("stripe_webhook_event", {
   processedAt: timestamp("processed_at").defaultNow().notNull(),
 });
 
+/**
+ * Better Auth built-in rate limiter store (`rateLimit` with `storage: "database"`). The column names
+ * and JS property keys MUST match Better Auth's `rateLimit` model exactly (`id`, `key`, `count`,
+ * `lastRequest`) — the drizzle adapter resolves columns by property name and requires an `id` PK.
+ * `lastRequest` is a JS epoch-ms value (`Date.now()`), so it must be `bigint`.
+ */
+export const rateLimit = pgTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").unique(),
+  count: integer("count"),
+  lastRequest: bigint("last_request", { mode: "number" }),
+});
+
+/**
+ * Single-use ledger for operator/customer invite tokens. Keyed by a SHA-256 hash of the full token
+ * (never the raw token). Presence = already redeemed; the redeem route rejects reuse by anyone other
+ * than the original redeemer.
+ */
+export const towerOperatorInviteRedemption = pgTable("tower_operator_invite_redemption", {
+  tokenHash: text("token_hash").primaryKey(),
+  email: text("email").notNull(),
+  redeemedByUserId: text("redeemed_by_user_id"),
+  redeemedAt: timestamp("redeemed_at").defaultNow().notNull(),
+});
+
 export const userRelations = relations(user, ({ many, one }) => ({
   sessions: many(session),
   accounts: many(account),

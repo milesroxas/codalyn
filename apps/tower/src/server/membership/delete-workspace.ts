@@ -4,6 +4,7 @@ import { getStripe } from "@/server/billing/stripe-client";
 import {
   sendWorkspaceDeletedMemberNotificationEmail,
   sendWorkspaceDeletionPreNoticeEmail,
+  sendWorkspacePurgedMemberNotificationEmail,
 } from "@/server/email/workspace-deletion-member-email";
 import { computePurgeScheduledAt } from "@/server/membership/workspace-deletion-preview";
 import { assertUserIsWorkspaceOwner } from "@/server/membership/workspace-ownership";
@@ -43,6 +44,7 @@ type WorkspaceDeletionTarget = {
   id: string;
   slug: string;
   name: string;
+  ownerUserId: string;
   stripeSubscriptionId: string | null;
   deletedAt: Date | null;
 };
@@ -121,6 +123,7 @@ async function loadWorkspaceDeletionTarget(organizationId: string): Promise<Work
       id: organization.id,
       slug: organization.slug,
       name: organization.name,
+      ownerUserId: organization.ownerUserId,
       stripeSubscriptionId: organization.stripeSubscriptionId,
       deletedAt: organization.deletedAt,
     })
@@ -287,4 +290,90 @@ export async function deleteWorkspace(input: DeleteWorkspaceInput): Promise<void
   }
 
   await softDeleteWorkspaceTarget(target, input.actorUserId, input);
+}
+
+export type PurgeWorkspaceNowInput = {
+  organizationId: string;
+  /** Required for destructive actions; compared case-insensitively to the workspace slug. */
+  confirmSlug: string;
+  /** Required re-authentication for owner-initiated permanent deletion. */
+  password: string;
+  actorUserId: string;
+  /** Notify members after the purge completes. Defaults to true. */
+  notifyMembers?: boolean;
+};
+
+async function loadWorkspacePurgeNotificationData(
+  organizationId: string,
+  actorUserId: string
+): Promise<{ actorName: string | null; memberEmails: string[] }> {
+  const [actor] = await db
+    .select({ name: user.name, email: user.email })
+    .from(user)
+    .where(eq(user.id, actorUserId))
+    .limit(1);
+
+  const members = await db
+    .select({ email: user.email, userId: member.userId })
+    .from(member)
+    .innerJoin(user, eq(member.userId, user.id))
+    .where(eq(member.organizationId, organizationId));
+
+  return {
+    actorName: actor?.name ?? actor?.email ?? null,
+    memberEmails: members.filter((row) => row.userId !== actorUserId).map((row) => row.email),
+  };
+}
+
+/**
+ * Owner-initiated permanent deletion, after slug confirmation and password re-authentication.
+ * Works on active workspaces (skips the recovery window) and on workspaces already scheduled
+ * for deletion (ends the recovery window early). Rows are removed immediately and cannot be recovered.
+ */
+export async function purgeWorkspaceNow(input: PurgeWorkspaceNowInput): Promise<void> {
+  const organizationId = input.organizationId.trim();
+  if (!organizationId) {
+    throw new WorkspaceDeletionError("not_found");
+  }
+
+  const target = await loadWorkspaceDeletionTarget(organizationId);
+  if (!target) {
+    throw new WorkspaceDeletionError("not_found");
+  }
+  if (target.ownerUserId !== input.actorUserId) {
+    throw new WorkspaceDeletionError("forbidden");
+  }
+
+  try {
+    await assertActorPassword(input.actorUserId, input.password);
+  } catch (error) {
+    if (error instanceof ActorPasswordVerificationError) {
+      throw new WorkspaceDeletionError("forbidden", error.message);
+    }
+    throw error;
+  }
+
+  const confirmResult = assertWorkspaceSlugConfirmation(input.confirmSlug, target.slug);
+  if (!confirmResult.ok) {
+    throw new WorkspaceDeletionError(confirmResult.code);
+  }
+
+  // Member rows cascade with the organization row — snapshot recipients before the purge.
+  const notification =
+    input.notifyMembers !== false ? await loadWorkspacePurgeNotificationData(target.id, input.actorUserId) : null;
+
+  await cancelWorkspaceStripeSubscription(target.stripeSubscriptionId);
+  await removeWorkspaceRecordsWithRetry([target.id]);
+
+  if (notification && notification.memberEmails.length > 0) {
+    void Promise.all(
+      notification.memberEmails.map((email) =>
+        sendWorkspacePurgedMemberNotificationEmail({
+          to: email,
+          workspaceName: target.name,
+          actorName: notification.actorName,
+        })
+      )
+    ).catch(() => undefined);
+  }
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computePurgeScheduledAt } from "@/server/membership/workspace-deletion-preview";
 import {
+  canPurgeBlockedWorkspaceNow,
   computeAccountDeletionBlockers,
   formatAccountDeletionBlockedMessage,
   resolveSharedMembershipOrganizationIds,
@@ -161,6 +162,24 @@ describe("formatAccountDeletionBlockedMessage", () => {
         },
       ])
     ).toContain(String(WORKSPACE_SOFT_DELETE_RECOVERY_DAYS));
+  });
+});
+
+describe("canPurgeBlockedWorkspaceNow", () => {
+  const base = {
+    organizationId: "org-1",
+    organizationName: "Acme",
+    organizationSlug: "acme",
+    memberCount: 1,
+    otherMemberCount: 0,
+    hasTeamSubscription: false,
+  } as const;
+
+  it("allows in-place purge for personal and pending-deletion workspaces only", () => {
+    expect(canPurgeBlockedWorkspaceNow({ ...base, reason: "sole_owner_workspace" })).toBe(true);
+    expect(canPurgeBlockedWorkspaceNow({ ...base, reason: "workspace_pending_deletion" })).toBe(true);
+    expect(canPurgeBlockedWorkspaceNow({ ...base, reason: "workspace_owner" })).toBe(false);
+    expect(canPurgeBlockedWorkspaceNow({ ...base, reason: "billing_owner" })).toBe(false);
   });
 });
 

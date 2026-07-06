@@ -2,6 +2,7 @@ import { cookies, headers } from "next/headers";
 import type * as React from "react";
 import { TowerAuthFlashToasts } from "@/features/auth/ui/tower-auth-flash-toasts";
 import { TowerEmailVerificationBanner } from "@/features/auth/ui/tower-email-verification-banner";
+import { TowerSessionSync } from "@/features/auth/ui/tower-session-sync";
 import { TowerUsageApproachingBanner } from "@/features/billing/ui/tower-usage-approaching-banner";
 import { TowerAppShell } from "@/features/tower-ui/tower-app-shell";
 import { TowerWorkspaceOnboardingShell } from "@/features/tower-ui/tower-workspace-onboarding-shell";
@@ -34,6 +35,7 @@ export default async function TowerLayout({ children }: { children: React.ReactN
 
   return (
     <>
+      <TowerSessionSync serverSignedIn={Boolean(userId)} />
       <TowerAuthFlashToasts flash={authFlash} />
       <TowerAppShell
         billingEnabled={billingEnabled}

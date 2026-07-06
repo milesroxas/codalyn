@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
+import { AccountWorkspacePurgeRow } from "@/features/account/ui/account-workspace-purge-row";
 import { resolveTowerAppCallbackUrl } from "@/features/auth/lib/email-verification";
 import { authClient } from "@/features/auth/model/auth-client";
 import {
@@ -12,6 +13,7 @@ import {
 import { buildTeamPageHref } from "@/features/team/lib/team-workspace-tab";
 import {
   type AccountDeletionBlocker,
+  canPurgeBlockedWorkspaceNow,
   formatAccountDeletionBlockedMessage,
 } from "@/shared/lib/membership/user-account-deletion";
 import { Button } from "@/shared/ui/button";
@@ -104,6 +106,8 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
     : deleteBlockers.length > 0
       ? formatAccountDeletionBlockedMessage(deleteBlockers)
       : null;
+  const purgeableBlockers = deleteBlockers.filter(canPurgeBlockedWorkspaceNow);
+  const hasActionableTeamBlockers = deleteBlockers.some((blocker) => blocker.reason !== "workspace_pending_deletion");
 
   return (
     <Card tone="destructive">
@@ -152,9 +156,18 @@ export function AccountDeleteSection(props: { sessionReady: boolean }) {
         {!deleteEligibilityPending && deleteBlockedMessage ? (
           <div className="space-y-3 rounded-sm border border-destructive/30 bg-destructive/5 p-3">
             <p className="text-sm text-destructive">{deleteBlockedMessage}</p>
-            <Button asChild variant="outline" size="sm">
-              <Link href={buildTeamPageHref({ tab: "settings" })}>Open Team settings</Link>
-            </Button>
+            {purgeableBlockers.map((blocker) => (
+              <AccountWorkspacePurgeRow
+                key={blocker.organizationId}
+                blocker={blocker}
+                onPurged={refreshDeleteEligibility}
+              />
+            ))}
+            {hasActionableTeamBlockers ? (
+              <Button asChild variant="outline" size="sm">
+                <Link href={buildTeamPageHref({ tab: "settings" })}>Open Team settings</Link>
+              </Button>
+            ) : null}
           </div>
         ) : null}
         {deleteErr ? (

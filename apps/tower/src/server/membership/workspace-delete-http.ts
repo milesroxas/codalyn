@@ -9,6 +9,35 @@ export type WorkspaceDeleteConfirmBody = {
   confirmPhrase?: unknown;
 };
 
+type OwnerWorkspaceDeleteBody = {
+  organizationId?: unknown;
+  confirmSlug?: unknown;
+  password?: unknown;
+};
+
+/** Owner-initiated delete/purge routes: organizationId + slug confirmation + password re-authentication. */
+export function parseOwnerWorkspaceDeleteBody(
+  raw: unknown
+): { organizationId: string; confirmSlug: string; password: string } | { error: string } {
+  if (!raw || typeof raw !== "object") {
+    return { error: "invalid_body" };
+  }
+  const body = raw as OwnerWorkspaceDeleteBody;
+  const organizationId = typeof body.organizationId === "string" ? body.organizationId.trim() : "";
+  const confirmSlug = typeof body.confirmSlug === "string" ? body.confirmSlug : "";
+  const password = typeof body.password === "string" ? body.password : "";
+  if (!organizationId) {
+    return { error: "organizationId required" };
+  }
+  if (!confirmSlug.trim()) {
+    return { error: "confirmSlug required" };
+  }
+  if (!password.trim()) {
+    return { error: "password required" };
+  }
+  return { organizationId, confirmSlug, password };
+}
+
 export function parseWorkspaceDeleteConfirmBody(raw: unknown): { confirmSlug: string } | { error: string } {
   if (!raw || typeof raw !== "object") {
     return { error: "invalid_body" };

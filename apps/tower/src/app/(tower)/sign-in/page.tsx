@@ -31,7 +31,10 @@ import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
 import { resolveTowerEarlyAccessRequired } from "@/shared/lib/access/access-policy";
 import { isTeamInvitationAcceptPath } from "@/shared/lib/membership/team-invitation-accept";
-import { readTeamInvitationIdFromCallbackPath } from "@/shared/lib/membership/team-invitation-header";
+import {
+  readTeamInvitationIdFromCallbackPath,
+  readTeamInviteAcceptTokenFromCallbackPath,
+} from "@/shared/lib/membership/team-invitation-header";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -92,6 +95,7 @@ function SignInForm() {
   const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl, authSearchParams);
   const joiningViaTeamInvite = isTeamInvitationAcceptPath(callbackUrl);
   const teamInvitationId = readTeamInvitationIdFromCallbackPath(callbackUrl);
+  const teamInviteAcceptToken = readTeamInviteAcceptTokenFromCallbackPath(callbackUrl);
   const verificationPromptContext = joiningViaTeamInvite ? "teamInvite" : "signIn";
 
   useEffect(() => {
@@ -188,6 +192,7 @@ function SignInForm() {
       fetchOptions: resolveTowerEmailLinkAuthFetchOptions({
         operatorInviteToken,
         teamInvitationId,
+        teamInviteAcceptToken,
       }),
     });
     setPending(false);

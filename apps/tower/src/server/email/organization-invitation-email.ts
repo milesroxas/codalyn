@@ -1,5 +1,7 @@
 import { sendTransactionalEmail } from "@/server/email/resend-send";
+import { signTeamInvitationAcceptToken } from "@/server/membership/team-invitation-accept-token";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
+import { TEAM_INVITATION_ACCEPT_TOKEN_PARAM } from "@/shared/lib/membership/team-invitation-header";
 
 /**
  * Team invitation email (Better Auth organization `sendInvitationEmail`).
@@ -14,7 +16,11 @@ export async function sendOrganizationInvitationEmail(data: {
   invitation: { id: string };
 }): Promise<void> {
   const base = resolveTowerPublicBaseUrl();
-  const acceptPath = `/invitations/accept?invitationId=${encodeURIComponent(data.invitation.id)}`;
+  // Secret, recipient-only proof of inbox ownership. Minted here (server-side, never returned to the
+  // inviter) and embedded ONLY in this email, so clicking through auto-verifies the invited email —
+  // no separate verification step — without letting the inviter forge a verified account.
+  const acceptToken = signTeamInvitationAcceptToken(data.invitation.id, data.email);
+  const acceptPath = `/invitations/accept?invitationId=${encodeURIComponent(data.invitation.id)}&${TEAM_INVITATION_ACCEPT_TOKEN_PARAM}=${encodeURIComponent(acceptToken)}`;
   const acceptUrl = `${base}${acceptPath}`;
   const inviterName = data.inviter.user.name?.trim() || data.inviter.user.email || "A teammate";
   const orgName = data.organization.name;

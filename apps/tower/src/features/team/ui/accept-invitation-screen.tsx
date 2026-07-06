@@ -32,8 +32,14 @@ export function AcceptInvitationMessageScreen(props: { title: string; descriptio
   );
 }
 
-export function AcceptInvitationAuthGateScreen(props: { preview: AcceptInvitationPreview; invitationId: string }) {
-  const callbackUrl = buildTeamInvitationAcceptPath(props.invitationId);
+export function AcceptInvitationAuthGateScreen(props: {
+  preview: AcceptInvitationPreview;
+  invitationId: string;
+  acceptToken?: string | null;
+}) {
+  // Carry the secret acceptance token into sign-up/sign-in so the server can auto-verify the invited
+  // email (one-click onboarding) without a separate verification step.
+  const callbackUrl = buildTeamInvitationAcceptPath(props.invitationId, props.acceptToken);
   const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl);
   const signUpHref = buildTowerAuthSurfaceHref("/sign-up", callbackUrl);
 

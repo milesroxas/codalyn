@@ -55,6 +55,33 @@ export async function sendWorkspaceDeletionPreNoticeEmail(input: {
   await sendTransactionalEmail({ to: input.to, subject, html, text });
 }
 
+export async function sendWorkspacePurgedMemberNotificationEmail(input: {
+  to: string;
+  workspaceName: string;
+  actorName: string | null;
+}): Promise<void> {
+  const actorLabel = input.actorName?.trim() || "The workspace owner";
+  const subject = `${input.workspaceName} was permanently deleted on Tower`;
+  const text = [
+    `${actorLabel} permanently deleted “${input.workspaceName}” on Tower.`,
+    "",
+    "The workspace and its data cannot be recovered.",
+    "",
+    "If you did not expect this, contact the workspace owner or Tower support.",
+  ].join("\n");
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #171717;">
+  <p><strong>${escapeHtml(actorLabel)}</strong> permanently deleted <strong>${escapeHtml(input.workspaceName)}</strong> on Tower.</p>
+  <p>The workspace and its data cannot be recovered.</p>
+  <p style="font-size: 12px; color: #737373;">If you did not expect this, contact the workspace owner or Tower support.</p>
+</body>
+</html>`;
+
+  await sendTransactionalEmail({ to: input.to, subject, html, text });
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

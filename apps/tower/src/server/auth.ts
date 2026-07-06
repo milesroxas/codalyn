@@ -18,6 +18,7 @@ import {
   rewriteBetterAuthVerifyEmailUrlToAppPage,
   rewriteVerifyEmailCallbackUrl,
 } from "@/server/auth/email-verification-token";
+import { resolveTowerAuthRateLimitStorage } from "@/server/auth/rate-limit-storage";
 import { setTowerEmailVerifiedFlashCookieInHook } from "@/server/auth/tower-auth-flash-cookie";
 import { shouldSetTowerEmailVerifiedFlashAfterVerifyEmail } from "@/server/auth/tower-email-verification-after-hook";
 import { resolveAuthSecret } from "@/server/auth-secret";
@@ -26,6 +27,10 @@ import { sendChangeEmailNewAddressVerificationEmail } from "@/server/email/chang
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
 import { sendExistingAccountSignUpEmail } from "@/server/email/existing-account-sign-up-email";
 import { sendPasswordResetEmail } from "@/server/email/password-reset-email";
+import {
+  isValidTeamInviteAcceptTokenForEmail,
+  readTeamInviteAcceptTokenFromAuthContext,
+} from "@/server/membership/team-invitation-accept-token";
 import { towerOrganization } from "@/server/membership/tower-organization";
 import {
   prepareUserAccountDeletion,
@@ -39,6 +44,18 @@ import { db } from "@/shared/lib/db";
 import * as schema from "@/shared/lib/db/auth-schema";
 
 const baseURL = resolveTowerPublicBaseUrl();
+
+/** True when the verification-email request originated from the sign-up endpoint (vs sign-in / explicit send). */
+function isSignUpEmailRequest(request: Request | undefined): boolean {
+  if (!request) {
+    return false;
+  }
+  try {
+    return new URL(request.url).pathname.endsWith("/sign-up/email");
+  } catch {
+    return false;
+  }
+}
 
 function resolveAdvancedAuthOptions(): {
   crossSubDomainCookies?: { enabled: true; domain: string };
@@ -90,16 +107,19 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url, token }, request) => {
       const changeEmailVerification = isChangeEmailVerificationRequest(token);
-      // Only an operator-issued invite token (HMAC-signed by a product admin, emailed to this exact
-      // address, non-forgeable) proves inbox ownership at sign-up, so only it may suppress the
-      // verification email. Team invitations are NOT trusted here: any user can invite an arbitrary
-      // email to their own workspace, so possession of the invitation is not proof the sign-up owns
-      // that inbox — those users verify their email normally, then accept the invitation.
+      // Suppress the redundant verification email ONLY at sign-up, and only when the account is being
+      // auto-verified from real inbox proof:
+      //  - an operator invite token (admin-signed, bound to this email, non-forgeable), or
+      //  - a secret team-invite acceptance token (emailed ONLY to this address).
+      // The bare invitation id is never trusted (any user can invite any email to their own
+      // workspace). On sign-in we deliberately do NOT suppress: an already-registered but unverified
+      // invitee must still receive the email so they can verify — otherwise they'd be stuck.
       const operatorInviteToken = readOperatorInviteTokenFromAuthContext({ request });
-      const skipForOperatorInvite = operatorInviteToken
-        ? isValidOperatorInviteForEmail(operatorInviteToken, user.email)
-        : false;
-      if (skipForOperatorInvite && !changeEmailVerification) {
+      const teamInviteAcceptToken = readTeamInviteAcceptTokenFromAuthContext({ request });
+      const hasInboxProof =
+        (operatorInviteToken != null && isValidOperatorInviteForEmail(operatorInviteToken, user.email)) ||
+        (teamInviteAcceptToken != null && isValidTeamInviteAcceptTokenForEmail(teamInviteAcceptToken, user.email));
+      if (isSignUpEmailRequest(request) && hasInboxProof && !changeEmailVerification) {
         return;
       }
       if (changeEmailVerification) {
@@ -175,6 +195,22 @@ export const auth = betterAuth({
   baseURL,
   trustedOrigins: resolveTowerTrustedOrigins(),
   advanced: resolveAdvancedAuthOptions(),
+  /**
+   * Rate limiting is enabled by default in production/preview (Better Auth's `isProduction` default).
+   * Better Auth already applies strict per-IP special rules for sign-in/up (3/10s). We additionally
+   * cap the email-sending endpoints per hour so an attacker can't bomb an arbitrary address with
+   * reset / verification mail. Storage is env-gated (see `resolveTowerAuthRateLimitStorage`): "memory"
+   * (default, per-instance) until the `rate_limit` table exists, then "database" (shared) once
+   * `TOWER_AUTH_RATELIMIT_DB_STORAGE=1` is set.
+   */
+  rateLimit: {
+    storage: resolveTowerAuthRateLimitStorage(),
+    customRules: {
+      "/forget-password": { window: 3600, max: 5 },
+      "/request-password-reset": { window: 3600, max: 5 },
+      "/send-verification-email": { window: 3600, max: 5 },
+    },
+  },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path === "/sign-up/email") {
@@ -213,13 +249,23 @@ export const auth = betterAuth({
           if (!createdUser.email) {
             return;
           }
-          // Auto-verify at sign-up ONLY for a valid operator invite token (admin-signed, bound to
-          // this exact email, non-forgeable). Team-invitation possession is deliberately NOT trusted:
-          // an attacker can invite any email to their own workspace and would otherwise mint a
-          // verified account under the victim's identity. Team-invited users verify their email
-          // normally; genuine ownership is (re)confirmed in `beforeAcceptInvitation`.
+          // Auto-verify at sign-up only from real inbox-ownership proof:
+          //  - an operator invite token (admin-signed, bound to this email, non-forgeable), or
+          //  - a secret team-invite acceptance token that was emailed ONLY to this address.
+          // The bare invitation id is deliberately NOT trusted: any user can invite an arbitrary
+          // email to their own workspace and knows that id, so it would let them mint a verified
+          // account under the victim's identity. The secret token, unknown to the inviter, closes that.
           const operatorInviteToken = readOperatorInviteTokenFromAuthContext(ctx);
           if (operatorInviteToken && isValidOperatorInviteForEmail(operatorInviteToken, createdUser.email)) {
+            return {
+              data: {
+                ...createdUser,
+                emailVerified: true,
+              },
+            };
+          }
+          const teamInviteAcceptToken = readTeamInviteAcceptTokenFromAuthContext(ctx);
+          if (teamInviteAcceptToken && isValidTeamInviteAcceptTokenForEmail(teamInviteAcceptToken, createdUser.email)) {
             return {
               data: {
                 ...createdUser,

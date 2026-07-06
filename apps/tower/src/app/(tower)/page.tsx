@@ -2,7 +2,6 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { TowerDashboard } from "@/features/tower-ui/tower-dashboard";
 import { TowerLanding } from "@/features/tower-ui/tower-landing";
-import { TowerLandingAuthSync } from "@/features/tower-ui/tower-landing-auth-sync";
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
 import { auth } from "@/server/auth";
 import { isTowerBillingEnabled } from "@/server/billing/billing-feature";
@@ -32,12 +31,7 @@ export default async function HomePage() {
   const appLinks = buildTowerLandingAppLinks(host);
 
   if (isMarketingHost(host)) {
-    return (
-      <>
-        <TowerLandingAuthSync serverSignedIn={false} />
-        <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={appLinks} />
-      </>
-    );
+    return <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={appLinks} />;
   }
 
   const requestHeaders = await headers();
@@ -61,12 +55,7 @@ export default async function HomePage() {
     }
     const userId = session?.user?.id;
     if (!userId) {
-      return (
-        <>
-          <TowerLandingAuthSync serverSignedIn={false} />
-          <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={appLinks} />
-        </>
-      );
+      return <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={appLinks} />;
     }
 
     const activeOrg = await getActiveOrganizationIdForAuthHeaders(requestHeaders);
@@ -75,10 +64,5 @@ export default async function HomePage() {
     return <TowerDashboard summary={summary} usage={usage} billingEnabled={isTowerBillingEnabled()} />;
   }
 
-  return (
-    <>
-      <TowerLandingAuthSync serverSignedIn={false} />
-      <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={appLinks} />
-    </>
-  );
+  return <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={appLinks} />;
 }

@@ -21,6 +21,7 @@ import {
   classifyTeamInvitationAcceptError,
   isTeamInvitationVerificationRedirectError,
   messageForTeamInvitationAcceptError,
+  readTeamInvitationAcceptTokenFromSearchParams,
   readTeamInvitationIdFromSearchParams,
   TEAM_INVITATION_ACCEPT_COPY,
   type TeamInvitationPreview,
@@ -33,6 +34,7 @@ function AcceptInvitationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const invitationId = readTeamInvitationIdFromSearchParams(searchParams);
+  const acceptToken = readTeamInvitationAcceptTokenFromSearchParams(searchParams);
   const verificationRedirectError = readEmailVerificationRedirectError(searchParams);
   const [storedVerificationRedirectError, setStoredVerificationRedirectError] = useState<string | null>(null);
   const { data: session, isPending: sessionPending } = authClient.useSession();
@@ -156,7 +158,7 @@ function AcceptInvitationContent() {
 
   const preview = previewState.preview;
   if (preview.ok && isTeamInvitationVerificationRedirectError(activeVerificationRedirectError) && !session?.user) {
-    const callbackUrl = buildTeamInvitationAcceptPath(invitationId);
+    const callbackUrl = buildTeamInvitationAcceptPath(invitationId, acceptToken);
     const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl);
     return (
       <AcceptInvitationMessageScreen
@@ -184,7 +186,7 @@ function AcceptInvitationContent() {
   }
 
   if (!session?.user) {
-    return <AcceptInvitationAuthGateScreen preview={preview} invitationId={invitationId} />;
+    return <AcceptInvitationAuthGateScreen preview={preview} invitationId={invitationId} acceptToken={acceptToken} />;
   }
 
   const signedInEmail = session.user.email.trim().toLowerCase();

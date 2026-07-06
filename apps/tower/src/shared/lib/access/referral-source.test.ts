@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  EARLY_ACCESS_REFERRAL_OTHER_MAX_LENGTH,
   formatEarlyAccessReferralNote,
   parseEarlyAccessReferralRequestInput,
   parseEarlyAccessReferralSourceInput,
@@ -27,6 +28,12 @@ describe("formatEarlyAccessReferralNote", () => {
     expect(formatEarlyAccessReferralNote("other", "  Podcast  ")).toBe("Other: Podcast");
     expect(formatEarlyAccessReferralNote("other", "   ")).toBeNull();
     expect(formatEarlyAccessReferralNote("other")).toBeNull();
+  });
+
+  it("caps oversized free-text detail", () => {
+    const huge = "x".repeat(EARLY_ACCESS_REFERRAL_OTHER_MAX_LENGTH + 500);
+    const note = formatEarlyAccessReferralNote("other", huge);
+    expect(note).toBe(`Other: ${"x".repeat(EARLY_ACCESS_REFERRAL_OTHER_MAX_LENGTH)}`);
   });
 });
 

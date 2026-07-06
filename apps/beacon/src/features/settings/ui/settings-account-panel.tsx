@@ -1,10 +1,13 @@
+import type { TowerUsagePlanContext } from "@codalyn/webflow-kit";
+import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
-import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
+import { getTowerAuthBaseUrl, openTowerAppPath } from "@/features/auth/model/tower-auth-client";
 import type { BridgedTowerUser } from "@/features/auth/model/use-beacon-tower-session";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { BeaconTowerActionList } from "@/features/auth/ui/beacon-tower-action-list";
 import { BeaconTowerNotConfiguredNotice } from "@/features/auth/ui/beacon-tower-not-configured-notice";
 import { BeaconTowerSignInPrompt } from "@/features/auth/ui/beacon-tower-sign-in-prompt";
+import { useTowerUsageStatus } from "@/features/billing/model/use-tower-usage-status";
 import type {
   BeaconSettingsSyncState,
   BeaconTowerWorkspace,
@@ -116,6 +119,68 @@ function syncStatusMeta(syncState: BeaconSettingsSyncState): {
   };
 }
 
+function planStatusMeta(
+  plan: TowerUsagePlanContext | null,
+  loading: boolean
+): { label: string | null; description: string } {
+  if (plan) {
+    if (plan.billingScope === "workspace") {
+      return { label: plan.name, description: "Billed to the workspace, per seat." };
+    }
+    if (plan.key === "free") {
+      return { label: plan.name, description: "Upgrade in Tower to raise monthly limits." };
+    }
+    return { label: plan.name, description: "Billed to your Tower account." };
+  }
+  if (loading) {
+    return { label: null, description: "Loading plan from Tower." };
+  }
+  return { label: null, description: "Could not load plan details from Tower." };
+}
+
+/** Plan name, workspace role, and the billing hand-off to Tower. Mirrors the Sync section's header + badge layout. */
+function AccountPlanSection({ roleAux }: { roleAux: ReturnType<typeof roleAuxLabel> }) {
+  const { status, loading } = useTowerUsageStatus(true);
+  const meta = planStatusMeta(status?.plan ?? null, loading);
+
+  return (
+    <section className="flex flex-col gap-2 py-6">
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <h2 className="text-sm font-medium leading-tight">Plan</h2>
+        {meta.label ? (
+          <Badge variant="outline" className="shrink-0 font-normal">
+            {meta.label}
+          </Badge>
+        ) : null}
+      </div>
+      <p className="text-muted-foreground text-xs leading-snug">{meta.description}</p>
+      {roleAux ? (
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+          <span className="text-muted-foreground text-xs leading-tight">Role</span>
+          <span
+            className={cn(
+              "text-xs leading-tight",
+              roleAux.tone === "destructive" ? "text-destructive" : "text-foreground"
+            )}
+          >
+            {roleAux.text}
+          </span>
+        </div>
+      ) : null}
+      <Button
+        type="button"
+        variant="outline"
+        size="xs"
+        className="mt-1 self-start"
+        onClick={() => openTowerAppPath("/billing")}
+      >
+        Manage billing
+        <ExternalLink aria-hidden />
+      </Button>
+    </section>
+  );
+}
+
 function AccessModeChip({ label, tooltip }: { label: string; tooltip: ReactNode }) {
   return (
     <Tooltip>
@@ -224,17 +289,7 @@ function SignedInAccountSections({
                 </Badge>
               ) : null}
             </div>
-            <p className="text-muted-foreground truncate text-xs leading-tight">
-              <span>{user.email}</span>
-              {roleAux ? (
-                <>
-                  <span aria-hidden> · </span>
-                  <span className={cn(roleAux.tone === "destructive" ? "text-destructive" : undefined)}>
-                    {roleAux.text}
-                  </span>
-                </>
-              ) : null}
-            </p>
+            <p className="text-muted-foreground truncate text-xs leading-tight">{user.email}</p>
           </div>
           <BeaconWorkspaceSelectField
             syncState={syncState}
@@ -244,6 +299,10 @@ function SignedInAccountSections({
           />
         </div>
       </section>
+
+      <Separator />
+
+      <AccountPlanSection roleAux={roleAux} />
 
       <Separator />
 

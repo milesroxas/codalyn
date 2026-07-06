@@ -8,6 +8,7 @@ import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/u
 import { EarlyAccessRequestForm } from "@/features/auth/ui/early-access-request-form";
 import { EarlyAccessRequestFormSkeletonPage } from "@/features/auth/ui/early-access-request-form-skeleton";
 import { EarlyAccessPageShell } from "@/features/tower-ui/early-access-page-shell";
+import { resolveTowerEarlyAccessRequired } from "@/shared/lib/access/access-policy";
 import {
   EARLY_ACCESS_REQUEST_PAGE_SIGN_UP_CTA,
   EARLY_ACCESS_REQUEST_PAGE_UNAVAILABLE,
@@ -35,14 +36,14 @@ function RequestAccessContent() {
     let cancelled = false;
     void fetch("/api/account/access-policy", { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { earlyAccessRequired?: boolean } | null) => {
+      .then((data: unknown) => {
         if (!cancelled) {
-          setAvailable(Boolean(data?.earlyAccessRequired));
+          setAvailable(resolveTowerEarlyAccessRequired(data));
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setAvailable(false);
+          setAvailable(true);
         }
       });
     return () => {

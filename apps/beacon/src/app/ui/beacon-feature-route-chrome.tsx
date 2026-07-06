@@ -29,8 +29,17 @@ export function BeaconFeatureRouteBackHeader(props: BeaconFeatureRouteBackHeader
 
   return (
     <div className="shrink-0 border-b border-border/65 bg-background" data-slot={dataSlot}>
-      <div className={cn(beaconPanelContainClass, "grid h-8 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 px-3")}>
-        <Button type="button" size="icon-sm" variant="ghost" onClick={onBack} aria-label={backLabel}>
+      <div className={cn(beaconPanelContainClass, "grid h-8 grid-cols-[auto_minmax(0,1fr)] items-center gap-1 px-3")}>
+        {/* Mirrors the app header's HeaderFeatureTitle inset: icon-xs + -ml-1 lands the arrow glyph and title on the
+            same left edge as flat feature route headers. */}
+        <Button
+          type="button"
+          size="icon-xs"
+          variant="ghost"
+          className="-ml-1 shrink-0"
+          onClick={onBack}
+          aria-label={backLabel}
+        >
           <ArrowLeft aria-hidden className="size-4" />
         </Button>
         <h2 className="min-w-0 truncate text-sm font-medium leading-none tracking-tight text-foreground">{title}</h2>

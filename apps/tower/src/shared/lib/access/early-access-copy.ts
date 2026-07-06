@@ -52,4 +52,8 @@ export const EARLY_ACCESS_REQUEST_INVALID_EMAIL = "Enter a valid email address."
 
 export const EARLY_ACCESS_REQUEST_SUBMIT_ERROR = "Could not send your request. Try again.";
 
+export const EARLY_ACCESS_REQUEST_RATE_LIMITED = "Too many requests. Please wait a few minutes and try again.";
+
+export const EARLY_ACCESS_REQUEST_CAPTCHA_FAILED = "Couldn't verify you're human. Please refresh and try again.";
+
 export const EARLY_ACCESS_REQUEST_SIGN_IN_LABEL = "Sign in";

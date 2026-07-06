@@ -27,6 +27,22 @@ const nextConfig: NextConfig = {
     root: monorepoRoot,
   },
   output: "standalone",
+  /**
+   * Auth surfaces carry secrets in the URL (`?invite=` operator token, `?token=` reset token,
+   * invitationId). `no-referrer` keeps those from leaking to third parties via the Referer header
+   * (history/logs/analytics) when the page loads sub-resources or the user follows an outbound link.
+   */
+  async headers() {
+    const noReferrer = [{ key: "Referrer-Policy", value: "no-referrer" }];
+    return [
+      { source: "/sign-up", headers: noReferrer },
+      { source: "/sign-in", headers: noReferrer },
+      { source: "/request-access", headers: noReferrer },
+      { source: "/forgot-password", headers: noReferrer },
+      { source: "/reset-password", headers: noReferrer },
+      { source: "/invitations/accept", headers: noReferrer },
+    ];
+  },
 };
 
 export default withSentryConfig(nextConfig, {

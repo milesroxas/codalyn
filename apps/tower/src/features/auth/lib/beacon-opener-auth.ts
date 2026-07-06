@@ -1,3 +1,4 @@
+import { isTrustedBeaconMessageOrigin } from "@/server/tower-beacon-message-origin";
 import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "./resolve-email-auth-session";
 
 /** Minimal user payload posted to Beacon after popup sign-in (cross-origin cookies not available in Designer iframe). */
@@ -13,7 +14,7 @@ export type BeaconTowerAuthMessageUser = {
  * but Beacon has no bearer in storage, hand off the current session the same way as after email sign-in.
  */
 export async function syncExistingTowerSessionToBeaconIfPopup(beaconOrigin: string | null): Promise<void> {
-  if (!beaconOrigin || typeof window === "undefined" || !window.opener) {
+  if (!beaconOrigin || !isTrustedBeaconMessageOrigin(beaconOrigin) || typeof window === "undefined" || !window.opener) {
     return;
   }
   const { user: u, token } = await resolveUserAndTokenAfterEmailAuth(null);
@@ -30,7 +31,14 @@ export function tryFinishBeaconTowerAuthPopup(
   user: BeaconTowerAuthMessageUser | undefined,
   sessionToken: string | undefined
 ): boolean {
-  if (!beaconOrigin || typeof window === "undefined" || !window.opener || !user || !sessionToken) {
+  if (
+    !beaconOrigin ||
+    !isTrustedBeaconMessageOrigin(beaconOrigin) ||
+    typeof window === "undefined" ||
+    !window.opener ||
+    !user ||
+    !sessionToken
+  ) {
     return false;
   }
   window.opener.postMessage({ type: "codalyn:tower-auth", status: "success", user, token: sessionToken }, beaconOrigin);

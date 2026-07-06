@@ -11,8 +11,8 @@ import {
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { resolveMembershipSeatCapFromOrg } from "@/server/billing/team-billing-config";
 import { sendOrganizationInvitationEmail } from "@/server/email/organization-invitation-email";
+import { markEmailVerifiedForUserId } from "@/server/membership/email-verification-trust";
 import { clearAccountDeletedInvitationGhosts } from "@/server/membership/invitation-hygiene";
-import { markEmailVerifiedForUserId } from "@/server/membership/team-invitation-email-trust";
 import { resolveUserWorkspaceCreationEligibility } from "@/server/membership/user-workspace-creation-eligibility";
 import {
   assertWorkspaceSlugAvailableForUpdate,

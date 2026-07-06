@@ -29,6 +29,7 @@ import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/u
 import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
 import { AuthShell } from "@/features/tower-ui/auth-shell";
+import { resolveTowerEarlyAccessRequired } from "@/shared/lib/access/access-policy";
 import { isTeamInvitationAcceptPath } from "@/shared/lib/membership/team-invitation-accept";
 import { readTeamInvitationIdFromCallbackPath } from "@/shared/lib/membership/team-invitation-header";
 import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-path";
@@ -108,14 +109,14 @@ function SignInForm() {
     let cancelled = false;
     void fetch("/api/account/access-policy", { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { earlyAccessRequired?: boolean } | null) => {
+      .then((data: unknown) => {
         if (!cancelled) {
-          setEarlyAccessRequired(Boolean(data?.earlyAccessRequired));
+          setEarlyAccessRequired(resolveTowerEarlyAccessRequired(data));
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setEarlyAccessRequired(false);
+          setEarlyAccessRequired(true);
         }
       });
     return () => {

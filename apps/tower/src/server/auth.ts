@@ -11,10 +11,7 @@ import {
   readOperatorInviteTokenFromAuthContext,
 } from "@/server/access/early-access";
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
-import {
-  isValidOperatorInviteForEmail,
-  trustEmailForOperatorInvite,
-} from "@/server/access/operator-invite-email-trust";
+import { isValidOperatorInviteForEmail } from "@/server/access/operator-invite-email-trust";
 import { resolveTowerEmailChangeCompleteAppCallbackUrl } from "@/server/auth/change-email-callback";
 import {
   isChangeEmailVerificationRequest,
@@ -29,13 +26,6 @@ import { sendChangeEmailNewAddressVerificationEmail } from "@/server/email/chang
 import { sendEmailVerificationEmail } from "@/server/email/email-verification-email";
 import { sendExistingAccountSignUpEmail } from "@/server/email/existing-account-sign-up-email";
 import { sendPasswordResetEmail } from "@/server/email/password-reset-email";
-import {
-  readTeamInvitationIdFromAuthContext,
-  shouldMarkEmailVerifiedOnTeamInviteSignUp,
-  shouldSkipVerificationEmailForTeamInvite,
-  trustEmailForPendingOrgInvitationEmail,
-  trustEmailForPendingTeamInvitation,
-} from "@/server/membership/team-invitation-email-trust";
 import { towerOrganization } from "@/server/membership/tower-organization";
 import {
   prepareUserAccountDeletion,
@@ -45,7 +35,6 @@ import {
 import { resolveTowerCookieDomain, resolveTowerCookiePrefix } from "@/server/tower-hosts";
 import { resolveTowerPublicBaseUrl } from "@/server/tower-public-url";
 import { resolveTowerTrustedOrigins } from "@/server/tower-trusted-origins";
-import { TOWER_SKIP_VERIFICATION_EMAIL_HEADER } from "@/shared/lib/auth/tower-email-verification-header";
 import { db } from "@/shared/lib/db";
 import * as schema from "@/shared/lib/db/auth-schema";
 
@@ -87,7 +76,9 @@ export const auth = betterAuth({
       });
     },
     sendResetPassword: async ({ user, url }) => {
-      void sendPasswordResetEmail({
+      // Must await: on Vercel the function can freeze after returning, so a fire-and-forget send may
+      // never reach Resend and the reset email silently never arrives.
+      await sendPasswordResetEmail({
         user: { email: user.email, name: user.name },
         url,
       });
@@ -98,18 +89,17 @@ export const auth = betterAuth({
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url, token }, request) => {
-      const skipHeader = request?.headers.get(TOWER_SKIP_VERIFICATION_EMAIL_HEADER) === "1";
       const changeEmailVerification = isChangeEmailVerificationRequest(token);
-      const teamInvitationId = readTeamInvitationIdFromAuthContext({ request });
+      // Only an operator-issued invite token (HMAC-signed by a product admin, emailed to this exact
+      // address, non-forgeable) proves inbox ownership at sign-up, so only it may suppress the
+      // verification email. Team invitations are NOT trusted here: any user can invite an arbitrary
+      // email to their own workspace, so possession of the invitation is not proof the sign-up owns
+      // that inbox — those users verify their email normally, then accept the invitation.
       const operatorInviteToken = readOperatorInviteTokenFromAuthContext({ request });
-      const skipForTeamInvitation = await shouldSkipVerificationEmailForTeamInvite({
-        email: user.email,
-        invitationId: teamInvitationId,
-      });
       const skipForOperatorInvite = operatorInviteToken
         ? isValidOperatorInviteForEmail(operatorInviteToken, user.email)
         : false;
-      if ((skipHeader || skipForTeamInvitation || skipForOperatorInvite) && !changeEmailVerification) {
+      if (skipForOperatorInvite && !changeEmailVerification) {
         return;
       }
       if (changeEmailVerification) {
@@ -159,7 +149,8 @@ export const auth = betterAuth({
       enabled: true,
       updateEmailWithoutVerification: false,
       sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
-        void sendChangeEmailConfirmationEmail({
+        // Await so the confirmation actually sends before the serverless function can freeze.
+        await sendChangeEmailConfirmationEmail({
           user: { email: user.email, name: user.name },
           newEmail,
           url,
@@ -194,10 +185,11 @@ export const auth = betterAuth({
       }
       if (ctx.path === "/sign-in/email") {
         const email = typeof ctx.body?.email === "string" ? ctx.body.email : "";
+        // Only gate sign-in here — no email-verification side effects. Marking a victim's account
+        // verified before the password is even checked let a wrong-password attempt flip
+        // `emailVerified`. Unverified users (invited or not) re-trigger the verification email via
+        // `sendOnSignIn` and verify normally.
         await assertUserMaySignInByEmail(email);
-        await trustEmailForPendingTeamInvitation(email, readTeamInvitationIdFromAuthContext(ctx));
-        await trustEmailForPendingOrgInvitationEmail(email);
-        await trustEmailForOperatorInvite(email, readOperatorInviteTokenFromAuthContext(ctx));
       }
     }),
     after: createAuthMiddleware(async (ctx) => {
@@ -221,20 +213,11 @@ export const auth = betterAuth({
           if (!createdUser.email) {
             return;
           }
-          const invitationId = readTeamInvitationIdFromAuthContext(ctx);
-          if (
-            await shouldMarkEmailVerifiedOnTeamInviteSignUp({
-              email: createdUser.email,
-              invitationId,
-            })
-          ) {
-            return {
-              data: {
-                ...createdUser,
-                emailVerified: true,
-              },
-            };
-          }
+          // Auto-verify at sign-up ONLY for a valid operator invite token (admin-signed, bound to
+          // this exact email, non-forgeable). Team-invitation possession is deliberately NOT trusted:
+          // an attacker can invite any email to their own workspace and would otherwise mint a
+          // verified account under the victim's identity. Team-invited users verify their email
+          // normally; genuine ownership is (re)confirmed in `beforeAcceptInvitation`.
           const operatorInviteToken = readOperatorInviteTokenFromAuthContext(ctx);
           if (operatorInviteToken && isValidOperatorInviteForEmail(operatorInviteToken, createdUser.email)) {
             return {

@@ -5,8 +5,15 @@ const VERSION = 1 as const;
 
 type PayloadV1 = { v: typeof VERSION; e: string; exp: number };
 
-/** Default 14 days — long enough for email + onboarding. */
-export const OPERATOR_CUSTOMER_INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+/**
+ * Default 3 days. Short by design: the token is a stateless, replayable bearer credential that
+ * auto-verifies the account it names, so its validity window is the replay window. Kept long enough
+ * for an invited user to receive the email and finish onboarding.
+ *
+ * TODO(security): make redemption single-use (persist a redeemed-jti and reject reuse) — tracked as
+ * a follow-up because it requires a new table + migration. Until then, TTL is the only replay bound.
+ */
+export const OPERATOR_CUSTOMER_INVITE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
 export function signOperatorCustomerInviteToken(email: string, ttlMs = OPERATOR_CUSTOMER_INVITE_TTL_MS): string {
   const e = email.trim().toLowerCase();

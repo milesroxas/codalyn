@@ -10,7 +10,13 @@ export const TOWER_WEBFLOW_DESIGNER_TRUSTED_ORIGIN_PATTERNS = [
 
 export function isWebflowDesignerExtensionOrigin(origin: string): boolean {
   try {
-    const { hostname } = new URL(origin);
+    const { protocol, hostname } = new URL(origin);
+    // Webflow Designer + extension origins are always https; reject scheme downgrades (http://…)
+    // so a matching hostname over http can't be treated as trusted (defense in depth for CORS +
+    // the Beacon postMessage handoff).
+    if (protocol !== "https:") {
+      return false;
+    }
     return (
       hostname === "design.webflow.com" ||
       hostname.endsWith(".design.webflow.com") ||

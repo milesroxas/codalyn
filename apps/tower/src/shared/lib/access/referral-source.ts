@@ -11,6 +11,9 @@ export const EARLY_ACCESS_REFERRAL_SOURCE_OPTIONS = [
 
 export type EarlyAccessReferralSource = (typeof EARLY_ACCESS_REFERRAL_SOURCE_OPTIONS)[number]["value"];
 
+/** Cap the free-text "other" detail so an unauthenticated caller can't push an oversized note into operator emails. */
+export const EARLY_ACCESS_REFERRAL_OTHER_MAX_LENGTH = 500;
+
 export function parseEarlyAccessReferralSourceInput(raw: unknown): EarlyAccessReferralSource | null {
   if (typeof raw !== "string") {
     return null;
@@ -23,7 +26,7 @@ export function formatEarlyAccessReferralNote(
   otherDetail?: string | null
 ): string | null {
   if (source === "other") {
-    const detail = otherDetail?.trim();
+    const detail = otherDetail?.trim().slice(0, EARLY_ACCESS_REFERRAL_OTHER_MAX_LENGTH);
     if (!detail) {
       return null;
     }

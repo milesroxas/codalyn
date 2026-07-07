@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type FormEvent, useId, useState } from "react";
+import { TurnstileWidget } from "@/features/auth/ui/turnstile-widget";
 import {
   EARLY_ACCESS_ALREADY_APPROVED_PROMPT,
   EARLY_ACCESS_REQUEST_ALREADY_HAS_ACCESS_MESSAGE,
@@ -37,6 +38,10 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
+
+// The server enforces Turnstile on this form's route whenever TURNSTILE_SECRET_KEY is set, so the
+// site key must be provisioned alongside it — otherwise every submission fails with captcha_failed.
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 type RequestOutcome = "created" | "already_pending" | "already_has_access";
 
@@ -98,6 +103,18 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ message: string; outcome: RequestOutcome } | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  // Turnstile tokens are single-use; bumping this key remounts the widget for a fresh challenge
+  // after a rejected submission.
+  const [turnstileNonce, setTurnstileNonce] = useState(0);
+
+  function resetTurnstile() {
+    if (!TURNSTILE_SITE_KEY) {
+      return;
+    }
+    setTurnstileToken(null);
+    setTurnstileNonce((nonce) => nonce + 1);
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -122,11 +139,13 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
           email: normalizeAccessEmail(email),
           referralSource,
           referralOther: referralSource === "other" ? referralOther : undefined,
+          turnstileToken: turnstileToken ?? undefined,
         }),
       });
       const body = (await res.json().catch(() => null)) as { outcome?: RequestOutcome; error?: string } | null;
       if (!res.ok) {
         setError(submitErrorMessage(body?.error));
+        resetTurnstile();
         return;
       }
       const outcome = body?.outcome ?? "created";
@@ -140,6 +159,7 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
       setReferralOther("");
     } catch {
       setError(EARLY_ACCESS_REQUEST_SUBMIT_ERROR);
+      resetTurnstile();
     } finally {
       setPending(false);
     }
@@ -239,12 +259,20 @@ export function EarlyAccessRequestForm(props: EarlyAccessRequestFormProps) {
                 />
               </FormField>
             ) : null}
+            {TURNSTILE_SITE_KEY ? (
+              <TurnstileWidget key={turnstileNonce} siteKey={TURNSTILE_SITE_KEY} onToken={setTurnstileToken} />
+            ) : null}
             {error ? (
               <p className="text-sm text-destructive" role="alert">
                 {error}
               </p>
             ) : null}
-            <Button type="submit" disabled={pending} size="form" width="full">
+            <Button
+              type="submit"
+              disabled={pending || (Boolean(TURNSTILE_SITE_KEY) && !turnstileToken)}
+              size="form"
+              width="full"
+            >
               {pending ? EARLY_ACCESS_REQUEST_SUBMIT_PENDING : EARLY_ACCESS_REQUEST_SUBMIT_LABEL}
             </Button>
           </form>

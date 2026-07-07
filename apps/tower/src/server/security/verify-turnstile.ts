@@ -2,11 +2,12 @@ const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverif
 
 /**
  * True when Cloudflare Turnstile is provisioned. Captcha enforcement is opt-in via env: setting
- * `TURNSTILE_SECRET_KEY` turns it on. IMPORTANT: when you set the secret you MUST also render a
- * Turnstile widget on every client that posts to a protected route (currently only the Tower
- * `/request-access` form) so it can supply a token — otherwise those submissions will start
- * failing with `captcha_failed`. The Beacon inline early-access form is exempt (the Designer
- * extension iframe can't render the widget); its route relies on rate limiting instead.
+ * `TURNSTILE_SECRET_KEY` turns it on. IMPORTANT: the secret must be provisioned together with
+ * `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — clients that post to a protected route (currently only the
+ * Tower `/request-access` form) render the widget only when the site key is present, and without
+ * a widget token every submission fails with `captcha_failed`. The Beacon inline early-access
+ * form is exempt (the Designer extension iframe can't render the widget); its route relies on
+ * rate limiting instead.
  */
 export function isTurnstileConfigured(): boolean {
   return Boolean(process.env.TURNSTILE_SECRET_KEY);

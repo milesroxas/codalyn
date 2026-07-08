@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { auth } from "@/server/auth";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
+import { decryptStoredSecret } from "@/server/security/secret-encryption";
 import {
   resolveWebflowAppClientCredentials,
   WEBFLOW_DATA_API_APP_KEY,
@@ -64,7 +65,12 @@ export async function resolveActiveOrganizationWebflowToken(
     )
     .limit(1);
   const stored = rows[0]?.accessToken?.trim();
-  return stored ? { organizationId, accessToken: stored } : undefined;
+  if (!stored) {
+    return undefined;
+  }
+  // Undecryptable (rotated key / tampered row) means unusable — same as no token: reconnect required.
+  const accessToken = decryptStoredSecret(stored)?.trim();
+  return accessToken ? { organizationId, accessToken } : undefined;
 }
 
 /**
@@ -95,7 +101,11 @@ export async function listOrganizationWebflowTokens(
     .where(eq(organizationWebflowOAuthToken.appKey, app))
     .limit(limit);
   return rows
-    .map((r) => ({ organizationId: r.organizationId, accessToken: r.accessToken?.trim() ?? "" }))
+    .map((r) => {
+      const stored = r.accessToken?.trim() ?? "";
+      const accessToken = stored ? (decryptStoredSecret(stored)?.trim() ?? "") : "";
+      return { organizationId: r.organizationId, accessToken };
+    })
     .filter((r) => r.accessToken.length > 0);
 }
 

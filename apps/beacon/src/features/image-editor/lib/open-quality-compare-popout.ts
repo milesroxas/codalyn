@@ -23,22 +23,19 @@ export function openQualityComparePopout(options: {
   const { originalBlob, compressedBlob, aspectRatio, initialQuality, targetOrigin } = options;
   const ar = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 1;
   const q0 = clampExportQuality(initialQuality);
-  const popWin = window.open("", POPOUT_NAME, "popup=yes,width=1120,height=900,scrollbars=yes,resizable=yes");
-  if (!popWin) {
-    return null;
-  }
 
-  const PopURL = (popWin as Window & { URL: typeof URL }).URL;
-  const originalSrc = PopURL.createObjectURL(originalBlob);
-  const compressedSrc = PopURL.createObjectURL(compressedBlob);
+  const originalSrc = URL.createObjectURL(originalBlob);
+  const compressedSrc = URL.createObjectURL(compressedBlob);
   const o = escapeAttr(originalSrc);
   const c = escapeAttr(compressedSrc);
   const popSrc = JSON.stringify(BEACON_QUALITY_POPOUT_SOURCE);
   const parSrc = JSON.stringify(BEACON_QUALITY_PARENT_SOURCE);
   const originJs = JSON.stringify(targetOrigin);
 
-  popWin.document.open();
-  popWin.document.write(`<!DOCTYPE html>
+  // Rendered as a same-origin Blob URL document rather than document.write into a blank popup
+  // (Marketplace guidelines bar direct-DOM-manipulation patterns). Blob documents inherit this
+  // window's origin, so the postMessage bridge and TARGET_ORIGIN checks are unchanged.
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -386,8 +383,29 @@ export function openQualityComparePopout(options: {
     })();
   </script>
 </body>
-</html>`);
-  popWin.document.close();
+</html>`;
+
+  const htmlUrl = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+  const popWin = window.open(htmlUrl, POPOUT_NAME, "popup=yes,width=1120,height=900,scrollbars=yes,resizable=yes");
+  if (!popWin) {
+    URL.revokeObjectURL(htmlUrl);
+    URL.revokeObjectURL(originalSrc);
+    URL.revokeObjectURL(compressedSrc);
+    return null;
+  }
+
+  // These blob URLs live in this window's URL store — the popout's own pagehide revoke cannot
+  // release them — so watch for close and release them here.
+  const cleanupTimer = window.setInterval(() => {
+    if (!popWin.closed) {
+      return;
+    }
+    window.clearInterval(cleanupTimer);
+    URL.revokeObjectURL(htmlUrl);
+    URL.revokeObjectURL(originalSrc);
+    URL.revokeObjectURL(compressedSrc);
+  }, 1000);
+
   popWin.focus();
   return popWin;
 }

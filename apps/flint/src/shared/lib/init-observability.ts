@@ -2,6 +2,7 @@ import {
   buildCodalynPostHogSuperProperties,
   buildCodalynSentryEnvironment,
   buildCodalynSentryTags,
+  CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS,
   resolveCodalynSentryTracesSampleRate,
   resolvePostHogHost,
   resolvePostHogKey,
@@ -23,6 +24,7 @@ export function initObservability(): void {
       dsn: sentryDsn,
       environment: buildCodalynSentryEnvironment("flint", buildInfo.channel),
       release: buildInfo.version,
+      sendDefaultPii: false,
       tracesSampleRate: resolveCodalynSentryTracesSampleRate(buildInfo.channel),
       initialScope: {
         tags: buildCodalynSentryTags("flint", buildInfo.channel),
@@ -34,6 +36,7 @@ export function initObservability(): void {
     posthog.init(posthogKey, {
       api_host: posthogHost,
       person_profiles: "identified_only",
+      ...CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS,
       capture_exceptions: {
         capture_unhandled_errors: true,
         capture_unhandled_rejections: true,

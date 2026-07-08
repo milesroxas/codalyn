@@ -155,6 +155,21 @@ export function openTowerWebflowConnect(onClosed?: () => void): void {
 }
 
 /**
+ * The only destination the OAuth popup may be pointed at. Tower mints the authorize URL, but the
+ * client still allowlists it (Marketplace OAuth guidance): a compromised or misconfigured response
+ * must not be able to redirect the popup anywhere but Webflow's consent screen.
+ */
+function isAllowedWebflowAuthorizeUrl(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  return url.protocol === "https:" && url.hostname === "webflow.com" && url.pathname === "/oauth/authorize";
+}
+
+/**
  * Opens the Webflow OAuth consent screen directly in a popup — the same flow as Tower's "Relink", but
  * skipping the Tower `/connection` page. Mints an authorize URL from Tower (`POST` with the Designer
  * bearer; server stores the OAuth `state`→user/org so the cookie-less popup callback can resolve it),
@@ -178,6 +193,10 @@ export async function openWebflowOAuthAuthorize(
     if (!res.ok || !data?.url) {
       win.close();
       return { ok: false, error: data?.error ?? `http_${res.status}` };
+    }
+    if (!isAllowedWebflowAuthorizeUrl(data.url)) {
+      win.close();
+      return { ok: false, error: "invalid_authorize_url" };
     }
     win.location.replace(data.url);
     if (onClosed) {

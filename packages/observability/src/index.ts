@@ -49,6 +49,23 @@ export function resolveCodalynSentryTracesSampleRate(channel: CodalynBuildChanne
   return channel === "production" ? 0.1 : 1;
 }
 
+/**
+ * Privacy-hardened PostHog options for Webflow Designer Extension bundles.
+ * Marketplace guidelines restrict data collection to disclosed, operational telemetry and bar
+ * non-authentication iframes — so no autocapture, no session recording, no surveys/toolbar, no
+ * lazy-loaded external scripts (recorder/surveys would otherwise be fetched off-origin), and no
+ * tracking identifiers persisted to storage.
+ */
+export const CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS = {
+  autocapture: false,
+  capture_pageview: false,
+  capture_pageleave: false,
+  disable_session_recording: true,
+  disable_surveys: true,
+  disable_external_dependency_loading: true,
+  persistence: "memory",
+} as const;
+
 export type CodalynPostHogSuperProperties = {
   app: CodalynApp;
   environment: CodalynBuildChannel;

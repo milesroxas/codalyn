@@ -1,3 +1,6 @@
+import { getClientIp } from "@/server/security/client-ip";
+import { RateLimitError } from "@/server/security/rate-limit";
+import { assertWebflowDesignerExchangeIpRateLimit } from "@/server/security/webflow-designer-exchange-rate-limit";
 import { towerCorsHeadersFor } from "@/server/tower-cors";
 import { normalizeWebflowAppKey } from "@/server/webflow-app-registry";
 import { establishDesignerBetterAuthSession } from "@/server/webflow-designer-session-logic";
@@ -5,6 +8,9 @@ import {
   collectWebflowIdTokenResolveBearers,
   resolveDesignerIdTokenAcrossCandidates,
 } from "@/server/webflow-resolve-designer-id-token";
+
+/** Well beyond any real Designer ID token (a compact JWT); rejects garbage before it reaches Webflow. */
+const MAX_ID_TOKEN_LENGTH = 8192;
 
 function jsonWithCors(request: Request, body: unknown, init?: ResponseInit) {
   const headers = new Headers(init?.headers);
@@ -40,7 +46,25 @@ async function pruneRevokedWebflowTokens(
   }
 }
 
+/** 429 response when the per-IP exchange budget is exhausted, null when the request may proceed. */
+async function guardExchangeRateLimit(request: Request): Promise<Response | null> {
+  try {
+    await assertWebflowDesignerExchangeIpRateLimit(getClientIp(request));
+    return null;
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      return jsonWithCors(request, { error: "rate_limited" }, { status: 429, headers: { "Retry-After": "600" } });
+    }
+    throw error;
+  }
+}
+
 export async function POST(request: Request) {
+  const limited = await guardExchangeRateLimit(request);
+  if (limited) {
+    return limited;
+  }
+
   let parsed: { idToken?: string; app?: string };
   try {
     parsed = (await request.json()) as { idToken?: string; app?: string };
@@ -51,6 +75,9 @@ export async function POST(request: Request) {
   const idToken = typeof parsed.idToken === "string" ? parsed.idToken.trim() : "";
   if (!idToken) {
     return jsonWithCors(request, { error: "id_token_required" }, { status: 400 });
+  }
+  if (idToken.length > MAX_ID_TOKEN_LENGTH) {
+    return jsonWithCors(request, { error: "id_token_invalid" }, { status: 400 });
   }
 
   // Which Webflow app issued this ID token — selects the matching app's resolve bearer (cross-app

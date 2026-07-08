@@ -1,3 +1,4 @@
+import { encryptStoredSecret } from "@/server/security/secret-encryption";
 import { WEBFLOW_DATA_API_APP_KEY, type WebflowAppKey } from "@/server/webflow-app-registry";
 import type { WebflowOAuthTokenResponse } from "@/server/webflow-oauth-exchange";
 import { db } from "@/shared/lib/db";
@@ -18,21 +19,24 @@ export async function persistOrganizationWebflowOAuthToken(
   const expiresAt =
     typeof expiresIn === "number" && Number.isFinite(expiresIn) ? new Date(Date.now() + expiresIn * 1000) : null;
 
+  const accessToken = encryptStoredSecret(tokenResponse.access_token);
+  const refreshToken = tokenResponse.refresh_token ? encryptStoredSecret(tokenResponse.refresh_token) : null;
+
   await db
     .insert(organizationWebflowOAuthToken)
     .values({
       organizationId,
       appKey,
-      accessToken: tokenResponse.access_token,
-      refreshToken: tokenResponse.refresh_token ?? null,
+      accessToken,
+      refreshToken,
       expiresAt,
       scope: tokenResponse.scope ?? null,
     })
     .onConflictDoUpdate({
       target: [organizationWebflowOAuthToken.organizationId, organizationWebflowOAuthToken.appKey],
       set: {
-        accessToken: tokenResponse.access_token,
-        refreshToken: tokenResponse.refresh_token ?? null,
+        accessToken,
+        refreshToken,
         expiresAt,
         scope: tokenResponse.scope ?? null,
         updatedAt: new Date(),

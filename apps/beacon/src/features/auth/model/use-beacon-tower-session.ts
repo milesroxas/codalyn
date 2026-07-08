@@ -159,7 +159,7 @@ export function useBeaconTowerSession(): {
     setBeaconTowerDesignerExchangePhase("settled");
     const epoch = beginBeaconTowerSignOut();
     // Clear the stored bearer even if signOut() rejects (Tower briefly unreachable). Otherwise the
-    // token stays in localStorage and keeps getting attached to requests after the user signed out.
+    // in-memory token keeps getting attached to requests after the user signed out.
     void towerAuthClient.signOut({ fetchOptions: { credentials: "include" } }).finally(() => {
       if (!isBeaconTowerSignOutCurrent(epoch)) {
         return;

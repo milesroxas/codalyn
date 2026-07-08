@@ -2,15 +2,22 @@
  * Better Auth session token (bearer plugin) for Tower — not a Webflow Data API
  * OAuth token. Namespaced separately from Beacon's token so the two extensions
  * never read each other's session.
+ *
+ * Held in memory only — never persisted to localStorage/sessionStorage (Webflow Marketplace
+ * token-storage guidance). On reload the silent Designer exchange (`webflow.getIdToken()` → Tower)
+ * re-establishes the session.
  */
-const FLINT_TOWER_SESSION_TOKEN_KEY = "codalyn:flint-tower-session-token";
+let flintTowerSessionToken: string | undefined;
+
+// One-time cleanup: earlier builds persisted the bearer under this key; remove any leftover copy.
+try {
+  localStorage.removeItem("codalyn:flint-tower-session-token");
+} catch {
+  /* ignore */
+}
 
 export function readFlintTowerSessionToken(): string | undefined {
-  try {
-    return localStorage.getItem(FLINT_TOWER_SESSION_TOKEN_KEY)?.trim() || undefined;
-  } catch {
-    return undefined;
-  }
+  return flintTowerSessionToken;
 }
 
 export function writeFlintTowerSessionToken(token: string): void {
@@ -18,17 +25,9 @@ export function writeFlintTowerSessionToken(token: string): void {
   if (!t) {
     return;
   }
-  try {
-    localStorage.setItem(FLINT_TOWER_SESSION_TOKEN_KEY, t);
-  } catch {
-    /* ignore */
-  }
+  flintTowerSessionToken = t;
 }
 
 export function clearFlintTowerSessionToken(): void {
-  try {
-    localStorage.removeItem(FLINT_TOWER_SESSION_TOKEN_KEY);
-  } catch {
-    /* ignore */
-  }
+  flintTowerSessionToken = undefined;
 }

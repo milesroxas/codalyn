@@ -9,6 +9,8 @@ const PERMANENT_DESIGNER_EXCHANGE_ERRORS = new Set([
   "webflow_resolve_scope_missing",
   "no_session_token",
   "sign_up_failed",
+  // Tower throttled this IP — immediate retries only extend the block window.
+  "rate_limited",
 ]);
 
 export function isPermanentDesignerExchangeFailure(error: string): boolean {

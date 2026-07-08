@@ -2,6 +2,7 @@ import {
   buildCodalynPostHogSuperProperties,
   buildCodalynSentryEnvironment,
   buildCodalynSentryTags,
+  CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS,
   resolveCodalynSentryTracesSampleRate,
   resolvePostHogHost,
   resolvePostHogKey,
@@ -10,6 +11,7 @@ import {
 import * as Sentry from "@sentry/react";
 import posthog from "posthog-js";
 import { buildInfo } from "@/shared/lib/build-info";
+import { readTelemetryOptOut } from "@/shared/lib/telemetry-preference";
 
 const posthogKey = resolvePostHogKey(import.meta.env.VITE_POSTHOG_KEY);
 const posthogHost = resolvePostHogHost(import.meta.env.VITE_POSTHOG_HOST);
@@ -21,7 +23,11 @@ export function initObservability(): void {
       dsn: sentryDsn,
       environment: buildCodalynSentryEnvironment("beacon", buildInfo.channel),
       release: buildInfo.version,
+      sendDefaultPii: false,
       tracesSampleRate: resolveCodalynSentryTracesSampleRate(buildInfo.channel),
+      // Delivery-time gate so the settings opt-out applies without re-initializing the SDK.
+      beforeSend: (event) => (readTelemetryOptOut() ? null : event),
+      beforeSendTransaction: (event) => (readTelemetryOptOut() ? null : event),
       initialScope: {
         tags: buildCodalynSentryTags("beacon", buildInfo.channel),
       },
@@ -32,6 +38,8 @@ export function initObservability(): void {
     posthog.init(posthogKey, {
       api_host: posthogHost,
       person_profiles: "identified_only",
+      ...CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS,
+      opt_out_capturing_by_default: readTelemetryOptOut(),
       capture_exceptions: {
         capture_unhandled_errors: true,
         capture_unhandled_rejections: true,

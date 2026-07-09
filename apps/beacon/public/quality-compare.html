@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beacon — compression compare</title>
+  <!-- Static popout shipped in the extension bundle: no blob-URL document, no inline script or
+       style (Webflow Marketplace CSP/technical guidelines). Data arrives via postMessage from the
+       opener after this page announces readiness (see quality-compare.js). -->
+  <link rel="stylesheet" href="./quality-compare.css" />
+  <script src="./quality-compare.js" defer></script>
+</head>
+<body>
+  <h1>Compression compare</h1>
+  <p class="hint">Adjust export quality below (matches Beacon). Drag the handle on the preview to compare. Save and close applies quality to the extension.</p>
+  <div class="toolbar">
+    <div class="quality-field">
+      <label for="quality">Export quality</label>
+      <div class="quality-row">
+        <input type="range" id="quality" min="0.05" max="1" step="0.01" value="0.8" />
+        <span class="quality-pct" id="qualityPct"></span>
+      </div>
+    </div>
+    <button type="button" class="save-btn" id="saveClose">Save and close</button>
+    <p class="err" id="encodeErr" role="alert"></p>
+  </div>
+  <div class="stage-wrap">
+    <div class="stage" id="stage">
+      <img id="imgCompressed" alt="" />
+      <div class="clip" id="clip">
+        <img id="imgOriginal" alt="" />
+      </div>
+      <div class="divider" id="divider"></div>
+      <div class="compare-wipe-handle" id="compareWipeHandle"></div>
+      <div
+        class="compare-scrub-hit"
+        id="compareScrubHit"
+        role="slider"
+        tabindex="0"
+        aria-valuenow="50"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-label="Compare original and compressed"
+        aria-valuetext="50% original on the left"
+      ></div>
+      <div class="compare-labels"><span>Original</span><span>Compressed</span></div>
+    </div>
+  </div>
+</body>
+</html>

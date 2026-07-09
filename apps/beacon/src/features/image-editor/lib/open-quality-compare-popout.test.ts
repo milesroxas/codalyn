@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
+import {
+  openQualityComparePopout,
+  QUALITY_COMPARE_POPOUT_PAGE,
+} from "@/features/image-editor/lib/open-quality-compare-popout";
 import {
   BEACON_QUALITY_PARENT_SOURCE,
   BEACON_QUALITY_POPOUT_SOURCE,
@@ -8,46 +11,33 @@ import {
 
 describe("openQualityComparePopout", () => {
   const targetOrigin = "http://localhost:1337";
-  let createdBlobs: Blob[];
-  let mockPopWin: { focus: () => void; closed: boolean };
+  let mockPopWin: { focus: () => void; closed: boolean; postMessage: ReturnType<typeof vi.fn> };
   let openSpy: ReturnType<typeof vi.fn>;
   let setIntervalSpy: ReturnType<typeof vi.fn>;
   let clearIntervalSpy: ReturnType<typeof vi.fn>;
-  let createObjectURLSpy: ReturnType<typeof vi.fn>;
-  let revokeObjectURLSpy: ReturnType<typeof vi.fn>;
+  let addEventListenerSpy: ReturnType<typeof vi.fn>;
+  let removeEventListenerSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    createdBlobs = [];
-    mockPopWin = { focus: vi.fn(), closed: false };
+    mockPopWin = { focus: vi.fn(), closed: false, postMessage: vi.fn() };
     openSpy = vi.fn(() => mockPopWin as unknown as Window);
     setIntervalSpy = vi.fn(() => 1);
     clearIntervalSpy = vi.fn();
-    createObjectURLSpy = vi.fn((blob: Blob) => {
-      createdBlobs.push(blob);
-      return `blob:mock-${createdBlobs.length}`;
-    });
-    revokeObjectURLSpy = vi.fn();
+    addEventListenerSpy = vi.fn();
+    removeEventListenerSpy = vi.fn();
     vi.stubGlobal("window", {
       open: openSpy,
       setInterval: setIntervalSpy,
       clearInterval: clearIntervalSpy,
+      addEventListener: addEventListenerSpy,
+      removeEventListener: removeEventListenerSpy,
+      location: { href: `${targetOrigin}/index.html`, origin: targetOrigin },
     } as unknown as Window & typeof globalThis);
-    vi.stubGlobal("URL", {
-      createObjectURL: createObjectURLSpy,
-      revokeObjectURL: revokeObjectURLSpy,
-    } as unknown as typeof URL);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
-
-  /** The compare document is minted as a text/html Blob URL (never document.write). */
-  async function renderedHtml(): Promise<string> {
-    const htmlBlob = createdBlobs.find((b) => b.type === "text/html");
-    expect(htmlBlob).toBeDefined();
-    return await (htmlBlob as Blob).text();
-  }
 
   function openWith(overrides?: Partial<Parameters<typeof openQualityComparePopout>[0]>) {
     return openQualityComparePopout({
@@ -60,61 +50,84 @@ describe("openQualityComparePopout", () => {
     });
   }
 
-  it("returns null and revokes minted blob URLs when popup is blocked", () => {
+  function readyListener(): (event: MessageEvent) => void {
+    const call = addEventListenerSpy.mock.calls.find((c) => c[0] === "message");
+    expect(call).toBeDefined();
+    return (call as unknown[])[1] as (event: MessageEvent) => void;
+  }
+
+  function fireReady(overrides?: Partial<{ origin: string; source: unknown; data: unknown }>) {
+    readyListener()({
+      origin: targetOrigin,
+      source: mockPopWin,
+      data: { source: BEACON_QUALITY_POPOUT_SOURCE, type: "ready" },
+      ...overrides,
+    } as MessageEvent);
+  }
+
+  it("returns null when the popup is blocked", () => {
     openSpy.mockReturnValue(null);
-    const out = openWith();
-    expect(out).toBeNull();
-    expect(revokeObjectURLSpy).toHaveBeenCalledTimes(3);
+    expect(openWith()).toBeNull();
+    expect(addEventListenerSpy).not.toHaveBeenCalled();
   });
 
-  it("opens named popup at a blob URL, wires protocol sources and target origin", async () => {
-    const win = openWith({ aspectRatio: 1.5, initialQuality: 0.42 });
-
+  it("opens the static bundled page at a same-origin URL (no blob document)", () => {
+    const win = openWith();
     expect(win).toBeDefined();
-    // originalSrc (1), compressedSrc (2), then the html document itself (3).
     expect(openSpy).toHaveBeenCalledWith(
-      "blob:mock-3",
+      `${targetOrigin}/${QUALITY_COMPARE_POPOUT_PAGE}`,
       "beacon-quality-compare",
       expect.stringContaining("width=1120")
     );
     expect(mockPopWin.focus).toHaveBeenCalled();
-
-    const html = await renderedHtml();
-    expect(html).toContain("aspect-ratio: 1.5");
-    expect(html).toContain('value="0.42"');
-    expect(html).toContain('src="blob:mock-1"');
-    expect(html).toContain('src="blob:mock-2"');
-    expect(html).toContain(JSON.stringify(BEACON_QUALITY_POPOUT_SOURCE));
-    expect(html).toContain(JSON.stringify(BEACON_QUALITY_PARENT_SOURCE));
-    expect(html).toContain(JSON.stringify(targetOrigin));
-    expect(html).toContain("postMessage");
-    expect(html).toContain("preview-quality-changed");
-    expect(html).toContain("save-and-close");
   });
 
-  it("revokes all minted blob URLs once the popout closes", () => {
+  it("answers the popout's ready message with an init payload, then detaches", () => {
+    openWith({ aspectRatio: 1.5, initialQuality: 0.42 });
+    expect(mockPopWin.postMessage).not.toHaveBeenCalled();
+
+    fireReady();
+    expect(mockPopWin.postMessage).toHaveBeenCalledTimes(1);
+    const [message, origin] = mockPopWin.postMessage.mock.calls[0] as [Record<string, unknown>, string];
+    expect(origin).toBe(targetOrigin);
+    expect(message.source).toBe(BEACON_QUALITY_PARENT_SOURCE);
+    expect(message.type).toBe("init");
+    expect(message.originalBlob).toBeInstanceOf(Blob);
+    expect(message.compressedBlob).toBeInstanceOf(Blob);
+    expect(message.aspectRatio).toBe(1.5);
+    expect(message.initialQuality).toBe(0.42);
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith("message", readyListener());
+    expect(clearIntervalSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("ignores ready messages from another origin or window", () => {
     openWith();
-    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+    fireReady({ origin: "https://evil.example" });
+    fireReady({ source: {} });
+    fireReady({ data: { source: "someone-else", type: "ready" } });
+    expect(mockPopWin.postMessage).not.toHaveBeenCalled();
+    expect(removeEventListenerSpy).not.toHaveBeenCalled();
+  });
+
+  it("falls back to aspect ratio 1 and clamps quality into export range", () => {
+    openWith({ aspectRatio: Number.NaN, initialQuality: 0.01 });
+    fireReady();
+    const [message] = mockPopWin.postMessage.mock.calls[0] as [Record<string, unknown>];
+    expect(message.aspectRatio).toBe(1);
+    expect(message.initialQuality).toBe(0.05);
+  });
+
+  it("drops the ready listener when the popout closes before announcing itself", () => {
+    openWith();
     const tick = setIntervalSpy.mock.calls[0]?.[0] as () => void;
 
     tick();
-    expect(revokeObjectURLSpy).not.toHaveBeenCalled();
+    expect(removeEventListenerSpy).not.toHaveBeenCalled();
 
     mockPopWin.closed = true;
     tick();
     expect(clearIntervalSpy).toHaveBeenCalledWith(1);
-    expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock-1");
-    expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock-2");
-    expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock-3");
-  });
-
-  it("falls back to aspect ratio 1 when ratio is invalid", async () => {
-    openWith({ aspectRatio: Number.NaN, initialQuality: 0.9 });
-    expect(await renderedHtml()).toContain("aspect-ratio: 1");
-  });
-
-  it("clamps initial quality into export range in markup", async () => {
-    openWith({ initialQuality: 0.01 });
-    expect(await renderedHtml()).toContain('value="0.05"');
+    expect(removeEventListenerSpy).toHaveBeenCalledWith("message", readyListener());
   });
 });

@@ -5,7 +5,7 @@ import { BeaconHomeScreen } from "@/app/ui/beacon-home-screen";
 import { CmsSlotsAccessGate, CmsSlotsScreen } from "@/features/cms-slots";
 import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-access";
 import { ImageEditor } from "@/features/image-editor";
-import { BeaconAppSettingsProvider, BeaconSettingsScreen } from "@/features/settings";
+import { BeaconAppSettingsProvider, BeaconSettingsScreen, TelemetryConsentPrompt } from "@/features/settings";
 import { ErrorBoundary } from "@/shared/components/error-boundary";
 import { applyBeaconExtensionSize } from "@/shared/lib/beacon-extension-size";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
@@ -48,6 +48,7 @@ export function App() {
         <CmsCollectionTemplatePageProvider>
           <HashRouter>
             <TooltipProvider delayDuration={200}>
+              <TelemetryConsentPrompt />
               <Routes>
                 <Route element={<BeaconAppShell />}>
                   <Route index element={<Navigate to="/home" replace />} />

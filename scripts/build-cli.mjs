@@ -14,7 +14,7 @@
  */
 
 import { execSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as p from "@clack/prompts";
@@ -218,6 +218,56 @@ function readAllDistJs(appPath) {
   return parts.join("\n");
 }
 
+/** Documented Designer Extension manifest properties (developers.webflow.com/apps/designer/guides/configuring-your-app). */
+const WEBFLOW_MANIFEST_ALLOWED_KEYS = ["name", "publicDir", "size", "apiVersion"];
+const WEBFLOW_MANIFEST_ALLOWED_SIZES = ["default", "comfortable", "large"];
+
+/**
+ * The `webflow` CLI stores its own telemetry consent (`telemetry.global`) inside webflow.json.
+ * That block is a local dev artifact, not a documented manifest property, and shipping it was
+ * flagged in Marketplace review — strip undocumented keys before bundling and validate `size`.
+ */
+function sanitizeWebflowManifest(appPath) {
+  const manifestPath = resolve(appPath, "webflow.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+  const kept = {};
+  let stripped = false;
+  for (const key of Object.keys(manifest)) {
+    if (WEBFLOW_MANIFEST_ALLOWED_KEYS.includes(key)) {
+      kept[key] = manifest[key];
+    } else {
+      stripped = true;
+    }
+  }
+  if (!WEBFLOW_MANIFEST_ALLOWED_SIZES.includes(kept.size)) {
+    throw new Error(
+      `webflow.json "size" must be one of ${WEBFLOW_MANIFEST_ALLOWED_SIZES.join(", ")} (got ${JSON.stringify(kept.size)})`
+    );
+  }
+  if (stripped) {
+    writeFileSync(manifestPath, `${JSON.stringify(kept, null, 2)}\n`);
+  }
+}
+
+function verifyArchivedManifest(archivePath) {
+  let raw;
+  try {
+    raw = execSync(`unzip -p ${JSON.stringify(archivePath)} webflow.json`, {
+      maxBuffer: 10 * 1024 * 1024,
+    }).toString();
+  } catch {
+    throw new Error("Archived zip does not contain webflow.json");
+  }
+  const manifest = JSON.parse(raw);
+  const extras = Object.keys(manifest).filter((key) => !WEBFLOW_MANIFEST_ALLOWED_KEYS.includes(key));
+  if (extras.length > 0) {
+    throw new Error(`Archived webflow.json contains undocumented keys: ${extras.join(", ")}`);
+  }
+  if (!WEBFLOW_MANIFEST_ALLOWED_SIZES.includes(manifest.size)) {
+    throw new Error(`Archived webflow.json "size" is undocumented: ${JSON.stringify(manifest.size)}`);
+  }
+}
+
 function verifyArchivedZipContains(archivePath, markers) {
   const needles = [markers.version, markers.recipient, markers.towerOrigin].filter(Boolean);
   for (const needle of needles) {
@@ -249,12 +299,23 @@ function verifyDistBundle(appPath, markers) {
 
 function verifyArchivedZipBundle(archivePath, markers) {
   verifyArchivedZipContains(archivePath, markers);
+  verifyArchivedManifest(archivePath);
 }
 
 function reportStepFailure(s, title, result) {
   s.stop(color.red(title));
   p.log.error(result.stdout || result.stderr || "Unknown error");
   process.exit(1);
+}
+
+function sanitizeWebflowManifestOrExit(s, appPath, title) {
+  try {
+    sanitizeWebflowManifest(appPath);
+  } catch (err) {
+    s.stop(color.red(title));
+    p.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
 }
 
 async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
@@ -295,12 +356,20 @@ async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
   }
 
   s.message(`${progressBar(STEPS[3].pct)}  ${STEPS[3].label}…`);
+  sanitizeWebflowManifestOrExit(s, appPath, "webflow.json manifest invalid");
+  // DO_NOT_TRACK=1 stops the Webflow CLI from auto-writing its telemetry consent block into
+  // webflow.json mid-bundle (its --no-input consent flow otherwise stores `telemetry.global`
+  // in the manifest, which then ships inside bundle.zip — flagged in Marketplace review).
   const bundleResult = await run("pnpm", ["exec", "webflow", "extension", "bundle", "--no-input"], {
     cwd: appPath,
+    env: { DO_NOT_TRACK: "1" },
   });
   if (bundleResult.status !== 0) {
     reportStepFailure(s, "Webflow bundle failed", bundleResult);
   }
+  // Repo hygiene: if the CLI wrote to the manifest anyway, strip it again so the artifact never
+  // gets committed; the archived-zip verification below remains the hard gate.
+  sanitizeWebflowManifestOrExit(s, appPath, "webflow.json manifest invalid after bundle");
 
   s.message(`${progressBar(STEPS[4].pct)}  ${STEPS[4].label}…`);
   const uploadBundlePath = resolve(appPath, WEBFLOW_EXTENSION_BUNDLE_FILENAME);

@@ -2,6 +2,8 @@
 
 Point-by-point response to the Webflow app-review feedback (July 2026), mapping each flag to what
 the app does and what changed. Doc references verified against developers.webflow.com on 2026-07-08.
+Round-2 feedback (2026-07-09) is addressed in [Round 2](#round-2--2026-07-09-follow-up-flags); where
+a round-2 fix supersedes a round-1 answer below, the original item notes it.
 
 ## 1. Direct DOM manipulation / unsafe patterns
 
@@ -10,10 +12,9 @@ Guideline: "Do not use statements or patterns that could introduce vulnerabiliti
 
 - No `eval()` or `new Function()` exists in shipped first-party code (only in unit tests that load
   generated runtime source for assertions; tests are not bundled).
-- **Fixed:** the image-quality compare popout previously used `document.open()/document.write()`.
-  It now renders via a same-origin `Blob` URL document
-  (`apps/beacon/src/features/image-editor/lib/open-quality-compare-popout.ts`), with blob URLs
-  revoked when the popout closes.
+- **Fixed (superseded in round 2):** the image-quality compare popout previously used
+  `document.open()/document.write()`, then a same-origin `Blob` URL document. It is now a static
+  page shipped in the bundle with zero inline script/style — see Round 2, item 5.
 - **Fixed:** PostHog now runs with `autocapture: false` and
   `disable_external_dependency_loading: true`, so the SDK never injects listeners into the
   extension DOM or lazy-loads remote scripts (`packages/observability` →
@@ -47,10 +48,9 @@ Guidelines, Privacy & Data Protection.
   no pageview/pageleave capture, no surveys, `persistence: "memory"` (no tracking identifiers
   written to cookies/localStorage), `person_profiles: "identified_only"`, Sentry
   `sendDefaultPii: false`.
-- **Fixed:** in-app disclosure + opt-out added under Settings → Preferences → Privacy
-  (`settings-preferences-panel.tsx`). The description states exactly what is collected (error
-  reports, feature-usage events, app version, current site/workspace IDs) and the switch disables
-  both PostHog capture and Sentry delivery (`beforeSend`/`beforeSendTransaction` gates).
+- **Fixed (superseded in round 2):** the round-1 model (default-on with in-app disclosure +
+  opt-out under Settings → Preferences → Privacy) is now full opt-in with a first-run consent
+  prompt — see Round 2, item 3. The Settings switch and disclosure remain.
 - What is collected: exceptions, explicit product events (e.g. support/feedback submissions),
   app/version/channel super-properties, and PostHog group keys `site` (siteId, siteName,
   shortName) and `workspace` (workspaceId, workspaceSlug) from `webflow.getSiteInfo()` — disclosed
@@ -141,4 +141,70 @@ Doc: [Get site information](https://developers.webflow.com/designer/reference/ge
 Doc: [Resize extension](https://developers.webflow.com/designer/reference/resize-extension).
 
 - Single `setExtensionSize({ width: 350, height: 800 })` call on boot — within the documented
-  custom limits (min 240×360, max 1200×800). No runtime resizing. No change required.
+  custom limits (min 240×360, max 1200×800). No runtime resizing beyond that call.
+- **Fixed in round 2:** the manifest `size` value now uses the documented `"comfortable"` keyword
+  (see Round 2, item 2).
+
+---
+
+## Round 2 — 2026-07-09 follow-up flags
+
+### R2.1 Development artifact in manifest (`telemetry` object)
+
+- **Fixed:** the `telemetry` block (written into `webflow.json` by the `webflow` CLI's own
+  consent storage — a local dev artifact, never an app setting) is removed from
+  `apps/beacon/webflow.json` (and `apps/flint/webflow.json`). The manifest now contains only
+  documented properties: `name`, `publicDir`, `size`, `apiVersion`.
+- **Guarded:** `scripts/build-cli.mjs` now strips undocumented manifest keys immediately before
+  `webflow extension bundle` and re-verifies the `webflow.json` inside the archived zip
+  (`sanitizeWebflowManifest` / `verifyArchivedManifest`), so the artifact cannot ship again even
+  if the CLI rewrites it locally.
+
+### R2.2 Undocumented `size` value (`"custom"`)
+
+- **Fixed:** `webflow.json` now declares `"size": "comfortable"` (a documented value). The
+  existing `webflow.setExtensionSize({ width: 350, height: 800 })` boot call is unchanged and
+  remains the effective panel size. The build guard above also rejects any undocumented `size`.
+
+### R2.3 Default-on telemetry
+
+- **Fixed — telemetry is now opt-in on first run.** PostHog and Sentry are not initialized at all
+  (no network traffic, no SDK boot) until the user explicitly grants consent
+  (`init-observability.ts` gates `Sentry.init`/`posthog.init` on stored consent).
+- First run shows a consent dialog (`telemetry-consent-prompt.tsx`) disclosing exactly what is
+  collected (error reports, feature-usage events, app version, site/workspace IDs) and naming the
+  processors — PostHog (product analytics) and Sentry (error reporting). Choices: allow / decline;
+  dismissing decides nothing and telemetry stays off.
+- Consent is tri-state (`granted` / `denied` / undecided) in `telemetry-preference.ts`; the legacy
+  opt-out flag from earlier builds is honored as an explicit denial. Undecided and malformed
+  stored values are never treated as consent (unit-tested).
+- Settings → Preferences → Privacy retains the toggle (now reflecting consent state) and the
+  updated disclosure naming both processors. App-listing and privacy-policy copy should name
+  PostHog and Sentry as processors and mirror the collected-fields list above.
+
+### R2.4 Regex-based HTML sanitizer in published-site runtime
+
+- **Fixed:** the footer runtime's `bSafeHtml` is no longer regex string-rewriting. It now rebuilds
+  rich-text fragments through a `DOMParser`-based allowlist sanitizer
+  (`cms-slot-beacon-prop-runtime.ts`) mirroring the authoritative save-time sanitizer
+  (`cms-slot-rich-text-html.ts`): same tag allowlist (p, br, strong, b, em, i, u, a, ul, ol, li,
+  h2, h3, blockquote), subtree drops for script/style/iframe/object/etc., all attributes dropped
+  except a scheme-checked `href` (+ hardened `target="_blank"`/`rel`) on anchors.
+- Fail-closed: if DOM parsing is unavailable the value is written via `textContent`, never raw
+  `innerHTML`.
+- Additional hardening: the runtime's link and iframe/embed apply paths now reject non-navigational
+  URL schemes (`javascript:`, `data:`, …) via the same `bSafeHref` allowlist.
+- Defense-in-depth is two layers: values are sanitized at save time before entering the payload,
+  and re-sanitized by the runtime before any `innerHTML` write.
+
+### R2.5 CSP compatibility gap in blob popout
+
+- **Fixed:** the compare popout no longer mints a `Blob` HTML document with inline `<script>`. It
+  is now a static page shipped in the extension bundle (`public/quality-compare.html` + external
+  `quality-compare.css` / `quality-compare.js`), opened same-origin — compatible with a strict CSP
+  (`script-src 'self'`, no `blob:` document, no inline script or style attributes; unit-tested in
+  `quality-compare-popout-page.test.ts`).
+- Data flows over the existing origin-checked `postMessage` bridge: the page announces `ready`,
+  the opener replies with an `init` message carrying the image Blobs (structured clone) and
+  settings; the popout mints and revokes its own object URLs
+  (`open-quality-compare-popout.ts`, `quality-popout-protocol.ts`).

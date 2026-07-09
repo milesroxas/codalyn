@@ -1,13 +1,6 @@
 {
   "name": "beacon",
   "publicDir": "dist",
-  "size": "custom",
-  "apiVersion": "2",
-  "telemetry": {
-    "global": {
-      "allowTelemetry": true,
-      "lastPrompted": 1776882978227,
-      "version": "1.15.0"
-    }
-  }
+  "size": "comfortable",
+  "apiVersion": "2"
 }

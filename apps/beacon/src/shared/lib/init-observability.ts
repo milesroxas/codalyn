@@ -11,13 +11,26 @@ import {
 import * as Sentry from "@sentry/react";
 import posthog from "posthog-js";
 import { buildInfo } from "@/shared/lib/build-info";
-import { readTelemetryOptOut } from "@/shared/lib/telemetry-preference";
+import { isTelemetryGranted, setTelemetryConsent, type TelemetryConsent } from "@/shared/lib/telemetry-preference";
 
 const posthogKey = resolvePostHogKey(import.meta.env.VITE_POSTHOG_KEY);
 const posthogHost = resolvePostHogHost(import.meta.env.VITE_POSTHOG_HOST);
 const sentryDsn = resolveSentryDsn(import.meta.env.VITE_SENTRY_DSN);
 
+let observabilityStarted = false;
+
+/**
+ * Opt-in telemetry (Webflow Marketplace Privacy & Data Protection): the SDKs are not initialized —
+ * no PostHog or Sentry network traffic at all — until the user has explicitly granted consent via
+ * the first-run prompt or Settings → Privacy. Safe to call repeatedly; used both at boot and when
+ * consent is granted mid-session.
+ */
 export function initObservability(): void {
+  if (observabilityStarted || !isTelemetryGranted()) {
+    return;
+  }
+  observabilityStarted = true;
+
   if (sentryDsn) {
     Sentry.init({
       dsn: sentryDsn,
@@ -25,9 +38,9 @@ export function initObservability(): void {
       release: buildInfo.version,
       sendDefaultPii: false,
       tracesSampleRate: resolveCodalynSentryTracesSampleRate(buildInfo.channel),
-      // Delivery-time gate so the settings opt-out applies without re-initializing the SDK.
-      beforeSend: (event) => (readTelemetryOptOut() ? null : event),
-      beforeSendTransaction: (event) => (readTelemetryOptOut() ? null : event),
+      // Delivery-time gate so a mid-session opt-out applies without re-initializing the SDK.
+      beforeSend: (event) => (isTelemetryGranted() ? event : null),
+      beforeSendTransaction: (event) => (isTelemetryGranted() ? event : null),
       initialScope: {
         tags: buildCodalynSentryTags("beacon", buildInfo.channel),
       },
@@ -39,7 +52,6 @@ export function initObservability(): void {
       api_host: posthogHost,
       person_profiles: "identified_only",
       ...CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS,
-      opt_out_capturing_by_default: readTelemetryOptOut(),
       capture_exceptions: {
         capture_unhandled_errors: true,
         capture_unhandled_rejections: true,
@@ -73,7 +85,18 @@ export function initObservability(): void {
   });
 }
 
+/** Records the user's decision and, on a grant, starts the SDKs that were held back at boot. */
+export function applyTelemetryConsent(consent: TelemetryConsent): void {
+  setTelemetryConsent(consent);
+  if (consent === "granted") {
+    initObservability();
+  }
+}
+
 export function captureObservabilityException(error: Error, context?: Record<string, unknown>): void {
+  if (!observabilityStarted) {
+    return;
+  }
   if (sentryDsn) {
     Sentry.captureException(error, context ? { extra: context } : undefined);
   }

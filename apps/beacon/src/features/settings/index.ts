@@ -4,3 +4,4 @@ export {
   useBeaconAppSettings,
 } from "@/features/settings/model/beacon-app-settings-provider";
 export { BeaconSettingsScreen } from "@/features/settings/ui/beacon-settings-screen";
+export { TelemetryConsentPrompt } from "@/features/settings/ui/telemetry-consent-prompt";

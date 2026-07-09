@@ -213,4 +213,63 @@ describe("beacon prop applyValue runtime", () => {
     expect(marked.innerHTML.toLowerCase()).not.toContain("onerror");
     expect(marked.innerHTML.toLowerCase()).not.toContain("javascript:");
   });
+
+  it("rich text: allowlisted markup survives; safe anchors keep href with hardened target/rel", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+
+    const marked = document.createElement("div");
+    marked.setAttribute("data-cb-html", "1");
+    applyValue(
+      marked,
+      '<h2>T</h2><ul><li><strong>a</strong></li></ul><a href="https://x.com" target="_blank" class="fancy" data-x="1">go</a>'
+    );
+    expect(marked.querySelector("h2")?.textContent).toBe("T");
+    expect(marked.querySelector("ul li strong")?.textContent).toBe("a");
+    const a = marked.querySelector("a");
+    expect(a?.getAttribute("href")).toBe("https://x.com");
+    expect(a?.getAttribute("target")).toBe("_blank");
+    expect(a?.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(a?.getAttribute("class")).toBeNull();
+    expect(a?.getAttribute("data-x")).toBeNull();
+  });
+
+  it("rich text: disallowed wrappers unwrap (text kept), on* attrs on allowed tags dropped", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+
+    const marked = document.createElement("div");
+    marked.setAttribute("data-cb-html", "1");
+    applyValue(marked, '<div style="color:red"><p onclick="evil()">keep</p></div><a href="data:text/html,x">txt</a>');
+    expect(marked.querySelector("div")).toBeNull();
+    const p = marked.querySelector("p");
+    expect(p?.textContent).toBe("keep");
+    expect(p?.getAttribute("onclick")).toBeNull();
+    // data: href → anchor unwrapped, its text preserved.
+    expect(marked.querySelector("a")).toBeNull();
+    expect(marked.textContent).toContain("txt");
+  });
+
+  it("link + iframe apply paths reject javascript: URLs", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+
+    const a = document.createElement("a");
+    applyValue(a, JSON.stringify({ k: "url", h: "javascript:evil()", t: 1 }));
+    expect(a.getAttribute("href")).toBe("#");
+
+    const iframe = document.createElement("iframe");
+    applyValue(iframe, "javascript:evil()");
+    expect(iframe.getAttribute("src")).toBeNull();
+
+    const iframeOk = document.createElement("iframe");
+    applyValue(iframeOk, "https://player.example/v/1");
+    expect(iframeOk.getAttribute("src")).toBe("https://player.example/v/1");
+  });
 });

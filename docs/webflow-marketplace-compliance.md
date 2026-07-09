@@ -158,7 +158,12 @@ Doc: [Resize extension](https://developers.webflow.com/designer/reference/resize
 - **Guarded:** `scripts/build-cli.mjs` now strips undocumented manifest keys immediately before
   `webflow extension bundle` and re-verifies the `webflow.json` inside the archived zip
   (`sanitizeWebflowManifest` / `verifyArchivedManifest`), so the artifact cannot ship again even
-  if the CLI rewrites it locally.
+  if the CLI rewrites it locally. The bundle step also runs with `DO_NOT_TRACK=1`, which the
+  Webflow CLI honors — it no longer writes its consent block into the manifest at all.
+- **Guarded (release hygiene):** release-channel builds additionally assert the bundle contains
+  no local dev values — any `VITE_*KEY/TOKEN/SECRET` value present in `.env`/`.env.local` and any
+  localhost Tower origin fail the build if found in dist or the archived zip
+  (`collectForbiddenBundleMarkers` / `verifyArchivedZipExcludes`).
 
 ### R2.2 Undocumented `size` value (`"custom"`)
 
@@ -181,6 +186,9 @@ Doc: [Resize extension](https://developers.webflow.com/designer/reference/resize
 - Settings → Preferences → Privacy retains the toggle (now reflecting consent state) and the
   updated disclosure naming both processors. App-listing and privacy-policy copy should name
   PostHog and Sentry as processors and mirror the collected-fields list above.
+- Every PostHog event registers `$geoip_disable: true`, suppressing PostHog's server-side GeoIP
+  enrichment — no end-user location is derived or stored (Developer ToS §5.6(f); matches the
+  in-app disclosure).
 
 ### R2.4 Regex-based HTML sanitizer in published-site runtime
 

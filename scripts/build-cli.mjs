@@ -219,7 +219,15 @@ function readAllDistJs(appPath) {
 }
 
 /** Documented Designer Extension manifest properties (developers.webflow.com/apps/designer/guides/configuring-your-app). */
-const WEBFLOW_MANIFEST_ALLOWED_KEYS = ["name", "publicDir", "size", "apiVersion"];
+const WEBFLOW_MANIFEST_ALLOWED_KEYS = [
+  "name",
+  "publicDir",
+  "size",
+  "apiVersion",
+  "appIntents",
+  "appConnections",
+  "featureFlags",
+];
 const WEBFLOW_MANIFEST_ALLOWED_SIZES = ["default", "comfortable", "large"];
 
 /**
@@ -282,8 +290,37 @@ function verifyArchivedZipContains(archivePath, markers) {
   }
 }
 
-function expectedBundleMarkers({ appName, channel, recipient, pkg }) {
-  const expected = { version: pkg.version, recipient };
+/**
+ * Values that must never appear in a release bundle: local dev secrets/origins that Vite would
+ * happily inline from .env/.env.local if the channel env in buildViteEnv ever stopped overriding
+ * them (e.g. VITE_BEACON_API_KEY, a localhost Tower origin).
+ */
+function collectForbiddenBundleMarkers(appPath, channel) {
+  if (channel !== "production" && channel !== "preview") {
+    return [];
+  }
+  const forbidden = [{ value: "http://localhost:3100", label: "a localhost Tower origin" }];
+  for (const envFile of [".env", ".env.local"]) {
+    const envPath = resolve(appPath, envFile);
+    if (!existsSync(envPath)) {
+      continue;
+    }
+    for (const line of readFileSync(envPath, "utf-8").split("\n")) {
+      const match = line.match(/^\s*(VITE_[A-Z0-9_]*(?:KEY|TOKEN|SECRET)[A-Z0-9_]*)\s*=\s*(.+?)\s*$/);
+      if (!match) {
+        continue;
+      }
+      const value = match[2].replace(/^["']|["']$/g, "");
+      if (value.length >= 16) {
+        forbidden.push({ value, label: `the local ${match[1]} value` });
+      }
+    }
+  }
+  return forbidden;
+}
+
+function expectedBundleMarkers({ appName, appPath, channel, recipient, pkg }) {
+  const expected = { version: pkg.version, recipient, forbidden: collectForbiddenBundleMarkers(appPath, channel) };
   if (appName === "beacon" && channel === "production") {
     expected.towerOrigin = BEACON_PRODUCTION_TOWER_ORIGIN;
   }
@@ -297,8 +334,25 @@ function verifyDistBundle(appPath, markers) {
   assertBundleOutputMatchesBuild(readAllDistJs(appPath), markers);
 }
 
+function verifyArchivedZipExcludes(archivePath, forbidden) {
+  if (!forbidden?.length) {
+    return;
+  }
+  // Match in JS rather than a shell grep so forbidden values never pass through shell quoting.
+  const contents = execSync(`unzip -p ${JSON.stringify(archivePath)}`, {
+    maxBuffer: 50 * 1024 * 1024,
+    encoding: "latin1",
+  });
+  for (const { value, label } of forbidden) {
+    if (contents.includes(value)) {
+      throw new Error(`Archived zip contains ${label} — a local dev value leaked into the release bundle`);
+    }
+  }
+}
+
 function verifyArchivedZipBundle(archivePath, markers) {
   verifyArchivedZipContains(archivePath, markers);
+  verifyArchivedZipExcludes(archivePath, markers.forbidden);
   verifyArchivedManifest(archivePath);
 }
 
@@ -338,7 +392,7 @@ async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
 
   s.message(`${progressBar(STEPS[2].pct)}  ${STEPS[2].label}…`);
   cleanDist(appPath);
-  const markers = expectedBundleMarkers({ appName, channel, recipient, pkg });
+  const markers = expectedBundleMarkers({ appName, appPath, channel, recipient, pkg });
   const viteResult = await run("pnpm", ["exec", "vite", "build", "--mode", viteMode], {
     cwd: appPath,
     env: viteEnv,

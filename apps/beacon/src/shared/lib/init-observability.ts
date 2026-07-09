@@ -58,16 +58,20 @@ export function initObservability(): void {
         capture_console_errors: false,
       },
     });
-    posthog.register(
-      buildCodalynPostHogSuperProperties({
+    posthog.register({
+      ...buildCodalynPostHogSuperProperties({
         app: "beacon",
         environment: buildInfo.channel,
         app_version: buildInfo.version,
         release_stage: buildInfo.releaseStage,
         build_time: buildInfo.buildTime,
         bundle_recipient: buildInfo.recipient,
-      })
-    );
+      }),
+      // PostHog would otherwise derive coarse location from the client IP server-side; the
+      // in-app disclosure says no location is collected (and Webflow's developer ToS bars
+      // gathering end-user locations), so suppress GeoIP enrichment on every event.
+      $geoip_disable: true,
+    });
   }
 
   if (!posthogKey) {

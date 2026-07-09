@@ -3,9 +3,17 @@ export const WEBFLOW_EXTENSION_BUNDLE_FILENAME = "bundle.zip";
 
 /**
  * @param {string} jsContents concatenated JS from dist/ or the archived zip
- * @param {{ version: string; recipient?: string; towerOrigin?: string }} expected
+ * @param {{ version: string; recipient?: string; towerOrigin?: string; forbidden?: Array<{ value: string; label: string }> }} expected
  */
 export function assertBundleOutputMatchesBuild(jsContents, expected) {
+  for (const { value, label } of expected.forbidden ?? []) {
+    if (jsContents.includes(value)) {
+      throw new Error(
+        `Build output contains ${label} — a local dev value leaked into a release bundle. ` +
+          "Check .env/.env.local overrides and the channel env in build-cli.mjs."
+      );
+    }
+  }
   if (!jsContents.includes(expected.version)) {
     throw new Error(
       `Build output does not contain version "${expected.version}". The Vite build may be stale or misconfigured.`

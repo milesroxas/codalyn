@@ -34,17 +34,26 @@ export function TelemetryConsentPrompt() {
     <AlertDialog open={open}>
       <AlertDialogContent onEscapeKeyDown={() => setOpen(false)}>
         <AlertDialogHeader>
-          <AlertDialogTitle>Share anonymous usage &amp; error data?</AlertDialogTitle>
+          <AlertDialogTitle>Help improve Beacon</AlertDialogTitle>
           <AlertDialogDescription asChild>
-            <div className="grid gap-2">
+            <div className="grid gap-2.5">
+              <p>Share anonymous usage and error data to help us fix bugs and improve Beacon.</p>
+              <div className="grid gap-1">
+                <p>If you choose to share, we&rsquo;ll collect:</p>
+                <ul className="grid list-disc gap-0.5 pl-4">
+                  <li>Error reports</li>
+                  <li>Feature usage</li>
+                  <li>App version</li>
+                  <li>Your current Webflow site and workspace IDs</li>
+                </ul>
+              </div>
               <p>
-                Beacon can collect anonymous operational telemetry to fix errors and improve features: error reports,
-                feature-usage events, app version, and the current Webflow site and workspace IDs.
+                We never collect page content, design content, session recordings, or autocaptured activity. Data is
+                processed by PostHog (analytics) and Sentry (error reporting) on behalf of Codalyn.
               </p>
               <p>
-                Data is processed by PostHog (product analytics) and Sentry (error reporting) on Codalyn&rsquo;s behalf.
-                No session recording, no autocapture, and no page or design content is ever collected. Nothing is sent
-                unless you allow it, and you can change this anytime in Settings &rarr; Privacy.
+                Sharing is optional. Nothing is sent unless you turn it on, and you can change your choice anytime in
+                Settings &rarr; Privacy.
               </p>
             </div>
           </AlertDialogDescription>
@@ -54,7 +63,7 @@ export function TelemetryConsentPrompt() {
             No thanks
           </AlertDialogCancel>
           <AlertDialogAction type="button" onClick={() => decide(true)}>
-            Allow telemetry
+            Share data
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

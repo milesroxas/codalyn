@@ -35,7 +35,7 @@ export function TelemetryConsentPrompt() {
       <AlertDialogContent onEscapeKeyDown={() => setOpen(false)}>
         <AlertDialogHeader>
           <AlertDialogTitle>Help improve Beacon</AlertDialogTitle>
-          <AlertDialogDescription asChild>
+          <AlertDialogDescription size="xs" asChild>
             <div className="grid gap-2.5">
               <p>Share anonymous usage and error data to help us fix bugs and improve Beacon.</p>
               <div className="grid gap-1">

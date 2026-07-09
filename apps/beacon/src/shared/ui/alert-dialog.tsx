@@ -139,17 +139,31 @@ function AlertDialogTitle({ className, ...props }: React.ComponentProps<typeof A
   );
 }
 
+const alertDialogDescriptionVariants = cva(
+  "text-balance text-muted-foreground md:text-pretty *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+  {
+    variants: {
+      size: {
+        default: "text-sm",
+        xs: "text-xs",
+      },
+    },
+    defaultVariants: {
+      size: "default",
+    },
+  }
+);
+
 function AlertDialogDescription({
   className,
+  size,
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Description>) {
+}: React.ComponentProps<typeof AlertDialogPrimitive.Description> &
+  VariantProps<typeof alertDialogDescriptionVariants>) {
   return (
     <AlertDialogPrimitive.Description
       data-slot="alert-dialog-description"
-      className={cn(
-        "text-sm text-balance text-muted-foreground md:text-pretty *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
-        className
-      )}
+      className={cn(alertDialogDescriptionVariants({ size }), className)}
       {...props}
     />
   );

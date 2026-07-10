@@ -50,7 +50,7 @@ function TowerPublicHeader({
   return (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-6 antialiased">
       <div className="relative mx-auto w-full max-w-[100vw]">
-        <div className="pointer-events-auto relative flex h-12 w-full items-center justify-between gap-3 rounded-sm bg-[#FFFFFF40] px-2 py-2 backdrop-blur-sm md:hidden">
+        <div className="pointer-events-auto relative flex h-12 w-full items-center justify-between gap-3 rounded-sm border border-border/60 bg-background/60 px-2 py-2 backdrop-blur-sm md:hidden">
           <TowerPublicHeaderMobileMenu
             activeProduct={activeProduct}
             beaconHref={beaconHref}
@@ -61,7 +61,7 @@ function TowerPublicHeader({
 
           <TowerPublicHeaderLink
             href={homeHref}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white transition-opacity hover:opacity-80"
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-foreground transition-opacity hover:opacity-80"
           >
             <CodalynLogo />
           </TowerPublicHeaderLink>
@@ -70,8 +70,8 @@ function TowerPublicHeader({
         </div>
 
         <div className="relative mx-auto hidden h-12 w-full md:block">
-          <div className="pointer-events-auto absolute top-0 left-1/2 flex -translate-x-1/2 items-center gap-14 rounded-sm bg-[#FFFFFF40] px-4 py-2 backdrop-blur-sm">
-            <TowerPublicHeaderLink href={homeHref} className="text-white transition-opacity hover:opacity-80">
+          <div className="pointer-events-auto absolute top-0 left-1/2 flex -translate-x-1/2 items-center gap-14 rounded-sm border border-border/60 bg-background/60 px-4 py-2 backdrop-blur-sm">
+            <TowerPublicHeaderLink href={homeHref} className="text-foreground transition-opacity hover:opacity-80">
               <CodalynLogo />
             </TowerPublicHeaderLink>
             <TowerPublicHeaderProductNav

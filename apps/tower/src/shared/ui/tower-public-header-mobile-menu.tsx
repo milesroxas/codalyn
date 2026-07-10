@@ -43,7 +43,7 @@ function TowerPublicHeaderMobileMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="marketing-nav-ghost" size="icon-sm" className="md:hidden" aria-label="Open menu">
+        <Button type="button" variant="ghost" size="icon-sm" className="md:hidden" aria-label="Open menu">
           <IconMenu2 aria-hidden />
         </Button>
       </DropdownMenuTrigger>

@@ -36,7 +36,7 @@ function TowerPublicMarketingPageShell({
   children,
 }: TowerPublicMarketingPageShellProps) {
   return (
-    <div className="min-h-dvh bg-black text-foreground antialiased">
+    <div className="dark min-h-dvh bg-background text-foreground antialiased">
       <TowerPublicHeader
         homeHref={homeHref}
         activeProduct={activeProduct}

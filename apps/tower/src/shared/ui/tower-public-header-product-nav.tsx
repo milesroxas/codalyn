@@ -61,8 +61,8 @@ function TowerPublicHeaderNavLink({
       href={href}
       active={active}
       className={cn(
-        "inline-flex h-8 items-center justify-center gap-1.5 rounded-sm px-2.5 text-sm font-medium text-white transition-colors hover:bg-white/10",
-        active && "bg-white/20"
+        "inline-flex h-8 items-center justify-center gap-1.5 rounded-sm px-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/60",
+        active && "bg-muted"
       )}
     >
       {children}

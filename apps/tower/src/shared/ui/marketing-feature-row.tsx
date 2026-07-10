@@ -47,6 +47,8 @@ function MarketingFeatureRow({
     </MarketingFeaturePanel>
   );
 
+  // Media renders first in the DOM so the stacked mobile layout always leads
+  // with it; `mediaPosition` only reorders the desktop row via flex order.
   const media = (
     <MarketingVideoSlot
       src={videoSrc}
@@ -54,6 +56,7 @@ function MarketingFeatureRow({
       poster={videoPoster}
       label={videoLabel}
       shader={mediaShader}
+      className={mediaPosition === "end" ? "lg:order-last" : undefined}
     />
   );
 
@@ -62,17 +65,8 @@ function MarketingFeatureRow({
       data-slot="marketing-feature-row"
       className={cn("flex flex-col gap-6 lg:flex-row lg:items-start lg:min-h-0", className)}
     >
-      {mediaPosition === "start" ? (
-        <>
-          {media}
-          {panel}
-        </>
-      ) : (
-        <>
-          {panel}
-          {media}
-        </>
-      )}
+      {media}
+      {panel}
     </div>
   );
 }

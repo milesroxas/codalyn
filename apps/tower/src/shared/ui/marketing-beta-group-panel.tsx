@@ -109,7 +109,7 @@ function MarketingBetaGroupPanel({ title, description }: MarketingBetaGroupPanel
               {error}
             </p>
           ) : null}
-          <Button type="submit" variant="marketing-form-submit" size="form" width="fit" disabled={pending}>
+          <Button type="submit" size="form" width="fit" disabled={pending}>
             {pending ? FLINT_BETA_GROUP_FORM.submitPending : FLINT_BETA_GROUP_FORM.submitLabel}
           </Button>
         </form>

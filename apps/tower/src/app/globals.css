@@ -51,10 +51,16 @@
    body a scroll container — `hidden` forces computed `overflow-y: auto`, which
    pops a second vertical scrollbar on body while marketing enter animations
    translate content past its bottom edge. Vertical scroll is native. */
+/* No vertical rubber-band: iOS overscroll drags fixed-position art (landing
+   canvas, FAB, headers) along with the document and exposes the bare page
+   background below the footer — on dark surfaces that reads as the page
+   scrolling into a void. Vertical only: horizontal stays untouched so the
+   edge swipe-back navigation gesture keeps working. */
 html {
   margin: 0;
   min-height: 100%;
   overflow-x: clip;
+  overscroll-behavior-y: none;
 }
 
 body {

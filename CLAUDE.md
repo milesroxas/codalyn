@@ -65,6 +65,20 @@ When reading Webflow Designer API values (or any SDK returning rich value object
 - Only allow call-site overrides when absolutely necessary for non-visual layout placement constraints; keep them minimal.
 - Treat call-site visual styling as a DRY and single-source-of-truth violation.
 
+## Storybook Coverage Rule (Beacon)
+
+Every new or visually changed UI component in `apps/beacon` MUST ship with a Storybook story in the same change. No UI PR without its story.
+
+- Presentational components (plain props, no app context): plain-prop story. Titles: `UI/<PascalCase>` for `shared/ui`, `CmsSlots/<Name>` / `ImageEditor/<Name>` / feature-name for feature ui dirs.
+- Screens / context-heavy components: smoke story via `beaconScreen(persona, opts)` harness (title `App/<Screen>`, layout fullscreen).
+- Exempt: non-visual modules in ui dirs (context providers, gates, prefetchers, pure logic wrappers). If exempt, say so in the PR.
+- Changing a component's variants/props: update its existing story to cover the new surface.
+- Conventions and rationale: [Storybook guide](docs/storybook.md); exemplar `apps/beacon/src/shared/ui/button.stories.tsx`.
+
+PR checklist:
+
+- [ ] New/changed UI has a new/updated story (or an explicit exemption note).
+
 ## Reference Docs
 
 - [Agent Teams guide](docs/agent-teams.md) — how to spin up effective Claude Code agent teams (enable flag, teams vs subagents, spawn templates, monorepo patterns).

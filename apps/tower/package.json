@@ -41,6 +41,7 @@
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {
+    "@c15t/nextjs": "^2.1.0",
     "@codalyn/observability": "workspace:*",
     "@codalyn/webflow-kit": "workspace:*",
     "@dnd-kit/core": "^6.3.1",

@@ -1,5 +1,6 @@
 "use client";
 
+import { useConsentManager } from "@c15t/nextjs";
 import { buildCodalynPostHogSuperProperties, resolvePostHogHost, resolvePostHogKey } from "@codalyn/observability";
 import { PostHogProvider as PHProvider } from "@posthog/react";
 import posthog from "posthog-js";
@@ -9,12 +10,32 @@ import { codalynRuntimeInfo } from "@/shared/lib/codalyn-runtime-info";
 const posthogKey = resolvePostHogKey(process.env.NEXT_PUBLIC_POSTHOG_KEY);
 const posthogHost = resolvePostHogHost(process.env.NEXT_PUBLIC_POSTHOG_HOST);
 
+/**
+ * PostHog is gated on the c15t "measurement" consent category: the SDK is
+ * not initialized until consent is granted, and a later revocation opts the
+ * loaded SDK out of capturing rather than unloading it.
+ */
 export function PostHogProvider({ children }: { children: ReactNode }) {
-  const [ready, setReady] = useState(!posthogKey);
+  const { has } = useConsentManager();
+  const measurementAllowed = has("measurement");
+  const [loaded, setLoaded] = useState(Boolean(posthog.__loaded));
 
   useEffect(() => {
-    if (!posthogKey || posthog.__loaded) {
-      setReady(true);
+    if (!posthogKey) {
+      return;
+    }
+
+    if (!measurementAllowed) {
+      if (posthog.__loaded && !posthog.has_opted_out_capturing()) {
+        posthog.opt_out_capturing();
+      }
+      return;
+    }
+
+    if (posthog.__loaded) {
+      if (posthog.has_opted_out_capturing()) {
+        posthog.opt_in_capturing({ captureEventName: false });
+      }
       return;
     }
 
@@ -29,6 +50,10 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
         capture_console_errors: false,
       },
     });
+    // A pre-consent opt-out persisted by a previous session survives init.
+    if (posthog.has_opted_out_capturing()) {
+      posthog.opt_in_capturing({ captureEventName: false });
+    }
     posthog.register(
       buildCodalynPostHogSuperProperties({
         app: codalynRuntimeInfo.app,
@@ -36,10 +61,10 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
         app_version: codalynRuntimeInfo.version,
       })
     );
-    setReady(true);
-  }, []);
+    setLoaded(true);
+  }, [measurementAllowed]);
 
-  if (!posthogKey || !ready) {
+  if (!posthogKey || !loaded) {
     return children;
   }
 

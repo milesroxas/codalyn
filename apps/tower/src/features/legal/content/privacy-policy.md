@@ -70,9 +70,17 @@ We require processors to handle personal information only for authorized purpose
 We use:
 
 - **Strictly necessary cookies** for authentication, session management, and security. These cannot be disabled while using the signed-in Service.
-- **Analytics cookies** (when PostHog is enabled) to understand aggregate product usage. Where required by law, we will request consent before non-essential analytics.
+- **Analytics cookies** (**PostHog**) to understand aggregate product usage. These load only after you grant consent to the "measurement" category through our consent banner.
 
-You can control cookies through browser settings. Disabling necessary cookies may limit Service functionality.
+### Consent management
+
+Our websites show a consent banner (powered by **c15t**) before any non-essential cookies or analytics scripts run:
+
+- Analytics does not load, set cookies, or transmit data until you accept the "measurement" category.
+- Your choice is stored locally on your device (browser storage and a consent cookie); we do not maintain server-side consent records.
+- You can review, change, or withdraw your consent at any time using the "Cookies" link in the site footer. Withdrawing consent stops analytics collection for subsequent activity.
+
+You can also control cookies through browser settings. Disabling necessary cookies may limit Service functionality.
 
 ## 6. Data retention
 

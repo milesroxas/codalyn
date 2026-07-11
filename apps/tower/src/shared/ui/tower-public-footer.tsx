@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type * as React from "react";
+import { ConsentDialogLink } from "@/shared/lib/consent/consent-dialog-link";
 
 import {
   TOWER_PRIVACY_PATH,
@@ -75,6 +76,7 @@ function TowerPublicFooter({ variant = "default", placement = "static", classNam
           <TowerPublicFooterLink href={TOWER_PRIVACY_PATH} variant={variant}>
             Privacy
           </TowerPublicFooterLink>
+          <ConsentDialogLink className={cn("text-xs", footerLinkClassNames[variant])}>Cookies</ConsentDialogLink>
         </nav>
       </div>
     </footer>

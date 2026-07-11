@@ -76,7 +76,9 @@ function TowerPublicFooter({ variant = "default", placement = "static", classNam
           <TowerPublicFooterLink href={TOWER_PRIVACY_PATH} variant={variant}>
             Privacy
           </TowerPublicFooterLink>
-          <ConsentDialogLink className={cn("text-xs", footerLinkClassNames[variant])}>Cookies</ConsentDialogLink>
+          <ConsentDialogLink className={cn("cursor-pointer text-xs", footerLinkClassNames[variant])}>
+            Cookies
+          </ConsentDialogLink>
         </nav>
       </div>
     </footer>

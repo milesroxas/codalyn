@@ -21,7 +21,10 @@
       "!**/*.config.mjs",
       "!**/scripts/post-build.js",
       "!**/public/**/*.svg",
-      "!**/.storybook/public/mockServiceWorker.js"
+      "!**/.storybook/public/mockServiceWorker.js",
+      "!**/src/app/(payload)",
+      "!**/src/payload-types.ts",
+      "!**/src/cms/migrations"
     ]
   },
   "formatter": {

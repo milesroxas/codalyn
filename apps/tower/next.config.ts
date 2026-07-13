@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveCodalynBuildChannel } from "@codalyn/observability";
+import { withPayload } from "@payloadcms/next/withPayload";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 import packageJson from "./package.json";
@@ -18,6 +19,10 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_CODALYN_APP_VERSION: packageJson.version,
   },
   transpilePackages: ["@codalyn/webflow-kit", "@codalyn/observability"],
+  images: {
+    /** CMS media served from Vercel Blob (local-dev uploads resolve same-origin, no pattern needed). */
+    remotePatterns: [{ protocol: "https", hostname: "*.public.blob.vercel-storage.com" }],
+  },
   /** Trace files from the monorepo root so Docker `standalone` bundles workspace deps correctly. */
   outputFileTracingRoot: monorepoRoot,
   /** Sentry/OpenTelemetry instrumentation — must resolve from tower's node_modules (single version). */
@@ -45,11 +50,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-  silent: !process.env.CI,
-  widenClientFileUpload: true,
-  disableLogger: true,
-});
+export default withPayload(
+  withSentryConfig(nextConfig, {
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+    silent: !process.env.CI,
+    widenClientFileUpload: true,
+    disableLogger: true,
+  })
+);

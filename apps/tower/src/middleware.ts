@@ -11,7 +11,11 @@ import {
 } from "@/server/tower-hosts";
 import { readTowerSessionCookie } from "@/server/tower-session-cookie";
 import { TOWER_AUTH_SURFACE_PATHS } from "@/shared/lib/navigation/tower-auth-surfaces";
-import { isTowerMarketingPublicPath, TOWER_SUPPORT_PATH } from "@/shared/lib/navigation/tower-marketing-paths";
+import {
+  isTowerMarketingPublicPath,
+  TOWER_CMS_PAGE_PATH_PREFIX,
+  TOWER_SUPPORT_PATH,
+} from "@/shared/lib/navigation/tower-marketing-paths";
 
 function needsCors(pathname: string): boolean {
   return (
@@ -29,6 +33,10 @@ const PUBLIC_PREFIXES = [
   TOWER_SUPPORT_PATH,
   "/terms",
   "/privacy",
+  // Payload CMS admin — enforces its own auth (cms-users, `payload-token` cookie).
+  "/admin",
+  // CMS-managed marketing pages — the route only serves published docs to anonymous visitors.
+  TOWER_CMS_PAGE_PATH_PREFIX,
   "/integrations/webflow/success",
   "/integrations/webflow/error",
   "/integrations/beacon-popup-done",

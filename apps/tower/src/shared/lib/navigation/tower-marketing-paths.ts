@@ -3,6 +3,23 @@ export const TOWER_PRIVACY_PATH = "/privacy";
 export const TOWER_PRODUCT_MARKETING_PATH = "/tower";
 export const TOWER_SUPPORT_PATH = "/support";
 
+/** URL namespace for CMS-managed marketing pages (Payload `pages` collection), e.g. `/p/spring-launch`. */
+export const TOWER_CMS_PAGE_PATH_PREFIX = "/p";
+
+/** Kebab-case slug as stored in the Payload `pages` collection. */
+const CMS_PAGE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export function isValidTowerCmsPageSlug(slug: string): boolean {
+  return CMS_PAGE_SLUG_PATTERN.test(slug);
+}
+
+/** Any path under the CMS namespace; slug validity is enforced at the data layer, not routing. */
+export function isTowerCmsPagePath(pathname: string): boolean {
+  return (
+    pathname.startsWith(`${TOWER_CMS_PAGE_PATH_PREFIX}/`) && pathname.length > TOWER_CMS_PAGE_PATH_PREFIX.length + 1
+  );
+}
+
 /** Paths served on the marketing host (codalyn.app) without redirecting to the Tower app host. */
 export const TOWER_MARKETING_PUBLIC_PATHS = [
   "/",
@@ -32,7 +49,7 @@ function normalizePathname(pathname: string): string {
 
 export function isTowerMarketingPublicPath(pathname: string): boolean {
   const normalized = normalizePathname(pathname);
-  return TOWER_MARKETING_PUBLIC_PATHS.some((path) => normalized === path);
+  return TOWER_MARKETING_PUBLIC_PATHS.some((path) => normalized === path) || isTowerCmsPagePath(normalized);
 }
 
 export function isTowerMarketingSelfContainedPath(pathname: string): boolean {
@@ -42,7 +59,7 @@ export function isTowerMarketingSelfContainedPath(pathname: string): boolean {
 
 export function isTowerMarketingInnerPagePath(pathname: string): boolean {
   const normalized = normalizePathname(pathname);
-  return TOWER_MARKETING_INNER_PAGE_PATHS.some((path) => normalized === path);
+  return TOWER_MARKETING_INNER_PAGE_PATHS.some((path) => normalized === path) || isTowerCmsPagePath(normalized);
 }
 
 /** Public marketing/legal pages that render `TowerPublicFooter`. */
@@ -54,5 +71,5 @@ export const TOWER_PUBLIC_FOOTER_PATHS = [
 
 export function isTowerPublicFooterPath(pathname: string): boolean {
   const normalized = normalizePathname(pathname);
-  return TOWER_PUBLIC_FOOTER_PATHS.some((path) => normalized === path);
+  return TOWER_PUBLIC_FOOTER_PATHS.some((path) => normalized === path) || isTowerCmsPagePath(normalized);
 }

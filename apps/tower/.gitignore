@@ -1,2 +1,4 @@
 .vercel
 .env.migrate.pull
+# Payload CMS local-dev media uploads (Vercel Blob in deployed envs)
+/media

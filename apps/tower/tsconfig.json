@@ -3,7 +3,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@payload-config": ["./src/payload.config.ts"]
     },
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "preserve",
@@ -18,5 +19,5 @@
     "strict": true
   },
   "include": ["next-env.d.ts", "css.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "src/cms/migrations"]
 }

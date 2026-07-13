@@ -8,6 +8,9 @@ import sharp from "sharp";
 import { CmsUsers } from "./cms/collections/cms-users";
 import { Media } from "./cms/collections/media";
 import { Pages } from "./cms/collections/pages";
+import { StreamVideos } from "./cms/collections/stream-videos";
+import { Footer } from "./cms/globals/footer";
+import { Header } from "./cms/globals/header";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -34,7 +37,8 @@ export default buildConfig({
     // Scope Payload's REST API under /api/payload so it never shadows Tower's /api/* routes.
     api: "/api/payload",
   },
-  collections: [CmsUsers, Media, Pages],
+  collections: [CmsUsers, Media, Pages, StreamVideos],
+  globals: [Header, Footer],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET ?? "",
   typescript: {

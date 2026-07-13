@@ -6,6 +6,10 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const Media: CollectionConfig = {
   slug: "media",
+  // Payload's built-in folders: adds a `folder` field + folder browse view in
+  // the admin so uploads stay organized (payload-folders collection is
+  // auto-created).
+  folders: true,
   access: {
     read: () => true,
     create: ({ req }) => Boolean(req.user),

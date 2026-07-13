@@ -70,17 +70,25 @@ export interface Config {
     'cms-users': CmsUser;
     media: Media;
     pages: Page;
+    'stream-videos': StreamVideo;
     'payload-kv': PayloadKv;
+    'payload-folders': FolderInterface;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
   };
-  collectionsJoins: {};
+  collectionsJoins: {
+    'payload-folders': {
+      documentsAndFolders: 'payload-folders' | 'media';
+    };
+  };
   collectionsSelect: {
     'cms-users': CmsUsersSelect<false> | CmsUsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
+    'stream-videos': StreamVideosSelect<false> | StreamVideosSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
+    'payload-folders': PayloadFoldersSelect<false> | PayloadFoldersSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -89,8 +97,14 @@ export interface Config {
     defaultIDType: number;
   };
   fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    header: Header;
+    footer: Footer;
+  };
+  globalsSelect: {
+    header: HeaderSelect<false> | HeaderSelect<true>;
+    footer: FooterSelect<false> | FooterSelect<true>;
+  };
   locale: null;
   widgets: {
     collections: CollectionsWidget;
@@ -152,6 +166,7 @@ export interface CmsUser {
 export interface Media {
   id: number;
   alt: string;
+  folder?: (number | null) | FolderInterface;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -192,6 +207,32 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-folders".
+ */
+export interface FolderInterface {
+  id: number;
+  name: string;
+  folder?: (number | null) | FolderInterface;
+  documentsAndFolders?: {
+    docs?: (
+      | {
+          relationTo?: 'payload-folders';
+          value: number | FolderInterface;
+        }
+      | {
+          relationTo?: 'media';
+          value: number | Media;
+        }
+    )[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  folderType?: 'media'[] | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "pages".
  */
 export interface Page {
@@ -201,11 +242,52 @@ export interface Page {
    * URL path segment, e.g. `about` for /about.
    */
   slug: string;
-  hero?: {
+  hero: {
+    /**
+     * Hero layout variant.
+     */
+    variant: 'center' | 'none';
+    /**
+     * Short kicker line above the heading.
+     */
+    eyebrow?: string | null;
     heading?: string | null;
     subheading?: string | null;
+    /**
+     * Image or video shown below the hero copy.
+     */
+    image?: (number | null) | Media;
+    /**
+     * Cloudflare Stream demo video (click-to-play). Takes precedence over Media when both are set.
+     */
+    video?: (number | null) | StreamVideo;
+    /**
+     * Call-to-action buttons.
+     */
+    actions?:
+      | {
+          label: string;
+          /**
+           * Relative path (`/sign-up`) or absolute URL.
+           */
+          href: string;
+          appearance: 'primary' | 'secondary';
+          id?: string | null;
+        }[]
+      | null;
+  };
+  /**
+   * Page sections rendered top to bottom, below the hero.
+   */
+  layout?: (SectionHeaderBlock | ContentBlock)[] | null;
+  seo?: {
+    title?: string | null;
+    description?: string | null;
     image?: (number | null) | Media;
   };
+  /**
+   * Legacy — use a Content block in the Content tab instead.
+   */
   content?: {
     root: {
       type: string;
@@ -221,14 +303,105 @@ export interface Page {
     };
     [k: string]: unknown;
   } | null;
-  seo?: {
-    title?: string | null;
-    description?: string | null;
-    image?: (number | null) | Media;
-  };
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
+}
+/**
+ * Videos hosted on Cloudflare Stream. Upload in the Cloudflare dashboard (Stream → Videos), then register the video UID here to use it on pages.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "stream-videos".
+ */
+export interface StreamVideo {
+  id: number;
+  /**
+   * Editor-facing name; also used as the player's accessibility label.
+   */
+  title: string;
+  /**
+   * Cloudflare Stream video UID, e.g. `e652512a1aec7357bd78d18c594534d3`.
+   */
+  uid: string;
+  /**
+   * Optional poster image. Defaults to the Stream thumbnail when unset.
+   */
+  poster?: (number | null) | Media;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "SectionHeaderBlock".
+ */
+export interface SectionHeaderBlock {
+  /**
+   * Short uppercase kicker above the statement, e.g. `CMS Slots`.
+   */
+  eyebrow?: string | null;
+  /**
+   * Section statement, e.g. `Unique content sections for collection template pages`.
+   */
+  heading: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'sectionHeader';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ContentBlock".
+ */
+export interface ContentBlock {
+  blocks: (TwoColListLeftBlock | MediaBlock | VideoBlock)[];
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'content';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TwoColListLeftBlock".
+ */
+export interface TwoColListLeftBlock {
+  columns: {
+    /**
+     * Column heading, e.g. `Designer`.
+     */
+    label: string;
+    items: {
+      text: string;
+      id?: string | null;
+    }[];
+    id?: string | null;
+  }[];
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'twoColListLeft';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "MediaBlock".
+ */
+export interface MediaBlock {
+  media: number | Media;
+  caption?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'mediaBlock';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "VideoBlock".
+ */
+export interface VideoBlock {
+  video: number | StreamVideo;
+  /**
+   * Click to play suits demos with audio; ambient loop suits silent background footage.
+   */
+  playback: 'clickToPlay' | 'loop';
+  caption?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'videoBlock';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -265,6 +438,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'pages';
         value: number | Page;
+      } | null)
+    | ({
+        relationTo: 'stream-videos';
+        value: number | StreamVideo;
+      } | null)
+    | ({
+        relationTo: 'payload-folders';
+        value: number | FolderInterface;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -337,6 +518,7 @@ export interface CmsUsersSelect<T extends boolean = true> {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  folder?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -393,11 +575,27 @@ export interface PagesSelect<T extends boolean = true> {
   hero?:
     | T
     | {
+        variant?: T;
+        eyebrow?: T;
         heading?: T;
         subheading?: T;
         image?: T;
+        video?: T;
+        actions?:
+          | T
+          | {
+              label?: T;
+              href?: T;
+              appearance?: T;
+              id?: T;
+            };
       };
-  content?: T;
+  layout?:
+    | T
+    | {
+        sectionHeader?: T | SectionHeaderBlockSelect<T>;
+        content?: T | ContentBlockSelect<T>;
+      };
   seo?:
     | T
     | {
@@ -405,9 +603,87 @@ export interface PagesSelect<T extends boolean = true> {
         description?: T;
         image?: T;
       };
+  content?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "SectionHeaderBlock_select".
+ */
+export interface SectionHeaderBlockSelect<T extends boolean = true> {
+  eyebrow?: T;
+  heading?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ContentBlock_select".
+ */
+export interface ContentBlockSelect<T extends boolean = true> {
+  blocks?:
+    | T
+    | {
+        twoColListLeft?: T | TwoColListLeftBlockSelect<T>;
+        mediaBlock?: T | MediaBlockSelect<T>;
+        videoBlock?: T | VideoBlockSelect<T>;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TwoColListLeftBlock_select".
+ */
+export interface TwoColListLeftBlockSelect<T extends boolean = true> {
+  columns?:
+    | T
+    | {
+        label?: T;
+        items?:
+          | T
+          | {
+              text?: T;
+              id?: T;
+            };
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "MediaBlock_select".
+ */
+export interface MediaBlockSelect<T extends boolean = true> {
+  media?: T;
+  caption?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "VideoBlock_select".
+ */
+export interface VideoBlockSelect<T extends boolean = true> {
+  video?: T;
+  playback?: T;
+  caption?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "stream-videos_select".
+ */
+export interface StreamVideosSelect<T extends boolean = true> {
+  title?: T;
+  uid?: T;
+  poster?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -416,6 +692,18 @@ export interface PagesSelect<T extends boolean = true> {
 export interface PayloadKvSelect<T extends boolean = true> {
   key?: T;
   data?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-folders_select".
+ */
+export interface PayloadFoldersSelect<T extends boolean = true> {
+  name?: T;
+  folder?: T;
+  documentsAndFolders?: T;
+  folderType?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -448,6 +736,264 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * Logo, navigation, and call-to-action buttons shown on every page.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "header".
+ */
+export interface Header {
+  id: number;
+  /**
+   * Site logo at the left of the header. Falls back to the built-in wordmark when unset.
+   */
+  logo?: (number | null) | Media;
+  /**
+   * Top-level navigation, rendered left to right.
+   */
+  navItems?:
+    | {
+        type: 'link' | 'dropdown';
+        label: string;
+        link?: {
+          linkType: 'internal' | 'custom';
+          page?: (number | null) | Page;
+          /**
+           * Relative path (`/pricing`) or absolute URL.
+           */
+          url?: string | null;
+          newTab?: boolean | null;
+        };
+        /**
+         * Links shown in the dropdown panel.
+         */
+        items?:
+          | {
+              label: string;
+              /**
+               * Optional supporting line under the label.
+               */
+              description?: string | null;
+              link: {
+                linkType: 'internal' | 'custom';
+                page?: (number | null) | Page;
+                /**
+                 * Relative path (`/pricing`) or absolute URL.
+                 */
+                url?: string | null;
+                newTab?: boolean | null;
+              };
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Call-to-action buttons at the right of the header.
+   */
+  actions?:
+    | {
+        label: string;
+        appearance: 'primary' | 'secondary';
+        link: {
+          linkType: 'internal' | 'custom';
+          page?: (number | null) | Page;
+          /**
+           * Relative path (`/pricing`) or absolute URL.
+           */
+          url?: string | null;
+          newTab?: boolean | null;
+        };
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * Link columns, social links, and legal bar shown at the bottom of every page.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "footer".
+ */
+export interface Footer {
+  id: number;
+  /**
+   * Footer logo. Falls back to the built-in wordmark when unset.
+   */
+  logo?: (number | null) | Media;
+  /**
+   * Short blurb under the logo.
+   */
+  tagline?: string | null;
+  /**
+   * Grouped link lists, rendered left to right.
+   */
+  columns?:
+    | {
+        heading: string;
+        links?:
+          | {
+              label: string;
+              link: {
+                linkType: 'internal' | 'custom';
+                page?: (number | null) | Page;
+                /**
+                 * Relative path (`/pricing`) or absolute URL.
+                 */
+                url?: string | null;
+                newTab?: boolean | null;
+              };
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  socialLinks?:
+    | {
+        platform: 'x' | 'github' | 'linkedin' | 'youtube' | 'instagram';
+        /**
+         * Full profile URL, e.g. `https://github.com/codalyn`.
+         */
+        url: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Bottom bar links, e.g. Privacy, Terms, Cookies.
+   */
+  legalLinks?:
+    | {
+        label: string;
+        link: {
+          linkType: 'internal' | 'custom';
+          page?: (number | null) | Page;
+          /**
+           * Relative path (`/pricing`) or absolute URL.
+           */
+          url?: string | null;
+          newTab?: boolean | null;
+        };
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Copyright line without the year — the current year is added at render time.
+   */
+  copyright?: string | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "header_select".
+ */
+export interface HeaderSelect<T extends boolean = true> {
+  logo?: T;
+  navItems?:
+    | T
+    | {
+        type?: T;
+        label?: T;
+        link?:
+          | T
+          | {
+              linkType?: T;
+              page?: T;
+              url?: T;
+              newTab?: T;
+            };
+        items?:
+          | T
+          | {
+              label?: T;
+              description?: T;
+              link?:
+                | T
+                | {
+                    linkType?: T;
+                    page?: T;
+                    url?: T;
+                    newTab?: T;
+                  };
+              id?: T;
+            };
+        id?: T;
+      };
+  actions?:
+    | T
+    | {
+        label?: T;
+        appearance?: T;
+        link?:
+          | T
+          | {
+              linkType?: T;
+              page?: T;
+              url?: T;
+              newTab?: T;
+            };
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "footer_select".
+ */
+export interface FooterSelect<T extends boolean = true> {
+  logo?: T;
+  tagline?: T;
+  columns?:
+    | T
+    | {
+        heading?: T;
+        links?:
+          | T
+          | {
+              label?: T;
+              link?:
+                | T
+                | {
+                    linkType?: T;
+                    page?: T;
+                    url?: T;
+                    newTab?: T;
+                  };
+              id?: T;
+            };
+        id?: T;
+      };
+  socialLinks?:
+    | T
+    | {
+        platform?: T;
+        url?: T;
+        id?: T;
+      };
+  legalLinks?:
+    | T
+    | {
+        label?: T;
+        link?:
+          | T
+          | {
+              linkType?: T;
+              page?: T;
+              url?: T;
+              newTab?: T;
+            };
+        id?: T;
+      };
+  copyright?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

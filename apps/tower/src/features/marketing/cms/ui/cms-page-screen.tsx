@@ -2,7 +2,9 @@ import { headers } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
 
-import { resolveCmsMedia } from "@/features/marketing/cms/lib/get-cms-page";
+import { resolveCmsMedia } from "@/features/marketing/cms/lib/resolve-cms-media";
+import { CmsPageHero } from "@/features/marketing/cms/ui/blocks/page-hero";
+import { RenderBlocks } from "@/features/marketing/cms/ui/blocks/render-blocks";
 import type { Page } from "@/payload-types";
 import { auth } from "@/server/auth";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -45,7 +47,14 @@ async function CmsPageScreen({ page, draft }: CmsPageScreenProps) {
 
   const heroImage = resolveCmsMedia(page.hero?.image);
 
-  const body = (
+  // Block-based pages lead with the hero group then their layout sections;
+  // legacy pages fall back to the page-header + rich text body below.
+  const body = page.layout?.length ? (
+    <TowerPageMain width="wide" className="min-h-0 flex-1">
+      <CmsPageHero hero={page.hero} />
+      <RenderBlocks blocks={page.layout} />
+    </TowerPageMain>
+  ) : (
     <TowerPageMain width="narrow" className="min-h-0 flex-1">
       <TowerPageHeader title={page.hero?.heading || page.title} description={page.hero?.subheading ?? ""} />
       {heroImage?.url && heroImage.width && heroImage.height ? (

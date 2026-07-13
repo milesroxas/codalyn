@@ -1,6 +1,6 @@
 import config from "@payload-config";
 import { getPayload } from "payload";
-import type { Media, Page } from "@/payload-types";
+import type { Page } from "@/payload-types";
 import { isValidTowerCmsPageSlug } from "@/shared/lib/navigation/tower-marketing-paths";
 
 type GetCmsPageOptions = {
@@ -29,16 +29,4 @@ export async function getCmsPageBySlug(slug: string, { draft }: GetCmsPageOption
   });
 
   return result.docs[0] ?? null;
-}
-
-/**
- * Boundary normalizer for upload relation values: Payload returns a populated
- * `Media` object at depth > 0 but a bare numeric id at depth 0 — only the
- * populated shape carries a usable URL.
- */
-export function resolveCmsMedia(value: number | Media | null | undefined): Media | null {
-  if (!value || typeof value === "number") {
-    return null;
-  }
-  return typeof value.url === "string" && value.url.length > 0 ? value : null;
 }

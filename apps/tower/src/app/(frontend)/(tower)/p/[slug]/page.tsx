@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { draftMode } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { getCmsPageBySlug, resolveCmsMedia } from "@/features/marketing/cms/lib/get-cms-page";
+import { getCmsPageBySlug } from "@/features/marketing/cms/lib/get-cms-page";
+import { resolveCmsMedia } from "@/features/marketing/cms/lib/resolve-cms-media";
 import { CmsPageScreen } from "@/features/marketing/cms/ui/cms-page-screen";
 import { buildMarketingMetadata } from "@/server/marketing/marketing-seo";
 import { buildMarketingUrl } from "@/server/tower-hosts";

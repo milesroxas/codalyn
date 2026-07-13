@@ -11,6 +11,18 @@ import { Pages } from "./cms/collections/pages";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "postgres"]);
+
+/** Dev-mode push may only mutate local databases — shared Neon branches (dev/preview/prod) are migration-only. */
+function isLocalDatabaseUrl(url: string | undefined): boolean {
+  if (!url?.trim()) return true;
+  try {
+    return LOCAL_DB_HOSTS.has(new URL(url).hostname.toLowerCase());
+  } catch {
+    return true;
+  }
+}
+
 export default buildConfig({
   admin: {
     user: CmsUsers.slug,
@@ -32,6 +44,7 @@ export default buildConfig({
     // Isolated pg schema — keeps Payload's drizzle-managed tables away from
     // Tower's better-auth/drizzle-kit tables in `public`.
     schemaName: "payload",
+    push: isLocalDatabaseUrl(process.env.DATABASE_URL),
     pool: {
       connectionString: process.env.DATABASE_URL,
     },

@@ -3,7 +3,7 @@ import { draftMode } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPayload } from "payload";
 
-import { isValidTowerCmsPageSlug, TOWER_CMS_PAGE_PATH_PREFIX } from "@/shared/lib/navigation/tower-marketing-paths";
+import { isValidTowerCmsPageSlug, towerCmsPagePath } from "@/shared/lib/navigation/tower-marketing-paths";
 
 /**
  * Enables Next.js draft mode for CMS editors, then redirects to the page.
@@ -22,5 +22,5 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   (await draftMode()).enable();
-  redirect(`${TOWER_CMS_PAGE_PATH_PREFIX}/${slug}`);
+  redirect(towerCmsPagePath(slug));
 }

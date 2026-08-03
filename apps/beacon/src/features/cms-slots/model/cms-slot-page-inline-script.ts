@@ -227,11 +227,38 @@ async function createRuntimeAsset(siteId: string, fileName: string, sourceCode: 
   return data;
 }
 
+/**
+ * The presigned upload URL is the one outbound call in the install flow that does not go through
+ * Tower's proxy, so it is allowlisted client-side (Marketplace review): only HTTPS endpoints on
+ * Webflow's own hosts or their AWS S3 upload buckets are accepted.
+ */
+export function isAllowedAssetUploadUrl(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") {
+    return false;
+  }
+  const host = url.hostname;
+  return (
+    host === "webflow.com" ||
+    host.endsWith(".webflow.com") ||
+    host.endsWith(".amazonaws.com") ||
+    host.endsWith(".website-files.com")
+  );
+}
+
 async function uploadRuntimeAsset(
   uploadUrl: string,
   uploadDetails: Record<string, string>,
   sourceCode: string
 ): Promise<void> {
+  if (!isAllowedAssetUploadUrl(uploadUrl)) {
+    throw new Error("Upload runtime asset: upload URL is not a trusted Webflow endpoint.");
+  }
   const form = new FormData();
   for (const [k, v] of Object.entries(uploadDetails)) {
     form.append(k, String(v));

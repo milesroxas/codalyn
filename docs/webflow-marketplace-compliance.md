@@ -2,8 +2,9 @@
 
 Point-by-point response to the Webflow app-review feedback (July 2026), mapping each flag to what
 the app does and what changed. Doc references verified against developers.webflow.com on 2026-07-08.
-Round-2 feedback (2026-07-09) is addressed in [Round 2](#round-2--2026-07-09-follow-up-flags); where
-a round-2 fix supersedes a round-1 answer below, the original item notes it.
+Round-2 feedback (2026-07-09) is addressed in [Round 2](#round-2--2026-07-09-follow-up-flags);
+round-3 feedback (2026-08) in [Round 3](#round-3--2026-08-senior-engineer--review-team-flags).
+Where a later-round fix supersedes an earlier answer, the original item notes it.
 
 ## 1. Direct DOM manipulation / unsafe patterns
 
@@ -32,9 +33,9 @@ Guideline: "Do not use statements or patterns that could introduce vulnerabiliti
 Guideline: "Avoid using externally hosted iframes for anything beyond authentication."
 
 - First-party code creates no iframes.
-- The flagged "bundled Sentry iframe behavior" is dead SDK code: no Sentry feedback/replay
-  integrations are configured (those are the iframe-creating features), and `@sentry/react` core
-  creates no iframes at runtime.
+- **Superseded in round 3:** the round-1 position that the bundled Sentry iframe behavior was
+  dead SDK code was not accepted by review — Sentry is now removed from the extension bundle
+  entirely (see Round 3, item R3.1).
 - **Fixed:** PostHog can no longer inject its session-recording/surveys/toolbar iframes:
   `disable_session_recording: true`, `disable_surveys: true`, and
   `disable_external_dependency_loading: true` are now hard-coded for extension bundles.
@@ -46,8 +47,8 @@ Guidelines, Privacy & Data Protection.
 
 - **Fixed:** telemetry is operational-only by construction: no autocapture, no session recording,
   no pageview/pageleave capture, no surveys, `persistence: "memory"` (no tracking identifiers
-  written to cookies/localStorage), `person_profiles: "identified_only"`, Sentry
-  `sendDefaultPii: false`.
+  written to cookies/localStorage), `person_profiles: "identified_only"`. (Sentry references
+  here are historical — removed from the bundle in Round 3, item R3.1.)
 - **Fixed (superseded in round 2):** the round-1 model (default-on with in-app disclosure +
   opt-out under Settings → Preferences → Privacy) is now full opt-in with a first-run consent
   prompt — see Round 2, item 3. The Settings switch and disclosure remain.
@@ -216,3 +217,132 @@ Doc: [Resize extension](https://developers.webflow.com/designer/reference/resize
   the opener replies with an `init` message carrying the image Blobs (structured clone) and
   settings; the popout mints and revokes its own object URLs
   (`open-quality-compare-popout.ts`, `quality-popout-protocol.ts`).
+
+---
+
+## Round 3 — 2026-08 senior-engineer / review-team flags
+
+### R3.1 Sentry SDK iframe creation in `init-observability` chunk
+
+Flag: bundled Sentry browser SDK code creates hidden sandbox iframes
+(`document.createElement("iframe")`) for fetch/native-API checks; iframes are only allowed in the
+approved OAuth flow.
+
+- **Fixed — Sentry is removed from the Designer Extension bundle entirely.** `@sentry/react` is no
+  longer a Beacon dependency; `init-observability.ts` initializes only PostHog. Error reporting
+  moved to PostHog's iframe-free `capture_exceptions` (unhandled errors + rejections), which was
+  already wired; `captureObservabilityException` now reports through PostHog only.
+- Verified in the rebuilt production bundle: zero occurrences of `createElement("iframe")` (any
+  quote style) across `dist/bundle.js` and `dist/assets/*.js`. The only remaining "sentry" strings
+  are inert property names inside posthog-js's optional Sentry-integration shim and its
+  bot-detection UA list — no Sentry SDK code, no Sentry network endpoint, no iframe path.
+- First-party code creates no iframes (unchanged since round 1); PostHog's iframe-bearing features
+  (session recording, surveys, toolbar, external script loading) remain hard-disabled via
+  `CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS`.
+
+### R3.2 Telemetry disclosure + CSP allowlisting (PostHog / Sentry)
+
+- Processors: **PostHog only** (product analytics + error reporting) after R3.1. In-app disclosure
+  copy (first-run consent prompt and Settings → Privacy) updated to name PostHog as the single
+  processor; app-listing/privacy-policy copy should match.
+- Collected fields (unchanged, opt-in only): error reports (exception message/stack), explicit
+  feature-usage events, app version/channel/build metadata, and Webflow site + workspace
+  IDs/names from `webflow.getSiteInfo()` for grouping. GeoIP enrichment suppressed
+  (`$geoip_disable: true`); no autocapture, pageviews, session recording, surveys, or persistent
+  tracking identifiers (`persistence: "memory"`).
+- Consent controls: opt-in first-run prompt; toggle in Settings → Privacy; opt-out applies
+  immediately (`posthog.opt_out_capturing`). No SDK boot or network traffic before grant.
+- **Telemetry endpoints for the CSP `connect-src` allowlist** (HTTPS only):
+  - `https://us.i.posthog.com` — event/exception capture + feature flags
+  - `https://us-assets.i.posthog.com` — remote-config JSON (still fetched with
+    `disable_external_dependency_loading: true`; script loading stays blocked)
+  - Sentry's `*.ingest.us.sentry.io` is no longer needed and should be dropped from any allowlist.
+- Full non-telemetry `connect-src` inventory, for completeness: the Tower backend origin baked at
+  build time (`https://tower.codalyn.app` prod / `https://tower-preview.codalyn.app` preview) and
+  the Webflow-issued presigned asset-upload URL (S3; see R3.3 — now client-allowlisted). Beacon
+  never calls `api.webflow.com` directly — all Data API traffic goes through Tower's
+  authenticated proxy.
+
+### R3.3 Hosted custom-code runtime (`runtime.js`) — confirmation
+
+Confirmed against source (`cms-slot-page-inline-script.ts` and the fragment modules it inlines):
+
+- **The published runtime makes zero network calls.** No fetch/XHR/beacon/WebSocket, no storage or
+  cookie access, no `eval`/`new Function`, no dynamic script injection. It operates only on the
+  DOM of the page it ships on: it renders Beacon CMS-slot content — cloning source-list rows into
+  render targets and applying composed values to images (`src`/`srcset`/`<picture>`), sanitized
+  rich text (DOMParser allowlist, R2.4), scheme-checked links, text, and visibility — then reveals
+  the layout and strips designer placeholders. Debug HUD ships only on dev/preview channels;
+  production embeds no-op stubs (verified absent from the shipped bundle).
+- **Explicit user action:** installation runs only from the CMS Slots Install button or the Sync
+  button; automatic re-syncs happen solely as side effects of other explicit user actions on
+  already-installed pages (composer save, slot rename/delete). Nothing installs on app load.
+- **Install/remove behavior:** applied as page-level footer custom code with marker attributes;
+  registered via `POST /sites/{siteId}/registered_scripts/hosted` with an SRI SHA-384
+  `integrityHash` computed from the exact uploaded source. Uninstall (offered when deleting the
+  last slot list) strips the footer entries — matched by marker attribute and by registered-script
+  id — and purges unreferenced `codalyn-beacon-runtime-*.js` assets. (The Data API exposes no
+  delete for the registration record itself; the hosted asset and the page application are both
+  removed.)
+- **Hardened in this round:** the presigned asset-upload URL returned by Webflow's create-asset
+  endpoint — the one call in the install flow that does not go through Tower's proxy — is now
+  validated client-side before upload (`isAllowedAssetUploadUrl`: HTTPS + Webflow/AWS S3/
+  website-files hosts only; unit-tested).
+
+### R3.4 Server-driven redirect hook (`window.location.href = data.url`)
+
+Flag: the bundled Better Auth client redirect hook assigns `window.location.href` from a backend
+response without client-side validation.
+
+- **Fixed:** Better Auth's built-in redirect fetch plugin is disabled
+  (`disableDefaultFetchPlugins: true` in `tower-auth-client.ts`) and replaced with
+  `allowlistedRedirectPlugin`, which honors `redirect: true` responses only when the URL passes
+  `isTrustedRedirectUrl` — exact-origin match against the Tower backend this bundle was built for,
+  or `https://webflow.com/oauth/authorize`. Everything else (other origins, subdomain/suffix
+  lookalikes, non-HTTPS, `javascript:`, relative/malformed values) is dropped. Unit-tested
+  (`trusted-redirect.test.ts`).
+- Verified in the rebuilt bundle: the unconditional `id:"redirect"` plugin is gone; the
+  allowlisted replacement is present. (No current Beacon flow returns `redirect: true`; the
+  guard exists so any future one is origin-constrained by construction.)
+- The existing OAuth popup allowlist (`isAllowedWebflowAuthorizeUrl`, round 1) is unchanged.
+
+### R3.5 Runtime style injection under strict CSP
+
+- All first-party CSS is static: Vite emits a single `styles.css` (`cssCodeSplit: false`) linked
+  from `index.html`; the compare popout uses external `quality-compare.css`. No inline `<style>`
+  blocks or `style=""` attributes in any shipped HTML.
+- **Fixed:** `react-easy-crop` no longer injects a `<style>` tag at mount —
+  `disableAutomaticStylesInjection` is set and its stylesheet is bundled statically into
+  `styles.css`.
+- Remaining runtime injectors are two third-party libraries with no nonce/opt-out path in this
+  build: `react-remove-scroll` (Radix modal scroll lock) and `vaul` (drawer keyframes). The
+  extension therefore currently requires `style-src 'self' 'unsafe-inline'`; there are no
+  external style origins, no `blob:`/`data:` styles, and `script-src 'self'` holds throughout
+  (no inline scripts anywhere, unit-tested for the popout page).
+
+### R3.6 Popup windows (Tower auth, Webflow OAuth, image compare) — gesture gating
+
+- **Fixed:** the one non-gesture popup path is removed — the site-authorization gate no longer
+  auto-opens the Webflow OAuth popup from a mount effect (`beacon-site-link-gate.tsx`); the popup
+  now opens only from the explicit "Open Webflow authorization" button. All other `window.open`
+  call sites were audited and already run inside click/select handlers (header menu items,
+  settings/billing links, sign-in form links, connection indicator, quality-compare popout
+  button).
+- Popups open `about:blank` synchronously inside the gesture, then navigate only to allowlisted
+  destinations (Tower origin routes/handoff, `https://webflow.com/oauth/authorize` via
+  `isAllowedWebflowAuthorizeUrl`); the compare popout is a same-origin static page from the
+  bundle.
+- Popup blocking is handled without retries or error spam: a blocked auth popup resolves
+  `popup_blocked` and simply leaves the button available; a blocked compare popout returns null
+  and the editor stays fully usable inline.
+
+### R3.7 postMessage hardening in the compare popout
+
+- **Fixed:** the popout page (`public/quality-compare.js`) now requires
+  `event.source === window.opener` (and a live `window.opener`) in addition to the exact
+  same-origin check and the parent source marker before accepting any message. The parent side
+  already required `event.source === popoutWindow` plus exact origin plus payload validation
+  (`quality-popout-dispatch.ts`).
+- No wildcard origins anywhere in the bridge: every `postMessage` (both directions) targets the
+  explicit extension origin. Pinned by unit tests (`quality-compare-popout-page.test.ts`: opener
+  source-check present, no `"*"` target, all posts to `TARGET_ORIGIN`).

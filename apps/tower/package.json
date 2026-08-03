@@ -62,6 +62,7 @@
     "@fontsource-variable/geist": "^5.2.9",
     "@paper-design/shaders-react": "0.0.76",
     "@payloadcms/db-postgres": "^3.86.0",
+    "@payloadcms/email-resend": "^3.86.0",
     "@payloadcms/next": "^3.86.0",
     "@payloadcms/richtext-lexical": "^3.86.0",
     "@payloadcms/storage-vercel-blob": "^3.86.0",

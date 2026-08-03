@@ -34,11 +34,7 @@ export function isTelemetryGranted(): boolean {
   return readTelemetryConsent() === "granted";
 }
 
-/**
- * Persists the decision and applies it to the live PostHog client immediately.
- * Sentry is gated at delivery time via `beforeSend`/`beforeSendTransaction` in
- * `init-observability`, which re-read this consent per event.
- */
+/** Persists the decision and applies it to the live PostHog client immediately. */
 export function setTelemetryConsent(consent: TelemetryConsent): void {
   try {
     localStorage.setItem(BEACON_TELEMETRY_CONSENT_KEY, consent);

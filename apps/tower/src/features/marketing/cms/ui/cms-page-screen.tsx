@@ -26,7 +26,7 @@ type CmsPageScreenProps = {
   draft: boolean;
 };
 
-function DraftBanner({ slug }: { slug: string }) {
+export function DraftBanner({ slug }: { slug: string }) {
   return (
     <div className="sticky top-0 z-50 flex items-center justify-center gap-3 bg-amber-500/90 px-4 py-2 text-sm font-medium text-black">
       <span>Previewing draft</span>

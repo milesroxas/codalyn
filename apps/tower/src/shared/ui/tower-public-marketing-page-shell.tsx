@@ -2,6 +2,7 @@
 
 import type * as React from "react";
 
+import type { TowerPublicNavItem } from "@/shared/lib/navigation/tower-public-nav";
 import { TowerMarketingPublicPageBody } from "@/shared/ui/tower-marketing-public-page-body";
 import {
   TowerPublicHeader,
@@ -19,6 +20,7 @@ type TowerPublicMarketingPageShellProps = {
   primaryCtaHref: string;
   primaryCtaLabel: string;
   towerHref?: string;
+  navItems?: TowerPublicNavItem[] | null;
   contentClassName?: string;
   children: React.ReactNode;
 };
@@ -32,6 +34,7 @@ function TowerPublicMarketingPageShell({
   primaryCtaHref,
   primaryCtaLabel,
   towerHref,
+  navItems,
   contentClassName,
   children,
 }: TowerPublicMarketingPageShellProps) {
@@ -46,6 +49,7 @@ function TowerPublicMarketingPageShell({
         primaryCtaHref={primaryCtaHref}
         primaryCtaLabel={primaryCtaLabel}
         towerHref={towerHref}
+        navItems={navItems}
       />
       <TowerPublicHeaderSpacer />
       <TowerPublicPageScroll>

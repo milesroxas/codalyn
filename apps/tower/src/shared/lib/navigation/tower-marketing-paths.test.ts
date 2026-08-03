@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isLegacyTowerCmsPagePath,
   isTowerCmsPagePath,
+  isTowerCmsRootPagePath,
   isTowerMarketingInnerPagePath,
   isTowerMarketingPublicPath,
   isTowerMarketingSelfContainedPath,
   isTowerPublicFooterPath,
   isValidTowerCmsPageSlug,
+  towerCmsPagePath,
 } from "@/shared/lib/navigation/tower-marketing-paths";
 
 describe("tower marketing paths", () => {
@@ -44,20 +47,49 @@ describe("tower marketing paths", () => {
     expect(isTowerPublicFooterPath("/sign-in")).toBe(false);
   });
 
-  it("recognizes CMS page paths", () => {
+  it("recognizes legacy CMS page paths", () => {
+    expect(isLegacyTowerCmsPagePath("/p/spring-launch")).toBe(true);
+    expect(isLegacyTowerCmsPagePath("/p/a")).toBe(true);
+    expect(isLegacyTowerCmsPagePath("/p")).toBe(false);
+    expect(isLegacyTowerCmsPagePath("/p/")).toBe(false);
+    expect(isLegacyTowerCmsPagePath("/privacy")).toBe(false);
+    expect(isLegacyTowerCmsPagePath("/px/foo")).toBe(false);
+  });
+
+  it("recognizes root-level CMS page candidates", () => {
+    expect(isTowerCmsRootPagePath("/spring-launch")).toBe(true);
+    expect(isTowerCmsRootPagePath("/pricing")).toBe(true);
+    expect(isTowerCmsRootPagePath("/a")).toBe(true);
+    expect(isTowerCmsRootPagePath("/")).toBe(false);
+    expect(isTowerCmsRootPagePath("/spring-launch/deep")).toBe(false);
+    expect(isTowerCmsRootPagePath("/Spring-Launch")).toBe(false);
+    expect(isTowerCmsRootPagePath("spring-launch")).toBe(false);
+  });
+
+  it("never treats reserved app segments as CMS pages", () => {
+    for (const reserved of ["/sign-in", "/account", "/dashboard", "/admin", "/api", "/p", "/beacon", "/tower"]) {
+      expect(isTowerCmsRootPagePath(reserved)).toBe(false);
+    }
+  });
+
+  it("recognizes CMS page paths in both namespaces", () => {
     expect(isTowerCmsPagePath("/p/spring-launch")).toBe(true);
-    expect(isTowerCmsPagePath("/p/a")).toBe(true);
-    expect(isTowerCmsPagePath("/p")).toBe(false);
-    expect(isTowerCmsPagePath("/p/")).toBe(false);
+    expect(isTowerCmsPagePath("/spring-launch")).toBe(true);
     expect(isTowerCmsPagePath("/privacy")).toBe(false);
     expect(isTowerCmsPagePath("/px/foo")).toBe(false);
   });
 
+  it("builds canonical root URLs for CMS pages", () => {
+    expect(towerCmsPagePath("spring-launch")).toBe("/spring-launch");
+  });
+
   it("treats CMS pages as marketing public, inner, and footer paths", () => {
-    expect(isTowerMarketingPublicPath("/p/spring-launch")).toBe(true);
-    expect(isTowerMarketingInnerPagePath("/p/spring-launch")).toBe(true);
-    expect(isTowerPublicFooterPath("/p/spring-launch")).toBe(true);
-    expect(isTowerMarketingSelfContainedPath("/p/spring-launch")).toBe(false);
+    for (const path of ["/p/spring-launch", "/spring-launch"]) {
+      expect(isTowerMarketingPublicPath(path)).toBe(true);
+      expect(isTowerMarketingInnerPagePath(path)).toBe(true);
+      expect(isTowerPublicFooterPath(path)).toBe(true);
+      expect(isTowerMarketingSelfContainedPath(path)).toBe(false);
+    }
   });
 
   it("validates CMS page slugs", () => {

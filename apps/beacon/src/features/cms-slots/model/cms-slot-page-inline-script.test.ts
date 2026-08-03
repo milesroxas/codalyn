@@ -10,6 +10,7 @@ import { CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_INLINE_KEYS } from "@/feature
 import { CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
 import {
   getCmsSlotPageInlineScriptSource,
+  isAllowedAssetUploadUrl,
   isBeaconRuntimeAssetFileName,
   mergePageScriptsWithBeaconRuntime,
   normalizeBeaconRuntimeAssetRow,
@@ -958,5 +959,25 @@ describe("cms slot beacon runtime (published DOM)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("isAllowedAssetUploadUrl", () => {
+  it("accepts HTTPS upload endpoints on Webflow and AWS S3 hosts", () => {
+    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.com/webflow-bucket/key")).toBe(true);
+    expect(isAllowedAssetUploadUrl("https://webflow-prod-assets.s3.amazonaws.com/key")).toBe(true);
+    expect(isAllowedAssetUploadUrl("https://uploads.webflow.com/asset")).toBe(true);
+    expect(isAllowedAssetUploadUrl("https://webflow.com/upload")).toBe(true);
+    expect(isAllowedAssetUploadUrl("https://uploads-ssl.website-files.com/asset")).toBe(true);
+  });
+
+  it("rejects non-HTTPS, lookalike, and arbitrary hosts", () => {
+    expect(isAllowedAssetUploadUrl("http://s3.amazonaws.com/webflow-bucket/key")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://evil.example/upload")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://webflow.com.evil.example/upload")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://notwebflow.com/upload")).toBe(false);
+    expect(isAllowedAssetUploadUrl("javascript:alert(1)")).toBe(false);
+    expect(isAllowedAssetUploadUrl("not a url")).toBe(false);
+    expect(isAllowedAssetUploadUrl("")).toBe(false);
   });
 });

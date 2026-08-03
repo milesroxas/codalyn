@@ -3,7 +3,7 @@ export const TOWER_PRIVACY_PATH = "/privacy";
 export const TOWER_PRODUCT_MARKETING_PATH = "/tower";
 export const TOWER_SUPPORT_PATH = "/support";
 
-/** URL namespace for CMS-managed marketing pages (Payload `pages` collection), e.g. `/p/spring-launch`. */
+/** Legacy URL namespace for CMS-managed marketing pages; now permanently redirects to the root slug. */
 export const TOWER_CMS_PAGE_PATH_PREFIX = "/p";
 
 /** Kebab-case slug as stored in the Payload `pages` collection. */
@@ -13,11 +13,67 @@ export function isValidTowerCmsPageSlug(slug: string): boolean {
   return CMS_PAGE_SLUG_PATTERN.test(slug);
 }
 
-/** Any path under the CMS namespace; slug validity is enforced at the data layer, not routing. */
-export function isTowerCmsPagePath(pathname: string): boolean {
+/** Canonical URL for a CMS marketing page: the bare slug at the site root. */
+export function towerCmsPagePath(slug: string): string {
+  return `/${slug}`;
+}
+
+/** Any path under the legacy `/p/` CMS namespace; slug validity is enforced at the data layer, not routing. */
+export function isLegacyTowerCmsPagePath(pathname: string): boolean {
   return (
     pathname.startsWith(`${TOWER_CMS_PAGE_PATH_PREFIX}/`) && pathname.length > TOWER_CMS_PAGE_PATH_PREFIX.length + 1
   );
+}
+
+/**
+ * First path segments owned by app/static routes. A root-level path whose
+ * first segment is listed here can never be a CMS page — keep in sync with
+ * the top-level directories under `src/app` (plus `admin`/`api`).
+ */
+export const TOWER_RESERVED_ROOT_SEGMENTS = new Set([
+  "account",
+  "admin",
+  "api",
+  "auth",
+  "beacon",
+  "billing",
+  "connection",
+  "console",
+  "dashboard",
+  "flint",
+  "forgot-password",
+  "integrations",
+  "invitations",
+  "p",
+  "privacy",
+  "request-access",
+  "reset-password",
+  "sign-in",
+  "sign-up",
+  "support",
+  "team",
+  "terms",
+  "tower",
+  "verify-email",
+]);
+
+/**
+ * A root-level path that may resolve to a CMS page (Payload `pages`
+ * collection), e.g. `/spring-launch`: exactly one segment, valid slug, and
+ * not a reserved app/static segment. Existence is decided by the route's
+ * data lookup, not here.
+ */
+export function isTowerCmsRootPagePath(pathname: string): boolean {
+  if (!pathname.startsWith("/")) {
+    return false;
+  }
+  const slug = pathname.slice(1);
+  return isValidTowerCmsPageSlug(slug) && !TOWER_RESERVED_ROOT_SEGMENTS.has(slug);
+}
+
+/** Any path that may serve a CMS page: canonical root slug or legacy `/p/` namespace. */
+export function isTowerCmsPagePath(pathname: string): boolean {
+  return isTowerCmsRootPagePath(pathname) || isLegacyTowerCmsPagePath(pathname);
 }
 
 /** Paths served on the marketing host (codalyn.app) without redirecting to the Tower app host. */

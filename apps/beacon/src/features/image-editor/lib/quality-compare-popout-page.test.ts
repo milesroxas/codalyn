@@ -50,6 +50,19 @@ describe("quality-compare popout static page", () => {
     expect(js).toContain(`const PARENT_SOURCE = ${JSON.stringify(BEACON_QUALITY_PARENT_SOURCE)};`);
   });
 
+  it("accepts messages only from the exact opener window (origin + source check)", () => {
+    expect(js).toContain("e.origin !== TARGET_ORIGIN || !window.opener || e.source !== window.opener");
+  });
+
+  it("posts only to the opener with an explicit non-wildcard target origin", () => {
+    expect(js).not.toContain('"*"');
+    const postMessageCalls = js.match(/window\.opener\.postMessage\([^;]*\)/g) ?? [];
+    expect(postMessageCalls.length).toBeGreaterThan(0);
+    for (const call of postMessageCalls) {
+      expect(call).toContain("TARGET_ORIGIN");
+    }
+  });
+
   it("speaks the full popout protocol", () => {
     for (const marker of [
       "ready",

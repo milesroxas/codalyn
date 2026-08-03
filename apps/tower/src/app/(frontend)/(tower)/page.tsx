@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getTowerHeaderNavItems } from "@/features/marketing/cms/lib/get-header-nav";
 import { TowerDashboard } from "@/features/tower-ui/tower-dashboard";
 import { TowerLanding } from "@/features/tower-ui/tower-landing";
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
@@ -31,7 +32,8 @@ export default async function HomePage() {
   const appLinks = buildTowerLandingAppLinks(host);
 
   if (isMarketingHost(host)) {
-    return <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={appLinks} />;
+    const navItems = await getTowerHeaderNavItems(host);
+    return <TowerLanding earlyAccessRequired={earlyAccessRequired} appLinks={appLinks} navItems={navItems} />;
   }
 
   const requestHeaders = await headers();

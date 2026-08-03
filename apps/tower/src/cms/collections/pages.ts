@@ -119,8 +119,21 @@ export const Pages: CollectionConfig = {
                   label: "Stream Video",
                   admin: {
                     condition: (_data, siblingData) => siblingData?.variant !== "none",
-                    description:
-                      "Cloudflare Stream demo video (click-to-play). Takes precedence over Media when both are set.",
+                    description: "Cloudflare Stream video. Takes precedence over Media when both are set.",
+                  },
+                },
+                {
+                  name: "videoPlayback",
+                  type: "select",
+                  required: true,
+                  defaultValue: "clickToPlay",
+                  options: [
+                    { label: "Click to play (poster + controls)", value: "clickToPlay" },
+                    { label: "Ambient loop (autoplay, muted)", value: "loop" },
+                  ],
+                  admin: {
+                    condition: (_data, siblingData) => siblingData?.variant !== "none" && Boolean(siblingData?.video),
+                    description: "Click to play suits demos with audio; ambient loop suits silent background footage.",
                   },
                 },
                 {

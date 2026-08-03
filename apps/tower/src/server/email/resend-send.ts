@@ -1,9 +1,9 @@
 import { Resend } from "resend";
 
-const TRANSACTIONAL_EMAIL_SENDER_NAME = "Miles at Codalyn";
+export const TRANSACTIONAL_EMAIL_SENDER_NAME = "Miles at Codalyn";
 
-/** Applies a consistent inbox display name; `RESEND_FROM` may be a bare address or `Name <addr>`. */
-function formatTransactionalEmailFrom(raw: string): string {
+/** Extracts the bare address from `RESEND_FROM`; accepts a bare address or `Name <addr>`. */
+export function parseTransactionalEmailAddress(raw: string): string {
   const trimmed = raw.trim();
   const angleMatch = /^[^<]*<([^>]+)>$/.exec(trimmed);
   const email = (angleMatch ? angleMatch[1] : trimmed).trim();
@@ -12,7 +12,12 @@ function formatTransactionalEmailFrom(raw: string): string {
       'RESEND_FROM must be an email address or "Name <addr>" (display name is always "Miles at Codalyn")'
     );
   }
-  return `${TRANSACTIONAL_EMAIL_SENDER_NAME} <${email}>`;
+  return email;
+}
+
+/** Applies a consistent inbox display name; `RESEND_FROM` may be a bare address or `Name <addr>`. */
+function formatTransactionalEmailFrom(raw: string): string {
+  return `${TRANSACTIONAL_EMAIL_SENDER_NAME} <${parseTransactionalEmailAddress(raw)}>`;
 }
 
 function getResendClient(): Resend | null {

@@ -1,6 +1,7 @@
 import type * as React from "react";
 
 import { TOWER_PRODUCT_MARKETING_PATH } from "@/shared/lib/navigation/tower-marketing-paths";
+import type { TowerPublicNavItem } from "@/shared/lib/navigation/tower-public-nav";
 import { cn } from "@/shared/lib/utils";
 import { CodalynLogo } from "@/shared/ui/codalyn-logo";
 import { TowerPublicHeaderAuthActions } from "@/shared/ui/tower-public-header-auth-actions";
@@ -20,6 +21,8 @@ type TowerPublicHeaderProps = {
   signInHref: string;
   primaryCtaHref: string;
   primaryCtaLabel: string;
+  /** CMS-managed nav items; falls back to the built-in product nav when absent. */
+  navItems?: TowerPublicNavItem[] | null;
   actions?: React.ReactNode;
 };
 
@@ -32,6 +35,7 @@ function TowerPublicHeader({
   signInHref,
   primaryCtaHref,
   primaryCtaLabel,
+  navItems,
   actions,
 }: TowerPublicHeaderProps) {
   const resolvedTowerHref = towerHref ?? TOWER_PRODUCT_MARKETING_PATH;
@@ -57,6 +61,7 @@ function TowerPublicHeader({
             towerHref={resolvedTowerHref}
             flintHref={flintHref}
             signInHref={signInHref}
+            navItems={navItems}
           />
 
           <TowerPublicHeaderLink
@@ -79,6 +84,7 @@ function TowerPublicHeader({
               beaconHref={beaconHref}
               towerHref={resolvedTowerHref}
               flintHref={flintHref}
+              navItems={navItems}
             />
           </div>
 

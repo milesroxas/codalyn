@@ -1,5 +1,6 @@
 import type * as React from "react";
 
+import type { TowerPublicNavItem } from "@/shared/lib/navigation/tower-public-nav";
 import { cn } from "@/shared/lib/utils";
 import { TowerPublicMarketingPageShell } from "@/shared/ui/tower-public-marketing-page-shell";
 
@@ -44,6 +45,7 @@ type MarketingPageShellProps = {
   primaryCtaHref: string;
   primaryCtaLabel: string;
   towerHref?: string;
+  navItems?: TowerPublicNavItem[] | null;
   children: React.ReactNode;
 };
 
@@ -56,6 +58,7 @@ function MarketingPageShell({
   primaryCtaHref,
   primaryCtaLabel,
   towerHref,
+  navItems,
   children,
 }: MarketingPageShellProps) {
   return (
@@ -68,6 +71,7 @@ function MarketingPageShell({
       primaryCtaHref={primaryCtaHref}
       primaryCtaLabel={primaryCtaLabel}
       towerHref={towerHref}
+      navItems={navItems}
       contentClassName="gap-20 lg:gap-28"
     >
       {children}

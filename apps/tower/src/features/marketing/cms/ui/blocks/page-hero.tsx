@@ -57,7 +57,12 @@ function CmsPageHero({ hero }: CmsPageHeroProps) {
           </div>
           {/* Stream video takes precedence over the upload media slot when both are set. */}
           {resolveCmsStreamVideo(hero.video) ? (
-            <CmsStreamVideo video={hero.video} playback="clickToPlay" className="max-w-[954px]" />
+            <CmsStreamVideo
+              video={hero.video}
+              // Rows written before the field existed carry NULL — normalize to the default.
+              playback={hero.videoPlayback ?? "clickToPlay"}
+              className="max-w-[954px]"
+            />
           ) : (
             <CmsMedia media={hero.image} priority className="max-w-[954px]" />
           )}

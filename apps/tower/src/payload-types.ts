@@ -258,9 +258,13 @@ export interface Page {
      */
     image?: (number | null) | Media;
     /**
-     * Cloudflare Stream demo video (click-to-play). Takes precedence over Media when both are set.
+     * Cloudflare Stream video. Takes precedence over Media when both are set.
      */
     video?: (number | null) | StreamVideo;
+    /**
+     * Click to play suits demos with audio; ambient loop suits silent background footage.
+     */
+    videoPlayback?: ('clickToPlay' | 'loop') | null;
     /**
      * Call-to-action buttons.
      */
@@ -581,6 +585,7 @@ export interface PagesSelect<T extends boolean = true> {
         subheading?: T;
         image?: T;
         video?: T;
+        videoPlayback?: T;
         actions?:
           | T
           | {

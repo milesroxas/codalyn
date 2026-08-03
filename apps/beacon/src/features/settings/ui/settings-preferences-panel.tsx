@@ -66,7 +66,7 @@ export function SettingsPreferencesPanel() {
       <div className="mt-4 flex min-w-0 flex-col gap-1.5">
         <SurfaceSummaryCardPageIntro
           title="Privacy"
-          description="Telemetry is off unless you enable it. When enabled, Beacon collects anonymous operational telemetry to fix errors and improve features: error reports, feature-usage events, app version, and the current Webflow site and workspace IDs — processed by PostHog (product analytics) and Sentry (error reporting) on Codalyn's behalf. No session recording, no autocapture, and no page or design content is ever collected."
+          description="Telemetry is off unless you enable it. When enabled, Beacon collects anonymous operational telemetry to fix errors and improve features: error reports, feature-usage events, app version, and the current Webflow site and workspace IDs — processed by PostHog (product analytics and error reporting) on Codalyn's behalf. No session recording, no autocapture, and no page or design content is ever collected."
         />
         <div className="flex items-center justify-between gap-3">
           <Label htmlFor={`${baseId}-telemetry`}>Share usage &amp; error telemetry</Label>

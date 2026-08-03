@@ -12,6 +12,7 @@ import {
 import { readTowerSessionCookie } from "@/server/tower-session-cookie";
 import { TOWER_AUTH_SURFACE_PATHS } from "@/shared/lib/navigation/tower-auth-surfaces";
 import {
+  isTowerCmsRootPagePath,
   isTowerMarketingPublicPath,
   TOWER_CMS_PAGE_PATH_PREFIX,
   TOWER_SUPPORT_PATH,
@@ -75,6 +76,11 @@ function isPublicPath(pathname: string, hostname: string): boolean {
     return true;
   }
   if (isUnifiedMarketingProductPath(pathname)) {
+    return true;
+  }
+  // Root-level CMS page candidates (e.g. `/spring-launch`) — the route only
+  // serves published docs to anonymous visitors and 404s otherwise.
+  if (isTowerCmsRootPagePath(pathname)) {
     return true;
   }
   return matchesPublicPrefix(pathname);

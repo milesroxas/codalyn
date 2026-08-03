@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { postgresAdapter } from "@payloadcms/db-postgres";
+import { resendAdapter } from "@payloadcms/email-resend";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
 import { vercelBlobStorage } from "@payloadcms/storage-vercel-blob";
 import { buildConfig } from "payload";
@@ -11,8 +12,27 @@ import { Pages } from "./cms/collections/pages";
 import { StreamVideos } from "./cms/collections/stream-videos";
 import { Footer } from "./cms/globals/footer";
 import { Header } from "./cms/globals/header";
+import { parseTransactionalEmailAddress, TRANSACTIONAL_EMAIL_SENDER_NAME } from "./server/email/resend-send";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Resend adapter when `RESEND_API_KEY` is set; otherwise undefined so Payload
+ * falls back to its console-logging mock (matches Tower's local-dev skip behavior).
+ */
+function buildEmailAdapter() {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) return undefined;
+  const fromRaw = process.env.RESEND_FROM?.trim();
+  if (!fromRaw) {
+    throw new Error("RESEND_FROM is required when RESEND_API_KEY is set");
+  }
+  return resendAdapter({
+    apiKey,
+    defaultFromAddress: parseTransactionalEmailAddress(fromRaw),
+    defaultFromName: TRANSACTIONAL_EMAIL_SENDER_NAME,
+  });
+}
 
 const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "postgres"]);
 
@@ -40,6 +60,7 @@ export default buildConfig({
   collections: [CmsUsers, Media, Pages, StreamVideos],
   globals: [Header, Footer],
   editor: lexicalEditor(),
+  email: buildEmailAdapter(),
   secret: process.env.PAYLOAD_SECRET ?? "",
   typescript: {
     outputFile: path.resolve(dirname, "payload-types.ts"),

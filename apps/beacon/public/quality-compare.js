@@ -159,10 +159,16 @@
     encodeErr.classList.add("show");
   }
 
+  // Accept messages only from the exact opener window (Marketplace review hardening): a
+  // same-origin document other than the opener must not be able to drive this popout.
+  function isTrustedParentMessage(e) {
+    if (e.origin !== TARGET_ORIGIN || !window.opener || e.source !== window.opener) return false;
+    return Boolean(e.data) && e.data.source === PARENT_SOURCE;
+  }
+
   window.addEventListener("message", (e) => {
-    if (e.origin !== TARGET_ORIGIN) return;
+    if (!isTrustedParentMessage(e)) return;
     const d = e.data;
-    if (!d || d.source !== PARENT_SOURCE) return;
     if (d.type === "init" && d.originalBlob instanceof Blob && d.compressedBlob instanceof Blob) {
       initFromParent(d);
     } else if (d.type === "compressed-updated" && d.compressedBlob instanceof Blob) {

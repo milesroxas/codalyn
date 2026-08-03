@@ -4,6 +4,7 @@ import type * as React from "react";
 import { TowerLandingEntrance } from "@/features/tower-ui/tower-landing-entrance";
 import { TowerLandingGraphic } from "@/features/tower-ui/tower-landing-graphic";
 import { TOWER_PRODUCT_MARKETING_PATH } from "@/shared/lib/navigation/tower-marketing-paths";
+import type { TowerPublicNavItem } from "@/shared/lib/navigation/tower-public-nav";
 import { Button } from "@/shared/ui/button";
 import { TOWER_PUBLIC_FOOTER_HEIGHT_PX, TowerPublicFooter } from "@/shared/ui/tower-public-footer";
 import {
@@ -22,8 +23,12 @@ export type TowerLandingAppLinks = {
   flint?: string;
 };
 
-export function TowerLanding(props: { earlyAccessRequired?: boolean; appLinks?: TowerLandingAppLinks }) {
-  const { earlyAccessRequired = false, appLinks } = props;
+export function TowerLanding(props: {
+  earlyAccessRequired?: boolean;
+  appLinks?: TowerLandingAppLinks;
+  navItems?: TowerPublicNavItem[] | null;
+}) {
+  const { earlyAccessRequired = false, appLinks, navItems } = props;
   const homeHref = appLinks?.home ?? "/";
   const signInHref = appLinks?.signIn ?? "/sign-in";
   const signUpHref = appLinks?.signUp ?? "/sign-up";
@@ -46,6 +51,7 @@ export function TowerLanding(props: { earlyAccessRequired?: boolean; appLinks?: 
             primaryCtaHref={primaryCtaHref}
             primaryCtaLabel={primaryCtaLabel}
             towerHref={towerHref}
+            navItems={navItems}
           />
           <TowerPublicHeaderSpacer />
           <main

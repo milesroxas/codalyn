@@ -325,6 +325,18 @@ export function resolveTowerPublicTowerHref(hostname: string): string {
   return "/tower";
 }
 
+/** Any marketing-site path (e.g. CMS nav links) — same-origin on the marketing host, absolute elsewhere when split. */
+export function resolveTowerPublicMarketingHref(pathname: string, hostname: string): string {
+  const normalized = normalizeHostname(hostname);
+  if (normalized && isMarketingHost(normalized)) {
+    return pathname;
+  }
+  if (isHostSplitEnabled()) {
+    return buildMarketingUrl(pathname);
+  }
+  return pathname;
+}
+
 /** Product marketing page for Beacon — same-origin on the marketing host, absolute on the app host when split. */
 export function resolveTowerPublicBeaconHref(hostname: string): string {
   const normalized = normalizeHostname(hostname);

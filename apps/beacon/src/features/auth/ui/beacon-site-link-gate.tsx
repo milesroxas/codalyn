@@ -1,6 +1,6 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { ExternalLink, LogOut } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import { type BeaconCurrentSite, useBeaconCurrentSite } from "@/features/auth/lib/use-beacon-current-site";
 import { openWebflowOAuthAuthorize } from "@/features/auth/model/tower-auth-client";
@@ -40,17 +40,16 @@ function messageForAuthorizeError(error: string): string {
 }
 
 /**
- * Drives the Webflow OAuth consent popup for the current site. Opens it automatically on mount (the
- * login click is the gesture) and offers a button to (re)open if the browser blocked it or the user
- * closed it without granting. On popup close it refetches Tower state via `onClosed` — if the site was
- * granted, the surrounding guard unmounts this and the app unlocks.
+ * Drives the Webflow OAuth consent popup for the current site. The popup opens only from the
+ * explicit button click below — never automatically — so every `window.open` stays inside a user
+ * gesture (Marketplace popup guidance). On popup close it refetches Tower state via `onClosed` —
+ * if the site was granted, the surrounding guard unmounts this and the app unlocks.
  */
 function WebflowAuthorizeGate(props: { site: BeaconCurrentSite; onClosed: () => void }) {
   const { site, onClosed } = props;
   const { clearStoredSession } = useBeaconTowerSession();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const autoOpenedRef = useRef(false);
   const siteLabel = site.siteName.trim() || site.siteId;
 
   const open = useCallback(() => {
@@ -65,15 +64,6 @@ function WebflowAuthorizeGate(props: { site: BeaconCurrentSite; onClosed: () => 
       })
       .finally(() => setBusy(false));
   }, [onClosed]);
-
-  // Auto-open once: the popup appears right after login without an extra click when the browser allows it.
-  useEffect(() => {
-    if (autoOpenedRef.current) {
-      return;
-    }
-    autoOpenedRef.current = true;
-    open();
-  }, [open]);
 
   return (
     <ScrollArea className="min-h-0 min-w-0 flex-1">

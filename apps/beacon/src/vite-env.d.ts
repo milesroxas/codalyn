@@ -16,5 +16,4 @@ interface ImportMetaEnv {
   readonly VITE_CMS_SLOTS_SURFACE_ENABLED?: string;
   readonly VITE_POSTHOG_KEY?: string;
   readonly VITE_POSTHOG_HOST?: string;
-  readonly VITE_SENTRY_DSN?: string;
 }

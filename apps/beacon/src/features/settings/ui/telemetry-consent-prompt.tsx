@@ -49,7 +49,7 @@ export function TelemetryConsentPrompt() {
               </div>
               <p>
                 We never collect page content, design content, session recordings, or autocaptured activity. Data is
-                processed by PostHog (analytics) and Sentry (error reporting) on behalf of Codalyn.
+                processed by PostHog (analytics and error reporting) on behalf of Codalyn.
               </p>
               <p>
                 Sharing is optional. Nothing is sent unless you turn it on, and you can change your choice anytime in

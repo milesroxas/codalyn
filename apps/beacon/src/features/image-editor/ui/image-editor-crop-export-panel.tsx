@@ -652,6 +652,9 @@ function CropStageSection(p: CropStageProps) {
             onCropComplete={onCropComplete}
             onMediaLoaded={setCropMediaSize}
             objectFit="contain"
+            // Stylesheet is imported statically above; skipping the mount-time <style> injection
+            // keeps the extension compatible with a strict `style-src 'self'` CSP.
+            disableAutomaticStylesInjection
             style={{ containerStyle: { width: "100%", height: "100%" } }}
           />
         </div>

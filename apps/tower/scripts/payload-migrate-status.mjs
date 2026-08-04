@@ -37,7 +37,9 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`Payload migrate:status target: ${target}${databaseUrl ? ` (${describeDatabaseHost(databaseUrl)})` : ""}`);
+  console.log(
+    `Payload migrate:status target: ${target}${databaseUrl ? ` (${describeDatabaseHost(databaseUrl)})` : ""}`
+  );
   const env = { ...process.env, PAYLOAD_SECRET: resolvePayloadSecret() };
   if (databaseUrl) {
     env.DATABASE_URL = databaseUrl;

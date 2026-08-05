@@ -1,20 +1,23 @@
 import { describe, expect, it } from "vitest";
-import {
-  BEACON_EARLY_ACCESS_LABEL,
-  buildInfo,
-  getBeaconAppVersionDisplay,
-  parseBeaconReleaseStage,
-} from "@/shared/lib/build-info";
+import { buildInfo, getBeaconAppVersionDisplay, parseBeaconReleaseStage } from "@/shared/lib/build-info";
 
 describe("parseBeaconReleaseStage", () => {
-  it("defaults to early access when unset", () => {
-    expect(parseBeaconReleaseStage(undefined)).toBe("early-access");
+  // A shipped Marketplace app must present itself as complete, so an unset/unknown value must never
+  // resolve to a pre-release stage.
+  it("defaults to stable when unset", () => {
+    expect(parseBeaconReleaseStage(undefined)).toBe("stable");
   });
 
-  it("accepts stable aliases", () => {
+  it("defaults to stable for unknown or empty values", () => {
+    expect(parseBeaconReleaseStage("")).toBe("stable");
+    expect(parseBeaconReleaseStage("   ")).toBe("stable");
+    expect(parseBeaconReleaseStage("beta")).toBe("stable");
     expect(parseBeaconReleaseStage("stable")).toBe("stable");
-    expect(parseBeaconReleaseStage("GA")).toBe("stable");
-    expect(parseBeaconReleaseStage("general-availability")).toBe("stable");
+  });
+
+  it("resolves early access only on an explicit opt-in", () => {
+    expect(parseBeaconReleaseStage("early-access")).toBe("early-access");
+    expect(parseBeaconReleaseStage("  EARLY-ACCESS  ")).toBe("early-access");
   });
 });
 
@@ -25,11 +28,10 @@ describe("getBeaconAppVersionDisplay", () => {
     expect(display.primary.startsWith("Beacon ")).toBe(true);
   });
 
-  it("includes early access in the primary line while in early access", () => {
-    if (buildInfo.releaseStage !== "early-access") {
-      return;
-    }
-    expect(getBeaconAppVersionDisplay().primary).toContain(BEACON_EARLY_ACCESS_LABEL);
+  // Release stage is telemetry-only build metadata; it must never reach user-facing copy, whatever it is.
+  it("never stamps a release stage onto the user-facing version line", () => {
+    expect(getBeaconAppVersionDisplay().primary.toLowerCase()).not.toContain("early access");
+    expect(getBeaconAppVersionDisplay().primary.toLowerCase()).not.toContain("early-access");
   });
 
   it("omits build metadata in production builds", () => {

@@ -5,7 +5,7 @@ import { Button } from "@/shared/ui/button";
 
 type BeaconOnboardingProps = {
   towerConfigured: boolean;
-  /** True early access gate on (Request early access), false gate off (public Sign up), null unknown (defaults to early access). */
+  /** True: invite-only gate on ("Request access"); false: gate off (public "Sign up"); null: unknown, gate assumed on. */
   earlyAccessRequired: boolean | null;
   onContinueAsGuest: () => void;
 };
@@ -32,7 +32,7 @@ export function BeaconOnboarding(props: BeaconOnboardingProps) {
 
       <article className="rounded-sm border border-primary/30 bg-card p-4 ring-1 ring-primary/15">
         <h3 className="mt-1.5 text-base font-semibold text-foreground">
-          {requestingAccess ? "Request early access" : "Sign in to Tower"}
+          {requestingAccess ? "Request access" : "Sign in to Tower"}
         </h3>
         {requestingAccess ? null : (
           <p className="mt-1 text-xs leading-snug text-muted-foreground">
@@ -49,7 +49,7 @@ export function BeaconOnboarding(props: BeaconOnboardingProps) {
                 <BeaconTowerSignInForm />
                 {!publicSignUpOpen ? (
                   <Button type="button" variant="outline" className="w-full" onClick={() => setRequestingAccess(true)}>
-                    Request early access
+                    Request access
                   </Button>
                 ) : null}
               </>

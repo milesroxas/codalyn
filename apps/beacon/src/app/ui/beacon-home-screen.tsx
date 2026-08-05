@@ -1,13 +1,5 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
-import {
-  type Icon,
-  IconAlertTriangle,
-  IconArrowsMoveVertical,
-  IconCarouselHorizontal,
-  IconClick,
-  IconPhotoUp,
-  IconTransitionRight,
-} from "@tabler/icons-react";
+import { type Icon, IconAlertTriangle, IconClick, IconPhotoUp } from "@tabler/icons-react";
 import { Loader2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -25,13 +17,9 @@ import { useCmsSlotsAccess } from "@/features/cms-slots/model/use-cms-slots-acce
 import { CmsSlotsPageInstallPrefetch } from "@/features/cms-slots/ui/cms-slots-page-install-prefetch";
 import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
 import {
-  BEACON_HOME_COMING_SOON_SECTION_LABEL,
-  BEACON_HOME_EARLY_ACCESS_SECTION_LABEL,
+  BEACON_HOME_FEATURES_SECTION_LABEL,
   BEACON_HOME_SESSION_BOOTSTRAP_DESCRIPTION,
   BEACON_HOME_SESSION_BOOTSTRAP_TITLE,
-  CAROUSEL_FEATURE_NAME,
-  PAGE_TRANSITIONS_FEATURE_NAME,
-  SMOOTH_SCROLL_FEATURE_NAME,
 } from "@/shared/lib/beacon-home-copy";
 import {
   CMS_SLOTS_COLLECTION_TEMPLATE_PROMPT_LABEL,
@@ -101,13 +89,6 @@ function BeaconHomeTile(props: {
   );
 }
 
-// Roadmap tiles — disabled for now; rendered to signal what's coming next.
-const BEACON_HOME_COMING_SOON_TILES: { label: string; icon: Icon }[] = [
-  { label: CAROUSEL_FEATURE_NAME, icon: IconCarouselHorizontal },
-  { label: SMOOTH_SCROLL_FEATURE_NAME, icon: IconArrowsMoveVertical },
-  { label: PAGE_TRANSITIONS_FEATURE_NAME, icon: IconTransitionRight },
-];
-
 export function BeaconHomeScreen() {
   const navigate = useNavigate();
   const { defaultSegment } = useCmsSlotsAccess();
@@ -174,7 +155,7 @@ export function BeaconHomeScreen() {
         <div className="flex min-h-full min-w-0 flex-col px-3 py-3">
           <TooltipProvider delayDuration={200}>
             <div className="mx-auto flex w-full max-w-md flex-col gap-6">
-              <BeaconHomeSection label={BEACON_HOME_EARLY_ACCESS_SECTION_LABEL}>
+              <BeaconHomeSection label={BEACON_HOME_FEATURES_SECTION_LABEL}>
                 <BeaconHomeTile
                   label={IMAGE_UPLOAD_FEATURE_NAME}
                   icon={IconPhotoUp}
@@ -205,12 +186,6 @@ export function BeaconHomeScreen() {
                     ) : undefined
                   }
                 />
-              </BeaconHomeSection>
-
-              <BeaconHomeSection label={BEACON_HOME_COMING_SOON_SECTION_LABEL}>
-                {BEACON_HOME_COMING_SOON_TILES.map((tile) => (
-                  <BeaconHomeTile key={tile.label} label={tile.label} icon={tile.icon} disabled />
-                ))}
               </BeaconHomeSection>
             </div>
           </TooltipProvider>

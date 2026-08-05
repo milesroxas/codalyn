@@ -688,6 +688,30 @@ reviewer reads that as a broken or placeholder app.
   using a resolver that mirrors Vite's own `loadEnv` precedence. `.env.example` now ships the value
   uncommented.
 
+### R5.12 Placeholder content and pre-release framing removed
+
+Guidelines: "Ensure that end users are provided with a fully functional experience free of placeholder
+content", and submissions must be "complete, functional, and ready for their intended audience".
+R4.9's claim of "no placeholder/test content in UI copy" was wrong — the app shipped both.
+
+- **"Coming soon" section removed.** The home screen rendered a section of three permanently disabled
+  roadmap tiles (Carousel, Smooth Scroll, Page Transitions) that did nothing when clicked. The section,
+  the tile list, and their copy constants are deleted; the remaining working features now sit under a
+  neutral **"Features"** heading instead of **"Early access"**.
+- **Release stage is no longer user-facing, and no longer defaults to pre-release.**
+  `parseBeaconReleaseStage` defaulted to `early-access` for any unset or unrecognized value, so the
+  Settings and support version stamp read "Beacon v0.1.0 · Early access" in ordinary builds. It now
+  defaults to `stable` (only an explicit `early-access` opts in), and the stage is dropped from the
+  user-facing version display entirely, so no build can stamp a pre-release label on the product. It
+  remains available as the `release_stage` telemetry super-property, which is what the disclosure
+  describes.
+- **Invite-gate wording.** The onboarding heading and button now read "Request access" rather than
+  "Request early access". The gate's behavior is unchanged — this is wording only; see the reviewer-access
+  open item below, which is the substantive issue.
+
+Verified in the rebuilt production bundle: `grep -oi` returns 0 for `Coming soon`, `Early access`,
+`Carousel`, `Smooth Scroll`, `Page Transitions`, and `beta`.
+
 **Scope note:** this document and the audits cover **Beacon**. Flint is a separate, unsubmitted
 extension; its telemetry is not yet consent-gated and it still bundles Sentry. All Beacon
 round-2/3/4/5 fixes must be ported before any Flint submission. Flint does inherit the shared
@@ -700,14 +724,9 @@ scripts but only assert against Beacon's bundle) — still needs porting.
 **Open items that are product/listing decisions, not code** (flagged by the Round 5 audit, deliberately
 not changed here):
 
-- The home screen renders a **"Coming soon"** section with three permanently disabled tiles
-  (`beacon-home-screen.tsx`, copy in `beacon-home-copy.ts`), and the working features sit under a section
-  titled **"Early access"**. `parseBeaconReleaseStage` defaults to `early-access`, and the app version is
-  `0.1.0`. Guidelines require "a fully functional experience free of placeholder content" and submissions
-  that are "complete, functional, and ready for their intended audience". R4.9's claim of "no
-  placeholder/test content in UI copy" was wrong on this point.
-- **Reviewer access:** sign-up is invite-only behind "Request early access". Webflow requires access via a
-  demo account or credentials; if the reviewer cannot sign in, nothing else in this document matters.
+- **Reviewer access:** sign-up is invite-only (the "Request access" path). Webflow requires access via a
+  demo account or credentials; if the reviewer cannot sign in, nothing else in this document matters. The
+  gate itself is untouched — only its pre-release wording was removed (R5.12).
 - **Documentation:** guidelines ask for "comprehensive and user-friendly documentation or help resources".
   `codalyn.app/docs` and `/help` both 404; the in-app help action opens a support form, not documentation.
   The privacy policy and terms pages are live and are now linked from the app (R5.4).

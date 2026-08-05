@@ -1,13 +1,12 @@
 export type BeaconReleaseStage = "early-access" | "stable";
 
-export const BEACON_EARLY_ACCESS_LABEL = "Early access";
-
+/**
+ * Release stage is build metadata for telemetry only — it is never shown to users. It also defaults to
+ * `stable`: a shipped Marketplace app must present itself as complete, and defaulting to `early-access`
+ * meant any build without the env var stamped a pre-release label across the product.
+ */
 export function parseBeaconReleaseStage(raw: string | undefined): BeaconReleaseStage {
-  const normalized = raw?.trim().toLowerCase();
-  if (normalized === "stable" || normalized === "ga" || normalized === "general-availability") {
-    return "stable";
-  }
-  return "early-access";
+  return raw?.trim().toLowerCase() === "early-access" ? "early-access" : "stable";
 }
 
 export const buildInfo = {
@@ -25,9 +24,6 @@ export type BeaconAppVersionDisplay = {
 
 function beaconAppVersionPrimarySegments(): string[] {
   const segments = [`Beacon v${buildInfo.version}`];
-  if (buildInfo.releaseStage === "early-access") {
-    segments.push(BEACON_EARLY_ACCESS_LABEL);
-  }
   if (buildInfo.channel !== "production") {
     segments.push(buildInfo.channel);
     const recipient = buildInfo.recipient.trim();
@@ -38,7 +34,7 @@ function beaconAppVersionPrimarySegments(): string[] {
   return segments;
 }
 
-/** User-facing version stamp for settings and support (semver + release stage; build metadata in dev). */
+/** User-facing version stamp for settings and support (semver; build metadata on non-production channels). */
 export function getBeaconAppVersionDisplay(): BeaconAppVersionDisplay {
   return {
     primary: beaconAppVersionPrimarySegments().join(" · "),

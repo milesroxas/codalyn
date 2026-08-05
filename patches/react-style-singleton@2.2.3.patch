@@ -1,0 +1,256 @@
+diff --git a/dist/es2015/singleton.js b/dist/es2015/singleton.js
+index 1518d9f..af292bc 100644
+--- a/dist/es2015/singleton.js
++++ b/dist/es2015/singleton.js
+@@ -1,47 +1,49 @@
+-import { getNonce } from 'get-nonce';
+-function makeStyleTag() {
+-    if (!document)
++/**
++ * Patched for Webflow Designer Extension CSP compliance (Codalyn, Marketplace round 4):
++ * scroll-lock styles are applied through constructable stylesheets (CSSOM) instead of injected
++ * <style> elements. CSSOM sheets are exempt from CSP style-src, so no 'unsafe-inline' or nonce
++ * is needed. Browsers without adoptedStyleSheets skip the cosmetic scrollbar-gap styles.
++ */
++function makeSheet() {
++    if (typeof document === 'undefined' ||
++        typeof CSSStyleSheet === 'undefined' ||
++        !CSSStyleSheet.prototype.replaceSync ||
++        !('adoptedStyleSheets' in document)) {
+         return null;
+-    var tag = document.createElement('style');
+-    tag.type = 'text/css';
+-    var nonce = getNonce();
+-    if (nonce) {
+-        tag.setAttribute('nonce', nonce);
+     }
+-    return tag;
+-}
+-function injectStyles(tag, css) {
+-    // @ts-ignore
+-    if (tag.styleSheet) {
+-        // @ts-ignore
+-        tag.styleSheet.cssText = css;
++    try {
++        return new CSSStyleSheet();
+     }
+-    else {
+-        tag.appendChild(document.createTextNode(css));
++    catch (_e) {
++        return null;
+     }
+ }
+-function insertStyleTag(tag) {
+-    var head = document.head || document.getElementsByTagName('head')[0];
+-    head.appendChild(tag);
+-}
+ export var stylesheetSingleton = function () {
+     var counter = 0;
+-    var stylesheet = null;
++    var sheet = null;
+     return {
+         add: function (style) {
+             if (counter == 0) {
+-                if ((stylesheet = makeStyleTag())) {
+-                    injectStyles(stylesheet, style);
+-                    insertStyleTag(stylesheet);
++                if ((sheet = makeSheet())) {
++                    try {
++                        sheet.replaceSync(style);
++                    }
++                    catch (_e) { }
++                    document.adoptedStyleSheets = Array.prototype.slice
++                        .call(document.adoptedStyleSheets)
++                        .concat([sheet]);
+                 }
+             }
+             counter++;
+         },
+         remove: function () {
+             counter--;
+-            if (!counter && stylesheet) {
+-                stylesheet.parentNode && stylesheet.parentNode.removeChild(stylesheet);
+-                stylesheet = null;
++            if (!counter && sheet) {
++                var removed = sheet;
++                sheet = null;
++                document.adoptedStyleSheets = Array.prototype.filter.call(document.adoptedStyleSheets, function (s) {
++                    return s !== removed;
++                });
+             }
+         },
+     };
+diff --git a/dist/es2019/singleton.js b/dist/es2019/singleton.js
+index 3e58591..af292bc 100644
+--- a/dist/es2019/singleton.js
++++ b/dist/es2019/singleton.js
+@@ -1,47 +1,49 @@
+-import { getNonce } from 'get-nonce';
+-function makeStyleTag() {
+-    if (!document)
++/**
++ * Patched for Webflow Designer Extension CSP compliance (Codalyn, Marketplace round 4):
++ * scroll-lock styles are applied through constructable stylesheets (CSSOM) instead of injected
++ * <style> elements. CSSOM sheets are exempt from CSP style-src, so no 'unsafe-inline' or nonce
++ * is needed. Browsers without adoptedStyleSheets skip the cosmetic scrollbar-gap styles.
++ */
++function makeSheet() {
++    if (typeof document === 'undefined' ||
++        typeof CSSStyleSheet === 'undefined' ||
++        !CSSStyleSheet.prototype.replaceSync ||
++        !('adoptedStyleSheets' in document)) {
+         return null;
+-    const tag = document.createElement('style');
+-    tag.type = 'text/css';
+-    const nonce = getNonce();
+-    if (nonce) {
+-        tag.setAttribute('nonce', nonce);
+     }
+-    return tag;
+-}
+-function injectStyles(tag, css) {
+-    // @ts-ignore
+-    if (tag.styleSheet) {
+-        // @ts-ignore
+-        tag.styleSheet.cssText = css;
++    try {
++        return new CSSStyleSheet();
+     }
+-    else {
+-        tag.appendChild(document.createTextNode(css));
++    catch (_e) {
++        return null;
+     }
+ }
+-function insertStyleTag(tag) {
+-    const head = document.head || document.getElementsByTagName('head')[0];
+-    head.appendChild(tag);
+-}
+-export const stylesheetSingleton = () => {
+-    let counter = 0;
+-    let stylesheet = null;
++export var stylesheetSingleton = function () {
++    var counter = 0;
++    var sheet = null;
+     return {
+-        add: (style) => {
++        add: function (style) {
+             if (counter == 0) {
+-                if ((stylesheet = makeStyleTag())) {
+-                    injectStyles(stylesheet, style);
+-                    insertStyleTag(stylesheet);
++                if ((sheet = makeSheet())) {
++                    try {
++                        sheet.replaceSync(style);
++                    }
++                    catch (_e) { }
++                    document.adoptedStyleSheets = Array.prototype.slice
++                        .call(document.adoptedStyleSheets)
++                        .concat([sheet]);
+                 }
+             }
+             counter++;
+         },
+-        remove: () => {
++        remove: function () {
+             counter--;
+-            if (!counter && stylesheet) {
+-                stylesheet.parentNode && stylesheet.parentNode.removeChild(stylesheet);
+-                stylesheet = null;
++            if (!counter && sheet) {
++                var removed = sheet;
++                sheet = null;
++                document.adoptedStyleSheets = Array.prototype.filter.call(document.adoptedStyleSheets, function (s) {
++                    return s !== removed;
++                });
+             }
+         },
+     };
+diff --git a/dist/es5/singleton.js b/dist/es5/singleton.js
+index e90d76f..42f96ad 100644
+--- a/dist/es5/singleton.js
++++ b/dist/es5/singleton.js
+@@ -1,50 +1,52 @@
+-"use strict";
+-Object.defineProperty(exports, "__esModule", { value: true });
+-exports.stylesheetSingleton = void 0;
+-var get_nonce_1 = require("get-nonce");
+-function makeStyleTag() {
+-    if (!document)
++/**
++ * Patched for Webflow Designer Extension CSP compliance (Codalyn, Marketplace round 4):
++ * scroll-lock styles are applied through constructable stylesheets (CSSOM) instead of injected
++ * <style> elements. CSSOM sheets are exempt from CSP style-src, so no 'unsafe-inline' or nonce
++ * is needed. Browsers without adoptedStyleSheets skip the cosmetic scrollbar-gap styles.
++ */
++function makeSheet() {
++    if (typeof document === 'undefined' ||
++        typeof CSSStyleSheet === 'undefined' ||
++        !CSSStyleSheet.prototype.replaceSync ||
++        !('adoptedStyleSheets' in document)) {
+         return null;
+-    var tag = document.createElement('style');
+-    tag.type = 'text/css';
+-    var nonce = (0, get_nonce_1.getNonce)();
+-    if (nonce) {
+-        tag.setAttribute('nonce', nonce);
+     }
+-    return tag;
+-}
+-function injectStyles(tag, css) {
+-    // @ts-ignore
+-    if (tag.styleSheet) {
+-        // @ts-ignore
+-        tag.styleSheet.cssText = css;
++    try {
++        return new CSSStyleSheet();
+     }
+-    else {
+-        tag.appendChild(document.createTextNode(css));
++    catch (_e) {
++        return null;
+     }
+ }
+-function insertStyleTag(tag) {
+-    var head = document.head || document.getElementsByTagName('head')[0];
+-    head.appendChild(tag);
+-}
++"use strict";
++Object.defineProperty(exports, "__esModule", { value: true });
++exports.stylesheetSingleton = void 0;
+ var stylesheetSingleton = function () {
+     var counter = 0;
+-    var stylesheet = null;
++    var sheet = null;
+     return {
+         add: function (style) {
+             if (counter == 0) {
+-                if ((stylesheet = makeStyleTag())) {
+-                    injectStyles(stylesheet, style);
+-                    insertStyleTag(stylesheet);
++                if ((sheet = makeSheet())) {
++                    try {
++                        sheet.replaceSync(style);
++                    }
++                    catch (_e) { }
++                    document.adoptedStyleSheets = Array.prototype.slice
++                        .call(document.adoptedStyleSheets)
++                        .concat([sheet]);
+                 }
+             }
+             counter++;
+         },
+         remove: function () {
+             counter--;
+-            if (!counter && stylesheet) {
+-                stylesheet.parentNode && stylesheet.parentNode.removeChild(stylesheet);
+-                stylesheet = null;
++            if (!counter && sheet) {
++                var removed = sheet;
++                sheet = null;
++                document.adoptedStyleSheets = Array.prototype.filter.call(document.adoptedStyleSheets, function (s) {
++                    return s !== removed;
++                });
+             }
+         },
+     };

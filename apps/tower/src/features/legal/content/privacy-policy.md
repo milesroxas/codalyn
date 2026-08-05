@@ -21,6 +21,14 @@ We collect information in three broad categories:
 - **Analytics data:** product analytics events collected through **PostHog** when enabled, used to understand feature adoption and improve the Service.
 - **Cookies and similar technologies:** session cookies required for authentication and security, and optional analytics cookies as described below.
 
+### Beacon Designer Extension (inside Webflow)
+
+The Beacon extension runs inside the Webflow Designer and handles data as follows:
+
+- **Optional telemetry (opt-in only):** the extension sends no analytics or error data unless you enable sharing in the extension (first-run prompt or Settings → Privacy). When enabled, exactly the following is collected and processed by **PostHog** on our behalf: error reports (exception message and stack trace), feature-usage events you trigger (for example submitting feedback), app version, build channel and build metadata, and the current Webflow site (ID, name, short name) and workspace (ID, slug) used for grouping. Autocapture, session recording, pageview/pageleave capture, surveys, referrer capture, and GeoIP location enrichment are disabled, and no tracking identifiers are persisted to cookies or local storage. Telemetry never includes page content, design content, or images. You can withdraw consent at any time in Settings → Privacy.
+- **Image optimization (AVIF):** if you choose the AVIF file type in the image editor, the image being edited is sent over HTTPS to our Tower service, converted in memory, and returned in the response. We do not store the image; we log only operational metadata about the request (account and workspace identifiers, format, quality, input/output sizes, dimensions, and duration). Choosing WebP keeps encoding entirely inside the Designer with no upload.
+- The extension never reads or transmits your site's page or design content for analytics purposes.
+
 ### Information from third parties
 
 - **Webflow:** when you connect a Webflow account, we receive OAuth tokens and Webflow site, CMS, asset, and related metadata needed to operate integrations.
@@ -81,6 +89,8 @@ Our websites show a consent banner (powered by **c15t**) before any non-essentia
 - You can review, change, or withdraw your consent at any time using the "Cookies" link in the site footer. Withdrawing consent stops analytics collection for subsequent activity.
 
 You can also control cookies through browser settings. Disabling necessary cookies may limit Service functionality.
+
+**Beacon extension telemetry** is governed by the in-extension consent controls described in Section 1 (not the website consent banner): it is off by default, starts only after you opt in, and can be turned off at any time in the extension's Settings → Privacy.
 
 ## 6. Data retention
 

@@ -1,4 +1,5 @@
 import {
+  CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL,
   CMS_SLOT_PUBLISH_PLACEHOLDER_URL,
   isBeaconPropValueEmpty,
   isBeaconPublishPlaceholderValue,
@@ -141,7 +142,7 @@ export function publishPlaceholderForValueType(valueType: string): ResolvedValue
     case "videoUrl":
       return CMS_SLOT_PUBLISH_PLACEHOLDER_URL;
     case "email":
-      return { mode: "email", to: "placeholder@codalyn.invalid" };
+      return { mode: "email", to: CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL };
     case "phone":
       return { mode: "phone", to: "0" };
     case "boolean":

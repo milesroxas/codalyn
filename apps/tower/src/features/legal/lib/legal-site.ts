@@ -7,7 +7,7 @@ export const LEGAL_SITE = {
   contactEmail: "support@codalyn.app",
   /** ISO date shown in document headers (YYYY-MM-DD). Update when publishing revisions. */
   effectiveDate: "2026-07-11",
-  lastUpdatedDate: "2026-07-11",
+  lastUpdatedDate: "2026-08-05",
   governingLawJurisdiction: "State of Delaware, United States",
 } as const;
 

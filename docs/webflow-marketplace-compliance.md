@@ -3,7 +3,8 @@
 Point-by-point response to the Webflow app-review feedback (July 2026), mapping each flag to what
 the app does and what changed. Doc references verified against developers.webflow.com on 2026-07-08.
 Round-2 feedback (2026-07-09) is addressed in [Round 2](#round-2--2026-07-09-follow-up-flags);
-round-3 feedback (2026-08) in [Round 3](#round-3--2026-08-senior-engineer--review-team-flags).
+round-3 feedback (2026-08) in [Round 3](#round-3--2026-08-senior-engineer--review-team-flags);
+round-4 feedback (2026-08-05) in [Round 4](#round-4--2026-08-05-review-team-flags).
 Where a later-round fix supersedes an earlier answer, the original item notes it.
 
 ## 1. Direct DOM manipulation / unsafe patterns
@@ -346,3 +347,130 @@ response without client-side validation.
 - No wildcard origins anywhere in the bridge: every `postMessage` (both directions) targets the
   explicit extension origin. Pinned by unit tests (`quality-compare-popout-page.test.ts`: opener
   source-check present, no `"*"` target, all posts to `TARGET_ORIGIN`).
+
+---
+
+## Round 4 — 2026-08-05 review-team flags
+
+### R4.1 Runtime `<style>` injection / `dangerouslySetInnerHTML` styles (CSP compatibility)
+
+Flag: `bundle.js`, `assets/badge-*.js`, and `assets/dropdown-menu-*.js` inject runtime `<style>`
+tags and use `dangerouslySetInnerHTML` for UI-library styles.
+
+- **Fixed — every UI-library style injector is removed from the bundle.** The injectors were four
+  third-party libraries; each is now patched via pnpm `patchedDependencies` (see `/patches`):
+  - **vaul 1.1.2** (drawer): module-scope `__insertCSS` + its 5 KB static CSS string removed; the
+    CSS ships statically in `styles.css` (`src/styles/vendor-static.css`, including a fix for
+    vaul's malformed `[data-vaul-handle-hitarea]:{` selector).
+  - **@radix-ui/react-select 2.2.6** and **@radix-ui/react-scroll-area 1.2.10**: the viewport
+    `<style dangerouslySetInnerHTML>` elements are removed; their two static scrollbar-hiding
+    rules ship in `styles.css`.
+  - **react-easy-crop 5.5.7**: the (already opted-out, dead) injector code and its CSS string
+    literal are removed; its stylesheet was already statically bundled (R3.5).
+  - **react-style-singleton 2.2.3** (the scroll-lock injector Radix Dialog/Menu/Select/Popover
+    pull in via react-remove-scroll): rewritten to apply its genuinely dynamic scrollbar-gap
+    styles through **constructable stylesheets** (`new CSSStyleSheet()` + `replaceSync` +
+    `document.adoptedStyleSheets`). CSSOM stylesheets are not subject to CSP `style-src`, so the
+    extension no longer needs `style-src 'unsafe-inline'` — all first-party and vendor CSS is
+    either in the static `styles.css`/`quality-compare.css` files or applied via CSSOM.
+- Verified in the rebuilt production bundle: zero `createElement("style")`/`` createElement(`style`) ``
+  calls from UI libraries and zero style-carrying `dangerouslySetInnerHTML` across `bundle.js` and
+  all `assets/*.js` chunks. The only remaining textual matches are framework internals with no
+  UI-library styles behind them: react-dom's renderer machinery for React 19's
+  `<style precedence>` hoisting feature (never exercised — no first-party or library code renders
+  such elements) and react-dom's property-name switch statements that merely compare against the
+  string `"dangerouslySetInnerHTML"`; plus react-router's `ScrollRestoration` component
+  (unused — nothing in Beacon renders it), which serializes a `<script>` (not a style).
+
+### R4.2 Direct DOM manipulation (`quality-compare.js`, bundle DOM/canvas)
+
+- **Reduced to platform-required APIs and made declarative.** `public/quality-compare.js` no
+  longer mutates element styles: the two continuous values (compare-wipe position, per-image
+  aspect ratio) flow into `quality-compare.css` as CSS custom properties via CSSOM
+  `style.setProperty` (`--scrub`, `--stage-ar`); constant transforms moved fully into the
+  stylesheet; error state was already a class toggle. What remains is inherent to a static page:
+  `getElementById` lookups, `aria-valuenow`/`aria-valuetext` writes (the standard accessibility
+  API for a custom slider), object-URL assignment to the two `<img>` elements (with revocation on
+  `pagehide`/`beforeunload`), and `textContent` writes (never `innerHTML`).
+- **Why this popout exists and why it uses DOM APIs:** it is a same-origin static page in a
+  separate popup window for side-by-side image-quality comparison at a larger size than the
+  Designer panel allows. It never touches the Designer document — the Designer Extension APIs do
+  not apply inside a standalone popup; the page operates exclusively on its own three elements.
+- Bundle-side DOM/canvas use (unchanged, all inside the extension's own iframe, never the
+  Designer document): canvas cropping/encoding in the image editor (`crop-image.ts`,
+  `encode-image-blob.ts`), an `<a download>` element for the guest-mode WebP export, and the
+  save-time `DOMParser` allowlist sanitizer for rich text (R2.4). The `cloneNode`/`DOMParser`
+  strings visible in `bundle.js` belong to the *generated* published-site runtime source
+  (R3.3) — they execute on the published site, not in the Designer.
+
+### R4.3 External image processing (AVIF via Tower)
+
+- **Disclosed in-product at the point of use:** the file-type tooltip now reads that AVIF
+  "sends the cropped image to Codalyn's Tower service over HTTPS for conversion; it is processed
+  in memory and not stored," and Settings → Privacy carries the same disclosure. WebP is
+  explicitly described as encoding entirely in the Designer.
+- **User-initiated:** AVIF encoding happens only while the user has selected the AVIF file type
+  (guest mode and the default use in-Designer WebP); deselecting AVIF stops all uploads.
+  Preview re-encodes while AVIF is selected are debounced side effects of that explicit choice.
+- **Privacy policy** (`https://tower.codalyn.app/privacy`, §1 "Beacon Designer Extension") now
+  describes the exact data flow: image sent over HTTPS, converted in memory by `sharp`, returned
+  in the response, never persisted; only operational metadata (account/workspace IDs, format,
+  quality, sizes, dimensions, duration) is logged.
+
+### R4.4 Telemetry and analytics disclosure
+
+- Telemetry remains **opt-in only** (R2.3): no SDK boot or network traffic before explicit
+  consent; toggle in Settings → Privacy.
+- Disclosure copy (consent prompt, Settings → Privacy, privacy policy §1) now enumerates the
+  exact fields including the site/workspace **names** used for PostHog grouping (previously
+  summarized as "IDs"): error reports (message/stack), explicit feature-usage events, app
+  version/channel/build metadata, site ID/name/short name, workspace ID/slug. Processor: PostHog
+  only (post-R3.1). GeoIP enrichment stays suppressed.
+
+### R4.5 Localhost / development references in production bundle
+
+- **Fixed — release bundles now contain zero `localhost`/`127.0.0.1` strings.** Sources and
+  remedies:
+  - First-party dev-guidance message (`tower-reachability-error.ts`, Beacon and Flint): rewrote
+    the check to protocol-based (`new URL(origin).protocol === "http:"`) — same behavior (any
+    plain-HTTP origin is mixed content in the Designer), no host literals.
+  - Vendor literals in dead-in-extension code paths — react-router's windowless URL base,
+    better-auth's server-side proxy-header validation, posthog-js's cookie-domain probe (dead
+    under `persistence: "memory"`) and `internal_or_test_user_hostname` config default — are
+    compiled out by a build-time transform (`scripts/vite-strip-dev-host-literals.mjs`) with
+    per-site justification comments. The transform **fails the release build** if a vendor
+    upgrade reintroduces or moves such a literal.
+  - The release build guard (`scripts/build-cli.mjs`) now forbids the bare substrings
+    `localhost` and `127.0.0.1` (any scheme/port form) in dist and in the archived zip.
+
+### R4.6 Placeholder domains in production bundle
+
+- **Fixed — no URL-like placeholder values remain in shipped bundles.**
+  - `https://beacon.tower.invalid` / `https://flint.tower.invalid` (better-auth needs *some*
+    valid `baseURL` before Tower is configured): now a dev-only branch compiled out of release
+    builds; a release build without a Tower origin fails loudly instead.
+  - CMS publish-placeholder sentinels: new seeds are non-network by construction —
+    `#codalyn-beacon-publish-placeholder` (fragment; link/url/video props) and the bare token
+    `codalyn-beacon-publish-placeholder` (email props). Pages published by earlier builds still
+    carry the retired `https://codalyn.beacon/publish-placeholder` / `placeholder@codalyn.invalid`
+    values, so the generated site runtime and the extension keep recognizing them for cleanup;
+    those legacy constants are assembled from parts at runtime so the retired URL-like literals
+    never appear in the extension bundle (they only materialize inside the generated `runtime.js`
+    that must match older publishes).
+  - The build guard forbids `tower.invalid`, `codalyn.invalid`, and `codalyn.beacon/` in dist and
+    the archived zip.
+
+### R4.7 Popup and redirect behavior — reviewer context
+
+All popups are user-gesture-gated and destination-allowlisted (established in R3.4/R3.6,
+unchanged): auth/OAuth popups open only from explicit buttons and navigate only to the built-in
+Tower origin or `https://webflow.com/oauth/authorize` (`isAllowedWebflowAuthorizeUrl`,
+`isTrustedRedirectUrl`); the quality-compare popout is a same-origin static page from the bundle,
+opened only from the "Pop out" button. No non-gesture popup paths exist.
+
+### R4.8 Referrer handling
+
+- **Fixed:** `save_referrer: false` added to the shared extension PostHog options
+  (`CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS`) — referrer analytics are not used or disclosed,
+  and the extension iframe's referrer could carry Designer context. This complements the existing
+  `$geoip_disable`, memory-only persistence, and disabled autocapture/pageview capture.

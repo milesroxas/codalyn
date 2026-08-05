@@ -1,0 +1,318 @@
+diff --git a/index.js b/index.js
+index f69b367..8d0c10e 100644
+--- a/index.js
++++ b/index.js
+@@ -29,9 +29,9 @@ function _interopNamespace(e) {
+ var React__namespace = /*#__PURE__*/_interopNamespace(React);
+ var normalizeWheel__default = /*#__PURE__*/_interopDefaultLegacy(normalizeWheel);
+ 
+-/**
+- * Compute the dimension of the crop area based on media size,
+- * aspect ratio and optionally rotation
++/**
++ * Compute the dimension of the crop area based on media size,
++ * aspect ratio and optionally rotation
+  */
+ function getCropSize(mediaWidth, mediaHeight, containerWidth, containerHeight, aspect, rotation) {
+   if (rotation === void 0) {
+@@ -53,16 +53,16 @@ function getCropSize(mediaWidth, mediaHeight, containerWidth, containerHeight, a
+     height: fittingWidth / aspect
+   };
+ }
+-/**
+- * Compute media zoom.
+- * We fit the media into the container with "max-width: 100%; max-height: 100%;"
++/**
++ * Compute media zoom.
++ * We fit the media into the container with "max-width: 100%; max-height: 100%;"
+  */
+ function getMediaZoom(mediaSize) {
+   // Take the axis with more pixels to improve accuracy
+   return mediaSize.width > mediaSize.height ? mediaSize.width / mediaSize.naturalWidth : mediaSize.height / mediaSize.naturalHeight;
+ }
+-/**
+- * Ensure a new media position stays in the crop area.
++/**
++ * Ensure a new media position stays in the crop area.
+  */
+ function restrictPosition(position, mediaSize, cropSize, zoom, rotation) {
+   if (rotation === void 0) {
+@@ -86,9 +86,9 @@ function getDistanceBetweenPoints(pointA, pointB) {
+ function getRotationBetweenPoints(pointA, pointB) {
+   return Math.atan2(pointB.y - pointA.y, pointB.x - pointA.x) * 180 / Math.PI;
+ }
+-/**
+- * Compute the output cropped area of the media in percentages and pixels.
+- * x/y are the top-left coordinates on the src media
++/**
++ * Compute the output cropped area of the media in percentages and pixels.
++ * x/y are the top-left coordinates on the src media
+  */
+ function computeCroppedArea(crop, mediaSize, cropSize, aspect, zoom, rotation, restrictPosition) {
+   if (rotation === void 0) {
+@@ -134,8 +134,8 @@ function computeCroppedArea(crop, mediaSize, cropSize, aspect, zoom, rotation, r
+     croppedAreaPixels: croppedAreaPixels
+   };
+ }
+-/**
+- * Ensure the returned value is between 0 and max
++/**
++ * Ensure the returned value is between 0 and max
+  */
+ function limitArea(max, value) {
+   return Math.min(max, Math.max(0, value));
+@@ -143,8 +143,8 @@ function limitArea(max, value) {
+ function noOp(_max, value) {
+   return value;
+ }
+-/**
+- * Compute crop and zoom from the croppedAreaPercentages.
++/**
++ * Compute crop and zoom from the croppedAreaPercentages.
+  */
+ function getInitialCropFromCroppedAreaPercentages(croppedAreaPercentages, mediaSize, rotation, cropSize, minZoom, maxZoom) {
+   var mediaBBoxSize = rotateSize(mediaSize.width, mediaSize.height, rotation);
+@@ -159,15 +159,15 @@ function getInitialCropFromCroppedAreaPercentages(croppedAreaPercentages, mediaS
+     zoom: zoom
+   };
+ }
+-/**
+- * Compute zoom from the croppedAreaPixels
++/**
++ * Compute zoom from the croppedAreaPixels
+  */
+ function getZoomFromCroppedAreaPixels(croppedAreaPixels, mediaSize, cropSize) {
+   var mediaZoom = getMediaZoom(mediaSize);
+   return cropSize.height > cropSize.width ? cropSize.height / (croppedAreaPixels.height * mediaZoom) : cropSize.width / (croppedAreaPixels.width * mediaZoom);
+ }
+-/**
+- * Compute crop and zoom from the croppedAreaPixels
++/**
++ * Compute crop and zoom from the croppedAreaPixels
+  */
+ function getInitialCropFromCroppedAreaPixels(croppedAreaPixels, mediaSize, rotation, cropSize, minZoom, maxZoom) {
+   if (rotation === void 0) {
+@@ -185,8 +185,8 @@ function getInitialCropFromCroppedAreaPixels(croppedAreaPixels, mediaSize, rotat
+     zoom: zoom
+   };
+ }
+-/**
+- * Return the point that is the center of point a and b
++/**
++ * Return the point that is the center of point a and b
+  */
+ function getCenter(a, b) {
+   return {
+@@ -197,8 +197,8 @@ function getCenter(a, b) {
+ function getRadianAngle(degreeValue) {
+   return degreeValue * Math.PI / 180;
+ }
+-/**
+- * Returns the new bounding area of a rotated rectangle.
++/**
++ * Returns the new bounding area of a rotated rectangle.
+  */
+ function rotateSize(width, height, rotation) {
+   var rotRad = getRadianAngle(rotation);
+@@ -207,14 +207,14 @@ function rotateSize(width, height, rotation) {
+     height: Math.abs(Math.sin(rotRad) * width) + Math.abs(Math.cos(rotRad) * height)
+   };
+ }
+-/**
+- * Clamp value between min and max
++/**
++ * Clamp value between min and max
+  */
+ function clamp(value, min, max) {
+   return Math.min(Math.max(value, min), max);
+ }
+-/**
+- * Combine multiple class names into a single string.
++/**
++ * Combine multiple class names into a single string.
+  */
+ function classNames() {
+   var args = [];
+@@ -229,7 +229,6 @@ function classNames() {
+   }).join(' ').trim();
+ }
+ 
+-var css_248z = ".reactEasyCrop_Container {\n  position: absolute;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  overflow: hidden;\n  user-select: none;\n  touch-action: none;\n  cursor: move;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n}\n\n.reactEasyCrop_Image,\n.reactEasyCrop_Video {\n  will-change: transform; /* this improves performances and prevent painting issues on iOS Chrome */\n}\n\n.reactEasyCrop_Contain {\n  max-width: 100%;\n  max-height: 100%;\n  margin: auto;\n  position: absolute;\n  top: 0;\n  bottom: 0;\n  left: 0;\n  right: 0;\n}\n.reactEasyCrop_Cover_Horizontal {\n  width: 100%;\n  height: auto;\n}\n.reactEasyCrop_Cover_Vertical {\n  width: auto;\n  height: 100%;\n}\n\n.reactEasyCrop_CropArea {\n  position: absolute;\n  left: 50%;\n  top: 50%;\n  transform: translate(-50%, -50%);\n  border: 1px solid rgba(255, 255, 255, 0.5);\n  box-sizing: border-box;\n  box-shadow: 0 0 0 9999em;\n  color: rgba(0, 0, 0, 0.5);\n  overflow: hidden;\n}\n\n.reactEasyCrop_CropAreaRound {\n  border-radius: 50%;\n}\n\n.reactEasyCrop_CropAreaGrid::before {\n  content: ' ';\n  box-sizing: border-box;\n  position: absolute;\n  border: 1px solid rgba(255, 255, 255, 0.5);\n  top: 0;\n  bottom: 0;\n  left: 33.33%;\n  right: 33.33%;\n  border-top: 0;\n  border-bottom: 0;\n}\n\n.reactEasyCrop_CropAreaGrid::after {\n  content: ' ';\n  box-sizing: border-box;\n  position: absolute;\n  border: 1px solid rgba(255, 255, 255, 0.5);\n  top: 33.33%;\n  bottom: 33.33%;\n  left: 0;\n  right: 0;\n  border-left: 0;\n  border-right: 0;\n}\n";
+ 
+ var MIN_ZOOM = 1;
+ var MAX_ZOOM = 3;
+@@ -728,15 +727,6 @@ var Cropper = /** @class */function (_super) {
+       this.containerRef.addEventListener('gesturestart', this.onGestureStart);
+     }
+     this.currentDoc.addEventListener('scroll', this.onScroll);
+-    if (!this.props.disableAutomaticStylesInjection) {
+-      this.styleRef = this.currentDoc.createElement('style');
+-      this.styleRef.setAttribute('type', 'text/css');
+-      if (this.props.nonce) {
+-        this.styleRef.setAttribute('nonce', this.props.nonce);
+-      }
+-      this.styleRef.innerHTML = css_248z;
+-      this.currentDoc.head.appendChild(this.styleRef);
+-    }
+     // when rendered via SSR, the image can already be loaded and its onLoad callback will never be called
+     if (this.imageRef.current && this.imageRef.current.complete) {
+       this.onMediaLoad();
+diff --git a/index.module.mjs b/index.module.mjs
+index bfd9b46..6a5f681 100644
+--- a/index.module.mjs
++++ b/index.module.mjs
+@@ -2,9 +2,9 @@ import { __assign, __extends } from 'tslib';
+ import * as React from 'react';
+ import normalizeWheel from 'normalize-wheel';
+ 
+-/**
+- * Compute the dimension of the crop area based on media size,
+- * aspect ratio and optionally rotation
++/**
++ * Compute the dimension of the crop area based on media size,
++ * aspect ratio and optionally rotation
+  */
+ function getCropSize(mediaWidth, mediaHeight, containerWidth, containerHeight, aspect, rotation) {
+   if (rotation === void 0) {
+@@ -26,16 +26,16 @@ function getCropSize(mediaWidth, mediaHeight, containerWidth, containerHeight, a
+     height: fittingWidth / aspect
+   };
+ }
+-/**
+- * Compute media zoom.
+- * We fit the media into the container with "max-width: 100%; max-height: 100%;"
++/**
++ * Compute media zoom.
++ * We fit the media into the container with "max-width: 100%; max-height: 100%;"
+  */
+ function getMediaZoom(mediaSize) {
+   // Take the axis with more pixels to improve accuracy
+   return mediaSize.width > mediaSize.height ? mediaSize.width / mediaSize.naturalWidth : mediaSize.height / mediaSize.naturalHeight;
+ }
+-/**
+- * Ensure a new media position stays in the crop area.
++/**
++ * Ensure a new media position stays in the crop area.
+  */
+ function restrictPosition(position, mediaSize, cropSize, zoom, rotation) {
+   if (rotation === void 0) {
+@@ -59,9 +59,9 @@ function getDistanceBetweenPoints(pointA, pointB) {
+ function getRotationBetweenPoints(pointA, pointB) {
+   return Math.atan2(pointB.y - pointA.y, pointB.x - pointA.x) * 180 / Math.PI;
+ }
+-/**
+- * Compute the output cropped area of the media in percentages and pixels.
+- * x/y are the top-left coordinates on the src media
++/**
++ * Compute the output cropped area of the media in percentages and pixels.
++ * x/y are the top-left coordinates on the src media
+  */
+ function computeCroppedArea(crop, mediaSize, cropSize, aspect, zoom, rotation, restrictPosition) {
+   if (rotation === void 0) {
+@@ -107,8 +107,8 @@ function computeCroppedArea(crop, mediaSize, cropSize, aspect, zoom, rotation, r
+     croppedAreaPixels: croppedAreaPixels
+   };
+ }
+-/**
+- * Ensure the returned value is between 0 and max
++/**
++ * Ensure the returned value is between 0 and max
+  */
+ function limitArea(max, value) {
+   return Math.min(max, Math.max(0, value));
+@@ -116,8 +116,8 @@ function limitArea(max, value) {
+ function noOp(_max, value) {
+   return value;
+ }
+-/**
+- * Compute crop and zoom from the croppedAreaPercentages.
++/**
++ * Compute crop and zoom from the croppedAreaPercentages.
+  */
+ function getInitialCropFromCroppedAreaPercentages(croppedAreaPercentages, mediaSize, rotation, cropSize, minZoom, maxZoom) {
+   var mediaBBoxSize = rotateSize(mediaSize.width, mediaSize.height, rotation);
+@@ -132,15 +132,15 @@ function getInitialCropFromCroppedAreaPercentages(croppedAreaPercentages, mediaS
+     zoom: zoom
+   };
+ }
+-/**
+- * Compute zoom from the croppedAreaPixels
++/**
++ * Compute zoom from the croppedAreaPixels
+  */
+ function getZoomFromCroppedAreaPixels(croppedAreaPixels, mediaSize, cropSize) {
+   var mediaZoom = getMediaZoom(mediaSize);
+   return cropSize.height > cropSize.width ? cropSize.height / (croppedAreaPixels.height * mediaZoom) : cropSize.width / (croppedAreaPixels.width * mediaZoom);
+ }
+-/**
+- * Compute crop and zoom from the croppedAreaPixels
++/**
++ * Compute crop and zoom from the croppedAreaPixels
+  */
+ function getInitialCropFromCroppedAreaPixels(croppedAreaPixels, mediaSize, rotation, cropSize, minZoom, maxZoom) {
+   if (rotation === void 0) {
+@@ -158,8 +158,8 @@ function getInitialCropFromCroppedAreaPixels(croppedAreaPixels, mediaSize, rotat
+     zoom: zoom
+   };
+ }
+-/**
+- * Return the point that is the center of point a and b
++/**
++ * Return the point that is the center of point a and b
+  */
+ function getCenter(a, b) {
+   return {
+@@ -170,8 +170,8 @@ function getCenter(a, b) {
+ function getRadianAngle(degreeValue) {
+   return degreeValue * Math.PI / 180;
+ }
+-/**
+- * Returns the new bounding area of a rotated rectangle.
++/**
++ * Returns the new bounding area of a rotated rectangle.
+  */
+ function rotateSize(width, height, rotation) {
+   var rotRad = getRadianAngle(rotation);
+@@ -180,14 +180,14 @@ function rotateSize(width, height, rotation) {
+     height: Math.abs(Math.sin(rotRad) * width) + Math.abs(Math.cos(rotRad) * height)
+   };
+ }
+-/**
+- * Clamp value between min and max
++/**
++ * Clamp value between min and max
+  */
+ function clamp(value, min, max) {
+   return Math.min(Math.max(value, min), max);
+ }
+-/**
+- * Combine multiple class names into a single string.
++/**
++ * Combine multiple class names into a single string.
+  */
+ function classNames() {
+   var args = [];
+@@ -202,7 +202,6 @@ function classNames() {
+   }).join(' ').trim();
+ }
+ 
+-var css_248z = ".reactEasyCrop_Container {\n  position: absolute;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  overflow: hidden;\n  user-select: none;\n  touch-action: none;\n  cursor: move;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n}\n\n.reactEasyCrop_Image,\n.reactEasyCrop_Video {\n  will-change: transform; /* this improves performances and prevent painting issues on iOS Chrome */\n}\n\n.reactEasyCrop_Contain {\n  max-width: 100%;\n  max-height: 100%;\n  margin: auto;\n  position: absolute;\n  top: 0;\n  bottom: 0;\n  left: 0;\n  right: 0;\n}\n.reactEasyCrop_Cover_Horizontal {\n  width: 100%;\n  height: auto;\n}\n.reactEasyCrop_Cover_Vertical {\n  width: auto;\n  height: 100%;\n}\n\n.reactEasyCrop_CropArea {\n  position: absolute;\n  left: 50%;\n  top: 50%;\n  transform: translate(-50%, -50%);\n  border: 1px solid rgba(255, 255, 255, 0.5);\n  box-sizing: border-box;\n  box-shadow: 0 0 0 9999em;\n  color: rgba(0, 0, 0, 0.5);\n  overflow: hidden;\n}\n\n.reactEasyCrop_CropAreaRound {\n  border-radius: 50%;\n}\n\n.reactEasyCrop_CropAreaGrid::before {\n  content: ' ';\n  box-sizing: border-box;\n  position: absolute;\n  border: 1px solid rgba(255, 255, 255, 0.5);\n  top: 0;\n  bottom: 0;\n  left: 33.33%;\n  right: 33.33%;\n  border-top: 0;\n  border-bottom: 0;\n}\n\n.reactEasyCrop_CropAreaGrid::after {\n  content: ' ';\n  box-sizing: border-box;\n  position: absolute;\n  border: 1px solid rgba(255, 255, 255, 0.5);\n  top: 33.33%;\n  bottom: 33.33%;\n  left: 0;\n  right: 0;\n  border-left: 0;\n  border-right: 0;\n}\n";
+ 
+ var MIN_ZOOM = 1;
+ var MAX_ZOOM = 3;
+@@ -701,15 +700,6 @@ var Cropper = /** @class */function (_super) {
+       this.containerRef.addEventListener('gesturestart', this.onGestureStart);
+     }
+     this.currentDoc.addEventListener('scroll', this.onScroll);
+-    if (!this.props.disableAutomaticStylesInjection) {
+-      this.styleRef = this.currentDoc.createElement('style');
+-      this.styleRef.setAttribute('type', 'text/css');
+-      if (this.props.nonce) {
+-        this.styleRef.setAttribute('nonce', this.props.nonce);
+-      }
+-      this.styleRef.innerHTML = css_248z;
+-      this.currentDoc.head.appendChild(this.styleRef);
+-    }
+     // when rendered via SSR, the image can already be loaded and its onLoad callback will never be called
+     if (this.imageRef.current && this.imageRef.current.complete) {
+       this.onMediaLoad();

@@ -299,7 +299,17 @@ function collectForbiddenBundleMarkers(appPath, channel) {
   if (channel !== "production" && channel !== "preview") {
     return [];
   }
-  const forbidden = [{ value: "http://localhost:3100", label: "a localhost Tower origin" }];
+  // Marketplace round 4 (2026-08): reviewers flag dev hosts and URL-like placeholder domains in
+  // shipped bundles. Bare substrings so any scheme/port/derivative form is caught; the Vite
+  // transform in scripts/vite-strip-dev-host-literals.mjs plus source-side fixes are what make a
+  // clean release build possible — this is the backstop that keeps regressions from shipping.
+  const forbidden = [
+    { value: "localhost", label: "a localhost reference" },
+    { value: "127.0.0.1", label: "a loopback-IP reference" },
+    { value: "tower.invalid", label: "the dev-only Tower placeholder origin" },
+    { value: "codalyn.invalid", label: "the legacy placeholder email domain" },
+    { value: "codalyn.beacon/", label: "the legacy publish-placeholder URL" },
+  ];
   for (const envFile of [".env", ".env.local"]) {
     const envPath = resolve(appPath, envFile);
     if (!existsSync(envPath)) {

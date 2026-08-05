@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+/* Statically bundled styles for patched vendor libs (no runtime <style> injection — see /patches). */
+@import "./vendor-static.css";
 
 @source "../../../../packages/webflow-kit/src/**/*.{ts,tsx}";
 

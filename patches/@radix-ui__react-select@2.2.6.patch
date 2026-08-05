@@ -1,0 +1,40 @@
+diff --git a/dist/index.js b/dist/index.js
+index dc37ac4..f98449b 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -781,15 +781,6 @@ var SelectViewport = React.forwardRef(
+     const composedRefs = (0, import_react_compose_refs.useComposedRefs)(forwardedRef, contentContext.onViewportChange);
+     const prevScrollTopRef = React.useRef(0);
+     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+-        "style",
+-        {
+-          dangerouslySetInnerHTML: {
+-            __html: `[data-radix-select-viewport]{scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;}[data-radix-select-viewport]::-webkit-scrollbar{display:none}`
+-          },
+-          nonce
+-        }
+-      ),
+       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Collection.Slot, { scope: __scopeSelect, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+         import_react_primitive.Primitive.div,
+         {
+diff --git a/dist/index.mjs b/dist/index.mjs
+index f9b94f3..ac9c503 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -714,15 +714,6 @@ var SelectViewport = React.forwardRef(
+     const composedRefs = useComposedRefs(forwardedRef, contentContext.onViewportChange);
+     const prevScrollTopRef = React.useRef(0);
+     return /* @__PURE__ */ jsxs(Fragment, { children: [
+-      /* @__PURE__ */ jsx(
+-        "style",
+-        {
+-          dangerouslySetInnerHTML: {
+-            __html: `[data-radix-select-viewport]{scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;}[data-radix-select-viewport]::-webkit-scrollbar{display:none}`
+-          },
+-          nonce
+-        }
+-      ),
+       /* @__PURE__ */ jsx(Collection.Slot, { scope: __scopeSelect, children: /* @__PURE__ */ jsx(
+         Primitive.div,
+         {

@@ -121,7 +121,10 @@ h1 {
 .stage {
   position: relative;
   width: 100%;
-  aspect-ratio: 1; /* replaced per-image by quality-compare.js on init */
+  /* Dynamic state flows in through CSS custom properties set via CSSOM (style.setProperty) —
+     no style attributes or runtime <style> tags. --stage-ar is the per-image aspect ratio;
+     --scrub is the compare wipe position. */
+  aspect-ratio: var(--stage-ar, 1);
   max-height: min(75vh, 900px);
   background: #171717;
   border-radius: 8px;
@@ -142,13 +145,13 @@ h1 {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  clip-path: inset(0 50% 0 0);
+  clip-path: inset(0 calc(100% - var(--scrub, 50%)) 0 0);
 }
 .divider {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 50%;
+  left: var(--scrub, 50%);
   width: 1px;
   transform: translateX(-50%);
   background: #fff;
@@ -159,7 +162,7 @@ h1 {
 .compare-wipe-handle {
   position: absolute;
   top: 50%;
-  left: 50%;
+  left: var(--scrub, 50%);
   box-sizing: border-box;
   width: 14px;
   height: 32px;

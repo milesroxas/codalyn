@@ -10,8 +10,17 @@ const baseURL = readFlintTowerOrigin();
  * Tower is not configured; session hooks only run once `isTowerConfigured()` is
  * true, so the placeholder origin is never contacted in the free/offline path.
  */
+function unconfiguredTowerBaseUrl(): string {
+  // Dev-only RFC 2606 sentinel; release builds always embed the Tower origin (build guard),
+  // so no placeholder URL ships in production bundles.
+  if (import.meta.env.DEV) {
+    return "https://flint.tower.invalid";
+  }
+  throw new Error("Tower origin missing from build (VITE_TOWER_ORIGIN / __FLINT_TOWER_ORIGIN__)");
+}
+
 export const towerAuthClient = createAuthClient({
-  baseURL: baseURL || "https://flint.tower.invalid",
+  baseURL: baseURL || unconfiguredTowerBaseUrl(),
   fetchOptions: {
     onRequest(context) {
       const t = readFlintTowerSessionToken();

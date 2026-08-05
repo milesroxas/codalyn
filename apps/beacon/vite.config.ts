@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
+// @ts-expect-error — no .mjs typings; plugin is JS-only at repo root
+import { createStripDevHostLiteralsPlugin } from "../../scripts/vite-strip-dev-host-literals.mjs";
 // Shared JS module (see scripts/vite-wf-designer-extension-plugin.mjs)
 // @ts-expect-error — no .mjs typings; plugin is JS-only at repo root
 import { createWebflowDesignerExtensionPlugin } from "../../scripts/vite-wf-designer-extension-plugin.mjs";
@@ -46,6 +48,8 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     tailwindcss(),
     react(),
+    // Marketplace review: no dev-host literals in shipped bundles (build-only transform).
+    createStripDevHostLiteralsPlugin({ strict: mode !== "development" }),
     ...(isVitest ? [] : [createWebflowDesignerExtensionPlugin({ appRoot: beaconRoot })]),
   ],
   define: {

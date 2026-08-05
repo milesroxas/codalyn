@@ -1,0 +1,40 @@
+diff --git a/dist/index.js b/dist/index.js
+index 6e0a40d..de45eb9 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -141,15 +141,6 @@ var ScrollAreaViewport = React2.forwardRef(
+     const ref = React2.useRef(null);
+     const composedRefs = (0, import_react_compose_refs.useComposedRefs)(forwardedRef, ref, context.onViewportChange);
+     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+-        "style",
+-        {
+-          dangerouslySetInnerHTML: {
+-            __html: `[data-radix-scroll-area-viewport]{scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;}[data-radix-scroll-area-viewport]::-webkit-scrollbar{display:none}`
+-          },
+-          nonce
+-        }
+-      ),
+       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+         import_react_primitive.Primitive.div,
+         {
+diff --git a/dist/index.mjs b/dist/index.mjs
+index fac521d..8f63a27 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -96,15 +96,6 @@ var ScrollAreaViewport = React2.forwardRef(
+     const ref = React2.useRef(null);
+     const composedRefs = useComposedRefs(forwardedRef, ref, context.onViewportChange);
+     return /* @__PURE__ */ jsxs(Fragment, { children: [
+-      /* @__PURE__ */ jsx(
+-        "style",
+-        {
+-          dangerouslySetInnerHTML: {
+-            __html: `[data-radix-scroll-area-viewport]{scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;}[data-radix-scroll-area-viewport]::-webkit-scrollbar{display:none}`
+-          },
+-          nonce
+-        }
+-      ),
+       /* @__PURE__ */ jsx(
+         Primitive.div,
+         {

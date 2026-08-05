@@ -10,6 +10,23 @@ overrides:
   '@types/react': 19.2.17
   '@types/react-dom': 19.2.3
 
+patchedDependencies:
+  '@radix-ui/react-scroll-area@1.2.10':
+    hash: 7adb09ff66a610504aa2d1108899cea8f114c3d4179b2c0172cad3b29de67bca
+    path: patches/@radix-ui__react-scroll-area@1.2.10.patch
+  '@radix-ui/react-select@2.2.6':
+    hash: 479456b811c56ff3b6432ccafb8b2902cfb23706a3b0a9eee0b2c87374af6a3a
+    path: patches/@radix-ui__react-select@2.2.6.patch
+  react-easy-crop@5.5.7:
+    hash: da2c5d4a198421b67b01dedf142d566aa83aa75bef59a7a807e2754067ccb8ff
+    path: patches/react-easy-crop@5.5.7.patch
+  react-style-singleton@2.2.3:
+    hash: 8863ce0fa1810ab48590d0c293799e105946bae66c2f7950acff192521d9d5b7
+    path: patches/react-style-singleton@2.2.3.patch
+  vaul@1.1.2:
+    hash: 0730bcbf737c9d2d7e73d0ef26e63e0c595a3dcb61a208acf534f4eb633aff90
+    path: patches/vaul@1.1.2.patch
+
 importers:
 
   .:
@@ -109,7 +126,7 @@ importers:
         version: 1.4.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react-easy-crop:
         specifier: ^5.5.7
-        version: 5.5.7(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 5.5.7(patch_hash=da2c5d4a198421b67b01dedf142d566aa83aa75bef59a7a807e2754067ccb8ff)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react-router-dom:
         specifier: ^7.14.2
         version: 7.14.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -127,7 +144,7 @@ importers:
         version: 1.4.0
       vaul:
         specifier: ^1.1.2
-        version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 1.1.2(patch_hash=0730bcbf737c9d2d7e73d0ef26e63e0c595a3dcb61a208acf534f4eb633aff90)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.5.0
@@ -239,10 +256,10 @@ importers:
         version: 2.1.16(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@radix-ui/react-scroll-area':
         specifier: ^1.2.10
-        version: 1.2.10(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 1.2.10(patch_hash=7adb09ff66a610504aa2d1108899cea8f114c3d4179b2c0172cad3b29de67bca)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@radix-ui/react-select':
         specifier: ^2.2.6
-        version: 2.2.6(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 2.2.6(patch_hash=479456b811c56ff3b6432ccafb8b2902cfb23706a3b0a9eee0b2c87374af6a3a)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@radix-ui/react-slot':
         specifier: ^1.2.4
         version: 1.2.4(@types/react@19.2.17)(react@19.2.5)
@@ -477,7 +494,7 @@ importers:
         version: 3.6.0
       vaul:
         specifier: ^1.1.2
-        version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 1.1.2(patch_hash=0730bcbf737c9d2d7e73d0ef26e63e0c595a3dcb61a208acf534f4eb633aff90)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -16771,7 +16788,7 @@ snapshots:
       '@types/react': 19.2.17
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
 
-  '@radix-ui/react-scroll-area@1.2.10(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@radix-ui/react-scroll-area@1.2.10(patch_hash=7adb09ff66a610504aa2d1108899cea8f114c3d4179b2c0172cad3b29de67bca)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@radix-ui/number': 1.1.1
       '@radix-ui/primitive': 1.1.3
@@ -16805,7 +16822,7 @@ snapshots:
       '@types/react': 19.2.17
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
 
-  '@radix-ui/react-select@2.2.6(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@radix-ui/react-select@2.2.6(patch_hash=479456b811c56ff3b6432ccafb8b2902cfb23706a3b0a9eee0b2c87374af6a3a)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@radix-ui/number': 1.1.1
       '@radix-ui/primitive': 1.1.3
@@ -22526,8 +22543,8 @@ snapshots:
       '@radix-ui/react-progress': 1.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@radix-ui/react-radio-group': 1.3.8(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@radix-ui/react-roving-focus': 1.1.11(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@radix-ui/react-scroll-area': 1.2.10(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@radix-ui/react-select': 2.2.6(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@radix-ui/react-scroll-area': 1.2.10(patch_hash=7adb09ff66a610504aa2d1108899cea8f114c3d4179b2c0172cad3b29de67bca)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@radix-ui/react-select': 2.2.6(patch_hash=479456b811c56ff3b6432ccafb8b2902cfb23706a3b0a9eee0b2c87374af6a3a)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@radix-ui/react-separator': 1.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@radix-ui/react-slider': 1.3.6(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@radix-ui/react-slot': 1.2.3(@types/react@19.2.17)(react@19.2.5)
@@ -22674,7 +22691,7 @@ snapshots:
       react: 19.2.7
       scheduler: 0.27.0
 
-  react-easy-crop@5.5.7(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
+  react-easy-crop@5.5.7(patch_hash=da2c5d4a198421b67b01dedf142d566aa83aa75bef59a7a807e2754067ccb8ff)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
       normalize-wheel: 1.0.1
       react: 19.2.5
@@ -22728,7 +22745,7 @@ snapshots:
   react-remove-scroll-bar@2.3.8(@types/react@19.2.17)(react@19.2.5):
     dependencies:
       react: 19.2.5
-      react-style-singleton: 2.2.3(@types/react@19.2.17)(react@19.2.5)
+      react-style-singleton: 2.2.3(patch_hash=8863ce0fa1810ab48590d0c293799e105946bae66c2f7950acff192521d9d5b7)(@types/react@19.2.17)(react@19.2.5)
       tslib: 2.8.1
     optionalDependencies:
       '@types/react': 19.2.17
@@ -22736,7 +22753,7 @@ snapshots:
   react-remove-scroll-bar@2.3.8(@types/react@19.2.17)(react@19.2.7):
     dependencies:
       react: 19.2.7
-      react-style-singleton: 2.2.3(@types/react@19.2.17)(react@19.2.7)
+      react-style-singleton: 2.2.3(patch_hash=8863ce0fa1810ab48590d0c293799e105946bae66c2f7950acff192521d9d5b7)(@types/react@19.2.17)(react@19.2.7)
       tslib: 2.8.1
     optionalDependencies:
       '@types/react': 19.2.17
@@ -22745,7 +22762,7 @@ snapshots:
     dependencies:
       react: 19.2.5
       react-remove-scroll-bar: 2.3.8(@types/react@19.2.17)(react@19.2.5)
-      react-style-singleton: 2.2.3(@types/react@19.2.17)(react@19.2.5)
+      react-style-singleton: 2.2.3(patch_hash=8863ce0fa1810ab48590d0c293799e105946bae66c2f7950acff192521d9d5b7)(@types/react@19.2.17)(react@19.2.5)
       tslib: 2.8.1
       use-callback-ref: 1.3.3(@types/react@19.2.17)(react@19.2.5)
       use-sidecar: 1.1.3(@types/react@19.2.17)(react@19.2.5)
@@ -22756,7 +22773,7 @@ snapshots:
     dependencies:
       react: 19.2.7
       react-remove-scroll-bar: 2.3.8(@types/react@19.2.17)(react@19.2.7)
-      react-style-singleton: 2.2.3(@types/react@19.2.17)(react@19.2.7)
+      react-style-singleton: 2.2.3(patch_hash=8863ce0fa1810ab48590d0c293799e105946bae66c2f7950acff192521d9d5b7)(@types/react@19.2.17)(react@19.2.7)
       tslib: 2.8.1
       use-callback-ref: 1.3.3(@types/react@19.2.17)(react@19.2.7)
       use-sidecar: 1.1.3(@types/react@19.2.17)(react@19.2.7)
@@ -22794,7 +22811,7 @@ snapshots:
       - '@types/react'
       - supports-color
 
-  react-style-singleton@2.2.3(@types/react@19.2.17)(react@19.2.5):
+  react-style-singleton@2.2.3(patch_hash=8863ce0fa1810ab48590d0c293799e105946bae66c2f7950acff192521d9d5b7)(@types/react@19.2.17)(react@19.2.5):
     dependencies:
       get-nonce: 1.0.1
       react: 19.2.5
@@ -22802,7 +22819,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.17
 
-  react-style-singleton@2.2.3(@types/react@19.2.17)(react@19.2.7):
+  react-style-singleton@2.2.3(patch_hash=8863ce0fa1810ab48590d0c293799e105946bae66c2f7950acff192521d9d5b7)(@types/react@19.2.17)(react@19.2.7):
     dependencies:
       get-nonce: 1.0.1
       react: 19.2.7
@@ -24023,7 +24040,7 @@ snapshots:
 
   vary@1.1.2: {}
 
-  vaul@1.1.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
+  vaul@1.1.2(patch_hash=0730bcbf737c9d2d7e73d0ef26e63e0c595a3dcb61a208acf534f4eb633aff90)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
       '@radix-ui/react-dialog': 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react: 19.2.5
@@ -24032,7 +24049,7 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
 
-  vaul@1.1.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  vaul@1.1.2(patch_hash=0730bcbf737c9d2d7e73d0ef26e63e0c595a3dcb61a208acf534f4eb633aff90)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       '@radix-ui/react-dialog': 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react: 19.2.7

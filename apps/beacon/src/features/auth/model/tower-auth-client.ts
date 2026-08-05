@@ -34,9 +34,21 @@ const allowlistedRedirectPlugin = {
   },
 };
 
-/** Valid URL required by the client; session hooks only run when Tower is configured in the UI. */
+/**
+ * Valid URL required by the client; session hooks only run when Tower is configured in the UI.
+ * The RFC 2606 `.invalid` sentinel is dev-only — release builds always embed the Tower origin
+ * (asserted by the build guard), so the sentinel URL is compiled out of shipped bundles and
+ * a missing origin fails loudly instead of shipping an unreachable placeholder.
+ */
+function unconfiguredTowerBaseUrl(): string {
+  if (import.meta.env.DEV) {
+    return "https://beacon.tower.invalid";
+  }
+  throw new Error("Tower origin missing from build (VITE_TOWER_ORIGIN / __BEACON_TOWER_ORIGIN__)");
+}
+
 export const towerAuthClient = createAuthClient({
-  baseURL: baseURL || "https://beacon.tower.invalid",
+  baseURL: baseURL || unconfiguredTowerBaseUrl(),
   // Drops the built-in redirect plugin (unvalidated `window.location.href = data.url`);
   // `allowlistedRedirectPlugin` above is its origin-checked replacement.
   disableDefaultFetchPlugins: true,

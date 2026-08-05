@@ -64,6 +64,9 @@ export const CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS = {
   disable_surveys: true,
   disable_external_dependency_loading: true,
   persistence: "memory",
+  // The extension iframe's referrer is Designer/site context — never collected. Referrer
+  // analytics are not used or disclosed, so `$referrer`/`$referring_domain` stay off.
+  save_referrer: false,
 } as const;
 
 export type CodalynPostHogSuperProperties = {

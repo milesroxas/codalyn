@@ -10,6 +10,13 @@
     "pnpm": ">=10"
   },
   "pnpm": {
+    "patchedDependencies": {
+      "vaul@1.1.2": "patches/vaul@1.1.2.patch",
+      "react-style-singleton@2.2.3": "patches/react-style-singleton@2.2.3.patch",
+      "@radix-ui/react-select@2.2.6": "patches/@radix-ui__react-select@2.2.6.patch",
+      "@radix-ui/react-scroll-area@1.2.10": "patches/@radix-ui__react-scroll-area@1.2.10.patch",
+      "react-easy-crop@5.5.7": "patches/react-easy-crop@5.5.7.patch"
+    },
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp",

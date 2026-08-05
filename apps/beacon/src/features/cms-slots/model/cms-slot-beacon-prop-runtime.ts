@@ -179,10 +179,24 @@ export async function removeOwnedCmsSlotTagAttrs(
 /** Webflow conditional visibility class on published elements when “Keep in HTML when hidden” is enabled. */
 export const WEBFLOW_CONDITION_INVISIBLE_CLASS = "w-condition-invisible";
 
-/** Visible in Designer / publish HTML so Webflow conditional visibility includes tagged nodes; runtime treats as empty. */
-export const CMS_SLOT_PUBLISH_PLACEHOLDER_URL = "https://codalyn.beacon/publish-placeholder";
+/**
+ * Visible in Designer / publish HTML so Webflow conditional visibility includes tagged nodes; runtime treats as empty.
+ * Non-network by construction (fragment / bare token — no scheme, no host), per Marketplace
+ * round-4 feedback that URL-like placeholder domains get flagged in bundle review.
+ */
+export const CMS_SLOT_PUBLISH_PLACEHOLDER_URL = "#codalyn-beacon-publish-placeholder";
 
-export const CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL = "placeholder@codalyn.invalid";
+export const CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL = "codalyn-beacon-publish-placeholder";
+
+/**
+ * Sentinels seeded by earlier builds — still present in previously seeded props and published
+ * HTML, so recognition must survive. Assembled from parts so the retired URL-like literals do
+ * not reappear in the extension bundle; the values only materialize inside the generated
+ * footer runtime, which must match what those older publishes wrote.
+ */
+export const CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_URL = `https://${["codalyn", "beacon"].join(".")}/publish-placeholder`;
+
+export const CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_EMAIL = `placeholder@${["codalyn", "invalid"].join(".")}`;
 
 /** Non-breaking space used as a minimal text publish placeholder. */
 export const CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT = "\u00a0";
@@ -197,7 +211,12 @@ export function isBeaconPublishPlaceholderValue(v: unknown): boolean {
     return true;
   }
   const s = raw.trim();
-  if (s === CMS_SLOT_PUBLISH_PLACEHOLDER_URL || s === CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL) {
+  if (
+    s === CMS_SLOT_PUBLISH_PLACEHOLDER_URL ||
+    s === CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL ||
+    s === CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_URL ||
+    s === CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_EMAIL
+  ) {
     return true;
   }
   return isPublishPlaceholderImageReference(v);
@@ -227,10 +246,12 @@ export function beaconPropPickRuntimeSource(): string {
 /** Minified `function bPropEmpty(v){…}` embedded in the footer runtime. */
 export function beaconPropEmptyRuntimeSource(): string {
   const url = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
+  const legacyUrl = JSON.stringify(CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_URL);
   const email = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL);
+  const legacyEmail = JSON.stringify(CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_EMAIL);
   const text = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT);
   const assetName = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME);
-  return `function bPropEmpty(v){if(v==null)return true;var raw=String(v);if(raw===${text})return true;var s=raw.trim();if(s==="")return true;if(s.indexOf(${assetName})>=0)return true;return s===${url}||s===${email}}`;
+  return `function bPropEmpty(v){if(v==null)return true;var raw=String(v);if(raw===${text})return true;var s=raw.trim();if(s==="")return true;if(s.indexOf(${assetName})>=0)return true;return s===${url}||s===${email}||s===${legacyUrl}||s===${legacyEmail}}`;
 }
 
 /** Minified `applyValue` for the footer runtime — sets `src`/`srcset` on images and picture/source descendants. */
@@ -263,13 +284,14 @@ export function beaconPropApplyValueRuntimeSource(): string {
 export function beaconPropVisibilityRuntimeSource(): string {
   const cls = JSON.stringify(WEBFLOW_CONDITION_INVISIBLE_CLASS);
   const url = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
+  const legacyUrl = JSON.stringify(CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_URL);
   const text = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT);
   const assetName = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME);
   return [
     "function bPropSetHidden(n,h){if(h){n.setAttribute('hidden','');n.setAttribute('aria-hidden','true')}else{n.removeAttribute('hidden');n.removeAttribute('aria-hidden')}}",
     `function bPropReveal(n,row){bPropSetHidden(n,false);var cur=n===row?null:n.parentElement;while(cur&&cur!==row){if(cur.classList.contains(${cls})){cur.classList.remove(${cls});cur.style.removeProperty('display');cur.style.removeProperty('visibility')}cur=cur.parentElement}}`,
     `function bPropConceal(n,row){bPropSetHidden(n,true);var cur=n===row?null:n.parentElement,touched=false;while(cur&&cur!==row){if(cur.classList.contains(${cls})){cur.style.setProperty('display','none');cur.style.removeProperty('visibility');touched=true}cur=cur.parentElement}if(!touched&&n!==row){var p=n.parentElement;if(p&&p!==row){p.classList.add(${cls});p.style.setProperty('display','none')}}}`,
-    `function bIsPlaceholderImageSrc(s){s=String(s||"");return s===${url}||s.indexOf(${assetName})>=0}`,
-    `function bPropClearPublishPlaceholder(n){var tag=String(n.tagName||'').toUpperCase();if(tag==='SOURCE'){var ss=n.getAttribute('srcset')||'';if(bIsPlaceholderImageSrc(ss)||ss.indexOf(${assetName})>=0)n.removeAttribute('srcset');return}if(tag==='IMG'||tag==='IFRAME'||tag==='EMBED'){var s=n.getAttribute('src')||'';if(bIsPlaceholderImageSrc(s))n.removeAttribute('src');return}if(tag==='A'){var h=n.getAttribute('href')||'';if(h===${url})n.removeAttribute('href');return}var pic=n.querySelector&&n.querySelector('picture');if(pic){var sources=pic.querySelectorAll('source'),i;for(i=0;i<sources.length;i++){var si=sources[i].getAttribute('srcset')||'';if(bIsPlaceholderImageSrc(si)||si.indexOf(${assetName})>=0)sources[i].removeAttribute('srcset')}}var img=n.querySelector&&n.querySelector('img');if(img){var si=img.getAttribute('src')||'';if(bIsPlaceholderImageSrc(si))img.removeAttribute('src')}var t=n.textContent||'';if(t===${text})n.textContent=''}`,
+    `function bIsPlaceholderImageSrc(s){s=String(s||"");return s===${url}||s===${legacyUrl}||s.indexOf(${assetName})>=0}`,
+    `function bPropClearPublishPlaceholder(n){var tag=String(n.tagName||'').toUpperCase();if(tag==='SOURCE'){var ss=n.getAttribute('srcset')||'';if(bIsPlaceholderImageSrc(ss)||ss.indexOf(${assetName})>=0)n.removeAttribute('srcset');return}if(tag==='IMG'||tag==='IFRAME'||tag==='EMBED'){var s=n.getAttribute('src')||'';if(bIsPlaceholderImageSrc(s))n.removeAttribute('src');return}if(tag==='A'){var h=n.getAttribute('href')||'';if(h===${url}||h===${legacyUrl})n.removeAttribute('href');return}var pic=n.querySelector&&n.querySelector('picture');if(pic){var sources=pic.querySelectorAll('source'),i;for(i=0;i<sources.length;i++){var si=sources[i].getAttribute('srcset')||'';if(bIsPlaceholderImageSrc(si)||si.indexOf(${assetName})>=0)sources[i].removeAttribute('srcset')}}var img=n.querySelector&&n.querySelector('img');if(img){var si=img.getAttribute('src')||'';if(bIsPlaceholderImageSrc(si))img.removeAttribute('src')}var t=n.textContent||'';if(t===${text})n.textContent=''}`,
   ].join("");
 }

@@ -44,7 +44,7 @@ export function TelemetryConsentPrompt() {
                   <li>Error reports</li>
                   <li>Feature usage</li>
                   <li>App version</li>
-                  <li>Your current Webflow site and workspace IDs</li>
+                  <li>Your current Webflow site and workspace identifiers and names</li>
                 </ul>
               </div>
               <p>

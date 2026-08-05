@@ -1,5 +1,17 @@
 import { readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
 
+/**
+ * Dev-only guidance trigger: any non-HTTPS origin is mixed content inside the Designer iframe.
+ * Checked by protocol so no development host strings ship in the production bundle.
+ */
+function isInsecureHttpOrigin(origin: string): boolean {
+  try {
+    return new URL(origin).protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 function isTowerNetworkFetchError(error: unknown): boolean {
   if (!(error instanceof TypeError)) {
     return false;
@@ -14,8 +26,8 @@ export function formatTowerReachabilityError(error: unknown): string {
   }
 
   const origin = readBeaconTowerOrigin();
-  if (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) {
-    return `Could not reach Tower at ${origin}. From the Webflow Designer, local HTTP Tower is often blocked — use an HTTPS tunnel or the production Tower URL in VITE_TOWER_ORIGIN, and confirm Tower is running.`;
+  if (isInsecureHttpOrigin(origin)) {
+    return `Could not reach Tower at ${origin}. From the Webflow Designer, plain-HTTP Tower origins are often blocked — use an HTTPS tunnel or the production Tower URL in VITE_TOWER_ORIGIN, and confirm Tower is running.`;
   }
 
   if (origin.includes("tower-preview.") || origin.includes("-preview.codalyn.app")) {

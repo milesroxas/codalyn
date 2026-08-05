@@ -832,7 +832,7 @@ function ExportFormatFields(props: {
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-[16rem] whitespace-pre-line text-left">
               {
-                "WebP — Default: broad browser support; encodes in Designer.\n\nAVIF — Often smaller at similar quality; encoding uses Tower."
+                "WebP — Default: broad browser support; encodes entirely in the Designer.\n\nAVIF — Often smaller at similar quality. Encoding sends the cropped image to Codalyn's Tower service over HTTPS for conversion; it is processed in memory and not stored. Used only while AVIF is selected."
               }
             </TooltipContent>
           </Tooltip>

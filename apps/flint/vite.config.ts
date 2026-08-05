@@ -5,6 +5,8 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 // @ts-expect-error — shared JS module at repo root
+import { createStripDevHostLiteralsPlugin } from "../../scripts/vite-strip-dev-host-literals.mjs";
+// @ts-expect-error — shared JS module at repo root
 import { createWebflowDesignerExtensionPlugin } from "../../scripts/vite-wf-designer-extension-plugin.mjs";
 import pkg from "./package.json";
 
@@ -47,6 +49,8 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     tailwindcss(),
     react(),
+    // Marketplace review: no dev-host literals in shipped bundles (build-only transform).
+    createStripDevHostLiteralsPlugin({ strict: mode !== "development" }),
     ...(isVitest
       ? []
       : [

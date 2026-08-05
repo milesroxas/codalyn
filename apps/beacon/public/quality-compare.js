@@ -16,9 +16,6 @@
 
   const stage = document.getElementById("stage");
   const compareScrubHit = document.getElementById("compareScrubHit");
-  const compareWipeHandle = document.getElementById("compareWipeHandle");
-  const clip = document.getElementById("clip");
-  const divider = document.getElementById("divider");
   const qualityEl = document.getElementById("quality");
   const qualityPct = document.getElementById("qualityPct");
   const saveClose = document.getElementById("saveClose");
@@ -34,14 +31,14 @@
     return Math.min(1, Math.max(0.05, q));
   }
 
+  // All layout state is declared in quality-compare.css; the two continuous values (wipe
+  // position, image aspect ratio) flow in as CSS custom properties via CSSOM setProperty —
+  // no style attributes, no runtime style tags. The aria-value* writes keep the slider
+  // accessible and are the standard platform API for that.
   function applyScrub(pct) {
     const v = Math.max(0, Math.min(100, Math.round(pct)));
     scrubPct = v;
-    clip.style.clipPath = `inset(0 ${100 - v}% 0 0)`;
-    divider.style.left = `${v}%`;
-    divider.style.transform = "translateX(-50%)";
-    compareWipeHandle.style.left = `${v}%`;
-    compareWipeHandle.style.transform = "translate(-50%, -50%)";
+    stage.style.setProperty("--scrub", `${v}%`);
     compareScrubHit.setAttribute("aria-valuenow", String(v));
     compareScrubHit.setAttribute("aria-valuetext", `${v}% original on the left`);
   }
@@ -136,7 +133,7 @@
     if (initialized) return;
     initialized = true;
     const ar = Number(d.aspectRatio);
-    stage.style.aspectRatio = String(Number.isFinite(ar) && ar > 0 ? ar : 1);
+    stage.style.setProperty("--stage-ar", String(Number.isFinite(ar) && ar > 0 ? ar : 1));
     qualityEl.value = String(clampExportQuality(d.initialQuality));
     setQualityPctLabel();
     // Blob URLs are minted here, in this document's own URL store, and revoked on pagehide below.

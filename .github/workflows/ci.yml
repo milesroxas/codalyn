@@ -51,3 +51,25 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  # Production deploy for Tower runs here (not Vercel auto-deploy) so it only ships CI-green code.
+  # Vercel auto-deploy for main is disabled in apps/tower/vercel.json (git.deploymentEnabled);
+  # branch/PR preview deploys still come from the Vercel git integration. The build itself still
+  # runs on Vercel — this job only triggers it. Requires repo secrets VERCEL_TOKEN,
+  # VERCEL_ORG_ID, VERCEL_PROJECT_ID.
+  deploy-tower:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel (production)
+        run: npx vercel@latest deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}

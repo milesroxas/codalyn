@@ -51,6 +51,10 @@ jobs:
 
       - name: Build
         run: pnpm build
+        env:
+          # Tower's Next.js build (with Payload) exceeds the default V8 heap on 7 GB
+          # runners (exit 134 OOM in run 30958743139). Raise the ceiling for build only.
+          NODE_OPTIONS: --max-old-space-size=6144
 
   # Production deploy for Tower runs here (not Vercel auto-deploy) so it only ships CI-green code.
   # Vercel auto-deploy for main is disabled in apps/tower/vercel.json (git.deploymentEnabled);

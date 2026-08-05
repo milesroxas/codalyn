@@ -283,7 +283,17 @@ export interface Page {
   /**
    * Page sections rendered top to bottom, below the hero.
    */
-  layout?: (SectionHeaderBlock | ContentBlock)[] | null;
+  layout?:
+    | (
+        | SectionHeaderBlock
+        | ContentBlock
+        | PricingPlansBlock
+        | FeatureStripBlock
+        | CompareTableBlock
+        | FaqSectionBlock
+        | CtaBandBlock
+      )[]
+    | null;
   seo?: {
     title?: string | null;
     description?: string | null;
@@ -406,6 +416,154 @@ export interface VideoBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'videoBlock';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PricingPlansBlock".
+ */
+export interface PricingPlansBlock {
+  /**
+   * Short reassurances shown dot-separated above the cards, e.g. `Cancel anytime`.
+   */
+  trustItems?:
+    | {
+        text: string;
+        id?: string | null;
+      }[]
+    | null;
+  plans: {
+    name: string;
+    /**
+     * Display price, e.g. `$12`. Keep in sync with Stripe prices.
+     */
+    price: string;
+    /**
+     * Text after the price, e.g. `per month` or `per seat / month`.
+     */
+    priceSuffix?: string | null;
+    /**
+     * Optional highlight badge, e.g. `Most popular`.
+     */
+    badge?: string | null;
+    /**
+     * One-line fit statement under the price.
+     */
+    bestFor?: string | null;
+    /**
+     * Gradient border + primary CTA treatment. Feature at most one plan.
+     */
+    featured?: boolean | null;
+    cta: {
+      label: string;
+      /**
+       * Relative path (`/sign-up`) or absolute URL.
+       */
+      href: string;
+    };
+    features: {
+      text: string;
+      id?: string | null;
+    }[];
+    id?: string | null;
+  }[];
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'pricingPlans';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "FeatureStripBlock".
+ */
+export interface FeatureStripBlock {
+  heading: string;
+  /**
+   * Supporting line under the heading.
+   */
+  subheading?: string | null;
+  items: {
+    text: string;
+    id?: string | null;
+  }[];
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'featureStrip';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "CompareTableBlock".
+ */
+export interface CompareTableBlock {
+  columns: {
+    label: string;
+    /**
+     * Accent-colored column header (use for the featured plan).
+     */
+    accent?: boolean | null;
+    id?: string | null;
+  }[];
+  rows: {
+    label: string;
+    cells: {
+      value: string;
+      /**
+       * De-emphasize this cell (e.g. `Join only`).
+       */
+      muted?: boolean | null;
+      id?: string | null;
+    }[];
+    id?: string | null;
+  }[];
+  /**
+   * Small print below the table, e.g. where live caps are shown.
+   */
+  footnote?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'compareTable';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "FaqSectionBlock".
+ */
+export interface FaqSectionBlock {
+  /**
+   * Short kicker above the heading, e.g. `FAQ`.
+   */
+  eyebrow?: string | null;
+  heading: string;
+  items: {
+    question: string;
+    answer: string;
+    id?: string | null;
+  }[];
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'faqSection';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "CtaBandBlock".
+ */
+export interface CtaBandBlock {
+  heading: string;
+  /**
+   * Supporting line under the heading.
+   */
+  subheading?: string | null;
+  actions?:
+    | {
+        label: string;
+        /**
+         * Relative path (`/sign-up`) or absolute URL.
+         */
+        href: string;
+        appearance: 'primary' | 'secondary';
+        id?: string | null;
+      }[]
+    | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'ctaBand';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -600,6 +758,11 @@ export interface PagesSelect<T extends boolean = true> {
     | {
         sectionHeader?: T | SectionHeaderBlockSelect<T>;
         content?: T | ContentBlockSelect<T>;
+        pricingPlans?: T | PricingPlansBlockSelect<T>;
+        featureStrip?: T | FeatureStripBlockSelect<T>;
+        compareTable?: T | CompareTableBlockSelect<T>;
+        faqSection?: T | FaqSectionBlockSelect<T>;
+        ctaBand?: T | CtaBandBlockSelect<T>;
       };
   seo?:
     | T
@@ -676,6 +839,123 @@ export interface VideoBlockSelect<T extends boolean = true> {
   video?: T;
   playback?: T;
   caption?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "PricingPlansBlock_select".
+ */
+export interface PricingPlansBlockSelect<T extends boolean = true> {
+  trustItems?:
+    | T
+    | {
+        text?: T;
+        id?: T;
+      };
+  plans?:
+    | T
+    | {
+        name?: T;
+        price?: T;
+        priceSuffix?: T;
+        badge?: T;
+        bestFor?: T;
+        featured?: T;
+        cta?:
+          | T
+          | {
+              label?: T;
+              href?: T;
+            };
+        features?:
+          | T
+          | {
+              text?: T;
+              id?: T;
+            };
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "FeatureStripBlock_select".
+ */
+export interface FeatureStripBlockSelect<T extends boolean = true> {
+  heading?: T;
+  subheading?: T;
+  items?:
+    | T
+    | {
+        text?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "CompareTableBlock_select".
+ */
+export interface CompareTableBlockSelect<T extends boolean = true> {
+  columns?:
+    | T
+    | {
+        label?: T;
+        accent?: T;
+        id?: T;
+      };
+  rows?:
+    | T
+    | {
+        label?: T;
+        cells?:
+          | T
+          | {
+              value?: T;
+              muted?: T;
+              id?: T;
+            };
+        id?: T;
+      };
+  footnote?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "FaqSectionBlock_select".
+ */
+export interface FaqSectionBlockSelect<T extends boolean = true> {
+  eyebrow?: T;
+  heading?: T;
+  items?:
+    | T
+    | {
+        question?: T;
+        answer?: T;
+        id?: T;
+      };
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "CtaBandBlock_select".
+ */
+export interface CtaBandBlockSelect<T extends boolean = true> {
+  heading?: T;
+  subheading?: T;
+  actions?:
+    | T
+    | {
+        label?: T;
+        href?: T;
+        appearance?: T;
+        id?: T;
+      };
   id?: T;
   blockName?: T;
 }

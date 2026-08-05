@@ -413,7 +413,11 @@ function collectForbiddenBundleMarkers(appPath, channel) {
     { value: "codalyn.invalid", label: "the legacy placeholder email domain" },
     { value: "codalyn.beacon/", label: "the legacy publish-placeholder URL" },
   ];
-  for (const envFile of [".env", ".env.local"]) {
+  // Sweep every env file Vite loads for this channel (.env, .env.local, .env.<mode>,
+  // .env.<mode>.local) — a secret in .env.production.local gets inlined just as readily as one
+  // in .env.local, so the sweep must cover the same file set as viteEnvFilesForMode.
+  const seenValues = new Set();
+  for (const envFile of viteEnvFilesForMode(channel)) {
     const envPath = resolve(appPath, envFile);
     if (!existsSync(envPath)) {
       continue;
@@ -424,7 +428,8 @@ function collectForbiddenBundleMarkers(appPath, channel) {
         continue;
       }
       const value = match[2].replace(/^["']|["']$/g, "");
-      if (value.length >= 16) {
+      if (value.length >= 16 && !seenValues.has(value)) {
+        seenValues.add(value);
         forbidden.push({ value, label: `the local ${match[1]} value` });
       }
     }

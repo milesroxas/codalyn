@@ -91,6 +91,25 @@ describe("matchForbiddenMarker", () => {
   it("is inert on development builds, which may legitimately point at a local Tower", () => {
     expect(collectForbiddenBundleMarkers(tempAppDir(), "development")).toEqual([]);
   });
+
+  it("sweeps secrets from every env file Vite loads for the channel, including .env.<mode>.local", () => {
+    const appPath = tempAppDir();
+    const secret = "sk_live_0123456789abcdef";
+    writeFileSync(join(appPath, ".env.production.local"), `VITE_BEACON_API_KEY=${secret}\n`);
+
+    const markers = collectForbiddenBundleMarkers(appPath, "production");
+    expect(markers.some((m) => m.value === secret)).toBe(true);
+  });
+
+  it("deduplicates a secret that appears in more than one env file", () => {
+    const appPath = tempAppDir();
+    const secret = "sk_live_0123456789abcdef";
+    writeFileSync(join(appPath, ".env"), `VITE_BEACON_API_KEY=${secret}\n`);
+    writeFileSync(join(appPath, ".env.production"), `VITE_BEACON_API_KEY=${secret}\n`);
+
+    const markers = collectForbiddenBundleMarkers(appPath, "production");
+    expect(markers.filter((m) => m.value === secret)).toHaveLength(1);
+  });
 });
 
 describe("resolveViteEnvValue", () => {

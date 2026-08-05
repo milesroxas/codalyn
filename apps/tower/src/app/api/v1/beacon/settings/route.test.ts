@@ -1,5 +1,5 @@
 import { BEACON_IMAGE_ERROR_CODES } from "@codalyn/webflow-kit";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const verifyTowerApiRequest = vi.fn();
 const resolveBeaconMembershipContext = vi.fn();
@@ -54,6 +54,12 @@ vi.mock("@/shared/lib/db", () => ({
 }));
 
 describe("PUT /api/v1/beacon/settings", () => {
+  // Warm the route module import in a hook (10s budget) so the first test
+  // doesn't pay the cold-import cost against the 5s test timeout on slow CI runners.
+  beforeAll(async () => {
+    await import("./route");
+  });
+
   beforeEach(() => {
     verifyTowerApiRequest.mockReset();
     resolveBeaconMembershipContext.mockReset();

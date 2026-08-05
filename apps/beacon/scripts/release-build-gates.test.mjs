@@ -71,7 +71,7 @@ describe("strip-dev-host-literals / posthog-js", () => {
 });
 
 describe("matchForbiddenMarker", () => {
-  const forbidden = collectForbiddenBundleMarkers(tempAppDir(), "production");
+  const forbidden = collectForbiddenBundleMarkers(tempAppDir(), "production", "beacon");
 
   it("catches dev hosts regardless of casing", () => {
     expect(matchForbiddenMarker('fetch("http://LocalHost:3000")', forbidden)?.value).toBe("localhost");
@@ -89,7 +89,15 @@ describe("matchForbiddenMarker", () => {
   });
 
   it("is inert on development builds, which may legitimately point at a local Tower", () => {
-    expect(collectForbiddenBundleMarkers(tempAppDir(), "development")).toEqual([]);
+    expect(collectForbiddenBundleMarkers(tempAppDir(), "development", "beacon")).toEqual([]);
+  });
+
+  it("does not forbid Sentry for Flint, which deliberately ships @sentry/react", () => {
+    const forbiddenForFlint = collectForbiddenBundleMarkers(tempAppDir(), "production", "flint");
+    expect(matchForbiddenMarker("x.SentryIntegration=1", forbiddenForFlint)).toBeNull();
+    // Every other release marker still applies to Flint.
+    expect(matchForbiddenMarker('fetch("http://localhost:3000")', forbiddenForFlint)?.value).toBe("localhost");
+    expect(matchForbiddenMarker("https://tower.invalid/api", forbiddenForFlint)?.value).toBe("tower.invalid");
   });
 
   it("sweeps secrets from every env file Vite loads for the channel, including .env.<mode>.local", () => {
@@ -97,7 +105,7 @@ describe("matchForbiddenMarker", () => {
     const secret = "sk_live_0123456789abcdef";
     writeFileSync(join(appPath, ".env.production.local"), `VITE_BEACON_API_KEY=${secret}\n`);
 
-    const markers = collectForbiddenBundleMarkers(appPath, "production");
+    const markers = collectForbiddenBundleMarkers(appPath, "production", "beacon");
     expect(markers.some((m) => m.value === secret)).toBe(true);
   });
 
@@ -107,7 +115,7 @@ describe("matchForbiddenMarker", () => {
     writeFileSync(join(appPath, ".env"), `VITE_BEACON_API_KEY=${secret}\n`);
     writeFileSync(join(appPath, ".env.production"), `VITE_BEACON_API_KEY=${secret}\n`);
 
-    const markers = collectForbiddenBundleMarkers(appPath, "production");
+    const markers = collectForbiddenBundleMarkers(appPath, "production", "beacon");
     expect(markers.filter((m) => m.value === secret)).toHaveLength(1);
   });
 });

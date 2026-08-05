@@ -393,7 +393,12 @@ function assertRequiredReleaseEnv({ appName, appPath, channel, inlineEnv }) {
  * happily inline from .env/.env.local if the channel env in buildViteEnv ever stopped overriding
  * them (e.g. VITE_BEACON_API_KEY, a localhost Tower origin).
  */
-function collectForbiddenBundleMarkers(appPath, channel) {
+// Apps that deliberately ship the Sentry SDK in release bundles. Beacon must stay Sentry-free
+// (Marketplace round 3 removed it), so it is NOT in this list; Flint initializes @sentry/react in
+// src/shared/lib/init-observability.ts, so its bundle legitimately contains Sentry code.
+const SENTRY_ALLOWED_APPS = new Set(["flint"]);
+
+function collectForbiddenBundleMarkers(appPath, channel, appName) {
   if (channel !== "production" && channel !== "preview") {
     return [];
   }
@@ -405,14 +410,16 @@ function collectForbiddenBundleMarkers(appPath, channel) {
   const forbidden = [
     { value: "localhost", label: "a localhost reference" },
     { value: "127.0.0.1", label: "a loopback-IP reference" },
-    // An earlier review round flagged Sentry; it has since been removed from the app, but
-    // posthog-js still ships a (never-called) Sentry integration. The strip plugin compiles that
-    // out — this marker guarantees a reviewer's `grep -i sentry` over the bundle stays empty.
-    { value: "sentry", label: "a Sentry reference" },
     { value: "tower.invalid", label: "the dev-only Tower placeholder origin" },
     { value: "codalyn.invalid", label: "the legacy placeholder email domain" },
     { value: "codalyn.beacon/", label: "the legacy publish-placeholder URL" },
   ];
+  if (!SENTRY_ALLOWED_APPS.has(appName)) {
+    // An earlier review round flagged Sentry; it has since been removed from Beacon, but
+    // posthog-js still ships a (never-called) Sentry integration. The strip plugin compiles that
+    // out — this marker guarantees a reviewer's `grep -i sentry` over the bundle stays empty.
+    forbidden.push({ value: "sentry", label: "a Sentry reference" });
+  }
   // Sweep every env file Vite loads for this channel (.env, .env.local, .env.<mode>,
   // .env.<mode>.local) — a secret in .env.production.local gets inlined just as readily as one
   // in .env.local, so the sweep must cover the same file set as viteEnvFilesForMode.
@@ -438,7 +445,11 @@ function collectForbiddenBundleMarkers(appPath, channel) {
 }
 
 function expectedBundleMarkers({ appName, appPath, channel, recipient, pkg }) {
-  const expected = { version: pkg.version, recipient, forbidden: collectForbiddenBundleMarkers(appPath, channel) };
+  const expected = {
+    version: pkg.version,
+    recipient,
+    forbidden: collectForbiddenBundleMarkers(appPath, channel, appName),
+  };
   if (appName === "beacon" && channel === "production") {
     expected.towerOrigin = BEACON_PRODUCTION_TOWER_ORIGIN;
   }

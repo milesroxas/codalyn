@@ -545,7 +545,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     const row = doc.createElement("a");
     row.setAttribute(CMS_SLOT_CONTENT_ATTR, "root-link");
     row.setAttribute(CMS_SLOT_COND_ATTR, "1");
-    row.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
+    row.setAttribute("href", "#codalyn-beacon-publish-placeholder");
     source.appendChild(row);
 
     const target = doc.createElement("div");
@@ -632,7 +632,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     const link = doc.createElement("a");
     link.setAttribute(CMS_SLOT_CONTENT_ATTR, "cta-link");
     link.setAttribute(CMS_SLOT_COND_ATTR, "1");
-    link.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
+    link.setAttribute("href", "#codalyn-beacon-publish-placeholder");
     wrap.appendChild(link);
     row.appendChild(wrap);
     source.appendChild(row);
@@ -671,7 +671,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     const link = doc.createElement("a");
     link.setAttribute(CMS_SLOT_CONTENT_ATTR, "card-link");
     link.setAttribute(CMS_SLOT_COND_ATTR, "1");
-    link.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
+    link.setAttribute("href", "#codalyn-beacon-publish-placeholder");
     wrap.appendChild(link);
     nested.appendChild(wrap);
     row.appendChild(nested);
@@ -709,7 +709,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     const link = doc.createElement("a");
     link.setAttribute(CMS_SLOT_CONTENT_ATTR, "cta-link");
     link.setAttribute(CMS_SLOT_COND_ATTR, "1");
-    link.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
+    link.setAttribute("href", "#codalyn-beacon-publish-placeholder");
     link.textContent = "Click me";
     wrap.appendChild(link);
     row.appendChild(title);
@@ -754,7 +754,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     const link = doc.createElement("a");
     link.setAttribute(CMS_SLOT_CONTENT_ATTR, "card-link");
     link.setAttribute(CMS_SLOT_COND_ATTR, "1");
-    link.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
+    link.setAttribute("href", "#codalyn-beacon-publish-placeholder");
     wrap.appendChild(link);
     nested.appendChild(title);
     nested.appendChild(wrap);
@@ -794,7 +794,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     const link = doc.createElement("a");
     link.setAttribute(CMS_SLOT_CONTENT_ATTR, "cta-link");
     link.setAttribute(CMS_SLOT_COND_ATTR, "1");
-    link.setAttribute("href", "https://codalyn.beacon/publish-placeholder");
+    link.setAttribute("href", "#codalyn-beacon-publish-placeholder");
     row.appendChild(link);
     source.appendChild(row);
 
@@ -804,7 +804,7 @@ describe("cms slot beacon runtime (published DOM)", () => {
     target.textContent = JSON.stringify({
       v: 3,
       i: [0],
-      p: [{ "cta-link": "https://codalyn.beacon/publish-placeholder" }],
+      p: [{ "cta-link": "#codalyn-beacon-publish-placeholder" }],
     });
     doc.body.append(source, target);
 

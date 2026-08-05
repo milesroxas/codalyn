@@ -112,7 +112,8 @@ Verified compliant as-is:
   scripts and purges unreferenced assets.
 - Scopes are least-privilege for the feature set (`custom_code:read/write`, `assets:read/write`,
   …); missing-scope errors are surfaced to the user rather than escalated.
-- Debug HUD source ships only on dev/preview channels; production builds embed no-op stubs.
+- Debug HUD source ships only on the development channel; production and preview builds embed
+  no-op stubs (tightened from dev/preview in the round-4 self-audit — see R4.9).
 
 ## 8. Webflow API authentication
 
@@ -235,8 +236,10 @@ approved OAuth flow.
   already wired; `captureObservabilityException` now reports through PostHog only.
 - Verified in the rebuilt production bundle: zero occurrences of `createElement("iframe")` (any
   quote style) across `dist/bundle.js` and `dist/assets/*.js`. The only remaining "sentry" strings
-  are inert property names inside posthog-js's optional Sentry-integration shim and its
-  bot-detection UA list — no Sentry SDK code, no Sentry network endpoint, no iframe path.
+  are inert strings inside posthog-js: property names in its optional Sentry-integration shim, a
+  `https://sentry.io/organizations/` URL **template** used only to format a display link property
+  (never fetched), and the `sentryuptimebot` entry in its bot-detection UA list — no Sentry SDK
+  code, no Sentry network endpoint, no iframe path.
 - First-party code creates no iframes (unchanged since round 1); PostHog's iframe-bearing features
   (session recording, surveys, toolbar, external script loading) remain hard-disabled via
   `CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS`.
@@ -273,8 +276,9 @@ Confirmed against source (`cms-slot-page-inline-script.ts` and the fragment modu
   DOM of the page it ships on: it renders Beacon CMS-slot content — cloning source-list rows into
   render targets and applying composed values to images (`src`/`srcset`/`<picture>`), sanitized
   rich text (DOMParser allowlist, R2.4), scheme-checked links, text, and visibility — then reveals
-  the layout and strips designer placeholders. Debug HUD ships only on dev/preview channels;
-  production embeds no-op stubs (verified absent from the shipped bundle).
+  the layout and strips designer placeholders. Debug HUD ships only on the development channel;
+  production and preview embed no-op stubs (verified absent from the release bundle; pinned by a
+  unit test — see R4.9).
 - **Explicit user action:** installation runs only from the CMS Slots Install button or the Sync
   button; automatic re-syncs happen solely as side effects of other explicit user actions on
   already-installed pages (composer save, slot rename/delete). Nothing installs on app load.
@@ -302,8 +306,11 @@ response without client-side validation.
   or `https://webflow.com/oauth/authorize`. Everything else (other origins, subdomain/suffix
   lookalikes, non-HTTPS, `javascript:`, relative/malformed values) is dropped. Unit-tested
   (`trusted-redirect.test.ts`).
-- Verified in the rebuilt bundle: the unconditional `id:"redirect"` plugin is gone; the
-  allowlisted replacement is present. (No current Beacon flow returns `redirect: true`; the
+- Verified in the rebuilt bundle: the default `id:"redirect"` plugin is never registered — the
+  inert plugin object still appears in the minified bundle text (better-auth does not tree-shake
+  it), but the only reference is `disableDefaultFetchPlugins ? [] : [redirectPlugin]` and Beacon
+  hard-codes `disableDefaultFetchPlugins: true`, so it is unreachable. The allowlisted
+  replacement is present and registered. (No current Beacon flow returns `redirect: true`; the
   guard exists so any future one is origin-constrained by construction.)
 - The existing OAuth popup allowlist (`isAllowedWebflowAuthorizeUrl`, round 1) is unchanged.
 
@@ -315,11 +322,12 @@ response without client-side validation.
 - **Fixed:** `react-easy-crop` no longer injects a `<style>` tag at mount —
   `disableAutomaticStylesInjection` is set and its stylesheet is bundled statically into
   `styles.css`.
-- Remaining runtime injectors are two third-party libraries with no nonce/opt-out path in this
-  build: `react-remove-scroll` (Radix modal scroll lock) and `vaul` (drawer keyframes). The
-  extension therefore currently requires `style-src 'self' 'unsafe-inline'`; there are no
-  external style origins, no `blob:`/`data:` styles, and `script-src 'self'` holds throughout
-  (no inline scripts anywhere, unit-tested for the popout page).
+- **Superseded in round 4 (R4.1):** at the time of the round-3 response, two third-party
+  injectors remained (`react-remove-scroll` via Radix, `vaul`) and the extension required
+  `style-src 'self' 'unsafe-inline'`. That is no longer true — every injector has since been
+  removed or rewritten to CSP-exempt CSSOM (see R4.1), so `'unsafe-inline'` is no longer needed.
+  Unchanged: no external style origins, no `blob:`/`data:` styles, and `script-src 'self'` holds
+  throughout (no inline scripts anywhere, unit-tested for the popout page).
 
 ### R3.6 Popup windows (Tower auth, Webflow OAuth, image compare) — gesture gating
 
@@ -375,17 +383,20 @@ tags and use `dangerouslySetInnerHTML` for UI-library styles.
     either in the static `styles.css`/`quality-compare.css` files or applied via CSSOM.
 - Verified in the rebuilt production bundle: zero `createElement("style")`/`` createElement(`style`) ``
   calls from UI libraries and zero style-carrying `dangerouslySetInnerHTML` across `bundle.js` and
-  all `assets/*.js` chunks. The only remaining textual matches are framework internals with no
-  UI-library styles behind them: react-dom's renderer machinery for React 19's
-  `<style precedence>` hoisting feature (never exercised — no first-party or library code renders
-  such elements) and react-dom's property-name switch statements that merely compare against the
-  string `"dangerouslySetInnerHTML"`; plus react-router's `ScrollRestoration` component
-  (unused — nothing in Beacon renders it), which serializes a `<script>` (not a style).
+  all `assets/*.js` chunks. In release (production/preview) bundles the only remaining textual
+  matches are framework internals with no UI-library styles behind them: react-dom's renderer
+  machinery for React 19's `<style precedence>` hoisting feature (never exercised — no
+  first-party or library code renders such elements) and react-dom's property-name switch
+  statements that merely compare against the string `"dangerouslySetInnerHTML"`; plus
+  react-router's `ScrollRestoration` component (unused — nothing in Beacon renders it), which
+  serializes a `<script>` (not a style). Development-channel builds additionally embed the debug
+  HUD source for the published-site runtime, which is stubbed out of every release bundle
+  (unit-tested; see R4.9) — always submit a production-channel build.
 
 ### R4.2 Direct DOM manipulation (`quality-compare.js`, bundle DOM/canvas)
 
 - **Reduced to platform-required APIs and made declarative.** `public/quality-compare.js` no
-  longer mutates element styles: the two continuous values (compare-wipe position, per-image
+  longer writes concrete style declarations: the two continuous values (compare-wipe position, per-image
   aspect ratio) flow into `quality-compare.css` as CSS custom properties via CSSOM
   `style.setProperty` (`--scrub`, `--stage-ar`); constant transforms moved fully into the
   stylesheet; error state was already a class toggle. What remains is inherent to a static page:
@@ -449,14 +460,13 @@ tags and use `dangerouslySetInnerHTML` for UI-library styles.
   - `https://beacon.tower.invalid` / `https://flint.tower.invalid` (better-auth needs *some*
     valid `baseURL` before Tower is configured): now a dev-only branch compiled out of release
     builds; a release build without a Tower origin fails loudly instead.
-  - CMS publish-placeholder sentinels: new seeds are non-network by construction —
+  - CMS publish-placeholder sentinels: the seeds are non-network by construction —
     `#codalyn-beacon-publish-placeholder` (fragment; link/url/video props) and the bare token
-    `codalyn-beacon-publish-placeholder` (email props). Pages published by earlier builds still
-    carry the retired `https://codalyn.beacon/publish-placeholder` / `placeholder@codalyn.invalid`
-    values, so the generated site runtime and the extension keep recognizing them for cleanup;
-    those legacy constants are assembled from parts at runtime so the retired URL-like literals
-    never appear in the extension bundle (they only materialize inside the generated `runtime.js`
-    that must match older publishes).
+    `codalyn-beacon-publish-placeholder` (email props). The retired URL-like values from
+    pre-release builds (`https://codalyn.beacon/publish-placeholder`,
+    `placeholder@codalyn.invalid`) are removed entirely — the app has never shipped publicly, so
+    no published site carries them and nothing recognizes or reconstructs them anywhere in the
+    extension or the generated site runtime.
   - The build guard forbids `tower.invalid`, `codalyn.invalid`, and `codalyn.beacon/` in dist and
     the archived zip.
 
@@ -474,3 +484,44 @@ opened only from the "Pop out" button. No non-gesture popup paths exist.
   (`CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS`) — referrer analytics are not used or disclosed,
   and the extension iframe's referrer could carry Designer context. This complements the existing
   `$geoip_disable`, memory-only persistence, and disabled autocapture/pageview capture.
+
+### R4.9 Proactive self-audit against the full Marketplace Guidelines (2026-08-05)
+
+Beyond the flagged items, the whole Beacon app was re-audited against every guideline section.
+Additional hardening landed from that audit:
+
+- **Credential/authentication fields** (Performance/Technical §4): the published-site runtime's
+  `applyValue` now refuses to write into credential fields — `<input type="password">`,
+  `type="hidden"`, and any input/textarea whose `autocomplete` indicates
+  `current-password`/`new-password`/`one-time-code`/`username` are skipped entirely
+  (`bIsCredentialField`, unit-tested). Slot bindings only ever reach nodes the app itself tagged
+  in the Designer, and the runtime reads no user input anywhere; the deny-list guarantees even a
+  mis-tagged credential field cannot be touched.
+- **Keyboard shortcuts** (Design/Usability, Designer §2.5): the debug HUD — the only code with a
+  document-level key listener (Ctrl/Cmd+Shift+D), and only ever on the *published site*, never in
+  the extension — is now compiled to no-op stubs on **both** production and preview channels
+  (previously preview kept it). Pinned by a unit test asserting non-development runtime source
+  contains no HUD, no hotkey binder, and no `createElement("style")`. The extension UI itself has
+  zero document/window-level key listeners; the remaining element-scoped handlers (arrow keys on
+  the compare slider, Enter/Escape in dialogs) are the standard WCAG keyboard-accessibility
+  patterns the Accessibility guideline requires.
+- **Telemetry accuracy** (Privacy §4.2): the support/feedback analytics events previously
+  attached the submitted email and message text — contradicting the "anonymous" disclosure. They
+  now record only `kind`/`topic`/`signedIn`; the message body and reply email go exclusively to
+  Tower's support endpoint (the disclosed support channel). The privacy policy additionally
+  discloses signed-in settings sync (export defaults, crop presets, referenced page/collection
+  identifiers and names).
+- **Accessibility**: removed an `aria-describedby` override that disconnected tooltip text from
+  the plan-access chips in Settings; compare-preview images gained descriptive `alt` text.
+- Verified clean elsewhere: no `eval`/`new Function` in shipped code (the `new Function` calls
+  live in unit tests that execute the generated runtime source — they are not bundled); no
+  iframes; no global-variable pollution; no ads; no placeholder/test content in UI copy; no
+  Webflow trademark misuse; manifest limited to documented keys; Storybook/test code excluded
+  from the bundle; hosted runtime registered with SRI SHA-384 over a content-addressed, versioned
+  URL and never mutated in place; uninstall removes the page-level footer script and purges
+  unreferenced runtime assets (workspace-level app removal cannot run extension code — manual
+  cleanup instructions are provided in-app and in the docs).
+
+**Scope note:** this document and the audits cover **Beacon**. Flint is a separate, unsubmitted
+extension; its telemetry is not yet consent-gated and it still bundles Sentry. All Beacon
+round-2/3/4 fixes must be ported before any Flint submission.

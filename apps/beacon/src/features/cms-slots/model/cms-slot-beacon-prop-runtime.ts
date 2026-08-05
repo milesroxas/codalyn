@@ -188,16 +188,6 @@ export const CMS_SLOT_PUBLISH_PLACEHOLDER_URL = "#codalyn-beacon-publish-placeho
 
 export const CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL = "codalyn-beacon-publish-placeholder";
 
-/**
- * Sentinels seeded by earlier builds — still present in previously seeded props and published
- * HTML, so recognition must survive. Assembled from parts so the retired URL-like literals do
- * not reappear in the extension bundle; the values only materialize inside the generated
- * footer runtime, which must match what those older publishes wrote.
- */
-export const CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_URL = `https://${["codalyn", "beacon"].join(".")}/publish-placeholder`;
-
-export const CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_EMAIL = `placeholder@${["codalyn", "invalid"].join(".")}`;
-
 /** Non-breaking space used as a minimal text publish placeholder. */
 export const CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT = "\u00a0";
 
@@ -211,12 +201,7 @@ export function isBeaconPublishPlaceholderValue(v: unknown): boolean {
     return true;
   }
   const s = raw.trim();
-  if (
-    s === CMS_SLOT_PUBLISH_PLACEHOLDER_URL ||
-    s === CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL ||
-    s === CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_URL ||
-    s === CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_EMAIL
-  ) {
+  if (s === CMS_SLOT_PUBLISH_PLACEHOLDER_URL || s === CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL) {
     return true;
   }
   return isPublishPlaceholderImageReference(v);
@@ -246,12 +231,10 @@ export function beaconPropPickRuntimeSource(): string {
 /** Minified `function bPropEmpty(v){…}` embedded in the footer runtime. */
 export function beaconPropEmptyRuntimeSource(): string {
   const url = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
-  const legacyUrl = JSON.stringify(CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_URL);
   const email = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL);
-  const legacyEmail = JSON.stringify(CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_EMAIL);
   const text = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT);
   const assetName = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME);
-  return `function bPropEmpty(v){if(v==null)return true;var raw=String(v);if(raw===${text})return true;var s=raw.trim();if(s==="")return true;if(s.indexOf(${assetName})>=0)return true;return s===${url}||s===${email}||s===${legacyUrl}||s===${legacyEmail}}`;
+  return `function bPropEmpty(v){if(v==null)return true;var raw=String(v);if(raw===${text})return true;var s=raw.trim();if(s==="")return true;if(s.indexOf(${assetName})>=0)return true;return s===${url}||s===${email}}`;
 }
 
 /** Minified `applyValue` for the footer runtime — sets `src`/`srcset` on images and picture/source descendants. */
@@ -272,7 +255,11 @@ export function beaconPropApplyValueRuntimeSource(): string {
     // DOM parsing is unavailable so applyValue falls back to textContent instead of writing raw HTML.
     'function bSafeHtml(v){v=String(v==null?"":v);if(!v)return"";if(typeof DOMParser==="undefined")return null;var A={p:1,br:1,strong:1,b:1,em:1,i:1,u:1,a:1,ul:1,ol:1,li:1,h2:1,h3:1,blockquote:1},D={script:1,style:1,template:1,noscript:1,iframe:1,object:1,embed:1,form:1,link:1,meta:1,base:1},doc;try{doc=new DOMParser().parseFromString(v,"text/html")}catch(e){return null}if(!doc||!doc.body)return null;var out=doc.createElement("div");function walk(src,dst){var c,el,tag,h;for(c=src.firstChild;c;c=c.nextSibling){if(c.nodeType===3){dst.appendChild(doc.createTextNode(c.nodeValue||""));continue}if(c.nodeType!==1)continue;tag=c.tagName.toLowerCase();if(D[tag]===1)continue;if(A[tag]!==1){walk(c,dst);continue}el=doc.createElement(tag);if(tag==="a"){h=bSafeHref(c.getAttribute("href"));if(h==null){walk(c,dst);continue}el.setAttribute("href",h);if(c.getAttribute("target")==="_blank"){el.setAttribute("target","_blank");el.setAttribute("rel","noopener noreferrer")}}walk(c,el);dst.appendChild(el)}}walk(doc.body,out);return out.innerHTML}',
     'function bIsRichTextEl(el){return!!(el.getAttribute&&(el.getAttribute("data-cb-html")==="1"||(el.classList&&el.classList.contains("w-richtext"))))}',
-    'function applyValue(el,v){v=String(v==null?"":v);var tag=String(el.tagName||"").toUpperCase();if(bIsRichTextEl(el)){var sh=bSafeHtml(v);if(sh==null){el.textContent=v}else{el.innerHTML=sh}return}if(tag==="IMG"||tag==="SOURCE"){bApplyImageSrc(el,v);return}if(tag==="PICTURE"){bApplyImageToContainer(el,v);return}if(bLooksLikeImageUrl(v)&&bApplyImageToContainer(el,v))return;if(tag==="A"&&bLooksLikeImageUrl(v)&&el.querySelector&&el.querySelector("img")){bApplyImageToContainer(el,v);return}if(tag==="A"){bApplyLink(el,v);return}if(tag==="IFRAME"||tag==="EMBED"){var sv=bSafeHref(v);if(sv!=null)el.setAttribute("src",sv);return}if(tag==="INPUT"){var type=String(el.type||"").toLowerCase();if(type==="checkbox"||type==="radio"){el.checked=!!(v&&v!=="0"&&v!=="false"&&v.toLowerCase()!=="off")}else{el.value=v}return}if(tag==="TEXTAREA"||tag==="SELECT"){el.value=v;return}el.textContent=v}',
+    // Marketplace guideline (credential/authentication fields): the runtime must never modify or
+    // act on password/login/auth fields. Slot bindings only reach app-tagged nodes, but this
+    // deny-list guarantees a mis-tagged credential field is skipped rather than written.
+    'function bIsCredentialField(el){var t=String(el.type||"").toLowerCase();if(t==="password"||t==="hidden")return true;var ac=String((el.getAttribute&&el.getAttribute("autocomplete"))||"").toLowerCase();return ac.indexOf("password")>=0||ac.indexOf("one-time-code")>=0||ac.indexOf("username")>=0}',
+    'function applyValue(el,v){v=String(v==null?"":v);var tag=String(el.tagName||"").toUpperCase();if(bIsRichTextEl(el)){var sh=bSafeHtml(v);if(sh==null){el.textContent=v}else{el.innerHTML=sh}return}if(tag==="IMG"||tag==="SOURCE"){bApplyImageSrc(el,v);return}if(tag==="PICTURE"){bApplyImageToContainer(el,v);return}if(bLooksLikeImageUrl(v)&&bApplyImageToContainer(el,v))return;if(tag==="A"&&bLooksLikeImageUrl(v)&&el.querySelector&&el.querySelector("img")){bApplyImageToContainer(el,v);return}if(tag==="A"){bApplyLink(el,v);return}if(tag==="IFRAME"||tag==="EMBED"){var sv=bSafeHref(v);if(sv!=null)el.setAttribute("src",sv);return}if(tag==="INPUT"){if(bIsCredentialField(el))return;var type=String(el.type||"").toLowerCase();if(type==="checkbox"||type==="radio"){el.checked=!!(v&&v!=="0"&&v!=="false"&&v.toLowerCase()!=="off")}else{el.value=v}return}if(tag==="TEXTAREA"||tag==="SELECT"){if(bIsCredentialField(el))return;el.value=v;return}el.textContent=v}',
   ].join("");
 }
 
@@ -284,14 +271,13 @@ export function beaconPropApplyValueRuntimeSource(): string {
 export function beaconPropVisibilityRuntimeSource(): string {
   const cls = JSON.stringify(WEBFLOW_CONDITION_INVISIBLE_CLASS);
   const url = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
-  const legacyUrl = JSON.stringify(CMS_SLOT_LEGACY_PUBLISH_PLACEHOLDER_URL);
   const text = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT);
   const assetName = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME);
   return [
     "function bPropSetHidden(n,h){if(h){n.setAttribute('hidden','');n.setAttribute('aria-hidden','true')}else{n.removeAttribute('hidden');n.removeAttribute('aria-hidden')}}",
     `function bPropReveal(n,row){bPropSetHidden(n,false);var cur=n===row?null:n.parentElement;while(cur&&cur!==row){if(cur.classList.contains(${cls})){cur.classList.remove(${cls});cur.style.removeProperty('display');cur.style.removeProperty('visibility')}cur=cur.parentElement}}`,
     `function bPropConceal(n,row){bPropSetHidden(n,true);var cur=n===row?null:n.parentElement,touched=false;while(cur&&cur!==row){if(cur.classList.contains(${cls})){cur.style.setProperty('display','none');cur.style.removeProperty('visibility');touched=true}cur=cur.parentElement}if(!touched&&n!==row){var p=n.parentElement;if(p&&p!==row){p.classList.add(${cls});p.style.setProperty('display','none')}}}`,
-    `function bIsPlaceholderImageSrc(s){s=String(s||"");return s===${url}||s===${legacyUrl}||s.indexOf(${assetName})>=0}`,
-    `function bPropClearPublishPlaceholder(n){var tag=String(n.tagName||'').toUpperCase();if(tag==='SOURCE'){var ss=n.getAttribute('srcset')||'';if(bIsPlaceholderImageSrc(ss)||ss.indexOf(${assetName})>=0)n.removeAttribute('srcset');return}if(tag==='IMG'||tag==='IFRAME'||tag==='EMBED'){var s=n.getAttribute('src')||'';if(bIsPlaceholderImageSrc(s))n.removeAttribute('src');return}if(tag==='A'){var h=n.getAttribute('href')||'';if(h===${url}||h===${legacyUrl})n.removeAttribute('href');return}var pic=n.querySelector&&n.querySelector('picture');if(pic){var sources=pic.querySelectorAll('source'),i;for(i=0;i<sources.length;i++){var si=sources[i].getAttribute('srcset')||'';if(bIsPlaceholderImageSrc(si)||si.indexOf(${assetName})>=0)sources[i].removeAttribute('srcset')}}var img=n.querySelector&&n.querySelector('img');if(img){var si=img.getAttribute('src')||'';if(bIsPlaceholderImageSrc(si))img.removeAttribute('src')}var t=n.textContent||'';if(t===${text})n.textContent=''}`,
+    `function bIsPlaceholderImageSrc(s){s=String(s||"");return s===${url}||s.indexOf(${assetName})>=0}`,
+    `function bPropClearPublishPlaceholder(n){var tag=String(n.tagName||'').toUpperCase();if(tag==='SOURCE'){var ss=n.getAttribute('srcset')||'';if(bIsPlaceholderImageSrc(ss)||ss.indexOf(${assetName})>=0)n.removeAttribute('srcset');return}if(tag==='IMG'||tag==='IFRAME'||tag==='EMBED'){var s=n.getAttribute('src')||'';if(bIsPlaceholderImageSrc(s))n.removeAttribute('src');return}if(tag==='A'){var h=n.getAttribute('href')||'';if(h===${url})n.removeAttribute('href');return}var pic=n.querySelector&&n.querySelector('picture');if(pic){var sources=pic.querySelectorAll('source'),i;for(i=0;i<sources.length;i++){var si=sources[i].getAttribute('srcset')||'';if(bIsPlaceholderImageSrc(si)||si.indexOf(${assetName})>=0)sources[i].removeAttribute('srcset')}}var img=n.querySelector&&n.querySelector('img');if(img){var si=img.getAttribute('src')||'';if(bIsPlaceholderImageSrc(si))img.removeAttribute('src')}var t=n.textContent||'';if(t===${text})n.textContent=''}`,
   ].join("");
 }

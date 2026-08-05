@@ -31,10 +31,13 @@ type BeaconSupportRequestDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-function captureBeaconSupportRequest(
-  kind: TowerSupportRequestKind,
-  payload: { topic: string; details: string; email: string; signedIn: boolean }
-) {
+/**
+ * Analytics records only that a submission happened (kind/topic/signed-in state). The message body
+ * and email travel exclusively to Tower's support endpoint — the disclosed support channel. Never
+ * add PII or free-text here: telemetry is disclosed as anonymous with an exact field list
+ * (consent prompt, Settings → Privacy, privacy policy).
+ */
+function captureBeaconSupportRequest(kind: TowerSupportRequestKind, payload: { topic: string; signedIn: boolean }) {
   if (!posthog.__loaded) {
     return;
   }
@@ -104,12 +107,7 @@ export function BeaconSupportRequestDialog({
       return;
     }
 
-    captureBeaconSupportRequest(kind, {
-      topic: trimmedTopic,
-      details: trimmedDetails,
-      email: submitEmail,
-      signedIn,
-    });
+    captureBeaconSupportRequest(kind, { topic: trimmedTopic, signedIn });
     notifyUser("Success", config.kind === "feedback" ? "Thanks for the feedback." : "Help request sent.");
     resetForm();
     onOpenChange(false);

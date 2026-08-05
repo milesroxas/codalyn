@@ -80,12 +80,21 @@ describe("beacon prop runtime source snippets", () => {
     expect(s).toContain(beaconPropEmptyRuntimeSource());
     expect(s).toContain(beaconPropVisibilityRuntimeSource());
     expect(s).toContain(beaconPropApplyValueRuntimeSource());
-    expect(s).toContain(beaconPropDebugRuntimeSource());
-    expect(s).toContain("bDbgBindKeys()");
     expect(s).toContain("bPropReveal(node,row)");
     expect(s).toContain("bPropConceal(node,row)");
     expect(s).toContain("bPropClearPublishPlaceholder(node)");
     expect(s).toContain(WEBFLOW_CONDITION_INVISIBLE_CLASS);
+  });
+
+  it("stubs the debug HUD and its keyboard shortcut on every non-development channel", () => {
+    // Vitest runs with a non-development __BUILD_CHANNEL__, matching preview/production behavior:
+    // no debug UI, no document-level hotkey, no runtime <style> creation may reach customer sites
+    // (Marketplace guidelines: no app keyboard shortcuts; reviewed runtime = shipped runtime).
+    const s = getCmsSlotPageInlineScriptSource();
+    expect(s).not.toContain(beaconPropDebugRuntimeSource());
+    expect(s).toContain("function bDbgBindKeys(){}");
+    expect(s).not.toContain("codalyn-beacon-debug");
+    expect(s).not.toContain('createElement("style")');
   });
 });
 
@@ -101,7 +110,7 @@ describe("beacon prop applyValue runtime", () => {
 
     const picture = document.createElement("picture");
     const source = document.createElement("source");
-    source.setAttribute("srcset", "https://codalyn.beacon/publish-placeholder");
+    source.setAttribute("srcset", "#codalyn-beacon-publish-placeholder");
     const img = document.createElement("img");
     picture.append(source, img);
 
@@ -120,7 +129,7 @@ describe("beacon prop applyValue runtime", () => {
     const taggedImg = document.createElement("img");
     const picWrap = document.createElement("picture");
     const picSource = document.createElement("source");
-    picSource.setAttribute("srcset", "https://codalyn.beacon/publish-placeholder");
+    picSource.setAttribute("srcset", "#codalyn-beacon-publish-placeholder");
     picWrap.append(picSource, taggedImg);
     applyValue(taggedImg, avif);
     expect(taggedImg.getAttribute("src")).toBe(avif);
@@ -212,6 +221,55 @@ describe("beacon prop applyValue runtime", () => {
     expect(marked.querySelector("script")).toBeNull();
     expect(marked.innerHTML.toLowerCase()).not.toContain("onerror");
     expect(marked.innerHTML.toLowerCase()).not.toContain("javascript:");
+  });
+
+  it("never writes into credential/authentication fields (Marketplace guideline)", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+
+    const password = document.createElement("input");
+    password.type = "password";
+    applyValue(password, "leaked");
+    expect((password as HTMLInputElement).value).toBe("");
+
+    const hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.value = "csrf-token";
+    applyValue(hidden, "overwritten");
+    expect((hidden as HTMLInputElement).value).toBe("csrf-token");
+
+    const currentPassword = document.createElement("input");
+    currentPassword.type = "text";
+    currentPassword.setAttribute("autocomplete", "current-password");
+    applyValue(currentPassword, "leaked");
+    expect((currentPassword as HTMLInputElement).value).toBe("");
+
+    const otp = document.createElement("input");
+    otp.setAttribute("autocomplete", "one-time-code");
+    applyValue(otp, "123456");
+    expect((otp as HTMLInputElement).value).toBe("");
+
+    const username = document.createElement("input");
+    username.setAttribute("autocomplete", "username");
+    applyValue(username, "someone");
+    expect((username as HTMLInputElement).value).toBe("");
+
+    // Non-credential inputs still receive values.
+    const plain = document.createElement("input");
+    plain.type = "text";
+    applyValue(plain, "hello");
+    expect((plain as HTMLInputElement).value).toBe("hello");
+
+    const textarea = document.createElement("textarea");
+    applyValue(textarea, "note");
+    expect((textarea as HTMLTextAreaElement).value).toBe("note");
+
+    const credentialTextarea = document.createElement("textarea");
+    credentialTextarea.setAttribute("autocomplete", "current-password");
+    applyValue(credentialTextarea, "leaked");
+    expect((credentialTextarea as HTMLTextAreaElement).value).toBe("");
   });
 
   it("rich text: allowlisted markup survives; safe anchors keep href with hardened target/rel", () => {

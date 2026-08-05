@@ -123,7 +123,7 @@ export function QualityComparePreview(p: QualityComparePreviewProps) {
         {compressedSrc ? (
           <img
             src={compressedSrc}
-            alt=""
+            alt="Compressed preview"
             className="absolute inset-0 m-auto max-h-full max-w-full object-contain"
             draggable={false}
           />

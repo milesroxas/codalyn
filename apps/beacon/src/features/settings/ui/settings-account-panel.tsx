@@ -184,10 +184,11 @@ function AccountPlanSection({ roleAux }: { roleAux: ReturnType<typeof roleAuxLab
 function AccessModeChip({ label, tooltip }: { label: string; tooltip: ReactNode }) {
   return (
     <Tooltip>
+      {/* Radix wires aria-describedby to the tooltip content while open — do not override it,
+          or the chip's explanation disappears from the accessibility tree. */}
       <TooltipTrigger
         type="button"
         tabIndex={0}
-        aria-describedby={undefined}
         className="inline-flex h-5 cursor-help items-center rounded-sm bg-muted/60 px-2 text-xs font-normal text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         {label}

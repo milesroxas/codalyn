@@ -52,10 +52,13 @@ export function getCmsSlotPageInlineScriptSource(): string {
   // Stable build identifier embedded in the runtime so the debug HUD can report which synced build is live.
   // Must stay deterministic (no timestamps) — the source hash is what drift detection compares against.
   const buildVersion = String(__APP_VERSION__ ?? "0.0.1");
-  // The styled debug HUD ships only on dev/preview channels; production gets no-op stubs so it never reaches live
-  // traffic. The source still embeds the channel + version so a synced runtime is self-identifying via its hash.
+  // The styled debug HUD (and its document-level hotkey) ships only on the development channel;
+  // production AND preview get no-op stubs so no app-level keyboard shortcut or debug UI can ever
+  // reach a customer's live site (Marketplace guidelines: no keyboard shortcuts to invoke app
+  // functionality; reviewed runtime must match the shipped one). The source still embeds the
+  // channel + version so a synced runtime is self-identifying via its hash.
   const debugSource =
-    String(__BUILD_CHANNEL__) === "production" ? beaconPropDebugStubSource() : beaconPropDebugRuntimeSource();
+    String(__BUILD_CHANNEL__) === "development" ? beaconPropDebugRuntimeSource() : beaconPropDebugStubSource();
   return `(function(){
 var __bRtSrc=(typeof document!=="undefined"&&document.currentScript&&document.currentScript.src)||"";
 function listKey(el){var t=String(el.getAttribute("data-list")||"").toLowerCase();return t&&t.indexOf("beacon-")===0?t:null}

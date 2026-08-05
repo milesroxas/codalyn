@@ -1,8 +1,16 @@
 /**
- * Compiles development-host literals (`localhost` / `127.0.0.1`) out of vendor code bundled into
- * Webflow Designer Extension builds. Marketplace review (round 4, 2026-08) flags dev endpoints in
- * public bundles; every replacement below targets a code path that is dead inside the extension
- * iframe, so runtime behavior is unchanged:
+ * Compiles review-sensitive vendor literals out of the code bundled into Webflow Designer
+ * Extension builds. Two classes of literal are handled, both because Marketplace reviewers grep
+ * the shipped bundle:
+ *
+ * 1. Development-host literals (`localhost` / `127.0.0.1`, any casing) — flagged in review round 4
+ *    (2026-08).
+ * 2. Sentry references contributed by posthog-js's (unused) Sentry integration — an earlier review
+ *    round flagged Sentry specifically. Sentry has since been removed from the app, but a reviewer
+ *    re-grepping `sentry` would still hit posthog's dead integration code.
+ *
+ * Every replacement below targets a code path that is dead inside the extension iframe, so runtime
+ * behavior is unchanged:
  *
  * - react-router `createBrowserURLImpl` / memory-history `createURL`: `"http://localhost"` is the
  *   base for relative-URL parsing only when `window` is absent (SSR). The extension always has a
@@ -17,14 +25,51 @@
  *   `persistence: "memory"`, so the cookie store is never used.
  * - posthog-js `internal_or_test_user_hostname` config default: marks events from local hosts as
  *   internal test traffic. The extension origin is never a local host in shipped builds.
+ * - posthog-js `forceAllowLocalhost` identifiers (`__forceAllowLocalhost` on the deprecated
+ *   `webPerformance` shim and `_forceAllowLocalhostNetworkCapture` on the session-recording
+ *   controller): debug escape hatches that let session-recording network capture run against a
+ *   local host. Session recording is hard-disabled in Beacon, and both properties default to
+ *   `false`. Renaming the identifier is behavior-preserving because every read, write and the one
+ *   deprecation message that names the property are renamed together inside the same module — the
+ *   only surface lost is an undocumented `posthog.sessionRecording._forceAllowLocalhost…` poke
+ *   from app code, which Beacon never does.
+ * - posthog-js Sentry integration (`SentryIntegration` / `sentryIntegration` on the PostHog
+ *   instance, the `https://sentry.io/organizations/` display-URL template, and the `$sentry_*`
+ *   event properties): reachable only by calling `posthog.sentryIntegration()` / constructing
+ *   `posthog.SentryIntegration`, which Beacon never does. Dropping the instance-property
+ *   assignments also lets Rollup tree-shake the integration class itself.
+ * - posthog-js bot-detection UA list entry `"sentryuptimebot"`: removed. The list is scanned with
+ *   a substring match over independent entries, so dropping one entry only stops detecting that
+ *   one crawler — every other entry keeps working. Sentry's uptime bot cannot reach this code at
+ *   all: the bundle only executes inside an authenticated Webflow Designer iframe, never on a
+ *   crawlable page. Behavior loss is therefore zero, and keeping the literal would defeat the
+ *   whole point of this file.
  *
- * After the targeted replacements, any watched vendor module that still contains a dev-host
- * literal fails the build — a vendor upgrade that moves or adds such a string must be re-audited
- * here instead of silently shipping. `scripts/build-cli.mjs` re-verifies the final dist output.
+ * After the targeted replacements, any watched vendor module that still contains one of the
+ * patterns audited for it fails the build — a vendor upgrade that moves, renames or adds such a
+ * string must be re-audited here instead of silently shipping. `scripts/build-cli.mjs` re-verifies
+ * the final dist output and the archived zip.
  */
 
-const DEV_HOST_PATTERN = /localhost|127\.0\.0\.1/;
+/**
+ * Residual-literal guards. `pattern` is intentionally case-insensitive: posthog-js ships
+ * camelCase identifiers such as `__forceAllowLocalhost`, which a lowercase-only check misses even
+ * though `grep -i localhost` (what a reviewer runs) finds them.
+ */
+const DEV_HOST_RESIDUAL = {
+  label: "dev-host literal",
+  pattern: /localhost|127\.0\.0\.1/i,
+};
+const SENTRY_RESIDUAL = {
+  label: "Sentry reference",
+  pattern: /sentry/i,
+};
 
+/**
+ * `find` is either a literal string (replaced until no occurrences remain) or a global RegExp.
+ * RegExp replacements go through a function replacer, so `$` in `replaceWith` is literal and never
+ * interpreted as a capture-group reference.
+ */
 const RULES = [
   {
     name: "react-router windowless URL base",
@@ -56,14 +101,87 @@ const RULES = [
     find: "?/^(localhost|127\\.0\\.0\\.1)$/:void 0",
     replaceWith: "?void 0:void 0",
   },
+  {
+    // Covers `__forceAllowLocalhost` (deprecated webPerformance shim) and
+    // `_forceAllowLocalhostNetworkCapture` (session-recording controller) plus the deprecation
+    // message that names the latter, in one consistent module-local rename.
+    name: "posthog-js forceAllowLocalhost identifiers",
+    idIncludes: "posthog-js/dist/",
+    find: /forceAllowLocalhost/g,
+    replaceWith: "forceAllowLoopback",
+  },
+  {
+    name: "posthog-js Sentry integration instance properties",
+    idIncludes: "posthog-js/dist/",
+    find: /this\.SentryIntegration=\w+,this\.sentryIntegration=(\w+)=>function\(\w+,\w+\)\{var \w+=\w+\(\w+,\w+\);return\{name:\w+,processEvent:\w+=>\w+\(\w+\)\}\}\(this,\1\),/g,
+    replaceWith: "",
+  },
+  {
+    name: "posthog-js Sentry issue-URL template",
+    idIncludes: "posthog-js/dist/",
+    find: '"https://sentry.io/organizations/"',
+    replaceWith: '""',
+  },
+  {
+    name: "posthog-js $sentry_* event properties",
+    idIncludes: "posthog-js/dist/",
+    find: /\$sentry_/g,
+    replaceWith: "$unused_",
+  },
+  {
+    name: "posthog-js sentryuptimebot user-agent entry",
+    idIncludes: "posthog-js/dist/",
+    find: '"sentryuptimebot",',
+    replaceWith: "",
+  },
 ];
 
-/** Module-id fragments audited above; any residual dev-host literal in them fails the build. */
-const WATCHED_ID_FRAGMENTS = ["react-router/dist/", "better-auth/dist/utils/url", "posthog-js/dist/"];
+/** Modules audited above, with the residual patterns that must not survive the replacements. */
+const WATCHED_MODULES = [
+  { idIncludes: "react-router/dist/", residuals: [DEV_HOST_RESIDUAL] },
+  { idIncludes: "better-auth/dist/utils/url", residuals: [DEV_HOST_RESIDUAL] },
+  { idIncludes: "posthog-js/dist/", residuals: [DEV_HOST_RESIDUAL, SENTRY_RESIDUAL] },
+];
+
+function applyRule(code, rule) {
+  if (rule.find instanceof RegExp) {
+    return code.replace(rule.find, () => rule.replaceWith);
+  }
+  let next = code;
+  while (next.includes(rule.find)) {
+    next = next.replace(rule.find, rule.replaceWith);
+  }
+  return next;
+}
+
+function applyRules(code, id) {
+  let next = code;
+  for (const rule of RULES) {
+    if (id.includes(rule.idIncludes)) {
+      next = applyRule(next, rule);
+    }
+  }
+  return next;
+}
+
+/** Fails loudly when a vendor upgrade moves or renames a literal this file is supposed to strip. */
+function assertNoResiduals(code, id, residuals) {
+  for (const residual of residuals) {
+    const index = code.search(residual.pattern);
+    if (index === -1) {
+      continue;
+    }
+    const context = code.slice(Math.max(0, index - 80), index + 80);
+    throw new Error(
+      `[strip-dev-host-literals] Unhandled ${residual.label} in ${id} — vendor code changed; ` +
+        `re-audit and update scripts/vite-strip-dev-host-literals.mjs. Context: …${context}…`
+    );
+  }
+}
 
 /**
  * @param {{ strict?: boolean }} [options] `strict` (release channels) fails the build on any
- * residual dev-host literal in a watched module; non-strict (development channel) only applies
+ * residual audited literal in a watched module; non-strict (development channel) only applies
  * the replacements, since vendor development chunks legitimately mention localhost in warnings.
  */
 export function createStripDevHostLiteralsPlugin(options = {}) {
@@ -73,30 +191,19 @@ export function createStripDevHostLiteralsPlugin(options = {}) {
     apply: "build",
     enforce: "pre",
     transform(code, id) {
-      const watched = WATCHED_ID_FRAGMENTS.some((fragment) => id.includes(fragment));
-      if (!watched) {
+      const watched = WATCHED_MODULES.filter((module) => id.includes(module.idIncludes));
+      if (watched.length === 0) {
         return null;
       }
 
-      let next = code;
-      for (const rule of RULES) {
-        if (!id.includes(rule.idIncludes)) {
-          continue;
-        }
-        while (next.includes(rule.find)) {
-          next = next.replace(rule.find, rule.replaceWith);
-        }
-      }
-
-      if (strict && DEV_HOST_PATTERN.test(next)) {
-        const index = next.search(DEV_HOST_PATTERN);
-        const context = next.slice(Math.max(0, index - 80), index + 80);
-        throw new Error(
-          `[strip-dev-host-literals] Unhandled dev-host literal in ${id} — vendor code changed; ` +
-            `re-audit and update scripts/vite-strip-dev-host-literals.mjs. Context: …${context}…`
+      const next = applyRules(code, id);
+      if (strict) {
+        assertNoResiduals(
+          next,
+          id,
+          watched.flatMap((module) => module.residuals)
         );
       }
-
       return next === code ? null : { code: next, map: null };
     },
   };

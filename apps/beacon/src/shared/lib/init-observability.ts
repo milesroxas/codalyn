@@ -36,7 +36,8 @@ export function initObservability(): void {
 
   posthog.init(posthogKey, {
     api_host: posthogHost,
-    person_profiles: "identified_only",
+    // Spread last: the shared constant is the privacy floor for extension bundles, so it must win over
+    // anything set above it rather than being silently overridden by an app-local option.
     ...CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS,
     capture_exceptions: {
       capture_unhandled_errors: true,

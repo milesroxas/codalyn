@@ -26,15 +26,18 @@ export function formatTowerReachabilityError(error: unknown): string {
   }
 
   const origin = readBeaconTowerOrigin();
-  if (isInsecureHttpOrigin(origin)) {
-    return `Could not reach Tower at ${origin}. From the Webflow Designer, plain-HTTP Tower origins are often blocked — use an HTTPS tunnel or the production Tower URL in VITE_TOWER_ORIGIN, and confirm Tower is running.`;
+
+  // Build-configuration guidance is for developers running the extension locally, and naming env vars or
+  // hosting settings in end-user copy reads as an unfinished product to Marketplace review. Compiled out of
+  // release bundles entirely; shipped builds get product copy only.
+  if (import.meta.env.DEV) {
+    if (isInsecureHttpOrigin(origin)) {
+      return `Could not reach Tower at ${origin}. From the Webflow Designer, plain-HTTP Tower origins are often blocked — use an HTTPS tunnel or the production Tower URL, and confirm Tower is running.`;
+    }
+    if (origin.includes("tower-preview.") || origin.includes("-preview.codalyn.app")) {
+      return `Could not reach Tower at ${origin}. Preview Tower is usually behind Vercel Deployment Protection, which blocks Beacon API calls from the Webflow Designer (browser CORS errors on /api/auth/*). Add a Deployment Protection Exception for the preview domain, or point the build at production Tower.`;
+    }
   }
 
-  if (origin.includes("tower-preview.") || origin.includes("-preview.codalyn.app")) {
-    return `Could not reach Tower at ${origin}. Preview Tower is usually behind Vercel Deployment Protection, which blocks Beacon API calls from the Webflow Designer (browser CORS errors on /api/auth/*). Add a Deployment Protection Exception for the preview domain in Vercel, or point VITE_TOWER_ORIGIN at https://tower.codalyn.app for production auth.`;
-  }
-
-  return origin
-    ? `Could not reach Tower at ${origin}. Check your network connection and try again.`
-    : "Could not reach Tower. Check VITE_TOWER_ORIGIN and your network connection.";
+  return "Could not reach Codalyn. Check your network connection and try again.";
 }

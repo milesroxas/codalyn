@@ -35,7 +35,8 @@ export function initObservability(): void {
   if (posthogKey) {
     posthog.init(posthogKey, {
       api_host: posthogHost,
-      person_profiles: "identified_only",
+      // `person_profiles: "identified_only"` now lives in the shared privacy floor, which is spread last
+      // so it cannot be overridden by an app-local option.
       ...CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS,
       capture_exceptions: {
         capture_unhandled_errors: true,

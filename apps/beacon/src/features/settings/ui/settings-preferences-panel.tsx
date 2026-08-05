@@ -1,8 +1,10 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useId, useState } from "react";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
+import { CODALYN_PRIVACY_POLICY_URL, CODALYN_TERMS_URL, openCodalynPolicyPage } from "@/shared/lib/codalyn-links";
 import { applyTelemetryConsent } from "@/shared/lib/init-observability";
 import { isTelemetryGranted } from "@/shared/lib/telemetry-preference";
+import { Button } from "@/shared/ui/button";
 import { Label } from "@/shared/ui/label";
 import {
   RadioGroupTileGrid,
@@ -66,7 +68,7 @@ export function SettingsPreferencesPanel() {
       <div className="mt-4 flex min-w-0 flex-col gap-1.5">
         <SurfaceSummaryCardPageIntro
           title="Privacy"
-          description="Telemetry is off unless you enable it. When enabled, Beacon collects anonymous operational telemetry to fix errors and improve features: error reports, feature-usage events, app version, and the current Webflow site and workspace identifiers and names — processed by PostHog (product analytics and error reporting) on Codalyn's behalf. No session recording, no autocapture, no referrer capture, and telemetry never includes page or design content. Separately from telemetry, choosing the AVIF file type in the image editor sends that image to Codalyn's Tower service over HTTPS for conversion; images are processed in memory and not stored."
+          description="Telemetry is off unless you enable it. When enabled, Beacon collects anonymous operational telemetry to fix errors and improve features: error reports, feature-usage events, app version and build details, the current Webflow site and workspace identifiers and names, and basic browser and device details (browser, operating system, language, screen size) — processed by PostHog (product analytics and error reporting) on Codalyn's behalf. No session recording, no autocapture, no location, no referrer capture, and telemetry never includes page or design content. Separately from telemetry, choosing the AVIF file type in the image editor sends that image to Codalyn's Tower service over HTTPS for conversion; images are processed in memory and not stored. When you are signed in, your Beacon settings — export defaults, crop presets, and the page and collection identifiers and names you have referenced — sync to your Codalyn account."
         />
         <div className="flex items-center justify-between gap-3">
           <Label htmlFor={`${baseId}-telemetry`}>Share usage &amp; error telemetry</Label>
@@ -78,6 +80,26 @@ export function SettingsPreferencesPanel() {
               applyTelemetryConsent(checked ? "granted" : "denied");
             }}
           />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="link"
+            size="2xs"
+            className="px-0"
+            onClick={() => openCodalynPolicyPage(CODALYN_PRIVACY_POLICY_URL)}
+          >
+            Privacy policy
+          </Button>
+          <Button
+            type="button"
+            variant="link"
+            size="2xs"
+            className="px-0"
+            onClick={() => openCodalynPolicyPage(CODALYN_TERMS_URL)}
+          >
+            Terms
+          </Button>
         </div>
       </div>
     </section>

@@ -43,7 +43,12 @@ export function IncomingDissolvePreview(props: {
           onEntranceComplete?.();
         }}
       >
-        <img alt="" className="size-full object-contain" decoding="async" src={imageUrl} />
+        <img
+          alt={`Preview of the file you are editing: ${fileBaseName}`}
+          className="size-full object-contain"
+          decoding="async"
+          src={imageUrl}
+        />
       </div>
     </div>
   );

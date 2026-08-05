@@ -46,6 +46,16 @@ const CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX = "codalyn-beacon-runtime-";
 const LOG_PREFIX = "[codalyn-beacon-runtime-cleanup]";
 
 /**
+ * Fail-open deadline for the published runtime. A list target is hidden (`visibility:hidden`) the moment the runtime
+ * claims it, and is normally revealed at the end of the `reapply` chain (~100ms). If anything in between throws or
+ * never completes, the customer's live page would show an empty hole to real visitors forever — the worst failure
+ * this app can produce. Every claimed target therefore arms an unconditional reveal at this deadline: content that
+ * is visible but unstyled always beats content that is invisible. `bListTargetReveal` is idempotent, so the safety
+ * reveal firing after a successful reveal is a no-op.
+ */
+export const CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS = 3000;
+
+/**
  * Minified IIFE for the Beacon runtime source uploaded as a Webflow Asset.
  */
 export function getCmsSlotPageInlineScriptSource(): string {
@@ -72,32 +82,42 @@ ${beaconPropEmptyRuntimeSource()}
 ${beaconPropVisibilityRuntimeSource()}
 function bListTargetReveal(target){target.classList.remove("${CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");${cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource()}${cmsSlotListTargetRuntimeLayoutRevealSource()}target.style.removeProperty("visibility");target.removeAttribute("aria-label");target.removeAttribute("${CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR}")}
 function applyProps(target,payload){var vn=payload?+payload.v:NaN;if(!payload||!isFinite(vn)||vn<3)return;var pc=payload.p;if(!Array.isArray(pc))return;var rows=target.children,i,j,k,row,props,nodes,cands,node,rawP,isCond,segs,si,seg,pv,anyV,totA=0,totH=0,nLen=rows.length<pc.length?rows.length:pc.length;for(i=0;i<nLen;i++){row=rows[i];props=pc[i];if(!row||props===null||typeof props!=="object"){continue}nodes=row.querySelectorAll("[data-cb-c]");cands=[];if(row.getAttribute&&(row.getAttribute("data-cb-c")||"")!=="")cands.push(row);for(k=0;k<nodes.length;k++)cands.push(nodes[k]);for(j=0;j<cands.length;j++){node=cands[j];rawP=node.getAttribute("data-cb-c")||"";if(!rawP)continue;isCond=node.getAttribute("data-cb-v")==="1";segs=String(rawP).split("|");anyV=false;for(si=0;si<segs.length;si++){seg=segs[si].trim();if(!seg)continue;pv=pickP(props,seg);if(bPropEmpty(pv))continue;anyV=true;if(bBeaconNormHeadingTag(String(pv))){node=bBeaconResolveHeadingTagEl(node,String(pv));continue}if(bLooksLikeImageUrl(String(pv)))bLog("apply image",seg,String(pv).slice(0,80));applyValue(node,String(pv))}if(anyV){bPropReveal(node,row);totA++;continue}if(isCond){bPropClearPublishPlaceholder(node);bPropConceal(node,row);bLog("conceal empty conditional",rawP);totH++}}}bLog("applyProps",{rows:nLen,applied:totA,concealed:totH});bDbgBump("applied",totA);bDbgBump("concealed",totH)}
-function reapply(target,payload,done){applyProps(target,payload);setTimeout(function(){applyProps(target,payload);setTimeout(function(){applyProps(target,payload);if(typeof done==="function")done(target)},100)},0)}
+function bSafeReveal(target){if(!target)return;try{bListTargetReveal(target)}catch(e){try{target.style.removeProperty("visibility")}catch(e2){}}}
+function bArmSafetyReveal(target){try{setTimeout(function(){bSafeReveal(target)},${CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS})}catch(e){bSafeReveal(target)}}
+function bRevealAllTargets(){try{var els=document.querySelectorAll("[data-beacon-target][data-list]"),i;for(i=0;i<els.length;i++)bSafeReveal(els[i])}catch(e){}}
+function bTryApplyProps(target,payload){try{applyProps(target,payload)}catch(e){bLog("applyProps failed",e)}}
+function reapply(target,payload,done){bTryApplyProps(target,payload);setTimeout(function(){bTryApplyProps(target,payload);setTimeout(function(){bTryApplyProps(target,payload);if(typeof done==="function")done(target)},100)},0)}
+function bRunTarget(target,sourcesByList,sources,srcKeys){
+var targetKey=listKey(target),i,source;
+if(!targetKey||String(target.getAttribute("data-beacon-target")||"").toLowerCase()!=="list"){bLog("skip target: not a list target",{key:targetKey,role:String(target.getAttribute("data-beacon-target")||"")});return}
+if(target.getAttribute("data-cb-rendered")==="1"){bLog("skip target: already rendered",{key:targetKey});return}
+var sourceNode=sourcesByList[targetKey];
+if(!sourceNode){for(i=0;i<sources.length;i++){source=sources[i];if(isSource(source)&&listKey(source)===targetKey){sourceNode=source;break}}}
+if(!sourceNode){bLog("skip target: no source list found",{key:targetKey,available:srcKeys});return}
+bDbgBump("targets",1);
+target.style.visibility="hidden";
+bArmSafetyReveal(target);
+var raw=String(target.textContent||"").trim();
+target.textContent="";
+var payload=null,ok=false,indices=null;
+try{payload=JSON.parse(raw);var vv=+payload.v;ok=!!(payload&&vv===3&&Array.isArray(payload.i));if(ok){indices=payload.i}}catch(e){ok=false}
+var children=sourceNode.children,cloned=0;
+if(ok){for(var u=0;u<indices.length;u++){var idx=+indices[u];if(idx===idx&&idx>=0&&idx%1===0&&idx<children.length){target.appendChild(children[idx].cloneNode(true));cloned++}}}
+target.setAttribute("data-cb-rendered","1");
+bDbgBump("cloned",cloned);bLog("clone list",{list:targetKey,cloned:cloned,parsed:ok,sourceChildren:children.length,indices:ok&&indices?indices.length:null,rawLen:raw.length});
+if(ok&&payload&&Array.isArray(payload.p))reapply(target,payload,bSafeReveal);
+else{bSafeReveal(target)}
+}
 function run(){
+try{
 var sourcesByList={},sources=document.querySelectorAll("[data-target=beacons][data-list]");
 for(var i=0;i<sources.length;i++){var source=sources[i];if(isSource(source)){var key=listKey(source);if(key)sourcesByList[key]=source}}
 var lk=0,srcKeys=[];for(var sk in sourcesByList)if(Object.prototype.hasOwnProperty.call(sourcesByList,sk)){lk++;srcKeys.push(sk)}bDbgBump("lists",lk);
 var targets=document.querySelectorAll("[data-beacon-target][data-list]");
 bLog("runtime start",{sourceEls:sources.length,sourceLists:srcKeys,targetEls:targets.length});
-for(var t=0;t<targets.length;t++){
-var target=targets[t],targetKey=listKey(target);
-if(!targetKey||String(target.getAttribute("data-beacon-target")||"").toLowerCase()!=="list"){bLog("skip target: not a list target",{key:targetKey,role:String(target.getAttribute("data-beacon-target")||"")});continue}
-if(target.getAttribute("data-cb-rendered")==="1"){bLog("skip target: already rendered",{key:targetKey});continue}
-var sourceNode=sourcesByList[targetKey];
-if(!sourceNode){for(i=0;i<sources.length;i++){source=sources[i];if(isSource(source)&&listKey(source)===targetKey){sourceNode=source;break}}}
-if(!sourceNode){bLog("skip target: no source list found",{key:targetKey,available:srcKeys});continue}
-bDbgBump("targets",1);
-target.style.visibility="hidden";
-var raw=String(target.textContent||"").trim();
-target.textContent="";
-var payload=null,ok=false,indices=null,v=0;
-try{payload=JSON.parse(raw);var vv=+payload.v;ok=!!(payload&&vv===3&&Array.isArray(payload.i));if(ok){indices=payload.i;v=vv}}catch(e){ok=false}
-var children=sourceNode.children,cloned=0;
-if(ok){for(var u=0;u<indices.length;u++){var idx=+indices[u];if(idx===idx&&idx>=0&&idx%1===0&&idx<children.length){target.appendChild(children[idx].cloneNode(true));cloned++}}}
-target.setAttribute("data-cb-rendered","1");
-bDbgBump("cloned",cloned);bLog("clone list",{list:targetKey,cloned:cloned,parsed:ok,sourceChildren:children.length,indices:ok&&indices?indices.length:null,rawLen:raw.length});
-if(ok&&payload&&Array.isArray(payload.p))reapply(target,payload,bListTargetReveal);
-else{bListTargetReveal(target)}}
+// One bad target must never strand the rest of the page: each is isolated and revealed on failure.
+for(var t=0;t<targets.length;t++){var target=targets[t];try{bRunTarget(target,sourcesByList,sources,srcKeys)}catch(e){bLog("target failed",e);bSafeReveal(target)}}
+}catch(e){bLog("runtime failed",e);bRevealAllTargets()}
 }
 bDbgBindKeys();
 bDbgRuntimeInfo(${JSON.stringify(buildVersion)},__bRtSrc);
@@ -231,9 +251,31 @@ async function createRuntimeAsset(siteId: string, fileName: string, sourceCode: 
 }
 
 /**
+ * Amazon S3 endpoint host shapes, the only AWS service Webflow's create-asset endpoint hands back a presigned
+ * POST target on. Deliberately narrower than `*.amazonaws.com` (which would admit every AWS-hosted bucket and
+ * every other AWS service endpoint):
+ *
+ * - `s3.amazonaws.com` / `s3.<region>.amazonaws.com` / `s3-<region>.amazonaws.com` — path-style (bucket in the
+ *   path); this is the shape the Webflow Data API documents for `uploadUrl`.
+ * - `<bucket>.s3.amazonaws.com` / `<bucket>.s3.<region>.amazonaws.com` / `<bucket>.s3-<region>.amazonaws.com` —
+ *   virtual-hosted style, in case the endpoint moves to it.
+ *
+ * The region label must look like a real AWS region (`us-east-1`, `eu-central-1`, `us-gov-west-1`, `cn-north-1`)
+ * so a service/label subdomain such as `s3.evil.amazonaws.com` cannot pose as one. The bucket label is left
+ * generic on purpose: pinning Webflow's current bucket name would break the install flow the moment they rotate
+ * it, and the presigned URL is already an opaque value handed back by Webflow's own authenticated endpoint.
+ */
+const AWS_S3_UPLOAD_HOST_RE = /^(?:[a-z0-9][a-z0-9.-]*\.)?s3(?:[.-][a-z]{2}(?:-[a-z]+)+-\d{1,2})?\.amazonaws\.com$/;
+
+/** Webflow-owned upload/CDN hosts (apex + subdomains). */
+const WEBFLOW_UPLOAD_HOST_SUFFIXES = ["webflow.com", "website-files.com"] as const;
+
+/**
  * The presigned upload URL is the one outbound call in the install flow that does not go through
  * Tower's proxy, so it is allowlisted client-side (Marketplace review): only HTTPS endpoints on
- * Webflow's own hosts or their AWS S3 upload buckets are accepted.
+ * Webflow's own hosts or on an Amazon S3 endpoint host are accepted. Lookalike hosts
+ * (`amazonaws.com.evil.com`, `webflow.com.evil.com`) and non-S3 AWS hosts (`evil-bucket.amazonaws.com`)
+ * are rejected — suffix matching is anchored on a dot-delimited label boundary.
  */
 export function isAllowedAssetUploadUrl(raw: string): boolean {
   let url: URL;
@@ -245,13 +287,15 @@ export function isAllowedAssetUploadUrl(raw: string): boolean {
   if (url.protocol !== "https:") {
     return false;
   }
+  // `URL` already lowercases and punycodes the host; it also resolves userinfo tricks
+  // (`https://s3.amazonaws.com@evil.example/`) to the real host before we ever see it.
   const host = url.hostname;
-  return (
-    host === "webflow.com" ||
-    host.endsWith(".webflow.com") ||
-    host.endsWith(".amazonaws.com") ||
-    host.endsWith(".website-files.com")
-  );
+  for (const suffix of WEBFLOW_UPLOAD_HOST_SUFFIXES) {
+    if (host === suffix || host.endsWith(`.${suffix}`)) {
+      return true;
+    }
+  }
+  return AWS_S3_UPLOAD_HOST_RE.test(host);
 }
 
 async function uploadRuntimeAsset(
@@ -391,6 +435,14 @@ function withoutCmsSlotMarkedScripts(scripts: PageCustomScript[]): PageCustomScr
   );
 }
 
+/** True when a page custom-code entry is one of ours — by marker attribute or by registered-script id. */
+function isBeaconRuntimeScript(s: PageCustomScript, registeredBeaconScriptIds: ReadonlySet<string>): boolean {
+  return (
+    scriptAttrCI(s.attributes, CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR) === CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE ||
+    registeredBeaconScriptIds.has(s.id)
+  );
+}
+
 /**
  * Removes every beacon runtime script from a page's custom code — both ones carrying the current marker attribute
  * **and** any whose id is a registered `CodalynBeaconRuntime` script. The id cross-reference catches stale runtimes
@@ -416,6 +468,63 @@ export function mergePageScriptsWithBeaconRuntime(
   registeredBeaconScriptIds: ReadonlySet<string>
 ): PageCustomScript[] {
   return [...withoutAnyBeaconRuntimeScripts(existing, registeredBeaconScriptIds), beaconScript];
+}
+
+export type CmsSlotRuntimeSyncDecision = { action: "skip" | "register"; reason: string };
+
+/**
+ * Decides whether a sync must upload + register a new hosted script, or can no-op.
+ *
+ * Webflow's Data API exposes **no delete for a registration record**, so every `registered_scripts/hosted` POST is a
+ * permanent entry against the customer's site budget. Sync fires on composer save, slot rename, slot delete and
+ * install — many times per editing session — and previously registered a brand-new script every time (the version is
+ * `…+beacon.${Date.now()}`, so no two calls dedupe server-side). The page already carries the runtime's source hash
+ * in `data-codalyn-beacon-src-hash`, so an unchanged build is detectable without touching the registry.
+ *
+ * Pure and exported so the skip condition is unit-testable without the Data API. Every ambiguous or malformed input
+ * fails **toward** registering: a redundant registration is waste, but a wrongly-skipped one ships a page whose
+ * footer points at a stale or missing runtime, which breaks the customer's live site.
+ */
+export function decideCmsSlotRuntimeSyncAction(input: {
+  existing: readonly PageCustomScript[] | null | undefined;
+  expectedHash: string;
+  registeredBeaconScriptIds: ReadonlySet<string>;
+  force?: boolean;
+}): CmsSlotRuntimeSyncDecision {
+  if (input.force === true) {
+    return { action: "register", reason: "Forced re-sync." };
+  }
+  const expectedHash = readStringLikeValue(input.expectedHash);
+  if (expectedHash == null) {
+    return { action: "register", reason: "No expected runtime source hash." };
+  }
+  const applied = (Array.isArray(input.existing) ? input.existing : []).filter(
+    (s): s is PageCustomScript =>
+      s != null && typeof s === "object" && isBeaconRuntimeScript(s, input.registeredBeaconScriptIds)
+  );
+  if (applied.length === 0) {
+    return { action: "register", reason: "No beacon runtime applied to this page." };
+  }
+  // Stale duplicates must be collapsed back to the exactly-one-runtime invariant, which only the register+PUT path
+  // does. Rare and self-healing after a single sync.
+  if (applied.length > 1) {
+    return { action: "register", reason: "More than one beacon runtime applied to this page." };
+  }
+  const current = applied[0];
+  if (scriptLocation(current) !== "footer") {
+    return { action: "register", reason: "Applied beacon runtime is not in the page footer." };
+  }
+  if (scriptAttrCI(current.attributes, CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR) !== CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE) {
+    return { action: "register", reason: "Applied beacon runtime is missing its marker attribute." };
+  }
+  const appliedHash = readStringLikeValue(scriptAttrCI(current.attributes, CMS_SLOT_PAGE_SCRIPT_HASH_ATTR));
+  if (appliedHash == null) {
+    return { action: "register", reason: "Applied beacon runtime has no source hash." };
+  }
+  if (appliedHash !== expectedHash) {
+    return { action: "register", reason: "Applied beacon runtime is a different build." };
+  }
+  return { action: "skip", reason: "Applied beacon runtime already matches this build." };
 }
 
 type PaginatedList = { limit: number; offset: number; total: number };
@@ -599,14 +708,62 @@ function collectScriptIds(scripts: PageCustomScript[] | undefined, out: Set<stri
   }
 }
 
-async function collectAppliedCustomCodeScriptIds(siteId: string): Promise<Set<string>> {
+/**
+ * Hard bounds on the orphan-asset page scan. It issues one `GET /pages/{id}/custom_code` per page, so on a large site
+ * an unbounded scan is a long-running burst against a ~60 req/min budget (Marketplace: avoid long-running background
+ * work; respect rate limits). Housekeeping is never worth degrading the customer's own API budget, so the scan is
+ * capped by page count *and* wall-clock, and an incomplete scan skips the purge instead of acting on partial data.
+ */
+export const PURGE_MAX_PAGES_SCANNED = 60;
+export const PURGE_SCAN_TIME_BUDGET_MS = 10_000;
+
+export type BoundedPageScanPlan = { scan: string[]; skipped: number; complete: boolean };
+
+/**
+ * Splits the site's page ids into the bounded slice this invocation will scan and the remainder it will not.
+ * Pure and exported so the cap is testable without the Data API. Non-string / empty ids are dropped at the boundary.
+ */
+export function planBoundedPageScan(
+  pageIds: readonly unknown[] | null | undefined,
+  maxPages: number = PURGE_MAX_PAGES_SCANNED
+): BoundedPageScanPlan {
+  const ids = (Array.isArray(pageIds) ? pageIds : []).filter(
+    (id): id is string => typeof id === "string" && id.length > 0
+  );
+  const cap = Number.isFinite(maxPages) && maxPages > 0 ? Math.floor(maxPages) : 0;
+  const scan = ids.slice(0, cap);
+  return { scan, skipped: ids.length - scan.length, complete: scan.length === ids.length };
+}
+
+type AppliedScriptIdScan = { ids: Set<string>; complete: boolean; scanned: number; skipped: number };
+
+async function collectAppliedCustomCodeScriptIds(
+  siteId: string,
+  now: () => number = Date.now
+): Promise<AppliedScriptIdScan> {
   const ids = new Set<string>();
   collectScriptIds(await getSiteCustomScripts(siteId), ids);
 
-  const pageIds = await listAllSitePageIds(siteId);
+  const plan = planBoundedPageScan(await listAllSitePageIds(siteId));
+  let complete = plan.complete;
+  let skipped = plan.skipped;
+  let scanned = 0;
+  const deadline = now() + PURGE_SCAN_TIME_BUDGET_MS;
   const batchSize = 5;
-  for (let i = 0; i < pageIds.length; i += batchSize) {
-    const batch = pageIds.slice(i, i + batchSize);
+
+  for (let i = 0; i < plan.scan.length; i += batchSize) {
+    if (now() >= deadline) {
+      const remaining = plan.scan.length - i;
+      complete = false;
+      skipped += remaining;
+      console.warn(LOG_PREFIX, "page scan stopped at time budget", {
+        budgetMs: PURGE_SCAN_TIME_BUDGET_MS,
+        scanned,
+        remaining,
+      });
+      break;
+    }
+    const batch = plan.scan.slice(i, i + batchSize);
     // Fail-safe: a page read that errors (e.g. persistent 429/5xx) must abort the whole scan rather than be skipped.
     // A partial id set makes a still-referenced asset look orphaned, so the caller would wrongly delete a live runtime.
     // Propagating lets the caller treat the purge as not-run and retry later instead of acting on incomplete data.
@@ -614,9 +771,18 @@ async function collectAppliedCustomCodeScriptIds(siteId: string): Promise<Set<st
     for (const scripts of perPage) {
       collectScriptIds(scripts, ids);
     }
+    scanned += batch.length;
   }
 
-  return ids;
+  if (plan.skipped > 0) {
+    console.warn(LOG_PREFIX, "page scan capped", {
+      maxPages: PURGE_MAX_PAGES_SCANNED,
+      total: plan.scan.length + plan.skipped,
+      skipped: plan.skipped,
+    });
+  }
+
+  return { ids, complete, scanned, skipped };
 }
 
 function collectAppliedHostedUrls(
@@ -673,12 +839,22 @@ async function purgeUnreferencedBeaconRuntimeAssets(
   // re-driven by every subsequent sync (which is exactly the flood we're removing).
   lastPurgeAtBySite.set(siteId, Date.now());
   try {
-    const [appliedScriptIds, registeredScripts, assets] = await Promise.all([
+    const [scan, registeredScripts, assets] = await Promise.all([
       collectAppliedCustomCodeScriptIds(siteId),
       listRegisteredBeaconRuntimeScripts(siteId),
       listBeaconRuntimeAssets(siteId),
     ]);
-    const appliedHostedUrls = collectAppliedHostedUrls(appliedScriptIds, registeredScripts);
+    // Degrade gracefully: a bounded scan that did not cover every page yields a partial applied-id set, and acting on
+    // it would delete assets that are still referenced by an unscanned page. Skip the purge; the next eligible run
+    // reclaims them. Uninstall of the current page has already completed and is unaffected.
+    if (!scan.complete) {
+      console.warn(LOG_PREFIX, "orphan asset purge skipped — page scan was bounded and incomplete", {
+        scanned: scan.scanned,
+        skipped: scan.skipped,
+      });
+      return;
+    }
+    const appliedHostedUrls = collectAppliedHostedUrls(scan.ids, registeredScripts);
     for (const url of protectedHostedUrls) {
       if (typeof url === "string" && url.length > 0) {
         appliedHostedUrls.add(normalizeHostedAssetUrl(url));
@@ -700,10 +876,15 @@ async function purgeUnreferencedBeaconRuntimeAssets(
  * Uploads the Beacon runtime to Webflow Assets, registers it as a hosted script, and applies it to the current page
  * footer custom code. Requires Tower + Webflow OAuth with `assets:write`, `custom_code:read`, and
  * `custom_code:write`. Re-publish the site for changes to affect the live site.
+ *
+ * **No-ops when the page's applied runtime already matches this build** (see
+ * {@link decideCmsSlotRuntimeSyncAction}) — registration records cannot be deleted via the Data API, so a redundant
+ * register is a permanent entry against the customer's site. Pass `{ force: true }` from an explicit user-driven
+ * repair ("Sync page script") where a re-push is the point of the action.
  */
-export async function syncCmsSlotPageInlineScript(): Promise<void> {
+export async function syncCmsSlotPageInlineScript(options: { force?: boolean } = {}): Promise<void> {
   if (!getTowerOrigin()) {
-    throw new Error("Tower is not configured (VITE_TOWER_ORIGIN). Cannot sync page custom code.");
+    throw new Error("Connect your Codalyn account to sync page custom code.");
   }
 
   // Best-effort: the Designer chrome/layout style is cosmetic. A Designer style failure must never abort the runtime
@@ -715,15 +896,28 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
   }
 
   const sourceCode = getCmsSlotPageInlineScriptSource();
+  const expectedHash = hashCmsSlotRuntimeSource(sourceCode);
 
   const siteId = (await webflow.getSiteInfo()).siteId;
   const pageId = (await webflow.getCurrentPage()).id as string;
 
-  const registered = await registerHostedRuntimeScript(siteId, sourceCode, inlineScriptVersion());
+  // Read the page's current state *before* uploading anything: an unchanged build must cost two GETs, not an
+  // asset upload plus a permanent registration.
   const [existing, registeredBeaconScriptIds] = await Promise.all([
     getPageCustomScripts(pageId),
     registeredBeaconRuntimeScriptIdSet(siteId),
   ]);
+  const decision = decideCmsSlotRuntimeSyncAction({
+    existing,
+    expectedHash,
+    registeredBeaconScriptIds,
+    force: options.force,
+  });
+  if (decision.action === "skip") {
+    return;
+  }
+
+  const registered = await registerHostedRuntimeScript(siteId, sourceCode, inlineScriptVersion());
   const merged = mergePageScriptsWithBeaconRuntime(
     existing,
     {
@@ -732,7 +926,7 @@ export async function syncCmsSlotPageInlineScript(): Promise<void> {
       version: registered.version,
       attributes: {
         [CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR]: CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE,
-        [CMS_SLOT_PAGE_SCRIPT_HASH_ATTR]: hashCmsSlotRuntimeSource(sourceCode),
+        [CMS_SLOT_PAGE_SCRIPT_HASH_ATTR]: expectedHash,
       },
     },
     registeredBeaconScriptIds

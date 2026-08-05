@@ -268,9 +268,12 @@ function SignedInAccountSections({
       <section className="flex min-w-0 flex-col gap-4 pb-6">
         <div className="flex min-w-0 items-center gap-3">
           {user.image ? (
+            // Decorative: the account name and email sit right beside it, so a screen reader
+            // gains nothing from announcing the avatar (matches the initials fallback below).
             <img
               src={user.image}
               alt=""
+              aria-hidden
               className="size-10 shrink-0 rounded-sm object-cover ring-1 ring-inset ring-border"
             />
           ) : (

@@ -4,7 +4,9 @@ Point-by-point response to the Webflow app-review feedback (July 2026), mapping 
 the app does and what changed. Doc references verified against developers.webflow.com on 2026-07-08.
 Round-2 feedback (2026-07-09) is addressed in [Round 2](#round-2--2026-07-09-follow-up-flags);
 round-3 feedback (2026-08) in [Round 3](#round-3--2026-08-senior-engineer--review-team-flags);
-round-4 feedback (2026-08-05) in [Round 4](#round-4--2026-08-05-review-team-flags).
+round-4 feedback (2026-08-05) in [Round 4](#round-4--2026-08-05-review-team-flags); and the
+pre-submission full-guideline re-audit in
+[Round 5](#round-5--2026-08-05-full-guideline-re-audit-pre-submission).
 Where a later-round fix supersedes an earlier answer, the original item notes it.
 
 ## 1. Direct DOM manipulation / unsafe patterns
@@ -522,6 +524,190 @@ Additional hardening landed from that audit:
   unreferenced runtime assets (workspace-level app removal cannot run extension code — manual
   cleanup instructions are provided in-app and in the docs).
 
+---
+
+## Round 5 — 2026-08-05 full-guideline re-audit (pre-submission)
+
+Driven by repeat review flags rather than a specific new flag list: the entire app was re-audited against
+the full Marketplace Guidelines, and the shipped production bundle was scanned the way a hostile reviewer
+would scan it. Round 5 found one genuine security defect that all previous rounds missed, plus several
+guideline gaps the earlier self-audits had claimed clean.
+
+### R5.1 Control-character bypass in the URL scheme allowlist (security defect)
+
+Both href sanitizers rejected a disallowed scheme with `/^[a-z][a-z0-9+.-]*:/i`. That character class does
+not match across an embedded C0 control character, so `java<LF>script:alert(1)` and `dat<LF>a:text/html,…`
+matched neither the allowlist nor the rejection and were classified as harmless *relative* paths. Browsers
+strip TAB/LF/CR from a URL before parsing its scheme, so the value executed as `javascript:` once written.
+Reachable from save-time rich text, runtime rich text, `bApplyLink`, and `IFRAME`/`EMBED` `src` — i.e. it
+could ship an executing `javascript:` href onto a customer's published site.
+
+- **Fixed in both twins.** `stripUrlControlCharacters` (`shared/ui/rich-text-editor/lib/rich-text-url.ts`)
+  and `bStripCtl` (the generated runtime, `cms-slot-beacon-prop-runtime.ts`) drop every character below
+  U+0020 and trim, and the scheme tests now run on that reduced string — the same string the browser
+  parses. Interior spaces are deliberately preserved (browsers percent-encode rather than remove them, so
+  they cannot split a scheme, and stripping them would corrupt legitimate `mailto:` query strings).
+  `bSafeHref` returns the control-stripped value, so what is written to the DOM is what was validated.
+- Regression-tested in both implementations against an 11-payload obfuscation corpus (`\n`, `\r`, `\t`,
+  `\x00`, `\x0b`, leading `\x01`, mixed case, `data:`, `vbscript:`), each verified to have returned
+  "safe" against the pre-fix logic, plus end-to-end `applyValue` assertions (obfuscated anchor → `href="#"`,
+  obfuscated iframe → no `src`, obfuscated anchor inside rich text → unwrapped, text kept).
+
+### R5.2 Session-token postMessage accepted on origin alone
+
+`use-beacon-tower-session.ts` ingested a Tower bearer token from a `postMessage` validated by `event.origin`
+only — no `event.source` check — while the quality-compare bridge (three call sites) already required both.
+Any window at the Tower origin holding a handle to the extension frame could inject a session token.
+
+- **Fixed:** `tower-auth-client.ts` now keeps a registry of the auth windows this app itself opened and
+  exports `isBeaconAuthWindow(event.source)`; the session bridge requires it in addition to the exact origin
+  match. Closed windows are pruned from the registry on each check.
+
+### R5.3 Remotely-enablable capture in PostHog
+
+`capture_heatmaps`/`enable_heatmaps` were unset. Heatmaps ship inside the posthog core bundle, so
+`disable_external_dependency_loading` does not hold them back — `$heatmaps_enabled_server_side` from the
+remote-config response could have switched on document-level click/mousemove capture inside the Designer
+iframe, with no code change and no re-review, invalidating the "no autocapture" disclosure.
+
+- **Fixed** in `CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS`: `capture_heatmaps: false`,
+  `enable_heatmaps: false`, `save_campaign_params: false` (UTM params were being parsed off the iframe URL,
+  undisclosed), and `advanced_disable_flags` / `advanced_disable_feature_flags: true` to shut off the
+  remote-config request that delivers those server-side toggles. The shipped bundle's telemetry behavior is
+  now fully determined by the reviewed code.
+- `person_profiles: "identified_only"` moved into the shared constant, and the constant is now spread
+  **last** at both call sites, so the privacy floor cannot be silently overridden by an app-local option.
+
+### R5.4 Disclosure completeness
+
+R4.4 claimed the disclosure "enumerates the exact fields"; it did not. The consent prompt and Settings →
+Privacy now additionally name the release channel and build metadata super-properties, and the browser/device
+default properties PostHog attaches to every event (browser, OS, language, screen size), and state that no
+location and no referrer are collected. Settings → Privacy additionally discloses signed-in settings sync
+(export defaults, crop presets, referenced page/collection identifiers and names) — previously only in the
+privacy policy.
+
+- **The app now links to the published policies.** Neither disclosure surface previously contained any link:
+  the privacy policy was cited throughout this document as the disclosure vehicle while the app never pointed
+  at it. `shared/lib/codalyn-links.ts` adds `https://tower.codalyn.app/privacy` and `/terms` (both verified
+  live, HTTP 200) opened from user-gesture handlers, linked from the consent prompt and Settings → Privacy.
+
+### R5.5 Developer artifacts in end-user copy
+
+Guideline: a fully functional experience free of placeholder content. Several strings named build-time
+environment variables or hosting configuration to end users, and one rendered a raw backend response body.
+
+- `beacon-tower-not-configured-notice.tsx` (rendered in Settings → Account and the CMS Slots access gate)
+  said "Add `VITE_TOWER_ORIGIN` to connect an account" in visible JSX → now product copy directing the user
+  to update/reinstall or contact support.
+- `encode-image-blob.ts` AVIF errors named `VITE_BEACON_API_KEY`/`VITE_TOWER_ORIGIN`/`BEACON_API_KEY`, and
+  sliced 240 raw characters of the backend response into a user-facing toast → now product copy (status code
+  only); the raw detail goes to `console.warn`.
+- `cms-slot-page-inline-script.ts` "Tower is not configured (VITE_TOWER_ORIGIN)" → "Connect your Codalyn
+  account to sync page custom code."
+- `tower-reachability-error.ts` returned Vercel Deployment Protection setup instructions and env-var names to
+  end users → the developer-guidance branches are now compiled out of release builds entirely
+  (`import.meta.env.DEV`); shipped builds return product copy only.
+- Remaining developer-facing strings (console warnings, the build-misconfiguration throw) no longer contain
+  `VITE_*` identifiers, so no configuration tokens ship as strings in the reviewed bundle.
+
+### R5.6 Global error boundary rendered nothing
+
+`error-boundary.tsx` returned `null` on any caught error while wrapping the entire app, so a single React
+error blanked the whole Designer panel with no message and no recovery — the most reviewer-visible failure
+mode in the app, against "apps that are error prone … will be removed".
+
+- **Fixed:** a real fallback built from existing `shared/ui` primitives (apology copy, `role="alert"`, and a
+  **Try again** action that resets the boundary so children remount). Telemetry capture is unchanged and the
+  raw error is never shown to the user. Storybook story added (`UI/ErrorBoundary`), including a story that
+  throws once and recovers on retry.
+
+### R5.7 Accessibility
+
+- The image editor's primary selected-source preview had `alt=""` (R4.9 had fixed only the compare preview);
+  it now carries descriptive alt text naming the file being edited.
+- The Settings account avatar is genuinely decorative (name and email render adjacent, initials fallback
+  already hidden) and now carries `aria-hidden` alongside its empty alt.
+
+### R5.8 Asset-upload allowlist was broader than documented
+
+R3.3 described the presigned-upload allowlist as "Webflow/AWS S3 hosts", but the implementation accepted any
+`*.amazonaws.com` host — i.e. any AWS-hosted bucket. Tightened to real S3 endpoint host shapes (path-style
+`s3[.-]<region>.amazonaws.com` and virtual-hosted `<bucket>.s3[.<region>].amazonaws.com`, with the region
+label required to match an AWS region shape) plus Webflow-owned hosts matched on label boundaries. HTTPS-only
+is unchanged. The bucket label is deliberately not pinned to a literal name so a Webflow-side bucket rotation
+cannot break the install flow. Negative tests added (foreign buckets, non-S3 AWS services, suffix lookalikes
+such as `s3.amazonaws.com.evil.com`, userinfo tricks, plain HTTP).
+
+### R5.9 Long-running work
+
+- The OAuth popup watcher polled `win.closed` every 800 ms with no exit other than the popup closing — an
+  abandoned auth window leaked one interval for the rest of the Designer session. Now bounded by a 10-minute
+  watch timeout ("avoid long-running background processes").
+
+### R5.10 Bundle hygiene — the reviewer's grep now comes back empty
+
+R3.1 argued that the remaining `sentry` strings in the bundle were inert posthog-js internals. That argument
+is correct but it is also an argument a reviewer has to accept on trust, twice, after Sentry was already
+flagged once. The strings are now gone instead of explained:
+
+- `scripts/vite-strip-dev-host-literals.mjs` gained posthog-js rules removing the `SentryIntegration` /
+  `sentryIntegration` instance properties (which also lets Rollup tree-shake the integration class), the
+  `https://sentry.io/organizations/` URL template, the `$sentry_*` event property names, and the
+  `sentryuptimebot` bot-list entry. The bot entry is safe to drop: the list is a substring scan over
+  independent entries, and the bundle only ever executes inside an authenticated Designer iframe, never on a
+  crawlable page.
+- `__forceAllowLocalhost` / `_forceAllowLocalhostNetworkCapture` are renamed to `forceAllowLoopback` — every
+  read, write, and the deprecation message naming them are renamed together in the same module, so the rename
+  is behavior-preserving (and both are session-recording debug switches that default false, with session
+  recording hard-disabled anyway).
+- The forbidden-marker gate in `scripts/build-cli.mjs` is now **case-insensitive** — the previous
+  lowercase-only `localhost` check is exactly what let camelCase `__forceAllowLocalhost` through — and
+  `sentry` is now an enforced forbidden marker rather than an incidental absence.
+- Fail-if-moved behavior is preserved and extended to Sentry: a posthog upgrade that relocates any of these
+  literals throws at transform time in release builds instead of silently shipping them.
+
+Verified on the rebuilt production bundle, in `dist/` and inside the archived zip:
+`grep -ric sentry` → 0, `grep -ric localhost` → 0, `grep -ric 127.0.0.1` → 0.
+
+Pinned by `apps/beacon/scripts/release-build-gates.test.mjs` (24 tests), which runs the strip plugin against
+the actually-installed posthog-js and asserts zero residuals — inside `pnpm test:run`, which the release
+pipeline runs before the Vite build.
+
+### R5.11 The flagship feature could ship disabled
+
+`isCmsSlotsSurfaceEnabled()` required `VITE_CMS_SLOTS_SURFACE_ENABLED === "true"` under
+`import.meta.env.PROD`, but every `.env*` file is gitignored, so the value existed only on one developer's
+machine. Any clean checkout or CI release build produced a bundle where CMS Slots — the flagship surface —
+rendered as a permanently disabled home-screen tile with no explanation, next to the "Coming soon" tiles. A
+reviewer reads that as a broken or placeholder app.
+
+- **Fixed:** the flag is now a kill switch that defaults **on**; only an explicit `"false"` disables the
+  surface. The worst case is a build that ships the feature rather than one that ships a dead tile.
+- A release-channel build guard (production and preview) fails the build if the flag resolves to `"false"`,
+  using a resolver that mirrors Vite's own `loadEnv` precedence. `.env.example` now ships the value
+  uncommented.
+
 **Scope note:** this document and the audits cover **Beacon**. Flint is a separate, unsubmitted
 extension; its telemetry is not yet consent-gated and it still bundles Sentry. All Beacon
-round-2/3/4 fixes must be ported before any Flint submission.
+round-2/3/4/5 fixes must be ported before any Flint submission. Flint does inherit the shared
+`CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS` hardening from R5.3 automatically (heatmaps, campaign
+params, remote config, `person_profiles`), but everything else in Round 5 — the URL sanitizer fix
+(R5.1), the postMessage source check (R5.2), the disclosure and policy links (R5.4), the developer-copy
+cleanup (R5.5), and the bundle-hygiene strip rules (R5.10, which are wired into the shared build
+scripts but only assert against Beacon's bundle) — still needs porting.
+
+**Open items that are product/listing decisions, not code** (flagged by the Round 5 audit, deliberately
+not changed here):
+
+- The home screen renders a **"Coming soon"** section with three permanently disabled tiles
+  (`beacon-home-screen.tsx`, copy in `beacon-home-copy.ts`), and the working features sit under a section
+  titled **"Early access"**. `parseBeaconReleaseStage` defaults to `early-access`, and the app version is
+  `0.1.0`. Guidelines require "a fully functional experience free of placeholder content" and submissions
+  that are "complete, functional, and ready for their intended audience". R4.9's claim of "no
+  placeholder/test content in UI copy" was wrong on this point.
+- **Reviewer access:** sign-up is invite-only behind "Request early access". Webflow requires access via a
+  demo account or credentials; if the reviewer cannot sign in, nothing else in this document matters.
+- **Documentation:** guidelines ask for "comprehensive and user-friendly documentation or help resources".
+  `codalyn.app/docs` and `/help` both 404; the in-app help action opens a support form, not documentation.
+  The privacy policy and terms pages are live and are now linked from the app (R5.4).

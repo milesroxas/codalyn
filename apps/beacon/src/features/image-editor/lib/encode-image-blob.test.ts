@@ -78,10 +78,35 @@ describe("encodeCanvasToOptimizedFile", () => {
     });
   });
 
-  it("throws when AVIF is requested but Tower origin is missing", async () => {
+  it("throws a product-facing error when AVIF is requested but no Tower origin is configured", async () => {
     mockGetTowerOrigin.mockReturnValue("");
     await expect(encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif" })).rejects.toThrow(
-      /AVIF needs Tower/
+      "AVIF conversion isn't available in this version of Beacon. Export WebP instead."
     );
+  });
+
+  it("does not leak the raw Tower response body into the user-facing error", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockGetTowerOrigin.mockReturnValue("http://localhost:3100");
+    mockTowerFetch.mockResolvedValue(
+      new Response("Error: sharp pipeline crashed at /srv/tower/node_modules/sharp/lib/output.js:1234", {
+        status: 500,
+      })
+    );
+    await expect(encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif" })).rejects.toThrow(
+      /^AVIF conversion failed \(500\)\. Try again in a moment, or export WebP instead\.$/
+    );
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("500"), expect.stringContaining("sharp pipeline"));
+    warn.mockRestore();
+  });
+
+  it("asks the user to sign in when Tower returns 401", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockGetTowerOrigin.mockReturnValue("http://localhost:3100");
+    mockTowerFetch.mockResolvedValue(new Response("missing bearer token", { status: 401 }));
+    await expect(encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif" })).rejects.toThrow(
+      /^AVIF conversion needs a signed-in account\./
+    );
+    warn.mockRestore();
   });
 });

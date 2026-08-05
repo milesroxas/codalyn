@@ -42,13 +42,12 @@ async function assertTowerOptimizeResponseOk(res: Response): Promise<void> {
       throw new TowerUsageLimitError(usageLimit);
     }
   }
+  // Raw response bodies are developer detail — log them, never surface them in the UI.
+  console.warn(`[beacon] AVIF conversion request failed (${res.status})`, detail.slice(0, 240) || res.statusText);
   if (res.status === 401) {
-    throw new Error(
-      "Tower rejected the request (401). Set VITE_BEACON_API_KEY to match Tower BEACON_API_KEY, or use a session that can call /api/v1."
-    );
+    throw new Error("AVIF conversion needs a signed-in account. Sign in from Settings, or export WebP instead.");
   }
-  const detailSnippet = detail.slice(0, 240);
-  throw new Error(`Tower image optimize failed (${res.status}): ${detailSnippet || res.statusText}`);
+  throw new Error(`AVIF conversion failed (${res.status}). Try again in a moment, or export WebP instead.`);
 }
 
 async function encodeAvifViaTower(
@@ -92,7 +91,8 @@ export async function encodeCanvasToOptimizedFile(
   }
 
   if (format === "avif") {
-    throw new Error("AVIF needs Tower: set VITE_TOWER_ORIGIN (and VITE_BEACON_API_KEY if Tower uses BEACON_API_KEY).");
+    console.warn("[beacon] No Codalyn service origin in this build — AVIF conversion is disabled.");
+    throw new Error("AVIF conversion isn't available in this version of Beacon. Export WebP instead.");
   }
 
   const blob = await canvasToBlob(canvas, "image/webp", q);

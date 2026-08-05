@@ -63,6 +63,21 @@ export const CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS = {
   disable_session_recording: true,
   disable_surveys: true,
   disable_external_dependency_loading: true,
+  // Heatmaps ship inside the posthog core bundle, so `disable_external_dependency_loading` does NOT hold
+  // them back: left unset, `$heatmaps_enabled_server_side` from the remote-config response could switch on
+  // document-level click/mousemove capture inside the Designer iframe with no code change and no re-review.
+  // Pinned off locally so the "no autocapture" disclosure cannot be invalidated from the PostHog project UI.
+  capture_heatmaps: false,
+  enable_heatmaps: false,
+  // Campaign/UTM parameters are parsed off the extension iframe URL by default. Not used, not disclosed.
+  save_campaign_params: false,
+  // Remote config is the delivery channel for the server-side toggles above (heatmaps, conversations,
+  // product tours). Disabling it keeps the shipped bundle's behavior identical to the reviewed behavior.
+  advanced_disable_flags: true,
+  advanced_disable_feature_flags: true,
+  // No anonymous person profiles: a profile is only ever created for an explicitly identified user, and
+  // the extension never calls `identify`.
+  person_profiles: "identified_only",
   persistence: "memory",
   // The extension iframe's referrer is Designer/site context — never collected. Referrer
   // analytics are not used or disclosed, so `$referrer`/`$referring_domain` stay off.

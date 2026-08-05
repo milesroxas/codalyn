@@ -20,7 +20,7 @@ import {
   setSuppressDesignerSessionExchange,
   writeBeaconTowerSessionToken,
 } from "@/features/auth/lib/webflow-designer-session";
-import { getTowerAuthBaseUrl, towerAuthClient } from "@/features/auth/model/tower-auth-client";
+import { getTowerAuthBaseUrl, isBeaconAuthWindow, towerAuthClient } from "@/features/auth/model/tower-auth-client";
 
 /** Single-flighted across all hook instances so multiple mounted consumers don't fire duplicate exchanges. */
 let designerExchangeInFlight = false;
@@ -54,6 +54,12 @@ function handleTowerMessage(event: MessageEvent, towerOrigin: string, onSessionC
     return;
   }
   if (event.origin !== towerOrigin) {
+    return;
+  }
+  // This handler ingests a bearer token, so origin alone is not enough: any window at the Tower origin
+  // holding a handle to this frame could post one. Only auth windows this app itself opened are accepted
+  // (the same `event.source` discipline the quality-compare bridge already applies).
+  if (!isBeaconAuthWindow(event.source)) {
     return;
   }
   const data = event.data as Record<string, unknown> | null;

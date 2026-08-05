@@ -331,3 +331,149 @@ describe("beacon prop applyValue runtime", () => {
     expect(iframeOk.getAttribute("src")).toBe("https://player.example/v/1");
   });
 });
+
+/**
+ * Control-character scheme-obfuscation payloads. Browsers remove every C0 control character from a URL before
+ * parsing its scheme, so each of these navigates as `javascript:` / `data:` / `vbscript:` even though the raw
+ * string does not match a `^scheme:` test. Mirrors the corpus pinned against `isSafeRichTextUrl` in
+ * `shared/ui/rich-text-editor/__tests__/rich-text-url.test.ts` — the two implementations must agree.
+ */
+const CONTROL_CHAR_OBFUSCATED_URLS = [
+  "java\nscript:alert(1)",
+  "java\rscript:alert(1)",
+  "java\tscript:alert(1)",
+  "java\x00script:alert(1)",
+  "j\x0bavascript:alert(1)",
+  "\x01javascript:alert(1)",
+  "\njavascript:alert(1)",
+  "JAVA\tSCRIPT:alert(1)",
+  "dat\na:text/html,x",
+  "\x00data:text/html;base64,PHNjcmlwdD4=",
+  "vb\tscript:msgbox",
+] as const;
+
+function loadRuntimeUrlGuards(): {
+  bStripCtl: (h: string) => string;
+  bSafeHref: (h: unknown) => string | null;
+} {
+  return new Function(
+    `${beaconPropApplyValueRuntimeSource()}; return { bStripCtl: bStripCtl, bSafeHref: bSafeHref };`
+  )() as { bStripCtl: (h: string) => string; bSafeHref: (h: unknown) => string | null };
+}
+
+describe("beacon footer runtime bStripCtl (minified twin of stripUrlControlCharacters)", () => {
+  it("returns the canonical value unchanged", () => {
+    const { bStripCtl } = loadRuntimeUrlGuards();
+    expect(bStripCtl("https://example.com/a?b=c#d")).toBe("https://example.com/a?b=c#d");
+  });
+
+  it("removes C0 control characters from anywhere in the value", () => {
+    const { bStripCtl } = loadRuntimeUrlGuards();
+    expect(bStripCtl("java\nscript:alert(1)")).toBe("javascript:alert(1)");
+    expect(bStripCtl("java\tscript:alert(1)")).toBe("javascript:alert(1)");
+    expect(bStripCtl("java\rscript:alert(1)")).toBe("javascript:alert(1)");
+    expect(bStripCtl("java\x00script:alert(1)")).toBe("javascript:alert(1)");
+    expect(bStripCtl("\x01javascript:alert(1)")).toBe("javascript:alert(1)");
+  });
+
+  it("trims surrounding whitespace but preserves interior spaces", () => {
+    const { bStripCtl } = loadRuntimeUrlGuards();
+    expect(bStripCtl("  https://example.com  ")).toBe("https://example.com");
+    expect(bStripCtl("mailto:a@b.com?subject=hello world&body=one two")).toBe(
+      "mailto:a@b.com?subject=hello world&body=one two"
+    );
+  });
+
+  it("collapses whitespace-only and empty input to an empty string", () => {
+    const { bStripCtl } = loadRuntimeUrlGuards();
+    expect(bStripCtl("")).toBe("");
+    expect(bStripCtl("   ")).toBe("");
+    expect(bStripCtl("\n\t\r")).toBe("");
+  });
+});
+
+describe("beacon footer runtime bSafeHref (minified twin of isSafeRichTextUrl)", () => {
+  it("returns the control-stripped href for navigational schemes", () => {
+    const { bSafeHref } = loadRuntimeUrlGuards();
+    for (const url of ["https://x.com", "http://x.com", "mailto:a@b.com", "tel:+15551234"]) {
+      expect(bSafeHref(url)).toBe(url);
+    }
+    expect(bSafeHref("HTTPS://EX.COM")).toBe("HTTPS://EX.COM");
+  });
+
+  it("returns the control-stripped href for relative / anchor / protocol-relative links", () => {
+    const { bSafeHref } = loadRuntimeUrlGuards();
+    for (const url of ["/relative", "#anchor", "path/to", "//host/path"]) {
+      expect(bSafeHref(url)).toBe(url);
+    }
+  });
+
+  it("writes the stripped string, not the raw one (that value reaches the DOM)", () => {
+    const { bSafeHref } = loadRuntimeUrlGuards();
+    expect(bSafeHref("  https://example.com\n")).toBe("https://example.com");
+    expect(bSafeHref("htt\nps://example.com")).toBe("https://example.com");
+    expect(bSafeHref("/rel\tative")).toBe("/relative");
+  });
+
+  it("preserves a mailto: query string containing interior spaces", () => {
+    const { bSafeHref } = loadRuntimeUrlGuards();
+    const mailto = "mailto:a@b.com?subject=hello world&body=one two";
+    expect(bSafeHref(mailto)).toBe(mailto);
+  });
+
+  it("rejects dangerous and empty schemes", () => {
+    const { bSafeHref } = loadRuntimeUrlGuards();
+    for (const url of [
+      "",
+      "   ",
+      "\n\t",
+      "javascript:alert(1)",
+      "data:text/html,x",
+      "vbscript:msgbox",
+      "JavaScript:alert(1)",
+      "DATA:text/html,x",
+    ]) {
+      expect(bSafeHref(url)).toBeNull();
+    }
+  });
+
+  // Regression: the `^[a-z][a-z0-9+.-]*:` rejection test does not match when a control character sits mid-scheme,
+  // so these values used to be misclassified as harmless relative paths while browsers still executed them.
+  it("rejects control-character-obfuscated dangerous schemes", () => {
+    const { bSafeHref } = loadRuntimeUrlGuards();
+    for (const url of CONTROL_CHAR_OBFUSCATED_URLS) {
+      expect(bSafeHref(url)).toBeNull();
+    }
+  });
+
+  it("treats null / undefined as empty", () => {
+    const { bSafeHref } = loadRuntimeUrlGuards();
+    expect(bSafeHref(null)).toBeNull();
+    expect(bSafeHref(undefined)).toBeNull();
+  });
+
+  it("blocks control-character-obfuscated hrefs end-to-end through applyValue", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+
+    for (const url of CONTROL_CHAR_OBFUSCATED_URLS) {
+      const a = document.createElement("a");
+      applyValue(a, JSON.stringify({ k: "url", h: url, t: 1 }));
+      expect(a.getAttribute("href")).toBe("#");
+
+      const iframe = document.createElement("iframe");
+      applyValue(iframe, url);
+      expect(iframe.getAttribute("src")).toBeNull();
+    }
+
+    // The rich-text sanitizer unwraps anchors whose obfuscated href is rejected, keeping only the text.
+    const marked = document.createElement("div");
+    marked.setAttribute("data-cb-html", "1");
+    marked.innerHTML = "";
+    applyValue(marked, '<p><a href="java\nscript:alert(1)">txt</a></p>');
+    expect(marked.querySelector("a")).toBeNull();
+    expect(marked.textContent).toContain("txt");
+  });
+});

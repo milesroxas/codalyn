@@ -139,7 +139,9 @@ export async function syncCmsSlotsInstallEmbedOnPage(): Promise<void> {
   if (!wrapper) {
     throw new Error("Install beacons on this page first.");
   }
-  await syncCmsSlotPageInlineScript();
+  // Explicit user-driven repair: re-pushing the runtime IS the action, so bypass the
+  // already-current check that keeps automatic re-syncs from registering a redundant script.
+  await syncCmsSlotPageInlineScript({ force: true });
 }
 
 /**

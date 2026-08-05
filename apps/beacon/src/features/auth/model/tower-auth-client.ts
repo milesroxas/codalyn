@@ -44,7 +44,9 @@ function unconfiguredTowerBaseUrl(): string {
   if (import.meta.env.DEV) {
     return "https://beacon.tower.invalid";
   }
-  throw new Error("Tower origin missing from build (VITE_TOWER_ORIGIN / __BEACON_TOWER_ORIGIN__)");
+  // Build-configuration failure. Named without env-var identifiers so no developer-configuration tokens
+  // ship as strings in the reviewed bundle; the release build already fails loudly when this is unset.
+  throw new Error("Codalyn service origin missing from this build");
 }
 
 export const towerAuthClient = createAuthClient({
@@ -128,11 +130,49 @@ type OpenTowerAppPathOptions = {
   onClosed?: () => void;
 };
 
+/**
+ * Windows this app opened for a Tower or Webflow auth flow. The session bridge ingests a bearer token from
+ * `postMessage`, and an origin check alone cannot tell "the auth window we opened" from any other window at
+ * the Tower origin that happens to hold a handle to this frame — so the message source is matched against
+ * this registry too.
+ */
+const openedAuthWindows = new Set<Window>();
+
+/** True when the message source is an auth window this app opened and that is still open. */
+export function isBeaconAuthWindow(source: MessageEventSource | null): boolean {
+  if (!source) {
+    return false;
+  }
+  let matched = false;
+  for (const win of [...openedAuthWindows]) {
+    if (win.closed) {
+      openedAuthWindows.delete(win);
+      continue;
+    }
+    if (win === source) {
+      matched = true;
+    }
+  }
+  return matched;
+}
+
+/**
+ * An abandoned auth window (left open, or backgrounded indefinitely) must not keep a polling timer alive for
+ * the rest of the Designer session — Marketplace guidance bars long-running background work.
+ */
+const POPUP_WATCH_TIMEOUT_MS = 10 * 60 * 1000;
+
 function watchPopupClosed(win: Window, onClosed: () => void): void {
+  const startedAt = Date.now();
   const timer = window.setInterval(() => {
     if (win.closed) {
       window.clearInterval(timer);
+      openedAuthWindows.delete(win);
       onClosed();
+      return;
+    }
+    if (Date.now() - startedAt >= POPUP_WATCH_TIMEOUT_MS) {
+      window.clearInterval(timer);
     }
   }, 800);
 }
@@ -146,6 +186,7 @@ export function openTowerAppPath(path: string, options: OpenTowerAppPathOptions 
   if (!win) {
     return;
   }
+  openedAuthWindows.add(win);
   if (options.onClosed) {
     watchPopupClosed(win, options.onClosed);
   }
@@ -229,6 +270,7 @@ export async function openWebflowOAuthAuthorize(
   if (!win) {
     return { ok: false, error: "popup_blocked" };
   }
+  openedAuthWindows.add(win);
   try {
     const res = await towerFetch("/api/integrations/webflow/authorize", { method: "POST" });
     const data = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;

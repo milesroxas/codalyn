@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { beaconPropDebugStubSource } from "@/features/cms-slots/model/cms-slot-beacon-debug";
 import {
   CMS_SLOT_COND_ATTR,
@@ -9,12 +9,16 @@ import {
 import { CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_INLINE_KEYS } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
 import { CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
 import {
+  CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS,
+  decideCmsSlotRuntimeSyncAction,
   getCmsSlotPageInlineScriptSource,
   isAllowedAssetUploadUrl,
   isBeaconRuntimeAssetFileName,
   mergePageScriptsWithBeaconRuntime,
   normalizeBeaconRuntimeAssetRow,
   normalizeHostedAssetUrl,
+  PURGE_MAX_PAGES_SCANNED,
+  planBoundedPageScan,
   selectBeaconRuntimeAssetIdsToPurge,
   withoutAnyBeaconRuntimeScripts,
 } from "@/features/cms-slots/model/cms-slot-page-inline-script";
@@ -962,10 +966,130 @@ describe("cms slot beacon runtime (published DOM)", () => {
   });
 });
 
+/**
+ * Fail-open guarantees for the published page. A list target is hidden the instant the runtime claims it; if the
+ * runtime then throws, the customer's live site shows an empty hole to real visitors and the app looks broken.
+ * Visible-but-unstyled must always beat invisible.
+ */
+describe("cms slot beacon runtime fail-open reveal (published site)", () => {
+  const LIST = "beacon-failopen-test";
+
+  function mountTarget(doc: Document, payload: unknown, listKey = LIST): HTMLDivElement {
+    const source = doc.createElement("div");
+    source.setAttribute("data-target", "beacons");
+    source.setAttribute("data-list", listKey);
+    const row = doc.createElement("div");
+    const bound = doc.createElement("span");
+    bound.setAttribute(CMS_SLOT_CONTENT_ATTR, "title");
+    row.appendChild(bound);
+    source.appendChild(row);
+
+    const target = doc.createElement("div");
+    target.setAttribute("data-beacon-target", "list");
+    target.setAttribute("data-list", listKey);
+    target.textContent = JSON.stringify(payload);
+    doc.body.append(source, target);
+    return target;
+  }
+
+  const okPayload = { v: 3, i: [0], p: [{ title: "hello" }] };
+
+  /** Breaks `applyProps` (its first statement reads `target.children`) without breaking the clone step. */
+  function breakApplyProps(target: HTMLElement): void {
+    Object.defineProperty(target, "children", {
+      configurable: true,
+      get() {
+        throw new Error("simulated runtime failure");
+      },
+    });
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+    document.body.innerHTML = "";
+  });
+
+  it("emits the safety reveal, per-target isolation, and guarded apply into the runtime source", () => {
+    const s = getCmsSlotPageInlineScriptSource();
+    expect(s).toContain("function bSafeReveal(target)");
+    expect(s).toContain(`},${CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS})`);
+    expect(s).toContain("bArmSafetyReveal(target)");
+    expect(s).toContain("function bTryApplyProps(target,payload)");
+    expect(s).toContain("bRevealAllTargets()");
+  });
+
+  it("arms an unconditional safety reveal for every claimed target", () => {
+    vi.useFakeTimers();
+    const target = mountTarget(document, okPayload);
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
+    runCmsSlotBeaconRuntime(document);
+
+    const safetyCalls = setTimeoutSpy.mock.calls.filter(([, ms]) => ms === CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS);
+    expect(safetyCalls).toHaveLength(1);
+
+    // The target is hidden right now; invoking *only* the safety callback must reveal it, proving the timer alone
+    // is sufficient even if the normal reveal chain never completes.
+    expect(target.style.visibility).toBe("hidden");
+    const safetyCallback = safetyCalls[0][0] as () => void;
+    safetyCallback();
+    expect(target.style.visibility).toBe("");
+  });
+
+  it("reveals a target whose applyProps throws (never leaves content invisible)", () => {
+    vi.useFakeTimers();
+    const target = mountTarget(document, okPayload);
+    breakApplyProps(target);
+
+    expect(() => runCmsSlotBeaconRuntime(document)).not.toThrow();
+    vi.advanceTimersByTime(CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS + 10);
+
+    expect(target.style.visibility).toBe("");
+  });
+
+  it("one failing target does not strand a healthy target elsewhere on the page", () => {
+    vi.useFakeTimers();
+    const broken = mountTarget(document, okPayload, "beacon-broken");
+    const healthy = mountTarget(document, okPayload, "beacon-healthy");
+    // Make the broken one fail during the clone step, before the normal reveal path runs.
+    Object.defineProperty(broken, "appendChild", {
+      configurable: true,
+      value: () => {
+        throw new Error("simulated clone failure");
+      },
+    });
+
+    expect(() => runCmsSlotBeaconRuntime(document)).not.toThrow();
+    vi.advanceTimersByTime(CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS + 10);
+
+    expect(broken.style.visibility).toBe("");
+    expect(healthy.style.visibility).toBe("");
+    expect(healthy.children.length).toBe(1);
+  });
+
+  it("still renders and reveals normally on the happy path", () => {
+    vi.useFakeTimers();
+    const target = mountTarget(document, okPayload);
+
+    runCmsSlotBeaconRuntime(document);
+    vi.advanceTimersByTime(200);
+
+    expect(target.style.visibility).toBe("");
+    expect(target.children.length).toBe(1);
+    expect(target.textContent).toContain("hello");
+  });
+});
+
 describe("isAllowedAssetUploadUrl", () => {
-  it("accepts HTTPS upload endpoints on Webflow and AWS S3 hosts", () => {
+  it("accepts HTTPS upload endpoints on Webflow and Amazon S3 hosts", () => {
+    // Path-style — the shape the Webflow Data API documents for `uploadUrl`.
     expect(isAllowedAssetUploadUrl("https://s3.amazonaws.com/webflow-bucket/key")).toBe(true);
+    expect(isAllowedAssetUploadUrl("https://s3.us-west-2.amazonaws.com/webflow-prod-assets/key")).toBe(true);
+    expect(isAllowedAssetUploadUrl("https://s3-us-west-2.amazonaws.com/webflow-prod-assets/key")).toBe(true);
+    // Virtual-hosted style.
     expect(isAllowedAssetUploadUrl("https://webflow-prod-assets.s3.amazonaws.com/key")).toBe(true);
+    expect(isAllowedAssetUploadUrl("https://webflow-prod-assets.s3.us-east-1.amazonaws.com/key")).toBe(true);
+    // Webflow-owned hosts.
     expect(isAllowedAssetUploadUrl("https://uploads.webflow.com/asset")).toBe(true);
     expect(isAllowedAssetUploadUrl("https://webflow.com/upload")).toBe(true);
     expect(isAllowedAssetUploadUrl("https://uploads-ssl.website-files.com/asset")).toBe(true);
@@ -975,9 +1099,184 @@ describe("isAllowedAssetUploadUrl", () => {
     expect(isAllowedAssetUploadUrl("http://s3.amazonaws.com/webflow-bucket/key")).toBe(false);
     expect(isAllowedAssetUploadUrl("https://evil.example/upload")).toBe(false);
     expect(isAllowedAssetUploadUrl("https://webflow.com.evil.example/upload")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://webflow.com.evil.com/upload")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://amazonaws.com.evil.com/upload")).toBe(false);
     expect(isAllowedAssetUploadUrl("https://notwebflow.com/upload")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://website-files.com.evil.com/upload")).toBe(false);
     expect(isAllowedAssetUploadUrl("javascript:alert(1)")).toBe(false);
     expect(isAllowedAssetUploadUrl("not a url")).toBe(false);
     expect(isAllowedAssetUploadUrl("")).toBe(false);
+  });
+
+  it("rejects AWS hosts that are not S3 endpoints (any bucket is not any Webflow bucket)", () => {
+    // The old `*.amazonaws.com` suffix test accepted every AWS-hosted host, including attacker-controlled
+    // buckets and unrelated AWS service endpoints. Only S3 endpoint host shapes are allowed now.
+    expect(isAllowedAssetUploadUrl("https://evil-bucket.amazonaws.com/upload/key")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://amazonaws.com/upload")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://execute-api.us-east-1.amazonaws.com/prod/upload")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://lambda.us-east-1.amazonaws.com/2015-03-31/functions")).toBe(false);
+    // `s3` must be its own host label, and the region label must look like a real AWS region.
+    expect(isAllowedAssetUploadUrl("https://evils3.amazonaws.com/key")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://s3.evil.amazonaws.com/key")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.com.evil.com/key")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.evil.com/key")).toBe(false);
+  });
+
+  it("resolves userinfo tricks to the real host before matching", () => {
+    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.com@evil.example/key")).toBe(false);
+    expect(isAllowedAssetUploadUrl("https://webflow.com@evil.example/upload")).toBe(false);
+  });
+});
+
+describe("decideCmsSlotRuntimeSyncAction", () => {
+  const HASH = "a1b2c3d4";
+  const NO_REGISTERED = new Set<string>();
+  const applied = (attrs?: Record<string, unknown>, over: Partial<PageScript> = {}): PageScript =>
+    ({
+      id: "reg-1",
+      location: "footer",
+      version: "1.0.0",
+      attributes: attrs as Record<string, string> | undefined,
+      ...over,
+    }) as PageScript;
+  const marked = (hash: unknown): Record<string, unknown> => ({
+    "data-codalyn-beacon": "runtime",
+    "data-codalyn-beacon-src-hash": hash,
+  });
+  const decide = (existing: unknown, force?: boolean) =>
+    decideCmsSlotRuntimeSyncAction({
+      existing: existing as never,
+      expectedHash: HASH,
+      registeredBeaconScriptIds: NO_REGISTERED,
+      force,
+    });
+
+  it("skips when the applied footer runtime already carries the expected hash (canonical shape)", () => {
+    expect(decide([applied(marked(HASH))]).action).toBe("skip");
+  });
+
+  it("skips regardless of attribute-name casing (Webflow varies it)", () => {
+    const attrs = { "Data-Codalyn-Beacon": "runtime", "DATA-CODALYN-BEACON-SRC-HASH": HASH };
+    expect(decide([applied(attrs)]).action).toBe("skip");
+  });
+
+  it("accepts the wrapped `{ value }` attribute shape for the hash (alternate runtime shape)", () => {
+    expect(decide([applied(marked({ value: HASH }))]).action).toBe("skip");
+  });
+
+  it("registers when the applied hash is a different build", () => {
+    expect(decide([applied(marked("ffffffff"))].concat()).action).toBe("register");
+  });
+
+  it("registers when no beacon runtime is applied at all (missing field)", () => {
+    expect(decide([]).action).toBe("register");
+    expect(decide([applied(undefined, { id: "someone-elses" })]).action).toBe("register");
+  });
+
+  it("registers on a missing or garbled hash attribute — never silently skips", () => {
+    for (const hash of [undefined, null, "", "   ", 42, {}, { value: "" }, [], true]) {
+      expect(decide([applied(marked(hash))]).action).toBe("register");
+    }
+  });
+
+  it("registers when the marker attribute is absent", () => {
+    expect(decide([applied({ "data-codalyn-beacon-src-hash": HASH })]).action).toBe("register");
+  });
+
+  it("registers when the applied runtime is not in the footer", () => {
+    expect(decide([applied(marked(HASH), { location: "header" })]).action).toBe("register");
+    expect(decide([applied(marked(HASH), { location: undefined })]).action).toBe("register");
+  });
+
+  it("registers when more than one beacon runtime is applied (restores the exactly-one invariant)", () => {
+    const dupes = [applied(marked(HASH)), applied(marked(HASH), { id: "reg-2" })];
+    expect(decide(dupes).action).toBe("register");
+  });
+
+  it("counts registry-known scripts as ours even without the marker attribute", () => {
+    const stale = { id: "reg-legacy", location: "footer", version: "0.9.0" } as PageScript;
+    const decision = decideCmsSlotRuntimeSyncAction({
+      existing: [applied(marked(HASH)), stale],
+      expectedHash: HASH,
+      registeredBeaconScriptIds: new Set(["reg-legacy"]),
+      force: false,
+    });
+    expect(decision.action).toBe("register");
+  });
+
+  it("registers on malformed `existing` input rather than assuming a clean page", () => {
+    for (const existing of [null, undefined, "not-an-array", 7, {}]) {
+      expect(decide(existing).action).toBe("register");
+    }
+    expect(decide([null, undefined]).action).toBe("register");
+  });
+
+  it("registers when the expected hash itself is missing or malformed", () => {
+    for (const expectedHash of ["", "   ", null, undefined, 5]) {
+      const decision = decideCmsSlotRuntimeSyncAction({
+        existing: [applied(marked(HASH))],
+        expectedHash: expectedHash as never,
+        registeredBeaconScriptIds: NO_REGISTERED,
+      });
+      expect(decision.action).toBe("register");
+    }
+  });
+
+  it("force always registers, even on an exact match", () => {
+    expect(decide([applied(marked(HASH))], true).action).toBe("register");
+  });
+
+  it("always explains itself (the reason is surfaced in warnings)", () => {
+    expect(decide([applied(marked(HASH))]).reason.length).toBeGreaterThan(0);
+    expect(decide([]).reason.length).toBeGreaterThan(0);
+  });
+});
+
+describe("planBoundedPageScan", () => {
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => `page-${i}`);
+
+  it("scans every page when the site fits under the cap", () => {
+    const plan = planBoundedPageScan(ids(10));
+    expect(plan.scan).toHaveLength(10);
+    expect(plan.skipped).toBe(0);
+    expect(plan.complete).toBe(true);
+  });
+
+  it("caps a large site and reports the remainder as skipped", () => {
+    const total = PURGE_MAX_PAGES_SCANNED + 25;
+    const plan = planBoundedPageScan(ids(total));
+    expect(plan.scan).toHaveLength(PURGE_MAX_PAGES_SCANNED);
+    expect(plan.skipped).toBe(25);
+    // Incomplete → the caller must skip the orphan purge rather than act on a partial id set.
+    expect(plan.complete).toBe(false);
+  });
+
+  it("is complete at exactly the cap", () => {
+    const plan = planBoundedPageScan(ids(PURGE_MAX_PAGES_SCANNED));
+    expect(plan.skipped).toBe(0);
+    expect(plan.complete).toBe(true);
+  });
+
+  it("drops non-string and empty ids at the boundary", () => {
+    const plan = planBoundedPageScan(["a", "", null, undefined, 5, {}, "b"]);
+    expect(plan.scan).toEqual(["a", "b"]);
+    expect(plan.complete).toBe(true);
+  });
+
+  it("treats malformed input as an empty, complete scan", () => {
+    for (const input of [null, undefined, "nope", 3, {}]) {
+      const plan = planBoundedPageScan(input as never);
+      expect(plan.scan).toEqual([]);
+      expect(plan.complete).toBe(true);
+    }
+  });
+
+  it("treats a non-positive or malformed cap as scan-nothing rather than scan-everything", () => {
+    for (const cap of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const plan = planBoundedPageScan(ids(5), cap);
+      expect(plan.scan).toEqual([]);
+      expect(plan.skipped).toBe(5);
+      expect(plan.complete).toBe(false);
+    }
   });
 });

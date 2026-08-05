@@ -14,7 +14,16 @@
  */
 
 import { execSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as p from "@clack/prompts";
@@ -291,6 +300,95 @@ function verifyArchivedZipContains(archivePath, markers) {
 }
 
 /**
+ * Env vars that must NOT disable a user-visible feature in a release bundle. These gate surfaces whose
+ * "off" state ships silently — the build must fail instead of quietly producing a crippled app.
+ *
+ * `VITE_CMS_SLOTS_SURFACE_ENABLED`: this variable used to be an *enable* switch that
+ * `isCmsSlotsSurfaceEnabled()` required to be exactly "true" under `import.meta.env.PROD` — but every
+ * `.env*` file is gitignored, so it existed only on one developer's machine. A clean checkout or CI
+ * release build therefore produced a bundle where CMS Slots — the flagship surface — rendered as a
+ * permanently disabled home-screen tile with no explanation. A Marketplace reviewer reads that as a
+ * broken or placeholder feature, which is the class of finding that has already cost four review rounds.
+ * The flag is now a kill switch that defaults on, so the guard only has to catch an explicit disable.
+ */
+const FORBIDDEN_RELEASE_ENV = {
+  beacon: [
+    {
+      key: "VITE_CMS_SLOTS_SURFACE_ENABLED",
+      rejected: "false",
+      feature: "the CMS Slots surface",
+      hint: "remove the override from your .env* files or CI environment before building a release bundle",
+    },
+  ],
+};
+
+/** Vite reads these in order, later files winning; mirrors vite's `getEnvFilesForMode`. */
+function viteEnvFilesForMode(mode) {
+  return [".env", ".env.local", `.env.${mode}`, `.env.${mode}.local`];
+}
+
+/**
+ * Reads one `KEY=value` entry from a dotenv file. Returns null — never a guessed default — when
+ * the file is missing or the key is absent, so the caller decides what "unset" means.
+ */
+function readEnvFileValue(filePath, key) {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+  let value = null;
+  for (const rawLine of readFileSync(filePath, "utf-8").split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+    const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!match || match[1] !== key) {
+      continue;
+    }
+    const raw = match[2].trim();
+    const quoted = raw.match(/^(["'])([\s\S]*)\1$/);
+    value = quoted ? quoted[2] : raw.replace(/\s+#.*$/, "").trim();
+  }
+  return value;
+}
+
+/**
+ * Resolves the value Vite will inline for `key`, using Vite's own precedence: env files in
+ * `viteEnvFilesForMode` order, then any `VITE_*` already present in the environment the build is
+ * spawned with (vite's `loadEnv` applies `process.env` last, so inline values win).
+ */
+function resolveViteEnvValue({ appPath, mode, key, inlineEnv }) {
+  let value = null;
+  for (const envFile of viteEnvFilesForMode(mode)) {
+    const fromFile = readEnvFileValue(resolve(appPath, envFile), key);
+    if (fromFile !== null) {
+      value = fromFile;
+    }
+  }
+  if (key.startsWith("VITE_") && inlineEnv[key] !== undefined) {
+    value = inlineEnv[key];
+  }
+  return value;
+}
+
+/** Release channels only; development builds are allowed to run with features toggled off. */
+function assertRequiredReleaseEnv({ appName, appPath, channel, inlineEnv }) {
+  if (channel !== "production" && channel !== "preview") {
+    return;
+  }
+  for (const { key, rejected, feature, hint } of FORBIDDEN_RELEASE_ENV[appName] ?? []) {
+    const resolved = resolveViteEnvValue({ appPath, mode: channel, key, inlineEnv });
+    if (resolved?.trim() !== rejected) {
+      continue;
+    }
+    throw new Error(
+      `${key} resolves to ${JSON.stringify(rejected)} for this ${channel} build, which ships ` +
+        `${feature} disabled — reviewers would see a dead feature. Fix: ${hint}.`
+    );
+  }
+}
+
+/**
  * Values that must never appear in a release bundle: local dev secrets/origins that Vite would
  * happily inline from .env/.env.local if the channel env in buildViteEnv ever stopped overriding
  * them (e.g. VITE_BEACON_API_KEY, a localhost Tower origin).
@@ -303,9 +401,14 @@ function collectForbiddenBundleMarkers(appPath, channel) {
   // shipped bundles. Bare substrings so any scheme/port/derivative form is caught; the Vite
   // transform in scripts/vite-strip-dev-host-literals.mjs plus source-side fixes are what make a
   // clean release build possible — this is the backstop that keeps regressions from shipping.
+  // Matching is case-insensitive (see matchForbiddenMarker).
   const forbidden = [
     { value: "localhost", label: "a localhost reference" },
     { value: "127.0.0.1", label: "a loopback-IP reference" },
+    // An earlier review round flagged Sentry; it has since been removed from the app, but
+    // posthog-js still ships a (never-called) Sentry integration. The strip plugin compiles that
+    // out — this marker guarantees a reviewer's `grep -i sentry` over the bundle stays empty.
+    { value: "sentry", label: "a Sentry reference" },
     { value: "tower.invalid", label: "the dev-only Tower placeholder origin" },
     { value: "codalyn.invalid", label: "the legacy placeholder email domain" },
     { value: "codalyn.beacon/", label: "the legacy publish-placeholder URL" },
@@ -340,8 +443,34 @@ function expectedBundleMarkers({ appName, appPath, channel, recipient, pkg }) {
   return expected;
 }
 
+/**
+ * Forbidden markers are matched case-insensitively. Reviewers grep with `grep -i`, and a
+ * lowercase-only `includes` silently let vendor camelCase identifiers through — posthog-js's
+ * `__forceAllowLocalhost` / `_forceAllowLocalhostNetworkCapture` passed a `localhost` gate that
+ * was supposed to catch exactly that. Values are compared as plain substrings (never regexes), so
+ * a genuine `http://localhost:3000` still trips the gate in any casing.
+ *
+ * @returns {{ value: string; label: string } | null} the first marker present, if any
+ */
+function matchForbiddenMarker(contents, forbidden) {
+  if (!forbidden?.length) {
+    return null;
+  }
+  const haystack = contents.toLowerCase();
+  return forbidden.find(({ value }) => haystack.includes(value.toLowerCase())) ?? null;
+}
+
 function verifyDistBundle(appPath, markers) {
-  assertBundleOutputMatchesBuild(readAllDistJs(appPath), markers);
+  const contents = readAllDistJs(appPath);
+  const hit = matchForbiddenMarker(contents, markers.forbidden);
+  if (hit) {
+    throw new Error(
+      `Build output contains ${hit.label} — a forbidden value leaked into a release bundle. ` +
+        "Check .env/.env.local overrides, the channel env in build-cli.mjs, and the strip rules in " +
+        "scripts/vite-strip-dev-host-literals.mjs."
+    );
+  }
+  assertBundleOutputMatchesBuild(contents, markers);
 }
 
 function verifyArchivedZipExcludes(archivePath, forbidden) {
@@ -353,10 +482,9 @@ function verifyArchivedZipExcludes(archivePath, forbidden) {
     maxBuffer: 50 * 1024 * 1024,
     encoding: "latin1",
   });
-  for (const { value, label } of forbidden) {
-    if (contents.includes(value)) {
-      throw new Error(`Archived zip contains ${label} — a local dev value leaked into the release bundle`);
-    }
+  const hit = matchForbiddenMarker(contents, forbidden);
+  if (hit) {
+    throw new Error(`Archived zip contains ${hit.label} — a forbidden value leaked into the release bundle`);
   }
 }
 
@@ -385,9 +513,18 @@ function sanitizeWebflowManifestOrExit(s, appPath, title) {
 async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
   const channelDir = channelOutputDir(channel);
   const viteMode = channel;
-  const s = p.spinner();
   const viteEnv = buildViteEnv({ appName, channel, recipient });
 
+  // Fail before lint/test/build: a missing release feature flag is a config problem, and the
+  // operator should not wait out a full pipeline to hear about it.
+  try {
+    assertRequiredReleaseEnv({ appName, appPath, channel, inlineEnv: { ...process.env, ...viteEnv } });
+  } catch (err) {
+    p.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+
+  const s = p.spinner();
   s.start(`${progressBar(STEPS[0].pct)}  ${STEPS[0].label}…`);
   const lintResult = await run("pnpm", ["lint:all"], { cwd: appPath });
   if (lintResult.status !== 0) {
@@ -518,7 +655,28 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  p.log.error(err.message);
-  process.exit(1);
-});
+/**
+ * Only run the TUI when invoked as a script. Importing this module (release-gate tests) must not
+ * kick off a build. `realpathSync` on both sides so a symlinked bin path still matches.
+ */
+function isDirectInvocation() {
+  const entry = process.argv[1];
+  if (!entry) {
+    return false;
+  }
+  try {
+    return realpathSync(resolve(entry)) === realpathSync(__filename);
+  } catch {
+    return false;
+  }
+}
+
+if (isDirectInvocation()) {
+  main().catch((err) => {
+    p.log.error(err.message);
+    process.exit(1);
+  });
+}
+
+/** Exported for scripts/__tests__ coverage of the release gates; not part of the CLI surface. */
+export { assertRequiredReleaseEnv, collectForbiddenBundleMarkers, matchForbiddenMarker, resolveViteEnvValue };

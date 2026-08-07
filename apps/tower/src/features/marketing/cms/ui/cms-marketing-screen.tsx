@@ -5,7 +5,9 @@ import type { TowerLandingAppLinks } from "@/features/tower-ui/tower-landing";
 import type { Page } from "@/payload-types";
 import { TOWER_PRODUCT_MARKETING_PATH } from "@/shared/lib/navigation/tower-marketing-paths";
 import type { TowerPublicNavItem } from "@/shared/lib/navigation/tower-public-nav";
+import { Card, CardContent } from "@/shared/ui/card";
 import { MarketingPageShell } from "@/shared/ui/marketing-page-shell";
+import { RichTextContent } from "@/shared/ui/rich-text-content";
 
 type CmsMarketingScreenProps = {
   page: Page;
@@ -49,7 +51,15 @@ function CmsMarketingScreen({
     >
       {draft ? <DraftBanner slug={page.slug} /> : null}
       <CmsPageHero hero={page.hero} />
-      {page.layout?.length ? <RenderBlocks blocks={page.layout} /> : null}
+      {page.layout?.length ? (
+        <RenderBlocks blocks={page.layout} />
+      ) : page.content ? (
+        <Card>
+          <CardContent>
+            <RichTextContent data={page.content} />
+          </CardContent>
+        </Card>
+      ) : null}
     </MarketingPageShell>
   );
 }

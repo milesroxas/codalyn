@@ -9,6 +9,7 @@ import { TowerLoggedOutHeader } from "@/features/tower-ui/tower-logged-out-heade
 import { TowerSiteHeader } from "@/features/tower-ui/tower-site-header";
 import { isTowerAuthSurfacePath } from "@/shared/lib/navigation/tower-auth-surfaces";
 import {
+  isTowerCmsRootPagePath,
   isTowerMarketingInnerPagePath,
   isTowerMarketingSelfContainedPath,
   TOWER_SUPPORT_PATH,
@@ -104,7 +105,9 @@ export function TowerAppShell({
   // Full-bleed surfaces that render their own layout (AuthShell) in both auth states.
   const isBareSurface = isTowerAuthSurfacePath(pathname) || pathname === TOWER_SUPPORT_PATH;
 
-  if (isTowerMarketingSelfContainedPath(pathname) && !showAuthenticatedChrome) {
+  // CMS root pages (e.g. /pricing) render their own marketing chrome via
+  // CmsMarketingScreen, same as the self-contained product pages.
+  if ((isTowerMarketingSelfContainedPath(pathname) || isTowerCmsRootPagePath(pathname)) && !showAuthenticatedChrome) {
     return children;
   }
 

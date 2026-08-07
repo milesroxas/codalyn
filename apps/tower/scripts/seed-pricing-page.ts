@@ -46,7 +46,9 @@ async function run() {
               cta: { label: "Start free", href: "/sign-up" },
               features: [
                 { text: "1 workspace you own" },
-                { text: "2,500 Webflow updates, 500 CMS writes, 25 image credits / month" },
+                {
+                  text: "{{limits.free.webflowUpdates}} Webflow updates, {{limits.free.cmsWrites}} CMS writes, {{limits.free.imageCredits}} image credits / month",
+                },
                 { text: "Join any Team workspace you're invited to" },
               ],
             },
@@ -60,7 +62,9 @@ async function run() {
               cta: { label: "Get Pro", href: "/sign-up" },
               features: [
                 { text: "Up to 3 workspaces you own" },
-                { text: "25,000 Webflow updates, 5,000 CMS writes, 500 image credits / month" },
+                {
+                  text: "{{limits.pro.webflowUpdates}} Webflow updates, {{limits.pro.cmsWrites}} CMS writes, {{limits.pro.imageCredits}} image credits / month",
+                },
                 { text: "Your plan follows you across workspaces you own" },
               ],
             },
@@ -73,7 +77,9 @@ async function run() {
               cta: { label: "Get Studio", href: "/sign-up" },
               features: [
                 { text: "Up to 10 workspaces you own" },
-                { text: "60,000 Webflow updates, 12,000 CMS writes, 1,500 image credits / month" },
+                {
+                  text: "{{limits.studio.webflowUpdates}} Webflow updates, {{limits.studio.cmsWrites}} CMS writes, {{limits.studio.imageCredits}} image credits / month",
+                },
                 { text: "Your plan follows you across workspaces you own" },
               ],
             },
@@ -131,19 +137,29 @@ async function run() {
             {
               label: "Webflow updates / month",
               cells: [
-                { value: "2,500" },
-                { value: "25,000" },
-                { value: "60,000" },
-                { value: "120,000 per seat, pooled" },
+                { value: "{{limits.free.webflowUpdates}}" },
+                { value: "{{limits.pro.webflowUpdates}}" },
+                { value: "{{limits.studio.webflowUpdates}}" },
+                { value: "{{limits.team.webflowUpdates}} per seat, pooled" },
               ],
             },
             {
               label: "CMS writes / month",
-              cells: [{ value: "500" }, { value: "5,000" }, { value: "12,000" }, { value: "25,000 per seat, pooled" }],
+              cells: [
+                { value: "{{limits.free.cmsWrites}}" },
+                { value: "{{limits.pro.cmsWrites}}" },
+                { value: "{{limits.studio.cmsWrites}}" },
+                { value: "{{limits.team.cmsWrites}} per seat, pooled" },
+              ],
             },
             {
               label: "Image credits / month",
-              cells: [{ value: "25" }, { value: "500" }, { value: "1,500" }, { value: "3,000 per seat, pooled" }],
+              cells: [
+                { value: "{{limits.free.imageCredits}}" },
+                { value: "{{limits.pro.imageCredits}}" },
+                { value: "{{limits.studio.imageCredits}}" },
+                { value: "{{limits.team.imageCredits}} per seat, pooled" },
+              ],
             },
             {
               label: "How usage is counted",

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { BEACON_DOCS_META } from "@/features/docs/lib/beacon-docs";
 import { LEGAL_DOCUMENTS } from "@/features/legal/lib/legal-site";
 import { BEACON_MARKETING_COPY } from "@/features/marketing/beacon/lib/beacon-marketing-content";
 import { FLINT_MARKETING_COPY } from "@/features/marketing/flint/lib/flint-marketing-content";
@@ -17,7 +18,7 @@ export const MARKETING_SEO_SITE = {
   locale: "en_US",
 } as const;
 
-export type MarketingPageId = "home" | "tower" | "beacon" | "flint" | "privacy" | "terms";
+export type MarketingPageId = "home" | "tower" | "beacon" | "flint" | "privacy" | "terms" | "docs";
 
 type MarketingPageCopy = {
   title: string;
@@ -42,6 +43,10 @@ export function getMarketingPageCopy(pageId: MarketingPageId): MarketingPageCopy
       const { title, description } = LEGAL_DOCUMENTS["terms-of-service"];
       return { title, description };
     }
+    case "docs": {
+      const { title, description } = BEACON_DOCS_META;
+      return { title, description };
+    }
   }
 }
 
@@ -60,6 +65,8 @@ export function resolveMarketingCanonicalUrl(pageId: MarketingPageId): string {
       return buildMarketingUrl("/privacy");
     case "terms":
       return buildMarketingUrl("/terms");
+    case "docs":
+      return buildMarketingUrl("/docs");
   }
 }
 

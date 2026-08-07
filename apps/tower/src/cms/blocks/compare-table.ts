@@ -48,7 +48,15 @@ export const CompareTable: Block = {
           maxRows: 4,
           labels: { singular: "Cell", plural: "Cells" },
           fields: [
-            { name: "value", type: "text", required: true },
+            {
+              name: "value",
+              type: "text",
+              required: true,
+              admin: {
+                description:
+                  "Supports limit tokens (e.g. `{{limits.free.cmsWrites}}`) so usage numbers track operator platform settings instead of drifting.",
+              },
+            },
             {
               name: "muted",
               type: "checkbox",

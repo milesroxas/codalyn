@@ -79,6 +79,10 @@ export const PricingPlans: Block = {
           required: true,
           minRows: 1,
           labels: { singular: "Feature", plural: "Features" },
+          admin: {
+            description:
+              "Never hardcode usage-limit numbers — use limit tokens so operator platform settings stay the single source of truth, e.g. `{{limits.pro.webflowUpdates}} Webflow updates / month`. Metrics: webflowUpdates, cmsWrites, imageCredits; tiers: free, pro, studio, team.",
+          },
           fields: [{ name: "text", type: "text", required: true }],
         },
       ],

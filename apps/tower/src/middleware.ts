@@ -15,6 +15,8 @@ import {
   isTowerCmsRootPagePath,
   isTowerMarketingPublicPath,
   TOWER_CMS_PAGE_PATH_PREFIX,
+  TOWER_DOCS_PATH,
+  TOWER_HELP_PATH,
   TOWER_SUPPORT_PATH,
 } from "@/shared/lib/navigation/tower-marketing-paths";
 
@@ -32,6 +34,8 @@ const PUBLIC_PREFIXES = [
   "/",
   ...TOWER_AUTH_SURFACE_PATHS,
   TOWER_SUPPORT_PATH,
+  TOWER_DOCS_PATH,
+  TOWER_HELP_PATH,
   "/terms",
   "/privacy",
   // Payload CMS admin — enforces its own auth (cms-users, `payload-token` cookie).

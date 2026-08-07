@@ -3,6 +3,7 @@ import type * as React from "react";
 import { ConsentDialogLink } from "@/shared/lib/consent/consent-dialog-link";
 
 import {
+  TOWER_DOCS_PATH,
   TOWER_PRIVACY_PATH,
   TOWER_SUPPORT_PATH,
   TOWER_TERMS_PATH,
@@ -67,6 +68,9 @@ function TowerPublicFooter({ variant = "default", placement = "static", classNam
           © {year} Codalyn
         </p>
         <nav aria-label="Footer" className="flex items-center gap-4">
+          <TowerPublicFooterLink href={TOWER_DOCS_PATH} variant={variant}>
+            Docs
+          </TowerPublicFooterLink>
           <TowerPublicFooterLink href={TOWER_SUPPORT_PATH} variant={variant}>
             Support
           </TowerPublicFooterLink>

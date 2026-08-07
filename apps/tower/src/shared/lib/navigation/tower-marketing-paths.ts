@@ -2,6 +2,9 @@ export const TOWER_TERMS_PATH = "/terms";
 export const TOWER_PRIVACY_PATH = "/privacy";
 export const TOWER_PRODUCT_MARKETING_PATH = "/tower";
 export const TOWER_SUPPORT_PATH = "/support";
+export const TOWER_DOCS_PATH = "/docs";
+/** Alias route that permanently redirects to {@link TOWER_DOCS_PATH}. */
+export const TOWER_HELP_PATH = "/help";
 
 /** Legacy URL namespace for CMS-managed marketing pages; now permanently redirects to the root slug. */
 export const TOWER_CMS_PAGE_PATH_PREFIX = "/p";
@@ -40,8 +43,10 @@ export const TOWER_RESERVED_ROOT_SEGMENTS = new Set([
   "connection",
   "console",
   "dashboard",
+  "docs",
   "flint",
   "forgot-password",
+  "help",
   "integrations",
   "invitations",
   "p",
@@ -85,6 +90,8 @@ export const TOWER_MARKETING_PUBLIC_PATHS = [
   TOWER_SUPPORT_PATH,
   TOWER_TERMS_PATH,
   TOWER_PRIVACY_PATH,
+  TOWER_DOCS_PATH,
+  TOWER_HELP_PATH,
 ] as const;
 
 export type TowerMarketingPublicPath = (typeof TOWER_MARKETING_PUBLIC_PATHS)[number];
@@ -95,7 +102,7 @@ export const TOWER_MARKETING_SELF_CONTAINED_PATHS = ["/", TOWER_PRODUCT_MARKETIN
 export type TowerMarketingSelfContainedPath = (typeof TOWER_MARKETING_SELF_CONTAINED_PATHS)[number];
 
 /** Logged-out marketing inner pages that use app header chrome (for example legal). */
-export const TOWER_MARKETING_INNER_PAGE_PATHS = [TOWER_TERMS_PATH, TOWER_PRIVACY_PATH] as const;
+export const TOWER_MARKETING_INNER_PAGE_PATHS = [TOWER_TERMS_PATH, TOWER_PRIVACY_PATH, TOWER_DOCS_PATH] as const;
 
 export type TowerMarketingInnerPagePath = (typeof TOWER_MARKETING_INNER_PAGE_PATHS)[number];
 
@@ -123,6 +130,7 @@ export const TOWER_PUBLIC_FOOTER_PATHS = [
   ...TOWER_MARKETING_SELF_CONTAINED_PATHS,
   TOWER_TERMS_PATH,
   TOWER_PRIVACY_PATH,
+  TOWER_DOCS_PATH,
 ] as const;
 
 export function isTowerPublicFooterPath(pathname: string): boolean {

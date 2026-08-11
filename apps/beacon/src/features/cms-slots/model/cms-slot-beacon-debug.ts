@@ -11,10 +11,11 @@
  * object; nothing touches `document`/`window` until `bDbgBindKeys`/`bLog` are invoked by the runtime.
  */
 /**
- * Production stand-in for {@link beaconPropDebugRuntimeSource}: declares the four functions the footer runtime calls
+ * Stand-in for {@link beaconPropDebugRuntimeSource}: declares the four functions the footer runtime calls
  * (`bLog`, `bDbgBump`, `bDbgBindKeys`, `bDbgRuntimeInfo`) as no-ops so the runtime parses and runs without shipping the
- * styled HUD, its CSS, or the event-log buffer to live traffic. Used for the `production` build channel; dev/preview
- * ship the full {@link beaconPropDebugRuntimeSource}.
+ * styled HUD, its CSS, or the event-log buffer to live traffic. Every non-`development` channel (production AND
+ * preview) embeds this stub — only development builds ship the full HUD (Marketplace: no app keyboard shortcuts,
+ * reviewed runtime = shipped runtime; pinned by cms-slot-beacon-prop-runtime.test.ts).
  */
 export function beaconPropDebugStubSource(): string {
   return "function bLog(){}function bDbgBump(){}function bDbgBindKeys(){}function bDbgRuntimeInfo(){}";

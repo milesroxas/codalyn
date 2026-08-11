@@ -6,6 +6,9 @@ import {
 
 const POPOUT_NAME = "beacon-quality-compare";
 
+/** Upper bound on the ready/close poll — an abandoned popout must not poll for the whole session. */
+const POPOUT_READY_WATCH_TIMEOUT_MS = 10 * 60 * 1000;
+
 /** Static compare page shipped in the extension bundle (public/quality-compare.html). */
 export const QUALITY_COMPARE_POPOUT_PAGE = "quality-compare.html";
 
@@ -60,13 +63,15 @@ export function openQualityComparePopout(options: {
   };
   window.addEventListener("message", onReady);
 
-  // Drop the ready listener if the popout is closed before it ever announces itself.
+  // Drop the ready listener if the popout is closed before it ever announces itself. Hard-bounded
+  // like the auth popup watcher (Marketplace guidance bars long-running background work): a popout
+  // that never loads and is left open must not keep this timer alive for the rest of the session.
+  const startedAt = Date.now();
   const closeWatch = window.setInterval(() => {
-    if (!popWin.closed) {
-      return;
+    if (popWin.closed || Date.now() - startedAt >= POPOUT_READY_WATCH_TIMEOUT_MS) {
+      window.clearInterval(closeWatch);
+      window.removeEventListener("message", onReady);
     }
-    window.clearInterval(closeWatch);
-    window.removeEventListener("message", onReady);
   }, 1000);
 
   popWin.focus();

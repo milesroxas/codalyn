@@ -167,6 +167,12 @@ describe("middleware host split", () => {
     expect(response?.headers.get("location")).toBe("https://tower.codalyn.app/sign-in?callbackUrl=%2Faccount");
   });
 
+  it("keeps /beacon-handoff public — the visitor has no session cookie until the page redeems its token", () => {
+    process.env.BETTER_AUTH_URL = "https://tower.codalyn.app";
+    const response = middleware(makeRequest("tower.codalyn.app", "/beacon-handoff"));
+    expect(response?.status).not.toBe(307);
+  });
+
   it("returns CORS headers for OPTIONS /api/auth from Webflow extension origins", () => {
     const url = new URL("/api/auth/get-session", "https://tower.codalyn.app");
     const request = new NextRequest(url, {

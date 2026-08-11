@@ -54,16 +54,14 @@ describe("stripUrlControlCharacters", () => {
 
 describe("isSafeRichTextUrl", () => {
   it("allows navigational schemes", () => {
-    for (const url of [
-      "https://x.com",
-      "http://x.com",
-      "https://example.com",
-      "http://example.com",
-      "mailto:a@b.com",
-      "tel:+15551234",
-      "HTTPS://EX.COM",
-    ]) {
+    for (const url of ["https://x.com", "https://example.com", "mailto:a@b.com", "tel:+15551234", "HTTPS://EX.COM"]) {
       expect(isSafeRichTextUrl(url)).toBe(true);
+    }
+  });
+
+  it("rejects http: (https-only for web URLs) and sms: — Marketplace round-6 scheme allowlist", () => {
+    for (const url of ["http://x.com", "HTTP://X.COM", "http://example.com/a?b=c", "sms:+15551234", "SMS:+15551234"]) {
+      expect(isSafeRichTextUrl(url)).toBe(false);
     }
   });
 

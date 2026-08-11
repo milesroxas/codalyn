@@ -16,7 +16,7 @@ export type BeaconTowerAccessPolicyState = {
 const UNKNOWN_POLICY: BeaconTowerAccessPolicyState = { earlyAccessRequired: null, ready: false };
 
 /**
- * Reads Tower's public access policy so auth UI can choose "Sign up" (gate off) vs "Request early access" (gate on).
+ * Reads Tower's public access policy so auth UI can choose "Sign up" (gate off) vs "Request access" (gate on).
  * Leaves `earlyAccessRequired` null on a missing/malformed/unreachable response, letting callers keep the safe default.
  */
 export function useBeaconTowerAccessPolicy(): BeaconTowerAccessPolicyState {

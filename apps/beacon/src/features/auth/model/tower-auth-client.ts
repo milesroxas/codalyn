@@ -83,6 +83,19 @@ export function buildTowerAppUrl(path: string): string | null {
   return `${baseURL}${normalizedPath}`;
 }
 
+/**
+ * Session-handoff URL for a freshly opened Tower tab. The one-time token travels in the URL
+ * **fragment**, never a query parameter: fragments are not sent to the server, so the token cannot
+ * land in server, proxy, or CDN access logs (Marketplace round-6 requirement). Tower's
+ * `/beacon-handoff` page strips the fragment from history immediately and redeems the token via
+ * `POST /api/beacon-handoff` (JSON body).
+ */
+export function buildTowerHandoffUrl(token: string, callbackPath: string): string | null {
+  return buildTowerAppUrl(
+    `/beacon-handoff#ott=${encodeURIComponent(token)}&callbackUrl=${encodeURIComponent(callbackPath)}`
+  );
+}
+
 export function buildTowerAuthPopupUrl(path: "/sign-in" | "/sign-up", beaconOrigin: string): string | null {
   if (!baseURL) {
     return null;
@@ -206,9 +219,7 @@ export function openTowerAppPath(path: string, options: OpenTowerAppPathOptions 
       win.location.replace(directUrl);
       return;
     }
-    const handoffUrl = buildTowerAppUrl(
-      `/api/beacon-handoff?ott=${encodeURIComponent(token)}&callbackUrl=${encodeURIComponent(resolvedPath)}`
-    );
+    const handoffUrl = buildTowerHandoffUrl(token, resolvedPath);
     win.location.replace(handoffUrl ?? directUrl);
   })();
 }

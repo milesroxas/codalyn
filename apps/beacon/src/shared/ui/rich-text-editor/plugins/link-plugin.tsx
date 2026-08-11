@@ -76,7 +76,7 @@ function LinkEditorFields({ active, currentUrl, onDone, inMenu = false }: LinkEd
           }
         }}
       />
-      {invalid ? <p className="text-[0.7rem] text-destructive">Enter a valid http(s), mailto, or tel link.</p> : null}
+      {invalid ? <p className="text-[0.7rem] text-destructive">Enter a valid https, mailto, or tel link.</p> : null}
       <div className="flex items-center justify-between gap-2">
         <Button type="button" size="sm" onClick={apply}>
           {active ? "Update" : "Add"}

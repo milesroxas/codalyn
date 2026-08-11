@@ -3,6 +3,7 @@ import {
   buildCodalynPostHogSuperProperties,
   buildCodalynSentryEnvironment,
   buildCodalynSentryTags,
+  CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS,
   CODALYN_POSTHOG_KEY,
   CODALYN_SENTRY_DSN,
   resolveCodalynBuildChannel,
@@ -11,6 +12,31 @@ import {
   resolvePostHogKey,
   resolveSentryDsn,
 } from "./index";
+
+describe("CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS", () => {
+  it("pins the Marketplace-reviewed privacy floor — these flags must never regress", () => {
+    // Webflow Marketplace rounds 3–6: the reviewed bundle's behavior is defined by these values.
+    // Loosening any of them re-enables remotely-configurable capture (heatmaps, surveys, web
+    // experiments, remote config) and invalidates the review. Change requires a re-review.
+    expect(CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS).toMatchObject({
+      autocapture: false,
+      capture_pageview: false,
+      capture_pageleave: false,
+      disable_session_recording: true,
+      disable_surveys: true,
+      disable_external_dependency_loading: true,
+      capture_heatmaps: false,
+      enable_heatmaps: false,
+      save_campaign_params: false,
+      advanced_disable_flags: true,
+      advanced_disable_feature_flags: true,
+      disable_web_experiments: true,
+      person_profiles: "identified_only",
+      persistence: "memory",
+      save_referrer: false,
+    });
+  });
+});
 
 describe("resolvePostHogKey", () => {
   it("returns shared key by default", () => {

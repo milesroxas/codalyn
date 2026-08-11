@@ -46,6 +46,10 @@ const nextConfig: NextConfig = {
       { source: "/forgot-password", headers: noReferrer },
       { source: "/reset-password", headers: noReferrer },
       { source: "/invitations/accept", headers: noReferrer },
+      // Session-handoff landing page: the one-time token rides the URL fragment (never sent in
+      // Referer anyway, and stripped from history before any network) — this header is
+      // belt-and-braces so no variant of the URL leaks via outbound sub-resource requests.
+      { source: "/beacon-handoff", headers: noReferrer },
     ];
   },
 };

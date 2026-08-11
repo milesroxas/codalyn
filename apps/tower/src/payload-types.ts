@@ -460,6 +460,9 @@ export interface PricingPlansBlock {
        */
       href: string;
     };
+    /**
+     * Never hardcode usage-limit numbers — use limit tokens so operator platform settings stay the single source of truth, e.g. `{{limits.pro.webflowUpdates}} Webflow updates / month`. Metrics: webflowUpdates, cmsWrites, imageCredits; tiers: free, pro, studio, team.
+     */
     features: {
       text: string;
       id?: string | null;
@@ -504,6 +507,9 @@ export interface CompareTableBlock {
   rows: {
     label: string;
     cells: {
+      /**
+       * Supports limit tokens (e.g. `{{limits.free.cmsWrites}}`) so usage numbers track operator platform settings instead of drifting.
+       */
       value: string;
       /**
        * De-emphasize this cell (e.g. `Join only`).

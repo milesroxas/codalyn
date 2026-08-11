@@ -45,6 +45,9 @@ const PUBLIC_PREFIXES = [
   "/integrations/webflow/success",
   "/integrations/webflow/error",
   "/integrations/beacon-popup-done",
+  // Extension → Tower session handoff: the visitor has no session cookie yet by definition
+  // (the page redeems a one-time token carried in the URL fragment to establish one).
+  "/beacon-handoff",
 ] as const;
 
 const FLINT_MARKETING_PUBLIC_PATHS = ["/", "/flint", "/terms", "/privacy"] as const;

@@ -47,12 +47,21 @@ describe("sanitizeBeaconRichTextHtml", () => {
     expect(out).not.toContain("onerror");
   });
 
-  it("keeps http/https/mailto/tel links", () => {
-    for (const href of ["https://a.com", "http://a.com", "mailto:a@b.com", "tel:+15551234"]) {
+  it("keeps https/mailto/tel links", () => {
+    for (const href of ["https://a.com", "mailto:a@b.com", "tel:+15551234"]) {
       const out = sanitizeBeaconRichTextHtml(`<p><a href="${href}">l</a></p>`);
       expect(out).toContain("<a");
       expect(out).toContain(href);
       expect(out).toContain("l");
+    }
+  });
+
+  it("drops http: and sms: links but preserves their text (https-only web scheme, Marketplace round 6)", () => {
+    for (const href of ["http://a.com", "sms:+15551234"]) {
+      const out = sanitizeBeaconRichTextHtml(`<p><a href="${href}">click</a></p>`);
+      expect(out).toContain("click");
+      expect(out.toLowerCase()).not.toContain("<a");
+      expect(out).not.toContain(href);
     }
   });
 

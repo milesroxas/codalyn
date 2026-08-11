@@ -289,8 +289,10 @@ export const auth = betterAuth({
     /**
      * Single-use session handoff for the Beacon Designer extension: Beacon authenticates Tower with
      * a cross-origin bearer token, so it mints a one-time token to bootstrap a first-party cookie
-     * session when opening Tower in a browser tab (see `/api/beacon-handoff`). Tokens are hashed at
-     * rest, single-use, and expire in one minute; they never carry the session value.
+     * session when opening Tower in a browser tab. The token travels in the `/beacon-handoff` URL
+     * fragment (never a query string — fragments are not sent to servers, so no access-log
+     * exposure) and is redeemed via `POST /api/beacon-handoff`. Tokens are hashed at rest,
+     * single-use, and expire in one minute; they never carry the session value.
      */
     oneTimeToken({
       storeToken: "hashed",

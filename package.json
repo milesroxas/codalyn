@@ -15,7 +15,9 @@
       "react-style-singleton@2.2.3": "patches/react-style-singleton@2.2.3.patch",
       "@radix-ui/react-select@2.2.6": "patches/@radix-ui__react-select@2.2.6.patch",
       "@radix-ui/react-scroll-area@1.2.10": "patches/@radix-ui__react-scroll-area@1.2.10.patch",
-      "react-easy-crop@5.5.7": "patches/react-easy-crop@5.5.7.patch"
+      "react-easy-crop@5.5.7": "patches/react-easy-crop@5.5.7.patch",
+      "@lexical/link@0.46.0": "patches/@lexical__link@0.46.0.patch",
+      "posthog-js@1.369.3": "patches/posthog-js@1.369.3.patch"
     },
     "onlyBuiltDependencies": [
       "esbuild",

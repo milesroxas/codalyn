@@ -312,7 +312,7 @@ describe("beacon prop applyValue runtime", () => {
     expect(marked.textContent).toContain("txt");
   });
 
-  it("link + iframe apply paths reject javascript: URLs", () => {
+  it("link apply path rejects javascript: URLs", () => {
     const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
       el: Element,
       v: string
@@ -321,14 +321,70 @@ describe("beacon prop applyValue runtime", () => {
     const a = document.createElement("a");
     applyValue(a, JSON.stringify({ k: "url", h: "javascript:evil()", t: 1 }));
     expect(a.getAttribute("href")).toBe("#");
+  });
 
-    const iframe = document.createElement("iframe");
-    applyValue(iframe, "javascript:evil()");
-    expect(iframe.getAttribute("src")).toBeNull();
+  it("never assigns iframe/embed/object sources — embeds are not a runtime surface (Marketplace round 6)", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
 
-    const iframeOk = document.createElement("iframe");
-    applyValue(iframeOk, "https://player.example/v/1");
-    expect(iframeOk.getAttribute("src")).toBe("https://player.example/v/1");
+    // Even a well-formed https URL must not be applied: externally hosted embeds would otherwise be
+    // an independently changeable app surface. The element is left completely untouched.
+    for (const tag of ["iframe", "embed", "object"] as const) {
+      const el = document.createElement(tag);
+      applyValue(el, "https://player.example/v/1");
+      expect(el.getAttribute("src")).toBeNull();
+      expect(el.textContent).toBe("");
+    }
+
+    const seeded = document.createElement("iframe");
+    seeded.setAttribute("src", "https://original.example/embed");
+    applyValue(seeded, "https://attacker.example/embed");
+    expect(seeded.getAttribute("src")).toBe("https://original.example/embed");
+  });
+
+  it("image src gate: https / protocol-relative / relative apply; http:, data:, blob: and other schemes do not", () => {
+    const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
+      el: Element,
+      v: string
+    ) => void;
+
+    // Canonical https URL applies.
+    const ok = document.createElement("img");
+    applyValue(ok, "https://cdn.example.com/a.webp");
+    expect(ok.getAttribute("src")).toBe("https://cdn.example.com/a.webp");
+
+    // Protocol-relative and site-relative paths inherit the published page's https origin.
+    const rel = document.createElement("img");
+    applyValue(rel, "/assets/a.png");
+    expect(rel.getAttribute("src")).toBe("/assets/a.png");
+    const proto = document.createElement("img");
+    applyValue(proto, "//cdn.example.com/a.png");
+    expect(proto.getAttribute("src")).toBe("//cdn.example.com/a.png");
+
+    // Rejected schemes are not applied at all — no partial application, existing src untouched.
+    for (const bad of [
+      "http://cdn.example.com/a.png",
+      "data:image/svg+xml,<svg/>",
+      "blob:https://x/y",
+      "javascript:evil()",
+      "java\nscript:evil()",
+    ]) {
+      const img = document.createElement("img");
+      img.setAttribute("src", "https://keep.example/orig.png");
+      applyValue(img, bad);
+      expect(img.getAttribute("src")).toBe("https://keep.example/orig.png");
+
+      // Direct PICTURE binding runs the container path; the same gate holds there.
+      const picture = document.createElement("picture");
+      const source = document.createElement("source");
+      const nested = document.createElement("img");
+      picture.append(source, nested);
+      applyValue(picture, bad);
+      expect(source.getAttribute("srcset")).toBeNull();
+      expect(nested.getAttribute("src")).toBeNull();
+    }
   });
 });
 
@@ -395,10 +451,17 @@ describe("beacon footer runtime bStripCtl (minified twin of stripUrlControlChara
 describe("beacon footer runtime bSafeHref (minified twin of isSafeRichTextUrl)", () => {
   it("returns the control-stripped href for navigational schemes", () => {
     const { bSafeHref } = loadRuntimeUrlGuards();
-    for (const url of ["https://x.com", "http://x.com", "mailto:a@b.com", "tel:+15551234"]) {
+    for (const url of ["https://x.com", "mailto:a@b.com", "tel:+15551234"]) {
       expect(bSafeHref(url)).toBe(url);
     }
     expect(bSafeHref("HTTPS://EX.COM")).toBe("HTTPS://EX.COM");
+  });
+
+  it("rejects http: (transport downgrade) and sms: — https is the only web scheme (Marketplace round 6)", () => {
+    const { bSafeHref } = loadRuntimeUrlGuards();
+    for (const url of ["http://x.com", "HTTP://X.COM", "http://x.com/path?q=1", "sms:+15551234", "SMS:+15551234"]) {
+      expect(bSafeHref(url)).toBeNull();
+    }
   });
 
   it("returns the control-stripped href for relative / anchor / protocol-relative links", () => {

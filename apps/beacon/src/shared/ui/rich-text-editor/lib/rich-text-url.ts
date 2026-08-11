@@ -1,9 +1,11 @@
 /**
  * Link URL scheme allowlist shared by the editor's link plugin (`validateUrl`) and any consumer that needs to
  * gate a href before it reaches the DOM. Only navigational schemes are permitted; `javascript:`/`data:`/`vbscript:`
- * are rejected (the runtime apply path ultimately writes hrefs into the published page).
+ * are rejected (the runtime apply path ultimately writes hrefs into the published page). Web URLs are `https:`
+ * only — `http:` is rejected as a transport-downgrade/interception risk (Marketplace round-6 requirement), and
+ * `sms:` is deliberately absent (never a product need; the bundled `@lexical/link` default set is patched to match).
  */
-const SAFE_URL_SCHEME_RE = /^(https?:|mailto:|tel:)/i;
+const SAFE_URL_SCHEME_RE = /^(https:|mailto:|tel:)/i;
 
 /**
  * The URL parser removes every C0 control character (including TAB/LF/CR) from anywhere in a URL and trims
@@ -26,7 +28,7 @@ export function stripUrlControlCharacters(raw: string): string {
   return stripped.trim();
 }
 
-/** True for an http(s)/mailto/tel absolute URL, a protocol-relative `//host`, or a same-document relative path. */
+/** True for an https/mailto/tel absolute URL, a protocol-relative `//host`, or a same-document relative path. */
 export function isSafeRichTextUrl(raw: string): boolean {
   const url = stripUrlControlCharacters(raw);
   if (url.length === 0) {

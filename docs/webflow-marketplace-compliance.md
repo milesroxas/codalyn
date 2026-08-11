@@ -258,10 +258,15 @@ approved OAuth flow.
   tracking identifiers (`persistence: "memory"`).
 - Consent controls: opt-in first-run prompt; toggle in Settings → Privacy; opt-out applies
   immediately (`posthog.opt_out_capturing`). No SDK boot or network traffic before grant.
-- **Telemetry endpoints for the CSP `connect-src` allowlist** (HTTPS only):
-  - `https://us.i.posthog.com` — event/exception capture + feature flags
-  - `https://us-assets.i.posthog.com` — remote-config JSON (still fetched with
-    `disable_external_dependency_loading: true`; script loading stays blocked)
+- **Telemetry endpoints for the CSP `connect-src` allowlist** (HTTPS only) — *superseded by R6.4,
+  which is the authoritative current list*:
+  - `https://us.i.posthog.com` — event/exception capture. Feature flags are disabled
+    (`advanced_disable_flags` + `advanced_disable_feature_flags`, pinned since R5.3), so no flags
+    traffic occurs.
+  - `https://us-assets.i.posthog.com` — **no longer contacted** as of R5.3: with
+    `advanced_disable_flags: true` the SDK's remote-config loader returns before both the script
+    path and the config JSON fetch (verified in the installed patched posthog-js 1.369.3). Drop
+    from the allowlist.
   - Sentry's `*.ingest.us.sentry.io` is no longer needed and should be dropped from any allowlist.
 - Full non-telemetry `connect-src` inventory, for completeness: the Tower backend origin baked at
   build time (`https://tower.codalyn.app` prod / `https://tower-preview.codalyn.app` preview) and
@@ -730,3 +735,134 @@ not changed here):
 - **Documentation:** guidelines ask for "comprehensive and user-friendly documentation or help resources".
   `codalyn.app/docs` and `/help` both 404; the in-app help action opens a support form, not documentation.
   The privacy policy and terms pages are live and are now linked from the app (R5.4).
+
+## Round 6 — 2026-08-11 review-team flags
+
+Five flags. All four code-level items are fixed in source; the fifth (documentation) is satisfied by
+R6.4 below, which is written to be pasted into the submission notes.
+
+### R6.1 Insecure URL scheme handling (`http:` accepted; editor allowlist included `sms:`)
+
+Flagged: the published-site runtime's `bSafeHref` and the rich-text link validation accepted `http:`
+alongside `https:`/`mailto:`/`tel:` (a transport-downgrade/interception risk), and the bundled rich-text
+editor chunk additionally permitted `sms:`.
+
+- **`http:` is now rejected everywhere a URL is validated.** The shared allowlist is
+  `https:` / `mailto:` / `tel:` plus same-document relative paths and protocol-relative `//host`
+  (which inherits the published page's `https:`). Changed in lockstep in all three implementations:
+  `isSafeRichTextUrl` (editor `validateUrl` + the save-time boundary sanitizer), the runtime's
+  minified twin `bSafeHref`, and the anchor path of the runtime rich-text sanitizer `bSafeHtml`.
+  A rejected link is never partially applied: the editor marks the field invalid, the boundary
+  sanitizer unwraps the anchor keeping its text, and the runtime writes `href="#"`.
+- **`sms:` was never in Beacon's own allowlist** — it came from the bundled `@lexical/link` default
+  (`SUPPORTED_URL_PROTOCOLS = {http:, https:, mailto:, sms:, tel:}`), which the editor does not use
+  for validation (`validateUrl` is `isSafeRichTextUrl`). Applying the round-3 lesson that unreachable
+  vendor code is still review surface, the dependency is patched via pnpm `patchedDependencies`
+  (`patches/@lexical__link@0.46.0.patch`): the set is now `{https:, mailto:, tel:}` in every shipped
+  dist variant, so neither `sms:` nor `http:` appears in the bundle at all.
+- **Media sources got the same tightening pre-emptively** (not flagged, but the adjacent surface):
+  the runtime's image apply path now runs every value through `bSafeSrc` — `https:` absolute,
+  protocol-relative, or relative path only; `http:`, `data:`, `blob:`, and every other explicit
+  scheme are rejected before any `src`/`srcset`/`background-image` write, with the existing
+  attribute left untouched.
+- Pinned by unit tests in all three suites (canonical + alternate + malformed shapes, per the repo's
+  boundary-testing rules): `rich-text-url.test.ts`, `cms-slot-rich-text-html.test.tsx`,
+  `cms-slot-beacon-prop-runtime.test.ts`.
+
+### R6.2 Iframe/embed source assignment removed from the published-site runtime
+
+Flagged: `applyValue` would assign `src` on existing `IFRAME`/`EMBED` elements from CMS-bound values,
+making externally hosted embeds an independently changeable runtime surface.
+
+- The branch is deleted. `applyValue` now begins with a hard exclusion — `IFRAME`, `EMBED`, and
+  `OBJECT` elements are returned from untouched: no `src`, no `textContent`, no attribute of any
+  kind. There is no code path in the runtime that can set an embed source anymore.
+- The placeholder-cleanup helper similarly dropped its iframe/embed handling (nothing can seed
+  those elements now), and the rich-text sanitizers continue to strip `iframe`/`object`/`embed`
+  subtrees outright.
+- The Designer never offered iframe binding UI, so no user-facing capability is lost.
+- Pinned by a unit test: a bound iframe keeps its authored `src` even when the bound value is a
+  well-formed `https:` URL.
+
+### R6.3 One-time token moved out of the URL query string
+
+Flagged: the auth handoff navigated a popup to `/api/beacon-handoff?ott=…&callbackUrl=…`, leaving the
+single-use token exposed to server, proxy, and CDN access logs and browser history.
+
+The handoff now uses the URL **fragment** plus a **POST body**, combining both remediations the
+review offered:
+
+- Beacon opens `https://tower.codalyn.app/beacon-handoff#ott=…&callbackUrl=…`. The fragment is never
+  transmitted to the server, so no request line, access log, or `Referer` can contain the token.
+- The `/beacon-handoff` page immediately strips the fragment from the address bar and history entry
+  (`history.replaceState`) — before any network activity — then redeems the token via
+  `POST /api/beacon-handoff` with a JSON body and navigates to the sanitized same-origin
+  `callbackUrl`.
+- The API route accepts **POST only** (the GET query-parameter form is gone, not deprecated), and
+  hardens redemption: same-origin `Origin` header required (redeeming sets a first-party session
+  cookie, so cross-site posts must not be able to fixate a session — login-CSRF guard),
+  `application/json` content type required, `Cache-Control: no-store`, and an identical `200 {ok}`
+  response whether or not the token was valid (no validity oracle).
+- Token properties are unchanged: minted only by an authenticated extension session, hashed at rest,
+  single-use, 60-second expiry, never contains the session value.
+- Pinned by unit tests: the beacon URL builder (token appears only after `#`; the loggable prefix
+  contains neither `ott` nor the token) and the Tower route (same-origin enforcement, content-type
+  enforcement, malformed-body handling, no-oracle behavior).
+
+### R6.4 Published-site runtime + external endpoint documentation (submission text)
+
+Requested: document the runtime script behavior and the full external endpoint list for CSP
+`connect-src` review. The following is the authoritative statement for the submission notes.
+
+**Published-site runtime (`codalyn-beacon-runtime-*.js`, registered via Custom Code hosted script
+with an SRI SHA-384 integrity hash):**
+
+- Performs **zero network requests** of any kind — no `fetch`, XHR, beacon, WebSocket, or dynamic
+  script/resource injection — and no cookie, storage, `eval`, or `new Function` use. It reads a JSON
+  payload embedded in the page at publish time and renders it into the page's own DOM.
+- All HTML it writes passes an allowlist DOM sanitizer (DOMParser rebuild; tags
+  `p/br/strong/b/em/i/u/a/ul/ol/li/h2/h3/blockquote`; `script`/`style`/`iframe`/`object`/`embed`/
+  `form` subtrees dropped; anchors keep only a scheme-checked `https:`/`mailto:`/`tel:`/relative
+  `href` plus hardened `target="_blank" rel="noopener noreferrer"`). This mirrors the authoritative
+  save-time sanitizer in the extension; the runtime re-sanitizes rather than trusting the payload.
+- It never assigns iframe/embed/object sources (R6.2), never writes into credential or hidden form
+  fields (R4.9), applies media sources only after the `https:`-only `bSafeSrc` check (R6.1), and
+  installs no keyboard shortcuts, timers, or observers beyond a DOMContentLoaded hook.
+- It is installed/updated only by explicit user action in the Designer (R3.3) and is byte-pinned by
+  the SRI hash — the served file cannot change behavior without a re-registration from the app.
+
+**Complete external endpoint list (Designer extension iframe; for CSP `connect-src`):**
+
+| Endpoint | Purpose | Condition |
+| --- | --- | --- |
+| `https://tower.codalyn.app` | First-party backend (auth, settings, CMS composition, image processing, support) | Always |
+| `https://us.i.posthog.com` | Product analytics + error reporting (PostHog, sole processor) | Only after explicit opt-in consent; SDK not initialized before grant |
+| Webflow asset-upload presigned URLs (`https://s3.amazonaws.com/webflow-*`, `https://*.website-files.com`) | Direct upload of the runtime JS asset returned by Webflow's create-asset endpoint | Only during user-initiated CMS Slots install/sync; URL allowlist-validated client-side (R3.3) |
+
+No other host is contacted. `us-assets.i.posthog.com` is **not** required: remote config, feature
+flags, surveys, heatmaps, session recording, and external dependency loading are all disabled in the
+pinned privacy options (R5.3/R6.5), so the SDK never fetches from the assets host. The published-site
+runtime contributes nothing to `connect-src` (zero network). Webflow Designer/Data APIs are reached
+via the `webflow` extension bridge and Tower's server-side proxy respectively, not directly from the
+iframe.
+
+### R6.5 PostHog web-experiment code paths removed from the bundle
+
+Flagged (advisory): the bundled `posthog-js` contained web-experiment code capable of applying remote
+HTML/inline styles — disabled by configuration as shipped; keep the flags pinned and tree-shake if
+possible.
+
+Both required actions are done, and the code is now gone rather than merely disabled:
+
+- **Flags pinned by test:** `CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS` now sets
+  `disable_web_experiments: true` explicitly (previously the SDK default), and a new unit test in
+  `@codalyn/observability` locks the full privacy floor (`advanced_disable_flags`,
+  `advanced_disable_feature_flags`, `disable_surveys`, `disable_external_dependency_loading`,
+  heatmaps off, `persistence: "memory"`, `save_referrer: false`, …) so any regression fails CI.
+- **Implementation excised via pnpm patch** (`patches/posthog-js@1.369.3.patch`), the same
+  mechanism accepted for the round-4 style-injection fixes: the `WebExperiments` transform applier
+  (the only `innerHTML` assignment and the only `setAttribute("style", …)` in the entire module),
+  the `/api/web_experiments/?token=` fetch, and the `__experiment_id`/`__experiment_variant`
+  URL-preview path are all stubbed to no-ops in `dist/module.js`. A static scan of the shipped
+  bundle now finds **zero** occurrences of the experiments endpoint, `innerHTML` writes, or style
+  `setAttribute` inside the telemetry chunk — the capability is absent, not dormant.

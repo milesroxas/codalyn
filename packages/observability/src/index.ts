@@ -75,6 +75,11 @@ export const CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS = {
   // product tours). Disabling it keeps the shipped bundle's behavior identical to the reviewed behavior.
   advanced_disable_flags: true,
   advanced_disable_feature_flags: true,
+  // Web experiments could apply remote HTML/styles to the page. Off by default in this posthog-js
+  // version, but pinned here per Marketplace round-6 so a future SDK default change cannot re-enable
+  // them; the bundled implementation is additionally stubbed out via the posthog-js pnpm patch
+  // (no fetch, no DOM transforms remain in the shipped code).
+  disable_web_experiments: true,
   // No anonymous person profiles: a profile is only ever created for an explicitly identified user, and
   // the extension never calls `identify`.
   person_profiles: "identified_only",

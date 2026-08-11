@@ -11,12 +11,18 @@ overrides:
   '@types/react-dom': 19.2.3
 
 patchedDependencies:
+  '@lexical/link@0.46.0':
+    hash: a7f3b22f2afd034322ab391c0e9817e2f9b180617fbbe944f047fbf00102d07d
+    path: patches/@lexical__link@0.46.0.patch
   '@radix-ui/react-scroll-area@1.2.10':
     hash: 7adb09ff66a610504aa2d1108899cea8f114c3d4179b2c0172cad3b29de67bca
     path: patches/@radix-ui__react-scroll-area@1.2.10.patch
   '@radix-ui/react-select@2.2.6':
     hash: 479456b811c56ff3b6432ccafb8b2902cfb23706a3b0a9eee0b2c87374af6a3a
     path: patches/@radix-ui__react-select@2.2.6.patch
+  posthog-js@1.369.3:
+    hash: 3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21
+    path: patches/posthog-js@1.369.3.patch
   react-easy-crop@5.5.7:
     hash: da2c5d4a198421b67b01dedf142d566aa83aa75bef59a7a807e2754067ccb8ff
     path: patches/react-easy-crop@5.5.7.patch
@@ -84,7 +90,7 @@ importers:
         version: 0.46.0(typescript@6.0.3)
       '@lexical/link':
         specifier: ^0.46.0
-        version: 0.46.0(typescript@6.0.3)
+        version: 0.46.0(patch_hash=a7f3b22f2afd034322ab391c0e9817e2f9b180617fbbe944f047fbf00102d07d)(typescript@6.0.3)
       '@lexical/list':
         specifier: ^0.46.0
         version: 0.46.0(typescript@6.0.3)
@@ -120,7 +126,7 @@ importers:
         version: 1.8.0(react@19.2.5)
       posthog-js:
         specifier: ^1.369.3
-        version: 1.369.3
+        version: 1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21)
       radix-ui:
         specifier: ^1.4.3
         version: 1.4.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -244,7 +250,7 @@ importers:
         version: link:../../packages/webflow-kit
       '@posthog/react':
         specifier: ^1.9.0
-        version: 1.9.0(@types/react@19.2.17)(posthog-js@1.369.3)(react@19.2.5)
+        version: 1.9.0(@types/react@19.2.17)(posthog-js@1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21))(react@19.2.5)
       '@radix-ui/react-accordion':
         specifier: ^1.2.12
         version: 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -286,7 +292,7 @@ importers:
         version: 1.8.0(react@19.2.5)
       posthog-js:
         specifier: ^1.369.3
-        version: 1.369.3
+        version: 1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -14504,7 +14510,7 @@ snapshots:
   '@lexical/devtools-core@0.46.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.3)':
     dependencies:
       '@lexical/html': 0.46.0(typescript@6.0.3)
-      '@lexical/link': 0.46.0(typescript@6.0.3)
+      '@lexical/link': 0.46.0(patch_hash=a7f3b22f2afd034322ab391c0e9817e2f9b180617fbbe944f047fbf00102d07d)(typescript@6.0.3)
       '@lexical/mark': 0.46.0(typescript@6.0.3)
       '@lexical/table': 0.46.0(typescript@6.0.3)
       '@lexical/utils': 0.46.0(typescript@6.0.3)
@@ -14603,7 +14609,7 @@ snapshots:
       '@lexical/utils': 0.41.0
       lexical: 0.41.0
 
-  '@lexical/link@0.46.0(typescript@6.0.3)':
+  '@lexical/link@0.46.0(patch_hash=a7f3b22f2afd034322ab391c0e9817e2f9b180617fbbe944f047fbf00102d07d)(typescript@6.0.3)':
     dependencies:
       '@lexical/extension': 0.46.0(typescript@6.0.3)
       '@lexical/html': 0.46.0(typescript@6.0.3)
@@ -14656,7 +14662,7 @@ snapshots:
     dependencies:
       '@lexical/code-core': 0.46.0(typescript@6.0.3)
       '@lexical/internal': 0.46.0(typescript@6.0.3)
-      '@lexical/link': 0.46.0(typescript@6.0.3)
+      '@lexical/link': 0.46.0(patch_hash=a7f3b22f2afd034322ab391c0e9817e2f9b180617fbbe944f047fbf00102d07d)(typescript@6.0.3)
       '@lexical/list': 0.46.0(typescript@6.0.3)
       '@lexical/rich-text': 0.46.0(typescript@6.0.3)
       '@lexical/selection': 0.46.0(typescript@6.0.3)
@@ -14734,7 +14740,7 @@ snapshots:
       '@lexical/hashtag': 0.46.0(typescript@6.0.3)
       '@lexical/history': 0.46.0(typescript@6.0.3)
       '@lexical/internal': 0.46.0(typescript@6.0.3)
-      '@lexical/link': 0.46.0(typescript@6.0.3)
+      '@lexical/link': 0.46.0(patch_hash=a7f3b22f2afd034322ab391c0e9817e2f9b180617fbbe944f047fbf00102d07d)(typescript@6.0.3)
       '@lexical/list': 0.46.0(typescript@6.0.3)
       '@lexical/mark': 0.46.0(typescript@6.0.3)
       '@lexical/markdown': 0.46.0(typescript@6.0.3)
@@ -15691,9 +15697,9 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@posthog/react@1.9.0(@types/react@19.2.17)(posthog-js@1.369.3)(react@19.2.5)':
+  '@posthog/react@1.9.0(@types/react@19.2.17)(posthog-js@1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21))(react@19.2.5)':
     dependencies:
-      posthog-js: 1.369.3
+      posthog-js: 1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21)
       react: 19.2.5
     optionalDependencies:
       '@types/react': 19.2.17
@@ -22382,7 +22388,7 @@ snapshots:
     dependencies:
       xtend: 4.0.2
 
-  posthog-js@1.369.3:
+  posthog-js@1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21):
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/api-logs': 0.208.0

@@ -115,8 +115,10 @@ export function openTowerWebflowConnect(): void {
       popup.location.replace(directUrl);
       return;
     }
+    // Token in the URL fragment (never a query param — fragments are not sent to the server, so the
+    // token stays out of server/proxy logs). Tower's /beacon-handoff page redeems it via POST body.
     const handoffUrl = buildTowerAppUrl(
-      `/api/beacon-handoff?ott=${encodeURIComponent(token)}&callbackUrl=${encodeURIComponent(callbackPath)}`
+      `/beacon-handoff#ott=${encodeURIComponent(token)}&callbackUrl=${encodeURIComponent(callbackPath)}`
     );
     popup.location.replace(handoffUrl ?? directUrl);
   })();

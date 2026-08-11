@@ -256,6 +256,23 @@ describe("beacon prop applyValue runtime", () => {
     applyValue(username, "someone");
     expect((username as HTMLInputElement).value).toBe("");
 
+    // Payment fields (Marketplace: injected scripts must not modify payment/checkout form
+    // elements). Every WHATWG payment token is `cc-`-prefixed; space-separated forms count too.
+    const cardNumber = document.createElement("input");
+    cardNumber.setAttribute("autocomplete", "cc-number");
+    applyValue(cardNumber, "4242424242424242");
+    expect((cardNumber as HTMLInputElement).value).toBe("");
+
+    const billingCard = document.createElement("input");
+    billingCard.setAttribute("autocomplete", "billing cc-number");
+    applyValue(billingCard, "4242424242424242");
+    expect((billingCard as HTMLInputElement).value).toBe("");
+
+    const cardCsc = document.createElement("textarea");
+    cardCsc.setAttribute("autocomplete", "cc-csc");
+    applyValue(cardCsc, "123");
+    expect((cardCsc as HTMLTextAreaElement).value).toBe("");
+
     // Non-credential inputs still receive values.
     const plain = document.createElement("input");
     plain.type = "text";
@@ -270,6 +287,26 @@ describe("beacon prop applyValue runtime", () => {
     credentialTextarea.setAttribute("autocomplete", "current-password");
     applyValue(credentialTextarea, "leaked");
     expect((credentialTextarea as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("background-image writes the sanitized value, not the raw one (write-what-you-validated)", () => {
+    const bApplyImageToContainer = new Function(
+      `${beaconPropApplyValueRuntimeSource()}; return bApplyImageToContainer;`
+    )() as (el: Element, v: string) => boolean;
+
+    // A control character after a valid https prefix passes the (control-stripped) bSafeSrc check;
+    // the CSS write must emit that same stripped string, never the raw value.
+    const div = document.createElement("div");
+    const applied = bApplyImageToContainer(div, "https://cdn.example.com/hero\t.png");
+    expect(applied).toBe(true);
+    const bg = (div as HTMLElement).style.getPropertyValue("background-image");
+    expect(bg).toContain("hero.png");
+    expect(bg).not.toContain("\t");
+
+    // Rejected schemes still apply nothing.
+    const rejected = document.createElement("div");
+    expect(bApplyImageToContainer(rejected, "http://cdn.example.com/hero.png")).toBe(false);
+    expect((rejected as HTMLElement).style.getPropertyValue("background-image")).toBe("");
   });
 
   it("rich text: allowlisted markup survives; safe anchors keep href with hardened target/rel", () => {

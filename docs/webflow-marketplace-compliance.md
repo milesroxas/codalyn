@@ -866,3 +866,40 @@ Both required actions are done, and the code is now gone rather than merely disa
   URL-preview path are all stubbed to no-ops in `dist/module.js`. A static scan of the shipped
   bundle now finds **zero** occurrences of the experiments endpoint, `innerHTML` writes, or style
   `setAttribute` inside the telemetry chunk — the capability is absent, not dormant.
+
+### R6.6 Post-fix full re-audit (2026-08-11, pre-submission)
+
+After the round-6 fixes landed, the whole app, the release pipeline, and the rebuilt production
+bundle were re-audited against the full Marketplace Guidelines (hostile-grep of `dist/` and the
+archived zip included). The audit confirmed every round-1→6 fix intact — no regressions — and
+landed three further hardenings in the same spirit as the round-6 flags:
+
+- **Payment/checkout fields added to the published-site runtime's deny-list** (guideline: injected
+  scripts "must not read from, write to, listen on, or modify payment or checkout form elements").
+  `bIsCredentialField` now also refuses any input/textarea/select whose `autocomplete` carries a
+  WHATWG payment token (`cc-` prefix: `cc-number`, `cc-exp`, `cc-csc`, …, including space-separated
+  forms like `billing cc-number`), alongside the existing password/hidden/username/one-time-code
+  exclusions (R4.9). The runtime already reads no user input and transmits nothing; this guarantees
+  a mis-tagged payment field is never written either. Unit-tested.
+- **`bApplyImageToContainer` now writes exactly the value it validated.** The container path's CSS
+  `background-image` write previously emitted the raw value after validating its control-stripped
+  form (injection-proof — quotes/backslashes were escaped — but a validated-vs-written drift
+  against the R5.1 write-what-you-validated contract). The function now reassigns the `bSafeSrc`
+  result up front so every downstream write, including the CSS branch, emits the sanitized string.
+  Unit-tested (control character stripped from the emitted `background-image`; rejected schemes
+  apply nothing).
+- **`@lexical/link` patch extended: `isWebSiteURI` no longer names `http://`.** The round-6 patch
+  removed `http:`/`sms:` from `SUPPORTED_URL_PROTOCOLS`; the same package still shipped an
+  `isWebSiteURI()` helper testing `startsWith("http://")` (a read-only classifier, unused by
+  Beacon's validation path). Applying the round-3/round-6 lesson that unreachable vendor code is
+  still review surface, the patch now reduces it to `https://` only — the rich-text chunk contains
+  no `http://` scheme test at all.
+
+Verified on the rebuilt production bundle (dist + archived zip): `sentry`, `localhost`,
+`127.0.0.1`, `sms:`, `tower.invalid`, `codalyn.invalid`, `Coming soon`, `Early access`,
+`eval(`/`new Function`, and `createElement("iframe")` all return zero. Remaining `http://` strings
+are inert and unavoidable: W3C XML namespace identifiers (`http://www.w3.org/...`) that React needs
+at runtime for SVG/MathML rendering, posthog-js's `http://yandex.com/bots` bot-list UA entry, and a
+better-auth error-message string — none is a fetchable endpoint or an accepted scheme. The
+`web_experiments` tokens remaining in the telemetry chunk are the `disable_web_experiments` config
+key and the guard reading it; the fetch behind them is the stubbed `return e([])` (R6.5).

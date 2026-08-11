@@ -17,11 +17,7 @@ import { POST } from "./route";
 
 const ORIGIN = "https://tower.codalyn.app";
 
-function makeRequest(options: {
-  origin?: string | null;
-  contentType?: string | null;
-  body?: string;
-}): Request {
+function makeRequest(options: { origin?: string | null; contentType?: string | null; body?: string }): Request {
   const headers = new Headers();
   if (options.origin != null) {
     headers.set("origin", options.origin);

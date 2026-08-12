@@ -1,6 +1,7 @@
 import {
   BEACON_QUALITY_PARENT_SOURCE,
   BEACON_QUALITY_POPOUT_SOURCE,
+  clampExportQuality,
   type QualityParentToPopoutMessage,
 } from "@/features/image-editor/lib/quality-popout-protocol";
 
@@ -9,15 +10,11 @@ const POPOUT_NAME = "beacon-quality-compare";
 /** Upper bound on the ready/close poll — an abandoned popout must not poll for the whole session. */
 const POPOUT_READY_WATCH_TIMEOUT_MS = 10 * 60 * 1000;
 
-/** Static compare page shipped in the extension bundle (public/quality-compare.html). */
+/** Compare page shipped in the extension bundle (second Vite entry, React-rendered). */
 export const QUALITY_COMPARE_POPOUT_PAGE = "quality-compare.html";
 
-function clampExportQuality(q: number): number {
-  return Math.min(1, Math.max(0.05, q));
-}
-
 /**
- * Opens the compression-compare popout as a static, same-origin page from the bundle — no blob-URL
+ * Opens the compression-compare popout as a same-origin page from the bundle — no blob-URL
  * document and no inline script, so it works under a strict CSP (Marketplace technical guidelines).
  * The page carries no data of its own: it posts `ready` once loaded and receives an `init` message
  * with the image Blobs (structured-cloned; the popout mints and revokes its own object URLs) and

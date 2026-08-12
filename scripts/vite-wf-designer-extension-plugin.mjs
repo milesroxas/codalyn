@@ -26,6 +26,12 @@ export function createWebflowDesignerExtensionPlugin(options = {}) {
         if (!ctx.server) {
           return;
         }
+        // Only the Designer Extension document gets the Webflow boot scripts — secondary HTML
+        // entries (e.g. Beacon's quality-compare popout) run outside the Designer iframe.
+        const pathOnly = ctx.path.split("?")[0];
+        if (pathOnly !== "/" && !pathOnly.endsWith("/index.html")) {
+          return;
+        }
         console.log("\x1b[36m%s\x1b[0m", "Development mode");
         if (!webflowHTML) {
           const { name, apiVersion } = webflowConfig;

@@ -1,0 +1,176 @@
+diff --git a/dist/development/chunk-EVOBXE3Y.mjs b/dist/development/chunk-EVOBXE3Y.mjs
+index 7f3642e663d3e7926d653f3e193984f86551ab18..468f7c32d3a77c7418251c4751c47416a3fa48f9 100644
+--- a/dist/development/chunk-EVOBXE3Y.mjs
++++ b/dist/development/chunk-EVOBXE3Y.mjs
+@@ -10419,34 +10419,11 @@ function ScrollRestoration({
+   if (!remixContext || remixContext.isSpaMode) {
+     return null;
+   }
+-  let restoreScroll = ((storageKey2, restoreKey) => {
+-    if (!window.history.state || !window.history.state.key) {
+-      let key = Math.random().toString(32).slice(2);
+-      window.history.replaceState({ key }, "");
+-    }
+-    try {
+-      let positions = JSON.parse(sessionStorage.getItem(storageKey2) || "{}");
+-      let storedY = positions[restoreKey || window.history.state.key];
+-      if (typeof storedY === "number") {
+-        window.scrollTo(0, storedY);
+-      }
+-    } catch (error) {
+-      console.error(error);
+-      sessionStorage.removeItem(storageKey2);
+-    }
+-  }).toString();
+-  return /* @__PURE__ */ React10.createElement(
+-    "script",
+-    {
+-      ...props,
+-      suppressHydrationWarning: true,
+-      dangerouslySetInnerHTML: {
+-        __html: `(${restoreScroll})(${escapeHtml(
+-          JSON.stringify(storageKey || SCROLL_RESTORATION_STORAGE_KEY)
+-        )}, ${escapeHtml(JSON.stringify(ssrKey))})`
+-      }
+-    }
+-  );
++  // codalyn patch: the framework/SSR scroll-restore inline <script> emission is removed
++  // (Webflow Marketplace CSP review: no dangerouslySetInnerHTML in shipped bundles). SPA scroll
++  // restoration via useScrollRestoration above is unchanged; this branch was only reachable in
++  // framework/SSR mode, which a Designer extension never runs (remixContext is always null).
++  return null;
+ }
+ ScrollRestoration.displayName = "ScrollRestoration";
+ function getDataRouterConsoleError2(hookName) {
+diff --git a/dist/development/chunk-YZKCRDTN.js b/dist/development/chunk-YZKCRDTN.js
+index 7937a3fdf367406c4a5e39b457b02e51125ec4d2..f12b15c76600d5009eab7c5c3e44e9b9b5f2ea06 100644
+--- a/dist/development/chunk-YZKCRDTN.js
++++ b/dist/development/chunk-YZKCRDTN.js
+@@ -610,34 +610,11 @@ function ScrollRestoration({
+   if (!remixContext || remixContext.isSpaMode) {
+     return null;
+   }
+-  let restoreScroll = ((storageKey2, restoreKey) => {
+-    if (!window.history.state || !window.history.state.key) {
+-      let key = Math.random().toString(32).slice(2);
+-      window.history.replaceState({ key }, "");
+-    }
+-    try {
+-      let positions = JSON.parse(sessionStorage.getItem(storageKey2) || "{}");
+-      let storedY = positions[restoreKey || window.history.state.key];
+-      if (typeof storedY === "number") {
+-        window.scrollTo(0, storedY);
+-      }
+-    } catch (error) {
+-      console.error(error);
+-      sessionStorage.removeItem(storageKey2);
+-    }
+-  }).toString();
+-  return /* @__PURE__ */ React.createElement(
+-    "script",
+-    {
+-      ...props,
+-      suppressHydrationWarning: true,
+-      dangerouslySetInnerHTML: {
+-        __html: `(${restoreScroll})(${_chunkZZNWZ5Q3js.escapeHtml.call(void 0, 
+-          JSON.stringify(storageKey || SCROLL_RESTORATION_STORAGE_KEY)
+-        )}, ${_chunkZZNWZ5Q3js.escapeHtml.call(void 0, JSON.stringify(ssrKey))})`
+-      }
+-    }
+-  );
++  // codalyn patch: the framework/SSR scroll-restore inline <script> emission is removed
++  // (Webflow Marketplace CSP review: no dangerouslySetInnerHTML in shipped bundles). SPA scroll
++  // restoration via useScrollRestoration above is unchanged; this branch was only reachable in
++  // framework/SSR mode, which a Designer extension never runs (remixContext is always null).
++  return null;
+ }
+ ScrollRestoration.displayName = "ScrollRestoration";
+ function getDataRouterConsoleError(hookName) {
+diff --git a/dist/production/chunk-LK6U7ULH.mjs b/dist/production/chunk-LK6U7ULH.mjs
+index 79b90a9d56b80f42e67789ac27b2beacfab52563..cc6cd6be70b695b2b1109719dcb3a4398c48d73e 100644
+--- a/dist/production/chunk-LK6U7ULH.mjs
++++ b/dist/production/chunk-LK6U7ULH.mjs
+@@ -10419,34 +10419,11 @@ function ScrollRestoration({
+   if (!remixContext || remixContext.isSpaMode) {
+     return null;
+   }
+-  let restoreScroll = ((storageKey2, restoreKey) => {
+-    if (!window.history.state || !window.history.state.key) {
+-      let key = Math.random().toString(32).slice(2);
+-      window.history.replaceState({ key }, "");
+-    }
+-    try {
+-      let positions = JSON.parse(sessionStorage.getItem(storageKey2) || "{}");
+-      let storedY = positions[restoreKey || window.history.state.key];
+-      if (typeof storedY === "number") {
+-        window.scrollTo(0, storedY);
+-      }
+-    } catch (error) {
+-      console.error(error);
+-      sessionStorage.removeItem(storageKey2);
+-    }
+-  }).toString();
+-  return /* @__PURE__ */ React10.createElement(
+-    "script",
+-    {
+-      ...props,
+-      suppressHydrationWarning: true,
+-      dangerouslySetInnerHTML: {
+-        __html: `(${restoreScroll})(${escapeHtml(
+-          JSON.stringify(storageKey || SCROLL_RESTORATION_STORAGE_KEY)
+-        )}, ${escapeHtml(JSON.stringify(ssrKey))})`
+-      }
+-    }
+-  );
++  // codalyn patch: the framework/SSR scroll-restore inline <script> emission is removed
++  // (Webflow Marketplace CSP review: no dangerouslySetInnerHTML in shipped bundles). SPA scroll
++  // restoration via useScrollRestoration above is unchanged; this branch was only reachable in
++  // framework/SSR mode, which a Designer extension never runs (remixContext is always null).
++  return null;
+ }
+ ScrollRestoration.displayName = "ScrollRestoration";
+ function getDataRouterConsoleError2(hookName) {
+diff --git a/dist/production/chunk-UJQ4OJF4.js b/dist/production/chunk-UJQ4OJF4.js
+index 95755bb557a993e7c21b96f12e5c0553b6ff1e18..5299ecc52e4335767c166304e0a49ffce39e86c2 100644
+--- a/dist/production/chunk-UJQ4OJF4.js
++++ b/dist/production/chunk-UJQ4OJF4.js
+@@ -610,34 +610,11 @@ function ScrollRestoration({
+   if (!remixContext || remixContext.isSpaMode) {
+     return null;
+   }
+-  let restoreScroll = ((storageKey2, restoreKey) => {
+-    if (!window.history.state || !window.history.state.key) {
+-      let key = Math.random().toString(32).slice(2);
+-      window.history.replaceState({ key }, "");
+-    }
+-    try {
+-      let positions = JSON.parse(sessionStorage.getItem(storageKey2) || "{}");
+-      let storedY = positions[restoreKey || window.history.state.key];
+-      if (typeof storedY === "number") {
+-        window.scrollTo(0, storedY);
+-      }
+-    } catch (error) {
+-      console.error(error);
+-      sessionStorage.removeItem(storageKey2);
+-    }
+-  }).toString();
+-  return /* @__PURE__ */ React.createElement(
+-    "script",
+-    {
+-      ...props,
+-      suppressHydrationWarning: true,
+-      dangerouslySetInnerHTML: {
+-        __html: `(${restoreScroll})(${_chunkX5SKXJ4Ajs.escapeHtml.call(void 0, 
+-          JSON.stringify(storageKey || SCROLL_RESTORATION_STORAGE_KEY)
+-        )}, ${_chunkX5SKXJ4Ajs.escapeHtml.call(void 0, JSON.stringify(ssrKey))})`
+-      }
+-    }
+-  );
++  // codalyn patch: the framework/SSR scroll-restore inline <script> emission is removed
++  // (Webflow Marketplace CSP review: no dangerouslySetInnerHTML in shipped bundles). SPA scroll
++  // restoration via useScrollRestoration above is unchanged; this branch was only reachable in
++  // framework/SSR mode, which a Designer extension never runs (remixContext is always null).
++  return null;
+ }
+ ScrollRestoration.displayName = "ScrollRestoration";
+ function getDataRouterConsoleError(hookName) {

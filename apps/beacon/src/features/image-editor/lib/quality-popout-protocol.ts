@@ -8,8 +8,8 @@ export type QualityPopoutToParentMessage =
 
 /**
  * Opener → popout messages. `init` answers the popout's `ready` announcement with the image Blobs
- * (structured-cloned; the popout mints its own object URLs) and initial settings — the popout is a
- * static page shipped in the bundle (public/quality-compare.html), so it carries no baked-in data.
+ * (structured-cloned; the popout mints its own object URLs) and initial settings — the popout page
+ * (quality-compare.html, a second Vite entry in the bundle) carries no baked-in data.
  */
 export type QualityParentToPopoutMessage =
   | {
@@ -22,6 +22,42 @@ export type QualityParentToPopoutMessage =
     }
   | { source: typeof BEACON_QUALITY_PARENT_SOURCE; type: "compressed-updated"; compressedBlob: Blob }
   | { source: typeof BEACON_QUALITY_PARENT_SOURCE; type: "compressed-error" };
+
+/** Export quality is a 0.05–1 ratio everywhere the popout protocol carries it. */
+export function clampExportQuality(raw: unknown): number {
+  const q = Number(raw);
+  if (!Number.isFinite(q)) {
+    return 0.8;
+  }
+  return Math.min(1, Math.max(0.05, q));
+}
+
+/**
+ * Boundary guard for the popout side: validates opener → popout postMessage payloads before any
+ * field is used (Blob instances included — a structured clone from another same-origin document
+ * could carry anything).
+ */
+export function isQualityParentToPopoutMessage(data: unknown): data is QualityParentToPopoutMessage {
+  if (!data || typeof data !== "object") {
+    return false;
+  }
+  const d = data as Record<string, unknown>;
+  if (d.source !== BEACON_QUALITY_PARENT_SOURCE) {
+    return false;
+  }
+  if (d.type === "init") {
+    return (
+      d.originalBlob instanceof Blob &&
+      d.compressedBlob instanceof Blob &&
+      typeof d.aspectRatio === "number" &&
+      typeof d.initialQuality === "number"
+    );
+  }
+  if (d.type === "compressed-updated") {
+    return d.compressedBlob instanceof Blob;
+  }
+  return d.type === "compressed-error";
+}
 
 export function isQualityPopoutMessage(data: unknown): data is QualityPopoutToParentMessage {
   if (!data || typeof data !== "object") {

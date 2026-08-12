@@ -22,6 +22,7 @@ import { Button } from "@/shared/ui/button";
 const DRAWER_BASE_Z_INDEX = 50;
 
 type DrawerStackState = {
+  drawerId: string;
   stackIndex: number;
   totalOpen: number;
   isTopmost: boolean;
@@ -31,6 +32,7 @@ type DrawerStackState = {
 };
 
 const defaultDrawerStackState: DrawerStackState = {
+  drawerId: "",
   stackIndex: 0,
   totalOpen: 0,
   isTopmost: true,
@@ -71,11 +73,48 @@ function getDrawerStackState(id: string): DrawerStackState {
   const isTopmost = stackIndex >= 0 && stackIndex === totalOpen - 1;
 
   return {
+    drawerId: id,
     stackIndex: stackIndex >= 0 ? stackIndex : 0,
     totalOpen,
     isTopmost,
     isStackedTop: totalOpen > 1 && isTopmost,
     useNativeNestedStacking: false,
+  };
+}
+
+// Vaul keeps a closed drawer's content mounted until its exit animation finishes (Radix
+// presence). Mounted-but-logically-closed is the window where opening another modal drawer races
+// its scroll-lock teardown; consumers can wait it out via the registry below instead of polling
+// the DOM.
+const mountedDrawerContentIds = new Set<string>();
+
+function syncDrawerContentMounted(id: string, mounted: boolean) {
+  if (!id) {
+    return;
+  }
+  if (mounted) {
+    mountedDrawerContentIds.add(id);
+  } else {
+    mountedDrawerContentIds.delete(id);
+  }
+  notifyDrawerStackListeners();
+}
+
+/** True while any drawer's content is still mounted (exit animation running) after logical close. */
+function hasDrawerMidClose(): boolean {
+  for (const id of mountedDrawerContentIds) {
+    if (!openDrawerOrder.includes(id)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Notifies on any drawer open/close/mount/unmount transition. Returns the unsubscribe. */
+function subscribeDrawerStack(listener: () => void): () => void {
+  drawerStackListeners.add(listener);
+  return () => {
+    drawerStackListeners.delete(listener);
   };
 }
 
@@ -92,6 +131,12 @@ function syncDrawerStackMembership(id: string, open: boolean) {
 // lock stuck — killing scroll and portaled Select dropdowns inside the freshly opened sheet
 // ("dead" sheet). Our DrawerOverlay (fixed inset-0) already blocks the background, so <body> never
 // needs the lock: while any drawer is open we observe <body> and immediately revert a stuck `none`.
+//
+// Scope note (Marketplace review): this guard reverts a style the bundled library itself wrote —
+// it introduces no styling of its own and cannot execute markup. It stays inside the extension's
+// own iframe document, exists only while a drawer is open (refcounted acquire/release below,
+// disconnected on the last close), and a static CSS rule cannot express "revert the lock only
+// when it is stuck" without also defeating the legitimate lock other Radix modals rely on.
 let bodyPointerEventsGuardCount = 0;
 let bodyPointerEventsObserver: MutationObserver | null = null;
 
@@ -376,8 +421,17 @@ function DrawerContent({
      */
     flushBottom?: boolean;
   }) {
-  const { isStackedTop, stackIndex, useNativeNestedStacking } = useContext(DrawerStackContext);
+  const { drawerId, isStackedTop, stackIndex, useNativeNestedStacking } = useContext(DrawerStackContext);
   const stackedTop = isStackedTop && !useNativeNestedStacking;
+
+  // Mounted-content registry feed for hasDrawerMidClose(); vaul unmounts this node only after the
+  // exit animation completes, so the unregister marks "the drawer has fully left".
+  useEffect(() => {
+    syncDrawerContentMounted(drawerId, true);
+    return () => {
+      syncDrawerContentMounted(drawerId, false);
+    };
+  }, [drawerId]);
   const closeControl = showCloseButton ? (
     <DrawerClose asChild>
       <Button
@@ -545,4 +599,6 @@ export {
   DrawerTitle,
   DrawerTrigger,
   drawerListSheetContentDefaults,
+  hasDrawerMidClose,
+  subscribeDrawerStack,
 };

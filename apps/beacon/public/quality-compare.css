@@ -1,10 +1,17 @@
 /* Styles for the compression-compare popout (quality-compare.html). External stylesheet — the
-   popout ships without inline style/script for CSP compatibility. */
-* {
+   popout ships without inline style/script for CSP compatibility. Every rule is scoped under
+   .qc-page so the sheet can also load in Storybook without leaking into other stories. */
+/* The popout document opts in via <body class="qc-body"> — the selector never matches the
+   Storybook preview body, which also loads this sheet. */
+body.qc-body {
+  margin: 0;
+  background: #0a0a0a;
+}
+.qc-page,
+.qc-page * {
   box-sizing: border-box;
 }
-body {
-  margin: 0;
+.qc-page {
   min-height: 100vh;
   font-family:
     system-ui,
@@ -20,7 +27,7 @@ body {
   align-items: center;
   gap: 16px;
 }
-h1 {
+.qc-title {
   font-size: 15px;
   font-weight: 600;
   margin: 0;
@@ -28,14 +35,14 @@ h1 {
   max-width: min(100%, 1280px);
   width: 100%;
 }
-.hint {
+.qc-hint {
   font-size: 12px;
   color: #a3a3a3;
   margin: 0;
   max-width: min(100%, 1280px);
   width: 100%;
 }
-.toolbar {
+.qc-toolbar {
   width: 100%;
   max-width: 1280px;
   display: flex;
@@ -47,33 +54,33 @@ h1 {
   border: 1px solid #262626;
   border-radius: 8px;
 }
-.quality-field {
+.qc-quality-field {
   flex: 1 1 220px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
 }
-.quality-field label {
+.qc-quality-field label {
   font-size: 11px;
   font-weight: 600;
   color: #a3a3a3;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.quality-row {
+.qc-quality-row {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.quality-row input[type="range"] {
+.qc-quality-row input[type="range"] {
   flex: 1;
   min-width: 0;
   height: 8px;
   accent-color: #fafafa;
   cursor: ew-resize;
 }
-.quality-pct {
+.qc-quality-pct {
   font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -81,7 +88,7 @@ h1 {
   text-align: right;
   color: #fafafa;
 }
-.save-btn {
+.qc-save-btn {
   flex: 0 0 auto;
   padding: 10px 18px;
   font-size: 13px;
@@ -92,24 +99,24 @@ h1 {
   border-radius: 6px;
   cursor: pointer;
 }
-.save-btn:hover {
+.qc-save-btn:hover {
   filter: brightness(0.95);
 }
-.save-btn:disabled {
+.qc-save-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.err {
+.qc-err {
   font-size: 12px;
   color: #f87171;
   width: 100%;
   display: none;
   margin: 0;
 }
-.err.show {
+.qc-err.qc-err-show {
   display: block;
 }
-.stage-wrap {
+.qc-stage-wrap {
   width: 100%;
   max-width: 1280px;
   flex: 1;
@@ -118,12 +125,11 @@ h1 {
   justify-content: center;
   min-height: 200px;
 }
-.stage {
+.qc-stage {
   position: relative;
   width: 100%;
-  /* Dynamic state flows in through CSS custom properties set via CSSOM (style.setProperty) —
-     no style attributes or runtime <style> tags. --stage-ar is the per-image aspect ratio;
-     --scrub is the compare wipe position. */
+  /* Dynamic state flows in through CSS custom properties set from React state — --stage-ar is
+     the per-image aspect ratio; --scrub is the compare wipe position. */
   aspect-ratio: var(--stage-ar, 1);
   max-height: min(75vh, 900px);
   background: #171717;
@@ -131,7 +137,7 @@ h1 {
   overflow: hidden;
   border: 1px solid #262626;
 }
-.stage img {
+.qc-stage img {
   position: absolute;
   inset: 0;
   margin: auto;
@@ -141,13 +147,13 @@ h1 {
   user-select: none;
   pointer-events: none;
 }
-.clip {
+.qc-clip {
   position: absolute;
   inset: 0;
   overflow: hidden;
   clip-path: inset(0 calc(100% - var(--scrub, 50%)) 0 0);
 }
-.divider {
+.qc-divider {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -159,7 +165,7 @@ h1 {
   pointer-events: none;
   z-index: 2;
 }
-.compare-wipe-handle {
+.qc-wipe-handle {
   position: absolute;
   top: 50%;
   left: var(--scrub, 50%);
@@ -187,21 +193,21 @@ h1 {
   pointer-events: none;
   z-index: 3;
 }
-.compare-scrub-hit {
+.qc-scrub-hit {
   position: absolute;
   inset: 0;
   z-index: 4;
   cursor: grab;
   touch-action: none;
 }
-.compare-scrub-hit:active {
+.qc-scrub-hit:active {
   cursor: grabbing;
 }
-.compare-scrub-hit:focus-visible {
+.qc-scrub-hit:focus-visible {
   outline: 2px solid #a3a3a3;
   outline-offset: 2px;
 }
-.stage .compare-labels {
+.qc-labels {
   position: absolute;
   left: 10px;
   right: 10px;

@@ -4,9 +4,11 @@ Point-by-point response to the Webflow app-review feedback (July 2026), mapping 
 the app does and what changed. Doc references verified against developers.webflow.com on 2026-07-08.
 Round-2 feedback (2026-07-09) is addressed in [Round 2](#round-2--2026-07-09-follow-up-flags);
 round-3 feedback (2026-08) in [Round 3](#round-3--2026-08-senior-engineer--review-team-flags);
-round-4 feedback (2026-08-05) in [Round 4](#round-4--2026-08-05-review-team-flags); and the
+round-4 feedback (2026-08-05) in [Round 4](#round-4--2026-08-05-review-team-flags); the
 pre-submission full-guideline re-audit in
-[Round 5](#round-5--2026-08-05-full-guideline-re-audit-pre-submission).
+[Round 5](#round-5--2026-08-05-full-guideline-re-audit-pre-submission); round-6 feedback
+(2026-08-11) in [Round 6](#round-6--2026-08-11-review-team-flags); and round-7 feedback
+(2026-08-12) in [Round 7](#round-7--2026-08-12-senior-engineer-flag).
 Where a later-round fix supersedes an earlier answer, the original item notes it.
 
 ## 1. Direct DOM manipulation / unsafe patterns
@@ -16,9 +18,10 @@ Guideline: "Do not use statements or patterns that could introduce vulnerabiliti
 
 - No `eval()` or `new Function()` exists in shipped first-party code (only in unit tests that load
   generated runtime source for assertions; tests are not bundled).
-- **Fixed (superseded in round 2):** the image-quality compare popout previously used
-  `document.open()/document.write()`, then a same-origin `Blob` URL document. It is now a static
-  page shipped in the bundle with zero inline script/style — see Round 2, item 5.
+- **Fixed (superseded in rounds 2 and 7):** the image-quality compare popout previously used
+  `document.open()/document.write()`, then a same-origin `Blob` URL document, then a static page
+  with a hand-authored script (round 2). It is now a React-rendered Vite entry with zero
+  hand-written DOM manipulation — see Round 7, item R7.1.
 - **Fixed:** PostHog now runs with `autocapture: false` and
   `disable_external_dependency_loading: true`, so the SDK never injects listeners into the
   extension DOM or lazy-loads remote scripts (`packages/observability` →
@@ -26,7 +29,8 @@ Guideline: "Do not use statements or patterns that could introduce vulnerabiliti
   `init-observability.ts`).
 - Remaining `document.createElement` uses are standard platform APIs inside the extension's own
   iframe (canvas-based image cropping, `<a download>` file export) — they never touch the Designer
-  document. All canvas/page changes go through official Designer and Data APIs.
+  document. All canvas/page changes go through official Designer and Data APIs. The complete,
+  current inventory of platform-API use (post round-7 sweep) is in R7.2.
 - Rich text saved to CMS passes a strict allowlist sanitizer
   (`cms-slot-rich-text-html.ts`: tag allowlist, subtree drops for script/style/iframe/object,
   `javascript:` URL rejection, forced `rel="noopener noreferrer"`).
@@ -212,11 +216,12 @@ Doc: [Resize extension](https://developers.webflow.com/designer/reference/resize
 
 ### R2.5 CSP compatibility gap in blob popout
 
-- **Fixed:** the compare popout no longer mints a `Blob` HTML document with inline `<script>`. It
-  is now a static page shipped in the extension bundle (`public/quality-compare.html` + external
-  `quality-compare.css` / `quality-compare.js`), opened same-origin — compatible with a strict CSP
-  (`script-src 'self'`, no `blob:` document, no inline script or style attributes; unit-tested in
-  `quality-compare-popout-page.test.ts`).
+- **Fixed (page implementation superseded in round 7):** the compare popout no longer mints a
+  `Blob` HTML document with inline `<script>`. It is a page shipped in the extension bundle
+  (since round 7 a React-rendered Vite entry: `quality-compare.html` + compiled
+  `quality-compare.js` + external `quality-compare.css`), opened same-origin — compatible with a
+  strict CSP (`script-src 'self'`, no `blob:` document, no inline script or style attributes;
+  unit-tested in `quality-compare-popout-page.test.ts`).
 - Data flows over the existing origin-checked `postMessage` bridge: the page announces `ready`,
   the opener replies with an `init` message carrying the image Blobs (structured clone) and
   settings; the popout mints and revokes its own object URLs
@@ -354,9 +359,10 @@ response without client-side validation.
 
 ### R3.7 postMessage hardening in the compare popout
 
-- **Fixed:** the popout page (`public/quality-compare.js`) now requires
-  `event.source === window.opener` (and a live `window.opener`) in addition to the exact
-  same-origin check and the parent source marker before accepting any message. The parent side
+- **Fixed:** the popout page (since round 7: `use-quality-popout-bridge.ts`,
+  `isTrustedQualityParentEvent`) now requires `event.source === window.opener` (and a live
+  `window.opener`) in addition to the exact same-origin check and the parent source marker before
+  accepting any message. The parent side
   already required `event.source === popoutWindow` plus exact origin plus payload validation
   (`quality-popout-dispatch.ts`).
 - No wildcard origins anywhere in the bridge: every `postMessage` (both directions) targets the
@@ -394,13 +400,17 @@ tags and use `dangerouslySetInnerHTML` for UI-library styles.
   matches are framework internals with no UI-library styles behind them: react-dom's renderer
   machinery for React 19's `<style precedence>` hoisting feature (never exercised — no
   first-party or library code renders such elements) and react-dom's property-name switch
-  statements that merely compare against the string `"dangerouslySetInnerHTML"`; plus
-  react-router's `ScrollRestoration` component (unused — nothing in Beacon renders it), which
-  serializes a `<script>` (not a style). Development-channel builds additionally embed the debug
+  statements that merely compare against the string `"dangerouslySetInnerHTML"`. (react-router's
+  `ScrollRestoration` component previously also matched here — unused dead code that serialized a
+  `<script>`; since round 7 its emission is patched out of the package entirely, see R7.2.) Development-channel builds additionally embed the debug
   HUD source for the published-site runtime, which is stubbed out of every release bundle
   (unit-tested; see R4.9) — always submit a production-channel build.
 
 ### R4.2 Direct DOM manipulation (`quality-compare.js`, bundle DOM/canvas)
+
+> Popout-page portion superseded in round 7 (R7.1): the hand-authored `quality-compare.js` is
+> deleted; the popout is now a React-rendered Vite entry with no first-party DOM API calls at all.
+> The bundle-side DOM/canvas notes below remain current.
 
 - **Reduced to platform-required APIs and made declarative.** `public/quality-compare.js` no
   longer writes concrete style declarations: the two continuous values (compare-wipe position, per-image
@@ -482,7 +492,7 @@ tags and use `dangerouslySetInnerHTML` for UI-library styles.
 All popups are user-gesture-gated and destination-allowlisted (established in R3.4/R3.6,
 unchanged): auth/OAuth popups open only from explicit buttons and navigate only to the built-in
 Tower origin or `https://webflow.com/oauth/authorize` (`isAllowedWebflowAuthorizeUrl`,
-`isTrustedRedirectUrl`); the quality-compare popout is a same-origin static page from the bundle,
+`isTrustedRedirectUrl`); the quality-compare popout is a same-origin page shipped in the bundle,
 opened only from the "Pop out" button. No non-gesture popup paths exist.
 
 ### R4.8 Referrer handling
@@ -903,3 +913,129 @@ at runtime for SVG/MathML rendering, posthog-js's `http://yandex.com/bots` bot-l
 better-auth error-message string — none is a fetchable endpoint or an accepted scheme. The
 `web_experiments` tokens remaining in the telemetry chunk are the `disable_web_experiments` config
 key and the guard reading it; the fetch behind them is the stubbed `return e([])` (R6.5).
+
+---
+
+## Round 7 — 2026-08-12 senior-engineer flag
+
+### R7.1 Direct DOM manipulation in `quality-compare.js`
+
+Flag: the extension directly accesses and mutates DOM nodes — `document.getElementById`,
+`stage.style.setProperty`, `setAttribute`, `textContent`, `classList.add`, direct `img.src`
+assignment (`quality-compare.js:17-24, 42-43, 91, 140-155`). Required fix: implement the UI
+through the app framework/state layer.
+
+- **Fixed — the hand-authored popout script is deleted; the popout is now rendered by React, the
+  same framework and state layer as the rest of the extension.** `quality-compare.html` is a
+  second Vite entry built from source (`apps/beacon/quality-compare.html` +
+  `src/quality-compare.tsx`); the shipped `quality-compare.js` is compiler output, exactly like
+  `bundle.js`. Every flagged line is gone with the file:
+  - UI state is React state. The compare-wipe position and slider value are `useState`; the image
+    sources, aspect ratio, and error state come from a `useQualityPopoutBridge` hook
+    (`features/image-editor/lib/use-quality-popout-bridge.ts`) that owns the postMessage protocol
+    and the object-URL lifecycle. Rendering is declarative JSX — first-party popout code contains
+    no `getElementById` lookups (beyond the standard `createRoot(document.getElementById("root"))`
+    framework bootstrap shared with `index.html`), no `classList`/`setAttribute`/`textContent`
+    writes, and no `img.src` assignment; images, ARIA slider attributes, and the error alert are
+    all rendered as props/state.
+  - The two continuous visual values (wipe position, stage aspect ratio) still resolve in the
+    static stylesheet as CSS custom properties (`--scrub`, `--stage-ar`), now supplied through
+    React's `style` prop instead of CSSOM calls.
+  - The page is split into a presentational component
+    (`quality-compare-popout-page.tsx`, Storybook-covered: `ImageEditor/QualityComparePopoutPage`)
+    and a container (`quality-compare-popout-app.tsx`), matching the app's architecture.
+- **Security posture preserved or improved:**
+  - The R3.7 opener-trust rule is intact: exact same-origin check plus
+    `event.source === window.opener` plus the parent source marker
+    (`isTrustedQualityParentEvent`, unit-tested in `quality-compare-popout-page.test.ts`).
+  - Payload validation is now a typed boundary guard exported from the shared protocol module
+    (`isQualityParentToPopoutMessage`: message-shape and `instanceof Blob` checks before any field
+    is used; unit-tested for canonical, malformed, and missing shapes).
+  - The duplicated protocol constants the old static file required are gone — the page imports
+    `quality-popout-protocol.ts` directly, so the two sides of the bridge can no longer drift.
+  - All posts still target the explicit extension origin (never `"*"`); object URLs are still
+    minted only inside the popout and revoked on replacement, unmount, and
+    `pagehide`/`beforeunload`.
+- **CSP posture unchanged:** the built `quality-compare.html` contains no inline script or style
+  (src-only `<script type="module">` + external stylesheets; pinned by unit tests against the
+  source document). `public/quality-compare.css` remains the page's only stylesheet — the build
+  strips the extension's merged `styles.css` link from this document so the popout ships no
+  Tailwind payload.
+- Verified in the rebuilt production bundle: `dist/quality-compare.js` is minified Vite/React
+  output sharing chunks with `bundle.js` (`assets/jsx-runtime-*.js`,
+  `assets/quality-popout-protocol-*.js`); `dist/quality-compare.html` links only
+  `quality-compare.css` and module scripts.
+
+### R7.2 Proactive whole-app DOM-pattern sweep (2026-08-12, post-R7.1)
+
+After the popout fix, the entire extension (source, workspace packages, and the rebuilt production
+bundle) was re-audited for any remaining hand-written DOM manipulation, plus a fresh pass over
+popups, postMessage, timers, storage, navigation, and network surface. Three further reductions
+landed:
+
+- **`shared/ui/scroll-area.tsx` no longer patches Radix's DOM from JS.** The component previously
+  wrote five inline style declarations onto the viewport's content wrapper (undoing Radix's inline
+  `display: table; min-width: 100%`). The override now ships statically in
+  `styles/vendor-static.css` (`[data-slot="scroll-area-viewport"] > div`, `!important` to beat the
+  library's inline styles) and the JS patch is deleted.
+- **Startup CSS-variable writes on `<html>` removed.** `injectBeaconAppBackgroundCssVars()` (eight
+  `documentElement.style.setProperty` calls from the entry file) is deleted; the six
+  `--beacon-*` background-image vars are fully static and now declared in `globals.css` under
+  `:root`. The production bundle contains **zero** first-party CSSOM writes on extension code
+  paths — remaining `style.setProperty` text in `bundle.js` is (a) string literals of the
+  generated published-site runtime (R3.3) and (b) framework internals.
+- **`document.querySelector` poll removed.** The one first-party `querySelector` (a
+  requestAnimationFrame loop waiting for a closing drawer's exit animation before auto-opening the
+  next sheet) is replaced by a mount registry inside the drawer primitive
+  (`shared/ui/drawer.tsx`: `hasDrawerMidClose()` / `subscribeDrawerStack()`, fed by React
+  lifecycle, consumer keeps a hard 1200 ms cap). Remaining `document.querySelector` matches in the
+  bundle are react-router/vaul/Vite-preload internals.
+
+Complete inventory of remaining platform-API use inside the extension iframe (each deliberate,
+none manipulates the Designer document):
+
+- Framework bootstrap: `createRoot(document.getElementById("root"))` in the two Vite entries
+  (`src/index.tsx`, `src/quality-compare.tsx`).
+- Theme switch: `documentElement.classList` toggle of `light`/`dark`
+  (`shared/providers/theme-provider.tsx`) — the standard shadcn/next-themes dark-mode mechanism;
+  constant class names, no user input, required because `<html>` sits outside the React root.
+- Drawer body pointer-events guard (`shared/ui/drawer.tsx`): a MutationObserver scoped to
+  `<body>`'s `style` attribute that reverts a stuck `pointer-events: none` written by the bundled
+  Radix/vaul scroll-lock when two drawers' open/close animations race. Refcounted to the
+  open-drawer lifetime (disconnected on last close), reverts only a value the library itself
+  wrote, introduces no styling of its own; rationale documented in-code.
+- Image pipeline (extends the R4.2 inventory): canvas crop/encode (`crop-image.ts`,
+  `encode-image-blob.ts`), the `<a download>` guest-export anchor, and detached
+  `new Image()` decode/measure probes (`load-image.ts`, `validate-source-image-file.ts`) whose
+  `src` is an object URL minted from the user's own picked file — these elements are never
+  inserted into any document.
+- `DOMParser`, parse-only: the save-time rich-text sanitizer (R2.4, `cms-slot-rich-text-html.ts`)
+  and Lexical's HTML import (`shared/ui/rich-text-editor/lib/rich-text-html.ts`), where the
+  editor's registered node set is the allowlist.
+- React `createPortal(…, document.body)` for the route-loading overlay — React-managed rendering,
+  not manual DOM mutation.
+- Note for text-only greps: `setAttribute`/`append`/`setProperty` matches in
+  `features/cms-slots/model/*` are calls on **Webflow Designer API objects** (`DOMElement`,
+  `elementBuilder`, `Style` from the official SDK) — the sanctioned way to edit canvas elements —
+  not browser DOM.
+
+**`dangerouslySetInnerHTML` grep on `bundle.js` now returns zero.** The single remaining match was
+react-router's `ScrollRestoration` — dead code in this SPA extension (its framework/SSR context is
+always null, so the component returns before the emission), but a live grep hit. Applying the
+round-3 lesson that unreachable vendor code is still review surface, the package is now patched
+(`patches/react-router@7.14.2.patch`, same pnpm `patchedDependencies` mechanism as vaul/Radix/
+Lexical/posthog): the SSR inline-`<script>` branch is replaced with `return null`, while SPA
+scroll restoration (`useScrollRestoration`) is untouched. Pinned by a unit test that reads the
+installed package's dist chunks and fails if the emission ever returns
+(`react-router-scroll-restoration-patch.test.ts`). The only `dangerouslySetInnerHTML` text left in
+the shipped bundle is react-dom's own property-handling internals in the shared framework chunk —
+string comparisons in the renderer, not usable API surface, and not removable without forking
+react-dom.
+
+Re-verified on the rebuilt production bundle: zero `eval`/`new Function`; zero wildcard
+`postMessage` targets (all sends pin the exact extension origin; all four receive paths check
+exact origin + `event.source` identity + typed payload); zero first-party document-level keyboard
+listeners; `sentry`/`localhost`/placeholder-domain/`sms:` greps still zero; all `window.open`
+calls user-gesture-gated and allowlisted; both watch intervals hard-bounded at 10 minutes; no
+tokens or PII in storage (session token is memory-only; the legacy localStorage key is actively
+purged); `quality-compare.js` contains a single `getElementById` — the React bootstrap.

@@ -246,3 +246,14 @@
 [data-radix-scroll-area-viewport]::-webkit-scrollbar {
   display: none;
 }
+
+/* @radix-ui/react-scroll-area@1.2.10 sets inline `display: table; min-width: 100%` on the
+   viewport's content wrapper, which breaks width-constrained layouts. Overridden statically here
+   (!important beats the library's inline styles) instead of patching the node from JS. */
+[data-slot="scroll-area-viewport"] > div {
+  display: block !important;
+  min-width: 0 !important;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}

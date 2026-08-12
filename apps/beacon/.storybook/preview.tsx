@@ -1,17 +1,15 @@
 import { withThemeByClassName } from "@storybook/addon-themes";
 import type { Preview, ReactRenderer } from "@storybook/react-vite";
 import { initialize as initializeMsw, mswLoader } from "msw-storybook-addon";
-import { injectBeaconAppBackgroundCssVars } from "@/shared/lib/beacon-app-backgrounds";
 import { TooltipProvider } from "@/shared/ui/tooltip";
 import "@/styles/globals.css";
 import "./preview.css";
 import { beaconAppLoader, withBeaconApp } from "./beacon-app";
 import { installWebflowStub } from "./webflow-stub";
 
-// The real app performs both of these in `src/index.tsx` before mounting. Reproduce them so
-// components render with the same CSS vars (backgrounds) and a safe `webflow` global.
+// The real app installs this in `src/index.tsx` before mounting; reproduce it so components see a
+// safe `webflow` global. Background CSS vars need no setup — globals.css declares them statically.
 installWebflowStub();
-injectBeaconAppBackgroundCssVars();
 
 // Tower is mocked at the network layer (see `tower-mock.ts`); requests to other origins
 // (fonts, story assets) pass through untouched.

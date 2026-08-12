@@ -15,6 +15,27 @@ import { resolveBeaconTowerOriginForBuild } from "./src/shared/lib/resolve-beaco
 const beaconRoot = path.dirname(fileURLToPath(import.meta.url));
 const towerRoot = path.join(beaconRoot, "../tower");
 
+/**
+ * `cssCodeSplit: false` merges all imported CSS into one styles.css and links it into every HTML
+ * entry. The quality-compare popout imports no CSS — it ships with its own static stylesheet
+ * (public/quality-compare.css) — so drop the injected link from that document.
+ */
+function createStripMainCssFromPopoutPlugin() {
+  return {
+    name: "beacon-popout-strip-main-css",
+    apply: "build" as const,
+    transformIndexHtml: {
+      order: "post" as const,
+      handler(html: string, ctx: { filename: string }) {
+        if (!ctx.filename.endsWith("quality-compare.html")) {
+          return html;
+        }
+        return html.replace(/\s*<link rel="stylesheet"[^>]*href="[^"]*styles\.css"[^>]*>/, "");
+      },
+    },
+  };
+}
+
 /** Vitest loads this config; skip Webflow dev plugins so the process can exit cleanly. */
 const isVitest = Boolean(process.env.VITEST);
 
@@ -50,6 +71,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     // Marketplace review: no dev-host literals in shipped bundles (build-only transform).
     createStripDevHostLiteralsPlugin({ strict: mode !== "development" }),
+    createStripMainCssFromPopoutPlugin(),
     ...(isVitest ? [] : [createWebflowDesignerExtensionPlugin({ appRoot: beaconRoot })]),
   ],
   define: {
@@ -78,8 +100,16 @@ export default defineConfig(({ mode }) => ({
     emptyOutDir: true,
     cssCodeSplit: false,
     rollupOptions: {
+      // Two documents ship in the extension bundle: the Designer Extension iframe (index.html)
+      // and the compression-compare popout window (quality-compare.html). Both are Vite-built
+      // React entries — no hand-authored scripts in public/.
+      input: {
+        main: path.resolve(beaconRoot, "index.html"),
+        "quality-compare": path.resolve(beaconRoot, "quality-compare.html"),
+      },
       output: {
-        entryFileNames: "bundle.js",
+        entryFileNames: (chunk: { name: string }) =>
+          chunk.name === "quality-compare" ? "quality-compare.js" : "bundle.js",
         assetFileNames: (assetInfo: { name?: string | undefined }) =>
           assetInfo.name?.endsWith(".css") ? "styles.css" : "assets/[name]-[hash][extname]",
       },

@@ -52,6 +52,8 @@ import {
   DrawerHeader,
   DrawerTitle,
   drawerListSheetContentDefaults,
+  hasDrawerMidClose,
+  subscribeDrawerStack,
 } from "@/shared/ui/drawer";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
 import { Input } from "@/shared/ui/input";
@@ -623,24 +625,35 @@ export function CmsSlotDesignerSelectedRow(props: CmsSlotDesignerSelectedRowProp
     // The palette sheet that triggered the add closes itself as the row is added, so its vaul exit
     // animation (~500ms) is still running. Opening this drawer on top of a closing modal drawer leaves
     // two overlapping scroll-locks fighting, and the fresh sheet ends up non-interactive (no scroll,
-    // dead dropdowns) until it is reopened. Wait for any closing drawer to leave the DOM first.
-    let cancelled = false;
-    const deadline = performance.now() + 1200;
-    let frame = requestAnimationFrame(function openWhenClear() {
-      if (cancelled) {
+    // dead dropdowns) until it is reopened. Wait for the drawer registry to report the close settled
+    // (hard-capped at 1200ms in case an exit animation never completes).
+    let settled = false;
+    let unsubscribe = () => {};
+    let deadline = 0;
+    const finish = () => {
+      if (settled) {
         return;
       }
-      const closingDrawer = document.querySelector('[data-vaul-drawer][data-state="closed"]');
-      if (closingDrawer != null && performance.now() < deadline) {
-        frame = requestAnimationFrame(openWhenClear);
-        return;
-      }
+      settled = true;
+      unsubscribe();
+      window.clearTimeout(deadline);
       openExposeDrawer();
       onAutoOpenExposeDrawerConsumed?.();
+    };
+    if (!hasDrawerMidClose()) {
+      finish();
+      return;
+    }
+    unsubscribe = subscribeDrawerStack(() => {
+      if (!hasDrawerMidClose()) {
+        finish();
+      }
     });
+    deadline = window.setTimeout(finish, 1200);
     return () => {
-      cancelled = true;
-      cancelAnimationFrame(frame);
+      settled = true;
+      unsubscribe();
+      window.clearTimeout(deadline);
     };
   }, [
     addPending,

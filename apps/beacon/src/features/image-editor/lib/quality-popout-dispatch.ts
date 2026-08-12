@@ -1,12 +1,8 @@
 import type { MutableRefObject } from "react";
 
-import { isQualityPopoutMessage } from "@/features/image-editor/lib/quality-popout-protocol";
+import { clampExportQuality, isQualityPopoutMessage } from "@/features/image-editor/lib/quality-popout-protocol";
 
 const PREVIEW_DEBOUNCE_MS = 400;
-
-function clampExportQuality(q: number): number {
-  return Math.min(1, Math.max(0.05, q));
-}
 
 function scheduleDebouncedPreview(
   debounceTimerRef: MutableRefObject<number | null>,

@@ -2,6 +2,10 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
+		<!-- Enforced CSP (Webflow Marketplace external-endpoint allowlisting). Placeholder is
+		     replaced at build time with the zero-network popout policy from
+		     src/shared/lib/beacon-extension-csp.ts; stripped in dev serve for Vite HMR. -->
+		<meta http-equiv="Content-Security-Policy" content="__BEACON_CSP__" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>Beacon — compression compare</title>
 		<!-- Popout window opened by the extension (see open-quality-compare-popout.ts). Second Vite

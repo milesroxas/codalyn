@@ -16,6 +16,7 @@ export function useExportByteEstimate(options: {
   effectiveOutputH: number;
   quality: number;
   exportFormat: ImageExportFormat;
+  avifTowerConsentGranted?: boolean;
   /** When false, skips estimate (e.g. export W×H not chosen yet). */
   enabled?: boolean;
   onTowerUsageLimit?: (details: TowerUsageLimitDetails) => void;
@@ -27,6 +28,7 @@ export function useExportByteEstimate(options: {
     effectiveOutputH,
     quality,
     exportFormat,
+    avifTowerConsentGranted,
     enabled = true,
     onTowerUsageLimit,
   } = options;
@@ -65,6 +67,7 @@ export function useExportByteEstimate(options: {
         outputHeight: h,
         quality,
         format: exportFormat,
+        avifTowerConsentGranted,
       })
         .then((bytes) => {
           if (estimateGenRef.current !== gen) {
@@ -93,6 +96,7 @@ export function useExportByteEstimate(options: {
     estimateNonce,
     quality,
     exportFormat,
+    avifTowerConsentGranted,
     imageSrc,
     completedCrop,
     effectiveOutputW,

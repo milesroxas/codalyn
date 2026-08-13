@@ -8,7 +8,7 @@ round-4 feedback (2026-08-05) in [Round 4](#round-4--2026-08-05-review-team-flag
 pre-submission full-guideline re-audit in
 [Round 5](#round-5--2026-08-05-full-guideline-re-audit-pre-submission); round-6 feedback
 (2026-08-11) in [Round 6](#round-6--2026-08-11-review-team-flags); and round-7 feedback
-(2026-08-12) in [Round 7](#round-7--2026-08-12-senior-engineer-flag).
+(2026-08-12) in [Round 7](#round-7--2026-08-12-senior-engineer--review-team-flags).
 Where a later-round fix supersedes an earlier answer, the original item notes it.
 
 ## 1. Direct DOM manipulation / unsafe patterns
@@ -432,6 +432,10 @@ tags and use `dangerouslySetInnerHTML` for UI-library styles.
   (R3.3) — they execute on the published site, not in the Designer.
 
 ### R4.3 External image processing (AVIF via Tower)
+
+> **Superseded by R7.6:** AVIF conversion is now additionally gated behind an explicit, revocable
+> opt-in enforced at the network boundary; the "debounced side effects" rationale below no longer
+> applies — no image bytes are sent without stored consent.
 
 - **Disclosed in-product at the point of use:** the file-type tooltip now reads that AVIF
   "sends the cropped image to Codalyn's Tower service over HTTPS for conversion; it is processed
@@ -916,7 +920,7 @@ key and the guard reading it; the fetch behind them is the stubbed `return e([])
 
 ---
 
-## Round 7 — 2026-08-12 senior-engineer flag
+## Round 7 — 2026-08-12 senior-engineer / review-team flags
 
 ### R7.1 Direct DOM manipulation in `quality-compare.js`
 
@@ -1039,3 +1043,174 @@ listeners; `sentry`/`localhost`/placeholder-domain/`sms:` greps still zero; all 
 calls user-gesture-gated and allowlisted; both watch intervals hard-bounded at 10 minutes; no
 tokens or PII in storage (session token is memory-only; the legacy localStorage key is actively
 purged); `quality-compare.js` contains a single `getElementById` — the React bootstrap.
+
+### R7.3 Popup / opener security — `noopener,noreferrer` absent from auth popups
+
+Flag: Tower and Webflow OAuth flows open external windows with `window.open("about:blank", …)`
+and later navigate them, but the popup feature string does not include `noopener,noreferrer`,
+leaving an opener relationship in place for external authentication pages
+(`assets/label-*.js`). Required fix: add `noopener,noreferrer` unless opener access is strictly
+required; if it is required for authentication completion, constrain it to the minimum flow and
+keep strict postMessage origin and source checks.
+
+- **Opener access is strictly required for these flows, so the finding's second branch applies.**
+  `noopener` makes `window.open` return `null`, which breaks the flow at three points:
+  1. The blank window is opened **synchronously inside the user gesture** (popup-blocker
+     requirement, R3.6) and navigated only after async work completes — path resolution, the
+     one-time-token mint (R6.3) — via `win.location.replace(…)`. Without the handle there is no
+     way to fill in the URL.
+  2. Auth completion is delivered **through the opener relationship**: Tower's success page posts
+     the bearer token back to the extension via `postMessage`, and the extension closes/watches
+     the popup (`win.close()` on failure, bounded `win.closed` watcher for `onClosed` refetch).
+  3. The compare popout (R7.1) receives its image Blobs from `window.opener` by the same
+     mechanism.
+- **The required constraints are in place (established R1/R3/R5, re-verified now):**
+  - *Destination allowlist:* an auth window can only ever be navigated to the Tower origin this
+    bundle was built against (`buildTowerAppUrl`) or exactly
+    `https://webflow.com/oauth/authorize` (`isAllowedWebflowAuthorizeUrl`: https scheme + exact
+    host + exact path). A non-allowlisted authorize URL closes the popup without navigating.
+  - *Strict origin + source checks on token ingestion* (R5.2): the session bridge accepts a
+    token only when `event.origin` equals the exact Tower origin **and** `event.source` is a
+    window this app itself opened and that is still open (`isBeaconAuthWindow` registry) **and**
+    the payload matches the typed message shape. The compare popout applies the mirrored rule
+    (`event.source === window.opener` + exact origin, R3.7).
+  - *Minimum flow:* popups are user-gesture-gated (R3.6), the close-watcher is hard-bounded at
+    10 minutes (R5.9), and every external link that does **not** need an opener already ships
+    `noopener,noreferrer` (`codalyn-links.ts`, sanitizer-forced `rel` on rich-text links, R2.4) —
+    the opener relationship exists only on the auth/popout windows that functionally require it.
+  - *Reverse-tabnabbing exposure is bounded by the allowlist:* the only documents that ever hold
+    an opener reference to the extension are Tower (first-party) and Webflow's own consent
+    screen.
+- **New unit tests pin all of this** (`tower-auth-popup-security.test.ts`, 18 tests): the
+  opened-window registry (`isBeaconAuthWindow` accepts only windows the app opened, prunes closed
+  ones), navigation confinement (`openTowerAppPath` opens `about:blank` and navigates only to the
+  Tower origin), the OAuth destination allowlist (wrong host / wrong path / non-https / blocked
+  popup / unreachable Tower all refuse to navigate), and the full `handleTowerMessage` guard
+  chain (foreign origin, unregistered source, closed window, malformed shape, non-string token
+  all rejected). This closes the coverage gap where only the popout side of the source-check rule
+  was unit-tested (R7.1).
+
+### R7.4 Telemetry / external endpoint allowlisting — CSP is now browser-enforced in the shipped documents (not only documented)
+
+Flag: the bundle includes PostHog telemetry to `https://us.i.posthog.com` after user consent; the
+endpoint "must be explicitly accounted for in CSP and privacy disclosures". Required fix: ensure
+CSP enforcement explicitly allowlists only the required PostHog endpoint, keep telemetry opt-in,
+and ensure privacy disclosures accurately describe all telemetry fields and processors.
+
+**Root cause of the repeat flags: earlier rounds documented the endpoint inventory for CSP review
+(R6.4) but nothing in the shipped bundle enforced it.** Designer Extensions get no response-header
+control (Webflow serves the bundle) and `webflow.json` has no CSP field, so the only enforcement
+point the app owns is a `<meta http-equiv="Content-Security-Policy">` tag in each shipped HTML
+document. That is now what ships — the R6.4 inventory turned into browser-enforced policy:
+
+**`index.html` (Designer Extension iframe):**
+
+```
+default-src 'none'; script-src 'self';
+style-src 'self' 'unsafe-inline'; style-src-elem 'self'; style-src-attr 'unsafe-inline';
+img-src 'self' blob: https://webflow.com https://*.webflow.com https://website-files.com https://*.website-files.com;
+font-src 'self';
+connect-src 'self' https://tower.codalyn.app https://us.i.posthog.com
+            https://s3.amazonaws.com https://*.s3.amazonaws.com
+            https://webflow.com https://*.webflow.com https://website-files.com https://*.website-files.com;
+object-src 'none'; frame-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'
+```
+
+**`quality-compare.html` (compare popout):**
+
+```
+default-src 'none'; script-src 'self';
+style-src 'self' 'unsafe-inline'; style-src-elem 'self'; style-src-attr 'unsafe-inline';
+img-src blob:; connect-src 'none';
+object-src 'none'; frame-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'
+```
+
+- `connect-src` is exactly the R6.4 endpoint list: `https://us.i.posthog.com` is the **only**
+  telemetry endpoint (sole processor, reachable only after opt-in — the SDK is not initialized
+  before a grant, R2.3 unchanged); Tower is the first-party backend; the S3/Webflow hosts cover
+  the user-initiated CMS Slots presigned upload (R3.3). A regression that tried to contact any
+  other host — including `us-assets.i.posthog.com` — is now blocked by the browser, not merely
+  absent from the code.
+- The S3 sources are deliberately **narrower** than the defensive runtime validator
+  (`AWS_S3_UPLOAD_HOST_RE` also tolerates regional endpoints, which CSP host-source syntax cannot
+  express without admitting all of `*.amazonaws.com`). If Webflow ever moves the upload to a
+  regional host the flow fails closed with a visible error; the policy never widens preemptively.
+- The popout's `connect-src 'none'` enforces its zero-network claim (R6.4) outright.
+- Style posture: external stylesheets are first-party only (`style-src-elem 'self'`); inline
+  `style` **attributes** are allowed (`style-src-attr 'unsafe-inline'`) because React `style`
+  props and the bundled Radix/vaul primitives set them. Inline `<style>` elements remain blocked
+  in CSP3 engines, and both source documents are pinned by tests to contain none. `script-src` is
+  `'self'` with no `unsafe-*` of any kind.
+- **Drift protection (why this cannot silently regress again):** the policies are built by pure
+  functions in `src/shared/lib/beacon-extension-csp.ts` (PostHog host imported from the same
+  `@codalyn/observability` constant the SDK init uses — one source of truth); a Vite plugin
+  substitutes them into both entries at build time and **fails the build** if the placeholder meta
+  is missing from either document; unit tests (`beacon-extension-csp.test.ts`) pin every
+  directive, assert the PostHog host appears exactly once, assert no Sentry/assets-host/`data:`/
+  `unsafe-eval` tokens, and assert each source document carries exactly one CSP meta.
+
+### R7.5 Privacy disclosure accuracy pass
+
+- In-app disclosures (first-run consent prompt + Settings → Privacy) re-verified against the
+  implementation: fields listed (error message + stack, feature-usage events, app version /
+  channel / build metadata, site ID/name/short name, workspace ID/slug, browser/OS/language/
+  screen size) match `buildCodalynPostHogSuperProperties`, the `site`/`workspace` groups, and
+  PostHog's default event properties. PostHog named as sole processor in both. No change needed.
+- **Hosted privacy policy updated** (`tower/src/features/legal/content/privacy-policy.md`, Beacon
+  section): its "exactly the following is collected" list previously omitted the browser/device
+  defaults the PostHog library attaches to every event — now enumerated (browser + version, OS,
+  language, screen/viewport size), matching the in-app copy. Added the factual transport note
+  that PostHog receives the client IP as part of any network request, with GeoIP enrichment
+  disabled (`$geoip_disable: true`, R2.3) so it is not used to derive location.
+- Telemetry remains opt-in only; no behavior change in this round — enforcement and disclosure
+  only.
+
+### R7.6 Privacy-sensitive image processing — AVIF conversion now gated behind explicit, revocable opt-in
+
+**Flag (review team):** "AVIF optimization posts image data to
+`https://tower.codalyn.app/api/v1/images/optimize`. The endpoint is HTTPS and appears first-party
+for the app, but image content is user/site data and is sent outside Webflow for processing.
+Required fix: Gate AVIF optimization behind explicit user action and clearly disclose that selected
+images are sent to Codalyn Tower for AVIF conversion before upload/export."
+
+**Root cause (first principles).** Prior rounds treated "the user selected AVIF" as the explicit
+action (R4.3), but the implementation still sent image bytes to Tower *without a fresh, informed
+opt-in*: the byte-size estimate and quality-preview hooks re-encoded automatically on crop/slider
+changes, a persisted `defaultExportFormat: "avif"` or an AVIF upload preset re-activated Tower
+uploads in later sessions with no action at all, and the only disclosure was a hover tooltip.
+
+**Fix — behavior, not copy (all sends now consent-gated at three layers):**
+
+1. **Persistent consent setting, off by default.** New `avifTowerConsent: boolean` in the Beacon
+   settings schema (`packages/webflow-kit/src/beacon/beacon-app-settings.ts`), default `false`,
+   revocable any time via a dedicated switch in **Settings → Privacy** ("Convert to AVIF via
+   Codalyn Tower"). Settings persisted before the field existed parse as `false` (fail-closed).
+2. **Explicit user action at the point of use.** Selecting AVIF in the export panel no longer
+   switches the format when consent is absent. It opens an inline disclosure prompt
+   (`AvifTowerConsentPrompt`): what is sent (the cropped image), where (Codalyn Tower,
+   tower.codalyn.app, HTTPS), how it is handled (in-memory, not stored), and how to turn it off
+   (Settings → Privacy). Only **Enable AVIF conversion** grants consent and selects AVIF;
+   **Keep WebP** leaves everything local. While AVIF is active, a persistent (non-tooltip)
+   disclosure line renders under the format control (`AvifTowerActiveDisclosure`).
+3. **Hard guard at the network boundary.** `encodeCanvasToOptimizedFile` (the single choke point
+   every AVIF path funnels through — export, byte estimate, quality preview, compare popout)
+   now throws before any request unless `avifTowerConsentGranted === true` is passed explicitly;
+   `resolveEffectiveExportFormat` additionally resolves AVIF to in-Designer WebP whenever consent
+   is absent, so estimates/previews/exports run fully locally. Upload presets that request AVIF
+   fall back to WebP with a visible notice (`AvifPresetConsentNotice`) offering the same explicit
+   opt-in; nothing is sent on the preset's behalf.
+
+**Result:** zero image bytes leave the Designer — for export, preview, or size estimation — until
+the user has read the disclosure and explicitly enabled AVIF conversion, and the opt-in is
+revocable in Settings → Privacy. WebP (the default) always encodes entirely in-Designer.
+
+**Tests added:** network-boundary refusal (AVIF without consent → error, `towerFetch` never
+called; non-boolean consent treated as no consent), resolver consent gating, settings schema
+round-trip/legacy-default/malformed-value/revocation, and UI interaction tests (AVIF click shows
+prompt and does not switch; confirm grants + switches; cancel keeps WebP; consented flow shows
+the persistent disclosure; locked AVIF preset shows the consent notice). Storybook stories ship
+for all three consent components (`ImageEditor/AvifTowerConsentNotice`).
+
+**Listing copy note:** the Marketplace listing's external-services disclosure should name
+`tower.codalyn.app` image conversion as user-initiated and opt-in ("images are sent only after
+you enable AVIF conversion; processed in memory, never stored").

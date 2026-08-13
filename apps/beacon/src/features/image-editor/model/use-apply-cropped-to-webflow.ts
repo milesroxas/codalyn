@@ -104,6 +104,7 @@ async function exportWebflowPlacement(args: {
   h: number;
   quality: number;
   exportFormat: ImageExportFormat;
+  avifTowerConsentGranted: boolean;
   safeName: string;
   altText: string;
   dimSetters: Parameters<typeof syncExportDimensionsToState>[3];
@@ -124,6 +125,7 @@ async function exportWebflowPlacement(args: {
     h,
     quality,
     exportFormat,
+    avifTowerConsentGranted,
     safeName,
     altText,
     dimSetters,
@@ -147,6 +149,7 @@ async function exportWebflowPlacement(args: {
       outputHeight: h,
       quality,
       exportFormat,
+      avifTowerConsentGranted,
       fileBaseName: safeName,
       altText,
       componentImagePropId: componentImageProps.length > 1 ? selectedComponentImagePropId : null,
@@ -171,6 +174,7 @@ export function useApplyCroppedToWebflow(options: {
   effectiveOutputH: number;
   quality: number;
   exportFormat: ImageExportFormat;
+  avifTowerConsentGranted: boolean;
   fileBaseName: string;
   setFileBaseName: (s: string) => void;
   altText: string;
@@ -200,6 +204,7 @@ export function useApplyCroppedToWebflow(options: {
     effectiveOutputH,
     quality,
     exportFormat,
+    avifTowerConsentGranted,
     fileBaseName,
     setFileBaseName,
     altText,
@@ -296,6 +301,7 @@ export function useApplyCroppedToWebflow(options: {
       h,
       quality,
       exportFormat,
+      avifTowerConsentGranted,
       safeName,
       altText,
       dimSetters,
@@ -316,6 +322,7 @@ export function useApplyCroppedToWebflow(options: {
     effectiveOutputH,
     quality,
     exportFormat,
+    avifTowerConsentGranted,
     fileBaseName,
     setFileBaseName,
     altText,

@@ -62,6 +62,7 @@ import { loadImage } from "@/features/image-editor/lib/load-image";
 import { openQualityComparePopout } from "@/features/image-editor/lib/open-quality-compare-popout";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
 import {
+  isAvifPresetAwaitingConsent,
   isAvifPresetOverriddenByTowerLimit,
   resolveEffectiveExportFormat,
 } from "@/features/image-editor/lib/tower-avif-export-format";
@@ -377,6 +378,8 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
   const towerConfigured = isTowerConfigured();
   const { earlyAccessRequired } = useBeaconTowerAccessPolicy();
   const allowAvifEncoding = Boolean(towerUser);
+  /** Explicit user opt-in (Settings-persisted) for sending images to Tower for AVIF conversion. */
+  const avifTowerConsentGranted = settings.avifTowerConsent;
   const isConfirmedGuest = !towerUser && !towerSessionPending;
   const { isCmsCollectionTemplatePage: cmsCollectionTemplatePage } = useCmsCollectionTemplatePage();
   const guestCmsTemplateRestricted = isConfirmedGuest && cmsCollectionTemplatePage;
@@ -555,20 +558,32 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
   const selectedUploadPresetConstraints = uploadPresetPickerOptionMap.get(uploadPresetOptionId)?.constraints ?? null;
 
   const effectiveExportFormat = useMemo(
-    () => resolveEffectiveExportFormat(exportFormat, imageOptimizeLimitReached),
-    [exportFormat, imageOptimizeLimitReached]
+    () => resolveEffectiveExportFormat(exportFormat, { imageOptimizeLimitReached, avifTowerConsentGranted }),
+    [exportFormat, imageOptimizeLimitReached, avifTowerConsentGranted]
+  );
+
+  // The format the session is locked to: a Designer compose preset (highest precedence) else the upload preset.
+  const lockedPresetExportFormat = useMemo(
+    () => (compose.active ? compose.constraints?.exportFormat : selectedUploadPresetConstraints?.exportFormat),
+    [compose.active, compose.constraints, selectedUploadPresetConstraints?.exportFormat]
   );
 
   const avifPresetOverriddenByTowerLimit = useMemo(
     () =>
       isAvifPresetOverriddenByTowerLimit({
         imageOptimizeLimitReached,
-        // The format the session is locked to: a Designer compose preset (highest precedence) else the upload preset.
-        presetExportFormat: compose.active
-          ? compose.constraints?.exportFormat
-          : selectedUploadPresetConstraints?.exportFormat,
+        presetExportFormat: lockedPresetExportFormat,
       }),
-    [compose.active, compose.constraints, selectedUploadPresetConstraints?.exportFormat, imageOptimizeLimitReached]
+    [lockedPresetExportFormat, imageOptimizeLimitReached]
+  );
+
+  const avifPresetAwaitingConsent = useMemo(
+    () =>
+      isAvifPresetAwaitingConsent({
+        avifTowerConsentGranted,
+        presetExportFormat: lockedPresetExportFormat,
+      }) && !imageOptimizeLimitReached,
+    [lockedPresetExportFormat, avifTowerConsentGranted, imageOptimizeLimitReached]
   );
 
   const uploadPresetPickerReadOnly = useMemo(
@@ -782,6 +797,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
       presetId: resolvedConstraintsReadout?.presetId ?? null,
       constraints,
       imageSrc,
+      avifTowerConsentGranted,
     });
     if (lastAppliedResolverConstraintsKeyRef.current === applyKey) {
       return;
@@ -791,7 +807,10 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     applySessionConstraintsFromPickerSelection(
       {
         ...constraints,
-        exportFormat: resolveEffectiveExportFormat(constraints.exportFormat, imageOptimizeLimitReached),
+        exportFormat: resolveEffectiveExportFormat(constraints.exportFormat, {
+          imageOptimizeLimitReached,
+          avifTowerConsentGranted,
+        }),
       },
       {
         setOutputWidth,
@@ -812,6 +831,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     resolvedUploadTarget,
     resolvedConstraintsReadout,
     imageOptimizeLimitReached,
+    avifTowerConsentGranted,
   ]);
 
   useEffect(() => {
@@ -834,6 +854,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
       selectedOptionId: selectedOption.id,
       constraints: selectedConstraints,
       imageSrc,
+      avifTowerConsentGranted,
     });
     if (lastAppliedUploadPresetOptionIdRef.current === applyKey) {
       return;
@@ -843,7 +864,10 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     applySessionConstraintsFromPickerSelection(
       {
         ...selectedConstraints,
-        exportFormat: resolveEffectiveExportFormat(selectedConstraints.exportFormat, imageOptimizeLimitReached),
+        exportFormat: resolveEffectiveExportFormat(selectedConstraints.exportFormat, {
+          imageOptimizeLimitReached,
+          avifTowerConsentGranted,
+        }),
       },
       {
         setOutputWidth,
@@ -863,6 +887,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     uploadPresetPickerOptionMap,
     imageSrc,
     imageOptimizeLimitReached,
+    avifTowerConsentGranted,
   ]);
 
   // Compose mode: drive the session straight from the Designer per-prop preset (highest precedence, locks the UI).
@@ -873,7 +898,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
       lastAppliedComposeConstraintsKeyRef.current = null;
       return;
     }
-    const applyKey = JSON.stringify({ constraints: compose.constraints, imageSrc });
+    const applyKey = JSON.stringify({ constraints: compose.constraints, imageSrc, avifTowerConsentGranted });
     if (lastAppliedComposeConstraintsKeyRef.current === applyKey) {
       return;
     }
@@ -883,7 +908,10 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     applySessionConstraintsFromPickerSelection(
       {
         ...compose.constraints,
-        exportFormat: resolveEffectiveExportFormat(compose.constraints.exportFormat, imageOptimizeLimitReached),
+        exportFormat: resolveEffectiveExportFormat(compose.constraints.exportFormat, {
+          imageOptimizeLimitReached,
+          avifTowerConsentGranted,
+        }),
       },
       {
         setOutputWidth,
@@ -896,13 +924,13 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
         setAspectPreset,
       }
     );
-  }, [compose.active, compose.constraints, imageSrc, imageOptimizeLimitReached]);
+  }, [compose.active, compose.constraints, imageSrc, imageOptimizeLimitReached, avifTowerConsentGranted]);
 
   useEffect(() => {
     if (uploadPresetExportFormatLocked && !avifPresetOverriddenByTowerLimit) {
       return;
     }
-    if ((!allowAvifEncoding || imageOptimizeLimitReached) && exportFormat === "avif") {
+    if ((!allowAvifEncoding || imageOptimizeLimitReached || !avifTowerConsentGranted) && exportFormat === "avif") {
       setExportFormat("webp");
     }
   }, [
@@ -911,6 +939,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     exportFormat,
     uploadPresetExportFormatLocked,
     imageOptimizeLimitReached,
+    avifTowerConsentGranted,
   ]);
 
   useEffect(() => {
@@ -1077,6 +1106,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     effectiveOutputH,
     quality,
     exportFormat: effectiveExportFormat,
+    avifTowerConsentGranted,
     enabled: exportDimensionsReady,
     onTowerUsageLimit: reportTowerUsageLimit,
   });
@@ -1108,6 +1138,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     effectiveOutputH,
     quality,
     exportFormat: effectiveExportFormat,
+    avifTowerConsentGranted,
     enabled: exportDimensionsReady,
     onTowerUsageLimit: reportTowerUsageLimit,
   });
@@ -1119,6 +1150,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     effectiveOutputW,
     effectiveOutputH,
     exportFormat: effectiveExportFormat,
+    avifTowerConsentGranted,
     setQuality,
     onQualityCommit,
     popoutWindowRef: qualityPopoutWindowRef,
@@ -1388,6 +1420,11 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     }
   }, [pathMode, flowStep]);
 
+  /** Persist the explicit AVIF/Tower opt-in (revocable from Settings → Privacy). */
+  const grantAvifTowerConsent = useCallback(() => {
+    void updateSettings({ avifTowerConsent: true });
+  }, [updateSettings]);
+
   const handleExportSuccess = useCallback(
     (context: ImageExportSuccessContext) => {
       if (compose.active) {
@@ -1408,6 +1445,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
     effectiveOutputH,
     quality,
     exportFormat: effectiveExportFormat,
+    avifTowerConsentGranted,
     fileBaseName,
     setFileBaseName,
     altText,
@@ -1650,6 +1688,9 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
         onUploadPresetPickerChange: handleUploadPresetPickerChange,
         exportFormatLocked,
         avifPresetOverriddenByTowerLimit,
+        avifTowerConsentGranted,
+        onGrantAvifTowerConsent: grantAvifTowerConsent,
+        avifPresetAwaitingConsent,
       }}
     />
   );

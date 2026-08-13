@@ -19,6 +19,7 @@ export function useQualityPopoutBridge(options: {
   effectiveOutputW: number;
   effectiveOutputH: number;
   exportFormat: ImageExportFormat;
+  avifTowerConsentGranted?: boolean;
   setQuality: (q: number) => void;
   onQualityCommit: () => void;
   popoutWindowRef: MutableRefObject<Window | null>;
@@ -30,6 +31,7 @@ export function useQualityPopoutBridge(options: {
     effectiveOutputW,
     effectiveOutputH,
     exportFormat,
+    avifTowerConsentGranted,
     setQuality,
     onQualityCommit,
     popoutWindowRef,
@@ -58,6 +60,7 @@ export function useQualityPopoutBridge(options: {
           h,
           quality: q,
           exportFormat,
+          avifTowerConsentGranted,
         });
         if (gen !== encodeGenRef.current || !popoutWindowRef.current || popoutWindowRef.current.closed) {
           return;
@@ -79,7 +82,16 @@ export function useQualityPopoutBridge(options: {
         }
       }
     },
-    [imageSrc, completedCrop, effectiveOutputW, effectiveOutputH, exportFormat, popoutWindowRef, onTowerUsageLimit]
+    [
+      imageSrc,
+      completedCrop,
+      effectiveOutputW,
+      effectiveOutputH,
+      exportFormat,
+      avifTowerConsentGranted,
+      popoutWindowRef,
+      onTowerUsageLimit,
+    ]
   );
 
   useEffect(() => {

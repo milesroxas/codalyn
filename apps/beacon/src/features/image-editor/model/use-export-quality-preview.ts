@@ -22,6 +22,7 @@ async function runDebouncedPreviewJob(
     h: number;
     quality: number;
     exportFormat: ImageExportFormat;
+    avifTowerConsentGranted?: boolean;
   },
   onTowerUsageLimit?: (details: TowerUsageLimitDetails) => void
 ): Promise<void> {
@@ -58,6 +59,7 @@ export function useExportQualityPreview(options: {
   effectiveOutputH: number;
   quality: number;
   exportFormat: ImageExportFormat;
+  avifTowerConsentGranted?: boolean;
   /** When false, skips encode (e.g. export W×H not chosen yet). */
   enabled?: boolean;
   onTowerUsageLimit?: (details: TowerUsageLimitDetails) => void;
@@ -69,6 +71,7 @@ export function useExportQualityPreview(options: {
     effectiveOutputH,
     quality,
     exportFormat,
+    avifTowerConsentGranted,
     enabled = true,
     onTowerUsageLimit,
   } = options;
@@ -178,6 +181,7 @@ export function useExportQualityPreview(options: {
           h,
           quality,
           exportFormat,
+          avifTowerConsentGranted,
         },
         onTowerUsageLimit
       );
@@ -193,6 +197,7 @@ export function useExportQualityPreview(options: {
     effectiveOutputH,
     quality,
     exportFormat,
+    avifTowerConsentGranted,
     assignUrls,
     onTowerUsageLimit,
   ]);

@@ -49,7 +49,8 @@ function persistTowerSessionToken(token: unknown): void {
   writeBeaconTowerSessionToken(token);
 }
 
-function handleTowerMessage(event: MessageEvent, towerOrigin: string, onSessionChanged: () => void): void {
+/** Exported for unit tests — the guard chain (origin → opened-window source → message shape) is security-critical. */
+export function handleTowerMessage(event: MessageEvent, towerOrigin: string, onSessionChanged: () => void): void {
   if (!towerOrigin.trim()) {
     return;
   }

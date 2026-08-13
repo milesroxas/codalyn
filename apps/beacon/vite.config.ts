@@ -10,6 +10,11 @@ import { createStripDevHostLiteralsPlugin } from "../../scripts/vite-strip-dev-h
 // @ts-expect-error — no .mjs typings; plugin is JS-only at repo root
 import { createWebflowDesignerExtensionPlugin } from "../../scripts/vite-wf-designer-extension-plugin.mjs";
 import pkg from "./package.json";
+import {
+  BEACON_CSP_PLACEHOLDER,
+  buildBeaconExtensionCspContent,
+  buildQualityComparePopoutCspContent,
+} from "./src/shared/lib/beacon-extension-csp";
 import { resolveBeaconTowerOriginForBuild } from "./src/shared/lib/resolve-beacon-tower-origin-for-build";
 
 const beaconRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +36,35 @@ function createStripMainCssFromPopoutPlugin() {
           return html;
         }
         return html.replace(/\s*<link rel="stylesheet"[^>]*href="[^"]*styles\.css"[^>]*>/, "");
+      },
+    },
+  };
+}
+
+/**
+ * Substitutes the enforced Content-Security-Policy into each shipped HTML document (Webflow
+ * Marketplace external-endpoint allowlisting). Both source entries carry a placeholder meta tag;
+ * builds replace it with the document's policy from beacon-extension-csp.ts, dev serve strips it
+ * (Vite HMR needs websockets and inline preamble a production policy must not allow). A missing
+ * placeholder fails the build — the CSP cannot silently drop out of a shipped document.
+ */
+function createBeaconCspPlugin(towerOrigin: string) {
+  const placeholderMeta = `<meta http-equiv="Content-Security-Policy" content="${BEACON_CSP_PLACEHOLDER}" />`;
+  return {
+    name: "beacon-enforced-csp",
+    transformIndexHtml: {
+      order: "pre" as const,
+      handler(html: string, ctx: { filename: string; server?: unknown }) {
+        if (!html.includes(placeholderMeta)) {
+          throw new Error(`beacon-enforced-csp: CSP placeholder meta tag missing from ${ctx.filename}`);
+        }
+        if (ctx.server) {
+          return html.replace(placeholderMeta, "");
+        }
+        const content = ctx.filename.endsWith("quality-compare.html")
+          ? buildQualityComparePopoutCspContent()
+          : buildBeaconExtensionCspContent(towerOrigin);
+        return html.replace(placeholderMeta, `<meta http-equiv="Content-Security-Policy" content="${content}" />`);
       },
     },
   };
@@ -64,75 +98,79 @@ function resolveTowerOrigin(mode: string): string {
   });
 }
 
-export default defineConfig(({ mode }) => ({
-  base: "./",
-  plugins: [
-    tailwindcss(),
-    react(),
-    // Marketplace review: no dev-host literals in shipped bundles (build-only transform).
-    createStripDevHostLiteralsPlugin({ strict: mode !== "development" }),
-    createStripMainCssFromPopoutPlugin(),
-    ...(isVitest ? [] : [createWebflowDesignerExtensionPlugin({ appRoot: beaconRoot })]),
-  ],
-  define: {
-    __APP_VERSION__: JSON.stringify(pkg.version),
-    __BUILD_CHANNEL__: JSON.stringify(mode),
-    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
-    __BEACON_TOWER_ORIGIN__: JSON.stringify(isVitest ? "" : resolveTowerOrigin(mode)),
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(beaconRoot, "./src"),
+export default defineConfig(({ mode }) => {
+  const towerOrigin = isVitest ? "" : resolveTowerOrigin(mode);
+  return {
+    base: "./",
+    plugins: [
+      tailwindcss(),
+      react(),
+      // Marketplace review: no dev-host literals in shipped bundles (build-only transform).
+      createStripDevHostLiteralsPlugin({ strict: mode !== "development" }),
+      createStripMainCssFromPopoutPlugin(),
+      createBeaconCspPlugin(towerOrigin),
+      ...(isVitest ? [] : [createWebflowDesignerExtensionPlugin({ appRoot: beaconRoot })]),
+    ],
+    define: {
+      __APP_VERSION__: JSON.stringify(pkg.version),
+      __BUILD_CHANNEL__: JSON.stringify(mode),
+      __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+      __BEACON_TOWER_ORIGIN__: JSON.stringify(towerOrigin),
     },
-  },
-  optimizeDeps: {
-    exclude: ["@codalyn/webflow-kit", "@codalyn/webflow-kit/react", "@codalyn/observability"],
-  },
-  server: {
-    port: 1337,
-    watch: {
-      usePolling: true,
-      ignored: ["**/node_modules/**", "!**/node_modules/@codalyn/**"],
-    },
-  },
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-    cssCodeSplit: false,
-    rollupOptions: {
-      // Two documents ship in the extension bundle: the Designer Extension iframe (index.html)
-      // and the compression-compare popout window (quality-compare.html). Both are Vite-built
-      // React entries — no hand-authored scripts in public/.
-      input: {
-        main: path.resolve(beaconRoot, "index.html"),
-        "quality-compare": path.resolve(beaconRoot, "quality-compare.html"),
-      },
-      output: {
-        entryFileNames: (chunk: { name: string }) =>
-          chunk.name === "quality-compare" ? "quality-compare.js" : "bundle.js",
-        assetFileNames: (assetInfo: { name?: string | undefined }) =>
-          assetInfo.name?.endsWith(".css") ? "styles.css" : "assets/[name]-[hash][extname]",
+    resolve: {
+      alias: {
+        "@": path.resolve(beaconRoot, "./src"),
       },
     },
-  },
-  test: {
-    environment: "node",
-    globals: true,
-    passWithNoTests: true,
-    setupFiles: ["./src/test/setup-tests.ts"],
-    environmentMatchGlobs: [["**/*.test.tsx", "jsdom"]],
-    coverage: {
-      provider: "v8",
-      reporter: ["text", "html"],
-      include: ["src/**/*.{ts,tsx}"],
-      exclude: [
-        "**/*.d.ts",
-        "**/__tests__/**",
-        "**/vite-env.d.ts",
-        "**/*.test.{ts,tsx}",
-        "**/test/**",
-        "**/*.stories.tsx",
-      ],
+    optimizeDeps: {
+      exclude: ["@codalyn/webflow-kit", "@codalyn/webflow-kit/react", "@codalyn/observability"],
     },
-  },
-}));
+    server: {
+      port: 1337,
+      watch: {
+        usePolling: true,
+        ignored: ["**/node_modules/**", "!**/node_modules/@codalyn/**"],
+      },
+    },
+    build: {
+      outDir: "dist",
+      emptyOutDir: true,
+      cssCodeSplit: false,
+      rollupOptions: {
+        // Two documents ship in the extension bundle: the Designer Extension iframe (index.html)
+        // and the compression-compare popout window (quality-compare.html). Both are Vite-built
+        // React entries — no hand-authored scripts in public/.
+        input: {
+          main: path.resolve(beaconRoot, "index.html"),
+          "quality-compare": path.resolve(beaconRoot, "quality-compare.html"),
+        },
+        output: {
+          entryFileNames: (chunk: { name: string }) =>
+            chunk.name === "quality-compare" ? "quality-compare.js" : "bundle.js",
+          assetFileNames: (assetInfo: { name?: string | undefined }) =>
+            assetInfo.name?.endsWith(".css") ? "styles.css" : "assets/[name]-[hash][extname]",
+        },
+      },
+    },
+    test: {
+      environment: "node",
+      globals: true,
+      passWithNoTests: true,
+      setupFiles: ["./src/test/setup-tests.ts"],
+      environmentMatchGlobs: [["**/*.test.tsx", "jsdom"]],
+      coverage: {
+        provider: "v8",
+        reporter: ["text", "html"],
+        include: ["src/**/*.{ts,tsx}"],
+        exclude: [
+          "**/*.d.ts",
+          "**/__tests__/**",
+          "**/vite-env.d.ts",
+          "**/*.test.{ts,tsx}",
+          "**/test/**",
+          "**/*.stories.tsx",
+        ],
+      },
+    },
+  };
+});

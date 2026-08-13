@@ -51,6 +51,7 @@ describe("useApplyCroppedToWebflow", () => {
       effectiveOutputH: 300,
       quality: 0.85,
       exportFormat: "webp" as const,
+      avifTowerConsentGranted: false,
       fileBaseName: "export-name",
       altText: "A descriptive alt text",
       ...setters,

@@ -27,6 +27,11 @@ import type { ImageEditorPresetFileLimitBlocker } from "@/features/image-editor/
 import { resolveImageEditorPlacement } from "@/features/image-editor/lib/image-editor-resolved-placement";
 import { sanitizeAssetBaseName } from "@/features/image-editor/lib/sanitize-asset-base-name";
 import type { ImagePageTarget } from "@/features/image-editor/lib/scan-image-targets-on-page";
+import {
+  AvifPresetConsentNotice,
+  AvifTowerActiveDisclosure,
+  AvifTowerConsentPrompt,
+} from "@/features/image-editor/ui/avif-tower-consent-notice";
 import { AvifTowerLimitFallbackNotice } from "@/features/image-editor/ui/avif-tower-limit-fallback-notice";
 import { ExportEncodeSizeFootnote, ExportPresetLimitBar } from "@/features/image-editor/ui/export-size-estimate";
 import { ImagePageTargetSurfaceSummary } from "@/features/image-editor/ui/image-editor-page-target-surface-summary";
@@ -214,6 +219,12 @@ export type ImageEditorCropExportPanelProps = {
   exportFormatLocked?: boolean;
   /** AVIF preset forced to WebP because Tower image optimize limit was reached. */
   avifPresetOverriddenByTowerLimit?: boolean;
+  /** Explicit user opt-in for sending images to Codalyn Tower for AVIF conversion. */
+  avifTowerConsentGranted?: boolean;
+  /** Persists the AVIF/Tower opt-in (called from the consent prompt's confirm action). */
+  onGrantAvifTowerConsent?: () => void;
+  /** Preset requests AVIF but the user has not opted in; exports use WebP until enabled. */
+  avifPresetAwaitingConsent?: boolean;
   /** When true, show aspect ratio and export dimension controls (manual override). */
   showExportSizeControls?: boolean;
   /** Auto path: show selected image/component on the position step for context. */
@@ -742,6 +753,9 @@ type ExportCardProps = {
   presetFileLimitBlocker: ImageEditorPresetFileLimitBlocker | null;
   exportFormatLocked?: boolean;
   avifPresetOverriddenByTowerLimit?: boolean;
+  avifTowerConsentGranted?: boolean;
+  onGrantAvifTowerConsent?: () => void;
+  avifPresetAwaitingConsent?: boolean;
 };
 
 function UploadPresetPickerCard(props: {
@@ -750,6 +764,8 @@ function UploadPresetPickerCard(props: {
   uploadPresetPickerReadOnly: boolean;
   uploadPresetPickerOptions: UploadPresetPickerOption[];
   showAvifLimitNotice: boolean;
+  showAvifConsentNotice?: boolean;
+  onGrantAvifTowerConsent?: () => void;
 }) {
   const {
     uploadPresetPickerValue,
@@ -757,6 +773,8 @@ function UploadPresetPickerCard(props: {
     uploadPresetPickerReadOnly,
     uploadPresetPickerOptions,
     showAvifLimitNotice,
+    showAvifConsentNotice = false,
+    onGrantAvifTowerConsent,
   } = props;
 
   return (
@@ -785,9 +803,77 @@ function UploadPresetPickerCard(props: {
           </SelectContent>
         </Select>
         {showAvifLimitNotice ? <AvifTowerLimitFallbackNotice /> : null}
+        {showAvifConsentNotice && onGrantAvifTowerConsent ? (
+          <AvifPresetConsentNotice onEnable={onGrantAvifTowerConsent} />
+        ) : null}
       </div>
     </section>
   );
+}
+
+/** WebP/AVIF toggle with the consent prompt and the persistent Tower disclosure while AVIF is active. */
+function AvifCapableFormatToggle(props: {
+  baseId: string;
+  exportFormat: ImageExportFormat;
+  onFormatChange: (v: string) => void;
+  consentPromptVisible: boolean;
+  onConfirmConsent: () => void;
+  onCancelConsent: () => void;
+}) {
+  const { baseId, exportFormat, onFormatChange, consentPromptVisible, onConfirmConsent, onCancelConsent } = props;
+  return (
+    <>
+      <ToggleGroup
+        type="single"
+        value={exportFormat}
+        onValueChange={onFormatChange}
+        aria-labelledby={`${baseId}-format`}
+        className="grid w-full min-w-0 grid-cols-2 gap-0"
+        variant="outline"
+        size="sm"
+        spacing={0}
+      >
+        <ToggleGroupItem value="webp" className="text-xs font-medium">
+          WebP
+        </ToggleGroupItem>
+        <ToggleGroupItem value="avif" className="text-xs font-medium">
+          AVIF
+        </ToggleGroupItem>
+      </ToggleGroup>
+      {consentPromptVisible ? <AvifTowerConsentPrompt onConfirm={onConfirmConsent} onCancel={onCancelConsent} /> : null}
+      {exportFormat === "avif" ? <AvifTowerActiveDisclosure /> : null}
+    </>
+  );
+}
+
+/**
+ * Selecting AVIF is the explicit user action that gates Tower uploads: without a stored
+ * opt-in, show the disclosure prompt instead of switching — nothing is sent until Confirm.
+ */
+function handleExportFormatSelection(
+  v: string,
+  ctx: {
+    avifTowerConsentGranted: boolean;
+    setExportFormat: (f: ImageExportFormat) => void;
+    onExportFormatCommit: () => void;
+    setConsentPromptVisible: (visible: boolean) => void;
+  }
+): void {
+  if (v === "webp") {
+    ctx.setConsentPromptVisible(false);
+    ctx.setExportFormat(v);
+    ctx.onExportFormatCommit();
+    return;
+  }
+  if (v !== "avif") {
+    return;
+  }
+  if (!ctx.avifTowerConsentGranted) {
+    ctx.setConsentPromptVisible(true);
+    return;
+  }
+  ctx.setExportFormat(v);
+  ctx.onExportFormatCommit();
 }
 
 function ExportFormatFields(props: {
@@ -798,6 +884,9 @@ function ExportFormatFields(props: {
   onExportFormatCommit: () => void;
   exportFormatLocked: boolean;
   avifPresetOverriddenByTowerLimit: boolean;
+  avifTowerConsentGranted: boolean;
+  onGrantAvifTowerConsent: () => void;
+  avifPresetAwaitingConsent: boolean;
 }) {
   const {
     baseId,
@@ -807,9 +896,32 @@ function ExportFormatFields(props: {
     onExportFormatCommit,
     exportFormatLocked,
     avifPresetOverriddenByTowerLimit,
+    avifTowerConsentGranted,
+    onGrantAvifTowerConsent,
+    avifPresetAwaitingConsent,
   } = props;
 
+  const [consentPromptVisible, setConsentPromptVisible] = useState(false);
+
+  const handleFormatChange = (v: string) =>
+    handleExportFormatSelection(v, {
+      avifTowerConsentGranted,
+      setExportFormat,
+      onExportFormatCommit,
+      setConsentPromptVisible,
+    });
+
+  const confirmAvifConsent = () => {
+    onGrantAvifTowerConsent();
+    setExportFormat("avif");
+    onExportFormatCommit();
+    setConsentPromptVisible(false);
+  };
+
   if (exportFormatLocked && !avifPresetOverriddenByTowerLimit) {
+    if (avifPresetAwaitingConsent) {
+      return <AvifPresetConsentNotice onEnable={onGrantAvifTowerConsent} />;
+    }
     return null;
   }
 
@@ -846,28 +958,14 @@ function ExportFormatFields(props: {
           <AvifTowerLimitFallbackNotice />
         </>
       ) : allowAvifEncoding ? (
-        <ToggleGroup
-          type="single"
-          value={exportFormat}
-          onValueChange={(v) => {
-            if (v === "webp" || v === "avif") {
-              setExportFormat(v);
-              onExportFormatCommit();
-            }
-          }}
-          aria-labelledby={`${baseId}-format`}
-          className="grid w-full min-w-0 grid-cols-2 gap-0"
-          variant="outline"
-          size="sm"
-          spacing={0}
-        >
-          <ToggleGroupItem value="webp" className="text-xs font-medium">
-            WebP
-          </ToggleGroupItem>
-          <ToggleGroupItem value="avif" className="text-xs font-medium">
-            AVIF
-          </ToggleGroupItem>
-        </ToggleGroup>
+        <AvifCapableFormatToggle
+          baseId={baseId}
+          exportFormat={exportFormat}
+          onFormatChange={handleFormatChange}
+          consentPromptVisible={consentPromptVisible && !avifTowerConsentGranted}
+          onConfirmConsent={confirmAvifConsent}
+          onCancelConsent={() => setConsentPromptVisible(false)}
+        />
       ) : (
         <>
           <div className="text-foreground rounded-sm border border-border/60 bg-muted/20 px-3 py-2 text-sm font-medium">
@@ -911,6 +1009,9 @@ function ExportEncodeCard(p: ExportCardProps) {
     presetFileLimitBlocker,
     exportFormatLocked = false,
     avifPresetOverriddenByTowerLimit = false,
+    avifTowerConsentGranted = false,
+    onGrantAvifTowerConsent = () => {},
+    avifPresetAwaitingConsent = false,
   } = p;
 
   const exportW = completedCrop ? effectiveExportWidth : parsedExportWidth;
@@ -976,6 +1077,9 @@ function ExportEncodeCard(p: ExportCardProps) {
           onExportFormatCommit={onExportFormatCommit}
           exportFormatLocked={exportFormatLocked}
           avifPresetOverriddenByTowerLimit={avifPresetOverriddenByTowerLimit}
+          avifTowerConsentGranted={avifTowerConsentGranted}
+          onGrantAvifTowerConsent={onGrantAvifTowerConsent}
+          avifPresetAwaitingConsent={avifPresetAwaitingConsent}
         />
 
         <div className="flex flex-col gap-2">
@@ -1669,6 +1773,9 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     onUploadPresetPickerChange,
     exportFormatLocked = false,
     avifPresetOverriddenByTowerLimit = false,
+    avifTowerConsentGranted = false,
+    onGrantAvifTowerConsent = () => {},
+    avifPresetAwaitingConsent = false,
     showExportSizeControls = false,
     positionPageTarget = null,
   } = props;
@@ -1744,6 +1851,8 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
             uploadPresetPickerReadOnly={uploadPresetPickerReadOnly}
             uploadPresetPickerOptions={uploadPresetPickerOptions}
             showAvifLimitNotice={avifPresetOverriddenByTowerLimit}
+            showAvifConsentNotice={avifPresetAwaitingConsent}
+            onGrantAvifTowerConsent={onGrantAvifTowerConsent}
           />
         ) : null}
         <CropStageSection
@@ -1855,6 +1964,9 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         presetFileLimitBlocker={presetFileLimitBlocker}
         exportFormatLocked={exportFormatLocked}
         avifPresetOverriddenByTowerLimit={avifPresetOverriddenByTowerLimit}
+        avifTowerConsentGranted={avifTowerConsentGranted}
+        onGrantAvifTowerConsent={onGrantAvifTowerConsent}
+        avifPresetAwaitingConsent={avifPresetAwaitingConsent}
       />
 
       {showResolvedReadout ? (

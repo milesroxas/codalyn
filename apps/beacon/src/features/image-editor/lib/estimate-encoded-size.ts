@@ -12,12 +12,14 @@ export async function estimateEncodedOutputBytes(options: {
   outputHeight: number;
   quality: number;
   format: ImageExportFormat;
+  avifTowerConsentGranted?: boolean;
 }): Promise<number> {
   const w = clampEdge(options.outputWidth);
   const h = clampEdge(options.outputHeight);
   const canvas = await renderCroppedRegionToCanvas(options.imageSrc, options.completedCrop, w, h);
   const { blob } = await encodeCanvasToOptimizedFile(canvas, options.quality, {
     format: options.format,
+    avifTowerConsentGranted: options.avifTowerConsentGranted,
   });
   return blob.size;
 }

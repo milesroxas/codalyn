@@ -534,6 +534,8 @@ export async function applyCroppedImageToWebflow(options: {
   quality: number;
   /** Output codec; AVIF uses Tower `/api/v1/images/optimize`; WebP is encoded in the extension. */
   exportFormat: ImageExportFormat;
+  /** Explicit user opt-in required before AVIF image bytes may be sent to Tower. */
+  avifTowerConsentGranted?: boolean;
   fileBaseName: string;
   /** Alt text applied to every uploaded site asset; empty/whitespace leaves Webflow alt text unset. */
   altText: string;
@@ -554,6 +556,7 @@ export async function applyCroppedImageToWebflow(options: {
     outputHeight,
     quality,
     exportFormat,
+    avifTowerConsentGranted,
     fileBaseName,
     altText,
     componentImagePropId,
@@ -568,6 +571,7 @@ export async function applyCroppedImageToWebflow(options: {
     const { blob, fileName } = await encodeCanvasToOptimizedFile(canvas, quality, {
       baseName: fileBaseName,
       format: exportFormat,
+      avifTowerConsentGranted,
     });
     const file = new File([blob], fileName, { type: blob.type || mimeTypeForFormat(exportFormat) });
     const selectedElement = await webflow.getSelectedElement();

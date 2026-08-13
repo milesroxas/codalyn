@@ -2,6 +2,10 @@
 <html lang="en">
 	<head>
 		<meta charset="UTF-8" />
+		<!-- Enforced CSP (Webflow Marketplace external-endpoint allowlisting). Placeholder is
+		     replaced at build time with the policy from src/shared/lib/beacon-extension-csp.ts
+		     (Tower origin is build-resolved); stripped in dev serve for Vite HMR. -->
+		<meta http-equiv="Content-Security-Policy" content="__BEACON_CSP__" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Beacon</title>
 	</head>

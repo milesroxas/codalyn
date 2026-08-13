@@ -76,11 +76,19 @@ async function encodeAvifViaTower(
 export async function encodeCanvasToOptimizedFile(
   canvas: HTMLCanvasElement,
   quality: number,
-  options?: { baseName?: string; format?: ImageExportFormat }
+  options?: { baseName?: string; format?: ImageExportFormat; avifTowerConsentGranted?: boolean }
 ): Promise<EncodedImage> {
   const base = sanitizeAssetBaseName(options?.baseName ?? "edited");
   const q = Math.min(1, Math.max(0.05, quality));
   const format = options?.format ?? DEFAULT_IMAGE_EXPORT_FORMAT;
+
+  // Compliance boundary: AVIF encoding uploads the image to Codalyn Tower. No image bytes may
+  // leave the Designer unless the user explicitly opted in (Marketplace privacy requirement).
+  if (format === "avif" && options?.avifTowerConsentGranted !== true) {
+    throw new Error(
+      "AVIF conversion requires enabling it first — it sends the image to Codalyn Tower. Export WebP instead."
+    );
+  }
   await waitForNextPaint();
 
   const tower = getTowerOrigin();

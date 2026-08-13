@@ -96,6 +96,12 @@ export const beaconAppSettingsSchema = z.object({
    */
   limitCropZoomToNativeResolution: z.boolean().default(false),
   /**
+   * Explicit user opt-in for AVIF conversion via Codalyn Tower. AVIF encoding sends the cropped
+   * image to Tower over HTTPS; no image bytes may leave the Designer until this is true. Off by
+   * default, revocable from Settings → Privacy.
+   */
+  avifTowerConsent: z.boolean().default(false),
+  /**
    * CMS layout-composition editor (Tower ↔ Webflow `fieldData`); internal wiring, not shown in Beacon UI.
    */
   cmsLayout: z
@@ -191,6 +197,7 @@ export function getDefaultBeaconAppSettings(): BeaconAppSettings {
     },
     hiddenBuiltinAspectPresets: [],
     limitCropZoomToNativeResolution: false,
+    avifTowerConsent: false,
     cmsLayout: {
       fieldSlug: "",
       enabledCollections: [],

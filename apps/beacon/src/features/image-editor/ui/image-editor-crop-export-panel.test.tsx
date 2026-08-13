@@ -270,3 +270,89 @@ describe("ImageEditorCropExportPanel export format lock", () => {
     expect(screen.getByText("Image optimization credits used up")).toBeInTheDocument();
   });
 });
+
+describe("AVIF Tower consent gate", () => {
+  function saveProps(overrides: Partial<ImageEditorCropExportPanelProps> = {}) {
+    return baseProps({
+      flowPhase: "save",
+      allowAvifEncoding: true,
+      avifTowerConsentGranted: false,
+      onGrantAvifTowerConsent: vi.fn(),
+      ...overrides,
+    });
+  }
+
+  it("does not switch to AVIF on click without consent; shows disclosure prompt instead", () => {
+    const setExportFormat = vi.fn();
+    const props = saveProps({ setExportFormat });
+    render(
+      <TooltipProvider>
+        <ImageEditorCropExportPanel {...props} />
+      </TooltipProvider>
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "AVIF" }));
+    expect(setExportFormat).not.toHaveBeenCalled();
+    expect(screen.getByText("Send images to Codalyn Tower for AVIF?")).toBeTruthy();
+  });
+
+  it("confirming the prompt grants consent and then selects AVIF", () => {
+    const setExportFormat = vi.fn();
+    const onGrantAvifTowerConsent = vi.fn();
+    const props = saveProps({ setExportFormat, onGrantAvifTowerConsent });
+    render(
+      <TooltipProvider>
+        <ImageEditorCropExportPanel {...props} />
+      </TooltipProvider>
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "AVIF" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enable AVIF conversion" }));
+    expect(onGrantAvifTowerConsent).toHaveBeenCalledTimes(1);
+    expect(setExportFormat).toHaveBeenCalledWith("avif");
+  });
+
+  it("cancelling the prompt keeps WebP and grants nothing", () => {
+    const setExportFormat = vi.fn();
+    const onGrantAvifTowerConsent = vi.fn();
+    const props = saveProps({ setExportFormat, onGrantAvifTowerConsent });
+    render(
+      <TooltipProvider>
+        <ImageEditorCropExportPanel {...props} />
+      </TooltipProvider>
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "AVIF" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep WebP" }));
+    expect(onGrantAvifTowerConsent).not.toHaveBeenCalled();
+    expect(setExportFormat).not.toHaveBeenCalled();
+    expect(screen.queryByText("Send images to Codalyn Tower for AVIF?")).toBeNull();
+  });
+
+  it("selects AVIF directly once consent is granted and shows the persistent disclosure", () => {
+    const setExportFormat = vi.fn();
+    const props = saveProps({ avifTowerConsentGranted: true, setExportFormat, exportFormat: "avif" });
+    render(
+      <TooltipProvider>
+        <ImageEditorCropExportPanel {...props} />
+      </TooltipProvider>
+    );
+    expect(screen.getByTestId("avif-tower-active-disclosure")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "AVIF" }));
+    expect(screen.queryByText("Send images to Codalyn Tower for AVIF?")).toBeNull();
+  });
+
+  it("shows the preset consent notice when a locked preset requests AVIF without consent", () => {
+    const onGrantAvifTowerConsent = vi.fn();
+    const props = saveProps({
+      exportFormatLocked: true,
+      avifPresetAwaitingConsent: true,
+      onGrantAvifTowerConsent,
+    });
+    render(
+      <TooltipProvider>
+        <ImageEditorCropExportPanel {...props} />
+      </TooltipProvider>
+    );
+    expect(screen.getByText("This preset exports AVIF")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Enable AVIF conversion" }));
+    expect(onGrantAvifTowerConsent).toHaveBeenCalledTimes(1);
+  });
+});

@@ -23,18 +23,22 @@ export async function encodeExportPreviewPair(options: {
   h: number;
   quality: number;
   exportFormat: ImageExportFormat;
+  avifTowerConsentGranted?: boolean;
 }): Promise<{
   originalUrl: string;
   compressedUrl: string;
   pngBlob: Blob;
   compressedBlob: Blob;
 }> {
-  const { imageSrc, completedCrop, w, h, quality, exportFormat } = options;
+  const { imageSrc, completedCrop, w, h, quality, exportFormat, avifTowerConsentGranted } = options;
   const canvas = await renderCroppedRegionToCanvas(imageSrc, completedCrop, w, h);
   const pngBlob = await canvasToPngBlob(canvas);
   const originalUrl = URL.createObjectURL(pngBlob);
   try {
-    const { blob: compressedBlob } = await encodeCanvasToOptimizedFile(canvas, quality, { format: exportFormat });
+    const { blob: compressedBlob } = await encodeCanvasToOptimizedFile(canvas, quality, {
+      format: exportFormat,
+      avifTowerConsentGranted,
+    });
     const compressedUrl = URL.createObjectURL(compressedBlob);
     return { originalUrl, compressedUrl, pngBlob, compressedBlob };
   } catch (err) {
@@ -51,9 +55,13 @@ export async function encodeExportCompressedPreviewBlob(options: {
   h: number;
   quality: number;
   exportFormat: ImageExportFormat;
+  avifTowerConsentGranted?: boolean;
 }): Promise<Blob> {
-  const { imageSrc, completedCrop, w, h, quality, exportFormat } = options;
+  const { imageSrc, completedCrop, w, h, quality, exportFormat, avifTowerConsentGranted } = options;
   const canvas = await renderCroppedRegionToCanvas(imageSrc, completedCrop, w, h);
-  const { blob } = await encodeCanvasToOptimizedFile(canvas, quality, { format: exportFormat });
+  const { blob } = await encodeCanvasToOptimizedFile(canvas, quality, {
+    format: exportFormat,
+    avifTowerConsentGranted,
+  });
   return blob;
 }

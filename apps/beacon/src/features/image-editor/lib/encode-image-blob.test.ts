@@ -39,6 +39,25 @@ describe("encodeCanvasToOptimizedFile", () => {
     expect(mockTowerFetch).not.toHaveBeenCalled();
   });
 
+  it("refuses AVIF and never contacts Tower without the explicit user opt-in", async () => {
+    mockGetTowerOrigin.mockReturnValue("http://localhost:3100");
+    await expect(encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif" })).rejects.toThrow(
+      /requires enabling it first/
+    );
+    expect(mockTowerFetch).not.toHaveBeenCalled();
+  });
+
+  it("treats a non-boolean consent value as no consent (no Tower call)", async () => {
+    mockGetTowerOrigin.mockReturnValue("http://localhost:3100");
+    await expect(
+      encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, {
+        format: "avif",
+        avifTowerConsentGranted: "yes" as unknown as boolean,
+      })
+    ).rejects.toThrow(/requires enabling it first/);
+    expect(mockTowerFetch).not.toHaveBeenCalled();
+  });
+
   it("POSTs PNG to Tower for AVIF when origin is configured", async () => {
     mockGetTowerOrigin.mockReturnValue("http://localhost:3100");
     mockTowerFetch.mockResolvedValue(
@@ -50,6 +69,7 @@ describe("encodeCanvasToOptimizedFile", () => {
     const out = await encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, {
       format: "avif",
       baseName: "hero",
+      avifTowerConsentGranted: true,
     });
     expect(mockTowerFetch).toHaveBeenCalled();
     const [url, init] = mockTowerFetch.mock.calls[0] as [string, RequestInit | undefined];
@@ -73,16 +93,18 @@ describe("encodeCanvasToOptimizedFile", () => {
         { status: 402 }
       )
     );
-    await expect(encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif" })).rejects.toMatchObject({
+    await expect(
+      encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif", avifTowerConsentGranted: true })
+    ).rejects.toMatchObject({
       details: { kind: "image", used: 50, limit: 50 },
     });
   });
 
   it("throws a product-facing error when AVIF is requested but no Tower origin is configured", async () => {
     mockGetTowerOrigin.mockReturnValue("");
-    await expect(encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif" })).rejects.toThrow(
-      "AVIF conversion isn't available in this version of Beacon. Export WebP instead."
-    );
+    await expect(
+      encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif", avifTowerConsentGranted: true })
+    ).rejects.toThrow("AVIF conversion isn't available in this version of Beacon. Export WebP instead.");
   });
 
   it("does not leak the raw Tower response body into the user-facing error", async () => {
@@ -93,9 +115,9 @@ describe("encodeCanvasToOptimizedFile", () => {
         status: 500,
       })
     );
-    await expect(encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif" })).rejects.toThrow(
-      /^AVIF conversion failed \(500\)\. Try again in a moment, or export WebP instead\.$/
-    );
+    await expect(
+      encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif", avifTowerConsentGranted: true })
+    ).rejects.toThrow(/^AVIF conversion failed \(500\)\. Try again in a moment, or export WebP instead\.$/);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("500"), expect.stringContaining("sharp pipeline"));
     warn.mockRestore();
   });
@@ -104,9 +126,9 @@ describe("encodeCanvasToOptimizedFile", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mockGetTowerOrigin.mockReturnValue("http://localhost:3100");
     mockTowerFetch.mockResolvedValue(new Response("missing bearer token", { status: 401 }));
-    await expect(encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif" })).rejects.toThrow(
-      /^AVIF conversion needs a signed-in account\./
-    );
+    await expect(
+      encodeCanvasToOptimizedFile(stubCanvasWithWebpBlob(), 0.8, { format: "avif", avifTowerConsentGranted: true })
+    ).rejects.toThrow(/^AVIF conversion needs a signed-in account\./);
     warn.mockRestore();
   });
 });

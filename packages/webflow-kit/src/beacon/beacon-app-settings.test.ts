@@ -200,3 +200,32 @@ describe("beacon app settings preset storage", () => {
     }
   });
 });
+
+describe("avifTowerConsent setting", () => {
+  it("defaults to false (no Tower image uploads without explicit opt-in)", () => {
+    expect(getDefaultBeaconAppSettings().avifTowerConsent).toBe(false);
+  });
+
+  it("defaults to false for persisted settings written before the field existed", () => {
+    const legacy = { ...getDefaultBeaconAppSettings() } as Record<string, unknown>;
+    delete legacy.avifTowerConsent;
+    expect(parseBeaconAppSettings(legacy).avifTowerConsent).toBe(false);
+  });
+
+  it("round-trips an explicit true", () => {
+    const parsed = parseBeaconAppSettings({ ...getDefaultBeaconAppSettings(), avifTowerConsent: true });
+    expect(parsed.avifTowerConsent).toBe(true);
+  });
+
+  it("falls back to defaults on a malformed (non-boolean) value", () => {
+    const parsed = parseBeaconAppSettings({ ...getDefaultBeaconAppSettings(), avifTowerConsent: "yes" });
+    expect(parsed.avifTowerConsent).toBe(false);
+  });
+
+  it("merges a consent patch and supports revocation", () => {
+    const granted = mergeBeaconAppSettings(getDefaultBeaconAppSettings(), { avifTowerConsent: true });
+    expect(granted.avifTowerConsent).toBe(true);
+    const revoked = mergeBeaconAppSettings(granted, { avifTowerConsent: false });
+    expect(revoked.avifTowerConsent).toBe(false);
+  });
+});

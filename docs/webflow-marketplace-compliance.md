@@ -1211,6 +1211,9 @@ prompt and does not switch; confirm grants + switches; cancel keeps WebP; consen
 the persistent disclosure; locked AVIF preset shows the consent notice). Storybook stories ship
 for all three consent components (`ImageEditor/AvifTowerConsentNotice`).
 
-**Listing copy note:** the Marketplace listing's external-services disclosure should name
-`tower.codalyn.app` image conversion as user-initiated and opt-in ("images are sent only after
-you enable AVIF conversion; processed in memory, never stored").
+**Disclosure channel note:** Marketplace listing copy cannot be edited after the initial
+submission, so this external-service disclosure is delivered through the submission-note
+changelog on each update instead (see the round-7 AVIF body in
+[webflow-marketplace-response-short.md](webflow-marketplace-response-short.md)): AVIF
+conversion via `tower.codalyn.app` is user-initiated and opt-in — images are sent only after
+the user enables AVIF conversion; processed in memory, never stored.

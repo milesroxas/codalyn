@@ -2,11 +2,19 @@
 
 Condensed from [webflow-marketplace-compliance.md](webflow-marketplace-compliance.md) for the
 submission form's character-limited response field. Body below is the submittable text (round 7,
-2026-08-12 popup + telemetry flags).
+2026-08-13 AVIF privacy flag).
+
+> Note: Marketplace listing copy is locked after the initial submission, so the external-service
+> disclosure (opt-in image conversion via `tower.codalyn.app`) is carried in this submission-note
+> changelog on every update — it must stay in the note for each resubmission.
 
 ---
 
-CSP is now enforced via meta tag in both shipped documents: connect-src allowlists only our Tower backend, https://us.i.posthog.com (sole telemetry processor; strictly opt-in), and Webflow's presigned upload hosts; the popout is connect-src 'none'; tests pin every directive and the build fails if the CSP is absent. Auth popups require opener access (gesture-gated blank-window open, token returned via postMessage); destinations allowlisted with exact origin+source checks, now unit-tested.
+AVIF conversion is now opt-in, off by default. Selecting AVIF shows an in-context consent prompt disclosing the image is sent to our first-party Tower service (tower.codalyn.app) for conversion — in memory, never stored; revocable in Settings → Privacy. A persistent disclosure shows while AVIF is active. A hard guard at the single network call site refuses AVIF without consent, so no path (previews, size estimates, saved presets) sends image bytes unconsented. WebP stays fully in-Designer.
+
+---
+
+Earlier round-7 response (kept for reference, popup + telemetry flags): CSP is now enforced via meta tag in both shipped documents: connect-src allowlists only our Tower backend, https://us.i.posthog.com (sole telemetry processor; strictly opt-in), and Webflow's presigned upload hosts; the popout is connect-src 'none'; tests pin every directive and the build fails if the CSP is absent. Auth popups require opener access (gesture-gated blank-window open, token returned via postMessage); destinations allowlisted with exact origin+source checks, now unit-tested.
 
 ---
 

@@ -24,6 +24,9 @@ export default defineConfig({
     // The CMS Slots surface flag defaults on in dev but off in prod builds; pin it on so the
     // static Storybook build (`storybook:build`) catalogs the same UI as `storybook` dev.
     "import.meta.env.VITE_CMS_SLOTS_SURFACE_ENABLED": JSON.stringify("true"),
+    // The quality-compare popout is flag-gated off in shipped bundles, but Storybook catalogs the
+    // full UI surface — keep the popout page and "Pop out" button stories rendering.
+    __QUALITY_COMPARE_POPOUT_ENABLED__: JSON.stringify(true),
   },
   resolve: {
     alias: {

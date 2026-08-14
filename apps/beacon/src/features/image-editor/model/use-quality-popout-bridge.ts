@@ -95,6 +95,11 @@ export function useQualityPopoutBridge(options: {
   );
 
   useEffect(() => {
+    // Build-time constant: with the popout flag-gated off there is no popout window to bridge to,
+    // so the message listener is never registered (and the handler wiring is eliminated).
+    if (!__QUALITY_COMPARE_POPOUT_ENABLED__) {
+      return;
+    }
     const targetOrigin = window.location.origin;
     const onMessage = (event: MessageEvent) => {
       dispatchQualityPopoutMessage(

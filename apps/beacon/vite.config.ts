@@ -1,4 +1,5 @@
 /// <reference types="vitest/config" />
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
@@ -74,6 +75,37 @@ function createBeaconCspPlugin(towerOrigin: string) {
 const isVitest = Boolean(process.env.VITEST);
 
 /**
+ * Quality-compare popout gate. The popout is withheld from Marketplace bundles for now: unless
+ * `VITE_QUALITY_COMPARE_POPOUT_ENABLED=true`, the `quality-compare` Rollup input is not built, the
+ * popout's static stylesheet is dropped from dist, and `__QUALITY_COMPARE_POPOUT_ENABLED__` is
+ * defined `false` so the opener path (window.open + bridge wiring) is dead-code-eliminated from
+ * bundle.js. Off must be *fully* off — Marketplace guidelines bar placeholder/dead features, and
+ * orphaned popout files in the zip read as exactly that. Release builds additionally refuse an
+ * enabled flag (FORBIDDEN_RELEASE_ENV in scripts/build-cli.mjs) and verify the archived zip carries
+ * no "quality-compare" traces.
+ */
+function resolveQualityPopoutEnabled(mode: string): boolean {
+  const beaconEnv = loadEnv(mode, beaconRoot, "");
+  const raw = beaconEnv.VITE_QUALITY_COMPARE_POPOUT_ENABLED ?? process.env.VITE_QUALITY_COMPARE_POPOUT_ENABLED;
+  return raw?.trim() === "true";
+}
+
+/**
+ * `public/` is copied into dist verbatim and Vite has no per-file exclude, so when the popout is
+ * disabled its stylesheet is deleted after the copy. Runs in `closeBundle` (after Vite's public-dir
+ * copy) so the file cannot ship in the extension zip.
+ */
+function createDropQualityPopoutCssPlugin() {
+  return {
+    name: "beacon-drop-quality-popout-css",
+    apply: "build" as const,
+    closeBundle() {
+      fs.rmSync(path.join(beaconRoot, "dist", "quality-compare.css"), { force: true });
+    },
+  };
+}
+
+/**
  * Tower base URL baked into the bundle.
  * - Dev / `vite build --mode development`: default `http://TOWER_DEV_HOST:TOWER_PORT` when unset.
  * - Production (`vite build --mode production`): defaults to tower.codalyn.app when unset.
@@ -100,6 +132,9 @@ function resolveTowerOrigin(mode: string): string {
 
 export default defineConfig(({ mode }) => {
   const towerOrigin = isVitest ? "" : resolveTowerOrigin(mode);
+  // Vitest pins the flag on so popout unit/UI tests always exercise the real code paths; the
+  // shipped state is decided by real builds, not the test runner.
+  const qualityPopoutEnabled = isVitest || resolveQualityPopoutEnabled(mode);
   return {
     base: "./",
     plugins: [
@@ -108,6 +143,7 @@ export default defineConfig(({ mode }) => {
       // Marketplace review: no dev-host literals in shipped bundles (build-only transform).
       createStripDevHostLiteralsPlugin({ strict: mode !== "development" }),
       createStripMainCssFromPopoutPlugin(),
+      ...(qualityPopoutEnabled ? [] : [createDropQualityPopoutCssPlugin()]),
       createBeaconCspPlugin(towerOrigin),
       ...(isVitest ? [] : [createWebflowDesignerExtensionPlugin({ appRoot: beaconRoot })]),
     ],
@@ -116,6 +152,7 @@ export default defineConfig(({ mode }) => {
       __BUILD_CHANNEL__: JSON.stringify(mode),
       __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
       __BEACON_TOWER_ORIGIN__: JSON.stringify(towerOrigin),
+      __QUALITY_COMPARE_POPOUT_ENABLED__: JSON.stringify(qualityPopoutEnabled),
     },
     resolve: {
       alias: {
@@ -137,12 +174,12 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       cssCodeSplit: false,
       rollupOptions: {
-        // Two documents ship in the extension bundle: the Designer Extension iframe (index.html)
-        // and the compression-compare popout window (quality-compare.html). Both are Vite-built
-        // React entries — no hand-authored scripts in public/.
+        // The Designer Extension iframe (index.html) always ships. The compression-compare popout
+        // window (quality-compare.html, a second Vite-built React entry — no hand-authored scripts
+        // in public/) is flag-gated and only built when VITE_QUALITY_COMPARE_POPOUT_ENABLED=true.
         input: {
           main: path.resolve(beaconRoot, "index.html"),
-          "quality-compare": path.resolve(beaconRoot, "quality-compare.html"),
+          ...(qualityPopoutEnabled ? { "quality-compare": path.resolve(beaconRoot, "quality-compare.html") } : {}),
         },
         output: {
           entryFileNames: (chunk: { name: string }) =>

@@ -10,7 +10,8 @@ type QualityComparePreviewProps = {
   pending: boolean;
   exportWidth: number;
   exportHeight: number;
-  onOpenQualityPopout: () => void;
+  /** Absent when the quality-compare popout is flag-gated off — the "Pop out" button is not rendered. */
+  onOpenQualityPopout?: (() => void) | undefined;
 };
 
 export function QualityComparePreview(p: QualityComparePreviewProps) {
@@ -26,7 +27,7 @@ export function QualityComparePreview(p: QualityComparePreviewProps) {
     if (!originalSrc || !compressedSrc) {
       return;
     }
-    onOpenQualityPopout();
+    onOpenQualityPopout?.();
   }, [originalSrc, compressedSrc, onOpenQualityPopout]);
 
   const setScrubFromClientX = useCallback((clientX: number) => {
@@ -92,19 +93,21 @@ export function QualityComparePreview(p: QualityComparePreviewProps) {
             Drag the handle on the preview to compare lossless crop vs. export.
           </p>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-foreground -mr-1 h-8 shrink-0 gap-1 px-2 text-[10px] font-medium"
-          disabled={!ready}
-          onClick={onPopOut}
-          title="Open a larger compare view"
-          aria-label="Open larger compression compare in a new window"
-        >
-          <ExternalLink aria-hidden className="size-3" />
-          Pop out
-        </Button>
+        {onOpenQualityPopout ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground -mr-1 h-8 shrink-0 gap-1 px-2 text-[10px] font-medium"
+            disabled={!ready}
+            onClick={onPopOut}
+            title="Open a larger compare view"
+            aria-label="Open larger compression compare in a new window"
+          >
+            <ExternalLink aria-hidden className="size-3" />
+            Pop out
+          </Button>
+        ) : null}
       </div>
 
       <div

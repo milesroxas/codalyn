@@ -323,6 +323,14 @@ function shouldShowResolvedReadout(composeActive: boolean): boolean {
   return import.meta.env.DEV && !composeActive;
 }
 
+/**
+ * Undefined when the quality-compare popout is flag-gated off: the "Pop out" button must disappear
+ * entirely (Marketplace bars dead/placeholder UI), not render disabled.
+ */
+function gatedQualityPopoutHandler(handler: () => void): (() => void) | undefined {
+  return __QUALITY_COMPARE_POPOUT_ENABLED__ ? handler : undefined;
+}
+
 export function ImageEditor({ composeSession }: { composeSession?: ImageEditorComposeSession } = {}) {
   const compose = useImageEditorComposeMode(composeSession);
   const navigate = useNavigate();
@@ -1158,20 +1166,25 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
   });
 
   const openQualityPopout = useCallback(() => {
-    const blobs = getPopoutPreviewBlobs();
-    if (!blobs) {
-      return;
-    }
-    const ar = effectiveOutputH > 0 ? effectiveOutputW / effectiveOutputH : 1;
-    const win = openQualityComparePopout({
-      originalBlob: blobs.png,
-      compressedBlob: blobs.compressed,
-      aspectRatio: ar,
-      initialQuality: quality,
-      targetOrigin: window.location.origin,
-    });
-    if (win) {
-      qualityPopoutWindowRef.current = win;
+    // Build-time constant: when the popout is flag-gated off, this whole block — and with it the
+    // only reference to openQualityComparePopout, whose window.open call and quality-compare.html
+    // URL must not ship in a bundle that withholds the feature — is dead-code-eliminated.
+    if (__QUALITY_COMPARE_POPOUT_ENABLED__) {
+      const blobs = getPopoutPreviewBlobs();
+      if (!blobs) {
+        return;
+      }
+      const ar = effectiveOutputH > 0 ? effectiveOutputW / effectiveOutputH : 1;
+      const win = openQualityComparePopout({
+        originalBlob: blobs.png,
+        compressedBlob: blobs.compressed,
+        aspectRatio: ar,
+        initialQuality: quality,
+        targetOrigin: window.location.origin,
+      });
+      if (win) {
+        qualityPopoutWindowRef.current = win;
+      }
     }
   }, [getPopoutPreviewBlobs, effectiveOutputW, effectiveOutputH, quality]);
 
@@ -1667,7 +1680,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
         effectiveExportWidth: effectiveOutputW,
         effectiveExportHeight: effectiveOutputH,
         exportPreviewReady: exportDimensionsReady,
-        onOpenQualityPopout: openQualityPopout,
+        onOpenQualityPopout: gatedQualityPopoutHandler(openQualityPopout),
         limitCropZoomToNativeResolution: settings.limitCropZoomToNativeResolution,
         flowPhase: flowStep === "position" ? "position" : "save",
         hidePlacementCard,

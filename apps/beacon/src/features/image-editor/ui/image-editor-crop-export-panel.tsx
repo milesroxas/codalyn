@@ -189,7 +189,8 @@ export type ImageEditorCropExportPanelProps = {
   effectiveExportWidth: number;
   effectiveExportHeight: number;
   exportPreviewReady: boolean;
-  onOpenQualityPopout: () => void;
+  /** Absent when the quality-compare popout is flag-gated off — the "Pop out" button is not rendered. */
+  onOpenQualityPopout?: (() => void) | undefined;
   limitCropZoomToNativeResolution: boolean;
   /** `position` — crop and zoom only; `save` — encoding, placement, and primary action. */
   flowPhase: "position" | "save";
@@ -749,7 +750,8 @@ type ExportCardProps = {
   effectiveExportWidth: number;
   effectiveExportHeight: number;
   exportPreviewReady: boolean;
-  onOpenQualityPopout: () => void;
+  /** Absent when the quality-compare popout is flag-gated off — the "Pop out" button is not rendered. */
+  onOpenQualityPopout?: (() => void) | undefined;
   presetFileLimitBlocker: ImageEditorPresetFileLimitBlocker | null;
   exportFormatLocked?: boolean;
   avifPresetOverriddenByTowerLimit?: boolean;

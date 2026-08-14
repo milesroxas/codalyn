@@ -970,6 +970,24 @@ through the app framework/state layer.
   `assets/quality-popout-protocol-*.js`); `dist/quality-compare.html` links only
   `quality-compare.css` and module scripts.
 
+**Update 2026-08-14 — popout withheld from submission bundles.** The quality-compare popout is now
+behind a build-time flag (`VITE_QUALITY_COMPARE_POPOUT_ENABLED`, default off; see
+`apps/beacon/vite.config.ts`) and is **not present in Marketplace submission bundles**:
+
+- With the flag off, the `quality-compare` Vite entry is not built and `public/quality-compare.css`
+  is dropped from dist — no `quality-compare.html/.js/.css` in the zip, so no orphaned/unreachable
+  files for a reviewer to find.
+- The opener path is dead-code-eliminated from `bundle.js` (the `window.open` call, the popup
+  window name, and the `quality-compare.html` URL are gone), and the parent-side bridge never
+  registers its `message` listener. The "Pop out" button is not rendered at all — off means fully
+  off, per the guideline barring placeholder or non-functional UI.
+- Enforced by the release pipeline: `build:prod`/`build:preview` fail if the flag resolves to
+  `"true"` (`FORBIDDEN_RELEASE_ENV`), and the archived-zip verification treats the substring
+  `quality-compare` as a forbidden marker across every file in the bundle.
+- The R7.1 rebuild above remains the implementation of record for when the popout ships again; the
+  popup inventory in R3.6 should be read minus this popout for bundles built with the flag off
+  (the auth popup is unaffected).
+
 ### R7.2 Proactive whole-app DOM-pattern sweep (2026-08-12, post-R7.1)
 
 After the popout fix, the entire extension (source, workspace packages, and the rebuilt production

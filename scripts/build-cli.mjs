@@ -300,8 +300,11 @@ function verifyArchivedZipContains(archivePath, markers) {
 }
 
 /**
- * Env vars that must NOT disable a user-visible feature in a release bundle. These gate surfaces whose
- * "off" state ships silently — the build must fail instead of quietly producing a crippled app.
+ * Env values that must not reach a release bundle — each entry rejects one flag value whose effect
+ * would ship silently. The build must fail instead of quietly producing the wrong bundle, in either
+ * direction: a feature toggled *off* that should ship (dead UI in front of a reviewer) or a feature
+ * toggled *on* that is withheld from the current Marketplace submission (undocumented surface in
+ * front of a reviewer).
  *
  * `VITE_CMS_SLOTS_SURFACE_ENABLED`: this variable used to be an *enable* switch that
  * `isCmsSlotsSurfaceEnabled()` required to be exactly "true" under `import.meta.env.PROD` — but every
@@ -310,14 +313,29 @@ function verifyArchivedZipContains(archivePath, markers) {
  * permanently disabled home-screen tile with no explanation. A Marketplace reviewer reads that as a
  * broken or placeholder feature, which is the class of finding that has already cost four review rounds.
  * The flag is now a kill switch that defaults on, so the guard only has to catch an explicit disable.
+ *
+ * `VITE_QUALITY_COMPARE_POPOUT_ENABLED`: the quality-compare popout is flag-gated off and withheld
+ * from Marketplace bundles for now (see apps/beacon/vite.config.ts). A stray `=true` in a gitignored
+ * `.env*` would ship a popup surface absent from the review notes and demo video. Delete this entry
+ * when the popout is cleared to ship again.
  */
 const FORBIDDEN_RELEASE_ENV = {
   beacon: [
     {
       key: "VITE_CMS_SLOTS_SURFACE_ENABLED",
       rejected: "false",
-      feature: "the CMS Slots surface",
+      problem: "ships the CMS Slots surface disabled — reviewers would see a dead feature",
       hint: "remove the override from your .env* files or CI environment before building a release bundle",
+    },
+    {
+      key: "VITE_QUALITY_COMPARE_POPOUT_ENABLED",
+      rejected: "true",
+      problem:
+        "ships the quality-compare popout, which is withheld from the current Marketplace submission — " +
+        "reviewers would see an undocumented popup feature",
+      hint:
+        "remove the override from your .env* files or CI environment, or delete this " +
+        "FORBIDDEN_RELEASE_ENV entry once the popout is cleared to ship",
     },
   ],
 };
@@ -376,14 +394,13 @@ function assertRequiredReleaseEnv({ appName, appPath, channel, inlineEnv }) {
   if (channel !== "production" && channel !== "preview") {
     return;
   }
-  for (const { key, rejected, feature, hint } of FORBIDDEN_RELEASE_ENV[appName] ?? []) {
+  for (const { key, rejected, problem, hint } of FORBIDDEN_RELEASE_ENV[appName] ?? []) {
     const resolved = resolveViteEnvValue({ appPath, mode: channel, key, inlineEnv });
     if (resolved?.trim() !== rejected) {
       continue;
     }
     throw new Error(
-      `${key} resolves to ${JSON.stringify(rejected)} for this ${channel} build, which ships ` +
-        `${feature} disabled — reviewers would see a dead feature. Fix: ${hint}.`
+      `${key} resolves to ${JSON.stringify(rejected)} for this ${channel} build, which ${problem}. Fix: ${hint}.`
     );
   }
 }
@@ -398,10 +415,29 @@ function assertRequiredReleaseEnv({ appName, appPath, channel, inlineEnv }) {
 // src/shared/lib/init-observability.ts, so its bundle legitimately contains Sentry code.
 const SENTRY_ALLOWED_APPS = new Set(["flint"]);
 
-function collectForbiddenBundleMarkers(appPath, channel, appName) {
-  if (channel !== "production" && channel !== "preview") {
-    return [];
+/**
+ * The quality-compare popout is flag-gated (apps/beacon/vite.config.ts). When the flag is off, no
+ * trace may ship: not the entry files (quality-compare.html/.js/.css) and not the opener path in
+ * bundle.js — its dead-code elimination is what this marker verifies. The protocol source constants
+ * that legitimately remain bundled ("beacon-quality-popout-v1" et al.) do not contain this substring.
+ */
+function qualityPopoutForbiddenMarker({ appName, appPath, channel }) {
+  if (appName !== "beacon") {
+    return null;
   }
+  const popoutFlag = resolveViteEnvValue({
+    appPath,
+    mode: channel,
+    key: "VITE_QUALITY_COMPARE_POPOUT_ENABLED",
+    inlineEnv: process.env,
+  });
+  if (popoutFlag?.trim() === "true") {
+    return null;
+  }
+  return { value: "quality-compare", label: "a flag-gated quality-compare popout reference" };
+}
+
+function staticForbiddenMarkers(appPath, channel, appName) {
   // Marketplace round 4 (2026-08): reviewers flag dev hosts and URL-like placeholder domains in
   // shipped bundles. Bare substrings so any scheme/port/derivative form is caught; the Vite
   // transform in scripts/vite-strip-dev-host-literals.mjs plus source-side fixes are what make a
@@ -420,6 +456,18 @@ function collectForbiddenBundleMarkers(appPath, channel, appName) {
     // out — this marker guarantees a reviewer's `grep -i sentry` over the bundle stays empty.
     forbidden.push({ value: "sentry", label: "a Sentry reference" });
   }
+  const popoutMarker = qualityPopoutForbiddenMarker({ appName, appPath, channel });
+  if (popoutMarker) {
+    forbidden.push(popoutMarker);
+  }
+  return forbidden;
+}
+
+function collectForbiddenBundleMarkers(appPath, channel, appName) {
+  if (channel !== "production" && channel !== "preview") {
+    return [];
+  }
+  const forbidden = staticForbiddenMarkers(appPath, channel, appName);
   // Sweep every env file Vite loads for this channel (.env, .env.local, .env.<mode>,
   // .env.<mode>.local) — a secret in .env.production.local gets inlined just as readily as one
   // in .env.local, so the sweep must cover the same file set as viteEnvFilesForMode.

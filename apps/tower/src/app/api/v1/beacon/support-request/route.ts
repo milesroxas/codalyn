@@ -1,4 +1,10 @@
 import { auth } from "@/server/auth";
+import { getClientIp } from "@/server/security/client-ip";
+import { RateLimitError } from "@/server/security/rate-limit";
+import {
+  assertBeaconSupportRequestIpRateLimit,
+  assertSupportRequestEmailRateLimit,
+} from "@/server/security/support-request-rate-limit";
 import { submitSupportRequest } from "@/server/support/support-request";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { parseAccessEmailInput } from "@/shared/lib/access/email-input";
@@ -29,6 +35,46 @@ async function resolveAuthenticatedSupportEmail(
   return { email, userId };
 }
 
+function rateLimited(): Response {
+  return Response.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": "600" } });
+}
+
+/** Runs a rate-limit assertion, mapping {@link RateLimitError} to a 429 and rethrowing anything else. */
+async function guardRateLimit(assertion: () => Promise<void>): Promise<Response | null> {
+  try {
+    await assertion();
+    return null;
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      return rateLimited();
+    }
+    throw error;
+  }
+}
+
+/**
+ * Unauthenticated (signed-out Designer) path: no session, no Turnstile (the extension iframe cannot
+ * render the widget), so per-IP + per-email budgets are the abuse control for DB rows + admin email.
+ */
+async function resolveUnauthenticatedSupportEmail(
+  req: Request,
+  body: SupportRequestBody | null
+): Promise<{ email: string } | { response: Response }> {
+  const ipLimited = await guardRateLimit(() => assertBeaconSupportRequestIpRateLimit(getClientIp(req)));
+  if (ipLimited) {
+    return { response: ipLimited };
+  }
+  const email = parseAccessEmailInput(body?.email);
+  if (!email) {
+    return { response: Response.json({ error: "invalid_email" }, { status: 400 }) };
+  }
+  const emailLimited = await guardRateLimit(() => assertSupportRequestEmailRateLimit(email));
+  if (emailLimited) {
+    return { response: emailLimited };
+  }
+  return { email };
+}
+
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as SupportRequestBody | null;
   const verified = await verifyTowerApiRequest(req);
@@ -44,10 +90,11 @@ export async function POST(req: Request) {
     email = resolved.email;
     userId = resolved.userId;
   } else {
-    email = parseAccessEmailInput(body?.email);
-    if (!email) {
-      return Response.json({ error: "invalid_email" }, { status: 400 });
+    const resolved = await resolveUnauthenticatedSupportEmail(req, body);
+    if ("response" in resolved) {
+      return resolved.response;
     }
+    email = resolved.email;
   }
 
   try {

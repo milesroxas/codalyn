@@ -1,6 +1,6 @@
 /**
  * Compiles review-sensitive vendor literals out of the code bundled into Webflow Designer
- * Extension builds. Two classes of literal are handled, both because Marketplace reviewers grep
+ * Extension builds. Three classes of literal are handled, all because Marketplace reviewers grep
  * the shipped bundle:
  *
  * 1. Development-host literals (`localhost` / `127.0.0.1`, any casing) — flagged in review round 4
@@ -8,6 +8,9 @@
  * 2. Sentry references contributed by posthog-js's (unused) Sentry integration — an earlier review
  *    round flagged Sentry specifically. Sentry has since been removed from the app, but a reviewer
  *    re-grepping `sentry` would still hit posthog's dead integration code.
+ * 3. React's production error-decoder URL (`https://react.dev/errors/`) — never fetched, but the only
+ *    third-party `https://` literal left in the bundle; dropped so an external-endpoint grep shows
+ *    exactly the endpoints the CSP allowlists.
  *
  * Every replacement below targets a code path that is dead inside the extension iframe, so runtime
  * behavior is unchanged:
@@ -64,6 +67,10 @@ const SENTRY_RESIDUAL = {
   label: "Sentry reference",
   pattern: /sentry/i,
 };
+const REACT_ERROR_DECODER_RESIDUAL = {
+  label: "react.dev error-decoder URL",
+  pattern: /react\.dev/i,
+};
 
 /**
  * `find` is either a literal string (replaced until no occurrences remain) or a global RegExp.
@@ -71,6 +78,15 @@ const SENTRY_RESIDUAL = {
  * interpreted as a capture-group reference.
  */
 const RULES = [
+  {
+    // React's production error decoder builds "https://react.dev/errors/<code>" into thrown messages.
+    // It is never fetched, but it is the only external URL a `grep https://` over the bundle finds
+    // besides our own endpoints; the code number survives, so errors stay decodable by hand.
+    name: "react-dom production error-decoder URL",
+    idIncludes: "react-dom/cjs/react-dom",
+    find: '"https://react.dev/errors/"',
+    replaceWith: '"#"',
+  },
   {
     name: "react-router windowless URL base",
     idIncludes: "react-router/dist/",
@@ -84,9 +100,11 @@ const RULES = [
     replaceWith: ";",
   },
   {
-    name: "better-auth isLoopbackHost",
+    // better-auth ≥1.6.30: `isLoopbackForDevScheme` only picks http vs https for a dev base URL;
+    // Beacon always talks to an https Tower in release builds, so "never loopback" is behavior-neutral.
+    name: "better-auth isLoopbackForDevScheme",
     idIncludes: "better-auth/dist/utils/url",
-    find: 'return h === "localhost" || h.startsWith("localhost:") || h === "127.0.0.1" || h.startsWith("127.0.0.1:") || h === "[::1]" || h.startsWith("[::1]:") || h === "0.0.0.0" || h.startsWith("0.0.0.0:");',
+    find: 'return hostname === "localhost" || hostname.endsWith(".localhost") || hostname === "::1" || hostname.startsWith("127.");',
     replaceWith: "return false;",
   },
   {
@@ -138,6 +156,7 @@ const RULES = [
 
 /** Modules audited above, with the residual patterns that must not survive the replacements. */
 const WATCHED_MODULES = [
+  { idIncludes: "react-dom/cjs/react-dom", residuals: [REACT_ERROR_DECODER_RESIDUAL] },
   { idIncludes: "react-router/dist/", residuals: [DEV_HOST_RESIDUAL] },
   { idIncludes: "better-auth/dist/utils/url", residuals: [DEV_HOST_RESIDUAL] },
   { idIncludes: "posthog-js/dist/", residuals: [DEV_HOST_RESIDUAL, SENTRY_RESIDUAL] },

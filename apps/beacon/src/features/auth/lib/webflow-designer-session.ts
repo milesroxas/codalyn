@@ -44,6 +44,16 @@ export async function exchangeWebflowDesignerSession(): Promise<{ ok: true } | {
     return { ok: false, error: "get_id_token_failed" };
   }
 
+  // The site this ID token was issued on. Tower uses it to resolve with the token of the workspace that
+  // owns this site (never another tenant's). Best-effort: a missing site id only narrows Tower's options.
+  let siteId: string | null = null;
+  try {
+    const info = await webflow.getSiteInfo();
+    siteId = typeof info?.siteId === "string" && info.siteId.length > 0 ? info.siteId : null;
+  } catch {
+    siteId = null;
+  }
+
   let res: Response;
   try {
     res = await fetch(`${towerOrigin}/api/auth/webflow-designer`, {
@@ -53,7 +63,7 @@ export async function exchangeWebflowDesignerSession(): Promise<{ ok: true } | {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ idToken, app: "beacon" }),
+      body: JSON.stringify({ idToken, app: "beacon", ...(siteId ? { siteId } : {}) }),
     });
   } catch (error) {
     // Network/CORS failure reaching Tower's auth API (common on preview behind Deployment Protection).

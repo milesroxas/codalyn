@@ -1,0 +1,29 @@
+Webflow App developer skills — webflow-app-preflight + webflow-app-review-remediation
+
+Packaged:        2026-08-12 (rev b — App Review Preflight install link added)
+Source commit:   431648adf27399d521709162114b09bb884ebf2a
+Contents:        2 skill directories + README-START-HERE.md (toolkit overview)
+
+Reference claims in this package were verified against the public Webflow
+developer documentation on 2026-08-03; submission-artifact requirements
+(testing site, source-map upload, App Review Preflight receipt) reflect the
+submission form as of 2026-08-12. Public documentation and Marketplace
+expectations change — re-verify links and re-run the included evals before reuse.
+
+These skills are developer aids. They do not make, predict, or substitute for a
+Webflow Marketplace review decision.
+
+How to use:
+  - In a skill-capable coding agent (e.g. Claude Code): copy the two skill
+    directories into your skills location (Claude Code: ~/.claude/skills/).
+  - Or read them directly — SKILL.md in each directory is the entry point.
+  - Start with webflow-app-preflight before submitting.
+  - Use webflow-app-review-remediation only after you have received findings.
+
+Feedback:
+  If guidance is wrong, out of date, or unclear, reply through the channel
+  that delivered this package and include the Packaged date and Source
+  commit above.
+
+Verify integrity:
+  shasum -a 256 -c SHA256SUMS.txt

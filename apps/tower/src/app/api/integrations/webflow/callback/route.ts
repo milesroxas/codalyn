@@ -20,8 +20,14 @@ import {
   WEBFLOW_OAUTH_STATE_COOKIE,
   webflowOAuthInstallPendingCookieOptions,
 } from "@/server/webflow-oauth-config";
-import { exchangeWebflowAuthorizationCode, type WebflowOAuthTokenResponse } from "@/server/webflow-oauth-exchange";
+import {
+  exchangeWebflowAuthorizationCode,
+  revokeWebflowAccessToken,
+  type WebflowOAuthTokenResponse,
+} from "@/server/webflow-oauth-exchange";
 import { persistOrganizationWebflowOAuthToken } from "@/server/webflow-oauth-persist";
+import { isWebflowOAuthApproverBound, validateWebflowOAuthStateRow } from "@/server/webflow-oauth-state-binding";
+import { fetchWebflowAuthorizedUserId } from "@/server/webflow-token-identity";
 import { db } from "@/shared/lib/db";
 import { webflowOauthAuthorizeState } from "@/shared/lib/db/auth-schema";
 import { towerConnectionPathWithStatus } from "@/shared/lib/navigation/tower-app-paths";
@@ -53,7 +59,16 @@ function clearWebflowOauthCookies(cookieStore: CookieStore): void {
   cookieStore.delete(WEBFLOW_OAUTH_ORG_COOKIE);
 }
 
-type ResolvedConnectTarget = { organizationId: string; appKey: WebflowAppKey };
+type ResolvedConnectTarget = {
+  organizationId: string;
+  appKey: WebflowAppKey;
+  /**
+   * Set for the Designer-initiated (DB-state) flow: the exchanged token must be proven (via Webflow
+   * `token/authorized_by`) to belong to this Webflow user before it is stored. Undefined for the
+   * dashboard cookie flow, which is bound to the browser session that started it.
+   */
+  requiredWebflowUserId?: string;
+};
 
 async function resolveOrganizationFromCookieFlow(
   request: Request,
@@ -88,23 +103,32 @@ async function resolveOrganizationFromDbStateFlow(
       userId: webflowOauthAuthorizeState.userId,
       organizationId: webflowOauthAuthorizeState.organizationId,
       appKey: webflowOauthAuthorizeState.appKey,
+      webflowAuthorizedUserId: webflowOauthAuthorizeState.webflowAuthorizedUserId,
+      createdAt: webflowOauthAuthorizeState.createdAt,
     })
     .from(webflowOauthAuthorizeState)
     .where(eq(webflowOauthAuthorizeState.state, state))
     .limit(1);
   const row = rows[0];
   if (row) {
+    // Single-use: consumed on first sight, whether or not it validates.
     await db.delete(webflowOauthAuthorizeState).where(eq(webflowOauthAuthorizeState.state, state));
   }
-  if (!row?.organizationId) {
+  const validated = validateWebflowOAuthStateRow(row, new Date());
+  if (!validated.ok) {
     clearWebflowOauthCookies(cookieStore);
-    return { error: oauthErrorRedirect(appUrl, { error: "invalid_state" }, { popup: isPopupFlow }) };
+    return { error: oauthErrorRedirect(appUrl, { error: validated.error }, { popup: isPopupFlow }) };
   }
-  const stillAdmin = await isTowerTeamAdminMemberOfOrg(row.userId, row.organizationId);
+  const bound = validated.row;
+  const stillAdmin = await isTowerTeamAdminMemberOfOrg(bound.userId, bound.organizationId);
   if (!stillAdmin) {
     return { error: oauthErrorRedirect(appUrl, { error: "team_admin_required" }, { popup: isPopupFlow }) };
   }
-  return { organizationId: row.organizationId, appKey: normalizeWebflowAppKey(row.appKey) };
+  return {
+    organizationId: bound.organizationId,
+    appKey: normalizeWebflowAppKey(bound.appKey),
+    requiredWebflowUserId: bound.webflowAuthorizedUserId,
+  };
 }
 
 async function tryCompleteWebflowInitiatedInstallInSession(
@@ -231,15 +255,51 @@ export async function GET(request: Request) {
   if ("error" in resolved) {
     return resolved.error;
   }
-  const { organizationId, appKey } = resolved;
+
+  const outcome = await exchangeAndStoreConnectTarget(resolved, code, redirectUri);
+  if (outcome !== "ok") {
+    return oauthErrorRedirect(appUrl, { error: outcome }, { popup: isPopupFlow });
+  }
+  return oauthSuccessRedirect(appUrl, { popup: isPopupFlow });
+}
+
+type ExchangeAndStoreOutcome = "ok" | "token_exchange" | "identity_mismatch" | "token_storage";
+
+/**
+ * Exchanges the code and stores the token under the resolved org. For the Designer-initiated flow
+ * (`requiredWebflowUserId` set) the approving Webflow user must be proven to be the minter first;
+ * a token that fails binding or storage is revoked (best-effort) rather than left live.
+ */
+async function exchangeAndStoreConnectTarget(
+  target: ResolvedConnectTarget,
+  code: string,
+  redirectUri: string
+): Promise<ExchangeAndStoreOutcome> {
+  const { organizationId, appKey, requiredWebflowUserId } = target;
 
   let tokenResponse: WebflowOAuthTokenResponse;
   try {
     tokenResponse = await exchangeWebflowAuthorizationCode(code, redirectUri, appKey);
   } catch {
-    return oauthErrorRedirect(appUrl, { error: "token_exchange" }, { popup: isPopupFlow });
+    return "token_exchange";
   }
 
-  await persistOrganizationWebflowOAuthToken(organizationId, tokenResponse, appKey);
-  return oauthSuccessRedirect(appUrl, { popup: isPopupFlow });
+  if (requiredWebflowUserId) {
+    const approver = await fetchWebflowAuthorizedUserId(tokenResponse.access_token);
+    if (!isWebflowOAuthApproverBound(requiredWebflowUserId, approver)) {
+      await revokeWebflowAccessToken(tokenResponse.access_token, appKey);
+      console.warn(`[tower/webflow-oauth] callback identity mismatch for org ${organizationId}; token discarded`);
+      return "identity_mismatch";
+    }
+  }
+
+  try {
+    await persistOrganizationWebflowOAuthToken(organizationId, tokenResponse, appKey);
+  } catch (error) {
+    // e.g. MissingSecretEncryptionKeyError in production — the token is never stored in plaintext.
+    console.error(`[tower/webflow-oauth] token storage failed: ${error instanceof Error ? error.message : error}`);
+    await revokeWebflowAccessToken(tokenResponse.access_token, appKey);
+    return "token_storage";
+  }
+  return "ok";
 }

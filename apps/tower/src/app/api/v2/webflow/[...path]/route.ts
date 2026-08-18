@@ -4,7 +4,9 @@ import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import { getActiveOrganizationIdForApiRequest } from "@/server/billing/session-org";
 import { consumeWebflowProxy, recordMeterCost, type UsageScope } from "@/server/billing/usage-gate";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
-import { hasWebflowOAuthCredentials, resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
+import { isWebflowSiteId, linkOrganizationWebflowSites } from "@/server/webflow-organization-sites";
+import { hasWebflowOAuthCredentials, resolveActiveOrganizationWebflowToken } from "@/server/webflow-proxy-token";
+import { handleWebflowUpstreamRevocation } from "@/server/webflow-upstream-revocation";
 
 const MAX_WEBFLOW_PROXY_SEGMENTS = 40;
 const MAX_WEBFLOW_PROXY_SEGMENT_LEN = 200;
@@ -31,6 +33,36 @@ function assertSafeWebflowProxySegments(segments: string[]): Response | null {
   return null;
 }
 
+/** Meters the call against the caller's entitlement; returns the usage scope, or the 4xx to send back. */
+async function consumeProxyUsage(
+  req: Request,
+  userId: string | null | undefined,
+  segments: string[]
+): Promise<UsageScope | null | Response> {
+  if (!userId) {
+    return null;
+  }
+  const activeOrg = await getActiveOrganizationIdForApiRequest(req);
+  const entitlement = await resolveTowerEntitlement(userId, activeOrg);
+  const usage = await consumeWebflowProxy(userId, entitlement, activeOrg, classifyWebflowProxyUsage(segments));
+  return usage.ok ? usage.scope : usage.response;
+}
+
+/**
+ * A successful `GET sites/{id}` proves this org's token reaches that site — record it (idempotent, after
+ * the response) so the Designer ID-token exchange can pick this token for that site later.
+ */
+function recordSiteLinkFromProxyRead(res: Response, method: string, segments: string[], organizationId: string): void {
+  if (!res.ok || method !== "GET" || segments.length !== 2 || segments[0] !== "sites") {
+    return;
+  }
+  const siteId = segments[1];
+  if (!isWebflowSiteId(siteId)) {
+    return;
+  }
+  after(() => linkOrganizationWebflowSites(organizationId, [siteId]));
+}
+
 async function forward(req: Request, segments: string[]) {
   const auth = await verifyTowerApiRequest(req);
   if (!auth.ok) {
@@ -40,8 +72,9 @@ async function forward(req: Request, segments: string[]) {
   if (badPath) {
     return badPath;
   }
-  const webflowToken = await resolveWebflowBearerToken({ userId: auth.userId, request: req });
-  if (!webflowToken) {
+  const stored = await resolveActiveOrganizationWebflowToken({ userId: auth.userId, request: req });
+  const webflowToken = stored?.accessToken;
+  if (!stored || !webflowToken) {
     return Response.json(
       {
         error: "No Webflow access token available",
@@ -53,16 +86,11 @@ async function forward(req: Request, segments: string[]) {
     );
   }
 
-  let usageScope: UsageScope | null = null;
-  if (auth.userId) {
-    const activeOrg = await getActiveOrganizationIdForApiRequest(req);
-    const entitlement = await resolveTowerEntitlement(auth.userId, activeOrg);
-    const usage = await consumeWebflowProxy(auth.userId, entitlement, activeOrg, classifyWebflowProxyUsage(segments));
-    if (!usage.ok) {
-      return usage.response;
-    }
-    usageScope = usage.scope;
+  const usage = await consumeProxyUsage(req, auth.userId, segments);
+  if (usage instanceof Response) {
+    return usage;
   }
+  const usageScope = usage;
 
   // Proxy time is dominated by the upstream Webflow round-trip (I/O wait, not Vercel active CPU), so we
   // measure local handler compute as total local time minus the awaited fetch.
@@ -93,6 +121,16 @@ async function forward(req: Request, segments: string[]) {
   const fetchStart = Date.now();
   const res = await fetch(target, init);
   const fetchMs = Date.now() - fetchStart;
+
+  // Webflow rejected the stored workspace token (revoked / app uninstalled): prune it and tell the
+  // extension to reconnect instead of retrying a dead credential. 403 (missing scope) passes through.
+  const revoked = await handleWebflowUpstreamRevocation(res, stored);
+  if (revoked) {
+    return revoked;
+  }
+
+  recordSiteLinkFromProxyRead(res, method, segments, stored.organizationId);
+
   const responseHeaders = new Headers(res.headers);
   responseHeaders.set("Cache-Control", "no-store");
   const response = new Response(res.body, { status: res.status, headers: responseHeaders });

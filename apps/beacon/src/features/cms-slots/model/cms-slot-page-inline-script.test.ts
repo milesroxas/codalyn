@@ -10,7 +10,9 @@ import { CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_INLINE_KEYS } from "@/feature
 import { CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
 import {
   CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS,
+  cmsSlotRuntimeScriptVersion,
   decideCmsSlotRuntimeSyncAction,
+  describeTowerFailure,
   getCmsSlotPageInlineScriptSource,
   isAllowedAssetUploadUrl,
   isBeaconRuntimeAssetFileName,
@@ -1278,5 +1280,80 @@ describe("planBoundedPageScan", () => {
       expect(plan.skipped).toBe(5);
       expect(plan.complete).toBe(false);
     }
+  });
+});
+
+describe("describeTowerFailure (Tower/Webflow error → actionable message)", () => {
+  it("prefers message, then error, then hint, then a generic status line", () => {
+    expect(describeTowerFailure(500, { message: "boom" }, "Register")).toBe("boom");
+    expect(describeTowerFailure(500, { error: "bad" }, "Register")).toBe("bad");
+    expect(describeTowerFailure(500, { hint: "try later" }, "Register")).toBe("try later");
+    expect(describeTowerFailure(500, null, "Register")).toBe("Register failed (500)");
+  });
+
+  it("tells the user to reconnect when the proxy reports the Webflow token was revoked (401)", () => {
+    const msg = describeTowerFailure(
+      401,
+      { error: "webflow_token_revoked", code: "WEBFLOW_TOKEN_REVOKED" },
+      "Register"
+    );
+    expect(msg).toMatch(/Reconnect Webflow in Tower/);
+    expect(msg).toContain("webflow_token_revoked");
+  });
+
+  it("explains a 403 as a permission problem with a reconnect CTA, not a retry", () => {
+    expect(describeTowerFailure(403, { message: "Forbidden" }, "Register")).toMatch(/Reconnect Webflow in Tower/);
+  });
+
+  it("keeps the missing-scope guidance for scope errors regardless of status", () => {
+    expect(describeTowerFailure(400, { message: "missing_scopes: assets:write" }, "Register")).toMatch(
+      /assets:write and custom_code:write/
+    );
+  });
+
+  it("returns the plain message for other statuses", () => {
+    expect(describeTowerFailure(404, { message: "Custom code block not found" }, "Get")).toBe(
+      "Custom code block not found"
+    );
+  });
+});
+
+describe("cmsSlotRuntimeScriptVersion (content-derived registered-script version)", () => {
+  it("derives the version from the app semver plus the runtime source hash", () => {
+    expect(cmsSlotRuntimeScriptVersion({ base: "0.1.0", sourceHash: "1a2b3c4d", takenVersions: new Set() })).toBe(
+      "0.1.0+beacon.1a2b3c4d"
+    );
+  });
+
+  it("is deterministic for the same content and only suffixes when that exact version is already registered", () => {
+    const a = cmsSlotRuntimeScriptVersion({ base: "0.1.0", sourceHash: "1a2b3c4d", takenVersions: new Set() });
+    const b = cmsSlotRuntimeScriptVersion({ base: "0.1.0", sourceHash: "1a2b3c4d", takenVersions: new Set() });
+    expect(a).toBe(b);
+    expect(
+      cmsSlotRuntimeScriptVersion({
+        base: "0.1.0",
+        sourceHash: "1a2b3c4d",
+        takenVersions: new Set(["0.1.0+beacon.1a2b3c4d"]),
+      })
+    ).toBe("0.1.0+beacon.1a2b3c4d.2");
+    expect(
+      cmsSlotRuntimeScriptVersion({
+        base: "0.1.0",
+        sourceHash: "1a2b3c4d",
+        takenVersions: new Set(["0.1.0+beacon.1a2b3c4d", "0.1.0+beacon.1a2b3c4d.2"]),
+      })
+    ).toBe("0.1.0+beacon.1a2b3c4d.3");
+  });
+
+  it("changes when the runtime source changes", () => {
+    const taken = new Set<string>();
+    expect(cmsSlotRuntimeScriptVersion({ base: "0.1.0", sourceHash: "aaaaaaaa", takenVersions: taken })).not.toBe(
+      cmsSlotRuntimeScriptVersion({ base: "0.1.0", sourceHash: "bbbbbbbb", takenVersions: taken })
+    );
+  });
+
+  it("stays a valid semver build string (dot-separated alphanumerics after +)", () => {
+    const v = cmsSlotRuntimeScriptVersion({ base: "1.2.3", sourceHash: "0f0f0f0f", takenVersions: new Set() });
+    expect(v).toMatch(/^\d+\.\d+\.\d+\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*$/);
   });
 });

@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { decryptStoredSecret, encryptStoredSecret } from "./secret-encryption";
+import {
+  decryptStoredSecret,
+  encryptStoredSecret,
+  isPlaintextSecretStorageAllowed,
+  MissingSecretEncryptionKeyError,
+} from "./secret-encryption";
 
 const BASE64_KEY = Buffer.alloc(32, 7).toString("base64");
 const HEX_KEY = Buffer.alloc(32, 9).toString("hex");
@@ -70,5 +75,42 @@ describe("encryptStoredSecret / decryptStoredSecret", () => {
   it("returns null for a truncated encrypted payload", () => {
     vi.stubEnv("TOWER_TOKEN_ENCRYPTION_KEY", BASE64_KEY);
     expect(decryptStoredSecret(`enc:v1:${Buffer.alloc(8).toString("base64")}`)).toBeNull();
+  });
+});
+
+describe("production hard-fail without a key", () => {
+  it("allows plaintext passthrough outside production", () => {
+    expect(isPlaintextSecretStorageAllowed({ NODE_ENV: "development" })).toBe(true);
+    expect(isPlaintextSecretStorageAllowed({ NODE_ENV: "test" })).toBe(true);
+    expect(isPlaintextSecretStorageAllowed({})).toBe(true);
+  });
+
+  it("refuses plaintext in production unless the explicit override is set", () => {
+    expect(isPlaintextSecretStorageAllowed({ NODE_ENV: "production" })).toBe(false);
+    expect(
+      isPlaintextSecretStorageAllowed({ NODE_ENV: "production", TOWER_TOKEN_ENCRYPTION_ALLOW_PLAINTEXT: "0" })
+    ).toBe(false);
+    expect(
+      isPlaintextSecretStorageAllowed({ NODE_ENV: "production", TOWER_TOKEN_ENCRYPTION_ALLOW_PLAINTEXT: "1" })
+    ).toBe(true);
+  });
+
+  it("throws on a production write when the key is missing", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TOWER_TOKEN_ENCRYPTION_KEY", "");
+    vi.stubEnv("TOWER_TOKEN_ENCRYPTION_ALLOW_PLAINTEXT", "");
+    expect(() => encryptStoredSecret("plain_token")).toThrow(MissingSecretEncryptionKeyError);
+  });
+
+  it("still encrypts normally in production when the key is present", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TOWER_TOKEN_ENCRYPTION_KEY", BASE64_KEY);
+    expect(decryptStoredSecret(encryptStoredSecret("secret"))).toBe("secret");
+  });
+
+  it("legacy plaintext reads keep working in production without a key (read path is not the leak)", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TOWER_TOKEN_ENCRYPTION_KEY", "");
+    expect(decryptStoredSecret("legacy_plaintext_token")).toBe("legacy_plaintext_token");
   });
 });

@@ -6,12 +6,19 @@
  */
 export const CODALYN_PRIVACY_POLICY_URL = "https://tower.codalyn.app/privacy";
 export const CODALYN_TERMS_URL = "https://tower.codalyn.app/terms";
+/** Public Beacon documentation (setup, CMS Slots, custom-code removal). */
+export const CODALYN_BEACON_DOCS_URL = "https://tower.codalyn.app/docs";
+
+export type CodalynPublicPageUrl =
+  | typeof CODALYN_PRIVACY_POLICY_URL
+  | typeof CODALYN_TERMS_URL
+  | typeof CODALYN_BEACON_DOCS_URL;
 
 /**
- * Opens a public Codalyn policy page in a new tab. Must be called from a user gesture (Designer popup
+ * Opens a public Codalyn page in a new tab. Must be called from a user gesture (Designer popup
  * blocking), and only accepts the constants above — the extension never navigates to a URL it did not
  * author, which is the same allowlist discipline the auth popups follow.
  */
-export function openCodalynPolicyPage(url: typeof CODALYN_PRIVACY_POLICY_URL | typeof CODALYN_TERMS_URL): void {
+export function openCodalynPolicyPage(url: CodalynPublicPageUrl): void {
   window.open(url, "_blank", "noopener,noreferrer");
 }

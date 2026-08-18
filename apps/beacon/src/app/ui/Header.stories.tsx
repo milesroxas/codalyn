@@ -40,3 +40,14 @@ export const TeamEditor: Story = {
 export const OnImagesRoute: Story = {
   parameters: beaconScreen("teamAdmin", { route: "/images" }),
 };
+
+/**
+ * Menu open (Help group visible): Documentation opens the public docs in a new tab, alongside the
+ * feedback / support form actions.
+ */
+export const MenuOpenHelp: Story = {
+  parameters: beaconScreen("freeUser"),
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(await canvas.findByRole("button", { name: /menu/i }));
+  },
+};

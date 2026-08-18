@@ -56,3 +56,32 @@ export async function exchangeWebflowAuthorizationCode(
   }
   return data;
 }
+
+const REVOKE_URL = "https://webflow.com/oauth/revoke_authorization";
+
+/**
+ * Best-effort revoke of an OAuth access token Tower will not keep (e.g. the approving Webflow user did
+ * not match the party that started the flow). Never throws — the token is discarded either way.
+ * @see https://developers.webflow.com/data/reference/oauth-app
+ */
+export async function revokeWebflowAccessToken(
+  accessToken: string,
+  app: WebflowAppKey = WEBFLOW_DATA_API_APP_KEY,
+  fetchImpl: typeof fetch = fetch
+): Promise<boolean> {
+  const { clientId, clientSecret } = resolveWebflowAppClientCredentials(app);
+  if (!clientId || !clientSecret) {
+    return false;
+  }
+  try {
+    const res = await fetchImpl(REVOKE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, access_token: accessToken }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

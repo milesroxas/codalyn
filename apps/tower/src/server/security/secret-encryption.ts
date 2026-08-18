@@ -4,8 +4,10 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
  * AES-256-GCM encryption-at-rest for stored third-party secrets (Webflow OAuth tokens).
  *
  * Key: `TOWER_TOKEN_ENCRYPTION_KEY`, a 32-byte key encoded as base64 or hex
- * (`openssl rand -base64 32`). When unset, values pass through as plaintext so local dev
- * and existing deployments keep working; production logs a one-time warning.
+ * (`openssl rand -base64 32`). When unset outside production, values pass through as plaintext so
+ * local dev keeps working (one-time warning). In production a missing/invalid key is a hard failure
+ * on write: storing a third-party credential in plaintext is never the silent default. The only
+ * escape hatch is `TOWER_TOKEN_ENCRYPTION_ALLOW_PLAINTEXT=1`, for a deliberate, logged emergency.
  *
  * Format: `enc:v1:<base64(iv | authTag | ciphertext)>`. Values without the prefix are
  * treated as legacy plaintext on read (lazy migration — rows re-encrypt on next write).
@@ -36,6 +38,29 @@ function parseEncryptionKey(raw: string | undefined): Buffer | null {
 
 let warnedMissingKey = false;
 
+/** Thrown from production writes when no usable encryption key is configured. */
+export class MissingSecretEncryptionKeyError extends Error {
+  readonly code = "secret_encryption_key_missing" as const;
+
+  constructor() {
+    super(
+      "TOWER_TOKEN_ENCRYPTION_KEY is not set (or not a 32-byte base64/hex key); refusing to store a credential in plaintext in production"
+    );
+    this.name = "MissingSecretEncryptionKeyError";
+  }
+}
+
+/** Pure policy: may a write proceed in plaintext when the key is missing? Exported for tests. */
+export function isPlaintextSecretStorageAllowed(env: {
+  NODE_ENV?: string;
+  TOWER_TOKEN_ENCRYPTION_ALLOW_PLAINTEXT?: string;
+}): boolean {
+  if (env.NODE_ENV !== "production") {
+    return true;
+  }
+  return env.TOWER_TOKEN_ENCRYPTION_ALLOW_PLAINTEXT?.trim() === "1";
+}
+
 function getEncryptionKey(): Buffer | null {
   const key = parseEncryptionKey(process.env.TOWER_TOKEN_ENCRYPTION_KEY);
   if (!key && !warnedMissingKey && process.env.NODE_ENV === "production") {
@@ -47,10 +72,17 @@ function getEncryptionKey(): Buffer | null {
   return key;
 }
 
-/** Encrypts a secret for storage. Passthrough (plaintext) when no valid key is configured. */
+/**
+ * Encrypts a secret for storage. Passthrough (plaintext) when no valid key is configured *and* the
+ * environment allows it (never production without the explicit override) — otherwise throws
+ * {@link MissingSecretEncryptionKeyError} so the credential is not persisted at all.
+ */
 export function encryptStoredSecret(plain: string): string {
   const key = getEncryptionKey();
   if (!key) {
+    if (!isPlaintextSecretStorageAllowed(process.env)) {
+      throw new MissingSecretEncryptionKeyError();
+    }
     return plain;
   }
   const iv = randomBytes(IV_LENGTH);

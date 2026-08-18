@@ -173,6 +173,12 @@ export default defineConfig(({ mode }) => {
       outDir: "dist",
       emptyOutDir: true,
       cssCodeSplit: false,
+      // Marketplace submission requires source maps for the minified bundle, uploaded separately in a
+      // private form field. "hidden" emits dist/*.map without a `//# sourceMappingURL=` comment, so the
+      // shipped bundle.js carries no map reference; scripts/build-cli.mjs then moves every .map out of
+      // dist into a private sourcemaps zip *before* `webflow extension bundle` and verifies the
+      // archived bundle contains none.
+      sourcemap: "hidden",
       rollupOptions: {
         // The Designer Extension iframe (index.html) always ships. The compression-compare popout
         // window (quality-compare.html, a second Vite-built React entry — no hand-authored scripts

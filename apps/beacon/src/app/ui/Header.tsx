@@ -3,6 +3,7 @@ import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
 import { IconLayoutGrid } from "@tabler/icons-react";
 import {
   ArrowLeft,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -34,6 +35,7 @@ import { BeaconSupportRequestDialog } from "@/features/support/ui/beacon-support
 import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
+import { CODALYN_BEACON_DOCS_URL, openCodalynPolicyPage } from "@/shared/lib/codalyn-links";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
@@ -271,6 +273,14 @@ function BeaconMenuHelpGroup(props: { onOpenSupportDialog: (kind: TowerSupportRe
   return (
     <DropdownMenuGroup>
       <BeaconMenuSectionLabel>Help</BeaconMenuSectionLabel>
+      <DropdownMenuItem
+        onSelect={() => {
+          openCodalynPolicyPage(CODALYN_BEACON_DOCS_URL);
+        }}
+      >
+        <BookOpen aria-hidden />
+        Documentation
+      </DropdownMenuItem>
       <DropdownMenuItem
         onSelect={() => {
           onOpenSupportDialog("feedback");

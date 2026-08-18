@@ -1235,3 +1235,115 @@ changelog on each update instead (see the round-7 AVIF body in
 [webflow-marketplace-response-short.md](webflow-marketplace-response-short.md)): AVIF
 conversion via `tower.codalyn.app` is user-initiated and opt-in — images are sent only after
 the user enables AVIF conversion; processed in memory, never stored.
+
+## Round 7b — 2026-08-18 pre-submission preflight remediation
+
+Self-issued findings from running `/webflow-app-preflight` + `/webflow-app-review-remediation`
+against the 08-18 public build (bundle itself was clean; findings were outside the zip). All
+items below are **source-verified** and covered by unit tests; the artifact state is re-verified
+by the release build gates. Nothing here has been deployed or resubmitted yet — see "Before
+submitting" at the end.
+
+### R7b.1 Source maps for the submission form (blocker)
+
+**Finding.** The submission form requires source maps for a minified bundle, from the exact
+build, uploaded in a private field. `vite.config.ts` emitted none.
+
+**Fix.** `build.sourcemap: "hidden"` in `apps/beacon/vite.config.ts` (maps are written, no
+`//# sourceMappingURL=` comment in shipped files). `scripts/build-cli.mjs` now moves every
+`dist/**/*.map` into `bundle/<channel>/<recipient>/<archive>.sourcemaps.zip` **before**
+`webflow extension bundle` zips `dist/`, then verifies the archived bundle contains no `.map`
+entry (`verifyArchivedZipHasNoSourceMaps`) and no `sourceMappingURL` string (new static
+forbidden marker). The build prints both paths; the sourcemaps zip is the private form upload
+and must never be attached as the bundle. Tests: `apps/beacon/scripts/release-build-gates.test.mjs`.
+
+**Artifact check (08-18 19:06 build):** `v0.1.0_public_08-18_19-06-40.zip` (612 KB) — 0 `.map`
+entries, 0 `sourceMappingURL`; `…sourcemaps.zip` (1.4 MB) — `bundle.js.map` + 9 chunk maps.
+
+### R7b.2 Tower OAuth callback — DB-state flow bound to the approving Webflow user (blocker)
+
+**Finding.** The Designer-initiated (`POST /api/integrations/webflow/authorize`) flow stored
+`state → (user, org)`; the callback looked the row up, deleted it, and stored the exchanged token
+under that org without checking who actually approved the consent screen. A forwarded authorize
+URL would land the approver's workspace token in the minter's Tower org. No TTL on the row.
+
+**Fix.**
+- Schema: `webflow_oauth_authorize_state.webflow_authorized_user_id` (migration
+  `drizzle/0036_empty_solo.sql`). Minting requires the session user's Designer identity
+  (`webflowAuthorizedUserId`); users without one get `403 webflow_identity_required`.
+- Callback (`resolveOrganizationFromDbStateFlow` → `exchangeAndStoreConnectTarget`): row is
+  single-use, rejected when older than **10 min** (`state_expired`) or lacking a bound id
+  (`invalid_state`); after the code exchange, `GET /v2/token/authorized_by` with the new token
+  must return the minter's Webflow user id (`isWebflowOAuthApproverBound`) — otherwise the token
+  is **revoked** (`POST /oauth/revoke_authorization`, best-effort), nothing is stored, and the
+  user sees `identity_mismatch`. Pure rules + tests: `src/server/webflow-oauth-state-binding.ts`.
+- The dashboard cookie flow was already session-bound and is unchanged.
+
+### R7b.3 ID-token exchange — no cross-tenant token pool
+
+**Finding.** `collectWebflowIdTokenResolveBearers` tried up to five arbitrary tenants' stored
+Data API tokens for an unauthenticated caller (cross-tenant credential use; org #6+ unresolvable).
+
+**Fix.** Candidates are now (1) the caller's own active-workspace token when a Tower session is
+present, (2) the operator-owned app bearer (`WEBFLOW_TOKEN_RESOLVE_BEARER`), (3) stored tokens of
+the org(s) whose token is **known to reach the site the ID token was issued on** — the extension
+now sends `siteId` (from `webflow.getSiteInfo()`) with the ID token. Site↔org linkage lives in the
+new `organization_webflow_site` table, populated at OAuth completion (`GET /v2/sites` with the
+fresh token) and refreshed by successful authenticated `GET sites/{id}` proxy reads; links are
+dropped when a token is pruned. `listOrganizationWebflowTokens` / `pickAnyOrganizationWebflowAccessToken`
+are removed. (Deployment note: existing connected orgs have no site links until they reconnect or
+the proxy observes a `GET sites/{id}` — the operator bearer covers them meanwhile.)
+
+### R7b.4 Revocation handling
+
+- Proxy `/api/v2/webflow/[...path]` and both `cms-layout` routes: an upstream **401** prunes the
+  stored token (`handleWebflowUpstreamRevocation`) and returns a stable
+  `401 { error: "webflow_token_revoked", code: "WEBFLOW_TOKEN_REVOKED", hint }` instead of passing
+  a dead credential's error through. 403 (scope) is untouched.
+- Beacon `describeTowerFailure` (was inline in `assertTowerOk`): 401 → "Reconnect Webflow in
+  Tower" CTA; 403 → permission explanation + reconnect CTA; scope-string detection kept.
+
+### R7b.5 Dependencies
+
+Tower: `sharp ^0.35.3`, `next ^15.5.23`, `better-auth ~1.6.30` (tilde — 1.7 changes the internal
+adapter API used by the Designer session logic). Beacon/Flint client `better-auth 1.6.30`. Beacon
+`shadcn` CLI moved to devDependencies. The vendor-literal strip rule for better-auth's URL util
+was updated for 1.6.30 (`isLoopbackForDevScheme`) and is now covered by a gate test. Remaining
+`pnpm audit --prod` entries are transitive dev/SSR/CMS-admin paths (posthog→otel/protobufjs,
+react-router SSR, Payload admin UI, `@vercel/blob`→undici) not reachable from the extension.
+
+### R7b.6 Encryption at rest — production hard-fail
+
+`encryptStoredSecret` throws `MissingSecretEncryptionKeyError` under `NODE_ENV=production` when
+`TOWER_TOKEN_ENCRYPTION_KEY` is unset/invalid (override only via
+`TOWER_TOKEN_ENCRYPTION_ALLOW_PLAINTEXT=1`). OAuth callback/completion catch it, revoke the token,
+and surface `token_storage`; nothing is stored in plaintext. **Confirm the key is set in Vercel
+Production before deploying** (could not be verified from this environment).
+
+### R7b.7 Medium / low
+
+- `/api/v1/beacon/support-request` unauthenticated path: per-IP (5/10 min) + per-email (5/h)
+  Postgres rate limits → `429` + `Retry-After`; extension copy for `rate_limited`.
+- `cms-layout` `collectionId`/`itemId`: 24-hex Webflow object-id schema (path-like input rejected).
+- CORS: `Access-Control-Allow-Private-Network` only for allowlisted origins whose preflight sends
+  `Access-Control-Request-Private-Network: true` (never for production); stale
+  `X-Beacon-Tower-User-Id` allow-header removed.
+- `/api/v1/images/optimize`: input allowlist (png/jpeg/webp/avif/gif/tiff/heif); SVG/PDF/non-image
+  → `400 UNREADABLE_IMAGE` before any libvips decode (was 500).
+- Designer session failure log now records the Webflow user id, not the email.
+- Beacon Help menu: **Documentation** → `https://tower.codalyn.app/docs` (allowlisted opener,
+  new tab); story `App/Header › MenuOpenHelp`.
+- Registered runtime script version is content-derived: `<semver>+beacon.<source-hash>[.n]`
+  (suffix only when the same content is force-registered again on a site).
+- React production error-decoder URL (`https://react.dev/errors/`) compiled out of react-dom
+  (`"#"`; error code preserved) — the bundle's `https://` grep now shows only allowlisted endpoints
+  plus inert vendor strings.
+
+### Before submitting (not done in this change)
+
+1. Deploy Tower with migration `0036` applied (`pnpm app tower db:migrate:prod -- --confirm`) and
+   `TOWER_TOKEN_ENCRYPTION_KEY` confirmed in Production env.
+2. Rebuild Beacon (`CI=true BUILD_RECIPIENT=public pnpm build:prod`), run **App Review Preflight**
+   on the new bundle **and** the matching `.sourcemaps.zip`, record the `wfpre_…` receipt.
+3. Re-confirm reviewer credentials, published `.webflow.io` test site, screenshots, 512×512 icon,
+   demo video (approve + deny). Keep the AVIF disclosure in the submission notes.

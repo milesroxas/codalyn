@@ -110,6 +110,9 @@ export function supportRequestSubmitErrorMessage(
   if (errorCode === "unauthorized") {
     return "Sign in to continue.";
   }
+  if (errorCode === "rate_limited") {
+    return "Too many requests from this connection. Try again in a few minutes.";
+  }
   if (errorCode === "invalid_details") {
     return `Enter your ${config.detailsLabel.toLowerCase()}.`;
   }

@@ -7,7 +7,8 @@
  * Extension bundles across apps. Handles channel selection, recipient
  * targeting, and versioned output. Invoked from app package scripts.
  *
- * Pipeline: lint:all → test:run → clean dist → vite build → verify markers → webflow bundle → archive
+ * Pipeline: lint:all → test:run → clean dist → vite build → verify markers → extract source maps →
+ *           webflow bundle → archive → verify archive
  *
  * Usage:
  *   node scripts/build-cli.mjs --app <name> [--channel production|development|preview]
@@ -17,6 +18,7 @@ import { execSync, spawn } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
   realpathSync,
@@ -24,7 +26,8 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as p from "@clack/prompts";
 import color from "picocolors";
@@ -225,6 +228,84 @@ function readAllDistJs(appPath) {
     throw new Error(`No JavaScript files under ${distDir}`);
   }
   return parts.join("\n");
+}
+
+/** Every `*.map` under dist/, as paths relative to dist/. */
+function listDistSourceMaps(appPath) {
+  const distDir = resolve(appPath, "dist");
+  const maps = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.name.endsWith(".map")) {
+        maps.push(relative(distDir, full));
+      }
+    }
+  };
+  if (existsSync(distDir)) {
+    walk(distDir);
+  }
+  return maps.sort();
+}
+
+/**
+ * Moves every source map out of dist/ into a private zip next to the bundle archive, *before*
+ * `webflow extension bundle` zips dist/. The Marketplace submission form requires source maps for a
+ * minified bundle, uploaded in a private field from the exact same build — so they are produced on
+ * every release build, but they must never ship inside bundle.zip (they would expose the full source
+ * to every Designer session). Returns the archive path, or null when the build emitted no maps.
+ */
+function extractSourceMapsToPrivateZip(appPath, archivePath) {
+  const maps = listDistSourceMaps(appPath);
+  if (maps.length === 0) {
+    return null;
+  }
+  const distDir = resolve(appPath, "dist");
+  const staging = mkdtempSync(resolve(tmpdir(), "codalyn-sourcemaps-"));
+  try {
+    for (const rel of maps) {
+      const dest = resolve(staging, rel);
+      mkdirSync(dirname(dest), { recursive: true });
+      renameSync(resolve(distDir, rel), dest);
+    }
+    mkdirSync(dirname(archivePath), { recursive: true });
+    rmSync(archivePath, { force: true });
+    execSync(`zip -qr ${JSON.stringify(archivePath)} .`, { cwd: staging, stdio: "pipe" });
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+  }
+  if (listDistSourceMaps(appPath).length > 0) {
+    throw new Error("Source maps remain in dist/ after extraction");
+  }
+  return archivePath;
+}
+
+/** Entry names inside a zip (one per line from `unzip -Z1`). */
+function listArchiveEntries(archivePath) {
+  return execSync(`unzip -Z1 ${JSON.stringify(archivePath)}`, { encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 })
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+/** Pure check for the archived-bundle source-map gate; exported for tests. */
+function findSourceMapEntries(entries) {
+  return entries.filter((name) => name.toLowerCase().endsWith(".map"));
+}
+
+/**
+ * The shipped bundle must carry neither `.map` files nor a `sourceMappingURL` reference: maps go to
+ * the private submission-form field only (see extractSourceMapsToPrivateZip).
+ */
+function verifyArchivedZipHasNoSourceMaps(archivePath) {
+  const hit = findSourceMapEntries(listArchiveEntries(archivePath));
+  if (hit.length > 0) {
+    throw new Error(
+      `Archived zip contains source map(s): ${hit.join(", ")} — maps must ship only in the private sourcemaps zip`
+    );
+  }
 }
 
 /** Documented Designer Extension manifest properties (developers.webflow.com/apps/designer/guides/configuring-your-app). */
@@ -449,6 +530,9 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     { value: "tower.invalid", label: "the dev-only Tower placeholder origin" },
     { value: "codalyn.invalid", label: "the legacy placeholder email domain" },
     { value: "codalyn.beacon/", label: "the legacy publish-placeholder URL" },
+    // Source maps are built (`sourcemap: "hidden"`) for the private submission field, so no shipped
+    // file may reference one — a `//# sourceMappingURL=` comment means a map leaked into the bundle.
+    { value: "sourceMappingURL", label: "a sourceMappingURL reference" },
   ];
   if (!SENTRY_ALLOWED_APPS.has(appName)) {
     // An earlier review round flagged Sentry; it has since been removed from Beacon, but
@@ -555,7 +639,18 @@ function verifyArchivedZipExcludes(archivePath, forbidden) {
 function verifyArchivedZipBundle(archivePath, markers) {
   verifyArchivedZipContains(archivePath, markers);
   verifyArchivedZipExcludes(archivePath, markers.forbidden);
+  verifyArchivedZipHasNoSourceMaps(archivePath);
   verifyArchivedManifest(archivePath);
+}
+
+function extractSourceMapsOrExit(s, appPath, archivePath) {
+  try {
+    return extractSourceMapsToPrivateZip(appPath, archivePath);
+  } catch (err) {
+    s.stop(color.red("Source map extraction failed"));
+    p.log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
 }
 
 function reportStepFailure(s, title, result) {
@@ -620,6 +715,14 @@ async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
     process.exit(1);
   }
 
+  const outDir = resolve(appPath, "bundle", channelDir, recipient);
+  const archiveBaseName = `v${pkg.version}_${recipient}_${buildTimestamp()}`;
+  const sourceMapArchivePath = extractSourceMapsOrExit(
+    s,
+    appPath,
+    resolve(outDir, `${archiveBaseName}.sourcemaps.zip`)
+  );
+
   s.message(`${progressBar(STEPS[3].pct)}  ${STEPS[3].label}…`);
   sanitizeWebflowManifestOrExit(s, appPath, "webflow.json manifest invalid");
   // DO_NOT_TRACK=1 stops the Webflow CLI from auto-writing its telemetry consent block into
@@ -644,8 +747,7 @@ async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
     process.exit(1);
   }
 
-  const outDir = resolve(appPath, "bundle", channelDir, recipient);
-  const archiveFilename = `v${pkg.version}_${recipient}_${buildTimestamp()}.zip`;
+  const archiveFilename = `${archiveBaseName}.zip`;
   const archivePath = resolve(outDir, archiveFilename);
   mkdirSync(outDir, { recursive: true });
   renameSync(uploadBundlePath, archivePath);
@@ -659,7 +761,7 @@ async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
   }
 
   s.stop(`${progressBar(100)}  ${color.green("Build complete")}`);
-  return { channelDir, archiveFilename, archivePath };
+  return { channelDir, archiveFilename, archivePath, sourceMapArchivePath };
 }
 
 async function main() {
@@ -706,7 +808,11 @@ async function main() {
     process.exit(0);
   }
 
-  const { channelDir: outChannelDir, archiveFilename } = await runBuildPipeline({
+  const {
+    channelDir: outChannelDir,
+    archiveFilename,
+    sourceMapArchivePath,
+  } = await runBuildPipeline({
     appPath,
     appName: appArg,
     pkg,
@@ -714,9 +820,15 @@ async function main() {
     recipient,
   });
 
-  p.outro(
-    `${color.green("✓")} ${color.cyan(`apps/${appArg}/bundle/${outChannelDir}/${recipient}/${archiveFilename}`)}`
-  );
+  const outLines = [
+    `${color.green("✓")} ${color.cyan(`apps/${appArg}/bundle/${outChannelDir}/${recipient}/${archiveFilename}`)}`,
+  ];
+  if (sourceMapArchivePath) {
+    outLines.push(
+      `${color.green("✓")} ${color.cyan(relative(ROOT, sourceMapArchivePath))} ${color.dim("(private — submission form source-map field only, never the bundle)")}`
+    );
+  }
+  p.outro(outLines.join("\n"));
 }
 
 /**
@@ -743,4 +855,12 @@ if (isDirectInvocation()) {
 }
 
 /** Exported for scripts/__tests__ coverage of the release gates; not part of the CLI surface. */
-export { assertRequiredReleaseEnv, collectForbiddenBundleMarkers, matchForbiddenMarker, resolveViteEnvValue };
+export {
+  assertRequiredReleaseEnv,
+  collectForbiddenBundleMarkers,
+  extractSourceMapsToPrivateZip,
+  findSourceMapEntries,
+  listDistSourceMaps,
+  matchForbiddenMarker,
+  resolveViteEnvValue,
+};

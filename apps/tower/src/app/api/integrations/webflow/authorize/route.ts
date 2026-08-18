@@ -36,6 +36,15 @@ function scopesForApp(app: WebflowAppKey): string {
   return process.env.WEBFLOW_OAUTH_SCOPES ?? BEACON_SCOPES;
 }
 
+/** Session users carry `webflowAuthorizedUserId` as a Better Auth additional field; normalize its runtime shape. */
+function readSessionWebflowAuthorizedUserId(sessionUser: unknown): string | null {
+  if (sessionUser === null || typeof sessionUser !== "object") {
+    return null;
+  }
+  const raw = (sessionUser as { webflowAuthorizedUserId?: unknown }).webflowAuthorizedUserId;
+  return typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
+}
+
 function buildWebflowAuthorizeUrl(state: string, app: WebflowAppKey = WEBFLOW_DATA_API_APP_KEY): string {
   const { clientId } = resolveWebflowAppClientCredentials(app);
   const redirectUri = resolveWebflowOAuthRedirectUri();
@@ -142,6 +151,15 @@ export async function POST(request: Request) {
     return Response.json({ error: "team_admin_required" }, { status: 403, headers: jsonHeaders });
   }
 
+  // The callback binds the exchanged token to the Webflow user who approves it (token/authorized_by)
+  // and requires that to be the same Webflow user who minted this state. A Tower user with no Designer
+  // identity cannot be bound, so they cannot start the Designer flow (the dashboard GET flow is
+  // session-cookie bound instead).
+  const minterWebflowUserId = readSessionWebflowAuthorizedUserId(session.user);
+  if (!minterWebflowUserId) {
+    return Response.json({ error: "webflow_identity_required" }, { status: 403, headers: jsonHeaders });
+  }
+
   try {
     const state = crypto.randomUUID();
     await db.insert(webflowOauthAuthorizeState).values({
@@ -149,6 +167,7 @@ export async function POST(request: Request) {
       userId: session.user.id,
       organizationId: activeOrganizationId,
       appKey: app,
+      webflowAuthorizedUserId: minterWebflowUserId,
     });
     const url = buildWebflowAuthorizeUrl(state, app);
     return Response.json({ url }, { headers: jsonHeaders });

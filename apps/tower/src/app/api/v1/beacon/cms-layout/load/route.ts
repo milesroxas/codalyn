@@ -7,7 +7,8 @@ import {
   webflowCmsItemUrl,
 } from "@/server/beacon-cms-layout";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
-import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
+import { resolveActiveOrganizationWebflowToken } from "@/server/webflow-proxy-token";
+import { handleWebflowUpstreamRevocation } from "@/server/webflow-upstream-revocation";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 
 export const runtime = "nodejs";
@@ -49,8 +50,9 @@ async function handleLoadRequest(req: Request, userId: string): Promise<Response
     );
   }
 
-  const webflowToken = await resolveWebflowBearerToken({ userId, request: req });
-  if (!webflowToken) {
+  const stored = await resolveActiveOrganizationWebflowToken({ userId, request: req });
+  const webflowToken = stored?.accessToken;
+  if (!stored || !webflowToken) {
     return Response.json({ code: "NO_WEBFLOW_TOKEN", message: "Connect Webflow in Tower first." }, { status: 503 });
   }
 
@@ -63,7 +65,7 @@ async function handleLoadRequest(req: Request, userId: string): Promise<Response
   });
 
   if (!upstream.ok) {
-    return toUpstreamError(upstream);
+    return (await handleWebflowUpstreamRevocation(upstream, stored)) ?? (await toUpstreamError(upstream));
   }
 
   let upstreamBody: unknown;

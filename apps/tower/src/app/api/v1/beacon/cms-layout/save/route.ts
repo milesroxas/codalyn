@@ -9,7 +9,8 @@ import { resolveTowerEntitlement } from "@/server/billing/entitlements";
 import { getActiveOrganizationIdForApiRequest } from "@/server/billing/session-org";
 import { consumeCmsWrite, recordMeterCost } from "@/server/billing/usage-gate";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
-import { resolveWebflowBearerToken } from "@/server/webflow-proxy-token";
+import { resolveActiveOrganizationWebflowToken } from "@/server/webflow-proxy-token";
+import { handleWebflowUpstreamRevocation } from "@/server/webflow-upstream-revocation";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
 
 export const runtime = "nodejs";
@@ -69,8 +70,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const webflowToken = await resolveWebflowBearerToken({ userId: auth.userId, request: req });
-  if (!webflowToken) {
+  const stored = await resolveActiveOrganizationWebflowToken({ userId: auth.userId, request: req });
+  const webflowToken = stored?.accessToken;
+  if (!stored || !webflowToken) {
     return Response.json({ code: "NO_WEBFLOW_TOKEN", message: "Connect Webflow in Tower first." }, { status: 503 });
   }
 
@@ -102,7 +104,7 @@ export async function POST(req: Request) {
   const fetchMs = Date.now() - fetchStart;
 
   if (!upstream.ok) {
-    return upstreamErrorResponse(upstream);
+    return (await handleWebflowUpstreamRevocation(upstream, stored)) ?? (await upstreamErrorResponse(upstream));
   }
 
   const responseBody = JSON.stringify({ composition: body.composition });

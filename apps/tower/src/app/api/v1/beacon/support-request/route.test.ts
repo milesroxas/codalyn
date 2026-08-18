@@ -1,9 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { verifyTowerApiRequest, getSession, submitSupportRequest } = vi.hoisted(() => ({
+const {
+  verifyTowerApiRequest,
+  getSession,
+  submitSupportRequest,
+  assertBeaconSupportRequestIpRateLimit,
+  assertSupportRequestEmailRateLimit,
+} = vi.hoisted(() => ({
   verifyTowerApiRequest: vi.fn(),
   getSession: vi.fn(),
   submitSupportRequest: vi.fn(),
+  assertBeaconSupportRequestIpRateLimit: vi.fn(),
+  assertSupportRequestEmailRateLimit: vi.fn(),
+}));
+
+vi.mock("@/server/security/support-request-rate-limit", () => ({
+  assertBeaconSupportRequestIpRateLimit,
+  assertSupportRequestEmailRateLimit,
 }));
 
 vi.mock("@/server/tower-api-auth", () => ({
@@ -30,6 +43,46 @@ describe("POST /api/v1/beacon/support-request", () => {
     getSession.mockReset();
     submitSupportRequest.mockReset();
     submitSupportRequest.mockResolvedValue({ id: "req-1" });
+    assertBeaconSupportRequestIpRateLimit.mockReset();
+    assertBeaconSupportRequestIpRateLimit.mockResolvedValue(undefined);
+    assertSupportRequestEmailRateLimit.mockReset();
+    assertSupportRequestEmailRateLimit.mockResolvedValue(undefined);
+  });
+
+  it("returns 429 when the guest path is over its per-IP budget (no DB row, no admin email)", async () => {
+    const { RateLimitError } = await import("@/server/security/rate-limit");
+    verifyTowerApiRequest.mockResolvedValue({ ok: false, response: Response.json({}, { status: 401 }) });
+    assertBeaconSupportRequestIpRateLimit.mockRejectedValue(new RateLimitError());
+
+    const res = await POST(
+      new Request("http://localhost/api/v1/beacon/support-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.9" },
+        body: JSON.stringify({ kind: "help", topic: "beacon", details: "spam", email: "guest@example.com" }),
+      })
+    );
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("600");
+    expect(submitSupportRequest).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 when the guest email is over its budget", async () => {
+    const { RateLimitError } = await import("@/server/security/rate-limit");
+    verifyTowerApiRequest.mockResolvedValue({ ok: false, response: Response.json({}, { status: 401 }) });
+    assertSupportRequestEmailRateLimit.mockRejectedValue(new RateLimitError());
+
+    const res = await POST(
+      new Request("http://localhost/api/v1/beacon/support-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "help", topic: "beacon", details: "spam", email: "guest@example.com" }),
+      })
+    );
+
+    expect(res.status).toBe(429);
+    expect(assertSupportRequestEmailRateLimit).toHaveBeenCalledWith("guest@example.com");
+    expect(submitSupportRequest).not.toHaveBeenCalled();
   });
 
   it("accepts guest submissions with email in the body", async () => {

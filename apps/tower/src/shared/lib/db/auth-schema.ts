@@ -301,8 +301,37 @@ export const webflowOauthAuthorizeState = pgTable("webflow_oauth_authorize_state
     .references(() => organization.id, { onDelete: "cascade" }),
   /** Which Webflow app initiated this OAuth (beacon|flint); the callback persists the token under it. */
   appKey: text("app_key").notNull().default("beacon"),
+  /**
+   * Webflow `authorized_user` id of the Tower user who minted this state (from their Designer session).
+   * The callback exchanges the code, calls `GET /v2/token/authorized_by` with the new token and requires
+   * the approving Webflow user to be this same person — otherwise a forwarded authorize URL would land
+   * the *approver's* workspace token in the *minter's* Tower org. Legacy rows (null) are rejected.
+   */
+  webflowAuthorizedUserId: text("webflow_authorized_user_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+/**
+ * Webflow sites known to be reachable with an organization's stored OAuth token (one app). Written when
+ * OAuth completes (`GET /v2/sites` with the fresh token) and refreshed opportunistically by successful
+ * authenticated proxy reads. Lets the Designer ID-token exchange pick the token for the site the ID
+ * token was issued on instead of trying other tenants' tokens.
+ */
+export const organizationWebflowSite = pgTable(
+  "organization_webflow_site",
+  {
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    appKey: text("app_key").notNull().default("beacon"),
+    siteId: text("site_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.appKey, table.siteId] }),
+    index("organization_webflow_site_app_site_idx").on(table.appKey, table.siteId),
+  ]
+);
 
 /**
  * Short-lived authorization `code` from Webflow-initiated OAuth (dashboard Install / marketplace install URL).

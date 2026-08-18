@@ -5,14 +5,19 @@
  * lint + tests before the Vite build), so a broken gate fails the build it protects.
  */
 
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   assertRequiredReleaseEnv,
   collectForbiddenBundleMarkers,
+  extractSourceMapsToPrivateZip,
+  findSourceMapEntries,
+  listDistSourceMaps,
   matchForbiddenMarker,
   resolveViteEnvValue,
 } from "../../../scripts/build-cli.mjs";
@@ -70,6 +75,41 @@ describe("strip-dev-host-literals / posthog-js", () => {
   });
 });
 
+describe("strip-dev-host-literals / react-dom + better-auth", () => {
+  // `exports` maps hide the cjs files, so resolve them relative to each package's package.json.
+  const reactDomDir = dirname(require.resolve("react-dom/package.json"));
+  const REACT_DOM_CLIENT_ID = join(reactDomDir, "cjs/react-dom-client.production.js");
+  const REACT_DOM_ID = join(reactDomDir, "cjs/react-dom.production.js");
+  // better-auth's exports map hides dist internals; walk from its resolved React client entry instead.
+  const BETTER_AUTH_URL_ID = join(
+    dirname(fileURLToPath(import.meta.resolve("better-auth/react"))),
+    "../../utils/url.mjs"
+  );
+
+  it("removes React's production error-decoder URL from both react-dom entry files", () => {
+    for (const id of [REACT_DOM_CLIENT_ID, REACT_DOM_ID]) {
+      const source = readFileSync(id, "utf-8");
+      expect(source).toContain('"https://react.dev/errors/"');
+      const result = transform(source, id, { strict: true });
+      expect(result).not.toBeNull();
+      expect(result.code).not.toMatch(/react\.dev/i);
+      // The error code still reaches the message, so a thrown minified error stays decodable by hand.
+      expect(result.code).toContain('"Minified React error #"');
+    }
+  });
+
+  it("fails the release build if a React upgrade moves the decoder URL", () => {
+    const moved = `${readFileSync(REACT_DOM_ID, "utf-8")}\nexport const probe="https://react.dev/errors/1";\n`;
+    expect(() => transform(moved, REACT_DOM_ID, { strict: true })).toThrow(/react\.dev error-decoder URL/);
+  });
+
+  it("leaves no dev-host literal in better-auth's URL util (rule tracks the installed version)", () => {
+    const result = transform(readFileSync(BETTER_AUTH_URL_ID, "utf-8"), BETTER_AUTH_URL_ID, { strict: true });
+    expect(result).not.toBeNull();
+    expect(result.code).not.toMatch(/localhost|127\.0\.0\.1/i);
+  });
+});
+
 describe("matchForbiddenMarker", () => {
   const forbidden = collectForbiddenBundleMarkers(tempAppDir(), "production", "beacon");
 
@@ -86,6 +126,10 @@ describe("matchForbiddenMarker", () => {
 
   it("passes clean bundle text", () => {
     expect(matchForbiddenMarker('fetch("https://tower.codalyn.app/api")', forbidden)).toBeNull();
+  });
+
+  it("catches a sourceMappingURL comment — a map reference must never ship in the bundle", () => {
+    expect(matchForbiddenMarker("//# sourceMappingURL=bundle.js.map", forbidden)?.value).toBe("sourceMappingURL");
   });
 
   it("is inert on development builds, which may legitimately point at a local Tower", () => {
@@ -244,5 +288,62 @@ describe("apps/beacon/.env.example", () => {
     const example = readFileSync(new URL("../.env.example", import.meta.url), "utf-8");
 
     expect(example).toMatch(/^VITE_CMS_SLOTS_SURFACE_ENABLED=true$/m);
+  });
+});
+
+describe("source-map extraction (Marketplace submission form field)", () => {
+  function fakeDist(appPath, files) {
+    for (const [rel, contents] of Object.entries(files)) {
+      const full = join(appPath, "dist", rel);
+      mkdirSync(join(full, ".."), { recursive: true });
+      writeFileSync(full, contents);
+    }
+  }
+
+  it("lists every .map under dist, recursively", () => {
+    const appPath = tempAppDir();
+    fakeDist(appPath, {
+      "bundle.js": "console.log(1)",
+      "bundle.js.map": "{}",
+      "assets/chunk-abc.js.map": "{}",
+      "styles.css": "body{}",
+    });
+    expect(listDistSourceMaps(appPath)).toEqual(["assets/chunk-abc.js.map", "bundle.js.map"]);
+  });
+
+  it("moves maps out of dist into the private zip so `webflow extension bundle` cannot ship them", () => {
+    const appPath = tempAppDir();
+    fakeDist(appPath, {
+      "bundle.js": "console.log(1)",
+      "bundle.js.map": '{"version":3}',
+      "assets/chunk-abc.js.map": '{"version":3}',
+    });
+    const archive = join(appPath, "bundle", "production", "public", "v0.0.0_public_x.sourcemaps.zip");
+
+    expect(extractSourceMapsToPrivateZip(appPath, archive)).toBe(archive);
+    expect(existsSync(archive)).toBe(true);
+    expect(listDistSourceMaps(appPath)).toEqual([]);
+    expect(existsSync(join(appPath, "dist", "bundle.js"))).toBe(true);
+
+    const entries = execSync(`unzip -Z1 ${JSON.stringify(archive)}`, { encoding: "utf-8" })
+      .split("\n")
+      .filter(Boolean)
+      .sort();
+    expect(entries).toEqual(["assets/", "assets/chunk-abc.js.map", "bundle.js.map"]);
+  });
+
+  it("returns null and writes nothing when the build emitted no maps (Flint)", () => {
+    const appPath = tempAppDir();
+    fakeDist(appPath, { "bundle.js": "console.log(1)" });
+    const archive = join(appPath, "bundle", "x.sourcemaps.zip");
+    expect(extractSourceMapsToPrivateZip(appPath, archive)).toBeNull();
+    expect(existsSync(archive)).toBe(false);
+  });
+
+  it("flags .map entries in an archived bundle listing", () => {
+    expect(findSourceMapEntries(["webflow.json", "index.html", "bundle.js", "assets/x.js.MAP"])).toEqual([
+      "assets/x.js.MAP",
+    ]);
+    expect(findSourceMapEntries(["webflow.json", "index.html", "bundle.js"])).toEqual([]);
   });
 });

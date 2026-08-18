@@ -125,13 +125,38 @@ if(document.readyState==="loading")addEventListener("DOMContentLoaded",run);else
 })();`;
 }
 
-function inlineScriptVersion(): string {
+function inlineScriptVersionBase(): string {
   const base = String(__APP_VERSION__ ?? "0.0.1")
     .split("+")[0]
     .replace(/[^0-9.]/g, "")
     .replace(/^\.+|\.+$/g, "");
-  const safeBase = base.length > 0 ? base : "0.0.1";
-  return `${safeBase}+beacon.${Date.now()}`;
+  return base.length > 0 ? base : "0.0.1";
+}
+
+/**
+ * Registered-script version for a runtime build: `<app semver>+beacon.<source hash>[.<n>]`. Webflow requires a unique
+ * `displayName` + `version` per registration and never lets one be overwritten, so the version is derived from the
+ * runtime *content* (the same FNV-1a hash the page marker carries) — a reviewer or operator can read which source a
+ * registration holds — and only gains a numeric suffix when that exact content is registered again on the same site
+ * (an explicit forced re-sync). Pure; exported for tests.
+ */
+export function cmsSlotRuntimeScriptVersion(input: {
+  base: string;
+  sourceHash: string;
+  takenVersions: ReadonlySet<string>;
+}): string {
+  const candidate = `${input.base}+beacon.${input.sourceHash}`;
+  if (!input.takenVersions.has(candidate)) {
+    return candidate;
+  }
+  for (let n = 2; n < 10_000; n++) {
+    const suffixed = `${candidate}.${n}`;
+    if (!input.takenVersions.has(suffixed)) {
+      return suffixed;
+    }
+  }
+  // Pathological: thousands of identical registrations on one site. Fall back to a unique build tag.
+  return `${candidate}.${Date.now()}`;
 }
 
 type PageCustomScript = {
@@ -163,36 +188,51 @@ async function readJson<T>(res: Response): Promise<T | null> {
   }
 }
 
+type TowerErrorBody = {
+  message?: string;
+  error?: string;
+  hint?: string;
+  code?: string;
+  details?: unknown;
+};
+
+/** Human-readable message for a failed Tower/Webflow response; exported for tests. */
+export function describeTowerFailure(status: number, body: TowerErrorBody | null, action: string): string {
+  let msg = `${action} failed (${status})`;
+  if (typeof body?.message === "string" && body.message.length > 0) {
+    msg = body.message;
+  } else if (typeof body?.error === "string" && body.error.length > 0) {
+    msg = body.error;
+  } else if (typeof body?.hint === "string" && body.hint.length > 0) {
+    msg = body.hint;
+  }
+  const context = `${msg} ${String(body?.code ?? "")} ${JSON.stringify(body?.details ?? "")}`.toLowerCase();
+  const scopeMissing =
+    context.includes("missing_scope") ||
+    context.includes("missing scopes") ||
+    context.includes("missing_scopes") ||
+    context.includes("assets:write") ||
+    context.includes("custom_code:write");
+  if (scopeMissing) {
+    return `${msg} Reconnect Webflow in Tower so the OAuth token includes assets:write and custom_code:write.`;
+  }
+  // 401 from the proxy = the stored Webflow token was revoked (Tower prunes it) or the Tower session is
+  // gone; 403 = the connection lacks permission (scope/site access). Both need a human to reconnect,
+  // not a retry — say so explicitly instead of surfacing a raw upstream error.
+  if (status === 401) {
+    return `${msg} Webflow no longer accepts this workspace's connection. Reconnect Webflow in Tower, then try again.`;
+  }
+  if (status === 403) {
+    return `${msg} Your Webflow connection does not permit this action on this site. Reconnect Webflow in Tower with the required scopes, or ask a workspace admin.`;
+  }
+  return msg;
+}
+
 async function assertTowerOk(res: Response, action: string): Promise<void> {
   if (res.ok) {
     return;
   }
-  let msg = `${action} failed (${res.status})`;
-  const j = await readJson<{
-    message?: string;
-    error?: string;
-    hint?: string;
-    code?: string;
-    details?: unknown;
-  }>(res);
-  if (typeof j?.message === "string" && j.message.length > 0) {
-    msg = j.message;
-  } else if (typeof j?.error === "string" && j.error.length > 0) {
-    msg = j.error;
-  } else if (typeof j?.hint === "string" && j.hint.length > 0) {
-    msg = j.hint;
-  }
-  const scopeContext = `${msg} ${String(j?.code ?? "")} ${JSON.stringify(j?.details ?? "")}`.toLowerCase();
-  if (
-    scopeContext.includes("missing_scope") ||
-    scopeContext.includes("missing scopes") ||
-    scopeContext.includes("missing_scopes") ||
-    scopeContext.includes("assets:write") ||
-    scopeContext.includes("custom_code:write")
-  ) {
-    msg += " Reconnect Webflow in Tower so the OAuth token includes assets:write and custom_code:write.";
-  }
-  throw new Error(msg);
+  throw new Error(describeTowerFailure(res.status, await readJson<TowerErrorBody>(res), action));
 }
 
 function arrayBufferToBase64(bytes: Uint8Array): string {
@@ -538,6 +578,7 @@ type SiteAssetRow = {
 type RegisteredScriptRow = {
   id: string;
   displayName?: string;
+  version?: string;
   hostedLocation?: string;
 };
 
@@ -691,12 +732,29 @@ async function listRegisteredBeaconRuntimeScripts(siteId: string): Promise<Regis
  * covers the freshly-applied script.
  */
 async function registeredBeaconRuntimeScriptIdSet(siteId: string): Promise<Set<string>> {
+  return (await registeredBeaconRuntimeScriptIndex(siteId)).ids;
+}
+
+/**
+ * Ids and taken versions of every registered beacon runtime script on the site. Same best-effort contract as
+ * {@link registeredBeaconRuntimeScriptIdSet}: a failed registry read yields empty sets, never a blocked sync.
+ */
+async function registeredBeaconRuntimeScriptIndex(
+  siteId: string
+): Promise<{ ids: Set<string>; versions: Set<string> }> {
   try {
     const scripts = await listRegisteredBeaconRuntimeScripts(siteId);
-    return new Set(scripts.map((s) => s.id));
+    return {
+      ids: new Set(scripts.map((s) => s.id)),
+      versions: new Set(
+        scripts
+          .filter((s) => s.displayName === REGISTER_DISPLAY_NAME && typeof s.version === "string")
+          .map((s) => s.version as string)
+      ),
+    };
   } catch (e) {
     console.warn(LOG_PREFIX, "list registered beacon scripts failed (non-fatal)", e);
-    return new Set<string>();
+    return { ids: new Set<string>(), versions: new Set<string>() };
   }
 }
 
@@ -903,10 +961,11 @@ export async function syncCmsSlotPageInlineScript(options: { force?: boolean } =
 
   // Read the page's current state *before* uploading anything: an unchanged build must cost two GETs, not an
   // asset upload plus a permanent registration.
-  const [existing, registeredBeaconScriptIds] = await Promise.all([
+  const [existing, registry] = await Promise.all([
     getPageCustomScripts(pageId),
-    registeredBeaconRuntimeScriptIdSet(siteId),
+    registeredBeaconRuntimeScriptIndex(siteId),
   ]);
+  const registeredBeaconScriptIds = registry.ids;
   const decision = decideCmsSlotRuntimeSyncAction({
     existing,
     expectedHash,
@@ -917,7 +976,12 @@ export async function syncCmsSlotPageInlineScript(options: { force?: boolean } =
     return;
   }
 
-  const registered = await registerHostedRuntimeScript(siteId, sourceCode, inlineScriptVersion());
+  const version = cmsSlotRuntimeScriptVersion({
+    base: inlineScriptVersionBase(),
+    sourceHash: expectedHash,
+    takenVersions: registry.versions,
+  });
+  const registered = await registerHostedRuntimeScript(siteId, sourceCode, version);
   const merged = mergePageScriptsWithBeaconRuntime(
     existing,
     {

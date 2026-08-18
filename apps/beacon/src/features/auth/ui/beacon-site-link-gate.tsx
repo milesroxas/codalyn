@@ -32,6 +32,8 @@ function messageForAuthorizeError(error: string): string {
       return "No active Tower workspace. Open Tower to select a workspace, then try again.";
     case "unauthorized":
       return "Your Tower session expired. Sign out and sign in again.";
+    case "webflow_identity_required":
+      return "Sign in to Tower from the Webflow Designer so the connection can be tied to your Webflow account, then try again.";
     case "tower_unreachable":
       return "Couldn't reach Tower. Check your connection and try again.";
     default:

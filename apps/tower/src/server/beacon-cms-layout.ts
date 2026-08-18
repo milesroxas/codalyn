@@ -15,9 +15,19 @@ const compositionSchema = z.object({
   blocks: z.array(blockSchema),
 });
 
+/**
+ * Webflow collection/item ids are 24-hex ObjectIds. Matching the exact shape (rather than `min(1)`)
+ * keeps path-like input (`../sites/x`) from ever reaching `webflowCmsItemUrl`, where `new URL` would
+ * normalize it into a different Data API resource.
+ */
+const webflowObjectIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[0-9a-f]{24}$/i, "Expected a Webflow object id");
+
 const loadRequestSchema = z.object({
-  collectionId: z.string().min(1),
-  itemId: z.string().min(1),
+  collectionId: webflowObjectIdSchema,
+  itemId: webflowObjectIdSchema,
 });
 
 const saveRequestSchema = loadRequestSchema.extend({

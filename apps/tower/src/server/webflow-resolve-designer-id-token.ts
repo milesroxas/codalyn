@@ -100,14 +100,19 @@ export type WebflowResolveBearerCandidate = { token: string; organizationId?: st
  * Ordered, de-duplicated resolve-bearer candidates for the app that issued the ID token.
  *
  * A Designer ID token can only be resolved by a Data Client token from the SAME Webflow app (Webflow
- * 400s cross-app resolves), so candidates are scoped by `app`:
- *  - Apps that connect to the Data API (Beacon): stored workspace OAuth tokens (active first), then
- *    that app's operator bearer. Stored tokens can be pruned on rejection (no refresh tokens exist).
- *  - Designer-only apps (Flint): just that app's operator bearer — stored Beacon tokens would 400.
+ * 400s cross-app resolves), so candidates are scoped by `app`. Tenant tokens are only ever used when
+ * they are tied to the caller — never a pool of unrelated tenants' tokens:
+ *  1. the caller's own active-workspace token (when the request already carries a Tower session);
+ *  2. the operator-owned app bearer (`WEBFLOW_TOKEN_RESOLVE_BEARER` / Flint equivalent);
+ *  3. for Data-API apps (Beacon) only: stored tokens of the org(s) whose token is known to reach the
+ *     site the ID token was issued on (`siteId`, sent by the extension from `getSiteInfo()`).
+ * Stored tokens can be pruned on rejection (no refresh tokens exist). Designer-only apps (Flint) get
+ * just their operator bearer — stored Beacon tokens would 400.
  */
 export async function collectWebflowIdTokenResolveBearers(
   request: Request,
-  app: WebflowAppKey = DEFAULT_WEBFLOW_APP_KEY
+  app: WebflowAppKey = DEFAULT_WEBFLOW_APP_KEY,
+  siteId: string | null = null
 ): Promise<WebflowResolveBearerCandidate[]> {
   const candidates: WebflowResolveBearerCandidate[] = [];
   const seenOrgIds = new Set<string>();
@@ -122,23 +127,27 @@ export async function collectWebflowIdTokenResolveBearers(
     candidates.push({ token: row.accessToken, organizationId: row.organizationId });
   };
 
-  if (webflowAppUsesStoredOAuthTokens(app)) {
-    // Lazy-imported so unit tests can exercise resolveWebflowDesignerIdToken without the DB/auth stack.
-    const { resolveActiveOrganizationWebflowToken, listOrganizationWebflowTokens } = await import(
-      "@/server/webflow-proxy-token"
-    );
-    const active = await resolveActiveOrganizationWebflowToken({ requestHeaders: request.headers, app });
+  const usesStoredTokens = webflowAppUsesStoredOAuthTokens(app);
+  // Lazy-imported so unit tests can exercise resolveWebflowDesignerIdToken without the DB/auth stack.
+  const tokens = usesStoredTokens ? await import("@/server/webflow-proxy-token") : null;
+
+  if (tokens) {
+    const active = await tokens.resolveActiveOrganizationWebflowToken({ requestHeaders: request.headers, app });
     if (active) {
       pushOrgToken(active);
-    }
-    for (const row of await listOrganizationWebflowTokens(app)) {
-      pushOrgToken(row);
     }
   }
 
   const envBearer = resolveWebflowAppBearer(app);
   if (envBearer && !seenTokens.has(envBearer)) {
+    seenTokens.add(envBearer);
     candidates.push({ token: envBearer });
+  }
+
+  if (tokens && siteId) {
+    for (const row of await tokens.listOrganizationWebflowTokensForSite(siteId, app)) {
+      pushOrgToken(row);
+    }
   }
 
   return candidates;

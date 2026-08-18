@@ -1,7 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const verifyTowerApiRequest = vi.fn();
-const resolveWebflowBearerToken = vi.fn();
+const resolveActiveOrganizationWebflowToken = vi.fn();
+const handleWebflowUpstreamRevocation = vi.fn();
 const parseCmsLayoutSaveRequest = vi.fn();
 const readUpstreamErrorMessage = vi.fn();
 const resolveUserCmsLayoutFieldSlug = vi.fn();
@@ -15,7 +16,11 @@ vi.mock("@/server/tower-api-auth", () => ({
 }));
 
 vi.mock("@/server/webflow-proxy-token", () => ({
-  resolveWebflowBearerToken,
+  resolveActiveOrganizationWebflowToken,
+}));
+
+vi.mock("@/server/webflow-upstream-revocation", () => ({
+  handleWebflowUpstreamRevocation,
 }));
 
 vi.mock("@/server/beacon-cms-layout", () => ({
@@ -43,7 +48,9 @@ describe("POST /api/v1/beacon/cms-layout/save", () => {
   beforeEach(() => {
     delete process.env.NEXT_PUBLIC_CMS_SLOTS_SURFACE_ENABLED;
     verifyTowerApiRequest.mockReset();
-    resolveWebflowBearerToken.mockReset();
+    resolveActiveOrganizationWebflowToken.mockReset();
+    handleWebflowUpstreamRevocation.mockReset();
+    handleWebflowUpstreamRevocation.mockResolvedValue(null);
     parseCmsLayoutSaveRequest.mockReset();
     readUpstreamErrorMessage.mockReset();
     resolveUserCmsLayoutFieldSlug.mockReset();
@@ -94,7 +101,7 @@ describe("POST /api/v1/beacon/cms-layout/save", () => {
       composition,
     });
     resolveUserCmsLayoutFieldSlug.mockResolvedValue("layout-json");
-    resolveWebflowBearerToken.mockResolvedValue("wf_token");
+    resolveActiveOrganizationWebflowToken.mockResolvedValue({ organizationId: "org_1", accessToken: "wf_token" });
     webflowCmsItemUrl.mockReturnValue(new URL("https://api.webflow.com/v2/collections/col_1/items/item_1"));
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
 

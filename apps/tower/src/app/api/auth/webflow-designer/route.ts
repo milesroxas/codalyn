@@ -4,6 +4,7 @@ import { assertWebflowDesignerExchangeIpRateLimit } from "@/server/security/webf
 import { towerCorsHeadersFor } from "@/server/tower-cors";
 import { normalizeWebflowAppKey } from "@/server/webflow-app-registry";
 import { establishDesignerBetterAuthSession } from "@/server/webflow-designer-session-logic";
+import { isWebflowSiteId } from "@/server/webflow-organization-sites";
 import {
   collectWebflowIdTokenResolveBearers,
   resolveDesignerIdTokenAcrossCandidates,
@@ -65,9 +66,9 @@ export async function POST(request: Request) {
     return limited;
   }
 
-  let parsed: { idToken?: string; app?: string };
+  let parsed: { idToken?: string; app?: string; siteId?: unknown };
   try {
-    parsed = (await request.json()) as { idToken?: string; app?: string };
+    parsed = (await request.json()) as { idToken?: string; app?: string; siteId?: unknown };
   } catch {
     return jsonWithCors(request, { error: "invalid_json" }, { status: 400 });
   }
@@ -83,7 +84,10 @@ export async function POST(request: Request) {
   // Which Webflow app issued this ID token — selects the matching app's resolve bearer (cross-app
   // resolves are rejected by Webflow). Untagged requests default to Beacon for back-compat.
   const app = normalizeWebflowAppKey(parsed.app);
-  const candidates = await collectWebflowIdTokenResolveBearers(request, app);
+  // Optional: the Designer site the ID token was issued on. Lets the resolve pick the token of the org
+  // linked to that site instead of any other tenant's token. Ignored unless it looks like a site id.
+  const siteId = isWebflowSiteId(parsed.siteId) ? parsed.siteId : null;
+  const candidates = await collectWebflowIdTokenResolveBearers(request, app, siteId);
   if (candidates.length === 0) {
     const bearerVar = app === "flint" ? "WEBFLOW_FLINT_TOKEN_RESOLVE_BEARER" : "WEBFLOW_TOKEN_RESOLVE_BEARER";
     return jsonWithCors(
@@ -109,8 +113,9 @@ export async function POST(request: Request) {
 
   const session = await establishDesignerBetterAuthSession(resolution.user);
   if (!session.ok) {
+    // Log the Webflow user id, not the email (PII stays out of function logs).
     console.warn(
-      `[tower/webflow-designer] establish session failed for ${resolution.user.email}: ${session.status} ${session.message}`
+      `[tower/webflow-designer] establish session failed for webflow user ${resolution.user.id}: ${session.status} ${session.message}`
     );
     return jsonWithCors(request, { error: session.message }, { status: session.status });
   }

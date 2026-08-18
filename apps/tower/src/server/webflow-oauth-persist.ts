@@ -1,6 +1,7 @@
 import { encryptStoredSecret } from "@/server/security/secret-encryption";
 import { WEBFLOW_DATA_API_APP_KEY, type WebflowAppKey } from "@/server/webflow-app-registry";
 import type { WebflowOAuthTokenResponse } from "@/server/webflow-oauth-exchange";
+import { syncOrganizationWebflowSitesFromToken } from "@/server/webflow-organization-sites";
 import { db } from "@/shared/lib/db";
 import { organizationWebflowOAuthToken } from "@/shared/lib/db/auth-schema";
 
@@ -42,4 +43,8 @@ export async function persistOrganizationWebflowOAuthToken(
         updatedAt: new Date(),
       },
     });
+
+  // Record which sites this token reaches so the Designer ID-token exchange can pick *this* org's token
+  // for an ID token issued on one of them (instead of trying other tenants' tokens). Best-effort.
+  await syncOrganizationWebflowSitesFromToken(organizationId, tokenResponse.access_token, appKey);
 }

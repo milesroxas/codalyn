@@ -20,8 +20,32 @@ describe("towerCorsHeadersFor", () => {
     const h = towerCorsHeadersFor(req);
     expect(h["Access-Control-Allow-Origin"]).toBe("http://localhost:1337");
     expect(h["Access-Control-Allow-Credentials"]).toBe("true");
-    expect(h["Access-Control-Allow-Private-Network"]).toBe("true");
+    expect(h["Access-Control-Allow-Private-Network"]).toBeUndefined();
     expect(h.Vary).toBe("Origin");
+  });
+
+  it("grants Private Network Access only when an allowlisted origin's preflight asks for it", () => {
+    const asked = towerCorsHeadersFor(
+      new Request("https://tower.example/api", {
+        method: "OPTIONS",
+        headers: { Origin: "http://localhost:1337", "Access-Control-Request-Private-Network": "true" },
+      })
+    );
+    expect(asked["Access-Control-Allow-Private-Network"]).toBe("true");
+
+    const notAllowlisted = towerCorsHeadersFor(
+      new Request("https://tower.example/api", {
+        method: "OPTIONS",
+        headers: { Origin: "https://evil.example", "Access-Control-Request-Private-Network": "true" },
+      })
+    );
+    expect(notAllowlisted["Access-Control-Allow-Private-Network"]).toBeUndefined();
+  });
+
+  it("does not advertise the retired X-Beacon-Tower-User-Id request header", () => {
+    const h = towerCorsHeadersFor(new Request("https://tower.example/api"));
+    expect(h["Access-Control-Allow-Headers"]).not.toMatch(/X-Beacon-Tower-User-Id/i);
+    expect(h["Access-Control-Allow-Headers"]).toMatch(/Authorization/);
   });
 
   it("reflects Webflow Designer dev app Origin (*.design.webflow.com)", () => {
@@ -31,7 +55,6 @@ describe("towerCorsHeadersFor", () => {
     const h = towerCorsHeadersFor(req);
     expect(h["Access-Control-Allow-Origin"]).toBe("https://codalyn-beacon.design.webflow.com");
     expect(h["Access-Control-Allow-Credentials"]).toBe("true");
-    expect(h["Access-Control-Allow-Private-Network"]).toBe("true");
   });
 
   it("reflects Webflow extension bundle Origin (*.webflow-ext.com)", () => {
@@ -57,7 +80,7 @@ describe("towerCorsHeadersFor", () => {
     const noOrigin = towerCorsHeadersFor(new Request("https://tower.example/api"));
     expect(noOrigin["Access-Control-Allow-Origin"]).toBe("*");
     expect(noOrigin["Access-Control-Allow-Credentials"]).toBeUndefined();
-    expect(noOrigin["Access-Control-Allow-Private-Network"]).toBe("true");
+    expect(noOrigin["Access-Control-Allow-Private-Network"]).toBeUndefined();
 
     const bad = new Request("https://tower.example/api", {
       headers: { Origin: "https://evil.example" },

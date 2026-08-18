@@ -171,6 +171,12 @@ export function messageForWebflowOAuthCallbackError(error?: string | null): stri
     case "token_exchange":
     case "token_exchange_failed":
       return "Could not complete Webflow connection. Try again.";
+    case "token_storage":
+      return "Tower could not store the Webflow connection securely. Contact support — nothing was saved.";
+    case "identity_mismatch":
+      return "The Webflow account that approved this connection is not the one that started it. Start the connection again from your own session.";
+    case "state_expired":
+      return "This connection link expired. Start the connection again and approve it within 10 minutes.";
     case "no_active_workspace":
       return messageForWebflowOAuthAuthorizeError("no_active_workspace");
     default:

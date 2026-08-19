@@ -141,7 +141,7 @@ evidence) before ordinary remediation.
 ### B5. Packet + resubmit
 
 Per finding: ID, one-line disposition, files changed, test command + result, artifact sha256,
-runtime evidence if any, remaining limitation. Then A5 (preflight re-run, confirm the finding is
+runtime evidence if any, remaining limitation (example: `docs/webflow-resubmission-packet-2026-08-19.md`). Then A5 (preflight re-run, confirm the finding is
 gone, new receipt) and A6. Skill ends with **READY TO RESUBMIT** / **NOT READY** — that is your
 readiness, not Webflow's approval.
 

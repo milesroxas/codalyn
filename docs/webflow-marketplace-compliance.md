@@ -1497,6 +1497,8 @@ any Flint submission).
 
 ### Before submitting (not done in this change)
 
+Partner-facing packet for R7b.8 + R7b.9: `docs/webflow-resubmission-packet-2026-08-19.md`.
+
 1. Deploy Tower with migration `0036` applied (`pnpm app tower db:migrate:prod -- --confirm`) and
    `TOWER_TOKEN_ENCRYPTION_KEY` confirmed in Production env.
 2. Rebuild Beacon (`CI=true BUILD_RECIPIENT=public pnpm build:prod`) — or use the 08-19 10:53 build

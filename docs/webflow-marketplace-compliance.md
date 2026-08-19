@@ -1339,11 +1339,171 @@ Production before deploying** (could not be verified from this environment).
   (`"#"`; error code preserved) — the bundle's `https://` grep now shows only allowlisted endpoints
   plus inert vendor strings.
 
+### R7b.8 Credential in URL — posthog-js token-in-query request URLs (blocker, App Review Preflight 2026-08-19)
+
+**Finding (issued by App Review Preflight, run against the 08-18 19:13 public build; priority:
+BLOCKER, 3 evidence locations in `assets/init-observability-Cw8VVyqB.js`).** "Tokens and
+credentials must never travel in URL query strings — URLs land in server logs, browser history, and
+analytics. Send credentials in an Authorization header or request body." Acceptance criterion as
+issued: move the credential out of the URL (header or protected body; GET routes carrying it become
+POST). Provenance: issued finding + published requirement (Marketplace Guidelines, token security).
+
+**Observed (source-verified).** All hits are inside the bundled `posthog-js@1.369.3` module — none
+are first-party. The installed (pnpm-patched) module builds four request URLs with the project
+key in the query string: `/api/early_access_features/?token=`, `/api/product_tours/?token=`,
+`/api/surveys/?token=`, and `/i/v1/logs?token=`. The value is PostHog's public write-only project
+key, but the rule is shape-based and the reviewer tooling greps for the shape. No first-party code
+in Beacon (or Flint, which shares the module) builds a `?token=`/`&token=` URL. Every one of the four
+paths is unreachable in the shipped configuration: early-access features are only fetched by
+`posthog.getEarlyAccessFeatures()` (never called; `advanced_disable_feature_flags` pinned), product
+tours need the `generateProductTours` extension script that `disable_external_dependency_loading`
+never loads, surveys return before any request under `disable_surveys: true`, and logs are only
+sent by `posthog.captureLog()` / `posthog.logger` (never called; logs extension likewise never
+loaded). Event ingestion (`/e/`) and flag evaluation (`/flags/`) already carry the token in the POST
+body and are unaffected.
+
+**Fix (source-verified, artifact-verified).**
+
+- `scripts/vite-strip-dev-host-literals.mjs`: four new posthog-js rules compile the `?token=<key>`
+  suffix out of each URL, leaving the bare endpoint (the early-access `&stage=` filter is kept).
+  Should any of these paths ever be reached, the request goes out without a credential and PostHog
+  rejects it — fail-closed, no key in a URL. New residual guard `credential-in-query-string URL`
+  (`/[?&]token=/i`) on the posthog-js module fails release builds if a vendor upgrade adds or moves a
+  token-in-query URL. The request-body assignment `token=this.config.token` (event capture) is
+  deliberately outside the pattern and untouched.
+- `scripts/build-cli.mjs`: `?token=` and `&token=` are new static forbidden bundle markers
+  (case-insensitive substring, every shipped JS file and the archived zip) — the backstop for
+  first-party regressions in any app built through the release pipeline.
+- Source-map artifact: Vite embeds the *loaded* vendor text in `sourcesContent`, so the private
+  `.sourcemaps.zip` (submission-form field) still carried the four URLs — and the `localhost`/Sentry
+  literals the transform compiles out — inside the posthog-js entry. `extractSourceMapsToPrivateZip`
+  now rewrites audited vendor `sourcesContent` with the same rules
+  (`rewriteSourceMapVendorContent`) so the map describes the code actually bundled, and fails the
+  release build if any map still contains a token-in-query URL. Mappings are untouched.
+- Tests: `apps/beacon/scripts/release-build-gates.test.mjs` (40 tests) — the installed module has
+  exactly 4 token-in-query URLs and 0 after transform; bare endpoints survive; body token survives;
+  residual guard throws on a synthetic fifth; forbidden marker catches `?token=`/`&TOKEN=` and
+  ignores `h.token=`; the map rewrite strips vendor content, leaves first-party content alone, and
+  the strict gate rejects a first-party `?token=` in a map.
+
+**Artifact check (08-19 10:31 build, `CI=true BUILD_RECIPIENT=public pnpm build:prod`):**
+`v0.1.0_public_08-19_10-31-14.zip` sha256 `f4a20169…2cd90` (25 entries, 0 `.map`, 0
+`sourceMappingURL`); `v0.1.0_public_08-19_10-31-14.sourcemaps.zip` sha256 `6330b7b6…6d015`.
+Unzipped bundle: `[?&]token=` 0 hits, `localhost|sentry` 0 hits; `/api/early_access_features/`,
+`/api/product_tours/`, `/api/surveys/`, `/i/v1/logs` present once each as bare paths; the
+observability chunk is now `assets/init-observability-DFbaRa90.js`. Unzipped sourcemaps:
+`[?&]token=` 0 hits across all 10 maps; posthog-js `sourcesContent` has 0 `localhost`/`sentry`.
+Remaining `localhost` in maps are first-party/vendor *comments* only (a better-auth JSDoc example,
+a `tower-client.ts` doc comment) and the `sentry` grep hit in `bundle.js.map` is the substring of
+`AttributeSettingsEntry` — pre-existing since R7b.1, not credentials, left as-is.
+
+**State.** Source verified ✓ · Artifact verified ✓ · Installed on test site ✗ · Runtime observed ✗
+(not applicable: no runtime behavior changes; the four paths were already unreachable) · Submitted ✗
+· Reviewer accepted ✗. Flint shares the module and gets the same rewrite on its next release build
+(its last `dist/` is from 08-05, pre-patch, and still shows the URLs — rebuild before any Flint
+submission).
+
+### R7b.9 Fingerprinting & Session Replay — posthog-js session-recording controller + canvas export (blocker, App Review Preflight 2026-08-19)
+
+**Finding (issued by App Review Preflight, run against the 08-19 10:31 public build; priority:
+BLOCKER, 3 evidence locations).** "Session replay (rrweb, FullStory) and fingerprinting are
+prohibited." Next move as issued: update the implementation, upload a revision, and use the next
+scan to confirm. Provenance: issued finding + published requirement (Marketplace Guidelines,
+privacy / data collection). No finer acceptance criterion was supplied.
+
+**Observed (source-verified).** The three evidence windows split into two distinct things:
+
+1. `assets/init-observability-Cw8VVyqB.js:1` — centred on `N.__PosthogExtensions__.rrweb` /
+   `initSessionRecording` / `"could not load recorder"`: the bundled `posthog-js@1.369.3`
+   session-recording *controller* (the class that lazy-loads posthog's rrweb recorder script). Not
+   first-party. It was dormant — `disable_session_recording: true`, `disable_external_dependency_loading:
+   true`, remote config off (R5.3/R6.5) — so no recorder ever loaded or ran, but the code and the
+   `rrweb` reference were present in the shipped chunk, which is what the scan matched. Same lesson
+   as R6.5 and the Sentry integration: disabled-by-config vendor code is still review surface.
+2. `bundle.js:85` ×2 — both centred on `canvas.toBlob(...)`: the image editor's two encode helpers
+   (WebP/PNG export in `encode-image-blob.ts`, PNG preview in `export-preview-encode.ts`). This is
+   image export, not fingerprinting: the canvas holds the user's own cropped asset, nothing is read
+   back for identification (`getImageData`/`toDataURL` do not exist anywhere in the bundle — 0 hits),
+   and the encoded bytes only go where the user sends them (Webflow asset upload, or Codalyn Tower
+   after the explicit AVIF opt-in of R7.6). No `navigator.hardwareConcurrency`/`deviceMemory`/
+   `plugins`, WebGL renderer, or AudioContext reads exist in the bundle either (0 hits each).
+
+**Fix (source-verified, artifact-verified).**
+
+- **Session-replay capability excised, not just disabled** — pnpm patch
+  `patches/posthog-js@1.369.3.patch` (same mechanism the reviewers accepted for R4/R6.5) now also
+  removes, from `dist/module.js`: the default `sessionRecording` extension class (controller,
+  rrweb hand-off, `lazy-recorder` loader, `[SessionRecording]` loggers and its status constants);
+  the PostHog core's recorder-instantiation seam (`__extensionClasses.sessionRecording` /
+  `__defaultExtensionClasses.sessionRecording` wiring, `startIfEnabledOrStop`/`stopRecording`
+  calls, `sdkDebugProperties` merge) so nothing — default or injected — can construct a recorder;
+  the public `startSessionRecording` / `stopSessionRecording` / `sessionRecordingStarted` /
+  `get_session_replay_url` methods; the `__rrweb_original__` console indirection in the logger; the
+  recording-URL tag in the (already tree-shaken) Sentry processor; the `webPerformance` shim's
+  deprecation text that pointed at `posthog.sessionRecording`; and the recorder's now-unread config
+  defaults and persistence keys (`disable_session_recording`, `session_recording`,
+  `enable_recording_console_log`, `__preview_eager_load_replay`, `$session_recording_remote_config`,
+  `$session_recording_enabled_server_side`). Every edit was verified against the installed module
+  with an AST parse (acorn) and a jsdom smoke run of Beacon's exact init options: `init`, `register`,
+  `group`, `capture`, `captureException`, `opt_out`/`opt_in`, `set_config` all behave identically
+  before and after (same four `/e/` requests), with `posthog.sessionRecording` now `undefined`.
+  `posthog-js` module size 185,884 → 178,246 bytes. First-party code never called any removed API
+  (grep across `apps/beacon`, `apps/flint`, `packages/*`: 0 hits).
+- **Gates.** `scripts/vite-strip-dev-host-literals.mjs`: new residual guard `session-replay
+  reference` (`/rrweb|fullstory|recorder|replay|recording/i`) on the posthog-js module — a vendor
+  upgrade that ships a recorder again, or a regenerated patch that forgets the excision, fails the
+  release build. `scripts/build-cli.mjs`: `rrweb`, `fullstory`, `sessionrecording`, `recorder` are
+  new whole-bundle forbidden markers (every shipped JS file + archived zip, case-insensitive;
+  `replay`/`recording` deliberately not global — React's `$$reactFormReplay`, Sentry's
+  `replay_event` envelope type in Flint, and our own pinned option / disclosure prose are not
+  recorder references). Tests: `apps/beacon/scripts/release-build-gates.test.mjs` (44 tests; +4 here)
+  — the installed module has 0 replay/recorder/recording references and no removed method, the
+  transformed module stays clean, five synthetic re-introductions (`window.rrweb`,
+  `"lazy-recorder"`, `this.sessionRecording`, `"[SessionRecording]"`,
+  `{disable_session_recording:!1}`) each throw, and the forbidden marker catches
+  `rrweb`/`FullStory`/`sessionRecording`/`lazy-recorder` while letting
+  `disable_session_recording:!0` and the disclosure sentence through.
+- **`disable_session_recording: true` stays pinned** in `CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS`
+  (documented as defence in depth; `@codalyn/observability` test still locks it). It is the one
+  `session_recording` token left in the bundle besides the Settings → Privacy prose that says
+  session recordings are never collected.
+- **Canvas export consolidated to one call site** — `apps/beacon/src/features/image-editor/lib/canvas-to-blob.ts`
+  (`canvasToBlob`, with the non-fingerprinting rationale in its doc comment) now serves both
+  `encode-image-blob.ts` and `export-preview-encode.ts`; the duplicate `canvasToPngBlob` is gone.
+  Behaviour unchanged (unit-tested: type/quality forwarded, null-blob rejection names the type).
+  The bundle goes from two `toBlob` sites to one. **Remaining limitation / open decision:** that one
+  `canvas.toBlob` call is the image editor's export step and cannot be removed without removing
+  in-browser WebP/PNG encoding. If the next scan still reports it under "Fingerprinting", the
+  reviewer needs the rationale above (user's own asset, no read-back, no identification, no
+  transmission outside user-initiated flows) — that is a reviewer judgment, not something code can
+  close. Switching the API (e.g. `OffscreenCanvas.convertToBlob`) would only change the keyword, not
+  the capability, and was deliberately not done.
+
+**Artifact check (08-19 10:53 build, `CI=true BUILD_RECIPIENT=public pnpm build:prod`):**
+`v0.1.0_public_08-19_10-53-26.zip` sha256 `eb963a9d…2ae79` (25 entries, 0 `.map`, 0
+`sourceMappingURL`); `v0.1.0_public_08-19_10-53-26.sourcemaps.zip` sha256 `18b43b87…3b20`.
+Unzipped bundle JS (case-insensitive): `rrweb` 0, `fullstory` 0, `sessionrecording` 0, `recorder` 0,
+`toDataURL` 0, `getImageData` 0, `toBlob` 1 (the shared helper), `replay` 1 (React DOM's
+`$$reactFormReplay`, form-action replay — unrelated), `recording` 3 (pinned
+`disable_session_recording:!0` + two disclosure sentences), `sentry`/`localhost`/`?token=` still 0.
+The observability chunk is now `assets/init-observability-DCGxr1q2.js` (195,230 bytes, was 202,306).
+Sourcemaps zip: `rrweb`/`lazy-recorder`/`sessionRecording`/`?token=` 0 hits.
+
+**State.** Source verified ✓ · Artifact verified ✓ · Installed on test site ✗ · Runtime observed ✗
+(not applicable: recorder was never loaded before either; capture/exception paths smoke-tested in
+jsdom) · Submitted ✗ · Reviewer accepted ✗. Flint shares the patched module and picks this up on its
+next release build (its `dist/` is still from 08-05 and shows the old controller — rebuild before
+any Flint submission).
+
 ### Before submitting (not done in this change)
 
 1. Deploy Tower with migration `0036` applied (`pnpm app tower db:migrate:prod -- --confirm`) and
    `TOWER_TOKEN_ENCRYPTION_KEY` confirmed in Production env.
-2. Rebuild Beacon (`CI=true BUILD_RECIPIENT=public pnpm build:prod`), run **App Review Preflight**
-   on the new bundle **and** the matching `.sourcemaps.zip`, record the `wfpre_…` receipt.
+2. Rebuild Beacon (`CI=true BUILD_RECIPIENT=public pnpm build:prod`) — or use the 08-19 10:53 build
+   from R7b.9 if nothing else changes — run **App Review Preflight** on the new bundle **and** the
+   matching `.sourcemaps.zip`, confirm the "Credential in URL" (R7b.8) and "Fingerprinting & Session
+   Replay" (R7b.9) findings no longer appear — if the latter still names the single `canvas.toBlob`
+   export site, answer with the R7b.9 rationale rather than changing the API — record the `wfpre_…`
+   receipt.
 3. Re-confirm reviewer credentials, published `.webflow.io` test site, screenshots, 512×512 icon,
    demo video (approve + deny). Keep the AVIF disclosure in the submission notes.

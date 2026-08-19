@@ -4,26 +4,11 @@ import {
   type ImageExportFormat,
   mimeTypeForFormat,
 } from "@codalyn/webflow-kit";
+import { canvasToBlob } from "@/features/image-editor/lib/canvas-to-blob";
 import { sanitizeAssetBaseName } from "@/features/image-editor/lib/sanitize-asset-base-name";
 import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
 import { parseTowerUsageLimitBody, TowerUsageLimitError } from "@/shared/lib/tower-usage-limit-error";
 import { waitForNextPaint } from "@/shared/lib/wait-for-next-paint";
-
-function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob) {
-          resolve(blob);
-        } else {
-          reject(new Error("Encoding produced no blob"));
-        }
-      },
-      type,
-      quality
-    );
-  });
-}
 
 export type EncodedImage = {
   blob: Blob;

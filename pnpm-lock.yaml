@@ -21,7 +21,7 @@ patchedDependencies:
     hash: 479456b811c56ff3b6432ccafb8b2902cfb23706a3b0a9eee0b2c87374af6a3a
     path: patches/@radix-ui__react-select@2.2.6.patch
   posthog-js@1.369.3:
-    hash: 3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21
+    hash: 1be3777d4cc070b00856a58cdb493197125486176aef9ba74dee844c707b023b
     path: patches/posthog-js@1.369.3.patch
   react-easy-crop@5.5.7:
     hash: da2c5d4a198421b67b01dedf142d566aa83aa75bef59a7a807e2754067ccb8ff
@@ -129,7 +129,7 @@ importers:
         version: 1.8.0(react@19.2.5)
       posthog-js:
         specifier: ^1.369.3
-        version: 1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21)
+        version: 1.369.3(patch_hash=1be3777d4cc070b00856a58cdb493197125486176aef9ba74dee844c707b023b)
       radix-ui:
         specifier: ^1.4.3
         version: 1.4.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -253,7 +253,7 @@ importers:
         version: link:../../packages/webflow-kit
       '@posthog/react':
         specifier: ^1.9.0
-        version: 1.9.0(@types/react@19.2.17)(posthog-js@1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21))(react@19.2.5)
+        version: 1.9.0(@types/react@19.2.17)(posthog-js@1.369.3(patch_hash=1be3777d4cc070b00856a58cdb493197125486176aef9ba74dee844c707b023b))(react@19.2.5)
       '@radix-ui/react-accordion':
         specifier: ^1.2.12
         version: 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -295,7 +295,7 @@ importers:
         version: 1.8.0(react@19.2.5)
       posthog-js:
         specifier: ^1.369.3
-        version: 1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21)
+        version: 1.369.3(patch_hash=1be3777d4cc070b00856a58cdb493197125486176aef9ba74dee844c707b023b)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -15768,9 +15768,9 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@posthog/react@1.9.0(@types/react@19.2.17)(posthog-js@1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21))(react@19.2.5)':
+  '@posthog/react@1.9.0(@types/react@19.2.17)(posthog-js@1.369.3(patch_hash=1be3777d4cc070b00856a58cdb493197125486176aef9ba74dee844c707b023b))(react@19.2.5)':
     dependencies:
-      posthog-js: 1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21)
+      posthog-js: 1.369.3(patch_hash=1be3777d4cc070b00856a58cdb493197125486176aef9ba74dee844c707b023b)
       react: 19.2.5
     optionalDependencies:
       '@types/react': 19.2.17
@@ -22437,7 +22437,7 @@ snapshots:
     dependencies:
       xtend: 4.0.2
 
-  posthog-js@1.369.3(patch_hash=3bd77da0c66851c2e71d1417294e3115be84ab9f667ba04794ae53b417675b21):
+  posthog-js@1.369.3(patch_hash=1be3777d4cc070b00856a58cdb493197125486176aef9ba74dee844c707b023b):
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/api-logs': 0.208.0

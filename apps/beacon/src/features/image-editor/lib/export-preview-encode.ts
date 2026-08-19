@@ -1,20 +1,9 @@
 import type { ImageExportFormat } from "@codalyn/webflow-kit";
 import type { Area } from "react-easy-crop";
 
+import { canvasToBlob } from "@/features/image-editor/lib/canvas-to-blob";
 import { renderCroppedRegionToCanvas } from "@/features/image-editor/lib/crop-image";
 import { encodeCanvasToOptimizedFile } from "@/features/image-editor/lib/encode-image-blob";
-
-function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(blob);
-      } else {
-        reject(new Error("PNG preview encoding produced no blob"));
-      }
-    }, "image/png");
-  });
-}
 
 export async function encodeExportPreviewPair(options: {
   imageSrc: string;
@@ -32,7 +21,7 @@ export async function encodeExportPreviewPair(options: {
 }> {
   const { imageSrc, completedCrop, w, h, quality, exportFormat, avifTowerConsentGranted } = options;
   const canvas = await renderCroppedRegionToCanvas(imageSrc, completedCrop, w, h);
-  const pngBlob = await canvasToPngBlob(canvas);
+  const pngBlob = await canvasToBlob(canvas, "image/png");
   const originalUrl = URL.createObjectURL(pngBlob);
   try {
     const { blob: compressedBlob } = await encodeCanvasToOptimizedFile(canvas, quality, {

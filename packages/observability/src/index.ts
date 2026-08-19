@@ -60,6 +60,10 @@ export const CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS = {
   autocapture: false,
   capture_pageview: false,
   capture_pageleave: false,
+  // Defence in depth only: the session-recording controller itself (rrweb loader, recorder API) is
+  // excised from the installed posthog-js by the pnpm patch (`patches/posthog-js@1.369.3.patch`,
+  // App Review Preflight "Fingerprinting & Session Replay", 2026-08-19), so no recorder can start
+  // regardless of this flag. Kept so a future SDK bump that loses the excision still ships disabled.
   disable_session_recording: true,
   disable_surveys: true,
   disable_external_dependency_loading: true,

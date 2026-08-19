@@ -21,7 +21,10 @@ import {
   matchForbiddenMarker,
   resolveViteEnvValue,
 } from "../../../scripts/build-cli.mjs";
-import { createStripDevHostLiteralsPlugin } from "../../../scripts/vite-strip-dev-host-literals.mjs";
+import {
+  createStripDevHostLiteralsPlugin,
+  rewriteSourceMapVendorContent,
+} from "../../../scripts/vite-strip-dev-host-literals.mjs";
 
 const require = createRequire(import.meta.url);
 const POSTHOG_MODULE_ID = require.resolve("posthog-js/dist/module.js");
@@ -58,10 +61,68 @@ describe("strip-dev-host-literals / posthog-js", () => {
     expect(() => transform(moved, POSTHOG_MODULE_ID, { strict: true })).toThrow(/dev-host literal/);
   });
 
+  it("compiles the project token out of every posthog-js request URL (App Review Preflight: Credential in URL)", () => {
+    const { code } = transform(POSTHOG_MODULE_SOURCE, POSTHOG_MODULE_ID, { strict: true });
+
+    // The installed module builds exactly these four token-in-query URLs; a vendor upgrade that
+    // adds or moves one must be re-audited (the residual guard below fails the build).
+    expect(POSTHOG_MODULE_SOURCE.match(/[?&]token=/g)).toHaveLength(4);
+    expect(code).not.toMatch(/[?&]token=/i);
+    // The bare endpoints survive; only the credential query is gone.
+    expect(code).toContain('"/api/early_access_features/"');
+    expect(code).toContain('"/api/product_tours/"');
+    expect(code).toContain('"/api/surveys/"');
+    expect(code).toContain('"/i/v1/logs"');
+    // Event capture keeps sending the token in the request body — that assignment is untouched.
+    expect(code).toContain("token=this.config.token");
+  });
+
+  it("fails the release build when a vendor upgrade adds a token-in-query URL", () => {
+    const moved = `${POSTHOG_MODULE_SOURCE}\nexport const probe="/api/x/?token="+t;\n`;
+
+    expect(() => transform(moved, POSTHOG_MODULE_ID, { strict: true })).toThrow(/credential-in-query-string URL/);
+  });
+
   it("fails the release build when a vendor upgrade moves a Sentry reference", () => {
     const moved = `${POSTHOG_MODULE_SOURCE}\nexport const probe="https://sentry.io/x";\n`;
 
     expect(() => transform(moved, POSTHOG_MODULE_ID, { strict: true })).toThrow(/Sentry reference/);
+  });
+
+  // App Review Preflight (2026-08-19): "Fingerprinting & Session Replay" — evidence was posthog's
+  // session-recording controller (`rrweb`, `initSessionRecording`, "could not load recorder"). The
+  // pnpm patch excises it from the installed module; these tests prove the excision held for the
+  // installed version and that the strip plugin's residual guard would catch it coming back.
+  it("installs a posthog-js with the session-replay controller excised (pnpm patch applied)", () => {
+    // The patch, not the transform, removes the recorder: the raw installed module is already clean —
+    // controller, API, lazy-loader name, log text, and the recorder's config defaults / persistence keys.
+    expect(POSTHOG_MODULE_SOURCE).not.toMatch(/rrweb|fullstory|recorder|replay|recording/i);
+    expect(POSTHOG_MODULE_SOURCE).not.toContain("startSessionRecording(");
+    expect(POSTHOG_MODULE_SOURCE).not.toContain("get_session_replay_url(");
+    expect(POSTHOG_MODULE_SOURCE).not.toContain("this.sessionRecording");
+    // The recorder-less core still carries everything Beacon uses: event capture, groups, exceptions.
+    expect(POSTHOG_MODULE_SOURCE).toContain("__defaultExtensionClasses");
+    expect(POSTHOG_MODULE_SOURCE).toContain("captureException(");
+    expect(POSTHOG_MODULE_SOURCE).toContain("group(");
+  });
+
+  it("leaves no session-replay reference in the transformed vendor module", () => {
+    const { code } = transform(POSTHOG_MODULE_SOURCE, POSTHOG_MODULE_ID, { strict: true });
+
+    expect(code).not.toMatch(/rrweb|fullstory|recorder|replay|recording/i);
+  });
+
+  it("fails the release build when a vendor upgrade (or a regenerated patch) ships a recorder again", () => {
+    for (const probe of [
+      "window.rrweb",
+      '"lazy-recorder"',
+      "this.sessionRecording",
+      '"[SessionRecording]"',
+      "{disable_session_recording:!1}",
+    ]) {
+      const moved = `${POSTHOG_MODULE_SOURCE}\nexport const probe=${probe};\n`;
+      expect(() => transform(moved, POSTHOG_MODULE_ID, { strict: true })).toThrow(/session-replay reference/);
+    }
   });
 
   it("only warns-by-omission in non-strict (development channel) builds", () => {
@@ -126,6 +187,28 @@ describe("matchForbiddenMarker", () => {
 
   it("passes clean bundle text", () => {
     expect(matchForbiddenMarker('fetch("https://tower.codalyn.app/api")', forbidden)).toBeNull();
+  });
+
+  it("catches a token-in-query URL regardless of casing or position", () => {
+    expect(matchForbiddenMarker('u="/api/surveys/?token="+k', forbidden)?.label).toMatch(/credential-in-query-string/);
+    expect(matchForbiddenMarker('u="/x?v=2&TOKEN="+k', forbidden)?.label).toMatch(/credential-in-query-string/);
+    // The request-body assignment posthog-js uses for event capture is not a URL — allowed.
+    expect(matchForbiddenMarker("h.token=this.config.token", forbidden)).toBeNull();
+  });
+
+  it("catches session-replay references regardless of casing (rrweb, FullStory, posthog's recorder API)", () => {
+    expect(matchForbiddenMarker("t=N.__PosthogExtensions__.rrweb", forbidden)?.value).toBe("rrweb");
+    expect(matchForbiddenMarker("window.FullStory", forbidden)?.value).toBe("fullstory");
+    expect(matchForbiddenMarker("this.sessionRecording=new u.sessionRecording(this)", forbidden)?.value).toBe(
+      "sessionrecording"
+    );
+    expect(matchForbiddenMarker('"lazy-recorder"', forbidden)?.value).toBe("recorder");
+    // The pinned privacy option is a config key, not a recorder reference — it stays shippable.
+    expect(matchForbiddenMarker("disable_session_recording:!0", forbidden)).toBeNull();
+    // The in-app privacy disclosure names what is NOT collected; prose stays shippable too.
+    expect(
+      matchForbiddenMarker("We never collect page content, session recordings, or location.", forbidden)
+    ).toBeNull();
   });
 
   it("catches a sourceMappingURL comment — a map reference must never ship in the bundle", () => {
@@ -330,6 +413,44 @@ describe("source-map extraction (Marketplace submission form field)", () => {
       .filter(Boolean)
       .sort();
     expect(entries).toEqual(["assets/", "assets/chunk-abc.js.map", "bundle.js.map"]);
+  });
+
+  it("rewrites audited vendor sourcesContent so the private map artifact carries no token-in-query URL", () => {
+    const appPath = tempAppDir();
+    const map = {
+      version: 3,
+      sources: [POSTHOG_MODULE_ID, "../../src/shared/lib/init-observability.ts"],
+      sourcesContent: [POSTHOG_MODULE_SOURCE, 'const own = "?token=" // first-party text is left alone'],
+      mappings: "",
+    };
+    fakeDist(appPath, { "chunk.js": "console.log(1)", "chunk.js.map": JSON.stringify(map) });
+    const archive = join(appPath, "bundle", "x.sourcemaps.zip");
+
+    // First-party content with the same shape is not rewritten and trips the strict gate instead.
+    expect(() => extractSourceMapsToPrivateZip(appPath, archive, { strict: true })).toThrow(
+      /credential-in-query-string URL/
+    );
+
+    map.sourcesContent[1] = "const own = 1;";
+    fakeDist(appPath, { "chunk.js.map": JSON.stringify(map) });
+    expect(extractSourceMapsToPrivateZip(appPath, archive, { strict: true })).toBe(archive);
+    const out = tempAppDir();
+    execSync(`unzip -q ${JSON.stringify(archive)} -d ${JSON.stringify(out)}`);
+    const written = JSON.parse(readFileSync(join(out, "chunk.js.map"), "utf-8"));
+    expect(written.sourcesContent[0]).not.toMatch(/[?&]token=|localhost|sentry/i);
+    expect(written.sourcesContent[0]).toContain('"/api/surveys/"');
+    expect(written.sourcesContent[1]).toBe("const own = 1;");
+    expect(written.mappings).toBe("");
+  });
+
+  it("rewriteSourceMapVendorContent passes non-watched sources and map-less shapes through unchanged", () => {
+    const plain = { version: 3, sources: ["/src/a.ts"], sourcesContent: ["localhost"], mappings: "" };
+    expect(rewriteSourceMapVendorContent(plain)).toEqual(plain);
+    expect(rewriteSourceMapVendorContent({ version: 3, sources: [POSTHOG_MODULE_ID], mappings: "" })).toEqual({
+      version: 3,
+      sources: [POSTHOG_MODULE_ID],
+      mappings: "",
+    });
   });
 
   it("returns null and writes nothing when the build emitted no maps (Flint)", () => {

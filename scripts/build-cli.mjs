@@ -32,6 +32,7 @@ import { fileURLToPath } from "node:url";
 import * as p from "@clack/prompts";
 import color from "picocolors";
 import { assertBundleOutputMatchesBuild, WEBFLOW_EXTENSION_BUNDLE_FILENAME } from "./extension-build.mjs";
+import { rewriteSourceMapVendorContent } from "./vite-strip-dev-host-literals.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -251,24 +252,48 @@ function listDistSourceMaps(appPath) {
 }
 
 /**
+ * Credential-shaped query parameter (`?token=` / `&token=`). The same shape is a forbidden bundle
+ * marker (see staticForbiddenMarkers); it is re-checked on the source-map artifact because the
+ * submission form uploads that artifact too and App Review Preflight scans what it is given.
+ */
+const CREDENTIAL_IN_QUERY_PATTERN = /[?&]token=/i;
+
+/**
  * Moves every source map out of dist/ into a private zip next to the bundle archive, *before*
  * `webflow extension bundle` zips dist/. The Marketplace submission form requires source maps for a
  * minified bundle, uploaded in a private field from the exact same build — so they are produced on
  * every release build, but they must never ship inside bundle.zip (they would expose the full source
  * to every Designer session). Returns the archive path, or null when the build emitted no maps.
+ *
+ * Each map's embedded `sourcesContent` for audited vendor modules is rewritten to the post-transform
+ * text (rewriteSourceMapVendorContent), so the private artifact carries no literal the bundle gate
+ * forbids — in particular no token-in-query URL (App Review Preflight "Credential in URL",
+ * 2026-08-19). `strict` mirrors the plugin option: release channels fail on any residual.
  */
-function extractSourceMapsToPrivateZip(appPath, archivePath) {
+function extractSourceMapsToPrivateZip(appPath, archivePath, options = {}) {
   const maps = listDistSourceMaps(appPath);
   if (maps.length === 0) {
     return null;
   }
+  const strict = options.strict !== false;
   const distDir = resolve(appPath, "dist");
   const staging = mkdtempSync(resolve(tmpdir(), "codalyn-sourcemaps-"));
   try {
     for (const rel of maps) {
+      const src = resolve(distDir, rel);
       const dest = resolve(staging, rel);
       mkdirSync(dirname(dest), { recursive: true });
-      renameSync(resolve(distDir, rel), dest);
+      const rewritten = rewriteSourceMapVendorContent(JSON.parse(readFileSync(src, "utf-8")), { strict });
+      const serialized = JSON.stringify(rewritten);
+      if (strict && CREDENTIAL_IN_QUERY_PATTERN.test(serialized)) {
+        const index = serialized.search(CREDENTIAL_IN_QUERY_PATTERN);
+        throw new Error(
+          `Source map ${rel} contains a credential-in-query-string URL — it would ship in the private ` +
+            `submission artifact. Context: …${serialized.slice(Math.max(0, index - 80), index + 80)}…`
+        );
+      }
+      writeFileSync(dest, serialized);
+      rmSync(src);
     }
     mkdirSync(dirname(archivePath), { recursive: true });
     rmSync(archivePath, { force: true });
@@ -533,6 +558,21 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     // Source maps are built (`sourcemap: "hidden"`) for the private submission field, so no shipped
     // file may reference one — a `//# sourceMappingURL=` comment means a map leaked into the bundle.
     { value: "sourceMappingURL", label: "a sourceMappingURL reference" },
+    // App Review Preflight (2026-08-19) flags "Credential in URL": any `?token=` / `&token=` query
+    // parameter in the shipped JS. posthog-js builds four such URLs (early-access features, product
+    // tours, surveys, logs); the strip plugin compiles the token out of each. Credentials belong in
+    // an Authorization header or request body, never a query string.
+    { value: "?token=", label: "a credential-in-query-string URL (?token=)" },
+    { value: "&token=", label: "a credential-in-query-string URL (&token=)" },
+    // App Review Preflight (2026-08-19) flags "Fingerprinting & Session Replay" on any rrweb /
+    // session-recorder reference. posthog-js's recorder controller is excised by the pnpm patch and
+    // the strip plugin's residual guard proves it per vendor module; these markers are the whole-
+    // bundle backstop (rrweb is posthog's recorder engine, FullStory the other named vendor,
+    // `sessionRecording` / `recorder` posthog's controller, API and lazy-loader script name).
+    { value: "rrweb", label: "an rrweb session-replay reference" },
+    { value: "fullstory", label: "a FullStory session-replay reference" },
+    { value: "sessionrecording", label: "a session-recording API reference" },
+    { value: "recorder", label: "a session-recorder reference" },
   ];
   if (!SENTRY_ALLOWED_APPS.has(appName)) {
     // An earlier review round flagged Sentry; it has since been removed from Beacon, but
@@ -643,9 +683,9 @@ function verifyArchivedZipBundle(archivePath, markers) {
   verifyArchivedManifest(archivePath);
 }
 
-function extractSourceMapsOrExit(s, appPath, archivePath) {
+function extractSourceMapsOrExit(s, appPath, archivePath, channel) {
   try {
-    return extractSourceMapsToPrivateZip(appPath, archivePath);
+    return extractSourceMapsToPrivateZip(appPath, archivePath, { strict: channel !== "development" });
   } catch (err) {
     s.stop(color.red("Source map extraction failed"));
     p.log.error(err instanceof Error ? err.message : String(err));
@@ -720,7 +760,8 @@ async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
   const sourceMapArchivePath = extractSourceMapsOrExit(
     s,
     appPath,
-    resolve(outDir, `${archiveBaseName}.sourcemaps.zip`)
+    resolve(outDir, `${archiveBaseName}.sourcemaps.zip`),
+    channel
   );
 
   s.message(`${progressBar(STEPS[3].pct)}  ${STEPS[3].label}…`);

@@ -11,6 +11,19 @@
  * 3. React's production error-decoder URL (`https://react.dev/errors/`) — never fetched, but the only
  *    third-party `https://` literal left in the bundle; dropped so an external-endpoint grep shows
  *    exactly the endpoints the CSP allowlists.
+ * 4. posthog-js request URLs that carry the project token in the query string (`?token=<key>`) —
+ *    flagged by App Review Preflight as "Credential in URL" (2026-08-19). The value is PostHog's
+ *    public, write-only project key, but the Marketplace rule is shape-based: no credential may
+ *    travel in a URL, and the reviewer tooling greps the bundle for exactly that shape.
+ * 5. posthog-js session-replay references — flagged by App Review Preflight as "Fingerprinting &
+ *    Session Replay" (2026-08-19; evidence: the `rrweb` / `initSessionRecording` / "could not load
+ *    recorder" text of posthog's session-recording controller). No rule in this file rewrites them:
+ *    the controller class, the PostHog core's recorder-instantiation seam, its public
+ *    `startSessionRecording` / `stopSessionRecording` / `sessionRecordingStarted` /
+ *    `get_session_replay_url` methods and every `rrweb` literal are excised from `dist/module.js`
+ *    by the pnpm patch (`patches/posthog-js@1.369.3.patch`). This file only guards the result
+ *    (`SESSION_REPLAY_RESIDUAL`): a posthog-js upgrade that ships a recorder again, or a regenerated
+ *    patch that forgets the excision, fails the release build instead of shipping.
  *
  * Every replacement below targets a code path that is dead inside the extension iframe, so runtime
  * behavior is unchanged:
@@ -29,18 +42,31 @@
  * - posthog-js `internal_or_test_user_hostname` config default: marks events from local hosts as
  *   internal test traffic. The extension origin is never a local host in shipped builds.
  * - posthog-js `forceAllowLocalhost` identifiers (`__forceAllowLocalhost` on the deprecated
- *   `webPerformance` shim and `_forceAllowLocalhostNetworkCapture` on the session-recording
- *   controller): debug escape hatches that let session-recording network capture run against a
- *   local host. Session recording is hard-disabled in Beacon, and both properties default to
- *   `false`. Renaming the identifier is behavior-preserving because every read, write and the one
- *   deprecation message that names the property are renamed together inside the same module — the
- *   only surface lost is an undocumented `posthog.sessionRecording._forceAllowLocalhost…` poke
- *   from app code, which Beacon never does.
+ *   `webPerformance` shim; the session-recording controller that carried the matching
+ *   `_forceAllowLocalhostNetworkCapture` is excised by the pnpm patch, see 5. above): a debug
+ *   escape hatch that let session-recording network capture run against a local host. The
+ *   property defaults to `false` and nothing reads it once the recorder is gone. Renaming the
+ *   identifier is behavior-preserving because every read and write is renamed together inside the
+ *   same module.
  * - posthog-js Sentry integration (`SentryIntegration` / `sentryIntegration` on the PostHog
  *   instance, the `https://sentry.io/organizations/` display-URL template, and the `$sentry_*`
  *   event properties): reachable only by calling `posthog.sentryIntegration()` / constructing
  *   `posthog.SentryIntegration`, which Beacon never does. Dropping the instance-property
  *   assignments also lets Rollup tree-shake the integration class itself.
+ * - posthog-js token-in-query request URLs (`/api/early_access_features/`, `/api/product_tours/`,
+ *   `/api/surveys/`, `/i/v1/logs`): the `?token=<project key>` suffix is compiled out, leaving the
+ *   bare endpoint path. Every one of these paths is unreachable in the extension builds:
+ *   - early-access features: only `posthog.getEarlyAccessFeatures()` reaches it — never called by
+ *     app code, and `advanced_disable_feature_flags` is pinned on;
+ *   - product tours: needs the `generateProductTours` extension script, which
+ *     `disable_external_dependency_loading` never loads, plus `disable_product_tours`;
+ *   - surveys: `disable_surveys: true` makes `getSurveys` return before any request;
+ *   - logs: only `posthog.captureLog()` / `posthog.logger` reach it — never called — and the logs
+ *     extension script is likewise never loaded.
+ *   Should a future caller reach one of them anyway, the request goes out without a token and
+ *   PostHog rejects it — it fails closed instead of leaking the key into a query string. Event
+ *   ingestion (`/e/`) and flag evaluation (`/flags/`) already carry the token in the POST body and
+ *   are untouched.
  * - posthog-js bot-detection UA list entry `"sentryuptimebot"`: removed. The list is scanned with
  *   a substring match over independent entries, so dropping one entry only stops detecting that
  *   one crawler — every other entry keeps working. Sentry's uptime bot cannot reach this code at
@@ -70,6 +96,30 @@ const SENTRY_RESIDUAL = {
 const REACT_ERROR_DECODER_RESIDUAL = {
   label: "react.dev error-decoder URL",
   pattern: /react\.dev/i,
+};
+/**
+ * A credential-shaped query parameter. Matches only the URL form (`?token=` / `&token=`), never the
+ * request-body assignment `token=this.config.token` that event capture legitimately uses.
+ */
+const CREDENTIAL_IN_QUERY_RESIDUAL = {
+  label: "credential-in-query-string URL",
+  pattern: /[?&]token=/i,
+};
+/**
+ * Session-replay / recorder references (App Review Preflight: "Fingerprinting & Session Replay").
+ * `rrweb` is posthog's recorder engine; `fullstory` is the other named-prohibited replay vendor;
+ * `recorder` / `replay` / `recording` cover posthog's own controller, its lazy-loader script name
+ * (`lazy-recorder`), its public API (`startSessionRecording`, `get_session_replay_url`), log text
+ * and the recorder's config defaults / persistence keys (`disable_session_recording`,
+ * `session_recording`, `enable_recording_console_log`, `$session_recording_*`). The excision itself
+ * lives in the pnpm patch — this guard only proves it held for the installed vendor module. It is
+ * scoped to posthog-js: first-party code keeps `disable_session_recording: true` pinned in
+ * `CODALYN_EXTENSION_POSTHOG_PRIVACY_OPTIONS` (defence in depth) and the privacy disclosure names
+ * "session recordings" as never collected — neither is a recorder reference.
+ */
+const SESSION_REPLAY_RESIDUAL = {
+  label: "session-replay reference",
+  pattern: /rrweb|fullstory|recorder|replay|recording/i,
 };
 
 /**
@@ -120,9 +170,9 @@ const RULES = [
     replaceWith: "?void 0:void 0",
   },
   {
-    // Covers `__forceAllowLocalhost` (deprecated webPerformance shim) and
-    // `_forceAllowLocalhostNetworkCapture` (session-recording controller) plus the deprecation
-    // message that names the latter, in one consistent module-local rename.
+    // Covers `__forceAllowLocalhost` on the deprecated webPerformance shim in one consistent
+    // module-local rename (the session-recording controller's `_forceAllowLocalhostNetworkCapture`
+    // and the deprecation message naming it no longer exist — excised by the pnpm patch).
     name: "posthog-js forceAllowLocalhost identifiers",
     idIncludes: "posthog-js/dist/",
     find: /forceAllowLocalhost/g,
@@ -152,6 +202,31 @@ const RULES = [
     find: '"sentryuptimebot",',
     replaceWith: "",
   },
+  {
+    // `s` is the minified `"&stage=…"` suffix (or ""); keep the stage filter, drop only the token.
+    name: "posthog-js early-access-features token-in-query URL",
+    idIncludes: "posthog-js/dist/",
+    find: '"/api/early_access_features/?token="+this.Rt.token+s)',
+    replaceWith: '"/api/early_access_features/"+(s?"?"+s.slice(1):""))',
+  },
+  {
+    name: "posthog-js product-tours token-in-query URL",
+    idIncludes: "posthog-js/dist/",
+    find: '"/api/product_tours/?token="+this._instance.config.token)',
+    replaceWith: '"/api/product_tours/")',
+  },
+  {
+    name: "posthog-js surveys token-in-query URL",
+    idIncludes: "posthog-js/dist/",
+    find: '"/api/surveys/?token="+this.Rt.token)',
+    replaceWith: '"/api/surveys/")',
+  },
+  {
+    name: "posthog-js logs token-in-query URL",
+    idIncludes: "posthog-js/dist/",
+    find: 'endpointFor("api","/i/v1/logs")+"?token="+encodeURIComponent(this._instance.config.token)',
+    replaceWith: 'endpointFor("api","/i/v1/logs")',
+  },
 ];
 
 /** Modules audited above, with the residual patterns that must not survive the replacements. */
@@ -159,7 +234,10 @@ const WATCHED_MODULES = [
   { idIncludes: "react-dom/cjs/react-dom", residuals: [REACT_ERROR_DECODER_RESIDUAL] },
   { idIncludes: "react-router/dist/", residuals: [DEV_HOST_RESIDUAL] },
   { idIncludes: "better-auth/dist/utils/url", residuals: [DEV_HOST_RESIDUAL] },
-  { idIncludes: "posthog-js/dist/", residuals: [DEV_HOST_RESIDUAL, SENTRY_RESIDUAL] },
+  {
+    idIncludes: "posthog-js/dist/",
+    residuals: [DEV_HOST_RESIDUAL, SENTRY_RESIDUAL, CREDENTIAL_IN_QUERY_RESIDUAL, SESSION_REPLAY_RESIDUAL],
+  },
 ];
 
 function applyRule(code, rule) {
@@ -196,6 +274,45 @@ function assertNoResiduals(code, id, residuals) {
         `re-audit and update scripts/vite-strip-dev-host-literals.mjs. Context: …${context}…`
     );
   }
+}
+
+/**
+ * Applies the same vendor rewrites to a source map's embedded `sourcesContent`. Vite embeds the
+ * *loaded* module text in each map, so without this the private source-map artifact (submission
+ * form upload, see scripts/build-cli.mjs) would still carry every literal the transform compiled out
+ * of the bundle — the token-in-query URLs included. Rewriting `sourcesContent` to the post-transform
+ * text makes the map describe the code that was actually bundled. Positions are untouched (the
+ * transform never emitted a map of its own). Returns a new map object; non-watched sources and maps
+ * without `sourcesContent` pass through unchanged.
+ *
+ * @param {{ sources?: string[]; sourcesContent?: (string | null)[] }} map parsed source map JSON
+ * @param {{ strict?: boolean }} [options] as for the plugin; strict fails on a residual literal.
+ */
+export function rewriteSourceMapVendorContent(map, options = {}) {
+  const strict = options.strict !== false;
+  if (!Array.isArray(map?.sources) || !Array.isArray(map.sourcesContent)) {
+    return map;
+  }
+  const sourcesContent = map.sourcesContent.map((content, index) => {
+    const id = map.sources[index] ?? "";
+    if (typeof content !== "string") {
+      return content;
+    }
+    const watched = WATCHED_MODULES.filter((module) => id.includes(module.idIncludes));
+    if (watched.length === 0) {
+      return content;
+    }
+    const next = applyRules(content, id);
+    if (strict) {
+      assertNoResiduals(
+        next,
+        `${id} (source map sourcesContent)`,
+        watched.flatMap((module) => module.residuals)
+      );
+    }
+    return next;
+  });
+  return { ...map, sourcesContent };
 }
 
 /**

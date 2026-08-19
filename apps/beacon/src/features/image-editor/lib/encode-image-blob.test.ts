@@ -17,14 +17,13 @@ vi.mock("@/shared/lib/tower-client", () => ({
   towerFetch: (path: string, init?: RequestInit) => mockTowerFetch(path, init),
 }));
 
-function stubCanvasWithWebpBlob(): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
-  canvas.width = 2;
-  canvas.height = 2;
-  vi.spyOn(canvas, "toBlob").mockImplementation((cb: (b: Blob | null) => void) => {
-    cb(new Blob([new Uint8Array([0x52, 0x49])], { type: "image/webp" }));
-  });
-  return canvas;
+function stubCanvasWithWebpBlob(): OffscreenCanvas {
+  // jsdom has no OffscreenCanvas; the encoder only needs `convertToBlob`.
+  return {
+    width: 2,
+    height: 2,
+    convertToBlob: vi.fn(async () => new Blob([new Uint8Array([0x52, 0x49])], { type: "image/webp" })),
+  } as unknown as OffscreenCanvas;
 }
 
 describe("encodeCanvasToOptimizedFile", () => {

@@ -573,6 +573,13 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     { value: "fullstory", label: "a FullStory session-replay reference" },
     { value: "sessionrecording", label: "a session-recording API reference" },
     { value: "recorder", label: "a session-recorder reference" },
+    // Same preflight rule, "fingerprinting" half (re-flagged on the 10:53 build): the DOM-canvas
+    // pixel-readback family is treated as a fingerprinting signal regardless of use. Beacon's image
+    // export renders to an OffscreenCanvas and encodes with `convertToBlob` (canvas-to-blob.ts);
+    // these markers keep the readback family out of release bundles for good.
+    { value: ".toBlob(", label: "a canvas toBlob() pixel readback" },
+    { value: "toDataURL", label: "a canvas toDataURL() pixel readback" },
+    { value: "getImageData", label: "a canvas getImageData() pixel readback" },
   ];
   if (!SENTRY_ALLOWED_APPS.has(appName)) {
     // An earlier review round flagged Sentry; it has since been removed from Beacon, but

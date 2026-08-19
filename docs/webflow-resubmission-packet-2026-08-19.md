@@ -10,10 +10,12 @@ Partner-facing resubmission note for the two App Review Preflight blockers issue
   (`apps/tower`, `https://tower.codalyn.app`). Hybrid (Designer Extension + Data Client OAuth).
 - Findings issued by: App Review Preflight (Webflow-controlled scan), run against
   `v0.1.0_public_08-19_10-31-14.zip` (sha256 `f4a20169…2cd90`).
-- Corrected artifact: `apps/beacon/bundle/production/public/v0.1.0_public_08-19_10-53-26.zip`
-  sha256 `eb963a9dc2efe50f41c88ef3bfea44b232684e4075807d1e77d84231b902ae79` (25 entries, 1.89 MB),
-  private source maps `v0.1.0_public_08-19_10-53-26.sourcemaps.zip` sha256
-  `18b43b876b6236f8890ad025d27c530b9f0138584531cd3dedf2f52937de3b20` (submission-form field only).
+- Corrected artifact: `apps/beacon/bundle/production/public/v0.1.0_public_08-19_12-13-38.zip`
+  sha256 `2e9fd8db1698e567ba13a939a9ed43f22643a33e8da70afc5ed138c1a7dc4af1` (25 entries, 1.89 MB),
+  private source maps `v0.1.0_public_08-19_12-13-38.sourcemaps.zip` sha256
+  `362eeeef5f26b8d4751f6e42865c84a7b62470bc19f55c7561fba07926565ec4` (submission-form field only).
+  (Intermediate build `v0.1.0_public_08-19_10-53-26.zip`, sha256 `eb963a9d…2ae79`, was scanned: the
+  session-replay evidence was gone; one `canvas.toBlob` location remained — resolved below.)
 - Build command: `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod` (lint + typecheck +
   unit tests + Vite build + forbidden-marker gate on dist and archived zip + source-map rewrite).
 - Source revision: working tree on `main` after `124dbea` (uncommitted at time of writing — commit
@@ -25,7 +27,7 @@ Partner-facing resubmission note for the two App Review Preflight blockers issue
 | Finding (verbatim) | Issued priority | Provenance | Acceptance criterion | Evidence state |
 | --- | --- | --- | --- | --- |
 | Credential in URL — `?token=` in `assets/init-observability-*.js` (3 locations) | Blocker | issued finding + published requirement (Marketplace Guidelines: credentials never in URLs) | "Move the credential out of the URL (header or protected body)" | artifact-verified |
-| Fingerprinting & Session Replay — `assets/init-observability-*.js:1` (rrweb / session recording), `bundle.js:85` ×2 (`canvas.toBlob`) | Blocker | issued finding + published requirement (Marketplace Guidelines: no session replay / fingerprinting) | As issued: "Update the implementation, upload a revision, and use the next scan to confirm" (no finer criterion supplied) | artifact-verified; one `toBlob` site remains — **open decision** (see below) |
+| Fingerprinting & Session Replay — `assets/init-observability-*.js:1` (rrweb / session recording), `bundle.js:85` ×2 (`canvas.toBlob`); re-scan on 10:53 build: `bundle.js:85` ×1 (`canvas.toBlob`) | Blocker | issued finding + published requirement (Marketplace Guidelines: no session replay / fingerprinting) | As issued: "Update the implementation, upload a revision, and use the next scan to confirm" (no finer criterion supplied) | artifact-verified (12:13 build not yet re-scanned) |
 
 ## Per-finding disposition
 
@@ -50,47 +52,52 @@ Partner-facing resubmission note for the two App Review Preflight blockers issue
 1. **Disposition** — Session replay: resolved — the posthog-js session-recording controller (the code
    that references `rrweb` and lazy-loads the recorder) is excised from the shipped module, together with
    the SDK's recorder-instantiation seam and public replay API; the capability is absent, not merely
-   disabled. Fingerprinting: no fingerprinting exists; the two `canvas.toBlob` evidence sites are the
-   image editor's export encoder and are now one shared call site.
+   disabled. The re-scan on the 10:53 build no longer listed the observability chunk (evidence from the
+   Webflow-controlled run, not acceptance). Fingerprinting: no fingerprinting exists; the `canvas.toBlob`
+   evidence was the image editor's export encoder. Because the re-scan still flagged the single remaining
+   `toBlob`, the export path now renders to an `OffscreenCanvas` and encodes with
+   `OffscreenCanvas.convertToBlob` — no DOM canvas element, no `toBlob`/`toDataURL`/`getImageData` in the
+   bundle — same capability and the same consent boundaries, disclosed on the helper and here.
 2. **Change** — `patches/posthog-js@1.369.3.patch` (pnpm `patchedDependencies`; removes the default
    `sessionRecording` extension class, `__extensionClasses.sessionRecording` wiring,
    `startSessionRecording` / `stopSessionRecording` / `sessionRecordingStarted` / `get_session_replay_url`,
    the `__rrweb_original__` console indirection, and the recorder's config defaults / persistence keys);
    `scripts/vite-strip-dev-host-literals.mjs` (`session-replay reference` residual guard on posthog-js);
-   `scripts/build-cli.mjs` (`rrweb` / `fullstory` / `sessionrecording` / `recorder` forbidden markers);
-   `apps/beacon/src/features/image-editor/lib/canvas-to-blob.ts` (single `canvasToBlob` helper used by
-   `encode-image-blob.ts` and `export-preview-encode.ts`); `packages/observability/src/index.ts`
-   (`disable_session_recording: true` kept, documented as defence in depth).
-3. **Verification** — release-gate suite 44/44 (installed module has 0 `rrweb|fullstory|recorder|replay|recording`
-   references and none of the removed methods; five synthetic re-introductions each fail the build; forbidden
-   marker catches `rrweb` / `FullStory` / `sessionRecording` / `lazy-recorder`);
-   `canvas-to-blob.test.ts` + `encode-image-blob.test.ts` 10/10; `@codalyn/observability` 18/18;
-   Beacon `tsc --noEmit` clean; full `build:prod` pipeline green. Behavioural equivalence of the patched SDK
+   `scripts/build-cli.mjs` (`rrweb` / `fullstory` / `sessionrecording` / `recorder` and `.toBlob(` /
+   `toDataURL` / `getImageData` forbidden markers);
+   `apps/beacon/src/features/image-editor/lib/crop-image.ts` (`renderCroppedRegionToCanvas` → `OffscreenCanvas`,
+   explicit support guard), `apps/beacon/src/features/image-editor/lib/canvas-to-blob.ts` (single
+   `canvasToBlob` via `convertToBlob`, used by `encode-image-blob.ts` and `export-preview-encode.ts`);
+   `packages/observability/src/index.ts` (`disable_session_recording: true` kept, documented as defence
+   in depth).
+3. **Verification** — release-gate suite 45/45 (installed posthog module has 0
+   `rrweb|fullstory|recorder|replay|recording` references and none of the removed methods; synthetic
+   re-introductions each fail the build; forbidden markers catch `rrweb` / `FullStory` / `sessionRecording`
+   / `lazy-recorder` / `.toBlob(` / `toDataURL` / `getImageData` and allow `convertToBlob`);
+   `canvas-to-blob.test.ts` 3/3 + `encode-image-blob.test.ts` 8/8; `@codalyn/observability` 18/18; Beacon
+   `tsc --noEmit` clean; full `build:prod` pipeline green. Behavioural equivalence of the patched SDK
    checked with an AST parse (acorn) and a jsdom smoke run using Beacon's exact init options — identical
    request pattern before/after, `posthog.sessionRecording === undefined` after.
-4. **Artifact evidence** — zip JS (case-insensitive): `rrweb` 0, `fullstory` 0, `sessionrecording` 0,
-   `recorder` 0, `toDataURL` 0, `getImageData` 0, `toBlob` 1, `replay` 1 (React DOM `$$reactFormReplay` —
-   form-action replay, unrelated), `recording` 3 (the pinned `disable_session_recording:!0` option and two
+4. **Artifact evidence (12:13 build)** — zip JS (case-insensitive): `rrweb` 0, `fullstory` 0,
+   `sessionrecording` 0, `recorder` 0, `toDataURL` 0, `getImageData` 0, DOM `createElement("canvas")` 0,
+   `OffscreenCanvas` 3, `convertToBlob` 1, `replay` 1 (React DOM `$$reactFormReplay` — form-action
+   replay, unrelated), `recording` 3 (the pinned `disable_session_recording:!0` option and two
    Settings → Privacy disclosure sentences stating session recordings are never collected). Source maps:
-   `rrweb` / `lazy-recorder` / `sessionRecording` 0 hits.
-5. **Limitations / open decision** — One `canvas.toBlob` call remains. It is the image editor's export
-   step (WebP/PNG encode of the user's own cropped asset). It is not fingerprinting: nothing is read back
-   from a canvas for identification (no `getImageData` / `toDataURL` anywhere in the bundle), no device
-   signals (`hardwareConcurrency`, `deviceMemory`, `plugins`, WebGL renderer, AudioContext) are read, and the
-   encoded bytes leave the Designer only through user-initiated flows (Webflow asset upload, or Codalyn
-   Tower after an explicit, revocable AVIF opt-in — see § R7.6). The encoder API was deliberately not
-   swapped (e.g. to `OffscreenCanvas.convertToBlob`) since that would change the keyword, not the
-   capability. Whether a canvas export encoder is acceptable under "fingerprinting" is a reviewer
-   judgment; this note is the requested rationale.
+   `rrweb` / `lazy-recorder` / `sessionRecording` / `?token=` 0 hits.
+5. **Limitations** — `convertToBlob` is the one encoder left; in-browser image export cannot exist without
+   it (the only alternatives read pixels back, which is worse, or send bytes to a server, which the
+   privacy model forbids without opt-in). A plain-substring `toBlob` scan would still match inside
+   `convertToBlob`; a word-bounded or `.toBlob(` scan would not. If the next scan names it, the rationale
+   above is the answer. Browser floor for the offscreen path: Chrome 69+, Firefox 105+, Safari 16.4+.
 
 ## Verification receipts (six states, reported separately)
 
 | State | Evidence | Result |
 | --- | --- | --- |
-| Source verified | Files above; `release-build-gates.test.mjs` 44/44; image-editor tests 10/10; observability 18/18; `tsc` clean | ✓ |
-| Artifact verified | `v0.1.0_public_08-19_10-53-26.zip` sha256 `eb963a9d…2ae79`; playbook A4 checks: 0 `.map`, 0 `sourceMappingURL`, 0 `[?&]token=`, 0 `localhost|ngrok|sentry`, 0 rrweb/recorder; `webflow.json` = `{name: beacon, publicDir: dist, size: comfortable, apiVersion: "2"}`, no telemetry block; sourcemaps zip 0 hits | ✓ |
+| Source verified | Files above; `release-build-gates.test.mjs` 45/45; image-editor tests 11/11; observability 18/18; `tsc` clean | ✓ |
+| Artifact verified | `v0.1.0_public_08-19_12-13-38.zip` sha256 `2e9fd8db…4af1`; playbook A4 checks: 0 `.map`, 0 `sourceMappingURL`, 0 `[?&]token=`, 0 `localhost|ngrok|sentry`, 0 rrweb/recorder, 0 toDataURL/getImageData; `webflow.json` = `{name: beacon, publicDir: dist, size: comfortable, apiVersion: "2"}`, no telemetry block; sourcemaps zip 0 hits | ✓ |
 | Installed revision verified | — | ✗ not yet installed on the `.webflow.io` test site |
-| Runtime observed | n/a for both findings (no runtime behaviour change; recorder was never loaded; paths unreachable). App Review Preflight re-scan on the corrected zip + sourcemaps not yet run | ✗ |
+| Runtime observed | n/a for both findings (no runtime behaviour change; recorder was never loaded; paths unreachable). App Review Preflight re-scan of the 10:53 build: Credential in URL gone, session-replay evidence gone, 1 `toBlob` location remained (now removed). 12:13 build not yet scanned | ✗ |
 | Submitted | — | ✗ |
 | Reviewer accepted | — | ✗ |
 
@@ -98,17 +105,17 @@ Partner-facing resubmission note for the two App Review Preflight blockers issue
 
 1. Commit source + docs (artifact ↔ commit traceability), then deploy Tower with migration `0036`
    applied and `TOWER_TOKEN_ENCRYPTION_KEY` confirmed in Production (carried over from § R7b).
-2. Install `v0.1.0_public_08-19_10-53-26.zip` on the published `.webflow.io` test site via the version
+2. Install `v0.1.0_public_08-19_12-13-38.zip` on the published `.webflow.io` test site via the version
    manager; confirm reviewer credentials and demo data.
-3. Run **App Review Preflight** on that exact zip **and** `v0.1.0_public_08-19_10-53-26.sourcemaps.zip`;
-   confirm "Credential in URL" is gone and whether "Fingerprinting & Session Replay" still names the single
-   `toBlob` site (if so, include the rationale above in the submission notes); record the `wfpre_…` receipt.
+3. Run **App Review Preflight** on that exact zip **and** `v0.1.0_public_08-19_12-13-38.sourcemaps.zip`;
+   confirm both findings are gone (if "Fingerprinting" still names `convertToBlob`, include the rationale
+   above in the submission notes); record the `wfpre_…` receipt.
 4. Submit at <https://developers.webflow.com/submit> (App Update, new bundle, source-map upload,
    `wfpre_…` receipt, notes incl. AVIF disclosure).
 
 ## Verdict
 
 **NOT READY TO RESUBMIT** — source and artifact evidence complete for both blockers; missing: installed
-revision on the test site, App Review Preflight re-scan receipt (`wfpre_…`), Tower production deploy
-(migration 0036 + key), and the reviewer judgment on the single remaining canvas export encoder. This
-verdict describes partner readiness only, not a Webflow decision.
+revision on the test site, App Review Preflight re-scan of the 12:13 build + receipt (`wfpre_…`), and the
+Tower production deploy (migration 0036 + key). This verdict describes partner readiness only, not a
+Webflow decision.

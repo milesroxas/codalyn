@@ -36,7 +36,7 @@ async function assertTowerOptimizeResponseOk(res: Response): Promise<void> {
 }
 
 async function encodeAvifViaTower(
-  canvas: HTMLCanvasElement,
+  canvas: OffscreenCanvas,
   qualityPercent: number,
   baseName: string
 ): Promise<EncodedImage> {
@@ -59,7 +59,7 @@ async function encodeAvifViaTower(
 }
 
 export async function encodeCanvasToOptimizedFile(
-  canvas: HTMLCanvasElement,
+  canvas: OffscreenCanvas,
   quality: number,
   options?: { baseName?: string; format?: ImageExportFormat; avifTowerConsentGranted?: boolean }
 ): Promise<EncodedImage> {

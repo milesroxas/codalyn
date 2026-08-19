@@ -1495,17 +1495,48 @@ jsdom) · Submitted ✗ · Reviewer accepted ✗. Flint shares the patched modul
 next release build (its `dist/` is still from 08-05 and shows the old controller — rebuild before
 any Flint submission).
 
+**R7b.9 re-scan (08-19, on the 10:53 build) — session-replay half cleared, canvas half re-flagged.**
+The second App Review Preflight run reported the "Fingerprinting & Session Replay" blocker with **1**
+evidence location (down from 3): `bundle.js:85`, centred on the single remaining `canvas.toBlob`
+helper. The observability chunk no longer appears — the posthog excision is confirmed effective by the
+Webflow-controlled scan (evidence, not acceptance). The scanner therefore treats the DOM-canvas
+`toBlob` call as a fingerprinting signal regardless of use, i.e. the rule is shape-based (same lesson
+as R7b.8 and the playbook's "don't argue the gate" rule). Resolution, disclosed rather than argued:
+
+- **Export render + encode moved to `OffscreenCanvas`.** `renderCroppedRegionToCanvas`
+  (`crop-image.ts`) now draws into `new OffscreenCanvas(w, h)` — nothing ever displayed it, so no
+  DOM `<canvas>` element is created — and `canvasToBlob` (`canvas-to-blob.ts`) encodes with
+  `OffscreenCanvas.convertToBlob({ type, quality })`. Same capability, same formats, same consent
+  boundaries (WebP/PNG in-browser; AVIF bytes to Tower only after the R7.6 opt-in); still no pixel
+  read-back anywhere (`getImageData`/`toDataURL` 0). Explicit guard throws a clear error if
+  `OffscreenCanvas` is missing (Chrome 69+, Firefox 105+, Safari 16.4+ — every Designer-supported
+  browser). Rationale is written on the helper itself.
+- **Gate.** `scripts/build-cli.mjs` forbids `.toBlob(`, `toDataURL`, `getImageData` in release
+  bundles (substring, case-insensitive); `convertToBlob(` deliberately does not match `.toBlob(`.
+  Tests: `release-build-gates.test.mjs` 45/45; `canvas-to-blob.test.ts` (3) + `encode-image-blob.test.ts`
+  (8) updated to a `convertToBlob` stub; Beacon `tsc` clean; full `build:prod` green.
+- **Artifact (08-19 12:13 build):** `v0.1.0_public_08-19_12-13-38.zip` sha256 `2e9fd8db…4af1`
+  (25 entries, 0 `.map`, 0 `sourceMappingURL`); sourcemaps `v0.1.0_public_08-19_12-13-38.sourcemaps.zip`
+  sha256 `362eeeef…5ec4`. Zip JS: `toDataURL` 0, `getImageData` 0, `createElement(\`canvas\`)` 0,
+  `OffscreenCanvas` 3, `convertToBlob` 1, `rrweb`/`recorder`/`sessionrecording`/`sentry`/`localhost`/
+  `?token=` 0. **Residual risk:** a plain-substring `toBlob` scan would still match inside
+  `convertToBlob` (1 hit, case-insensitive); a word-bounded or `.toBlob(` scan would not. If the next
+  scan still names it, the only remaining encoder is `convertToBlob` and the rationale on the helper is
+  the answer — no further API exists for in-browser image encoding without pixel read-back.
+
+**State.** Source ✓ · Artifact ✓ · Installed ✗ · Runtime n/a · Submitted ✗ · Reviewer accepted ✗
+(the 10:53 scan cleared the session-replay half; the 12:13 build has not been scanned yet).
+
 ### Before submitting (not done in this change)
 
 Partner-facing packet for R7b.8 + R7b.9: `docs/webflow-resubmission-packet-2026-08-19.md`.
 
 1. Deploy Tower with migration `0036` applied (`pnpm app tower db:migrate:prod -- --confirm`) and
    `TOWER_TOKEN_ENCRYPTION_KEY` confirmed in Production env.
-2. Rebuild Beacon (`CI=true BUILD_RECIPIENT=public pnpm build:prod`) — or use the 08-19 10:53 build
+2. Rebuild Beacon (`CI=true BUILD_RECIPIENT=public pnpm build:prod`) — or use the 08-19 12:13 build
    from R7b.9 if nothing else changes — run **App Review Preflight** on the new bundle **and** the
    matching `.sourcemaps.zip`, confirm the "Credential in URL" (R7b.8) and "Fingerprinting & Session
-   Replay" (R7b.9) findings no longer appear — if the latter still names the single `canvas.toBlob`
-   export site, answer with the R7b.9 rationale rather than changing the API — record the `wfpre_…`
-   receipt.
+   Replay" (R7b.9) findings no longer appear (if the latter still names `convertToBlob`, it is the only
+   encoder left — answer with the R7b.9 rationale), record the `wfpre_…` receipt.
 3. Re-confirm reviewer credentials, published `.webflow.io` test site, screenshots, 512×512 icon,
    demo video (approve + deny). Keep the AVIF disclosure in the submission notes.

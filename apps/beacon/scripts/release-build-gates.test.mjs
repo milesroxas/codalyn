@@ -211,6 +211,14 @@ describe("matchForbiddenMarker", () => {
     ).toBeNull();
   });
 
+  it("catches the DOM-canvas pixel-readback family the preflight scanner treats as fingerprinting", () => {
+    expect(matchForbiddenMarker("e.toBlob(e=>r(e),t,n)", forbidden)?.value).toBe(".toBlob(");
+    expect(matchForbiddenMarker("c.toDataURL('image/png')", forbidden)?.value).toBe("toDataURL");
+    expect(matchForbiddenMarker("ctx.getImageData(0,0,w,h)", forbidden)?.value).toBe("getImageData");
+    // The offscreen encode path Beacon uses is allowed.
+    expect(matchForbiddenMarker("await canvas.convertToBlob({type:t,quality:q})", forbidden)).toBeNull();
+  });
+
   it("catches a sourceMappingURL comment — a map reference must never ship in the bundle", () => {
     expect(matchForbiddenMarker("//# sourceMappingURL=bundle.js.map", forbidden)?.value).toBe("sourceMappingURL");
   });

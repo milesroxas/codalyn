@@ -284,7 +284,6 @@ export const auth = betterAuth({
     },
   },
   plugins: [
-    nextCookies(),
     bearer(),
     /**
      * Single-use session handoff for the Beacon Designer extension: Beacon authenticates Tower with
@@ -308,5 +307,7 @@ export const auth = betterAuth({
         product_admin: adminAc,
       },
     }),
+    // Must be last: forwards Set-Cookie from every plugin's `hooks.after` to the Next cookie store.
+    nextCookies(),
   ],
 });

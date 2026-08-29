@@ -1,15 +1,28 @@
 import config from "@payload-config";
+import { unstable_cache } from "next/cache";
 import { getPayload } from "payload";
 import { cache } from "react";
 
 import { resolveHeaderNavItems } from "@/features/marketing/cms/lib/resolve-header-nav";
 import { resolveTowerPublicMarketingHref } from "@/server/tower-hosts";
+import { CMS_CACHE_REVALIDATE_SECONDS, CMS_HEADER_CACHE_TAG } from "@/shared/lib/cms/cache-tags";
 import type { TowerPublicNavItem, TowerPublicNavLink } from "@/shared/lib/navigation/tower-public-nav";
 
-const findHeaderGlobal = cache(async () => {
-  const payload = await getPayload({ config });
-  return payload.findGlobal({ slug: "header", depth: 1, overrideAccess: false });
-});
+/**
+ * Header global read, cached in the Next.js Data Cache and purged by the
+ * Payload `header` afterChange hook. Anonymous marketing traffic (including
+ * uptime pings) therefore never opens a database connection — see cache-tags.
+ */
+const findHeaderGlobalCached = unstable_cache(
+  async () => {
+    const payload = await getPayload({ config });
+    return payload.findGlobal({ slug: "header", depth: 1, overrideAccess: false });
+  },
+  ["cms-header-global"],
+  { tags: [CMS_HEADER_CACHE_TAG], revalidate: CMS_CACHE_REVALIDATE_SECONDS }
+);
+
+const findHeaderGlobal = cache(findHeaderGlobalCached);
 
 function toHostAwareLink(link: TowerPublicNavLink, hostname: string): TowerPublicNavLink {
   return { ...link, href: toHostAwareHref(link.href, hostname) };

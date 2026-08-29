@@ -1,5 +1,6 @@
 import type { GlobalConfig } from "payload";
 import { linkGroup } from "../fields/link";
+import { revalidateCmsHeaderAfterChange } from "../hooks/revalidate-cms-cache";
 
 /**
  * Site header: logo, top-level navigation (plain links or one-level
@@ -15,6 +16,10 @@ export const Header: GlobalConfig = {
   access: {
     read: () => true,
     update: ({ req }) => Boolean(req.user),
+  },
+  hooks: {
+    // Purge the cached header read (see shared/lib/cms/cache-tags) so nav edits are visible immediately.
+    afterChange: [revalidateCmsHeaderAfterChange],
   },
   fields: [
     {

@@ -1,5 +1,6 @@
 import type { Access, CollectionConfig } from "payload";
 import { pageLayoutBlocks } from "../blocks";
+import { revalidateCmsPageAfterChange, revalidateCmsPageAfterDelete } from "../hooks/revalidate-cms-cache";
 
 /** Published pages are public; drafts are visible only to signed-in CMS editors. */
 const publishedOrEditor: Access = ({ req }) => {
@@ -28,6 +29,11 @@ export const Pages: CollectionConfig = {
   },
   versions: {
     drafts: true,
+  },
+  hooks: {
+    // Purge cached published reads (see shared/lib/cms/cache-tags) so publishes are visible immediately.
+    afterChange: [revalidateCmsPageAfterChange],
+    afterDelete: [revalidateCmsPageAfterDelete],
   },
   fields: [
     {

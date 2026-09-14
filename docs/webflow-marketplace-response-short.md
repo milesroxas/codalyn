@@ -2,7 +2,7 @@
 
 Condensed from [webflow-marketplace-compliance.md](webflow-marketplace-compliance.md) for the
 submission form's character-limited response field. Body below is the submittable text (round 7b,
-2026-09-14 App Review Preflight third scan: single egress point / Lexical observer). Keep the AVIF disclosure paragraph in the note too (listing copy is locked).
+2026-09-14 App Review Preflight third scan: single egress point / Lexical observer; the fourth scan on the 13:22 build returned only these two, one location each — compliance doc § R7b.13 — so this body is final). Keep the AVIF disclosure paragraph in the note too (listing copy is locked).
 
 > Note: Marketplace listing copy is locked after the initial submission, so the external-service
 > disclosure (opt-in image conversion via `tower.codalyn.app`) is carried in this submission-note

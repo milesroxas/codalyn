@@ -1908,7 +1908,7 @@ W3C 0. Manifest unchanged (4 documented keys). Gate negative proof: injecting a 
 into the real dist output fails `assertPinnedMarkerCounts` with the chokepoint named. Verified:
 biome + tsc clean (beacon), beacon **1030/1030** tests (build pipeline + standalone run), `build:prod`
 gates on dist and zip. States: Source ✓ · Artifact ✓ · Installed ✗ · Runtime n/a · Submitted ✗ ·
-Accepted ✗. Not yet re-scanned by App Review Preflight; not committed at time of writing.
+Accepted ✗. Re-scanned in R7b.13 (below); committed as `3bc7448`.
 
 Housekeeping in the same change: `BUNDLE_RETENTION` in `scripts/build-cli.mjs` prunes
 `apps/beacon/bundle/<channel>/<recipient>/` after every build — newest 2 stay, builds named in any
@@ -1916,3 +1916,25 @@ Housekeeping in the same change: `BUNDLE_RETENTION` in `scripts/build-cli.mjs` p
 08-18 / 08-19 / 09-14 public builds and removed 18 unreferenced intermediates (39 MB → 20 MB). The
 zip names + sha256s in this document are what keep an artifact; write them before the next build.
 
+### R7b.13 Fourth scan — the 09-14 13:22 build returns exactly the predicted residue (App Review Preflight 2026-09-14)
+
+Scan target: `v0.1.0_public_09-14_13-22-03.zip` (sha256 `0216deb1…cea6e`) + `.sourcemaps.zip`
+(`0392975d…c4fcb`) — confirmed by the evidence path `assets/label-Dl28TKRk.js`, a chunk name that
+exists only in this artifact. Two findings, both `REQUIRED`, **one evidence location each**, no
+IDs, generic next-move text.
+
+| Finding (verbatim title) | Evidence (artifact-verified) | Change from third scan | Disposition |
+| --- | --- | --- | --- |
+| External API Calls — "Review third-party data egress." | `assets/label-Dl28TKRk.js:1` — `extensionFetch` itself; the excerpt shows the destination classifier (`` `tower` `` / `` `webflow-asset-upload` `` / `null` → `Promise.reject(new EgressPolicyError)`) immediately before the platform call | 3 locations → 1 | **No further code change.** The token is the extension's single network call; the only way to clear the shape is an extension with no backend. The finding is a review prompt ("Review …"), answered in the short response with the policy + CSP. |
+| Silent Canvas Mutations — "Modifications must be user-initiated. No background loops/observers writing to canvas." | `assets/rich-text-editor-CAJW3FJ1.js:3` — Lexical's `initMutationObserver` (chunk byte-identical to the third scan) | unchanged (1) | **Open decision stands (R7b.12):** keep, answer with the rationale; fallback is the product change to a non-contenteditable CMS rich-text field. Owner Miles. |
+
+What this round proves: the R7b.12 controls did what they were built to do. The pinned inventory
+(`fetch(` = 1, `new MutationObserver(` = 1) is exactly what the scanner reports, so the residue is
+now a known, enforced set rather than a moving target. There is no honest source change left for
+either finding — the remaining options are (a) submit with the rationale, or (b) the product change
+for the editor. Obscuring either token (indirect call, renamed constructor, XHR swap) would be
+scanner evasion and is not on the table.
+
+States for the 13:22 artifact: Source ✓ · Artifact ✓ (scanned; residue = pinned inventory) ·
+Installed ✗ · Runtime n/a · Submitted ✗ · Accepted ✗. The `wfpre_` receipt from **this** run is the
+one to paste into the form, since it is the run on the artifact being submitted.

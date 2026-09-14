@@ -230,6 +230,10 @@ duplicates text for CJK users, and every contenteditable editor carries the same
 with the rationale in compliance doc § R7b.12; the fallback is a product change (non-contenteditable
 CMS rich-text field), Miles's call.
 Full write-up: compliance doc § R7b.12.
+Outcome: the fourth scan on the 13:22 build reported exactly the pinned inventory — one `fetch`
+location (`extensionFetch`, policy visible in the excerpt) and the one Lexical observer. That is
+the floor for a backend-backed extension shipping a contenteditable editor; do not chase it
+further. Submit with the short response + this run's `wfpre_` receipt (compliance doc § R7b.13).
 
 ## D. Don'ts (from the skills' anti-advice list)
 

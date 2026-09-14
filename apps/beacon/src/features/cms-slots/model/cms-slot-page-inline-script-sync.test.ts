@@ -46,6 +46,9 @@ function body<T>(init: RequestInit | undefined): T {
   return JSON.parse(String(init?.body ?? "{}")) as T;
 }
 
+/** What the last install flow actually sent: the uploaded runtime bytes and the SRI pin registered for them. */
+let captured: { source: string; integrity: string } = { source: "", integrity: "" };
+
 /** Minimal `METHOD /path` router over the Tower proxy endpoints `cms-slot-page-inline-script` calls. */
 const TOWER_ROUTES: Record<string, (init: RequestInit | undefined) => Response> = {
   [`POST /api/v2/webflow/sites/${SITE_ID}/assets`]: (init) => {
@@ -61,7 +64,12 @@ const TOWER_ROUTES: Record<string, (init: RequestInit | undefined) => Response> 
     json({ assets: [], pagination: { limit: 100, offset: 0, total: 0 } }),
   [`POST /api/v2/webflow/sites/${SITE_ID}/registered_scripts/hosted`]: (init) => {
     site.counts.register += 1;
-    const { hostedLocation, version } = body<{ hostedLocation?: string; version?: string }>(init);
+    const { hostedLocation, version, integrityHash } = body<{
+      hostedLocation?: string;
+      version?: string;
+      integrityHash?: string;
+    }>(init);
+    captured.integrity = String(integrityHash ?? "");
     const id = `reg-${site.counts.register}`;
     site.registered.push({ id, displayName: "CodalynBeaconRuntime", hostedLocation: String(hostedLocation ?? "") });
     return json({ id, version: String(version ?? "1.0.0") });
@@ -100,6 +108,7 @@ function appliedBeaconScript(): PageScript | undefined {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  captured = { source: "", integrity: "" };
   site = {
     pageScripts: [],
     registered: [],
@@ -111,9 +120,11 @@ beforeEach(() => {
   });
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string) => {
+    vi.fn(async (url: string, init?: RequestInit) => {
       if (String(url) === UPLOAD_URL) {
         site.counts.upload += 1;
+        const file = init?.body instanceof FormData ? init.body.get("file") : null;
+        captured.source = file instanceof Blob ? await file.text() : "";
         return new Response(null, { status: 204 });
       }
       return new Response(null, { status: 500 });
@@ -141,6 +152,14 @@ describe("syncCmsSlotPageInlineScript registration budget", () => {
     expect(site.counts.register).toBe(1);
     expect(site.counts.putPageCode).toBe(1);
     expect(appliedBeaconScript()?.attributes?.["data-codalyn-beacon-src-hash"]).toMatch(/^[0-9a-f]{8}$/);
+  });
+
+  it("pins the hosted runtime with a SHA-256 SRI of the exact uploaded bytes (Webflow's integrityHash format)", async () => {
+    await sync();
+    expect(captured.source.length).toBeGreaterThan(0);
+    expect(captured.integrity).toMatch(/^sha256-[A-Za-z0-9+/]{43}=$/);
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(captured.source));
+    expect(captured.integrity).toBe(`sha256-${Buffer.from(digest).toString("base64")}`);
   });
 
   it("unchanged source → zero upload and zero register calls on every later sync", async () => {

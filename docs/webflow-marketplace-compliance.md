@@ -112,7 +112,7 @@ Verified compliant as-is:
 
 - The runtime script is uploaded as a Webflow-hosted asset (Webflow CDN URL — no third-party
   hosting) and registered via `POST /sites/{siteId}/registered_scripts/hosted` with an SRI
-  `integrityHash` (SHA-384 of the exact source) and a unique semver `version` per build
+  `integrityHash` (SRI of the exact source; SHA-384 until R7b.14, SHA-256 since) and a unique semver `version` per build
   (`cms-slot-page-inline-script.ts`).
 - Applied at page level with marker attributes for drift detection; full uninstall path removes
   scripts and purges unreferenced assets.
@@ -295,7 +295,7 @@ Confirmed against source (`cms-slot-page-inline-script.ts` and the fragment modu
   button; automatic re-syncs happen solely as side effects of other explicit user actions on
   already-installed pages (composer save, slot rename/delete). Nothing installs on app load.
 - **Install/remove behavior:** applied as page-level footer custom code with marker attributes;
-  registered via `POST /sites/{siteId}/registered_scripts/hosted` with an SRI SHA-384
+  registered via `POST /sites/{siteId}/registered_scripts/hosted` with an SRI (SHA-384 then; SHA-256 since R7b.14)
   `integrityHash` computed from the exact uploaded source. Uninstall (offered when deleting the
   last slot list) strips the footer entries — matched by marker attribute and by registered-script
   id — and purges unreferenced `codalyn-beacon-runtime-*.js` assets. (The Data API exposes no
@@ -538,7 +538,7 @@ Additional hardening landed from that audit:
   live in unit tests that execute the generated runtime source — they are not bundled); no
   iframes; no global-variable pollution; no ads; no placeholder/test content in UI copy; no
   Webflow trademark misuse; manifest limited to documented keys; Storybook/test code excluded
-  from the bundle; hosted runtime registered with SRI SHA-384 over a content-addressed, versioned
+  from the bundle; hosted runtime registered with an SRI pin (SHA-256 since R7b.14) over a content-addressed, versioned
   URL and never mutated in place; uninstall removes the page-level footer script and purges
   unreferenced runtime assets (workspace-level app removal cannot run extension code — manual
   cleanup instructions are provided in-app and in the docs).
@@ -829,7 +829,7 @@ Requested: document the runtime script behavior and the full external endpoint l
 `connect-src` review. The following is the authoritative statement for the submission notes.
 
 **Published-site runtime (`codalyn-beacon-runtime-*.js`, registered via Custom Code hosted script
-with an SRI SHA-384 integrity hash):**
+with an SRI integrity hash — SHA-384 at the time, SHA-256 since R7b.14):**
 
 - Performs **zero network requests** of any kind — no `fetch`, XHR, beacon, WebSocket, or dynamic
   script/resource injection — and no cookie, storage, `eval`, or `new Function` use. It reads a JSON
@@ -1935,6 +1935,68 @@ either finding — the remaining options are (a) submit with the rationale, or (
 for the editor. Obscuring either token (indirect call, renamed constructor, XHR swap) would be
 scanner evasion and is not on the table.
 
+**Independent second pass (same day, read-only, remediation-skill framing) — no alternative missed;
+two corrections recorded.** (1) Lexical 0.46 constructs the observer unconditionally on root attach
+(`LexicalEditor.ts` `setRootElement` → `initMutationObserver`) and gates every DOM reconcile on it
+(`LexicalUpdates.ts` `$commitPendingUpdates`); `_headless` is not a public option. But the fallback
+is **smaller than "product change" implied**: the `richText` composer prop rendered as the plain
+`multiline` `<Textarea>` before commit `11baf76`, and that textarea is still the Suspense fallback
+of `composer-rich-text-field.tsx`. Reverting `richText: "richText"` → `"multiline"` in
+`cms-slot-composable-props.ts`, deleting `shared/ui/rich-text-editor/` + the field wrapper + eight
+lexical deps, and dropping the observer pin to 0 is ~20 files, mostly deletions. Cost is the
+feature regression (users hand-type HTML), not engineering effort — a credible fast escape hatch if
+the rationale is rejected. Markdown-textarea would be larger (new dependency to audit, HTML round
+trip) and is not preferred over the plain revert. (2) For External API Calls, Webflow's guidelines
+explicitly permit a Designer Extension calling its own backend (Hybrid App) and ask for
+**disclosure in the review notes**: list backend domains + endpoints and third-party integrations.
+No manifest field exists for it (`webflow.json` supports only `name`, `apiVersion`, `publicDir`,
+`size`, `appIntents`, `appConnections`, `featureFlags`). Add to the submission notes, beyond the
+≤500-char field: the `Authorization` bearer is sent only to `tower.codalyn.app` (exact-origin match
+in `extension-egress.ts`); the Webflow ID token is exchanged server-side at
+`/api/auth/webflow-designer` and never forwarded to a third party; the presigned asset upload to
+S3/Webflow hosts carries no credential header; PostHog is opt-in and receives no site data.
+
 States for the 13:22 artifact: Source ✓ · Artifact ✓ (scanned; residue = pinned inventory) ·
 Installed ✗ · Runtime n/a · Submitted ✗ · Accepted ✗. The `wfpre_` receipt from **this** run is the
 one to paste into the form, since it is the run on the artifact being submitted.
+
+### R7b.14 Published-runtime pin — hosted runtime SRI moved to SHA-256; App Review Preflight browser test prepared (2026-09-14)
+
+Not a scanner finding. While filling Preflight's **"Test the published runtime"** section (published
+test URL + one entry per production script with its versioned URL, lowercase SHA-256 hex and the SRI
+Preflight derives from it, which "page-loaded files must carry … in the DOM"), the hosted Beacon
+runtime turned out to be registered with a **SHA-384** SRI (`sourceSRIHash` in
+`cms-slot-page-inline-script.ts`). Browsers accept sha256/384/512 equally, so nothing was broken on
+customer sites, but two things say SHA-256: Webflow's hosted-script reference specifies the
+`integrityHash` as a SHA-256 SRI (published requirement,
+<https://developers.webflow.com/data/reference/custom-code/custom-code/register-hosted>), and
+Preflight's test computes `sha256-…` from the hex it is given and compares it to the page's
+`integrity` attribute — a `sha384-…` attribute would read as a mismatch.
+
+**Fix (source):** `sourceSRIHash` digests with SHA-256 and emits `sha256-<base64>`; JSDoc names the
+requirement. Test added to `cms-slot-page-inline-script-sync.test.ts`: the `integrityHash` sent to
+`POST /registered_scripts/hosted` is the SHA-256 SRI of the exact bytes uploaded to the presigned
+asset URL (captured from the FormData). No other behaviour changed; the runtime source, its FNV
+marker hash, version derivation and asset purge are untouched.
+
+**Rollout:** a site whose page already carries the current runtime skips re-registration (the
+source hash still matches), so existing installs keep their valid sha384 pin until the runtime
+source next changes. The test site must be re-pushed explicitly: CMS Slots → the page runtime
+**Sync** button (`cms-slots-page-runtime-sync-button.tsx` → `syncCmsSlotsInstallEmbedOnPage`,
+`force: true`; toast "Page custom code updated. Publish the site…") → publish.
+
+**Tooling:** `scripts/webflow-runtime-pin.mjs <published page url>` prints, per Beacon runtime
+`<script>` on the page, the values the form asks for (versioned URL, SHA-256 hex, derived SRI,
+whether the DOM `integrity` attribute already matches) and exits non-zero on a mismatch. Runtime
+facts it relies on: the runtime is applied at **page** level in the footer via the Custom Code API
+(Webflow renders the tag), loads no child scripts, and makes no network requests of its own —
+one "Runtime file" entry, "Loaded directly by the published page".
+
+**Artifact (09-14 13-55-57 build, `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod`, all
+gates green):** `v0.1.0_public_09-14_13-55-57.zip` sha256 `85c9da22…144c0` (25 entries, 600 KB) ·
+`.sourcemaps.zip` sha256 `9bac710e…5874d`. Shipped JS: `sha384` 0 · `sha256-` present (1 file) ·
+bare `fetch(` 1 · `new MutationObserver(` 1 · `window.open(` 0 · `postMessage` 0 · `?token=` 0 ·
+`.map` in bundle 0. Retention: 12:50 build archived (doc-referenced), 13:22 + 13:55 kept.
+States: Source ✓ · Artifact ✓ · Installed ✗ · Runtime ✗ (Preflight browser test not yet run) ·
+Submitted ✗ · Accepted ✗. The 13:22 artifact and its `wfpre_` run are **superseded**: scan the
+13:55 zip + its sourcemaps, expect the same two findings as R7b.13, and use that run's receipt.

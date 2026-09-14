@@ -106,7 +106,19 @@ ones it hid.
    `.cursor/skills/webflow-app-preflight/README-START-HERE.md`) — run it on the **same** bundle zip
    **and** the **same** `.sourcemaps.zip`. Zero blockers → copy the `wfpre_…` receipt.
    A blocker here → go to section B with the preflight output as the findings.
-3. Listing assets: screenshots, 512×512 icon, demo video (approve + deny flows), ToS and Privacy as
+3. **Preflight "Test the published runtime"** (Webflow browser test; Beacon ships a hosted runtime
+   to published sites, so this applies). On the test site: install beacons on a page, press the
+   page runtime **Sync** button in CMS Slots if the runtime was pushed before the current build
+   (forced re-register with the current SRI pin), **publish**, then:
+   ```bash
+   node scripts/webflow-runtime-pin.mjs https://<test-site>.webflow.io/<page-with-beacons>
+   ```
+   It prints one block per Beacon runtime `<script>`: versioned URL → "Versioned runtime URL",
+   "Loaded directly by the published page", SHA-256 hex → "SHA-256" (the form derives the SRI),
+   and whether the page's `integrity` attribute already equals that SRI (it must; exit 1 if not).
+   Published test URL = the page URL you passed; the site ID is prefilled from the Designer.
+   Expect exactly one runtime file: the runtime loads no child scripts and makes no requests.
+4. Listing assets: screenshots, 512×512 icon, demo video (approve + deny flows), ToS and Privacy as
    distinct URLs, fees disclosed, AVIF conversion disclosure in notes.
 
 ### A6. Record + commit

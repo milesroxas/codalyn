@@ -259,12 +259,18 @@ function sourceMd5Hex(sourceCode: string): string {
   return SparkMD5.ArrayBuffer.hash(copy.buffer);
 }
 
+/**
+ * SRI pin for the hosted runtime, over the exact bytes uploaded as the asset. SHA-256 is the algorithm Webflow
+ * specifies for a hosted script's `integrityHash`, and the one App Review Preflight's published-runtime test
+ * derives its pin from and expects to find in the page's `integrity` attribute.
+ * @see https://developers.webflow.com/data/reference/custom-code/custom-code/register-hosted
+ */
 async function sourceSRIHash(sourceCode: string): Promise<string> {
   const bytes = sourceToBytes(sourceCode);
   const copy = new Uint8Array(bytes.length);
   copy.set(bytes);
-  const digest = await crypto.subtle.digest("SHA-384", copy.buffer);
-  return `sha384-${arrayBufferToBase64(new Uint8Array(digest))}`;
+  const digest = await crypto.subtle.digest("SHA-256", copy.buffer);
+  return `sha256-${arrayBufferToBase64(new Uint8Array(digest))}`;
 }
 
 type CreatedWebflowAsset = {

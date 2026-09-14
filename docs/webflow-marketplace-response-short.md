@@ -4,6 +4,13 @@ Condensed from [webflow-marketplace-compliance.md](webflow-marketplace-complianc
 submission form's character-limited response field. Body below is the submittable text (round 7b,
 2026-09-14 App Review Preflight third scan: single egress point / Lexical observer; the fourth scan on the 13:22 build returned only these two, one location each — compliance doc § R7b.13 — so this body is final). Keep the AVIF disclosure paragraph in the note too (listing copy is locked).
 
+> Submission-notes addendum (not in the ≤500 field; the guidelines ask Hybrid Apps to list backend
+> domains + endpoints): Backend: https://tower.codalyn.app only — `/api/auth/webflow-designer`
+> (Designer ID-token exchange, server-side), `/api/v2/webflow/*` (Data API proxy), image conversion
+> (opt-in AVIF). Webflow-issued presigned asset-upload URLs (S3 / website-files.com), no credential
+> header. Telemetry: https://us.i.posthog.com, opt-in, no site data. The bearer is sent to the Tower
+> origin only (exact-origin match at the single egress call).
+>
 > Note: Marketplace listing copy is locked after the initial submission, so the external-service
 > disclosure (opt-in image conversion via `tower.codalyn.app`) is carried in this submission-note
 > changelog on every update — it must stay in the note for each resubmission.

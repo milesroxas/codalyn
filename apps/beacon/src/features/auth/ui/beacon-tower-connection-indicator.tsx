@@ -1,7 +1,8 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { Loader2, RadioTower } from "lucide-react";
 import { clearBeaconGuestChosen } from "@/features/auth/lib/beacon-guest-choice";
-import { openTowerAppHome } from "@/features/auth/model/tower-auth-client";
+import { TOWER_APP_ENTRY_PATH } from "@/features/auth/model/tower-auth-client";
+import { useTowerAppLink } from "@/features/auth/model/use-tower-app-link";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
@@ -36,6 +37,8 @@ export type BeaconTowerConnectionIndicatorProps = {
 export function BeaconTowerConnectionIndicator(props: BeaconTowerConnectionIndicatorProps) {
   const { status } = props;
   const connecting = status === "connecting";
+  // Connected: the indicator is an ordinary new-tab link to Tower (never `window.open`).
+  const towerHomeLink = useTowerAppLink(TOWER_APP_ENTRY_PATH);
 
   const tooltip =
     status === "connected"
@@ -44,33 +47,37 @@ export function BeaconTowerConnectionIndicator(props: BeaconTowerConnectionIndic
         ? "Connecting to Tower…"
         : "Not connected to Tower — click to sign in";
 
-  const handleClick = () => {
-    if (connecting) {
-      return;
-    }
-    if (status === "connected") {
-      openTowerAppHome();
-      return;
-    }
-    // Reveal the login gate (email/password). The Webflow session is attempted silently on load.
-    clearBeaconGuestChosen();
-  };
+  const className = cn(beaconTowerConnectionIndicatorVariants({ status: connecting ? "connecting" : status }));
+  const icon = connecting ? (
+    <Loader2 aria-hidden className="animate-spin" />
+  ) : (
+    <RadioTower aria-hidden strokeWidth={2} />
+  );
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          disabled={connecting}
-          aria-busy={connecting}
-          aria-label={tooltip}
-          onClick={handleClick}
-          className={cn(beaconTowerConnectionIndicatorVariants({ status: connecting ? "connecting" : status }))}
-        >
-          {connecting ? <Loader2 aria-hidden className="animate-spin" /> : <RadioTower aria-hidden strokeWidth={2} />}
-        </Button>
+        {status === "connected" && towerHomeLink ? (
+          <Button asChild variant="ghost" size="icon-sm" className={className}>
+            <a {...towerHomeLink} href={towerHomeLink.href} aria-label={tooltip}>
+              {icon}
+            </a>
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            disabled={connecting}
+            aria-busy={connecting}
+            aria-label={tooltip}
+            // Reveal the login gate (email/password). The Webflow session is attempted silently on load.
+            onClick={connecting ? undefined : clearBeaconGuestChosen}
+            className={className}
+          >
+            {icon}
+          </Button>
+        )}
       </TooltipTrigger>
       <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
         {tooltip}

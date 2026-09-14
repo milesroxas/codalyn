@@ -1,8 +1,9 @@
 # Webflow Marketplace Review — Short Response (≤500 chars)
 
 Condensed from [webflow-marketplace-compliance.md](webflow-marketplace-compliance.md) for the
-submission form's character-limited response field. Body below is the submittable text (round 7,
-2026-08-13 AVIF privacy flag).
+submission form's character-limited response field. Body below is the submittable text (round 7b,
+2026-09-14 App Review Preflight postMessage/popup blockers). Keep the AVIF disclosure paragraph in
+the note too (listing copy is locked).
 
 > Note: Marketplace listing copy is locked after the initial submission, so the external-service
 > disclosure (opt-in image conversion via `tower.codalyn.app`) is carried in this submission-note
@@ -10,7 +11,11 @@ submission form's character-limited response field. Body below is the submittabl
 
 ---
 
-AVIF conversion is now opt-in, off by default. Selecting AVIF shows an in-context consent prompt disclosing the image is sent to our first-party Tower service (tower.codalyn.app) for conversion — in memory, never stored; revocable in Settings → Privacy. A persistent disclosure shows while AVIF is active. A hard guard at the single network call site refuses AVIF without consent, so no path (previews, size estimates, saved presets) sends image bytes unconsented. WebP stays fully in-Designer.
+Preflight blockers (postMessage/popups) resolved: the extension opens no windows — every external destination (Tower, Webflow OAuth consent, policy pages) is a plain <a target="_blank" rel="noopener noreferrer">, and the release build fails on any window.open. Single-use handoff/OAuth-state URLs are minted before the click and refreshed when stale; the grant is detected by bounded, user-initiated polling. The only postMessage left is React's MessageChannel scheduler (no targetOrigin exists).
+
+---
+
+Earlier round-7 response (kept for reference, AVIF privacy flag): AVIF conversion is now opt-in, off by default. Selecting AVIF shows an in-context consent prompt disclosing the image is sent to our first-party Tower service (tower.codalyn.app) for conversion — in memory, never stored; revocable in Settings → Privacy. A persistent disclosure shows while AVIF is active. A hard guard at the single network call site refuses AVIF without consent, so no path (previews, size estimates, saved presets) sends image bytes unconsented. WebP stays fully in-Designer.
 
 ---
 

@@ -1,8 +1,8 @@
 import { Loader2 } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
-import { openTowerAppPath } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerAccessPolicy } from "@/features/auth/model/use-beacon-tower-access-policy";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import { useTowerAppLink } from "@/features/auth/model/use-tower-app-link";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -10,7 +10,7 @@ import { Label } from "@/shared/ui/label";
 /**
  * Email + password Tower sign-in, inline in the Designer (no popup). Use this for users who already
  * have a Tower account but haven't connected Webflow — the one-click Webflow sign-in can't resolve a
- * session for them. After signing in they can link the current site via the connect popup.
+ * session for them. After signing in they can link the current site via the connect link.
  */
 export function BeaconTowerSignInForm() {
   const { signInWithEmail } = useBeaconTowerSession();
@@ -19,6 +19,9 @@ export function BeaconTowerSignInForm() {
   const publicSignUpOpen = earlyAccessRequired === false;
   const emailId = useId();
   const passwordId = useId();
+  // Tower account routes open as ordinary new-tab links (never `window.open`).
+  const forgotPasswordLink = useTowerAppLink("/forgot-password");
+  const signUpLink = useTowerAppLink("/sign-up");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -55,15 +58,11 @@ export function BeaconTowerSignInForm() {
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label htmlFor={passwordId}>Password</Label>
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="h-auto px-0 text-xs"
-            onClick={() => openTowerAppPath("/forgot-password")}
-          >
-            Forgot password?
-          </Button>
+          {forgotPasswordLink ? (
+            <Button asChild variant="link" size="sm" className="h-auto px-0 text-xs">
+              <a {...forgotPasswordLink}>Forgot password?</a>
+            </Button>
+          ) : null}
         </div>
         <Input
           id={passwordId}
@@ -85,16 +84,10 @@ export function BeaconTowerSignInForm() {
         {pending ? <Loader2 aria-hidden data-icon="inline-start" className="animate-spin" /> : null}
         {pending ? "Signing in…" : "Sign in"}
       </Button>
-      {publicSignUpOpen ? (
+      {publicSignUpOpen && signUpLink ? (
         <div className="flex items-center justify-center text-xs">
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="h-auto px-0 text-xs"
-            onClick={() => openTowerAppPath("/sign-up")}
-          >
-            Create account
+          <Button asChild variant="link" size="sm" className="h-auto px-0 text-xs">
+            <a {...signUpLink}>Create account</a>
           </Button>
         </div>
       ) : null}

@@ -1,15 +1,13 @@
 import { useDeferredLoadingIndicator } from "@codalyn/webflow-kit/react";
-import { ExternalLink, LogOut } from "lucide-react";
-import { type ReactNode, useCallback, useState } from "react";
+import type { ReactNode } from "react";
 import { BeaconRouteLoadingStatus } from "@/app/ui/beacon-route-loading-status";
 import { type BeaconCurrentSite, useBeaconCurrentSite } from "@/features/auth/lib/use-beacon-current-site";
-import { openWebflowOAuthAuthorize } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import { useWebflowAuthorizeLink } from "@/features/auth/model/use-webflow-authorize-link";
+import { WebflowAuthorizeGateView } from "@/features/auth/ui/webflow-authorize-gate-view";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { beaconAppRouteSurfaceClass } from "@/shared/lib/beacon-app-route-surface";
-import { Button } from "@/shared/ui/button";
 import { RouteLoadingSurface } from "@/shared/ui/route-loading";
-import { ScrollArea } from "@/shared/ui/scroll-area";
 
 function SiteLinkGateLoading() {
   const show = useDeferredLoadingIndicator(true);
@@ -23,82 +21,34 @@ function SiteLinkGateLoading() {
   );
 }
 
-/** Authorize-error code → a short, actionable message. `popup_blocked` is handled separately (no error UI). */
-function messageForAuthorizeError(error: string): string {
-  switch (error) {
-    case "team_admin_required":
-      return "Only a workspace admin can authorize sites in Webflow. Ask an admin to connect this site.";
-    case "no_active_workspace":
-      return "No active Tower workspace. Open Tower to select a workspace, then try again.";
-    case "unauthorized":
-      return "Your Tower session expired. Sign out and sign in again.";
-    case "webflow_identity_required":
-      return "Sign in to Tower from the Webflow Designer so the connection can be tied to your Webflow account, then try again.";
-    case "tower_unreachable":
-      return "Couldn't reach Tower. Check your connection and try again.";
-    default:
-      return "Couldn't start Webflow authorization. Try again.";
-  }
-}
-
 /**
- * Drives the Webflow OAuth consent popup for the current site. The popup opens only from the
- * explicit button click below — never automatically — so every `window.open` stays inside a user
- * gesture (Marketplace popup guidance). On popup close it refetches Tower state via `onClosed` —
- * if the site was granted, the surrounding guard unmounts this and the app unlocks.
+ * Drives the Webflow OAuth consent link for the current site. The authorize URL is minted when this
+ * mounts (never on a timer, never opened automatically) and rendered as an ordinary new-tab link —
+ * the extension spawns no windows (Marketplace popup guidance). After the click, Tower state is
+ * re-read on a bounded interval and when the Designer tab regains visibility (`onGrantCheck`); once
+ * the site is granted, the surrounding guard unmounts this and the app unlocks.
  */
-function WebflowAuthorizeGate(props: { site: BeaconCurrentSite; onClosed: () => void }) {
-  const { site, onClosed } = props;
+function WebflowAuthorizeGate(props: { site: BeaconCurrentSite; onGrantCheck: () => void }) {
+  const { site, onGrantCheck } = props;
   const { clearStoredSession } = useBeaconTowerSession();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { state, linkProps, retry } = useWebflowAuthorizeLink(onGrantCheck);
   const siteLabel = site.siteName.trim() || site.siteId;
 
-  const open = useCallback(() => {
-    setBusy(true);
-    setError(null);
-    void openWebflowOAuthAuthorize(onClosed)
-      .then((result) => {
-        // popup_blocked just means the browser needs an explicit click — surface the button, not an error.
-        if (!result.ok && result.error !== "popup_blocked") {
-          setError(messageForAuthorizeError(result.error));
-        }
-      })
-      .finally(() => setBusy(false));
-  }, [onClosed]);
-
   return (
-    <ScrollArea className="min-h-0 min-w-0 flex-1">
-      <div className="flex min-h-full min-w-0 flex-col items-center justify-center px-4 py-8">
-        <div className="mx-auto w-full max-w-sm space-y-4 text-center">
-          <p className="text-sm text-foreground">
-            Authorize <span className="font-medium">{siteLabel}</span> in the Webflow window to continue.
-          </p>
-          {error ? <p className="text-xs leading-snug text-destructive">{error}</p> : null}
-          <Button type="button" className="w-full" disabled={busy} aria-busy={busy} onClick={open}>
-            <ExternalLink aria-hidden data-icon="inline-start" />
-            {busy ? "Opening Webflow…" : "Open Webflow authorization"}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 w-full justify-center text-[11px] text-muted-foreground"
-            onClick={clearStoredSession}
-          >
-            <LogOut aria-hidden data-icon="inline-start" />
-            Sign out
-          </Button>
-        </div>
-      </div>
-    </ScrollArea>
+    <WebflowAuthorizeGateView
+      siteLabel={siteLabel}
+      state={state}
+      linkProps={linkProps}
+      onRetry={retry}
+      onSignOut={clearStoredSession}
+    />
   );
 }
 
 /**
  * App-wide gate: once signed in to Tower, the user can't use any screen until the site currently open in
  * the Designer is part of the workspace's Webflow Data API OAuth grant. When it isn't, the Webflow OAuth
- * consent popup is driven directly (no Tower-side "authorize" page) so the user ticks the site there.
+ * consent screen is linked directly (no Tower-side "authorize" page) so the user ticks the site there.
  *
  * It only gates when we KNOW the site is unauthorized — signed in, settings synced (authoritative
  * `webflowSites`), and the current site resolved. Logged-out users (handled by the welcome gate), an
@@ -133,7 +83,7 @@ export function BeaconSiteLinkGuard(props: { children: ReactNode }) {
   if (!currentSiteAuthorized) {
     return (
       <div className={beaconAppRouteSurfaceClass}>
-        <WebflowAuthorizeGate site={site} onClosed={refreshBeaconSettings} />
+        <WebflowAuthorizeGate site={site} onGrantCheck={refreshBeaconSettings} />
       </div>
     );
   }

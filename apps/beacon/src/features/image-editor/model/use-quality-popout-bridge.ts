@@ -13,6 +13,31 @@ function clampExportQuality(q: number): number {
   return Math.min(1, Math.max(0.05, q));
 }
 
+type QualityParentToPopoutMessage =
+  | { source: typeof BEACON_QUALITY_PARENT_SOURCE; type: "compressed-updated"; compressedBlob: Blob }
+  | { source: typeof BEACON_QUALITY_PARENT_SOURCE; type: "compressed-error" };
+
+/**
+ * The only parent→popout send path. Build-time constant: with the popout flag-gated off there is no
+ * popout window to post to, so the `postMessage` call — the only first-party one in bundle.js — is
+ * dead-code-eliminated. App Review Preflight flags every `postMessage` whose target origin is not a
+ * string literal, and the Designer extension origin can only be known at runtime.
+ */
+function postToPopout(
+  popoutWindowRef: MutableRefObject<Window | null>,
+  message: QualityParentToPopoutMessage,
+  targetOrigin: string
+): void {
+  if (!__QUALITY_COMPARE_POPOUT_ENABLED__) {
+    return;
+  }
+  const win = popoutWindowRef.current;
+  if (!win || win.closed) {
+    return;
+  }
+  win.postMessage(message, targetOrigin);
+}
+
 export function useQualityPopoutBridge(options: {
   imageSrc: string | null;
   completedCrop: Area | null;
@@ -62,10 +87,11 @@ export function useQualityPopoutBridge(options: {
           exportFormat,
           avifTowerConsentGranted,
         });
-        if (gen !== encodeGenRef.current || !popoutWindowRef.current || popoutWindowRef.current.closed) {
+        if (gen !== encodeGenRef.current) {
           return;
         }
-        popoutWindowRef.current.postMessage(
+        postToPopout(
+          popoutWindowRef,
           { source: BEACON_QUALITY_PARENT_SOURCE, type: "compressed-updated", compressedBlob },
           targetOrigin
         );
@@ -74,12 +100,7 @@ export function useQualityPopoutBridge(options: {
         if (usageLimit != null) {
           onTowerUsageLimit?.(usageLimit);
         }
-        if (popoutWindowRef.current && !popoutWindowRef.current.closed) {
-          popoutWindowRef.current.postMessage(
-            { source: BEACON_QUALITY_PARENT_SOURCE, type: "compressed-error" },
-            targetOrigin
-          );
-        }
+        postToPopout(popoutWindowRef, { source: BEACON_QUALITY_PARENT_SOURCE, type: "compressed-error" }, targetOrigin);
       }
     },
     [

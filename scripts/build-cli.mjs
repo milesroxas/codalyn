@@ -540,7 +540,13 @@ function qualityPopoutForbiddenMarker({ appName, appPath, channel }) {
   if (popoutFlag?.trim() === "true") {
     return null;
   }
-  return { value: "quality-compare", label: "a flag-gated quality-compare popout reference" };
+  return [
+    { value: "quality-compare", label: "a flag-gated quality-compare popout reference" },
+    // App Review Preflight (2026-09-14) "Insecure postMessage": the parent-side bridge's send path
+    // (`postMessage({type:"compressed-updated"|"compressed-error"}, origin)`) is DCE'd with the flag
+    // off; this message-type literal only exists inside that path.
+    { value: "compressed-updated", label: "the flag-gated quality-compare popout bridge send path" },
+  ];
 }
 
 function staticForbiddenMarkers(appPath, channel, appName) {
@@ -558,6 +564,11 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     // Source maps are built (`sourcemap: "hidden"`) for the private submission field, so no shipped
     // file may reference one — a `//# sourceMappingURL=` comment means a map leaked into the bundle.
     { value: "sourceMappingURL", label: "a sourceMappingURL reference" },
+    // App Review Preflight (2026-09-14) "Prohibited Popups": the extension opens no windows itself —
+    // every external destination (Tower routes, the Webflow OAuth consent screen, policy pages) is an
+    // ordinary `<a target="_blank" rel="noopener noreferrer">`. The flag-gated quality-compare popout is
+    // the only remaining source-level caller and is DCE'd on release channels.
+    { value: "window.open(", label: "a window.open call" },
     // App Review Preflight (2026-08-19) flags "Credential in URL": any `?token=` / `&token=` query
     // parameter in the shipped JS. posthog-js builds four such URLs (early-access features, product
     // tours, surveys, logs); the strip plugin compiles the token out of each. Credentials belong in
@@ -587,9 +598,9 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     // out — this marker guarantees a reviewer's `grep -i sentry` over the bundle stays empty.
     forbidden.push({ value: "sentry", label: "a Sentry reference" });
   }
-  const popoutMarker = qualityPopoutForbiddenMarker({ appName, appPath, channel });
-  if (popoutMarker) {
-    forbidden.push(popoutMarker);
+  const popoutMarkers = qualityPopoutForbiddenMarker({ appName, appPath, channel });
+  if (popoutMarkers) {
+    forbidden.push(...popoutMarkers);
   }
   return forbidden;
 }

@@ -291,11 +291,14 @@ export const auth = betterAuth({
      * session when opening Tower in a browser tab. The token travels in the `/beacon-handoff` URL
      * fragment (never a query string — fragments are not sent to servers, so no access-log
      * exposure) and is redeemed via `POST /api/beacon-handoff`. Tokens are hashed at rest,
-     * single-use, and expire in one minute; they never carry the session value.
+     * single-use, and expire in three minutes; they never carry the session value. Three minutes
+     * (not one) because the extension opens Tower through plain `<a target="_blank">` links, so the
+     * token is minted ahead of the click and refreshed on hover/focus once 90 s old
+     * (`TOWER_HANDOFF_TOKEN_STALE_MS` in Beacon) — the TTL must comfortably outlast that window.
      */
     oneTimeToken({
       storeToken: "hashed",
-      expiresIn: 1,
+      expiresIn: 3,
     }),
     towerOrganization,
     admin({

@@ -1,9 +1,10 @@
 import type { TowerUsagePlanContext } from "@codalyn/webflow-kit";
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
-import { getTowerAuthBaseUrl, openTowerAppPath } from "@/features/auth/model/tower-auth-client";
+import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
 import type { BridgedTowerUser } from "@/features/auth/model/use-beacon-tower-session";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import { useTowerAppLink } from "@/features/auth/model/use-tower-app-link";
 import { BeaconTowerActionList } from "@/features/auth/ui/beacon-tower-action-list";
 import { BeaconTowerNotConfiguredNotice } from "@/features/auth/ui/beacon-tower-not-configured-notice";
 import { BeaconTowerSignInPrompt } from "@/features/auth/ui/beacon-tower-sign-in-prompt";
@@ -142,6 +143,8 @@ function planStatusMeta(
 function AccountPlanSection({ roleAux }: { roleAux: ReturnType<typeof roleAuxLabel> }) {
   const { status, loading } = useTowerUsageStatus(true);
   const meta = planStatusMeta(status?.plan ?? null, loading);
+  // Ordinary new-tab link to Tower billing (never `window.open`); handoff href pre-minted on mount.
+  const billingLink = useTowerAppLink("/billing");
 
   return (
     <section className="flex flex-col gap-2 py-6">
@@ -167,16 +170,14 @@ function AccountPlanSection({ roleAux }: { roleAux: ReturnType<typeof roleAuxLab
           </span>
         </div>
       ) : null}
-      <Button
-        type="button"
-        variant="outline"
-        size="xs"
-        className="mt-1 self-start"
-        onClick={() => openTowerAppPath("/billing")}
-      >
-        Manage billing
-        <ExternalLink aria-hidden />
-      </Button>
+      {billingLink ? (
+        <Button asChild variant="outline" size="xs" className="mt-1 self-start">
+          <a {...billingLink}>
+            Manage billing
+            <ExternalLink aria-hidden />
+          </a>
+        </Button>
+      ) : null}
     </section>
   );
 }

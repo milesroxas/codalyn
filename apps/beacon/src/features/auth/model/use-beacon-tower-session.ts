@@ -18,9 +18,8 @@ import {
   readBeaconTowerSessionToken,
   readSuppressDesignerSessionExchange,
   setSuppressDesignerSessionExchange,
-  writeBeaconTowerSessionToken,
 } from "@/features/auth/lib/webflow-designer-session";
-import { getTowerAuthBaseUrl, isBeaconAuthWindow, towerAuthClient } from "@/features/auth/model/tower-auth-client";
+import { getTowerAuthBaseUrl, towerAuthClient } from "@/features/auth/model/tower-auth-client";
 
 /** Single-flighted across all hook instances so multiple mounted consumers don't fire duplicate exchanges. */
 let designerExchangeInFlight = false;
@@ -41,42 +40,6 @@ export type BridgedTowerUser = {
   name?: string | null;
   image?: string | null;
 };
-
-function persistTowerSessionToken(token: unknown): void {
-  if (typeof token !== "string" || token.length === 0) {
-    return;
-  }
-  writeBeaconTowerSessionToken(token);
-}
-
-/** Exported for unit tests — the guard chain (origin → opened-window source → message shape) is security-critical. */
-export function handleTowerMessage(event: MessageEvent, towerOrigin: string, onSessionChanged: () => void): void {
-  if (!towerOrigin.trim()) {
-    return;
-  }
-  if (event.origin !== towerOrigin) {
-    return;
-  }
-  // This handler ingests a bearer token, so origin alone is not enough: any window at the Tower origin
-  // holding a handle to this frame could post one. Only auth windows this app itself opened are accepted
-  // (the same `event.source` discipline the quality-compare bridge already applies).
-  if (!isBeaconAuthWindow(event.source)) {
-    return;
-  }
-  const data = event.data as Record<string, unknown> | null;
-  if (data?.status !== "success") {
-    return;
-  }
-  if (data.type !== "codalyn:tower-auth") {
-    return;
-  }
-  invalidateBeaconTowerSignOut();
-  persistTowerSessionToken(data.token);
-  setSuppressDesignerSessionExchange(false);
-  designerExchangeBlockedAfterFailure = false;
-  setBeaconTowerDesignerExchangePhase("settled");
-  onSessionChanged();
-}
 
 function toBridgedTowerUser(sessionData: unknown): BridgedTowerUser | undefined {
   const s = sessionData as
@@ -236,8 +199,8 @@ export function useBeaconTowerSession(): {
           } else {
             // Exhausted the retry ladder (or hit a permanent failure). Stop further SILENT auto-retries
             // so focus/visibilitychange don't re-storm Tower with the same failing exchange; the user
-            // lands in the guest gate. A manual "Sign in to Tower" or a successful Tower postMessage
-            // (handleTowerMessage) clears this flag and re-enables sign-in.
+            // lands in the guest gate. A manual "Sign in to Tower" (email sign-in) clears this flag and
+            // re-enables sign-in.
             designerExchangeBlockedAfterFailure = true;
           }
         })
@@ -264,19 +227,6 @@ export function useBeaconTowerSession(): {
       window.removeEventListener("focus", attemptExchange);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refetch, towerOrigin]);
-
-  useEffect(() => {
-    if (!towerOrigin.trim()) {
-      return;
-    }
-    function onMessage(ev: MessageEvent) {
-      handleTowerMessage(ev, towerOrigin, () => {
-        void refetch();
-      });
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
   }, [refetch, towerOrigin]);
 
   const user = toBridgedTowerUser(session);

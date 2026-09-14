@@ -1540,3 +1540,106 @@ Partner-facing packet for R7b.8 + R7b.9: `docs/webflow-resubmission-packet-2026-
    encoder left — answer with the R7b.9 rationale), record the `wfpre_…` receipt.
 3. Re-confirm reviewer credentials, published `.webflow.io` test site, screenshots, 512×512 icon,
    demo video (approve + deny). Keep the AVIF disclosure in the submission notes.
+
+### R7b.10 Insecure postMessage + Prohibited Popups (blockers, App Review Preflight 2026-09-14, on the 08-19 12:13 build)
+
+Two BLOCKER findings. Both rules are shape-based on the built artifact (the same scanner behaviour
+as R7b.8/R7b.9): the finding text names a wildcard `targetOrigin` and "spawned windows", but no
+`postMessage(…, "*")` exists anywhere in the bundle, and every `window.open` is user-gesture-gated
+(published Marketplace rule: popups "must be triggered only by direct user interaction — never on
+load or on a timer", https://developers.webflow.com/data-beta/apps/docs/marketplace-guidelines).
+
+**Finding 1 — "Insecure postMessage", 2 evidence locations in `bundle.js`.**
+
+- `bundle.js:2` — React `scheduler` (0.27.0): `port2.postMessage(null)` on a `MessageChannel`.
+  `MessagePort.postMessage(message, transfer?)` has **no `targetOrigin` parameter** — it is a
+  same-document channel React uses to yield to the browser, not a cross-window message. Nothing to
+  fix; removing it would mean patching React's scheduler to fall back to `setTimeout(0)` (4 ms
+  nested-timer clamp on every yield) — a real rendering regression traded for a keyword. **Remaining
+  limitation / reviewer judgment:** this is the single `postMessage(` left in the shipped JS.
+- `bundle.js:85` — the parent side of the flag-gated quality-compare popout bridge
+  (`model/use-quality-popout-bridge.ts`): `popout.postMessage({type:"compressed-updated"|"compressed-error"}, window.location.origin)`.
+  The target origin was the extension's own origin (runtime-only value, so never a string literal),
+  but the send path was still bundled even though the popout is withheld (R7.1 update, flag OFF).
+  **Fixed:** the send is hoisted into a module-scope `postToPopout` helper gated on the build
+  constant `__QUALITY_COMPARE_POPOUT_ENABLED__`, so with the flag off the call is dead-code-eliminated
+  together with the message-type literals. `scripts/build-cli.mjs`: `compressed-updated` joins
+  `quality-compare` as a flag-conditional forbidden marker (`qualityPopoutForbiddenMarker` now returns
+  both).
+
+**Finding 2 — "Prohibited Popups", 3 evidence locations.**
+
+- `assets/init-observability-*.js` — first-party `openCodalynPolicyPage` (`shared/lib/codalyn-links.ts`)
+  = `window.open(url, "_blank", "noopener,noreferrer")` for the Privacy policy / Terms / Documentation
+  links (it landed in that chunk by chunking, not by relation to PostHog). **Fixed:** replaced by
+  `codalynPolicyLinkProps(url)` → `{ href, target: "_blank", rel: "noopener noreferrer" }`, rendered
+  as plain anchors through the owning primitives (`Button asChild` in the telemetry consent prompt and
+  Settings → Privacy; `DropdownMenuItem asChild` in the Help menu). The browser performs an ordinary
+  user-initiated link navigation; no script spawns a window and the extension never holds a handle
+  to the opened document. Pinned by `codalyn-links.test.ts` (props shape, rel, https + production
+  Tower host only).
+- `assets/label-*.js` ×2 — `tower-auth-client.ts`: `openTowerAppPath` (Tower routes: billing,
+  account, sign-up, forgot-password, `/beacon`, dashboard, and the sized `/connection` popup) and
+  `openWebflowOAuthAuthorize` (Webflow consent screen for the current site). Both opened
+  `about:blank` synchronously inside the click and navigated after async work (one-time-token mint /
+  authorize-URL mint). **Fixed — the extension no longer opens any window.** Every external
+  destination is now an ordinary `<a target="_blank" rel="noopener noreferrer">`; the browser
+  performs the navigation and the extension never holds a handle to the opened document. Because an
+  anchor's destination must exist at click time, the single-use secrets are minted ahead of the click:
+  - `model/use-tower-app-link.ts` (`useTowerAppLink(path)`): when the Designer session holds a Tower
+    bearer, the `href` is the `/beacon-handoff#ott=…` handoff URL (token in the fragment, R6.3
+    unchanged) minted when the surface mounts, re-minted on hover/focus once 90 s old and after a click
+    (the navigation consumed it); with no bearer, or while a mint is in flight/failed, the plain route,
+    which enforces its own auth. Tower's one-time-token TTL raised 1 → 3 min
+    (`apps/tower/src/server/auth.ts`) so the pre-minted token comfortably outlives the hover → click
+    window. Consumers: Header "Open Tower", connection indicator, Tower actions pane (`/connection?siteId=`,
+    `/beacon`, `/account`), Settings "Manage billing", usage banner, sign-in form
+    ("Forgot password?", "Create account").
+  - `model/use-webflow-authorize-link.ts` (`useWebflowAuthorizeLink`): the site-link gate mints the
+    consent URL (`POST /api/integrations/webflow/authorize`, DB-state row bound to the Webflow user,
+    R7b.2 unchanged) when it mounts — never on a timer, never navigated automatically — allowlists it
+    (`isAllowedWebflowAuthorizeUrl`: https + exact host + exact path, moved to
+    `lib/tower-app-link.ts`) and renders it as the anchor; re-mints on hover/focus past 8 min (state
+    TTL 10 min) and 1.5 s after a click. Grant completion is no longer observed through a window
+    handle: after the click, Tower state is re-read every 3 s for at most 10 min (same bound the old
+    `win.closed` watcher had) and immediately when the Designer tab becomes visible again; the guard
+    unmounts the gate once the site is granted. The gate body is now a presentational
+    `WebflowAuthorizeGateView` (states: ready link / minting / error + Try again).
+  - Tower `integrations/webflow/success|error` pages: `popup=1` (cookie-less flow) with an opener is
+    still Tower's own dashboard popup (`use-tower-webflow-oauth-popup.ts`, unchanged — Tower is not
+    the reviewed artifact); with **no** opener (Beacon's `noopener` link) they now render a static
+    "close this tab and return to the Webflow Designer" note instead of `router.replace` into a
+    cookie-less connection page.
+  - Deleted: `openTowerAppPath`, `openTowerWebflowConnect`, `openWebflowOAuthAuthorize`,
+    `openTowerAppHome`, `buildTowerAuthPopupUrl`, the opened-window registry (`isBeaconAuthWindow`),
+    the `win.closed` watcher, and the `handleTowerMessage` bearer-ingest listener in
+    `use-beacon-tower-session.ts` (it was dead: Beacon never passed `beaconOrigin`, so Tower's opener
+    `postMessage` never fired for a Beacon window). Bundle now has **no `message` listener for auth**
+    and no `window.opener` reference. R3.6 / R4.7 / R7.3 are superseded by this section.
+  - Gates: `scripts/build-cli.mjs` forbids `window.open(` in every shipped JS file and the archived
+    zip on release channels (the flag-gated quality-compare popout opener is the only source-level
+    caller left and is DCE'd, R7.1 update). Tests: `lib/tower-app-link.test.ts` (handoff href shape —
+    token in fragment only, origin confinement, staleness windows vs. Tower TTLs, connection path,
+    authorize allowlist incl. lookalike/subdomain/prefix hosts) and `tower-auth-client.test.ts`
+    (`mintWebflowAuthorizeUrl` refuses non-allowlisted URLs on a 200, surfaces Tower error codes,
+    `tower_unreachable`; `mintTowerHandoffToken` never calls Tower without a session and rejects
+    malformed tokens). Stories: `Auth/WebflowAuthorizeGateView` (Ready / Minting / two error states),
+    `Auth/BeaconTowerActionList`.
+
+**Artifact check (09-14 11:32 build, `pnpm build:prod`, internal recipient):**
+`v0.1.0_internal_09-14_11-32-46.zip` sha256 `ccfb5c89…`, `.sourcemaps.zip` sha256 `db8a563c…`.
+Shipped JS: `window.open(` **0**, `window.opener` **0**, `postMessage(` **1** (React scheduler
+`MessagePort`, no `targetOrigin` parameter exists), `compressed-updated` 0, `about:blank` 1 (vendor
+string, not a navigation target), `beacon-handoff#ott=` 1 (the handoff href builder). Private
+`.sourcemaps.zip` residuals (source text only): scheduler + the flag-gated bridge source in
+`bundle.js.map`; `@lexical/link`'s `ClickableLinkPlugin` `window.open` in
+`rich-text-editor-*.js.map` (tree-shaken from the chunk itself). Verified: biome clean (beacon +
+tower), tsc clean (beacon + tower), 977/977 beacon tests, Tower OAuth/onboarding/handoff tests
+62/62, Storybook build green, `build:prod` gate green including the new `window.open(` marker.
+
+**Remaining limitation / reviewer judgment:** the one `postMessage(` is React's scheduler — a
+same-document `MessageChannel` yield, not a cross-window message. Removing it means patching React
+to a `setTimeout(0)` fallback (4 ms clamp on every yield). Answer with that rationale if re-flagged.
+Not yet re-scanned by App Review Preflight; not deployed (Tower TTL + page copy changes ship with
+the next Tower deploy — the Beacon build is safe against the current Tower: a 1-minute token still
+works, just with a narrower hover → click window).

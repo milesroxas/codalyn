@@ -14,11 +14,22 @@ export type CodalynPublicPageUrl =
   | typeof CODALYN_TERMS_URL
   | typeof CODALYN_BEACON_DOCS_URL;
 
+/** `rel` for every external link the extension renders: no opener handle, no referrer leak. */
+export const CODALYN_EXTERNAL_LINK_REL = "noopener noreferrer";
+
+export type CodalynPolicyLinkProps = {
+  href: CodalynPublicPageUrl;
+  target: "_blank";
+  rel: typeof CODALYN_EXTERNAL_LINK_REL;
+};
+
 /**
- * Opens a public Codalyn page in a new tab. Must be called from a user gesture (Designer popup
- * blocking), and only accepts the constants above — the extension never navigates to a URL it did not
- * author, which is the same allowlist discipline the auth popups follow.
+ * Anchor props for a public Codalyn page. Rendered as a plain `<a target="_blank">` (via `Button asChild`
+ * / `DropdownMenuItem asChild`) rather than `window.open`: the browser handles the navigation as an ordinary
+ * user-initiated link, the extension holds no handle to the opened document, and no script-spawned window
+ * exists for App Review Preflight's "Prohibited Popups" rule to flag. Only accepts the constants above — the
+ * extension never navigates to a URL it did not author.
  */
-export function openCodalynPolicyPage(url: CodalynPublicPageUrl): void {
-  window.open(url, "_blank", "noopener,noreferrer");
+export function codalynPolicyLinkProps(url: CodalynPublicPageUrl): CodalynPolicyLinkProps {
+  return { href: url, target: "_blank", rel: CODALYN_EXTERNAL_LINK_REL };
 }

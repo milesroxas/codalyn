@@ -1,5 +1,6 @@
 import { createAuthClient } from "better-auth/react";
 import { readBeaconTowerSessionToken } from "@/features/auth/lib/beacon-tower-session-token";
+import { isAllowedWebflowAuthorizeUrl } from "@/features/auth/lib/tower-app-link";
 import { isTrustedRedirectUrl } from "@/features/auth/lib/trusted-redirect";
 import { isBeaconTowerOriginConfigured, readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
 import { towerFetch } from "@/shared/lib/tower-client";
@@ -84,30 +85,17 @@ export function buildTowerAppUrl(path: string): string | null {
 }
 
 /**
- * Session-handoff URL for a freshly opened Tower tab. The one-time token travels in the URL
- * **fragment**, never a query parameter: fragments are not sent to the server, so the token cannot
- * land in server, proxy, or CDN access logs (Marketplace round-6 requirement). Tower's
- * `/beacon-handoff` page strips the fragment from history immediately and redeems the token via
- * `POST /api/beacon-handoff` (JSON body).
+ * Mints a single-use Tower handoff token for the current Designer session, or null on failure.
+ *
+ * Consumed by `useTowerAppLink`: the token is minted ahead of the click so a plain
+ * `<a target="_blank">` can carry the `/beacon-handoff#ott=…` URL — the extension opens no windows
+ * itself (Marketplace popup guidance). Tokens are single-use and live 3 minutes; a leaked value
+ * cannot replay a session.
  */
-export function buildTowerHandoffUrl(token: string, callbackPath: string): string | null {
-  return buildTowerAppUrl(
-    `/beacon-handoff#ott=${encodeURIComponent(token)}&callbackUrl=${encodeURIComponent(callbackPath)}`
-  );
-}
-
-export function buildTowerAuthPopupUrl(path: "/sign-in" | "/sign-up", beaconOrigin: string): string | null {
-  if (!baseURL) {
+export async function mintTowerHandoffToken(): Promise<string | null> {
+  if (!readBeaconTowerSessionToken()) {
     return null;
   }
-  return `${baseURL}${path}?beaconOrigin=${encodeURIComponent(beaconOrigin)}`;
-}
-
-/** Sized popup window (not a full browser tab) for focused Tower flows like sign-in and connect. */
-const TOWER_POPUP_WINDOW_FEATURES = "popup=yes,width=520,height=760,scrollbars=yes,resizable=yes";
-
-/** Mints a single-use Tower handoff token for the current Designer session, or null on failure. */
-async function mintTowerHandoffToken(): Promise<string | null> {
   try {
     const res = await towerFetch("/api/auth/one-time-token/generate");
     if (!res.ok) {
@@ -121,190 +109,31 @@ async function mintTowerHandoffToken(): Promise<string | null> {
   }
 }
 
+export type MintWebflowAuthorizeUrlResult = { ok: true; url: string } | { ok: false; error: string };
+
 /**
- * Opens a Tower app route in a new browser tab.
+ * Mints the Webflow OAuth consent URL for the current site's workspace. Tower stores the OAuth
+ * `state` → user/org binding server-side (`POST /api/integrations/webflow/authorize`, Designer bearer)
+ * so the cookie-less callback can resolve it; the returned URL is allowlisted to exactly
+ * `https://webflow.com/oauth/authorize` before it is ever rendered into an anchor.
  *
- * When the Designer session holds a Tower bearer token, the tab is routed through a single-use
- * one-time-token handoff (`/api/beacon-handoff`) so Tower establishes a first-party cookie session
- * instead of bouncing the user to sign-in. The window is opened synchronously to preserve the user
- * gesture for popup blockers, then redirected once the short-lived token is minted; any failure
- * falls back to the plain route, which enforces its own auth.
+ * Resolves the authorize error code (`team_admin_required`, `no_active_workspace`, `unauthorized`,
+ * `webflow_identity_required`, …) when Tower declines, `invalid_authorize_url` when the response fails
+ * the allowlist, or `tower_unreachable` on a network failure.
  */
-type OpenTowerAppPathOptions = {
-  /** Open a sized popup window instead of a full browser tab. */
-  popup?: boolean;
-  /**
-   * Resolve the destination path lazily — e.g. to await the current Designer `siteId` before routing.
-   * When provided, it overrides `path`; the window is still opened synchronously to preserve the user
-   * gesture (popup blockers), then redirected once the path resolves.
-   */
-  resolvePath?: () => Promise<string>;
-  /** Called once the opened popup window is closed (e.g. to refetch state after an OAuth grant). */
-  onClosed?: () => void;
-};
-
-/**
- * Windows this app opened for a Tower or Webflow auth flow. The session bridge ingests a bearer token from
- * `postMessage`, and an origin check alone cannot tell "the auth window we opened" from any other window at
- * the Tower origin that happens to hold a handle to this frame — so the message source is matched against
- * this registry too.
- */
-const openedAuthWindows = new Set<Window>();
-
-/** True when the message source is an auth window this app opened and that is still open. */
-export function isBeaconAuthWindow(source: MessageEventSource | null): boolean {
-  if (!source) {
-    return false;
-  }
-  let matched = false;
-  for (const win of [...openedAuthWindows]) {
-    if (win.closed) {
-      openedAuthWindows.delete(win);
-      continue;
-    }
-    if (win === source) {
-      matched = true;
-    }
-  }
-  return matched;
-}
-
-/**
- * An abandoned auth window (left open, or backgrounded indefinitely) must not keep a polling timer alive for
- * the rest of the Designer session — Marketplace guidance bars long-running background work.
- */
-const POPUP_WATCH_TIMEOUT_MS = 10 * 60 * 1000;
-
-function watchPopupClosed(win: Window, onClosed: () => void): void {
-  const startedAt = Date.now();
-  const timer = window.setInterval(() => {
-    if (win.closed) {
-      window.clearInterval(timer);
-      openedAuthWindows.delete(win);
-      onClosed();
-      return;
-    }
-    if (Date.now() - startedAt >= POPUP_WATCH_TIMEOUT_MS) {
-      window.clearInterval(timer);
-    }
-  }, 800);
-}
-
-export function openTowerAppPath(path: string, options: OpenTowerAppPathOptions = {}): void {
-  // Open synchronously inside the click gesture so popup blockers allow it; fill the URL after any
-  // async work (path resolution, one-time-token mint) completes.
-  const win = options.popup
-    ? window.open("about:blank", "tower-app", TOWER_POPUP_WINDOW_FEATURES)
-    : window.open("about:blank", "_blank");
-  if (!win) {
-    return;
-  }
-  openedAuthWindows.add(win);
-  if (options.onClosed) {
-    watchPopupClosed(win, options.onClosed);
-  }
-  void (async () => {
-    const resolvedPath = options.resolvePath ? await options.resolvePath() : path;
-    const directUrl = buildTowerAppUrl(resolvedPath);
-    if (!directUrl) {
-      win.close();
-      return;
-    }
-    if (!readBeaconTowerSessionToken()) {
-      win.location.replace(directUrl);
-      return;
-    }
-    const token = await mintTowerHandoffToken();
-    if (!token) {
-      win.location.replace(directUrl);
-      return;
-    }
-    const handoffUrl = buildTowerHandoffUrl(token, resolvedPath);
-    win.location.replace(handoffUrl ?? directUrl);
-  })();
-}
-
-/** The Webflow site currently open in the Designer, scoped onto the connection path, or `/connection`. */
-async function resolveCurrentSiteConnectionPath(): Promise<string> {
-  let siteId = "";
-  try {
-    const info = await webflow.getSiteInfo();
-    siteId = typeof info?.siteId === "string" ? info.siteId.trim() : "";
-  } catch {
-    /* siteId is optional — the connection screen still works without it. */
-  }
-  return siteId ? `/connection?siteId=${encodeURIComponent(siteId)}` : "/connection";
-}
-
-/**
- * Opens Tower's Webflow connection screen in a popup, scoped to the site currently open in the Designer
- * so the user can authorize/relink the workspace that owns it. Use this when a feature needs the current
- * site linked — it lands on `/connection` (signed-in via one-time-token handoff), not the dashboard.
- *
- * `onClosed` fires when the popup closes so callers can refetch Tower state (the newly granted site then
- * unlocks without a manual reload).
- */
-export function openTowerWebflowConnect(onClosed?: () => void): void {
-  openTowerAppPath("/connection", { popup: true, resolvePath: resolveCurrentSiteConnectionPath, onClosed });
-}
-
-/**
- * The only destination the OAuth popup may be pointed at. Tower mints the authorize URL, but the
- * client still allowlists it (Marketplace OAuth guidance): a compromised or misconfigured response
- * must not be able to redirect the popup anywhere but Webflow's consent screen.
- */
-function isAllowedWebflowAuthorizeUrl(raw: string): boolean {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return false;
-  }
-  return url.protocol === "https:" && url.hostname === "webflow.com" && url.pathname === "/oauth/authorize";
-}
-
-/**
- * Opens the Webflow OAuth consent screen directly in a popup — the same flow as Tower's "Relink", but
- * skipping the Tower `/connection` page. Mints an authorize URL from Tower (`POST` with the Designer
- * bearer; server stores the OAuth `state`→user/org so the cookie-less popup callback can resolve it),
- * then points the popup at `webflow.com/oauth/authorize`. On grant, Webflow → Tower callback → success
- * page closes the popup, which trips `onClosed` so the caller can refetch the now-updated grant.
- *
- * Must be called inside a user gesture (the blank popup is opened synchronously). Resolves to the
- * authorize error code (`team_admin_required`, `no_active_workspace`, `unauthorized`, …) when Tower
- * declines, or `popup_blocked` when the browser blocks the window.
- */
-export async function openWebflowOAuthAuthorize(
-  onClosed?: () => void
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const win = window.open("about:blank", "webflow-oauth-authorize", TOWER_POPUP_WINDOW_FEATURES);
-  if (!win) {
-    return { ok: false, error: "popup_blocked" };
-  }
-  openedAuthWindows.add(win);
+export async function mintWebflowAuthorizeUrl(): Promise<MintWebflowAuthorizeUrlResult> {
   try {
     const res = await towerFetch("/api/integrations/webflow/authorize", { method: "POST" });
-    const data = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
-    if (!res.ok || !data?.url) {
-      win.close();
-      return { ok: false, error: data?.error ?? `http_${res.status}` };
+    const data = (await res.json().catch(() => null)) as { url?: unknown; error?: unknown } | null;
+    if (!res.ok || typeof data?.url !== "string") {
+      const error = typeof data?.error === "string" && data.error ? data.error : `http_${res.status}`;
+      return { ok: false, error };
     }
     if (!isAllowedWebflowAuthorizeUrl(data.url)) {
-      win.close();
       return { ok: false, error: "invalid_authorize_url" };
     }
-    win.location.replace(data.url);
-    if (onClosed) {
-      watchPopupClosed(win, onClosed);
-    }
-    return { ok: true };
+    return { ok: true, url: data.url };
   } catch {
-    win.close();
     return { ok: false, error: "tower_unreachable" };
   }
-}
-
-/** Opens the Tower dashboard entry (app host) in a new tab. */
-export function openTowerAppHome(): void {
-  openTowerAppPath(TOWER_APP_ENTRY_PATH);
 }

@@ -22,8 +22,9 @@ import { beaconParentRouteLabel, useNavigateUp } from "@/app/beacon-navigation-h
 import { resolveBeaconRouteParent } from "@/app/beacon-route-hierarchy";
 import { useRequestRouteLeave } from "@/app/beacon-route-leave-guard";
 import { clearBeaconGuestChosen } from "@/features/auth/lib/beacon-guest-choice";
-import { isTowerConfigured, openTowerAppHome } from "@/features/auth/model/tower-auth-client";
+import { isTowerConfigured, TOWER_APP_ENTRY_PATH } from "@/features/auth/model/tower-auth-client";
 import { type BridgedTowerUser, useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
+import { useTowerAppLink } from "@/features/auth/model/use-tower-app-link";
 import {
   BeaconTowerConnectionIndicator,
   type BeaconTowerConnectionStatus,
@@ -35,7 +36,7 @@ import { BeaconSupportRequestDialog } from "@/features/support/ui/beacon-support
 import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
-import { CODALYN_BEACON_DOCS_URL, openCodalynPolicyPage } from "@/shared/lib/codalyn-links";
+import { CODALYN_BEACON_DOCS_URL, codalynPolicyLinkProps } from "@/shared/lib/codalyn-links";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
@@ -90,8 +91,10 @@ function towerMenuProfileLabel(user: BridgedTowerUser): string {
   return user.email.trim();
 }
 
-function BeaconMenuTowerActionsPane(props: { onBack: () => void; onOpenTower: () => void; onSignOut: () => void }) {
-  const { onBack, onOpenTower, onSignOut } = props;
+function BeaconMenuTowerActionsPane(props: { onBack: () => void; onSignOut: () => void }) {
+  const { onBack, onSignOut } = props;
+  // Ordinary new-tab link (never `window.open`): the handoff href is pre-minted while the pane is open.
+  const towerHomeLink = useTowerAppLink(TOWER_APP_ENTRY_PATH);
 
   return (
     <>
@@ -109,14 +112,14 @@ function BeaconMenuTowerActionsPane(props: { onBack: () => void; onOpenTower: ()
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
-        <DropdownMenuItem
-          onSelect={() => {
-            onOpenTower();
-          }}
-        >
-          <ExternalLink aria-hidden />
-          Open Tower
-        </DropdownMenuItem>
+        {towerHomeLink ? (
+          <DropdownMenuItem asChild>
+            <a {...towerHomeLink}>
+              <ExternalLink aria-hidden />
+              Open Tower
+            </a>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem
           variant="destructive"
           onSelect={() => {
@@ -273,13 +276,11 @@ function BeaconMenuHelpGroup(props: { onOpenSupportDialog: (kind: TowerSupportRe
   return (
     <DropdownMenuGroup>
       <BeaconMenuSectionLabel>Help</BeaconMenuSectionLabel>
-      <DropdownMenuItem
-        onSelect={() => {
-          openCodalynPolicyPage(CODALYN_BEACON_DOCS_URL);
-        }}
-      >
-        <BookOpen aria-hidden />
-        Documentation
+      <DropdownMenuItem asChild>
+        <a {...codalynPolicyLinkProps(CODALYN_BEACON_DOCS_URL)}>
+          <BookOpen aria-hidden />
+          Documentation
+        </a>
       </DropdownMenuItem>
       <DropdownMenuItem
         onSelect={() => {
@@ -393,10 +394,6 @@ function BeaconAppMenu({ towerConfigured, user, sessionPending, onSignIn, onSign
   const [towerActionsOpen, setTowerActionsOpen] = useState(false);
   const [activeSupportDialog, setActiveSupportDialog] = useState<TowerSupportRequestKind | null>(null);
 
-  const openTowerApp = useCallback(() => {
-    openTowerAppHome();
-  }, []);
-
   const sessionEmail = user?.email.trim() ?? "";
 
   return (
@@ -424,11 +421,7 @@ function BeaconAppMenu({ towerConfigured, user, sessionPending, onSignIn, onSign
               <BeaconMenuSettingsGroup pathname={pathname} />
             </>
           ) : towerActionsOpen ? (
-            <BeaconMenuTowerActionsPane
-              onBack={() => setTowerActionsOpen(false)}
-              onOpenTower={openTowerApp}
-              onSignOut={onSignOut}
-            />
+            <BeaconMenuTowerActionsPane onBack={() => setTowerActionsOpen(false)} onSignOut={onSignOut} />
           ) : (
             <>
               <BeaconMenuAccountGroup

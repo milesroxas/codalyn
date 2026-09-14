@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CODALYN_PRIVACY_POLICY_URL, openCodalynPolicyPage } from "@/shared/lib/codalyn-links";
+import { CODALYN_PRIVACY_POLICY_URL, codalynPolicyLinkProps } from "@/shared/lib/codalyn-links";
 import { applyTelemetryConsent } from "@/shared/lib/init-observability";
 import { readTelemetryConsent } from "@/shared/lib/telemetry-preference";
 import {
@@ -58,14 +58,8 @@ export function TelemetryConsentPrompt() {
                 Sharing is optional. Nothing is sent unless you turn it on, and you can change your choice anytime in
                 Settings &rarr; Privacy.
               </p>
-              <Button
-                type="button"
-                variant="link"
-                size="2xs"
-                className="justify-self-start px-0"
-                onClick={() => openCodalynPolicyPage(CODALYN_PRIVACY_POLICY_URL)}
-              >
-                Read the privacy policy
+              <Button asChild variant="link" size="2xs" className="justify-self-start px-0">
+                <a {...codalynPolicyLinkProps(CODALYN_PRIVACY_POLICY_URL)}>Read the privacy policy</a>
               </Button>
             </div>
           </AlertDialogDescription>

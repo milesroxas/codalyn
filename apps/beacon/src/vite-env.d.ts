@@ -15,7 +15,6 @@ declare const __QUALITY_COMPARE_POPOUT_ENABLED__: boolean;
 interface ImportMetaEnv {
   readonly VITE_BUNDLE_RECIPIENT?: string;
   readonly VITE_TOWER_ORIGIN?: string;
-  readonly VITE_BEACON_API_KEY?: string;
   /**
    * Telemetry-only build metadata (`release_stage`); never shown to users. Defaults to `stable` —
    * only an explicit `early-access` opts into the pre-release stage.

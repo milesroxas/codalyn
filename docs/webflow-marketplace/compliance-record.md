@@ -2313,3 +2313,39 @@ residue. Finding 4: by design — expected residue. Next: bundle scan on the 14:
 `v0.1.0_public_09-14_14-50-17.zip` (sha256 `9d9e8958…7275`) + `.sourcemaps.zip` (`eab413d3…17f8`).
 Pasted into SUBMIT.md §2. The receipt reconciles artifacts with the run; it is not acceptance. States
 unchanged: Submitted ✗ · Accepted ✗ until the form goes in.
+
+### R7b.17 Independent pre-submission re-audit of the codebase; six findings fixed; 16:43 rebuild (2026-09-14)
+
+A from-scratch pass over the Beacon source, the shipped zip, the Tower backend and the live production
+service, run against the `/webflow-app-preflight` quality gate rather than this record. Everything the
+gate lists as verifiable from the repo was re-verified (single egress call, pinned scanner-shape counts,
+manifest, no source maps in the zip, OAuth state binding, per-user session auth on every route,
+401-as-revocation, page-level custom-code apply/remove with SHA-256 SRI, scope-to-endpoint mapping
+against the Webflow docs, telemetry consent gating, privacy/terms/docs reachable, demo page runtime SRI
+pin ✓). Six findings, all fixed in this change:
+
+| # | Finding | Fix | Evidence |
+| --- | --- | --- | --- |
+| 1 | `[control]` Tower CORS fell back to `Access-Control-Allow-Origin: *` (credential-less) for any non-allowlisted origin — confirmed live with an OPTIONS from `https://evil.example`. Gate item: "CORS allowlists your production origins — not `*`". | `towerCorsHeadersFor` now emits no ACAO at all outside the allowlist; `Vary: Origin` always. Local-dev origins (`http://localhost:1337`, `127.0.0.1:1337`, `localhost:3100`) are excluded on every deployed runtime (`VERCEL_ENV` set) via `resolveTowerStaticBeaconRelatedOrigins`, shared by CORS, Better Auth `trustedOrigins` and the popup-handoff target check. | `apps/tower/src/server/tower-cors.ts`, `tower-static-beacon-origins.ts`; tests `tower-cors.test.ts` ("never a wildcard", "does not trust local-dev origins on a deployed runtime"), `tower-beacon-message-origin.test.ts`. Tower: tsc clean, 61 files / 377 tests pass. **Deploy Tower before filing.** |
+| 2 | `[control]` `verifyTowerApiRequest` accepted a static `BEACON_API_KEY` bearer with no user identity (a reusable credential path; whether the env var was set in production could not be verified from the repo). | Branch removed from Tower and the extension (`towerFetch` sends the session bearer only); `VITE_BEACON_API_KEY` dropped from `vite-env.d.ts` and `.env.example`; README + Tower env examples updated; Flint's dev-only key comment marked retired. | `apps/tower/src/server/tower-api-auth.ts`, `apps/beacon/src/shared/lib/tower-client.ts`. Bundle grep `BEACON_API_KEY` = 0. Remove the `BEACON_API_KEY` var from the Vercel project if it exists (harmless now, but dead). |
+| 3 | `[control]` `pnpm audit --prod` reachable from `apps/beacon`: react-router-dom 7.14.2 carried 4 high advisories (all SSR/RSC/server-side, none reachable in the extension) plus posthog-js transitives (dompurify, protobufjs, OpenTelemetry, fflate — 0 occurrences in the zip). | react-router-dom → 7.18.3; the vendor patch that deletes `ScrollRestoration`'s framework-mode inline `<script>` emission re-created for 7.18.3 (`patches/react-router@7.18.3.patch`, four dist chunks, `${restoreScroll}` template absent from the installed package). | Beacon-reachable advisories 31 → 24, react-router 0; the rest are posthog-js transitives not in the bundle (documented reachability). |
+| 4 | Submission notes listed three Tower paths; the extension calls `/api/v1/beacon/*` (6), `/api/auth/{get-session,sign-in/email,sign-out,one-time-token/generate}` and `/api/integrations/webflow/authorize` as well (same origin). | SUBMIT.md §4 now enumerates every path the bundle calls, all on `tower.codalyn.app`. | Path list derived by grep over `towerFetch`/`extensionFetch` call sites. |
+| 5 | Vendor doc URLs in error strings: `https://lexical.dev/docs/error?code=` ×3, `reactrouter.com` ×2, posthog docs. Not connections; three Preflight scans did not flag them. | No change: rewriting Lexical's `new URL("https://lexical.dev/docs/error")` would throw inside its error formatter. Recorded here as expected residue; add a strip rule only if a scan flags it. | zip grep unchanged. |
+| 6 | In-app uninstall guidance covered only the delete-last-list moment; the "app removed from workspace first" case lived only in the external guide. | `CMS_SLOTS_UNINSTALL_PAGE_HINT` now says to run the page uninstall on every installed page before removing the app, and names the manual removal location (Page settings → Custom code → Footer code) + publish. Same sentence added to SUBMIT.md §4. | `apps/beacon/src/shared/lib/cms-slots-feature-copy.ts` (copy constant; the rendering component and its story are unchanged). |
+
+**Artifact:** `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod` →
+`apps/beacon/bundle/production/public/v0.1.0_public_09-14_16-43-22.zip` (sha256
+`07b52d491b13f1d666ff9f50c266c8d165d6e4bf92f3f02a885010fe62943d2e`, 602 176 bytes) +
+`.sourcemaps.zip` (`cfc89c5d0b9deb8267956bf57e756e9eb9f4927ec57b35da3646944c7b6bf04f`). All release
+gates green (lint, 1038 tests, forbidden markers, pinned counts `fetch(` 1 / `new MutationObserver(` 1,
+manifest, no maps in zip). Manual re-grep of the zip: `window.open(`/`postMessage(`/`innerHTML =`/
+`eval(`/`?token=`/`sentry`/`rrweb`/`localhost`/`http://` (non-W3C) all 0; `dangerouslySetInnerHTML` 14
+(react-dom's property name, unchanged from the 14:50 build); `restoreScroll` 1 (react-router's SPA
+scroll-position variable, not the removed script emitter). The published-site runtime source is
+unchanged, so the demo page's synced runtime (`codalyn-beacon-runtime-0410d012.js`) still matches this
+build; no re-push needed. Retention kept the 14:50 build beside it and moved the doc-referenced 14:11 build to `bundle/archive/`.
+
+**States:** Source ✓ (uncommitted at time of writing) · Artifact ✓ · Installed ✗ (install the 16:43 zip
+on the test site and confirm the panel renders) · Runtime ✓ (unchanged) · Submitted ✗ · Accepted ✗.
+**Next:** commit; deploy Tower (CORS + auth change); install the 16:43 zip; run App Review Preflight on
+the 16:43 zip + sourcemaps → new `wfpre_` receipt into SUBMIT.md §2; file per SUBMIT.md.

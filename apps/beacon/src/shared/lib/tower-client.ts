@@ -2,16 +2,13 @@ import { readBeaconTowerSessionToken } from "@/features/auth/lib/webflow-designe
 import { readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
 import { extensionFetch } from "@/shared/lib/extension-egress";
 
-const beaconApiKey = import.meta.env.VITE_BEACON_API_KEY ?? "";
-
 /** Base URL for Tower (a local Tower on port 3100 under Docker Compose, tower.codalyn.app in release builds). */
 export function getTowerOrigin(): string {
   return readBeaconTowerOrigin();
 }
 
 /**
- * Request to Tower with the Better Auth bearer (Designer session) or optional dev `VITE_BEACON_API_KEY`,
- * sent through the extension's single egress point (`extensionFetch`, Tower-origin policy).
+ * Request to Tower with the Better Auth bearer (Designer session), sent through the extension's single egress point (`extensionFetch`, Tower-origin policy).
  * Webflow OAuth access tokens are stored only on Tower; this client never persists them.
  */
 export function towerFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -22,8 +19,6 @@ export function towerFetch(path: string, init?: RequestInit): Promise<Response> 
   const sessionToken = readBeaconTowerSessionToken();
   if (sessionToken) {
     headers.set("Authorization", `Bearer ${sessionToken}`);
-  } else if (beaconApiKey) {
-    headers.set("Authorization", `Bearer ${beaconApiKey}`);
   }
   return extensionFetch(url, {
     ...init,

@@ -154,7 +154,7 @@ export const CMS_SLOTS_UNINSTALL_PAGE_LABEL = `Also uninstall ${CMS_SLOTS_FEATUR
 
 /** Shown when deleting the last list without also uninstalling the page install. */
 export const CMS_SLOTS_UNINSTALL_PAGE_HINT =
-  "The footer beacon script, hidden page install, and runtime JS files in Assets stay on this site unless you check the option above.";
+  "The footer beacon script, hidden page install, and runtime JS files in Assets stay on this site unless you check the option above. Do this on every installed page before removing Beacon from your Webflow workspace: once the app is removed it can no longer clean up, and you would delete the codalyn-beacon-runtime entry yourself under Page settings → Custom code → Footer code, then publish.";
 
 /** Composer empty state when an editor has no slot lists to open on this page. */
 export const CMS_SLOTS_EDITOR_NO_SLOTS_TITLE = "No Slots Found";

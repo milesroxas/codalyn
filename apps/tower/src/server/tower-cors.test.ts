@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { towerCorsHeadersFor } from "./tower-cors";
 
@@ -76,15 +76,36 @@ describe("towerCorsHeadersFor", () => {
     expect(h["Access-Control-Allow-Credentials"]).toBe("true");
   });
 
-  it("uses wildcard without credentials when Origin is missing or not allowlisted", () => {
+  it("emits no Access-Control-Allow-Origin when Origin is missing or not allowlisted (never a wildcard)", () => {
     const noOrigin = towerCorsHeadersFor(new Request("https://tower.example/api"));
-    expect(noOrigin["Access-Control-Allow-Origin"]).toBe("*");
+    expect(noOrigin["Access-Control-Allow-Origin"]).toBeUndefined();
     expect(noOrigin["Access-Control-Allow-Credentials"]).toBeUndefined();
     expect(noOrigin["Access-Control-Allow-Private-Network"]).toBeUndefined();
+    expect(noOrigin.Vary).toBe("Origin");
 
-    const bad = new Request("https://tower.example/api", {
-      headers: { Origin: "https://evil.example" },
-    });
-    expect(towerCorsHeadersFor(bad)["Access-Control-Allow-Origin"]).toBe("*");
+    const bad = towerCorsHeadersFor(
+      new Request("https://tower.example/api", { headers: { Origin: "https://evil.example" } })
+    );
+    expect(bad["Access-Control-Allow-Origin"]).toBeUndefined();
+    expect(bad["Access-Control-Allow-Credentials"]).toBeUndefined();
+    expect(Object.values(bad)).not.toContain("*");
+  });
+
+  it("does not trust local-dev origins on a deployed runtime (VERCEL_ENV set)", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    try {
+      const dev = towerCorsHeadersFor(
+        new Request("https://tower.example/api", { headers: { Origin: "http://localhost:1337" } })
+      );
+      expect(dev["Access-Control-Allow-Origin"]).toBeUndefined();
+      const prod = towerCorsHeadersFor(
+        new Request("https://tower.example/api", {
+          headers: { Origin: "https://69e2b49536eded7411b48cf6.webflow-ext.com" },
+        })
+      );
+      expect(prod["Access-Control-Allow-Origin"]).toBe("https://69e2b49536eded7411b48cf6.webflow-ext.com");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

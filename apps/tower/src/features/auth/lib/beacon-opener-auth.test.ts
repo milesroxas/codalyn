@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { tryFinishBeaconTowerAuthPopup } from "./beacon-opener-auth";
 
-/** In the static Beacon allowlist (`TOWER_STATIC_BEACON_RELATED_ORIGINS`). */
+/** In the static Beacon allowlist (`TOWER_STATIC_BEACON_PRODUCTION_ORIGINS`). */
 const TRUSTED_BEACON_ORIGIN = "https://69e2b49536eded7411b48cf6.webflow-ext.com";
 
 describe("tryFinishBeaconTowerAuthPopup", () => {

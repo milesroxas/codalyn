@@ -1,8 +1,8 @@
-diff --git a/dist/development/chunk-EVOBXE3Y.mjs b/dist/development/chunk-EVOBXE3Y.mjs
-index 7f3642e663d3e7926d653f3e193984f86551ab18..468f7c32d3a77c7418251c4751c47416a3fa48f9 100644
---- a/dist/development/chunk-EVOBXE3Y.mjs
-+++ b/dist/development/chunk-EVOBXE3Y.mjs
-@@ -10419,34 +10419,11 @@ function ScrollRestoration({
+diff --git a/dist/development/chunk-BV7QT456.mjs b/dist/development/chunk-BV7QT456.mjs
+index 088efac6d4b48de0ca8759eb7411c57ba5bfd4fd..cadcd22567e885a2320011279b98f46ade70ef08 100644
+--- a/dist/development/chunk-BV7QT456.mjs
++++ b/dist/development/chunk-BV7QT456.mjs
+@@ -10827,37 +10827,11 @@ function ScrollRestoration({
    if (!remixContext || remixContext.isSpaMode) {
      return null;
    }
@@ -22,6 +22,9 @@ index 7f3642e663d3e7926d653f3e193984f86551ab18..468f7c32d3a77c7418251c4751c47416
 -      sessionStorage.removeItem(storageKey2);
 -    }
 -  }).toString();
+-  if (props.nonce == null && remixContext?.nonce) {
+-    props.nonce = remixContext.nonce;
+-  }
 -  return /* @__PURE__ */ React10.createElement(
 -    "script",
 -    {
@@ -42,11 +45,11 @@ index 7f3642e663d3e7926d653f3e193984f86551ab18..468f7c32d3a77c7418251c4751c47416
  }
  ScrollRestoration.displayName = "ScrollRestoration";
  function getDataRouterConsoleError2(hookName) {
-diff --git a/dist/development/chunk-YZKCRDTN.js b/dist/development/chunk-YZKCRDTN.js
-index 7937a3fdf367406c4a5e39b457b02e51125ec4d2..f12b15c76600d5009eab7c5c3e44e9b9b5f2ea06 100644
---- a/dist/development/chunk-YZKCRDTN.js
-+++ b/dist/development/chunk-YZKCRDTN.js
-@@ -610,34 +610,11 @@ function ScrollRestoration({
+diff --git a/dist/development/chunk-YRTY65LJ.js b/dist/development/chunk-YRTY65LJ.js
+index e4710a284acb24cee0c223b38df63adfcdc4b658..fc0ecdee33fc83f05a9624625252369ca8199f61 100644
+--- a/dist/development/chunk-YRTY65LJ.js
++++ b/dist/development/chunk-YRTY65LJ.js
+@@ -611,37 +611,11 @@ function ScrollRestoration({
    if (!remixContext || remixContext.isSpaMode) {
      return null;
    }
@@ -66,15 +69,18 @@ index 7937a3fdf367406c4a5e39b457b02e51125ec4d2..f12b15c76600d5009eab7c5c3e44e9b9
 -      sessionStorage.removeItem(storageKey2);
 -    }
 -  }).toString();
+-  if (props.nonce == null && _optionalChain([remixContext, 'optionalAccess', _23 => _23.nonce])) {
+-    props.nonce = remixContext.nonce;
+-  }
 -  return /* @__PURE__ */ React.createElement(
 -    "script",
 -    {
 -      ...props,
 -      suppressHydrationWarning: true,
 -      dangerouslySetInnerHTML: {
--        __html: `(${restoreScroll})(${_chunkZZNWZ5Q3js.escapeHtml.call(void 0, 
+-        __html: `(${restoreScroll})(${_chunk7SIULPXIjs.escapeHtml.call(void 0, 
 -          JSON.stringify(storageKey || SCROLL_RESTORATION_STORAGE_KEY)
--        )}, ${_chunkZZNWZ5Q3js.escapeHtml.call(void 0, JSON.stringify(ssrKey))})`
+-        )}, ${_chunk7SIULPXIjs.escapeHtml.call(void 0, JSON.stringify(ssrKey))})`
 -      }
 -    }
 -  );
@@ -86,11 +92,11 @@ index 7937a3fdf367406c4a5e39b457b02e51125ec4d2..f12b15c76600d5009eab7c5c3e44e9b9
  }
  ScrollRestoration.displayName = "ScrollRestoration";
  function getDataRouterConsoleError(hookName) {
-diff --git a/dist/production/chunk-LK6U7ULH.mjs b/dist/production/chunk-LK6U7ULH.mjs
-index 79b90a9d56b80f42e67789ac27b2beacfab52563..cc6cd6be70b695b2b1109719dcb3a4398c48d73e 100644
---- a/dist/production/chunk-LK6U7ULH.mjs
-+++ b/dist/production/chunk-LK6U7ULH.mjs
-@@ -10419,34 +10419,11 @@ function ScrollRestoration({
+diff --git a/dist/production/chunk-EFMJ2SG4.mjs b/dist/production/chunk-EFMJ2SG4.mjs
+index d9b786e7d03794b3617ed52b2de39197c02864b4..53135e61cbd49f5595762150650d7f44dcb67353 100644
+--- a/dist/production/chunk-EFMJ2SG4.mjs
++++ b/dist/production/chunk-EFMJ2SG4.mjs
+@@ -10827,37 +10827,11 @@ function ScrollRestoration({
    if (!remixContext || remixContext.isSpaMode) {
      return null;
    }
@@ -110,6 +116,9 @@ index 79b90a9d56b80f42e67789ac27b2beacfab52563..cc6cd6be70b695b2b1109719dcb3a439
 -      sessionStorage.removeItem(storageKey2);
 -    }
 -  }).toString();
+-  if (props.nonce == null && remixContext?.nonce) {
+-    props.nonce = remixContext.nonce;
+-  }
 -  return /* @__PURE__ */ React10.createElement(
 -    "script",
 -    {
@@ -130,11 +139,11 @@ index 79b90a9d56b80f42e67789ac27b2beacfab52563..cc6cd6be70b695b2b1109719dcb3a439
  }
  ScrollRestoration.displayName = "ScrollRestoration";
  function getDataRouterConsoleError2(hookName) {
-diff --git a/dist/production/chunk-UJQ4OJF4.js b/dist/production/chunk-UJQ4OJF4.js
-index 95755bb557a993e7c21b96f12e5c0553b6ff1e18..5299ecc52e4335767c166304e0a49ffce39e86c2 100644
---- a/dist/production/chunk-UJQ4OJF4.js
-+++ b/dist/production/chunk-UJQ4OJF4.js
-@@ -610,34 +610,11 @@ function ScrollRestoration({
+diff --git a/dist/production/chunk-LNBCQR6O.js b/dist/production/chunk-LNBCQR6O.js
+index 0df3d76944eeb60672521809ec7b250eb34a6dc2..d19ca37b5fb542402048bf1feeb7cf01a1214913 100644
+--- a/dist/production/chunk-LNBCQR6O.js
++++ b/dist/production/chunk-LNBCQR6O.js
+@@ -611,37 +611,11 @@ function ScrollRestoration({
    if (!remixContext || remixContext.isSpaMode) {
      return null;
    }
@@ -154,15 +163,18 @@ index 95755bb557a993e7c21b96f12e5c0553b6ff1e18..5299ecc52e4335767c166304e0a49ffc
 -      sessionStorage.removeItem(storageKey2);
 -    }
 -  }).toString();
+-  if (props.nonce == null && _optionalChain([remixContext, 'optionalAccess', _23 => _23.nonce])) {
+-    props.nonce = remixContext.nonce;
+-  }
 -  return /* @__PURE__ */ React.createElement(
 -    "script",
 -    {
 -      ...props,
 -      suppressHydrationWarning: true,
 -      dangerouslySetInnerHTML: {
--        __html: `(${restoreScroll})(${_chunkX5SKXJ4Ajs.escapeHtml.call(void 0, 
+-        __html: `(${restoreScroll})(${_chunk6XRGXNVQjs.escapeHtml.call(void 0, 
 -          JSON.stringify(storageKey || SCROLL_RESTORATION_STORAGE_KEY)
--        )}, ${_chunkX5SKXJ4Ajs.escapeHtml.call(void 0, JSON.stringify(ssrKey))})`
+-        )}, ${_chunk6XRGXNVQjs.escapeHtml.call(void 0, JSON.stringify(ssrKey))})`
 -      }
 -    }
 -  );

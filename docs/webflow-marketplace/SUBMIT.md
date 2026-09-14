@@ -6,7 +6,8 @@ rationale; that lives in [compliance-record.md](compliance-record.md). Keep this
 list, then copy.
 
 Current round: **7b, 2026-09-14** (App Review Preflight re-scans + three "Test the published runtime"
-runs; no new reviewer email). Latest findings and their answers: compliance-record R7b.16.
+runs; no new reviewer email). Latest findings and their answers: compliance-record R7b.16; the 16:43
+rebuild and the backend fixes that go with it are R7b.17.
 
 ## Before you paste (30 seconds)
 
@@ -22,32 +23,27 @@ runs; no new reviewer email). Latest findings and their answers: compliance-reco
 
 | Form field | File |
 | --- | --- |
-| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-14_14-50-17.zip` |
-| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-14_14-50-17.sourcemaps.zip` |
+| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-14_16-43-22.zip` |
+| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-14_16-43-22.sourcemaps.zip` |
 | Package manifest + lockfile (required for compiled bundles since the 2026-08-19 guidelines) | `apps/beacon/package.json` + root `pnpm-lock.yaml`, as committed at the build commit |
 
-sha256 · bundle `9d9e8958fdf4ac33668a716475e6d1d444fc225559b4dda2b086ae8457e37275` ·
-sourcemaps `eab413d3443a47cf846e2c3970e4b611da28e8fd66b8bd749e3cc42bffae17f8`
+sha256 · bundle `07b52d491b13f1d666ff9f50c266c8d165d6e4bf92f3f02a885010fe62943d2e` ·
+sourcemaps `cfc89c5d0b9deb8267956bf57e756e9eb9f4927ec57b35da3646944c7b6bf04f`
 
 Rebuild command if needed: `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod`
 
 ## 2. App Review Preflight receipt
 
-Issued 2026-09-14 by the Preflight run on the two files above (bundle `9d9e8958…7275` + sourcemaps
-`eab413d3…17f8`). Paste as-is:
+**Not yet issued for the 16:43 build.** The previous receipt (`wfpre_d7c0944a2b2df172d989a97931230b21`)
+was issued for `v0.1.0_public_09-14_14-50-17.zip` (sha256 `9d9e8958…7275`) and does not reconcile with
+the files above. Run App Review Preflight on the 16:43 zip + its `.sourcemaps.zip`, then paste the new
+`wfpre_` code here before filing. Expected bundle-scan result is unchanged (External API Calls 1, Silent
+Canvas Mutations 1) — the 16:43 build changes no scanner-shaped token (verified by the release gates and
+a manual grep, compliance-record R7b.17).
 
 ```
-wfpre_d7c0944a2b2df172d989a97931230b21
+wfpre_<pending — run Preflight on the 16:43 artifacts>
 ```
-
-(Expected **bundle scan** result for this build: two REQUIRED items — External API Calls, 1 location;
-Silent Canvas Mutations, 1 location. Both are answered by the text in §3/§4. Anything else = stop, see
-[playbook.md](playbook.md) § B. Expected **published-runtime test** result (observed three times on
-2026-09-14, last at 15:45): runtime file 1 = Loaded ✓ · Hash matched ✓ · SRI mismatch ✗ · No source map
-✗, plus "New script elements were created" and "Unreviewed scripts loaded" listing only Webflow's own
-files. All four are answered by the PUBLISHED-RUNTIME TEST NOTES paragraph in §4; the SRI mismatch is
-tool-side (page tag, bytes and CORS verified — compliance-record R7b.16). Do not iterate the page for
-them.)
 
 ## 3. Response to the review team (≤500 characters)
 
@@ -61,6 +57,10 @@ Preflight: every request now leaves through one first-party egress call (extensi
 
 ```
 WHAT CHANGED IN THIS UPDATE
+- Backend CORS is allowlist-only: Tower answers non-allowlisted origins with no Access-Control-Allow-Origin header (previously a credential-less "*"), and local-development origins are excluded on every deployed runtime.
+- The optional shared API-key bearer for Tower's API was removed from both Tower and the extension; every request is attributed to a signed-in user session.
+- react-router-dom updated to 7.18.3 (clears the published react-router advisories in the uploaded manifest/lockfile); our vendor patch that removes its framework-mode inline <script> emission is re-applied to that version.
+- The in-app hint shown when deleting the last slot list on a page now tells the user to run the page uninstall on every installed page before removing Beacon from the workspace, and exactly what to delete by hand if the app was removed first.
 - All network requests from the extension go through one first-party call site (extension-egress.ts) with an explicit destination policy; the release build fails if a second call site appears.
 - The one MutationObserver in the bundle is the rich-text editor's (Lexical) contenteditable sync inside our own panel. It observes only that editor's root and writes only that editor's DOM. It never observes or writes the Designer canvas; canvas changes happen only through the Designer API behind explicit user actions.
 - Hosted runtime script (applied to pages via the Custom Code API) is registered with a SHA-256 SRI over the exact uploaded bytes at an immutable, versioned Webflow asset URL; Webflow renders the tag's integrity and crossorigin="anonymous" from that registration. It loads no other scripts and makes no network requests (unit-pinned).
@@ -69,10 +69,15 @@ WHAT CHANGED IN THIS UPDATE
 - styles.css ships a version-3 source map from the same build. No http:// or ws:// URLs, no innerHTML writes, no window.open, no postMessage, no credentials in URLs, no session replay.
 
 BACKEND DOMAINS AND ENDPOINTS (Hybrid App)
-- https://tower.codalyn.app (first-party backend, HTTPS, production only)
+- https://tower.codalyn.app (first-party backend, HTTPS, production only). Every path the extension calls, all on this one origin:
   - /api/auth/webflow-designer — Designer ID-token exchange (server-side; issues our session)
-  - /api/v2/webflow/* — proxy to the Webflow Data API using the OAuth token stored server-side
+  - /api/auth/get-session, /api/auth/sign-in/email, /api/auth/sign-out, /api/auth/one-time-token/generate — our own session lifecycle (Better Auth); the one-time token is consumed by the Tower sign-in handoff page and is never a Webflow credential
+  - /api/integrations/webflow/authorize — mints the server-stored OAuth state and returns the Webflow consent URL the user opens as an ordinary link
+  - /api/v1/beacon/settings, /active-workspace, /access-policy, /usage, /early-access-request, /support-request — app settings, workspace selection, entitlement, usage, and the two user-submitted forms
+  - /api/v2/webflow/* — proxy to the Webflow Data API using the OAuth token stored server-side (path segments only; the upstream host is fixed)
   - image conversion endpoint — opt-in AVIF only (see below)
+  - All endpoints require a session resolved server-side; CORS is allowlist-only (Webflow Designer/extension origins), no wildcard.
+- Uninstall: Beacon applies code at page level only, never site-level. Deleting the last slot list on a page offers a one-click page uninstall that removes the footer script entry and orphaned runtime assets and prompts to publish; the same hint tells the user to do this on every installed page before removing the app from the workspace, and what to delete by hand (Page settings → Custom code → Footer code) if the app was removed first. Full steps: https://tower.codalyn.app/docs.
 - Webflow-issued presigned asset-upload URLs (S3 / website-files.com) — direct upload of our runtime script; no credential header.
 - https://us.i.posthog.com — product analytics, opt-in only, no site content.
 - The Authorization bearer is sent only to the Tower origin (exact-origin match at the single call site). The Webflow ID token is never forwarded to a third party.

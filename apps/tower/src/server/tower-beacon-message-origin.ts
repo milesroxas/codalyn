@@ -1,4 +1,4 @@
-import { TOWER_STATIC_BEACON_RELATED_ORIGINS } from "@/server/tower-static-beacon-origins";
+import { resolveTowerStaticBeaconRelatedOrigins } from "@/server/tower-static-beacon-origins";
 import { isWebflowDesignerExtensionOrigin } from "@/server/tower-webflow-designer-origins";
 
 /**
@@ -16,7 +16,7 @@ export function isTrustedBeaconMessageOrigin(origin: string | null | undefined):
   if (!origin) {
     return false;
   }
-  if ((TOWER_STATIC_BEACON_RELATED_ORIGINS as readonly string[]).includes(origin)) {
+  if (resolveTowerStaticBeaconRelatedOrigins().includes(origin)) {
     return true;
   }
   return isWebflowDesignerExtensionOrigin(origin);

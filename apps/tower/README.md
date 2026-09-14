@@ -132,16 +132,9 @@ docker compose up --build -d
 
 ## Beacon → Tower
 
-**`/api/v1/*`** accepts:
+**`/api/v1/*` and `/api/v2/webflow/*`** accept a **Better Auth session** only: `Authorization: Bearer <session token>` (issued to the extension by `POST /api/auth/webflow-designer` from the Designer ID token, or by the popup sign-in handoff) and/or Tower’s session cookie on its own origin. There is no shared API key: every request is attributed to a user, and the former `BEACON_API_KEY` bearer was removed for the Marketplace submission.
 
-1. **`Authorization: Bearer <BEACON_API_KEY>`** when `BEACON_API_KEY` is set on Tower (match `VITE_BEACON_API_KEY` in Beacon). Use this from the Designer extension; CORS on `/api/v1/*` allows cross-origin `fetch` with Bearer.
-2. **Better Auth session** (cookie) when calling the API from the browser on Tower’s origin (e.g. dashboard).
-
-The key in `VITE_BEACON_API_KEY` is **bundled in the extension** — acceptable for **local/dev** only; plan a token-exchange or OAuth-style flow before production.
-
-**Beacon:** copy `apps/beacon/.env.example` → `.env.local`, set `VITE_TOWER_ORIGIN` to the Tower origin you run locally (typically **`http://localhost:3100`** when **`pnpm app tower dev`** is running). If you hit Tower via another host port (e.g. Docker with `TOWER_PORT=3101`), match that origin. Set `VITE_BEACON_API_KEY`. Use `towerFetch()` from `src/shared/lib/tower-client.ts` for requests to Tower.
-
-**Tower:** set `BEACON_API_KEY` in `.env.local` or `.env.docker` (same value as Beacon’s `VITE_BEACON_API_KEY`).
+**Beacon:** copy `apps/beacon/.env.example` → `.env.local`, set `VITE_TOWER_ORIGIN` to the Tower origin you run locally (typically **`http://localhost:3100`** when **`pnpm app tower dev`** is running). If you hit Tower via another host port (e.g. Docker with `TOWER_PORT=3101`), match that origin. Use `towerFetch()` from `src/shared/lib/tower-client.ts` for requests to Tower.
 
 ### Webflow Data API (aligned with official docs)
 

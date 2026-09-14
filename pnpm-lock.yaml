@@ -29,9 +29,9 @@ patchedDependencies:
   react-easy-crop@5.5.7:
     hash: da2c5d4a198421b67b01dedf142d566aa83aa75bef59a7a807e2754067ccb8ff
     path: patches/react-easy-crop@5.5.7.patch
-  react-router@7.14.2:
-    hash: 8f17450c2a60889f34a8c198be0f6310a496eee23edaabb6dd5de3cbedfd49d0
-    path: patches/react-router@7.14.2.patch
+  react-router@7.18.3:
+    hash: f9ec856d151250a12fcabe42983dee5eea9172e8eee826d36fad2fc1b0663473
+    path: patches/react-router@7.18.3.patch
   react-style-singleton@2.2.3:
     hash: 8863ce0fa1810ab48590d0c293799e105946bae66c2f7950acff192521d9d5b7
     path: patches/react-style-singleton@2.2.3.patch
@@ -143,8 +143,8 @@ importers:
         specifier: ^5.5.7
         version: 5.5.7(patch_hash=da2c5d4a198421b67b01dedf142d566aa83aa75bef59a7a807e2754067ccb8ff)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react-router-dom:
-        specifier: ^7.14.2
-        version: 7.14.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        specifier: ^7.18.3
+        version: 7.18.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       spark-md5:
         specifier: ^3.0.2
         version: 3.0.2
@@ -10367,15 +10367,15 @@ packages:
       '@types/react':
         optional: true
 
-  react-router-dom@7.14.2:
-    resolution: {integrity: sha512-YZcM5ES8jJSM+KrJ9BdvHHqlnGTg5tH3sC5ChFRj4inosKctdyzBDhOyyHdGk597q2OT6NTrCA1OvB/YDwfekQ==}
+  react-router-dom@7.18.3:
+    resolution: {integrity: sha512-ytVbyBBM7vMfRCam25r0WMhSVSom909A8p+8m0/f1w853dz/xfFu6etAT2SEbVoSnI+ZoPRDqIsQXVT89gp7kg==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       react: '>=18'
       react-dom: '>=18'
 
-  react-router@7.14.2:
-    resolution: {integrity: sha512-yCqNne6I8IB6rVCH7XUvlBK7/QKyqypBFGv+8dj4QBFJiiRX+FG7/nkdAvGElyvVZ/HQP5N19wzteuTARXi5Gw==}
+  react-router@7.18.3:
+    resolution: {integrity: sha512-gyXgtdr5uACJ5b1Q4udzjVV+tb/rlHIMJKuJ0e89R4Kzgz47z/rgP0dIKxktqIEUhDHluGTPJJH/wRha7CyqsA==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       react: '>=18'
@@ -22783,13 +22783,13 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.17
 
-  react-router-dom@7.14.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
+  react-router-dom@7.18.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
-      react-router: 7.14.2(patch_hash=8f17450c2a60889f34a8c198be0f6310a496eee23edaabb6dd5de3cbedfd49d0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      react-router: 7.18.3(patch_hash=f9ec856d151250a12fcabe42983dee5eea9172e8eee826d36fad2fc1b0663473)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
 
-  react-router@7.14.2(patch_hash=8f17450c2a60889f34a8c198be0f6310a496eee23edaabb6dd5de3cbedfd49d0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
+  react-router@7.18.3(patch_hash=f9ec856d151250a12fcabe42983dee5eea9172e8eee826d36fad2fc1b0663473)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
       cookie: 1.1.1
       react: 19.2.5

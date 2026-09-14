@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { isTrustedBeaconMessageOrigin } from "./tower-beacon-message-origin";
 
 describe("isTrustedBeaconMessageOrigin", () => {
@@ -18,6 +18,16 @@ describe("isTrustedBeaconMessageOrigin", () => {
     expect(isTrustedBeaconMessageOrigin(null)).toBe(false);
     expect(isTrustedBeaconMessageOrigin(undefined)).toBe(false);
     expect(isTrustedBeaconMessageOrigin("")).toBe(false);
+  });
+
+  it("rejects local-dev origins on a deployed runtime (VERCEL_ENV set)", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    try {
+      expect(isTrustedBeaconMessageOrigin("http://localhost:1337")).toBe(false);
+      expect(isTrustedBeaconMessageOrigin("https://69e2b49536eded7411b48cf6.webflow-ext.com")).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("rejects attacker-controlled origins", () => {

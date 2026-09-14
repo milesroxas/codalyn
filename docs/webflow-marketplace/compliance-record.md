@@ -2272,3 +2272,44 @@ automated receipt at real cost and with no requirement behind it. Expected resid
 findings 2, 3 (Webflow files) and 4 (no map, by design); the SUBMIT.md §4 "published-runtime test notes"
 paragraph is the answer to all three. Reversible: the 16 rows stay in SUBMIT.md §5 for the case a
 reviewer asks for them. Open decision remains with the reviewer.
+
+**Runtime observed again (2026-09-14, after Miles removed the template's jsdelivr embed components,
+re-synced and republished; third Preflight run still reports all four findings).** `node
+scripts/webflow-runtime-observe.mjs https://beacon-demo.webflow.io/blog/the-power-of-resilience`: 17
+scripts (was 24) — the 7 jsdelivr embeds are gone; what remains is the Beacon runtime plus Webflow's
+own set: jQuery, `webflow.049b2302.3c18d83945b06000.js` (Webflow renders it with its own
+`integrity="sha384-…" crossorigin="anonymous"`), the 12 `achunk` files it imports (no element, initiator
+= the core bundle), and `gsap/3.15.0/gsap.min.js` + `ScrollTrigger.min.js`, which Webflow renders in
+`<head>` from its own `cdn.prod.website-files.com/gsap/` path — not page custom code, so removing embeds
+cannot remove them. Beacon runtime: exactly one reference in the served HTML, tag unchanged
+(`integrity="sha256-ZxZtUnSp6VCb9YqsFffIPBLHmAhfYnhGvtPy6H/eD9g=" crossorigin="anonymous"`), served
+bytes 20081, SHA-256 `67166d52…0fd8`, DOM integrity ✓ matches, requests 0 scripts. The tool's finding 1
+wording ("does not use the SRI value **saved in this test package**") therefore points at the package's
+saved SRI, not the page: the DOM value is provably correct. Next: rebuild runtime file 1 from an empty
+row (URL, SHA-256; confirm the derived SRI reads `sha256-ZxZt…eD9g=` before Run) and capture the
+"Runtime file results" row (Loaded / Hash matched / SRI). If that row shows Hash matched and the field
+holds `ZxZt…` yet finding 1 persists, record it as a Preflight defect and rely on the raw tag above plus
+the SUBMIT.md §4 notes paragraph; Preflight is optional per the submission page.
+
+**Preflight's own "Runtime file results" row for the third run (2026-09-14, screenshot from Miles):**
+`6aa844abbb616acbbee14fa2_codalyn-beacon-runtime-0410d012.js` — **Loaded ✓ · Hash matched ✓ · SRI
+mismatch ✗ · No source map ✗**. The form held the exact page values (URL, "Loaded directly by the
+published page", SHA-256 `67166d52…0fd8`, tool-derived SRI `sha256-ZxZt…eD9g=`, ready selector
+`[data-beacon-target="list"][data-cb-rendered="1"]`, proxy = none). "Hash matched" means the bytes
+Preflight's browser received hash to the package SHA-256; the served tag carries the SRI of those same
+bytes (curl/HTML grep and headless-Chromium DOM read above, one tag, `crossorigin="anonymous"`, CDN ACAO
+`*` with and without `Origin`, identical bytes for identity/gzip/br). The runtime never touches its own
+`<script>` (reads `document.currentScript.src` only). Disposition for finding 1: **page and package are
+correct; the mismatch is inside Preflight's string comparison and could not be reproduced outside it.**
+Filed as a Preflight observation, answered in SUBMIT.md §4 (new bullet with the raw tag, hashes and
+encodings). Not pursued: re-hashing the runtime until its base64 SRI contains no `/` (a guess at the
+comparison bug; costs a rebuild, reinstall, sync and publish per attempt). States for finding 1: Source ✓
+· Artifact ✓ · Installed ✓ · Runtime ✓ (ours + Preflight's own Loaded/Hash matched) · Submitted ✗ ·
+Accepted ✗. Findings 2/3: only Webflow's files remain after the embed removal (17 scripts) — expected
+residue. Finding 4: by design — expected residue. Next: bundle scan on the 14:50 zip + sourcemaps zip →
+`wfpre_` receipt → SUBMIT.md §2 → submit.
+
+**Preflight receipt (2026-09-14):** `wfpre_d7c0944a2b2df172d989a97931230b21`, issued by the run on
+`v0.1.0_public_09-14_14-50-17.zip` (sha256 `9d9e8958…7275`) + `.sourcemaps.zip` (`eab413d3…17f8`).
+Pasted into SUBMIT.md §2. The receipt reconciles artifacts with the run; it is not acceptance. States
+unchanged: Submitted ✗ · Accepted ✗ until the form goes in.

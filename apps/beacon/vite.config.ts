@@ -6,6 +6,8 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 // @ts-expect-error — no .mjs typings; plugin is JS-only at repo root
+import { createCssSourceMapPlugin } from "../../scripts/vite-css-sourcemap-plugin.mjs";
+// @ts-expect-error — no .mjs typings; plugin is JS-only at repo root
 import { createStripDevHostLiteralsPlugin } from "../../scripts/vite-strip-dev-host-literals.mjs";
 // Shared JS module (see scripts/vite-wf-designer-extension-plugin.mjs)
 // @ts-expect-error — no .mjs typings; plugin is JS-only at repo root
@@ -145,6 +147,10 @@ export default defineConfig(({ mode }) => {
       createStripMainCssFromPopoutPlugin(),
       ...(qualityPopoutEnabled ? [] : [createDropQualityPopoutCssPlugin()]),
       createBeaconCspPlugin(towerOrigin),
+      // Marketplace submission form + App Review Preflight require a source map for styles.css too;
+      // Vite emits none for CSS, so this plugin minifies the stylesheet itself (needs cssMinify: false
+      // below) and writes styles.css.map, which build-cli moves into the private sourcemaps zip.
+      createCssSourceMapPlugin(),
       ...(isVitest ? [] : [createWebflowDesignerExtensionPlugin({ appRoot: beaconRoot })]),
     ],
     define: {
@@ -173,6 +179,15 @@ export default defineConfig(({ mode }) => {
       outDir: "dist",
       emptyOutDir: true,
       cssCodeSplit: false,
+      // Minification of the merged stylesheet is done by createCssSourceMapPlugin (lightningcss, same
+      // baseline targets) so that a styles.css.map exists for the submission form.
+      cssMinify: false,
+      // App Review Preflight (2026-09-14) "External API Calls" + "Silent Canvas Mutations" both flagged
+      // Vite's modulepreload polyfill in bundle.js: it fetches `<link rel="modulepreload">` targets and
+      // installs a document-wide MutationObserver to catch late-added links. Every browser the Webflow
+      // Designer runs in supports modulepreload natively, so the polyfill is dead weight; without it the
+      // links are plain hints and lazy chunks still load through `import()`.
+      modulePreload: { polyfill: false },
       // Marketplace submission requires source maps for the minified bundle, uploaded separately in a
       // private form field. "hidden" emits dist/*.map without a `//# sourceMappingURL=` comment, so the
       // shipped bundle.js carries no map reference; scripts/build-cli.mjs then moves every .map out of

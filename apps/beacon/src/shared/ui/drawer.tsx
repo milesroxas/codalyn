@@ -130,40 +130,15 @@ function syncDrawerStackMembership(id: string, open: boolean) {
 // on <body>. When one drawer opens while another is mid-close, Radix's open/close races leave the
 // lock stuck — killing scroll and portaled Select dropdowns inside the freshly opened sheet
 // ("dead" sheet). Our DrawerOverlay (fixed inset-0) already blocks the background, so <body> never
-// needs the lock: while any drawer is open we observe <body> and immediately revert a stuck `none`.
-//
-// Scope note (Marketplace review): this guard reverts a style the bundled library itself wrote —
-// it introduces no styling of its own and cannot execute markup. It stays inside the extension's
-// own iframe document, exists only while a drawer is open (refcounted acquire/release below,
-// disconnected on the last close), and a static CSS rule cannot express "revert the lock only
-// when it is stuck" without also defeating the legitimate lock other Radix modals rely on.
-let bodyPointerEventsGuardCount = 0;
-let bodyPointerEventsObserver: MutationObserver | null = null;
-
+// needs the lock while a drawer is open: a static rule in styles/vendor-static.css
+// (`body:has([data-slot="drawer-content"][data-state="open"]) { pointer-events: auto !important }`)
+// overrides the inline lock for exactly that window — no observer watches <body> (App Review
+// Preflight "Silent Canvas Mutations", 2026-09-14). The one-shot reset below covers the edges the
+// rule cannot: a lock written before the open state lands, and one left behind after the last close.
 function clearStuckBodyPointerEvents() {
   if (document.body.style.pointerEvents === "none") {
     document.body.style.pointerEvents = "";
   }
-}
-
-function acquireBodyPointerEventsGuard() {
-  bodyPointerEventsGuardCount += 1;
-  if (bodyPointerEventsObserver != null) {
-    return;
-  }
-  clearStuckBodyPointerEvents();
-  bodyPointerEventsObserver = new MutationObserver(clearStuckBodyPointerEvents);
-  bodyPointerEventsObserver.observe(document.body, { attributes: true, attributeFilter: ["style"] });
-}
-
-function releaseBodyPointerEventsGuard() {
-  bodyPointerEventsGuardCount = Math.max(0, bodyPointerEventsGuardCount - 1);
-  if (bodyPointerEventsGuardCount > 0) {
-    return;
-  }
-  bodyPointerEventsObserver?.disconnect();
-  bodyPointerEventsObserver = null;
-  clearStuckBodyPointerEvents();
 }
 
 function useClearStuckBodyPointerEvents(open: boolean) {
@@ -171,8 +146,8 @@ function useClearStuckBodyPointerEvents(open: boolean) {
     if (!open) {
       return;
     }
-    acquireBodyPointerEventsGuard();
-    return releaseBodyPointerEventsGuard;
+    clearStuckBodyPointerEvents();
+    return clearStuckBodyPointerEvents;
   }, [open]);
 }
 

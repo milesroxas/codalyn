@@ -3,7 +3,7 @@ import { readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
 
 const beaconApiKey = import.meta.env.VITE_BEACON_API_KEY ?? "";
 
-/** Base URL for Tower (e.g. `http://localhost:3100` when using Docker Compose). */
+/** Base URL for Tower (a local Tower on port 3100 under Docker Compose, tower.codalyn.app in release builds). */
 export function getTowerOrigin(): string {
   return readBeaconTowerOrigin();
 }

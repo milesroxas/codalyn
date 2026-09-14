@@ -259,6 +259,37 @@ function listDistSourceMaps(appPath) {
 const CREDENTIAL_IN_QUERY_PATTERN = /[?&]token=/i;
 
 /**
+ * Cleartext-scheme URL (App Review Preflight "Insecure Protocols", 2026-09-14), minus the W3C
+ * namespace URIs the rule itself exempts. The shipped bundle is gated on the same shape (see
+ * staticForbiddenMarkers); this pattern is applied to the private source-map artifact, whose
+ * embedded `sourcesContent` also carries vendor *comments* (license and reference links) that the
+ * bundle never contains.
+ */
+const INSECURE_SCHEME_PATTERN = /\bhttp:\/\/(?!www\.w3\.org\/)/gi;
+
+/**
+ * Rewrites cleartext `http://` links inside a map's embedded source text to `https://`. Every
+ * `http://` literal that survives into the shipped bundle fails the bundle gate first, so whatever
+ * is left in `sourcesContent` is comment text or tree-shaken code — rewriting its scheme changes
+ * no mapped position and no shipped behaviour, and keeps the artifact the submission form uploads
+ * free of the shape the scanner flags. W3C namespace URIs are left as they are. Pure; exported for
+ * tests.
+ *
+ * @param {{ sourcesContent?: (string | null)[] }} map parsed source map JSON
+ */
+export function rewriteSourceMapInsecureSchemes(map) {
+  if (!Array.isArray(map?.sourcesContent)) {
+    return map;
+  }
+  return {
+    ...map,
+    sourcesContent: map.sourcesContent.map((content) =>
+      typeof content === "string" ? content.replace(INSECURE_SCHEME_PATTERN, "https://") : content
+    ),
+  };
+}
+
+/**
  * Moves every source map out of dist/ into a private zip next to the bundle archive, *before*
  * `webflow extension bundle` zips dist/. The Marketplace submission form requires source maps for a
  * minified bundle, uploaded in a private field from the exact same build — so they are produced on
@@ -283,7 +314,9 @@ function extractSourceMapsToPrivateZip(appPath, archivePath, options = {}) {
       const src = resolve(distDir, rel);
       const dest = resolve(staging, rel);
       mkdirSync(dirname(dest), { recursive: true });
-      const rewritten = rewriteSourceMapVendorContent(JSON.parse(readFileSync(src, "utf-8")), { strict });
+      const rewritten = rewriteSourceMapInsecureSchemes(
+        rewriteSourceMapVendorContent(JSON.parse(readFileSync(src, "utf-8")), { strict })
+      );
       const serialized = JSON.stringify(rewritten);
       if (strict && CREDENTIAL_IN_QUERY_PATTERN.test(serialized)) {
         const index = serialized.search(CREDENTIAL_IN_QUERY_PATTERN);
@@ -291,6 +324,9 @@ function extractSourceMapsToPrivateZip(appPath, archivePath, options = {}) {
           `Source map ${rel} contains a credential-in-query-string URL — it would ship in the private ` +
             `submission artifact. Context: …${serialized.slice(Math.max(0, index - 80), index + 80)}…`
         );
+      }
+      if (strict && new RegExp(INSECURE_SCHEME_PATTERN.source, "i").test(serialized)) {
+        throw new Error(`Source map ${rel} still contains a cleartext http:// URL after rewriting`);
       }
       writeFileSync(dest, serialized);
       rmSync(src);
@@ -601,6 +637,19 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     // yield through `scheduler.postTask()` (patches/scheduler@0.27.0.patch), so no shipped JS may
     // contain the call.
     forbidden.push({ value: "postMessage(", label: "a postMessage call" });
+    // App Review Preflight (2026-09-14) "Insecure Protocols": no `http://` / `ws://` URL may ship. The
+    // W3C namespace URIs React needs at runtime (`http://www.w3.org/2000/svg` …) are the rule's own
+    // stated exception. Sources removed for this: posthog-js's yandex bot UA entry (strip rule) and the
+    // better-auth/better-fetch client, which Beacon no longer bundles (first-party session client).
+    forbidden.push({ pattern: /\bhttp:\/\/(?!www\.w3\.org\/)/i, label: "an insecure http:// URL" });
+    forbidden.push({ pattern: /\bws:\/\//i, label: "an insecure ws:// URL" });
+    // App Review Preflight (2026-09-14) "Unsafe HTML Injection": no HTML-injection sink write may
+    // ship — react-dom's three `.innerHTML =` sites are compiled into throws (strip plugin) and the
+    // published-site runtime renders sanitized DOM nodes instead of assigning `innerHTML`. Reads
+    // (`x.innerHTML` on the right-hand side) and react-dom's `case "innerHTML":` labels are not sinks.
+    forbidden.push({ pattern: /\.(?:inner|outer)html\s*=(?!=)/i, label: "an innerHTML/outerHTML write" });
+    forbidden.push({ value: "insertAdjacentHTML(", label: "an insertAdjacentHTML call" });
+    forbidden.push({ value: "document.write(", label: "a document.write call" });
   }
   if (!SENTRY_ALLOWED_APPS.has(appName)) {
     // An earlier review round flagged Sentry; it has since been removed from Beacon, but
@@ -668,12 +717,20 @@ function expectedBundleMarkers({ appName, appPath, channel, recipient, pkg }) {
  *
  * @returns {{ value: string; label: string } | null} the first marker present, if any
  */
+/**
+ * A marker is either a bare substring (`value`, matched case-insensitively) or a `pattern` RegExp
+ * (used where a substring cannot express an exception, e.g. `http://` minus the W3C namespace URIs).
+ */
 function matchForbiddenMarker(contents, forbidden) {
   if (!forbidden?.length) {
     return null;
   }
   const haystack = contents.toLowerCase();
-  return forbidden.find(({ value }) => haystack.includes(value.toLowerCase())) ?? null;
+  return (
+    forbidden.find((marker) =>
+      marker.pattern ? marker.pattern.test(contents) : haystack.includes(marker.value.toLowerCase())
+    ) ?? null
+  );
 }
 
 function verifyDistBundle(appPath, markers) {

@@ -3,11 +3,14 @@ export const WEBFLOW_EXTENSION_BUNDLE_FILENAME = "bundle.zip";
 
 /**
  * @param {string} jsContents concatenated JS from dist/ or the archived zip
- * @param {{ version: string; recipient?: string; towerOrigin?: string; forbidden?: Array<{ value: string; label: string }> }} expected
+ * @param {{ version: string; recipient?: string; towerOrigin?: string; forbidden?: Array<{ value?: string; pattern?: RegExp; label: string }> }} expected
+ *   `forbidden` entries are either a bare substring (`value`) or a `pattern` RegExp — the same
+ *   marker shape scripts/build-cli.mjs's matchForbiddenMarker consumes.
  */
 export function assertBundleOutputMatchesBuild(jsContents, expected) {
-  for (const { value, label } of expected.forbidden ?? []) {
-    if (jsContents.includes(value)) {
+  for (const { value, pattern, label } of expected.forbidden ?? []) {
+    const hit = pattern ? pattern.test(jsContents) : typeof value === "string" && jsContents.includes(value);
+    if (hit) {
       throw new Error(
         `Build output contains ${label} — a local dev value leaked into a release bundle. ` +
           "Check .env/.env.local overrides and the channel env in build-cli.mjs."

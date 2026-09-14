@@ -2,8 +2,8 @@
 
 Condensed from [webflow-marketplace-compliance.md](webflow-marketplace-compliance.md) for the
 submission form's character-limited response field. Body below is the submittable text (round 7b,
-2026-09-14 App Review Preflight postMessage/popup blockers). Keep the AVIF disclosure paragraph in
-the note too (listing copy is locked).
+2026-09-14 App Review Preflight second scan: egress / source maps / protocols / observers / HTML
+injection). Keep the AVIF disclosure paragraph in the note too (listing copy is locked).
 
 > Note: Marketplace listing copy is locked after the initial submission, so the external-service
 > disclosure (opt-in image conversion via `tower.codalyn.app`) is carried in this submission-note
@@ -11,7 +11,11 @@ the note too (listing copy is locked).
 
 ---
 
-Preflight blockers (postMessage/popups) resolved: the extension opens no windows — every external destination (Tower, Webflow OAuth consent, policy pages) is a plain <a target="_blank" rel="noopener noreferrer">, and the release build fails on any window.open. Single-use handoff/OAuth-state URLs are minted before the click and refreshed when stale; the grant is detected by bounded, user-initiated polling. The only postMessage left is React's MessageChannel scheduler (no targetOrigin exists).
+Preflight findings resolved: the bundled auth client is gone — every request is a first-party fetch to our Tower origin, enforced by the shipped CSP. styles.css ships a version-3 source map from the same build. No http:// or ws:// URL remains (W3C namespaces aside); react-dom's innerHTML writes are compiled out; the site runtime renders sanitized nodes. The one MutationObserver left is the rich-text editor's contenteditable sync in our own iframe, driven by typing; it never touches the canvas.
+
+---
+
+Earlier round-7b response (kept for reference, postMessage/popup blockers): the extension opens no windows — every external destination (Tower, Webflow OAuth consent, policy pages) is a plain <a target="_blank" rel="noopener noreferrer">, and the release build fails on any window.open. Single-use handoff/OAuth-state URLs are minted before the click and refreshed when stale; the grant is detected by bounded, user-initiated polling. The only postMessage left is React's MessageChannel scheduler (no targetOrigin exists).
 
 ---
 

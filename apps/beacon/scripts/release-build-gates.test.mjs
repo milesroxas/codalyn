@@ -20,7 +20,10 @@ import {
   listDistSourceMaps,
   matchForbiddenMarker,
   resolveViteEnvValue,
+  rewriteSourceMapInsecureSchemes,
 } from "../../../scripts/build-cli.mjs";
+import { assertBundleOutputMatchesBuild } from "../../../scripts/extension-build.mjs";
+import { minifyCssWithSourceMap } from "../../../scripts/vite-css-sourcemap-plugin.mjs";
 import {
   createStripDevHostLiteralsPlugin,
   rewriteSourceMapVendorContent,
@@ -125,6 +128,26 @@ describe("strip-dev-host-literals / posthog-js", () => {
     }
   });
 
+  it("compiles the cleartext scheme out of the yandex bot user-agent entry (App Review Preflight: Insecure Protocols)", () => {
+    expect(POSTHOG_MODULE_SOURCE).toContain('"http://yandex.com/bots",');
+    const { code } = transform(POSTHOG_MODULE_SOURCE, POSTHOG_MODULE_ID, { strict: true });
+    // Same substring match against the lowercased UA: the crawler is still recognised.
+    expect(code).toContain('"yandex.com/bots",');
+    expect(code).not.toMatch(/\b(?:http|ws):\/\/(?!www\.w3\.org\/)/i);
+  });
+
+  it("fails the release build when a vendor upgrade adds a cleartext-scheme URL", () => {
+    const moved = `${POSTHOG_MODULE_SOURCE}\nexport const probe="http://example.com/collect";\n`;
+    expect(() => transform(moved, POSTHOG_MODULE_ID, { strict: true })).toThrow(/insecure-scheme URL/);
+    const ws = `${POSTHOG_MODULE_SOURCE}\nexport const probe="ws://example.com/live";\n`;
+    expect(() => transform(ws, POSTHOG_MODULE_ID, { strict: true })).toThrow(/insecure-scheme URL/);
+  });
+
+  it("fails the release build when a vendor upgrade reintroduces an innerHTML write", () => {
+    const moved = `${POSTHOG_MODULE_SOURCE}\nexport const probe=(e,h)=>{e.innerHTML=h};\n`;
+    expect(() => transform(moved, POSTHOG_MODULE_ID, { strict: true })).toThrow(/HTML-injection sink write/);
+  });
+
   it("only warns-by-omission in non-strict (development channel) builds", () => {
     const moved = `${POSTHOG_MODULE_SOURCE}\nexport const probe="http://localhost:3000";\n`;
 
@@ -140,12 +163,47 @@ describe("strip-dev-host-literals / react-dom + better-auth", () => {
   // `exports` maps hide the cjs files, so resolve them relative to each package's package.json.
   const reactDomDir = dirname(require.resolve("react-dom/package.json"));
   const REACT_DOM_CLIENT_ID = join(reactDomDir, "cjs/react-dom-client.production.js");
+  const REACT_DOM_CLIENT_DEV_ID = join(reactDomDir, "cjs/react-dom-client.development.js");
   const REACT_DOM_ID = join(reactDomDir, "cjs/react-dom.production.js");
-  // better-auth's exports map hides dist internals; walk from its resolved React client entry instead.
-  const BETTER_AUTH_URL_ID = join(
-    dirname(fileURLToPath(import.meta.resolve("better-auth/react"))),
-    "../../utils/url.mjs"
-  );
+  // Beacon no longer bundles better-auth (first-party session client, App Review Preflight 2026-09-14);
+  // the rule stays for Flint, so the vendor file is resolved from Flint's install. better-auth's
+  // exports map hides dist internals; walk from its resolved React client entry instead.
+  const flintRequire = createRequire(join(dirname(fileURLToPath(import.meta.url)), "../../flint/package.json"));
+  const BETTER_AUTH_URL_ID = join(dirname(flintRequire.resolve("better-auth/react")), "../../utils/url.mjs");
+
+  it("compiles every innerHTML write out of react-dom's client bundle (App Review Preflight: Unsafe HTML Injection)", () => {
+    const write = /\.innerHTML\s*=(?!=)/g;
+    const prod = readFileSync(REACT_DOM_CLIENT_ID, "utf-8");
+    const dev = readFileSync(REACT_DOM_CLIENT_DEV_ID, "utf-8");
+    // The installed React writes innerHTML in exactly these places: the <script> creation trick
+    // and the two dangerouslySetInnerHTML setters (plus the dev-only normalizeHTML helper).
+    expect(prod.match(write)).toHaveLength(3);
+    expect(dev.match(write)).toHaveLength(4);
+
+    const prodOut = transform(prod, REACT_DOM_CLIENT_ID, { strict: true }).code;
+    expect(prodOut).not.toMatch(write);
+    expect(prodOut.match(/compiled out of this build/g)).toHaveLength(3);
+    // Property-name switch labels and reads are not sinks and stay (a reviewer grep still sees the
+    // word; the assignment is what the scanner and the residual guard match).
+    expect(prodOut).toContain('case "innerHTML":');
+
+    // Development channel is non-strict (react.dev links stay), but the rewrite still applies.
+    const devOut = transform(dev, REACT_DOM_CLIENT_DEV_ID, { strict: false }).code;
+    expect(devOut).not.toMatch(write);
+    expect(devOut.match(/compiled out of this build/g)).toHaveLength(3);
+  });
+
+  it("fails the release build if a React upgrade moves an innerHTML write", () => {
+    const moved = `${readFileSync(REACT_DOM_CLIENT_ID, "utf-8")}\nfunction probe(e,h){e.innerHTML=h}\n`;
+    expect(() => transform(moved, REACT_DOM_CLIENT_ID, { strict: true })).toThrow(/HTML-injection sink write/);
+  });
+
+  it("leaves only W3C namespace URIs as http:// literals in react-dom", () => {
+    const { code } = transform(readFileSync(REACT_DOM_CLIENT_ID, "utf-8"), REACT_DOM_CLIENT_ID, { strict: true });
+    const insecure = code.match(/\b(?:http|ws):\/\/[^"'`\s]*/gi) ?? [];
+    expect(insecure.length).toBeGreaterThan(0);
+    expect(insecure.every((url) => url.startsWith("http://www.w3.org/"))).toBe(true);
+  });
 
   it("removes React's production error-decoder URL from both react-dom entry files", () => {
     for (const id of [REACT_DOM_CLIENT_ID, REACT_DOM_ID]) {
@@ -217,6 +275,41 @@ describe("matchForbiddenMarker", () => {
     expect(matchForbiddenMarker("ctx.getImageData(0,0,w,h)", forbidden)?.value).toBe("getImageData");
     // The offscreen encode path Beacon uses is allowed.
     expect(matchForbiddenMarker("await canvas.convertToBlob({type:t,quality:q})", forbidden)).toBeNull();
+  });
+
+  it("catches an http:// or ws:// URL but exempts the W3C namespace URIs React needs (App Review Preflight: Insecure Protocols)", () => {
+    expect(matchForbiddenMarker('"http://yandex.com/bots"', forbidden)?.label).toMatch(/http:\/\//);
+    expect(matchForbiddenMarker("HTTP://EXAMPLE.COM/x", forbidden)?.label).toMatch(/http:\/\//);
+    expect(matchForbiddenMarker('new WebSocket("ws://example.com/live")', forbidden)?.label).toMatch(/ws:\/\//);
+    expect(
+      matchForbiddenMarker(
+        'createElementNS("http://www.w3.org/2000/svg",a);"http://www.w3.org/1999/xlink";"http://www.w3.org/XML/1998/namespace"',
+        forbidden
+      )
+    ).toBeNull();
+    expect(matchForbiddenMarker('fetch("https://tower.codalyn.app/api")', forbidden)).toBeNull();
+  });
+
+  it("catches HTML-injection sink writes but not reads or property-name labels (App Review Preflight: Unsafe HTML Injection)", () => {
+    expect(matchForbiddenMarker("e.innerHTML=n", forbidden)?.label).toMatch(/innerHTML/);
+    expect(matchForbiddenMarker("el.outerHTML = html", forbidden)?.label).toMatch(/outerHTML/);
+    expect(matchForbiddenMarker('el.insertAdjacentHTML("beforeend",h)', forbidden)?.label).toMatch(
+      /insertAdjacentHTML/
+    );
+    expect(matchForbiddenMarker("document.write(h)", forbidden)?.label).toMatch(/document\.write/);
+    // Reads, comparisons and switch labels are not sinks.
+    expect(matchForbiddenMarker('let i=r.innerHTML;return i}case"innerHTML":x.innerHTML===""', forbidden)).toBeNull();
+  });
+
+  it("regex markers are honoured by the dist/zip output check too (a pattern marker has no `value` to substring-match)", () => {
+    const expected = { version: "0.1.0", forbidden };
+    // A clean bundle must pass: with `value` undefined a naive includes(undefined) would match the
+    // literal "undefined" every real bundle contains.
+    expect(() => assertBundleOutputMatchesBuild('var v="0.1.0";if(x===undefined){}', expected)).not.toThrow();
+    expect(() => assertBundleOutputMatchesBuild('var v="0.1.0";fetch("http://example.com")', expected)).toThrow(
+      /insecure http:\/\/ URL/
+    );
+    expect(() => assertBundleOutputMatchesBuild('var v="0.1.0";e.innerHTML=h', expected)).toThrow(/innerHTML/);
   });
 
   it("catches a sourceMappingURL comment — a map reference must never ship in the bundle", () => {
@@ -451,6 +544,46 @@ describe("source-map extraction (Marketplace submission form field)", () => {
     expect(written.mappings).toBe("");
   });
 
+  it("rewrites cleartext http:// links in embedded source text, keeping W3C namespaces (App Review Preflight: Insecure Protocols)", () => {
+    const map = {
+      version: 3,
+      sources: ["spark-md5.js", "react-dom.js", "no-content.js"],
+      sourcesContent: [
+        "// see http://jsperf.com/md5-shootout/7 and HTTP://example.com/x\nvar a = 1;",
+        'createElementNS("http://www.w3.org/2000/svg", t)',
+        null,
+      ],
+      mappings: "AAAA",
+    };
+    const out = rewriteSourceMapInsecureSchemes(map);
+    expect(out.sourcesContent[0]).toBe(
+      "// see https://jsperf.com/md5-shootout/7 and https://example.com/x\nvar a = 1;"
+    );
+    expect(out.sourcesContent[1]).toBe('createElementNS("http://www.w3.org/2000/svg", t)');
+    expect(out.sourcesContent[2]).toBeNull();
+    expect(out.mappings).toBe("AAAA");
+    expect(rewriteSourceMapInsecureSchemes({ version: 3 })).toEqual({ version: 3 });
+  });
+
+  it("the private map zip carries no cleartext http:// link once extracted", () => {
+    const appPath = tempAppDir();
+    fakeDist(appPath, {
+      "bundle.js": "console.log(1)",
+      "bundle.js.map": JSON.stringify({
+        version: 3,
+        sources: ["a.js"],
+        sourcesContent: ["// http://reference.example/doc\nvar a = 'http://www.w3.org/2000/svg';"],
+        mappings: "AAAA",
+      }),
+    });
+    const archive = join(appPath, "bundle", "production", "public", "v0.0.0_public_x.sourcemaps.zip");
+    extractSourceMapsToPrivateZip(appPath, archive, { strict: true });
+    const text = execSync(`unzip -p ${JSON.stringify(archive)} bundle.js.map`, { encoding: "utf-8" });
+    expect(text).toContain("https://reference.example/doc");
+    expect(text).toContain("http://www.w3.org/2000/svg");
+    expect(text).not.toMatch(/\bhttp:\/\/(?!www\.w3\.org\/)/i);
+  });
+
   it("rewriteSourceMapVendorContent passes non-watched sources and map-less shapes through unchanged", () => {
     const plain = { version: 3, sources: ["/src/a.ts"], sourcesContent: ["localhost"], mappings: "" };
     expect(rewriteSourceMapVendorContent(plain)).toEqual(plain);
@@ -474,5 +607,45 @@ describe("source-map extraction (Marketplace submission form field)", () => {
       "assets/x.js.MAP",
     ]);
     expect(findSourceMapEntries(["webflow.json", "index.html", "bundle.js"])).toEqual([]);
+  });
+});
+
+describe("CSS source map (Marketplace submission form + App Review Preflight: traceable generated files)", () => {
+  const readable = `/* readable */\n:root {\n  --brand: #ff0000;\n}\n.button {\n  color: var(--brand);\n  padding: 0px 0px;\n}\n`;
+
+  it("minifies the readable stylesheet and emits a complete version-3 map that embeds it as the source", () => {
+    const { code, map } = minifyCssWithSourceMap({ fileName: "styles.css", code: readable });
+    expect(code).not.toContain("\n");
+    expect(code).toContain(".button{");
+    expect(code).not.toContain("sourceMappingURL");
+    expect(map.version).toBe(3);
+    expect(map.file).toBe("styles.css");
+    expect(map.sources).toHaveLength(1);
+    expect(map.sourcesContent).toEqual([readable]);
+    expect(map.mappings.length).toBeGreaterThan(0);
+    expect(Array.isArray(map.names)).toBe(true);
+  });
+
+  it("is picked up by the source-map extraction alongside the JS maps", () => {
+    const appPath = tempAppDir();
+    const { code, map } = minifyCssWithSourceMap({ fileName: "styles.css", code: readable });
+    for (const [rel, contents] of Object.entries({
+      "bundle.js": "console.log(1)",
+      "bundle.js.map": '{"version":3}',
+      "styles.css": code,
+      "styles.css.map": JSON.stringify(map),
+    })) {
+      mkdirSync(join(appPath, "dist"), { recursive: true });
+      writeFileSync(join(appPath, "dist", rel), contents);
+    }
+    const archive = join(appPath, "bundle", "production", "public", "v0.0.0_public_x.sourcemaps.zip");
+    expect(extractSourceMapsToPrivateZip(appPath, archive)).toBe(archive);
+    const entries = execSync(`unzip -Z1 ${JSON.stringify(archive)}`, { encoding: "utf-8" })
+      .split("\n")
+      .filter(Boolean)
+      .sort();
+    expect(entries).toEqual(["bundle.js.map", "styles.css.map"]);
+    expect(existsSync(join(appPath, "dist", "styles.css"))).toBe(true);
+    expect(existsSync(join(appPath, "dist", "styles.css.map"))).toBe(false);
   });
 });

@@ -257,3 +257,13 @@
   width: 100%;
   max-width: 100%;
 }
+
+/* vaul@1.1.2 / Radix Dialog lock background interaction with an inline `pointer-events: none` on
+   <body> while a modal layer is open. Beacon's DrawerOverlay already blocks the background, and the
+   lock gets stuck when one drawer opens while another is mid-close (dead sheet, no scroll, no
+   portaled Select). While any drawer is open the lock is overridden here (!important beats the
+   inline style) instead of being reverted from a MutationObserver on <body> — see
+   shared/ui/drawer.tsx. */
+body:has([data-slot="drawer-content"][data-state="open"]) {
+  pointer-events: auto !important;
+}

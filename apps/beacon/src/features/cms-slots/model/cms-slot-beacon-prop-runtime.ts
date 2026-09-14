@@ -17,8 +17,8 @@ export const CMS_SLOT_CONTENT_ATTR = "data-cb-c";
 export const CMS_SLOT_COND_ATTR = "data-cb-v";
 
 /**
- * Rich-text marker. `"1"` when a bound element carries a `richText` content prop, so the runtime applies its value via
- * `innerHTML` (rendering formatting) instead of `textContent`. The published Webflow rich-text wrapper (`.w-richtext`)
+ * Rich-text marker. `"1"` when a bound element carries a `richText` content prop, so the runtime renders its value as
+ * sanitized DOM nodes (formatting kept) instead of `textContent`. The published Webflow rich-text wrapper (`.w-richtext`)
  * is a structural fallback in the runtime, so this marker is the preferred, stable signal (CLAUDE.md: match by stable
  * markers, not presentation text).
  */
@@ -262,12 +262,17 @@ export function beaconPropApplyValueRuntimeSource(): string {
     // https/mailto/tel or scheme-less relative; any other scheme → null. http: is rejected —
     // web links must not downgrade transport (Marketplace round-6). sms: is not allowed.
     'function bSafeHref(h){h=bStripCtl(String(h==null?"":h));if(!h)return null;if(/^(https:|mailto:|tel:)/i.test(h))return h;if(/^[a-z][a-z0-9+.-]*:/i.test(h))return null;return h}',
-    // Belt-and-suspenders allowlist DOM sanitizer before innerHTML (the boundary sanitizer in
+    // Belt-and-suspenders allowlist DOM sanitizer for rich text (the boundary sanitizer in
     // cms-slot-rich-text-html.ts is authoritative; this guard ensures the footer never blindly trusts the
     // payload string). Rebuilds the fragment from a DOMParser parse — same tag set as the boundary; anchors
-    // keep only a safe href plus target="_blank"/rel; every other attribute is dropped. Returns null when
-    // DOM parsing is unavailable so applyValue falls back to textContent instead of writing raw HTML.
-    'function bSafeHtml(v){v=String(v==null?"":v);if(!v)return"";if(typeof DOMParser==="undefined")return null;var A={p:1,br:1,strong:1,b:1,em:1,i:1,u:1,a:1,ul:1,ol:1,li:1,h2:1,h3:1,blockquote:1},D={script:1,style:1,template:1,noscript:1,iframe:1,object:1,embed:1,form:1,link:1,meta:1,base:1},doc;try{doc=new DOMParser().parseFromString(v,"text/html")}catch(e){return null}if(!doc||!doc.body)return null;var out=doc.createElement("div");function walk(src,dst){var c,el,tag,h;for(c=src.firstChild;c;c=c.nextSibling){if(c.nodeType===3){dst.appendChild(doc.createTextNode(c.nodeValue||""));continue}if(c.nodeType!==1)continue;tag=c.tagName.toLowerCase();if(D[tag]===1)continue;if(A[tag]!==1){walk(c,dst);continue}el=doc.createElement(tag);if(tag==="a"){h=bSafeHref(c.getAttribute("href"));if(h==null){walk(c,dst);continue}el.setAttribute("href",h);if(c.getAttribute("target")==="_blank"){el.setAttribute("target","_blank");el.setAttribute("rel","noopener noreferrer")}}walk(c,el);dst.appendChild(el)}}walk(doc.body,out);return out.innerHTML}',
+    // keep only a safe href plus target="_blank"/rel; every other attribute is dropped. Returns the rebuilt
+    // container element (its children are moved into the bound element node-by-node — the payload string is
+    // never assigned as markup, so the runtime has no `innerHTML` write; App Review Preflight "Unsafe HTML
+    // Injection", 2026-09-14), or null when DOM parsing is unavailable so applyValue falls back to textContent.
+    'function bSafeHtml(v){v=String(v==null?"":v);if(typeof DOMParser==="undefined")return null;var A={p:1,br:1,strong:1,b:1,em:1,i:1,u:1,a:1,ul:1,ol:1,li:1,h2:1,h3:1,blockquote:1},D={script:1,style:1,template:1,noscript:1,iframe:1,object:1,embed:1,form:1,link:1,meta:1,base:1},doc;try{doc=new DOMParser().parseFromString(v,"text/html")}catch(e){return null}if(!doc||!doc.body)return null;var out=doc.createElement("div");function walk(src,dst){var c,el,tag,h;for(c=src.firstChild;c;c=c.nextSibling){if(c.nodeType===3){dst.appendChild(doc.createTextNode(c.nodeValue||""));continue}if(c.nodeType!==1)continue;tag=c.tagName.toLowerCase();if(D[tag]===1)continue;if(A[tag]!==1){walk(c,dst);continue}el=doc.createElement(tag);if(tag==="a"){h=bSafeHref(c.getAttribute("href"));if(h==null){walk(c,dst);continue}el.setAttribute("href",h);if(c.getAttribute("target")==="_blank"){el.setAttribute("target","_blank");el.setAttribute("rel","noopener noreferrer")}}walk(c,el);dst.appendChild(el)}}walk(doc.body,out);return out}',
+    // Moves the sanitized nodes into the bound element. appendChild adopts each node into the page
+    // document; nothing is re-parsed from a string.
+    'function bRenderNodes(el,src){el.textContent="";while(src.firstChild)el.appendChild(src.firstChild)}',
     'function bIsRichTextEl(el){return!!(el.getAttribute&&(el.getAttribute("data-cb-html")==="1"||(el.classList&&el.classList.contains("w-richtext"))))}',
     // Marketplace guidelines (credential/authentication fields; injected scripts must not modify
     // payment or checkout form elements): the runtime must never modify or act on password/login/
@@ -279,7 +284,7 @@ export function beaconPropApplyValueRuntimeSource(): string {
     // IFRAME/EMBED/OBJECT are hard-excluded: the runtime never assigns their src/data (Marketplace round-6 —
     // externally hosted embeds must not be an independently changeable runtime surface). The early return also
     // prevents the textContent fallback from writing into embed fallback content.
-    'function applyValue(el,v){v=String(v==null?"":v);var tag=String(el.tagName||"").toUpperCase();if(tag==="IFRAME"||tag==="EMBED"||tag==="OBJECT")return;if(bIsRichTextEl(el)){var sh=bSafeHtml(v);if(sh==null){el.textContent=v}else{el.innerHTML=sh}return}if(tag==="IMG"||tag==="SOURCE"){bApplyImageSrc(el,v);return}if(tag==="PICTURE"){bApplyImageToContainer(el,v);return}if(bLooksLikeImageUrl(v)&&bApplyImageToContainer(el,v))return;if(tag==="A"&&bLooksLikeImageUrl(v)&&el.querySelector&&el.querySelector("img")){bApplyImageToContainer(el,v);return}if(tag==="A"){bApplyLink(el,v);return}if(tag==="INPUT"){if(bIsCredentialField(el))return;var type=String(el.type||"").toLowerCase();if(type==="checkbox"||type==="radio"){el.checked=!!(v&&v!=="0"&&v!=="false"&&v.toLowerCase()!=="off")}else{el.value=v}return}if(tag==="TEXTAREA"||tag==="SELECT"){if(bIsCredentialField(el))return;el.value=v;return}el.textContent=v}',
+    'function applyValue(el,v){v=String(v==null?"":v);var tag=String(el.tagName||"").toUpperCase();if(tag==="IFRAME"||tag==="EMBED"||tag==="OBJECT")return;if(bIsRichTextEl(el)){var sh=bSafeHtml(v);if(sh==null){el.textContent=v}else{bRenderNodes(el,sh)}return}if(tag==="IMG"||tag==="SOURCE"){bApplyImageSrc(el,v);return}if(tag==="PICTURE"){bApplyImageToContainer(el,v);return}if(bLooksLikeImageUrl(v)&&bApplyImageToContainer(el,v))return;if(tag==="A"&&bLooksLikeImageUrl(v)&&el.querySelector&&el.querySelector("img")){bApplyImageToContainer(el,v);return}if(tag==="A"){bApplyLink(el,v);return}if(tag==="INPUT"){if(bIsCredentialField(el))return;var type=String(el.type||"").toLowerCase();if(type==="checkbox"||type==="radio"){el.checked=!!(v&&v!=="0"&&v!=="false"&&v.toLowerCase()!=="off")}else{el.value=v}return}if(tag==="TEXTAREA"||tag==="SELECT"){if(bIsCredentialField(el))return;el.value=v;return}el.textContent=v}',
   ].join("");
 }
 

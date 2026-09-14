@@ -19,7 +19,8 @@ import {
   readSuppressDesignerSessionExchange,
   setSuppressDesignerSessionExchange,
 } from "@/features/auth/lib/webflow-designer-session";
-import { getTowerAuthBaseUrl, towerAuthClient } from "@/features/auth/model/tower-auth-client";
+import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
+import { requestTowerSignOut, useTowerSession } from "@/features/auth/model/tower-session-client";
 
 /** Single-flighted across all hook instances so multiple mounted consumers don't fire duplicate exchanges. */
 let designerExchangeInFlight = false;
@@ -103,7 +104,8 @@ async function runSilentDesignerExchangeWithRetries(): Promise<{ ok: true } | { 
 }
 
 /**
- * Tower session via Better Auth. Session is optional: guest mode works without signing in.
+ * Tower session (Tower runs Better Auth; the extension reads it through its own first-party client).
+ * Session is optional: guest mode works without signing in.
  */
 export function useBeaconTowerSession(): {
   user: BridgedTowerUser | undefined;
@@ -112,7 +114,7 @@ export function useBeaconTowerSession(): {
   clearStoredSession: () => void;
   signInWithEmail: (email: string, password: string) => Promise<TowerEmailSignInResult>;
 } {
-  const { data: session, isPending: authSessionPending, refetch } = towerAuthClient.useSession();
+  const { data: session, isPending: authSessionPending, refetch } = useTowerSession();
   const hasStoredSessionToken = Boolean(readBeaconTowerSessionToken());
   const suppressDesignerExchange = readSuppressDesignerSessionExchange();
   const designerExchangePhase = useSyncExternalStore(
@@ -128,9 +130,9 @@ export function useBeaconTowerSession(): {
     setSuppressDesignerSessionExchange(true);
     setBeaconTowerDesignerExchangePhase("settled");
     const epoch = beginBeaconTowerSignOut();
-    // Clear the stored bearer even if signOut() rejects (Tower briefly unreachable). Otherwise the
+    // Clear the stored bearer even if Tower could not be reached for the sign-out. Otherwise the
     // in-memory token keeps getting attached to requests after the user signed out.
-    void towerAuthClient.signOut({ fetchOptions: { credentials: "include" } }).finally(() => {
+    void requestTowerSignOut().finally(() => {
       if (!isBeaconTowerSignOutCurrent(epoch)) {
         return;
       }

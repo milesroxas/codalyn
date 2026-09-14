@@ -1,72 +1,18 @@
-import { createAuthClient } from "better-auth/react";
 import { readBeaconTowerSessionToken } from "@/features/auth/lib/beacon-tower-session-token";
 import { isAllowedWebflowAuthorizeUrl } from "@/features/auth/lib/tower-app-link";
-import { isTrustedRedirectUrl } from "@/features/auth/lib/trusted-redirect";
 import { isBeaconTowerOriginConfigured, readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
 import { towerFetch } from "@/shared/lib/tower-client";
 
+/**
+ * Tower origin baked into this build (empty when the build carries none — dev only; release builds
+ * assert it). Session reads, sign-in and sign-out live in `tower-session-client.ts`: the extension
+ * talks to Tower's Better Auth endpoints through its own `towerFetch` and bundles no third-party
+ * auth client (App Review Preflight 2026-09-14, "External API Calls" / "Insecure Protocols").
+ */
 const baseURL = readBeaconTowerOrigin();
 
 /** Entry route for opening Tower from Beacon (host-split app host, not marketing `/`). */
 export const TOWER_APP_ENTRY_PATH = "/auth/continue";
-
-/**
- * Replaces Better Auth's default redirect fetch plugin (disabled below), which assigns
- * `window.location.href` to any `data.url` the server marks `redirect: true` — flagged in
- * Marketplace review as an unvalidated server-driven redirect. This variant honors the redirect
- * only for allowlisted destinations: the Tower origin this bundle was built against and Webflow's
- * OAuth consent screen. No Beacon flow currently returns `redirect: true`; the plugin exists so
- * any future one is origin-constrained by construction.
- */
-const allowlistedRedirectPlugin = {
-  id: "beacon-allowlisted-redirect",
-  name: "Beacon Allowlisted Redirect",
-  hooks: {
-    onSuccess(context: { data?: { url?: unknown; redirect?: unknown } | null }) {
-      const data = context.data;
-      if (!data?.redirect || typeof data.url !== "string") {
-        return;
-      }
-      if (!isTrustedRedirectUrl(data.url, baseURL)) {
-        return;
-      }
-      window.location.href = data.url;
-    },
-  },
-};
-
-/**
- * Valid URL required by the client; session hooks only run when Tower is configured in the UI.
- * The RFC 2606 `.invalid` sentinel is dev-only — release builds always embed the Tower origin
- * (asserted by the build guard), so the sentinel URL is compiled out of shipped bundles and
- * a missing origin fails loudly instead of shipping an unreachable placeholder.
- */
-function unconfiguredTowerBaseUrl(): string {
-  if (import.meta.env.DEV) {
-    return "https://beacon.tower.invalid";
-  }
-  // Build-configuration failure. Named without env-var identifiers so no developer-configuration tokens
-  // ship as strings in the reviewed bundle; the release build already fails loudly when this is unset.
-  throw new Error("Codalyn service origin missing from this build");
-}
-
-export const towerAuthClient = createAuthClient({
-  baseURL: baseURL || unconfiguredTowerBaseUrl(),
-  // Drops the built-in redirect plugin (unvalidated `window.location.href = data.url`);
-  // `allowlistedRedirectPlugin` above is its origin-checked replacement.
-  disableDefaultFetchPlugins: true,
-  fetchOptions: {
-    plugins: [allowlistedRedirectPlugin],
-    onRequest(context) {
-      const t = readBeaconTowerSessionToken();
-      if (t) {
-        context.headers.set("Authorization", `Bearer ${t}`);
-      }
-    },
-    // The stored token is cleared by `clearStoredSession` after sign-out resolves, guarded by the
-    // sign-out coordination epoch so a sign-in that lands mid-sign-out is not clobbered.
-  },
-});
 
 export function getTowerAuthBaseUrl(): string {
   return baseURL;

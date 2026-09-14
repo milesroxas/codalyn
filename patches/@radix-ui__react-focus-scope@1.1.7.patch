@@ -1,0 +1,110 @@
+diff --git a/dist/index.js b/dist/index.js
+index c91ae91..74ccba5 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -76,31 +76,38 @@ var FocusScope = React.forwardRef((props, forwardedRef) => {
+         if (container.contains(target)) {
+           lastFocusedElementRef.current = target;
+         } else {
+-          focus(lastFocusedElementRef.current, { select: true });
++          // codalyn patch: the last focused element may have left the DOM (the case upstream's
++          // DOM-removal observer covered); fall back to the container so the trap still re-enters.
++          const last = lastFocusedElementRef.current;
++          focus(last && last.isConnected ? last : container, { select: true });
+         }
+       }, handleFocusOut2 = function(event) {
+         if (focusScope.paused || !container) return;
+         const relatedTarget = event.relatedTarget;
+-        if (relatedTarget === null) return;
++        if (relatedTarget === null) {
++          // codalyn patch: Chrome fires focusout with a null relatedTarget when the focused element
++          // is removed from the DOM. Upstream refocuses the container from a DOM-removal observer on
++          // the scope; Webflow's App Review Preflight flags every such observer in a shipped bundle,
++          // so the same recovery runs from this event once the removal has settled. A null
++          // relatedTarget with the target still in the DOM (window/tab switch, click on
++          // non-focusable content) is left alone exactly as upstream leaves it.
++          const target = event.target;
++          queueMicrotask(() => {
++            if (focusScope.paused || !container.isConnected || target.isConnected) return;
++            if (document.activeElement === document.body) focus(container);
++          });
++          return;
++        }
+         if (!container.contains(relatedTarget)) {
+           focus(lastFocusedElementRef.current, { select: true });
+         }
+-      }, handleMutations2 = function(mutations) {
+-        const focusedElement = document.activeElement;
+-        if (focusedElement !== document.body) return;
+-        for (const mutation of mutations) {
+-          if (mutation.removedNodes.length > 0) focus(container);
+-        }
+       };
+-      var handleFocusIn = handleFocusIn2, handleFocusOut = handleFocusOut2, handleMutations = handleMutations2;
++      var handleFocusIn = handleFocusIn2, handleFocusOut = handleFocusOut2;
+       document.addEventListener("focusin", handleFocusIn2);
+       document.addEventListener("focusout", handleFocusOut2);
+-      const mutationObserver = new MutationObserver(handleMutations2);
+-      if (container) mutationObserver.observe(container, { childList: true, subtree: true });
+       return () => {
+         document.removeEventListener("focusin", handleFocusIn2);
+         document.removeEventListener("focusout", handleFocusOut2);
+-        mutationObserver.disconnect();
+       };
+     }
+   }, [trapped, container, focusScope.paused]);
+diff --git a/dist/index.mjs b/dist/index.mjs
+index e39d5c9..81e2e4d 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -40,31 +40,38 @@ var FocusScope = React.forwardRef((props, forwardedRef) => {
+         if (container.contains(target)) {
+           lastFocusedElementRef.current = target;
+         } else {
+-          focus(lastFocusedElementRef.current, { select: true });
++          // codalyn patch: the last focused element may have left the DOM (the case upstream's
++          // DOM-removal observer covered); fall back to the container so the trap still re-enters.
++          const last = lastFocusedElementRef.current;
++          focus(last && last.isConnected ? last : container, { select: true });
+         }
+       }, handleFocusOut2 = function(event) {
+         if (focusScope.paused || !container) return;
+         const relatedTarget = event.relatedTarget;
+-        if (relatedTarget === null) return;
++        if (relatedTarget === null) {
++          // codalyn patch: Chrome fires focusout with a null relatedTarget when the focused element
++          // is removed from the DOM. Upstream refocuses the container from a DOM-removal observer on
++          // the scope; Webflow's App Review Preflight flags every such observer in a shipped bundle,
++          // so the same recovery runs from this event once the removal has settled. A null
++          // relatedTarget with the target still in the DOM (window/tab switch, click on
++          // non-focusable content) is left alone exactly as upstream leaves it.
++          const target = event.target;
++          queueMicrotask(() => {
++            if (focusScope.paused || !container.isConnected || target.isConnected) return;
++            if (document.activeElement === document.body) focus(container);
++          });
++          return;
++        }
+         if (!container.contains(relatedTarget)) {
+           focus(lastFocusedElementRef.current, { select: true });
+         }
+-      }, handleMutations2 = function(mutations) {
+-        const focusedElement = document.activeElement;
+-        if (focusedElement !== document.body) return;
+-        for (const mutation of mutations) {
+-          if (mutation.removedNodes.length > 0) focus(container);
+-        }
+       };
+-      var handleFocusIn = handleFocusIn2, handleFocusOut = handleFocusOut2, handleMutations = handleMutations2;
++      var handleFocusIn = handleFocusIn2, handleFocusOut = handleFocusOut2;
+       document.addEventListener("focusin", handleFocusIn2);
+       document.addEventListener("focusout", handleFocusOut2);
+-      const mutationObserver = new MutationObserver(handleMutations2);
+-      if (container) mutationObserver.observe(container, { childList: true, subtree: true });
+       return () => {
+         document.removeEventListener("focusin", handleFocusIn2);
+         document.removeEventListener("focusout", handleFocusOut2);
+-        mutationObserver.disconnect();
+       };
+     }
+   }, [trapped, container, focusScope.paused]);

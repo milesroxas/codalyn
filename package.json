@@ -19,7 +19,8 @@
       "@lexical/link@0.46.0": "patches/@lexical__link@0.46.0.patch",
       "posthog-js@1.369.3": "patches/posthog-js@1.369.3.patch",
       "react-router@7.14.2": "patches/react-router@7.14.2.patch",
-      "scheduler@0.27.0": "patches/scheduler@0.27.0.patch"
+      "scheduler@0.27.0": "patches/scheduler@0.27.0.patch",
+      "@radix-ui/react-focus-scope@1.1.7": "patches/@radix-ui__react-focus-scope@1.1.7.patch"
     },
     "onlyBuiltDependencies": [
       "esbuild",
@@ -63,6 +64,7 @@
     "@changesets/cli": "^2.31.0",
     "@clack/prompts": "^1.6.0",
     "chokidar": "^5.0.0",
+    "lightningcss": "1.32.0",
     "lint-staged": "^17.0.7",
     "picocolors": "^1.1.1",
     "simple-git-hooks": "^2.13.1",

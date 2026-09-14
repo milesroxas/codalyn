@@ -168,7 +168,7 @@ describe("beacon prop applyValue runtime", () => {
     expect(a4.getAttribute("href")).toBe("{not json");
   });
 
-  it("rich text: data-cb-html marked node applies HTML via innerHTML (markup preserved)", () => {
+  it("rich text: data-cb-html marked node renders sanitized nodes (markup preserved)", () => {
     const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
       el: Element,
       v: string
@@ -181,7 +181,7 @@ describe("beacon prop applyValue runtime", () => {
     expect(marked.querySelector("p")).not.toBeNull();
   });
 
-  it("rich text: .w-richtext is a structural fallback for innerHTML", () => {
+  it("rich text: .w-richtext is a structural fallback for node rendering", () => {
     const applyValue = new Function(`${beaconPropApplyValueRuntimeSource()}; return applyValue;`)() as (
       el: Element,
       v: string

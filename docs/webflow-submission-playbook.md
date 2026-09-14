@@ -73,9 +73,19 @@ unzip -p "$Z" '*.js' | grep -c  'postMessage'              # 0  (Insecure postMe
 unzip -p "$Z" '*.js' | grep -oE 'https://[a-z0-9.-]+' | sort -u   # only CSP-allowlisted hosts
 unzip -p "$Z" webflow.json                                   # one manifest, real name, apiVersion "2", no telemetry
 unzip -p "$M" '*.map' | grep -ciE '[?&]token='               # 0 — reviewer scans the maps too
+unzip -l "$M" | grep -c 'styles.css.map'                     # 1 — every generated file needs a map (R7b.11)
+unzip -p "$Z" '*.js' | grep -oiE 'https?://[^"'"'"'` )]*' | grep -viE '^https://|www\.w3\.org' | wc -l   # 0 http:// (W3C namespaces exempt)
+unzip -p "$Z" '*.js' | grep -cE '\.(inner|outer)HTML\s*=[^=]|insertAdjacentHTML\(|document\.write\('  # 0 HTML-sink writes
+unzip -p "$Z" '*.js' | grep -c 'new MutationObserver'        # 1 — Lexical's contenteditable observer only (R7b.11 open item)
+unzip -p "$Z" '*.js' | grep -c 'window.open(\|postMessage('   # 0
 ```
 
-Anything non-zero → fix, rebuild, re-run. Never edit a zip by hand.
+Anything non-zero (other than the documented Lexical observer) → fix, rebuild, re-run. Never edit a zip by hand.
+
+**App Review Preflight shows at most 3 evidence locations per finding** (R7b.8 had four `?token=`
+URLs, three listed; R7b.11 had four `MutationObserver`s, three listed). Never fix only the listed
+locations — grep the whole artifact for the shape and clear every hit, or the next scan lists the
+ones it hid.
 
 ### A5. Webflow-side artifacts (required by the submission form)
 
@@ -179,6 +189,21 @@ Submitted ✗ · Accepted ✗.
 Full write-up: compliance doc § R7b.9.
 
 ---
+
+## C3. Worked example — R7b.11 five REQUIRED findings on the 09-14 12:08 build (2026-09-14)
+
+Findings: External API Calls (better-fetch request builder ×2, Vite modulepreload polyfill),
+Generated code not traceable (no `styles.css.map`), Insecure Protocols (posthog `http://yandex.com/bots`,
+better-fetch `'http://'`), Silent Canvas Mutations (Radix FocusScope / Lexical / Vite polyfill
+`MutationObserver`s — the first-party drawer observer was the hidden 4th), Unsafe HTML Injection
+(react-dom's three `.innerHTML =` sites). Fixes: better-auth client replaced by a first-party
+`tower-session-client.ts` (three `towerFetch` calls); `modulePreload.polyfill: false`;
+`scripts/vite-css-sourcemap-plugin.mjs` (lightningcss minify + map, `cssMinify: false`); strip rules
+for react-dom innerHTML (→ throws) and the yandex entry; pnpm patch drops FocusScope's observer
+(focusout-based recovery); drawer observer → static `:has()` CSS rule; site runtime renders
+sanitized nodes instead of assigning `innerHTML`; regex-capable forbidden markers (`http://` minus
+W3C, `ws://`, HTML sinks). Remaining: Lexical's contenteditable observer (open reviewer judgment).
+Full write-up: compliance doc § R7b.11.
 
 ## D. Don'ts (from the skills' anti-advice list)
 

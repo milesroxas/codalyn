@@ -24,6 +24,17 @@
  *    by the pnpm patch (`patches/posthog-js@1.369.3.patch`). This file only guards the result
  *    (`SESSION_REPLAY_RESIDUAL`): a posthog-js upgrade that ships a recorder again, or a regenerated
  *    patch that forgets the excision, fails the release build instead of shipping.
+ * 6. react-dom's `innerHTML` writes — flagged by App Review Preflight as "Unsafe HTML Injection"
+ *    (2026-09-14; evidence: the three `.innerHTML =` assignments in react-dom's client bundle). The
+ *    rule is shape-based on the shipped artifact: Beacon itself never passes
+ *    `dangerouslySetInnerHTML` (every vendor that did is pnpm-patched, see docs/webflow-marketplace-
+ *    compliance.md R4.1 / R7.2), so React's write path is unreachable, but it still has to be absent.
+ *    The three sites are compiled into throws (capability absent, not dormant — a future caller
+ *    fails loudly in every channel instead of writing markup).
+ * 7. posthog-js's bot-detection user-agent list entry `"http://yandex.com/bots"` — flagged by App
+ *    Review Preflight as "Insecure Protocols" (2026-09-14). The list is substring-matched against
+ *    the lowercased user agent, so the scheme-less `"yandex.com/bots"` recognises exactly the same
+ *    crawler (and its https form); nothing is fetched from it.
  *
  * Every replacement below targets a code path that is dead inside the extension iframe, so runtime
  * behavior is unchanged:
@@ -67,6 +78,16 @@
  *   PostHog rejects it — it fails closed instead of leaking the key into a query string. Event
  *   ingestion (`/e/`) and flag evaluation (`/flags/`) already carry the token in the POST body and
  *   are untouched.
+ * - react-dom `createInstance` for `<script>` elements: React builds the element through a
+ *   throw-away `<div>.innerHTML = "<script></script>"` so a JSX-rendered script is "parser-inserted"
+ *   and never executes. Beacon renders no `<script>` JSX, so the branch now throws instead of
+ *   creating the element (nothing in the extension can reach it; a regression fails at render time).
+ * - react-dom `setProp` / `setPropOnCustomElement` `dangerouslySetInnerHTML` write
+ *   (`domElement.innerHTML = key`): both sites throw. The prop is validated and rejected before any
+ *   markup is written; the surrounding switch/case structure is untouched.
+ * - react-dom development build `normalizeHTML` (hydration-mismatch diffing helper): round-trips
+ *   markup through a detached element's `innerHTML`; returns the input untouched instead. Only the
+ *   warning text of a hydration diff could differ, and the extension never hydrates.
  * - posthog-js bot-detection UA list entry `"sentryuptimebot"`: removed. The list is scanned with
  *   a substring match over independent entries, so dropping one entry only stops detecting that
  *   one crawler — every other entry keeps working. Sentry's uptime bot cannot reach this code at
@@ -121,6 +142,25 @@ const SESSION_REPLAY_RESIDUAL = {
   label: "session-replay reference",
   pattern: /rrweb|fullstory|recorder|replay|recording/i,
 };
+/**
+ * An HTML-injection sink write (App Review Preflight: "Unsafe HTML Injection"). Matches assignments
+ * only (`.innerHTML =`, `.outerHTML =`) plus the call-shaped sinks; reads such as
+ * `container.innerHTML` (Lexical's HTML export, the rich-text sanitizer) and the `case "innerHTML":`
+ * property-name switch labels in react-dom are not sinks and are left alone.
+ */
+const HTML_INJECTION_SINK_RESIDUAL = {
+  label: "HTML-injection sink write",
+  pattern: /\.(?:inner|outer)HTML\s*=(?!=)|insertAdjacentHTML\(|document\.write\(/,
+};
+/**
+ * A cleartext-scheme URL (App Review Preflight: "Insecure Protocols" — `http://`, `ws://`). The W3C
+ * namespace URIs react-dom needs at runtime (`http://www.w3.org/2000/svg` et al.) are the rule's own
+ * documented exception and are excluded here the same way.
+ */
+const INSECURE_SCHEME_RESIDUAL = {
+  label: "insecure-scheme URL",
+  pattern: /\b(?:http|ws):\/\/(?!www\.w3\.org\/)/i,
+};
 
 /**
  * `find` is either a literal string (replaced until no occurrences remain) or a global RegExp.
@@ -136,6 +176,31 @@ const RULES = [
     idIncludes: "react-dom/cjs/react-dom",
     find: '"https://react.dev/errors/"',
     replaceWith: '"#"',
+  },
+  {
+    // Beacon renders no <script> JSX. React's parser-inserted trick (`div.innerHTML = "<script>…"`,
+    // then detach) is the only innerHTML write on the element-creation path; it becomes a throw.
+    name: "react-dom <script> element creation via innerHTML",
+    idIncludes: "react-dom/cjs/react-dom-client",
+    find: /case "script":\s*nextResource = (?:ownerDocument|nextResource)\.createElement\("div"\);\s*nextResource\.innerHTML = "<script>\\x3c\/script>";\s*nextResource = nextResource\.removeChild\(\s*nextResource\.firstChild\s*\);/g,
+    replaceWith:
+      'case "script":\n  throw Error("Beacon does not render <script> elements; their creation is compiled out of this build");',
+  },
+  {
+    // `dangerouslySetInnerHTML` write in setProp (host elements) and setPropOnCustomElement. The
+    // statement sits at the end of an `if (null != key) { … }` block, so a throw is a drop-in.
+    name: "react-dom dangerouslySetInnerHTML write",
+    idIncludes: "react-dom/cjs/react-dom-client",
+    find: "domElement.innerHTML = key;",
+    replaceWith: 'throw Error("dangerouslySetInnerHTML is compiled out of this build");',
+  },
+  {
+    // Development-build hydration diff helper; returns the markup as-is instead of normalising it
+    // through a detached element. Never reached in the extension (no hydration), dev channel only.
+    name: "react-dom development normalizeHTML round-trip",
+    idIncludes: "react-dom/cjs/react-dom-client.development",
+    find: /parent\.innerHTML = html;\s*return parent\.innerHTML;/g,
+    replaceWith: "return html;",
   },
   {
     name: "react-router windowless URL base",
@@ -203,6 +268,14 @@ const RULES = [
     replaceWith: "",
   },
   {
+    // Same substring match against the lowercased UA — the crawler is still recognised, the
+    // cleartext scheme is gone (App Review Preflight: "Insecure Protocols", 2026-09-14).
+    name: "posthog-js yandex bot user-agent entry scheme",
+    idIncludes: "posthog-js/dist/",
+    find: '"http://yandex.com/bots",',
+    replaceWith: '"yandex.com/bots",',
+  },
+  {
     // `s` is the minified `"&stage=…"` suffix (or ""); keep the stage filter, drop only the token.
     name: "posthog-js early-access-features token-in-query URL",
     idIncludes: "posthog-js/dist/",
@@ -231,12 +304,22 @@ const RULES = [
 
 /** Modules audited above, with the residual patterns that must not survive the replacements. */
 const WATCHED_MODULES = [
-  { idIncludes: "react-dom/cjs/react-dom", residuals: [REACT_ERROR_DECODER_RESIDUAL] },
-  { idIncludes: "react-router/dist/", residuals: [DEV_HOST_RESIDUAL] },
+  {
+    idIncludes: "react-dom/cjs/react-dom",
+    residuals: [REACT_ERROR_DECODER_RESIDUAL, HTML_INJECTION_SINK_RESIDUAL, INSECURE_SCHEME_RESIDUAL],
+  },
+  { idIncludes: "react-router/dist/", residuals: [DEV_HOST_RESIDUAL, INSECURE_SCHEME_RESIDUAL] },
   { idIncludes: "better-auth/dist/utils/url", residuals: [DEV_HOST_RESIDUAL] },
   {
     idIncludes: "posthog-js/dist/",
-    residuals: [DEV_HOST_RESIDUAL, SENTRY_RESIDUAL, CREDENTIAL_IN_QUERY_RESIDUAL, SESSION_REPLAY_RESIDUAL],
+    residuals: [
+      DEV_HOST_RESIDUAL,
+      SENTRY_RESIDUAL,
+      CREDENTIAL_IN_QUERY_RESIDUAL,
+      SESSION_REPLAY_RESIDUAL,
+      HTML_INJECTION_SINK_RESIDUAL,
+      INSECURE_SCHEME_RESIDUAL,
+    ],
   },
 ];
 

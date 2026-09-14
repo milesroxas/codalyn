@@ -1,9 +1,10 @@
-import { getTowerAuthBaseUrl, towerAuthClient } from "@/features/auth/model/tower-auth-client";
+import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
+import { requestTowerEmailSignIn, type TowerEmailSignInError } from "@/features/auth/model/tower-session-client";
 import { writeBeaconTowerSessionToken } from "./beacon-tower-session-token";
 
 export type TowerEmailSignInResult = { ok: true } | { ok: false; error: string };
 
-type BetterAuthSignInError = { code?: string; message?: string; status?: number } | null | undefined;
+type BetterAuthSignInError = Partial<TowerEmailSignInError> | null | undefined;
 
 /** Map a Better Auth email sign-in error to a short, Designer-friendly message. Pure for testability. */
 export function messageForTowerEmailSignInError(error: BetterAuthSignInError): string {
@@ -34,28 +35,14 @@ export async function signInToTowerWithEmail(email: string, password: string): P
     return { ok: false, error: "Cloud sync isn't available in this build." };
   }
 
-  let headerToken = "";
-  const { data, error } = await towerAuthClient.signIn.email({
-    email: email.trim(),
-    password,
-    fetchOptions: {
-      onSuccess(ctx) {
-        headerToken = ctx.response.headers.get("set-auth-token")?.trim() ?? "";
-      },
-    },
-  });
-
-  if (error) {
-    return { ok: false, error: messageForTowerEmailSignInError(error) };
+  const result = await requestTowerEmailSignIn(email.trim(), password);
+  if (!result.ok) {
+    return { ok: false, error: messageForTowerEmailSignInError(result.error) };
   }
-
-  const bodyTokenRaw = (data as { token?: unknown } | null | undefined)?.token;
-  const bodyToken = typeof bodyTokenRaw === "string" ? bodyTokenRaw.trim() : "";
-  const token = bodyToken || headerToken;
-  if (!token) {
+  if (!result.token) {
     return { ok: false, error: "No session token returned. Try again." };
   }
 
-  writeBeaconTowerSessionToken(token);
+  writeBeaconTowerSessionToken(result.token);
   return { ok: true };
 }

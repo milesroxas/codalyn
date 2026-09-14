@@ -1,0 +1,74 @@
+diff --git a/cjs/scheduler.development.js b/cjs/scheduler.development.js
+index 44d756deabf4176cd69a0e7a3bcd9e9df50b5a18..c9643213318b2e699d1322b66333f82082a3b469 100644
+--- a/cjs/scheduler.development.js
++++ b/cjs/scheduler.development.js
+@@ -217,12 +217,27 @@
+       var schedulePerformWorkUntilDeadline = function () {
+         localSetImmediate(performWorkUntilDeadline);
+       };
+-    else if ("undefined" !== typeof MessageChannel) {
+-      var channel = new MessageChannel(),
+-        port = channel.port2;
+-      channel.port1.onmessage = performWorkUntilDeadline;
++    else if (
++      "object" === typeof globalThis.scheduler &&
++      null !== globalThis.scheduler &&
++      "function" === typeof globalThis.scheduler.postTask
++    ) {
++      // codalyn patch: yield through the Prioritized Task Scheduling API instead of a message
++      // channel port. Webflow's App Review Preflight flags every message-port send in a shipped
++      // bundle as a cross-window message, and React's yield was its only such call.
++      // "user-blocking" is the closest match to that macrotask (no timer clamp). An error
++      // thrown by performWorkUntilDeadline is rethrown from a timer so it surfaces as an uncaught
++      // error — as it would from a message handler — rather than an unhandled rejection. Hosts
++      // without postTask (jsdom, Safari) keep React's own setTimeout fallback below.
++      var hostTaskScheduler = globalThis.scheduler;
+       schedulePerformWorkUntilDeadline = function () {
+-        port.postMessage(null);
++        hostTaskScheduler
++          .postTask(performWorkUntilDeadline, { priority: "user-blocking" })
++          .catch(function (error) {
++            localSetTimeout(function () {
++              throw error;
++            }, 0);
++          });
+       };
+     } else
+       schedulePerformWorkUntilDeadline = function () {
+diff --git a/cjs/scheduler.production.js b/cjs/scheduler.production.js
+index b6a058400b2a20322b8363e8d3c886769bab0582..a8b839962c0d5b4e7fb28f92fa895576f61958da 100644
+--- a/cjs/scheduler.production.js
++++ b/cjs/scheduler.production.js
+@@ -194,12 +194,27 @@ if ("function" === typeof localSetImmediate)
+   schedulePerformWorkUntilDeadline = function () {
+     localSetImmediate(performWorkUntilDeadline);
+   };
+-else if ("undefined" !== typeof MessageChannel) {
+-  var channel = new MessageChannel(),
+-    port = channel.port2;
+-  channel.port1.onmessage = performWorkUntilDeadline;
++else if (
++  "object" === typeof globalThis.scheduler &&
++  null !== globalThis.scheduler &&
++  "function" === typeof globalThis.scheduler.postTask
++) {
++  // codalyn patch: yield through the Prioritized Task Scheduling API instead of a message
++  // channel port. Webflow's App Review Preflight flags every message-port send in a shipped
++  // bundle as a cross-window message, and React's yield was its only such call.
++  // "user-blocking" is the closest match to that macrotask (no timer clamp). An error
++  // thrown by performWorkUntilDeadline is rethrown from a timer so it surfaces as an uncaught
++  // error — as it would from a message handler — rather than an unhandled rejection. Hosts
++  // without postTask (jsdom, Safari) keep React's own setTimeout fallback below.
++  var hostTaskScheduler = globalThis.scheduler;
+   schedulePerformWorkUntilDeadline = function () {
+-    port.postMessage(null);
++    hostTaskScheduler
++      .postTask(performWorkUntilDeadline, { priority: "user-blocking" })
++      .catch(function (error) {
++        localSetTimeout(function () {
++          throw error;
++        }, 0);
++      });
+   };
+ } else
+   schedulePerformWorkUntilDeadline = function () {

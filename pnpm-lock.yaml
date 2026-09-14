@@ -32,6 +32,9 @@ patchedDependencies:
   react-style-singleton@2.2.3:
     hash: 8863ce0fa1810ab48590d0c293799e105946bae66c2f7950acff192521d9d5b7
     path: patches/react-style-singleton@2.2.3.patch
+  scheduler@0.27.0:
+    hash: 72e8755781ed7d8d68bf9e597633bdbed3fad138c0459bc7229dff04af83e118
+    path: patches/scheduler@0.27.0.patch
   vaul@1.1.2:
     hash: 0730bcbf737c9d2d7e73d0ef26e63e0c595a3dcb61a208acf534f4eb633aff90
     path: patches/vaul@1.1.2.patch
@@ -22739,12 +22742,12 @@ snapshots:
   react-dom@19.2.5(react@19.2.5):
     dependencies:
       react: 19.2.5
-      scheduler: 0.27.0
+      scheduler: 0.27.0(patch_hash=72e8755781ed7d8d68bf9e597633bdbed3fad138c0459bc7229dff04af83e118)
 
   react-dom@19.2.7(react@19.2.7):
     dependencies:
       react: 19.2.7
-      scheduler: 0.27.0
+      scheduler: 0.27.0(patch_hash=72e8755781ed7d8d68bf9e597633bdbed3fad138c0459bc7229dff04af83e118)
 
   react-easy-crop@5.5.7(patch_hash=da2c5d4a198421b67b01dedf142d566aa83aa75bef59a7a807e2754067ccb8ff)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
@@ -23196,7 +23199,7 @@ snapshots:
 
   scheduler@0.25.0: {}
 
-  scheduler@0.27.0: {}
+  scheduler@0.27.0(patch_hash=72e8755781ed7d8d68bf9e597633bdbed3fad138c0459bc7229dff04af83e118): {}
 
   schema-utils@3.3.0:
     dependencies:

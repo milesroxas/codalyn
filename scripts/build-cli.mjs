@@ -594,6 +594,13 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     // is the only remaining source-level caller and is DCE'd on release channels. Beacon-only until
     // Flint ports the same anchor-based flows (its auth/connect popups still call window.open).
     forbidden.push({ value: "window.open(", label: "a window.open call" });
+    // App Review Preflight (2026-09-14) "Insecure postMessage": the rule fires on every `postMessage(`
+    // whose second argument is not a string literal — including React's `MessagePort.postMessage(null)`
+    // yield in the `scheduler` package, which has no targetOrigin parameter at all. Beacon has no
+    // cross-window messaging left (auth and popout paths are gone), and the scheduler is patched to
+    // yield through `scheduler.postTask()` (patches/scheduler@0.27.0.patch), so no shipped JS may
+    // contain the call.
+    forbidden.push({ value: "postMessage(", label: "a postMessage call" });
   }
   if (!SENTRY_ALLOWED_APPS.has(appName)) {
     // An earlier review round flagged Sentry; it has since been removed from Beacon, but

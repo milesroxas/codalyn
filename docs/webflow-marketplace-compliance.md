@@ -1551,12 +1551,25 @@ load or on a timer", https://developers.webflow.com/data-beta/apps/docs/marketpl
 
 **Finding 1 — "Insecure postMessage", 2 evidence locations in `bundle.js`.**
 
-- `bundle.js:2` — React `scheduler` (0.27.0): `port2.postMessage(null)` on a `MessageChannel`.
+- `bundle.js:2` — React `scheduler` (0.27.0, bundled inside react-dom): `port2.postMessage(null)`
+  on a `MessageChannel`, React's yield-to-browser primitive between render slices.
   `MessagePort.postMessage(message, transfer?)` has **no `targetOrigin` parameter** — it is a
-  same-document channel React uses to yield to the browser, not a cross-window message. Nothing to
-  fix; removing it would mean patching React's scheduler to fall back to `setTimeout(0)` (4 ms
-  nested-timer clamp on every yield) — a real rendering regression traded for a keyword. **Remaining
-  limitation / reviewer judgment:** this is the single `postMessage(` left in the shipped JS.
+  same-document channel, not a cross-window message — but the rule is shape-based and the re-scan
+  on the 12:08 build (popups and the bridge cleared) still returned it as the sole BLOCKER.
+  **Fixed (2026-09-14, second pass):** `patches/scheduler@0.27.0.patch` (pnpm patch, both
+  `cjs/scheduler.production.js` and `cjs/scheduler.development.js`) replaces the MessageChannel
+  branch with the standards-track Prioritized Task Scheduling API —
+  `globalThis.scheduler.postTask(performWorkUntilDeadline, { priority: "user-blocking" })` — which
+  is the closest equivalent macrotask (no timer clamp). React's own `setTimeout(0)` last-resort
+  fallback is kept for hosts without `postTask` (Safari, jsdom); `setImmediate` still wins first on
+  Node. A callback error is re-thrown from a timer so it surfaces as an uncaught error (as it did
+  from the message handler) rather than an unhandled rejection. Verified by a Node smoke run of the
+  patched module with `setImmediate` removed: priority ordering, continuation callbacks and error
+  surfacing identical through the `postTask` branch (2 host tasks for 3 callbacks + 1 continuation)
+  and through the timer fallback. Pinned by `scheduler-post-task-patch.test.ts` (resolves the copy
+  react-dom bundles; asserts `postTask` + `codalyn patch` present, `MessageChannel`/`postMessage`
+  absent, timer fallback intact). `scripts/build-cli.mjs`: `postMessage(` is now a Beacon-only
+  forbidden marker across every shipped JS file and the archived zip.
 - `bundle.js:85` — the parent side of the flag-gated quality-compare popout bridge
   (`model/use-quality-popout-bridge.ts`): `popout.postMessage({type:"compressed-updated"|"compressed-error"}, window.location.origin)`.
   The target origin was the extension's own origin (runtime-only value, so never a string literal),
@@ -1637,9 +1650,15 @@ string, not a navigation target), `beacon-handoff#ott=` 1 (the handoff href buil
 tower), tsc clean (beacon + tower), 977/977 beacon tests, Tower OAuth/onboarding/handoff tests
 62/62, Storybook build green, `build:prod` gate green including the new `window.open(` marker.
 
-**Remaining limitation / reviewer judgment:** the one `postMessage(` is React's scheduler — a
-same-document `MessageChannel` yield, not a cross-window message. Removing it means patching React
-to a `setTimeout(0)` fallback (4 ms clamp on every yield). Answer with that rationale if re-flagged.
-Not yet re-scanned by App Review Preflight; not deployed (Tower TTL + page copy changes ship with
-the next Tower deploy — the Beacon build is safe against the current Tower: a 1-minute token still
+**Artifact check (09-14 12:16 build, `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod`) —
+the Preflight/submission artifact:** `v0.1.0_public_09-14_12-16-44.zip` sha256
+`1cbdfada…ffa4f`, `.sourcemaps.zip` sha256 `c550ab0f…82265`. Shipped JS: `postMessage` **0**,
+`MessageChannel` **0**, `postTask(` 1, `window.open(` 0, `window.opener` 0, `.map` entries 0,
+`sourceMappingURL` 0, token-in-query 0, rrweb/recorder/toBlob 0, localhost/ngrok/sentry 0; 25
+entries. Private `.sourcemaps.zip` residual: three `postMessage` occurrences in `bundle.js.map`
+`sourcesContent` — the flag-gated popout bridge's source text (DCE'd from the bundle), not shipped
+code. Not yet re-scanned by App Review Preflight.
+
+**Not deployed / not scanned as of writing.** The Tower TTL + page-copy changes ship with the
+next Tower deploy (the Beacon build is safe against the current Tower: a 1-minute token still
 works, just with a narrower hover → click window).

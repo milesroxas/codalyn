@@ -68,6 +68,8 @@ unzip -l "$Z" | grep -c '\.map$'                             # 0
 unzip -p "$Z" '*.js' | grep -c  'sourceMappingURL'           # 0
 unzip -p "$Z" '*.js' | grep -ciE '[?&]token='                # 0  (credential-in-URL)
 unzip -p "$Z" '*.js' | grep -ciE 'localhost|ngrok|sentry'    # 0
+unzip -p "$Z" '*.js' | grep -c  'window.open('             # 0  (Prohibited Popups, R7b.10)
+unzip -p "$Z" '*.js' | grep -c  'postMessage'              # 0  (Insecure postMessage, R7b.10 — scheduler patched to postTask)
 unzip -p "$Z" '*.js' | grep -oE 'https://[a-z0-9.-]+' | sort -u   # only CSP-allowlisted hosts
 unzip -p "$Z" webflow.json                                   # one manifest, real name, apiVersion "2", no telemetry
 unzip -p "$M" '*.map' | grep -ciE '[?&]token='               # 0 — reviewer scans the maps too

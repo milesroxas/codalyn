@@ -2440,3 +2440,9 @@ unchanged. 17:03 receipt never issued; 16:43 receipt `wfpre_5a2242e8…` superse
 as charset-sensitive hashing in the tool's browser path; keep the ASCII test, drop the SRI-mismatch
 sentences from SUBMIT.md §4. **SRI ✗:** three distinct valid pins rejected, including a pure-ASCII one —
 record as tool-side and file. Either way: bundle scan on the 18:26 artifacts → receipt → SUBMIT.md §2.
+
+**Receipt (2026-09-14, later):** bundle scan on `v0.1.0_public_09-14_18-26-19.zip` + `.sourcemaps.zip` issued
+`wfpre_dd6e03bf4a51905c6878d8906bf1dffc` (supersedes `wfpre_5a2242e8…`); pasted into SUBMIT.md §2. The page
+was re-pushed from the 18:26 build (`6aa881c9d6e9e70f262ea057_codalyn-beacon-runtime-1ebc5741.js`; pin
+script ✓, served file 20153 bytes / 0 non-ASCII, observe script: ready selector ×2, 0 requested scripts).
+Runtime-test flags for this build: pending Miles's report. SUBMIT.md §3 carries both 500-character variants.

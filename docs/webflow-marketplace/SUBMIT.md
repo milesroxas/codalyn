@@ -5,7 +5,7 @@ rationale; that lives in [compliance-record.md](compliance-record.md). Keep this
 **one** round only: when a new build is made, update the artifact block and the "what changed"
 list, then copy.
 
-Current round: **7b, 2026-09-14** (App Review Preflight re-scans + three "Test the published runtime"
+Current round: **7b, 2026-09-14** (App Review Preflight re-scans + five "Test the published runtime"
 runs; no new reviewer email). Latest findings and their answers: compliance-record R7b.16; the 16:43
 rebuild and the backend fixes that go with it are R7b.17; the 17:03 rebuild (URL-safe runtime SRI experiment) is R7b.18; the 18:26 rebuild (pure-ASCII runtime) is R7b.19.
 
@@ -14,6 +14,8 @@ rebuild and the backend fixes that go with it are R7b.17; the 17:03 rebuild (URL
 - [ ] The zip below is the **newest** file in `apps/beacon/bundle/production/public/`.
 - [ ] The `wfpre_` receipt came from a Preflight run on **that** zip + its `.sourcemaps.zip`.
 - [ ] Source is committed (so the artifact hash maps to a commit).
+- [ ] Tower is deployed to Production at commit 302edc7 or later — the notes below claim allowlist-only
+  CORS and session-only auth; a reviewer probing `tower.codalyn.app` must see that behaviour.
 - [ ] **That** zip is installed on the test site and the Beacon panel renders (no CSP violation for
   `cdn.prod.website-files.com` in the extension console) — see compliance-record R7b.15.
 - [ ] The test page's runtime was re-pushed **from that zip** (CMS Slots → page runtime **Sync**) and the
@@ -34,24 +36,40 @@ Rebuild command if needed: `CI=true BUILD_RECIPIENT=public pnpm --filter beacon 
 
 ## 2. App Review Preflight receipt
 
-**Pending for the 18:26 build.** Receipts are bound to the exact zip: `wfpre_5a2242e8a2e87aeb307efde92bd51bc0`
-(16:43 build, sha256 `07b52d49…3d2e`) and `wfpre_d7c0944a2b2df172d989a97931230b21` (14:50 build) do not
-reconcile with the files above. Run the bundle scan on the 18:26 zip + its `.sourcemaps.zip` and paste the
-new code here before filing. Expected bundle-scan result is unchanged (External API Calls 1, Silent Canvas
-Mutations 1); the only source change is one header comment line in the published runtime
-(compliance-record R7b.18, R7b.19).
+Issued 2026-09-14 by the Preflight run on the two files above (bundle `91b88847…99fd` + sourcemaps
+`0684d186…01ea`). Paste as-is:
 
 ```
-wfpre_<pending — run Preflight on the 18:26 artifacts>
+wfpre_dd6e03bf4a51905c6878d8906bf1dffc
 ```
+
+(Expected **bundle scan** result for this build: two REQUIRED items — External API Calls, 1 location;
+Silent Canvas Mutations, 1 location. Both are answered in §3/§4. Anything else = stop, see
+[playbook.md](playbook.md) § B. Superseded receipts: `wfpre_5a2242e8…` (16:43 build), `wfpre_d7c0944a…`
+(14:50 build).)
 
 ## 3. Response to the review team (≤500 characters)
 
-495 characters.
+One field covers both scans. Pick the variant that matches the runtime-test row for the 18:26 build.
+
+**If the runtime test still shows "SRI mismatch" (484 characters):**
 
 ```
-Preflight: every request now leaves through one first-party egress call (extension-egress.ts) with an explicit destination policy — our Tower origin, or the Webflow-issued presigned asset-upload URL — mirrored by the shipped CSP; the release build fails on any second fetch site. The one MutationObserver is the rich-text editor's (Lexical) contenteditable sync inside our own panel: created on editor mount, scoped to its root, driven by typing. It never observes or writes the Designer canvas.
+Bundle scan: every request leaves through one egress call (extension-egress.ts) with an explicit destination policy; the release build fails on a second fetch site. The one MutationObserver is Lexical's editor sync inside our panel, never the canvas. Runtime test: Beacon adds one page-level script, pinned by a SHA-256 SRI the tag carries verbatim; served bytes match (Hash matched). It is unminified, so it is its own source. Every other listed script is Webflow's own site runtime.
 ```
+
+**If the runtime test now shows SRI ✓ (490 characters):**
+
+```
+Bundle scan: every request leaves through one egress call (extension-egress.ts) with an explicit destination policy; the release build fails on a second fetch site. The one MutationObserver is Lexical's editor sync inside our panel, never the canvas. Runtime test: Beacon adds one page-level script, pinned by a SHA-256 SRI the tag carries verbatim (SRI now verified). It is unminified, so it is its own source. Every other listed script is Webflow's own site runtime, not loaded by Beacon.
+```
+
+How to defend each item if asked (one line each; the long version is in §4):
+- **External API Calls (1)** — that one `fetch(` is the chokepoint; its allowlist is the Tower origin or the Webflow-issued presigned upload URL, mirrored by the shipped CSP.
+- **Silent Canvas Mutations (1)** — Lexical's contenteditable observer, created on editor mount, scoped to the editor root inside our iframe; the Designer canvas is only changed through the Designer API on explicit user actions.
+- **Script integrity** — the tag carries the exact derived SRI with crossorigin="anonymous"; the CDN serves the same bytes for every encoding with ACAO *; the browser executed it (ready selector present), which is impossible if SRI failed in the browser.
+- **New / unreviewed scripts** — all are Webflow's published-site runtime (webflow.<site>.js, its achunk imports, GSAP for Interactions); Beacon requests zero scripts (unit-pinned).
+- **Not traceable to source** — the runtime is served unminified; the file is the source. The same modules are in the private source-map zip.
 
 ## 4. Submission notes / changelog (long field)
 
@@ -92,7 +110,7 @@ AVIF conversion is opt-in, off by default. Selecting AVIF shows an in-context co
 ```
 PUBLISHED-RUNTIME TEST NOTES
 - Beacon applies exactly one script to a page: the hosted runtime registered with a SHA-256 integrityHash and applied through the Custom Code API. It creates no script elements, performs no dynamic import, and makes no network requests (pinned by unit test on the generated source).
-- The page tag Webflow renders for it is <script src="<versioned URL — fill from `node scripts/webflow-runtime-pin.mjs` after Sync + Publish of the 18:26 build>" integrity="sha256-bzvg9YjCBFqQA0VVsDdcsIK0DUK5RSCi9mefHtVXldM=" crossorigin="anonymous">; the served bytes (20153, SHA-256 6f3be0f588c2045a90034555b0375cb082b40d42b94520a2f6679f1ed55795d3) hash to that SRI under Preflight's own curl/shasum/openssl steps, with or without an Origin header, for identity, gzip and br encodings, and the CDN answers Access-Control-Allow-Origin: *. Preflight's browser test still reports "Script integrity is missing or wrong" for this file with the same URL, SHA-256 and derived SRI in the package; we could not reproduce a mismatch outside the tool and would welcome the value it observed.
+- The page tag Webflow renders for it is <script src="https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6aa881c9d6e9e70f262ea057_codalyn-beacon-runtime-1ebc5741.js" integrity="sha256-bzvg9YjCBFqQA0VVsDdcsIK0DUK5RSCi9mefHtVXldM=" crossorigin="anonymous">; the served bytes (20153, SHA-256 6f3be0f588c2045a90034555b0375cb082b40d42b94520a2f6679f1ed55795d3) hash to that SRI under Preflight's own curl/shasum/openssl steps, with or without an Origin header, for identity, gzip and br encodings, and the CDN answers Access-Control-Allow-Origin: *. Preflight's browser test still reports "Script integrity is missing or wrong" for this file with the same URL, SHA-256 and derived SRI in the package; we could not reproduce a mismatch outside the tool and would welcome the value it observed.
 - The runtime is served unminified and formatted, with a header naming its version and authoring module (apps/beacon/src/features/cms-slots/model/cms-slot-page-inline-script.ts). There is no build transform, so the served file is its own readable source and no separate source map exists; the same modules are in the private source-map zip attached to this submission.
 - Every other script the test page loads is Webflow's own published-site runtime (js/webflow.<site>.<hash>.js and the webflow.achunk.* chunks it imports, plus GSAP/ScrollTrigger when Interactions are present), rendered by Webflow on every published page. None is loaded by Beacon.
 ```
@@ -128,10 +146,10 @@ node scripts/webflow-runtime-pin.mjs https://<test-site>.webflow.io/<page-with-b
 | --- | --- |
 | Published Webflow test URL | `https://beacon-demo.webflow.io/blog/the-power-of-resilience` |
 | Webflow installation or site ID | prefilled by Preflight (`6a35c562c551e2eb11bc4f1c` on 2026-09-14) |
-| Versioned runtime URL | `<fill from node scripts/webflow-runtime-pin.mjs after CMS Slots → Sync → Publish on the 18:26 build; file name ends in codalyn-beacon-runtime-1ebc5741.js>` |
+| Versioned runtime URL | `https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6aa881c9d6e9e70f262ea057_codalyn-beacon-runtime-1ebc5741.js` (pushed from the 18:26 build; verified 2026-09-14 by pin script + observe script) |
 | How runtime file 1 loads | Loaded directly by the published page |
 | SHA-256 | `6f3be0f588c2045a90034555b0375cb082b40d42b94520a2f6679f1ed55795d3` (20153 bytes, pure ASCII) |
-| Script integrity (SRI) | `sha256-bzvg9YjCBFqQA0VVsDdcsIK0DUK5RSCi9mefHtVXldM=` — confirm the page tag carries it with `crossorigin="anonymous"` via the pin script before running the test |
+| Script integrity (SRI) | `sha256-bzvg9YjCBFqQA0VVsDdcsIK0DUK5RSCi9mefHtVXldM=` — the page tag carries it with `crossorigin="anonymous"` (verified 2026-09-14) |
 | Does your app proxy or fetch another URL for customers? | **No** — Tower never fetches a URL the client supplies (`/api/v2/webflow/*` forwards path segments to the fixed Webflow Data API host; image conversion takes uploaded bytes) |
 | Ready selector | `[data-beacon-target="list"][data-cb-rendered="1"]` (set by the runtime per rendered beacon list; page must have one working beacon) |
 | Runtime file results, last run | 17:03 build (URL-safe pin, 3 non-ASCII bytes): Loaded ✓ · Hash matched ✓ · SRI mismatch ✗ · No source map ✗. 18:26 build (pure ASCII): not yet run — if SRI passes, delete the SRI-mismatch sentences from §4; if it fails, keep them (three distinct valid pins rejected = tool-side, R7b.19) |

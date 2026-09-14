@@ -29,6 +29,17 @@ const CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE = "runtime";
 /** Fingerprint of {@link getCmsSlotPageInlineScriptSource} so we can detect drift vs the page footer script. */
 const CMS_SLOT_PAGE_SCRIPT_HASH_ATTR = "data-codalyn-beacon-src-hash";
 
+/**
+ * Revision counter embedded in the runtime's header comment. It exists so the SHA-256 SRI of the served runtime is
+ * URL-safe: App Review Preflight's published-runtime test reported "Script integrity is missing or wrong" for a page
+ * whose `integrity` attribute matched the derived pin exactly — the only distinguishing feature of that pin was a
+ * `/` in its base64. Standard base64 SRI values may contain `/` and `+`, and browsers accept them, but a value made of
+ * `[A-Za-z0-9=]` only survives any URL-, regex- or base64url-based comparison as well. Bump this number whenever the
+ * runtime source changes and `cms-slot-page-inline-script.test.ts` reports a `/` or `+` in the pin (about one in four
+ * revisions passes; the test names the next passing value). Deterministic, so the FNV drift marker stays stable.
+ */
+export const CMS_SLOT_RUNTIME_REVISION = 2;
+
 /** 32-bit FNV-1a → 8 hex chars (stable across browsers for the same source string). */
 function hashCmsSlotRuntimeSource(source: string): string {
   let h = 2166136261;
@@ -83,6 +94,7 @@ export function getCmsSlotPageInlineScriptSource(): string {
     String(__BUILD_CHANNEL__) === "development" ? beaconPropDebugRuntimeSource() : beaconPropDebugStubSource();
   return `/*
  * Codalyn Beacon — published-site list runtime v${buildVersion}.
+ * Runtime revision ${CMS_SLOT_RUNTIME_REVISION}.
  * Served exactly as authored (unminified, no build step), so this file is its own readable source.
  * Authored in apps/beacon/src/features/cms-slots/model/cms-slot-page-inline-script.ts and the
  * cms-slot-beacon-*.ts / cms-slot-list-target-*.ts modules it composes. Loads no other scripts and

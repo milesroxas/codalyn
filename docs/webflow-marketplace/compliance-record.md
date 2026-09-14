@@ -2347,5 +2347,53 @@ build; no re-push needed. Retention kept the 14:50 build beside it and moved the
 
 **States:** Source ✓ (uncommitted at time of writing) · Artifact ✓ · Installed ✗ (install the 16:43 zip
 on the test site and confirm the panel renders) · Runtime ✓ (unchanged) · Submitted ✗ · Accepted ✗.
-**Next:** commit; deploy Tower (CORS + auth change); install the 16:43 zip; run App Review Preflight on
-the 16:43 zip + sourcemaps → new `wfpre_` receipt into SUBMIT.md §2; file per SUBMIT.md.
+**Follow-up (2026-09-14, later):** the 16:43 zip was installed on the test site; a Sync was pressed
+and the site republished — no-op by design (hash `0410d012` matched, no new registration; page tag,
+bytes and SRI re-verified identical, `webflow-runtime-observe.mjs`: ready selector present ×2, 0 scripts
+requested by the runtime). Preflight run on the 16:43 zip + sourcemaps issued receipt
+`wfpre_5a2242e8a2e87aeb307efde92bd51bc0` (supersedes `wfpre_d7c0944a…`); pasted into SUBMIT.md §2.
+States: Source ✓ (uncommitted) · Artifact ✓ · Installed ✓ · Runtime ✓ · Submitted ✗ · Accepted ✗.
+**Next:** commit; deploy Tower to Production (CORS + auth change must be live before review); file per
+SUBMIT.md.
+
+### R7b.18 Preflight "Script integrity is missing or wrong" — URL-safe SRI experiment; 17:03 rebuild (2026-09-14)
+
+**Finding (issued, priority unassigned):** Preflight's published-runtime test, three runs on the 14:11/14:50
+builds and the 16:43 build's page, reports the Beacon runtime row as Loaded ✓ · Hash matched ✓ · **SRI
+mismatch ✗** · No source map ✗. Acceptance criterion from the form: "page-loaded files must carry this SRI in
+the DOM." Provenance: published requirement is `integrity` + `crossorigin="anonymous"` at an immutable URL
+(marketplace guidelines); the exact-string DOM comparison is Preflight's own control; the guidelines also
+state review "verifies what your App registers, discloses, and removes through Webflow, not how your
+published-site runtime behaves."
+
+**Re-verified before changing anything (runtime-observed):** one tag, `integrity="sha256-ZxZt…6H/eD9g="`,
+`crossorigin="anonymous"`, equal to the SRI the form derives; served bytes hash to the typed SHA-256 and to
+the CDN etag (content MD5 `4ec963d1…`), identical for identity/br/zstd, ACAO `*` with and without Origin, no
+redirect; headless Chromium loads it and the ready selector resolves (a browser SRI failure would block the
+script). Webflow's own tags on the page use the same shape (jQuery sha256, core bundle sha384), so the
+algorithm is not the differentiator. The only distinguishing feature of our pin is a `/` in its base64 — a
+validator regex missing `/`, a one-sided base64url normalization, or an SRI passed through a URL path would
+each fail exactly this value while displaying it correctly.
+
+**Change (source):** `CMS_SLOT_RUNTIME_REVISION = 2` in `cms-slot-page-inline-script.ts`, emitted as one
+header comment line (` * Runtime revision 2.`) in the published runtime. Behaviour unchanged (the existing
+tests execute the generated runtime). New test in `cms-slot-page-inline-script.test.ts` fails whenever the
+runtime's SHA-256 SRI contains `/` or `+` and names the next passing revision. Runtime is now 20104 bytes,
+FNV marker `a92b64ed`, SHA-256 `047c7043c27a294bb56451a11918d9000c4eaf39cae74c494dbd265261cd8023`, SRI
+`sha256-BHxwQ8J6KUu1ZFGhGRjZAAxOrznK50xJTb0mUmHNgCM=` (URL-safe). Single variable changed: the pin's
+character set; algorithm, tag, host, registration path all as before.
+
+**Artifact:** `v0.1.0_public_09-14_17-03-17.zip` sha256
+`a89ec9e35eb32bb1d25052b083c8c6ea08590d9bb33ff4c882dd9474e9bec0cf` (602 188 bytes) + `.sourcemaps.zip`
+`bf957ee728372e6a81fec1541cf89f9999ef22c706f8375efe19b53f2fd8c725`. All gates green; manual re-grep
+unchanged (`fetch(` 1, `new MutationObserver(` 1, forbidden shapes 0). Receipts `wfpre_5a2242e8…` (16:43)
+and `wfpre_d7c0944a…` (14:50) are superseded; a new bundle scan is required.
+
+**States:** Source ✓ (uncommitted) · Artifact ✓ · Installed ✗ · Runtime ✗ (needs Sync — this time the hash
+differs, so a real registration + PUT happens — then Publish) · Submitted ✗ · Accepted ✗.
+**Next:** commit; install the 17:03 zip; CMS Slots → Sync → Publish; `node scripts/webflow-runtime-pin.mjs
+<page>` (expect exit 0, file `…codalyn-beacon-runtime-a92b64ed.js`, SRI `…gCM=`); fill Preflight's runtime
+test with those values and run it. **Outcome A (SRI ✓):** cause confirmed as the tool's handling of `/`;
+remove the SRI-mismatch sentences from SUBMIT.md §4 and keep the revision test. **Outcome B (SRI ✗):** two
+distinct valid pins rejected — record as tool-side, keep the §4 paragraph, file anyway. Either way, run the
+bundle scan on the 17:03 artifacts for the receipt.

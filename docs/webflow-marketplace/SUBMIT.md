@@ -7,7 +7,7 @@ list, then copy.
 
 Current round: **7b, 2026-09-14** (App Review Preflight re-scans + three "Test the published runtime"
 runs; no new reviewer email). Latest findings and their answers: compliance-record R7b.16; the 16:43
-rebuild and the backend fixes that go with it are R7b.17.
+rebuild and the backend fixes that go with it are R7b.17; the 17:03 rebuild (URL-safe runtime SRI experiment) is R7b.18.
 
 ## Before you paste (30 seconds)
 
@@ -23,26 +23,26 @@ rebuild and the backend fixes that go with it are R7b.17.
 
 | Form field | File |
 | --- | --- |
-| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-14_16-43-22.zip` |
-| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-14_16-43-22.sourcemaps.zip` |
+| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-14_17-03-17.zip` |
+| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-14_17-03-17.sourcemaps.zip` |
 | Package manifest + lockfile (required for compiled bundles since the 2026-08-19 guidelines) | `apps/beacon/package.json` + root `pnpm-lock.yaml`, as committed at the build commit |
 
-sha256 · bundle `07b52d491b13f1d666ff9f50c266c8d165d6e4bf92f3f02a885010fe62943d2e` ·
-sourcemaps `cfc89c5d0b9deb8267956bf57e756e9eb9f4927ec57b35da3646944c7b6bf04f`
+sha256 · bundle `a89ec9e35eb32bb1d25052b083c8c6ea08590d9bb33ff4c882dd9474e9bec0cf` ·
+sourcemaps `bf957ee728372e6a81fec1541cf89f9999ef22c706f8375efe19b53f2fd8c725`
 
 Rebuild command if needed: `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod`
 
 ## 2. App Review Preflight receipt
 
-**Not yet issued for the 16:43 build.** The previous receipt (`wfpre_d7c0944a2b2df172d989a97931230b21`)
-was issued for `v0.1.0_public_09-14_14-50-17.zip` (sha256 `9d9e8958…7275`) and does not reconcile with
-the files above. Run App Review Preflight on the 16:43 zip + its `.sourcemaps.zip`, then paste the new
-`wfpre_` code here before filing. Expected bundle-scan result is unchanged (External API Calls 1, Silent
-Canvas Mutations 1) — the 16:43 build changes no scanner-shaped token (verified by the release gates and
-a manual grep, compliance-record R7b.17).
+**Pending for the 17:03 build.** Receipts are bound to the exact zip: `wfpre_5a2242e8a2e87aeb307efde92bd51bc0`
+(16:43 build, sha256 `07b52d49…3d2e`) and `wfpre_d7c0944a2b2df172d989a97931230b21` (14:50 build) do not
+reconcile with the files above. Run the bundle scan on the 17:03 zip + its `.sourcemaps.zip` and paste the
+new code here before filing. Expected bundle-scan result is unchanged (External API Calls 1, Silent Canvas
+Mutations 1); the only source change is one header comment line in the published runtime
+(compliance-record R7b.18).
 
 ```
-wfpre_<pending — run Preflight on the 16:43 artifacts>
+wfpre_<pending — run Preflight on the 17:03 artifacts>
 ```
 
 ## 3. Response to the review team (≤500 characters)
@@ -57,6 +57,7 @@ Preflight: every request now leaves through one first-party egress call (extensi
 
 ```
 WHAT CHANGED IN THIS UPDATE
+- Published-site runtime: one header comment line added ("Runtime revision 2") so the runtime's SHA-256 SRI contains only [A-Za-z0-9=] (no "/" or "+"). Behaviour unchanged (unit tests execute the generated runtime); a unit test now keeps the pin URL-safe on every future revision. Motivation: Preflight's runtime test reported an SRI mismatch for a pin that matched byte-for-byte; the only distinguishing feature of that pin was a "/" in its base64.
 - Backend CORS is allowlist-only: Tower answers non-allowlisted origins with no Access-Control-Allow-Origin header (previously a credential-less "*"), and local-development origins are excluded on every deployed runtime.
 - The optional shared API-key bearer for Tower's API was removed from both Tower and the extension; every request is attributed to a signed-in user session.
 - react-router-dom updated to 7.18.3 (clears the published react-router advisories in the uploaded manifest/lockfile); our vendor patch that removes its framework-mode inline <script> emission is re-applied to that version.
@@ -91,7 +92,7 @@ AVIF conversion is opt-in, off by default. Selecting AVIF shows an in-context co
 ```
 PUBLISHED-RUNTIME TEST NOTES
 - Beacon applies exactly one script to a page: the hosted runtime registered with a SHA-256 integrityHash and applied through the Custom Code API. It creates no script elements, performs no dynamic import, and makes no network requests (pinned by unit test on the generated source).
-- The page tag Webflow renders for it is <script src="https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6aa844abbb616acbbee14fa2_codalyn-beacon-runtime-0410d012.js" integrity="sha256-ZxZtUnSp6VCb9YqsFffIPBLHmAhfYnhGvtPy6H/eD9g=" crossorigin="anonymous">; the served bytes (20081, SHA-256 67166d5274a9e9509bf58aac15f7c83c12c798085f627846bed3f2e87fde0fd8) hash to that SRI under Preflight's own curl/shasum/openssl steps, with or without an Origin header, for identity, gzip and br encodings, and the CDN answers Access-Control-Allow-Origin: *. Preflight's browser test still reports "Script integrity is missing or wrong" for this file with the same URL, SHA-256 and derived SRI in the package; we could not reproduce a mismatch outside the tool and would welcome the value it observed.
+- The page tag Webflow renders for it is <script src="<versioned URL — fill from `node scripts/webflow-runtime-pin.mjs` after Sync + Publish>" integrity="sha256-BHxwQ8J6KUu1ZFGhGRjZAAxOrznK50xJTb0mUmHNgCM=" crossorigin="anonymous">; the served bytes (20104, SHA-256 047c7043c27a294bb56451a11918d9000c4eaf39cae74c494dbd265261cd8023) hash to that SRI under Preflight's own curl/shasum/openssl steps, with or without an Origin header, for identity, gzip and br encodings, and the CDN answers Access-Control-Allow-Origin: *. Preflight's browser test still reports "Script integrity is missing or wrong" for this file with the same URL, SHA-256 and derived SRI in the package; we could not reproduce a mismatch outside the tool and would welcome the value it observed.
 - The runtime is served unminified and formatted, with a header naming its version and authoring module (apps/beacon/src/features/cms-slots/model/cms-slot-page-inline-script.ts). There is no build transform, so the served file is its own readable source and no separate source map exists; the same modules are in the private source-map zip attached to this submission.
 - Every other script the test page loads is Webflow's own published-site runtime (js/webflow.<site>.<hash>.js and the webflow.achunk.* chunks it imports, plus GSAP/ScrollTrigger when Interactions are present), rendered by Webflow on every published page. None is loaded by Beacon.
 ```
@@ -127,13 +128,13 @@ node scripts/webflow-runtime-pin.mjs https://<test-site>.webflow.io/<page-with-b
 | --- | --- |
 | Published Webflow test URL | `https://beacon-demo.webflow.io/blog/the-power-of-resilience` |
 | Webflow installation or site ID | prefilled by Preflight (`6a35c562c551e2eb11bc4f1c` on 2026-09-14) |
-| Versioned runtime URL | `https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6aa844abbb616acbbee14fa2_codalyn-beacon-runtime-0410d012.js` (19:02 UTC push from the 14:50 build; re-run the script after any new Sync + Publish) |
+| Versioned runtime URL | `<fill from node scripts/webflow-runtime-pin.mjs after CMS Slots → Sync → Publish on the 17:03 build; file name ends in codalyn-beacon-runtime-a92b64ed.js>` |
 | How runtime file 1 loads | Loaded directly by the published page |
-| SHA-256 | `67166d5274a9e9509bf58aac15f7c83c12c798085f627846bed3f2e87fde0fd8` |
-| Script integrity (SRI) | `sha256-ZxZtUnSp6VCb9YqsFffIPBLHmAhfYnhGvtPy6H/eD9g=` — the page already carries it with `crossorigin="anonymous"` (verified 2026-09-14) |
+| SHA-256 | `047c7043c27a294bb56451a11918d9000c4eaf39cae74c494dbd265261cd8023` (20104 bytes) |
+| Script integrity (SRI) | `sha256-BHxwQ8J6KUu1ZFGhGRjZAAxOrznK50xJTb0mUmHNgCM=` — URL-safe (no `/` or `+`); confirm the page tag carries it with `crossorigin="anonymous"` via the pin script before running the test |
 | Does your app proxy or fetch another URL for customers? | **No** — Tower never fetches a URL the client supplies (`/api/v2/webflow/*` forwards path segments to the fixed Webflow Data API host; image conversion takes uploaded bytes) |
 | Ready selector | `[data-beacon-target="list"][data-cb-rendered="1"]` (set by the runtime per rendered beacon list; page must have one working beacon) |
-| Runtime file results, last run (2026-09-14 15:45) | Loaded ✓ · Hash matched ✓ · SRI mismatch ✗ · No source map ✗ — expected; the first two prove the package matches the served bytes, the last two are answered in §4 |
+| Runtime file results, last run | 16:43 build (pin `…6H/eD9g=`): Loaded ✓ · Hash matched ✓ · SRI mismatch ✗ · No source map ✗. 17:03 build (URL-safe pin): not yet run — if SRI now passes, delete the SRI-mismatch sentences from §4; if it still fails, keep them (two distinct valid pins rejected = tool-side, R7b.18) |
 
 **Runtime files: fill runtime file 1 (Beacon) only. Do not pin Webflow's own scripts (decision
 2026-09-14, compliance-record R7b.16).** Provenance: the published guidelines scope review to "what your

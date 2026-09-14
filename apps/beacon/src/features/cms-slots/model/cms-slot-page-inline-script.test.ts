@@ -9,6 +9,7 @@ import {
 import { CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_INLINE_KEYS } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
 import { CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
 import {
+  CMS_SLOT_RUNTIME_REVISION,
   CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS,
   cmsSlotRuntimeScriptVersion,
   decideCmsSlotRuntimeSyncAction,
@@ -56,6 +57,28 @@ function runCmsSlotBeaconRuntime(doc: Document): void {
 }
 
 describe("getCmsSlotPageInlineScriptSource", () => {
+  it("pins to a URL-safe SHA-256 SRI (no `/` or `+` in the base64; bump CMS_SLOT_RUNTIME_REVISION otherwise)", async () => {
+    const s = getCmsSlotPageInlineScriptSource();
+    expect(s).toContain(`\n * Runtime revision ${CMS_SLOT_RUNTIME_REVISION}.\n`);
+    const sriOf = async (source: string) =>
+      Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source))).toString("base64");
+    const current = await sriOf(s);
+    if (/[+/]/.test(current)) {
+      // Find the next revision whose pin is URL-safe so the failure message says exactly what to change.
+      const line = ` * Runtime revision ${CMS_SLOT_RUNTIME_REVISION}.\n`;
+      let next = CMS_SLOT_RUNTIME_REVISION + 1;
+      for (; next < CMS_SLOT_RUNTIME_REVISION + 200; next++) {
+        if (!/[+/]/.test(await sriOf(s.replace(line, ` * Runtime revision ${next}.\n`)))) {
+          break;
+        }
+      }
+      throw new Error(
+        `Runtime SRI sha256-${current} contains '/' or '+'. Set CMS_SLOT_RUNTIME_REVISION = ${next} in cms-slot-page-inline-script.ts.`
+      );
+    }
+    expect(current).toMatch(/^[A-Za-z0-9]{43}=$/);
+  });
+
   it("is served as its own readable source and loads nothing else (App Review Preflight published-runtime test)", () => {
     const s = getCmsSlotPageInlineScriptSource();
     // Readable, unminified: many short lines (Biome's 120-column format plus seam indentation), a header that

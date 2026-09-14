@@ -56,6 +56,35 @@ function runCmsSlotBeaconRuntime(doc: Document): void {
 }
 
 describe("getCmsSlotPageInlineScriptSource", () => {
+  it("is served as its own readable source and loads nothing else (App Review Preflight published-runtime test)", () => {
+    const s = getCmsSlotPageInlineScriptSource();
+    // Readable, unminified: many short lines (Biome's 120-column format plus seam indentation), a header that
+    // names the authoring module, and no minifier artifacts such as a single multi-kilobyte line.
+    const lines = s.split("\n");
+    expect(lines.length).toBeGreaterThan(150);
+    expect(lines.reduce((n, l) => n + l.length, 0) / lines.length).toBeLessThan(60);
+    expect(Math.max(...lines.map((l) => l.length))).toBeLessThan(400);
+    expect(s.startsWith("/*\n * Codalyn Beacon — published-site list runtime v")).toBe(true);
+    expect(s).toContain("cms-slot-page-inline-script.ts");
+    // The pinned runtime must be the only script the page runs because of Beacon: no script creation, no
+    // dynamic import, no network, no storage, no eval — and no source-map pointer (there is no map; this is the source).
+    for (const shape of [
+      /createElement\(\s*["']script["']/i,
+      /<script/i,
+      /\bimport\s*\(/,
+      /(?<![\w$.])fetch\(/,
+      /XMLHttpRequest/,
+      /sendBeacon/,
+      /WebSocket/,
+      /localStorage|sessionStorage|indexedDB|document\.cookie/,
+      /\beval\(/,
+      /new Function\(/,
+      /sourceMappingURL/,
+    ]) {
+      expect(s).not.toMatch(shape);
+    }
+  });
+
   it("parses in JS", () => {
     const s = getCmsSlotPageInlineScriptSource();
     expect(() => {
@@ -74,7 +103,7 @@ describe("getCmsSlotPageInlineScriptSource", () => {
   it("applies display contents layout on list target reveal", () => {
     const s = getCmsSlotPageInlineScriptSource();
     expect(s).toContain(`classList.add("${CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME}")`);
-    expect(s).toContain('setProperty("display","contents","important")');
+    expect(s).toContain('setProperty("display", "contents", "important")');
   });
 
   it("reads the v3 content and conditional attributes", () => {
@@ -1013,9 +1042,9 @@ describe("cms slot beacon runtime fail-open reveal (published site)", () => {
   it("emits the safety reveal, per-target isolation, and guarded apply into the runtime source", () => {
     const s = getCmsSlotPageInlineScriptSource();
     expect(s).toContain("function bSafeReveal(target)");
-    expect(s).toContain(`},${CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS})`);
+    expect(s).toContain(`}, ${CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS})`);
     expect(s).toContain("bArmSafetyReveal(target)");
-    expect(s).toContain("function bTryApplyProps(target,payload)");
+    expect(s).toContain("function bTryApplyProps(target, payload)");
     expect(s).toContain("bRevealAllTargets()");
   });
 

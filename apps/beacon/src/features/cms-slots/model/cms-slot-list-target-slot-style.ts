@@ -100,9 +100,11 @@ export function ensureCmsSlotListTargetSlotStyle(): Promise<Style> {
   });
 }
 
-/** Minified snippet embedded in {@link getCmsSlotPageInlineScriptSource} (`bListTargetReveal`). */
+/** Runtime statements (readable JS) embedded in {@link getCmsSlotPageInlineScriptSource} (`bListTargetReveal`). */
 export function cmsSlotListTargetRuntimeLayoutRevealSource(): string {
-  return `target.classList.add("${CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME}");target.style.setProperty("display","contents","important");`;
+  return `target.classList.add("${CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME}");
+target.style.setProperty("display", "contents", "important");
+`;
 }
 
 /**

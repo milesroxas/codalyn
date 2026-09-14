@@ -112,17 +112,27 @@ ones it hid.
    **and** the **same** `.sourcemaps.zip`. Zero blockers → copy the `wfpre_…` receipt.
    A blocker here → go to section B with the preflight output as the findings.
 3. **Preflight "Test the published runtime"** (Webflow browser test; Beacon ships a hosted runtime
-   to published sites, so this applies). On the test site: install beacons on a page, press the
-   page runtime **Sync** button in CMS Slots if the runtime was pushed before the current build
-   (forced re-register with the current SRI pin), **publish**, then:
+   to published sites, so this applies). Use the simplest page that has beacons — no Interactions,
+   no custom-code embeds, no third-party scripts — so the only non-Beacon JavaScript is Webflow's
+   own site runtime. Press the page runtime **Sync** button in CMS Slots (forced re-register with
+   the current build's runtime + SHA-256 pin), **publish**, then:
    ```bash
-   node scripts/webflow-runtime-pin.mjs https://<test-site>.webflow.io/<page-with-beacons>
+   node scripts/webflow-runtime-observe.mjs https://<test-site>.webflow.io/<page-with-beacons>
+   node scripts/webflow-runtime-pin.mjs     https://<test-site>.webflow.io/<page-with-beacons>
    ```
-   It prints one block per Beacon runtime `<script>`: versioned URL → "Versioned runtime URL",
-   "Loaded directly by the published page", SHA-256 hex → "SHA-256" (the form derives the SRI),
-   and whether the page's `integrity` attribute already equals that SRI (it must; exit 1 if not).
-   Published test URL = the page URL you passed; the site ID is prefilled from the Designer.
-   Expect exactly one runtime file: the runtime loads no child scripts and makes no requests.
+   The observe script is a local stand-in for Preflight's browser test: every script the page
+   executed (served-HTML tags, elements created after page start, module imports) with SHA-256/SRI,
+   who requested it, and a Beacon / Webflow-platform / other label; the Beacon tag's `integrity`
+   checked against the served bytes (exit 1 if absent or different); a "test-package rows" block for
+   the form. The pin script is the static cross-check of the same values. Requirements: "Scripts
+   requested by the Beacon runtime: 0", "neither Webflow platform nor Beacon: 0", ready selector
+   present. Published test URL = the page URL you passed; the site ID is prefilled from the Designer.
+   Webflow's own scripts (`webflow.<site>.<hash>.js`, `webflow.achunk.*`, gsap/ScrollTrigger,
+   jQuery) show up as "unreviewed" / "new script elements" — **expected; do not pin them** (R7b.16:
+   published guidelines scope review to what the App registers, discloses and removes; Preflight is
+   optional). Fill runtime file 1 (Beacon) only and answer with the SUBMIT.md §4 published-runtime
+   paragraph; pin from the rows block only if a reviewer asks. "Runtime is not traceable to source"
+   is likewise expected — the runtime is served unminified as its own source; same paragraph.
 4. Listing assets: screenshots, 512×512 icon, demo video (approve + deny flows), ToS and Privacy as
    distinct URLs, fees disclosed, AVIF conversion disclosure in notes.
 

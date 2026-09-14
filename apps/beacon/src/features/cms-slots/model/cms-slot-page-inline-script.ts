@@ -56,8 +56,19 @@ const LOG_PREFIX = "[codalyn-beacon-runtime-cleanup]";
  */
 export const CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS = 3000;
 
+/** Indents every non-empty line of a runtime fragment so composed pieces sit at the nesting depth of their seam. */
+function indentRuntimeBlock(source: string, spaces = 2): string {
+  const pad = " ".repeat(spaces);
+  return source.replace(/\n$/, "").replace(/^(?=.)/gm, pad);
+}
+
 /**
- * Minified IIFE for the Beacon runtime source uploaded as a Webflow Asset.
+ * The Beacon published-site runtime, uploaded verbatim as a Webflow Asset and applied to pages through the Custom
+ * Code API. It is **served exactly as authored here — readable, unminified, no build transform** — so the file a
+ * reviewer or site owner downloads from the CDN is its own source: there is no separate source map to publish, and
+ * the private bundle source maps carry these same modules. Formatting is Biome's (120 columns); the fragments
+ * interpolated below are formatted the same way and indented to their seam. The runtime loads no other scripts,
+ * sends no network requests, and touches no storage (pinned by cms-slot-page-inline-script.test.ts).
  */
 export function getCmsSlotPageInlineScriptSource(): string {
   // Stable build identifier embedded in the runtime so the debug HUD can report which synced build is live.
@@ -70,60 +81,300 @@ export function getCmsSlotPageInlineScriptSource(): string {
   // channel + version so a synced runtime is self-identifying via its hash.
   const debugSource =
     String(__BUILD_CHANNEL__) === "development" ? beaconPropDebugRuntimeSource() : beaconPropDebugStubSource();
-  return `(function(){
-var __bRtSrc=(typeof document!=="undefined"&&document.currentScript&&document.currentScript.src)||"";
-function listKey(el){var t=String(el.getAttribute("data-list")||"").toLowerCase();return t&&t.indexOf("beacon-")===0?t:null}
-function isSource(el){return String(el.getAttribute("data-target")||"").toLowerCase()==="beacons"&&String(el.getAttribute("data-beacon-target")||"").toLowerCase()!=="list"&&listKey(el)!=null}
-${debugSource}
-${beaconPropApplyValueRuntimeSource()}
-function bBeaconNormHeadingTag(v){v=String(v==null?"":v).trim().toLowerCase();var m=v.match(/^h([1-6])$/);if(m)return"H"+m[1];if(/^[1-6]$/.test(v))return"H"+v;return""}
-function bBeaconResolveHeadingTagEl(el,v){var want=bBeaconNormHeadingTag(v);if(!want)return el;var cur=String(el.tagName||"").toUpperCase();var head=/^H[1-6]$/.test(cur),wrap=cur==="DIV"||cur==="SPAN";if(!head&&!wrap)return el;if(head&&cur===want)return el;var doc=el.ownerDocument,nw=doc.createElement(want),a,i;while(el.firstChild)nw.appendChild(el.firstChild);for(i=el.attributes.length-1;i>=0;i--){a=el.attributes[i];nw.setAttribute(a.name,a.value)}if(el.parentNode){el.parentNode.replaceChild(nw,el);return nw}return el}
-${beaconPropPickRuntimeSource()}
-${beaconPropEmptyRuntimeSource()}
-${beaconPropVisibilityRuntimeSource()}
-function bListTargetReveal(target){target.classList.remove("${CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");${cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource()}${cmsSlotListTargetRuntimeLayoutRevealSource()}target.style.removeProperty("visibility");target.removeAttribute("aria-label");target.removeAttribute("${CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR}")}
-function applyProps(target,payload){var vn=payload?+payload.v:NaN;if(!payload||!isFinite(vn)||vn<3)return;var pc=payload.p;if(!Array.isArray(pc))return;var rows=target.children,i,j,k,row,props,nodes,cands,node,rawP,isCond,segs,si,seg,pv,anyV,totA=0,totH=0,nLen=rows.length<pc.length?rows.length:pc.length;for(i=0;i<nLen;i++){row=rows[i];props=pc[i];if(!row||props===null||typeof props!=="object"){continue}nodes=row.querySelectorAll("[data-cb-c]");cands=[];if(row.getAttribute&&(row.getAttribute("data-cb-c")||"")!=="")cands.push(row);for(k=0;k<nodes.length;k++)cands.push(nodes[k]);for(j=0;j<cands.length;j++){node=cands[j];rawP=node.getAttribute("data-cb-c")||"";if(!rawP)continue;isCond=node.getAttribute("data-cb-v")==="1";segs=String(rawP).split("|");anyV=false;for(si=0;si<segs.length;si++){seg=segs[si].trim();if(!seg)continue;pv=pickP(props,seg);if(bPropEmpty(pv))continue;anyV=true;if(bBeaconNormHeadingTag(String(pv))){node=bBeaconResolveHeadingTagEl(node,String(pv));continue}if(bLooksLikeImageUrl(String(pv)))bLog("apply image",seg,String(pv).slice(0,80));applyValue(node,String(pv))}if(anyV){bPropReveal(node,row);totA++;continue}if(isCond){bPropClearPublishPlaceholder(node);bPropConceal(node,row);bLog("conceal empty conditional",rawP);totH++}}}bLog("applyProps",{rows:nLen,applied:totA,concealed:totH});bDbgBump("applied",totA);bDbgBump("concealed",totH)}
-function bSafeReveal(target){if(!target)return;try{bListTargetReveal(target)}catch(e){try{target.style.removeProperty("visibility")}catch(e2){}}}
-function bArmSafetyReveal(target){try{setTimeout(function(){bSafeReveal(target)},${CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS})}catch(e){bSafeReveal(target)}}
-function bRevealAllTargets(){try{var els=document.querySelectorAll("[data-beacon-target][data-list]"),i;for(i=0;i<els.length;i++)bSafeReveal(els[i])}catch(e){}}
-function bTryApplyProps(target,payload){try{applyProps(target,payload)}catch(e){bLog("applyProps failed",e)}}
-function reapply(target,payload,done){bTryApplyProps(target,payload);setTimeout(function(){bTryApplyProps(target,payload);setTimeout(function(){bTryApplyProps(target,payload);if(typeof done==="function")done(target)},100)},0)}
-function bRunTarget(target,sourcesByList,sources,srcKeys){
-var targetKey=listKey(target),i,source;
-if(!targetKey||String(target.getAttribute("data-beacon-target")||"").toLowerCase()!=="list"){bLog("skip target: not a list target",{key:targetKey,role:String(target.getAttribute("data-beacon-target")||"")});return}
-if(target.getAttribute("data-cb-rendered")==="1"){bLog("skip target: already rendered",{key:targetKey});return}
-var sourceNode=sourcesByList[targetKey];
-if(!sourceNode){for(i=0;i<sources.length;i++){source=sources[i];if(isSource(source)&&listKey(source)===targetKey){sourceNode=source;break}}}
-if(!sourceNode){bLog("skip target: no source list found",{key:targetKey,available:srcKeys});return}
-bDbgBump("targets",1);
-target.style.visibility="hidden";
-bArmSafetyReveal(target);
-var raw=String(target.textContent||"").trim();
-target.textContent="";
-var payload=null,ok=false,indices=null;
-try{payload=JSON.parse(raw);var vv=+payload.v;ok=!!(payload&&vv===3&&Array.isArray(payload.i));if(ok){indices=payload.i}}catch(e){ok=false}
-var children=sourceNode.children,cloned=0;
-if(ok){for(var u=0;u<indices.length;u++){var idx=+indices[u];if(idx===idx&&idx>=0&&idx%1===0&&idx<children.length){target.appendChild(children[idx].cloneNode(true));cloned++}}}
-target.setAttribute("data-cb-rendered","1");
-bDbgBump("cloned",cloned);bLog("clone list",{list:targetKey,cloned:cloned,parsed:ok,sourceChildren:children.length,indices:ok&&indices?indices.length:null,rawLen:raw.length});
-if(ok&&payload&&Array.isArray(payload.p))reapply(target,payload,bSafeReveal);
-else{bSafeReveal(target)}
-}
-function run(){
-try{
-var sourcesByList={},sources=document.querySelectorAll("[data-target=beacons][data-list]");
-for(var i=0;i<sources.length;i++){var source=sources[i];if(isSource(source)){var key=listKey(source);if(key)sourcesByList[key]=source}}
-var lk=0,srcKeys=[];for(var sk in sourcesByList)if(Object.prototype.hasOwnProperty.call(sourcesByList,sk)){lk++;srcKeys.push(sk)}bDbgBump("lists",lk);
-var targets=document.querySelectorAll("[data-beacon-target][data-list]");
-bLog("runtime start",{sourceEls:sources.length,sourceLists:srcKeys,targetEls:targets.length});
-// One bad target must never strand the rest of the page: each is isolated and revealed on failure.
-for(var t=0;t<targets.length;t++){var target=targets[t];try{bRunTarget(target,sourcesByList,sources,srcKeys)}catch(e){bLog("target failed",e);bSafeReveal(target)}}
-}catch(e){bLog("runtime failed",e);bRevealAllTargets()}
-}
-bDbgBindKeys();
-bDbgRuntimeInfo(${JSON.stringify(buildVersion)},__bRtSrc);
-if(document.readyState==="loading")addEventListener("DOMContentLoaded",run);else run();
-})();`;
+  return `/*
+ * Codalyn Beacon — published-site list runtime v${buildVersion}.
+ * Served exactly as authored (unminified, no build step), so this file is its own readable source.
+ * Authored in apps/beacon/src/features/cms-slots/model/cms-slot-page-inline-script.ts and the
+ * cms-slot-beacon-*.ts / cms-slot-list-target-*.ts modules it composes. Loads no other scripts and
+ * sends no network requests.
+ */
+(function () {
+  var __bRtSrc = (typeof document !== "undefined" && document.currentScript && document.currentScript.src) || "";
+  function listKey(el) {
+    var t = String(el.getAttribute("data-list") || "").toLowerCase();
+    return t && t.indexOf("beacon-") === 0 ? t : null;
+  }
+  function isSource(el) {
+    return (
+      String(el.getAttribute("data-target") || "").toLowerCase() === "beacons" &&
+      String(el.getAttribute("data-beacon-target") || "").toLowerCase() !== "list" &&
+      listKey(el) != null
+    );
+  }
+${indentRuntimeBlock(debugSource)}
+${indentRuntimeBlock(beaconPropApplyValueRuntimeSource())}
+  function bBeaconNormHeadingTag(v) {
+    v = String(v == null ? "" : v)
+      .trim()
+      .toLowerCase();
+    var m = v.match(/^h([1-6])$/);
+    if (m) return "H" + m[1];
+    if (/^[1-6]$/.test(v)) return "H" + v;
+    return "";
+  }
+  function bBeaconResolveHeadingTagEl(el, v) {
+    var want = bBeaconNormHeadingTag(v);
+    if (!want) return el;
+    var cur = String(el.tagName || "").toUpperCase();
+    var head = /^H[1-6]$/.test(cur),
+      wrap = cur === "DIV" || cur === "SPAN";
+    if (!head && !wrap) return el;
+    if (head && cur === want) return el;
+    var doc = el.ownerDocument,
+      nw = doc.createElement(want),
+      a,
+      i;
+    while (el.firstChild) nw.appendChild(el.firstChild);
+    for (i = el.attributes.length - 1; i >= 0; i--) {
+      a = el.attributes[i];
+      nw.setAttribute(a.name, a.value);
+    }
+    if (el.parentNode) {
+      el.parentNode.replaceChild(nw, el);
+      return nw;
+    }
+    return el;
+  }
+${indentRuntimeBlock(beaconPropPickRuntimeSource())}
+${indentRuntimeBlock(beaconPropEmptyRuntimeSource())}
+${indentRuntimeBlock(beaconPropVisibilityRuntimeSource())}
+  function bListTargetReveal(target) {
+    target.classList.remove("${CMS_SLOT_LIST_RENDER_TARGET_SLOT_STYLE_NAME}");
+${indentRuntimeBlock(cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource(), 4)}
+${indentRuntimeBlock(cmsSlotListTargetRuntimeLayoutRevealSource(), 4)}
+    target.style.removeProperty("visibility");
+    target.removeAttribute("aria-label");
+    target.removeAttribute("${CMS_SLOT_LIST_TARGET_CANVAS_LABEL_ATTR}");
+  }
+  function applyProps(target, payload) {
+    var vn = payload ? +payload.v : NaN;
+    if (!payload || !isFinite(vn) || vn < 3) return;
+    var pc = payload.p;
+    if (!Array.isArray(pc)) return;
+    var rows = target.children,
+      i,
+      j,
+      k,
+      row,
+      props,
+      nodes,
+      cands,
+      node,
+      rawP,
+      isCond,
+      segs,
+      si,
+      seg,
+      pv,
+      anyV,
+      totA = 0,
+      totH = 0,
+      nLen = rows.length < pc.length ? rows.length : pc.length;
+    for (i = 0; i < nLen; i++) {
+      row = rows[i];
+      props = pc[i];
+      if (!row || props === null || typeof props !== "object") {
+        continue;
+      }
+      nodes = row.querySelectorAll("[data-cb-c]");
+      cands = [];
+      if (row.getAttribute && (row.getAttribute("data-cb-c") || "") !== "") cands.push(row);
+      for (k = 0; k < nodes.length; k++) cands.push(nodes[k]);
+      for (j = 0; j < cands.length; j++) {
+        node = cands[j];
+        rawP = node.getAttribute("data-cb-c") || "";
+        if (!rawP) continue;
+        isCond = node.getAttribute("data-cb-v") === "1";
+        segs = String(rawP).split("|");
+        anyV = false;
+        for (si = 0; si < segs.length; si++) {
+          seg = segs[si].trim();
+          if (!seg) continue;
+          pv = pickP(props, seg);
+          if (bPropEmpty(pv)) continue;
+          anyV = true;
+          if (bBeaconNormHeadingTag(String(pv))) {
+            node = bBeaconResolveHeadingTagEl(node, String(pv));
+            continue;
+          }
+          if (bLooksLikeImageUrl(String(pv))) bLog("apply image", seg, String(pv).slice(0, 80));
+          applyValue(node, String(pv));
+        }
+        if (anyV) {
+          bPropReveal(node, row);
+          totA++;
+          continue;
+        }
+        if (isCond) {
+          bPropClearPublishPlaceholder(node);
+          bPropConceal(node, row);
+          bLog("conceal empty conditional", rawP);
+          totH++;
+        }
+      }
+    }
+    bLog("applyProps", { rows: nLen, applied: totA, concealed: totH });
+    bDbgBump("applied", totA);
+    bDbgBump("concealed", totH);
+  }
+  function bSafeReveal(target) {
+    if (!target) return;
+    try {
+      bListTargetReveal(target);
+    } catch (e) {
+      try {
+        target.style.removeProperty("visibility");
+      } catch (e2) {}
+    }
+  }
+  function bArmSafetyReveal(target) {
+    try {
+      setTimeout(function () {
+        bSafeReveal(target);
+      }, ${CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS});
+    } catch (e) {
+      bSafeReveal(target);
+    }
+  }
+  function bRevealAllTargets() {
+    try {
+      var els = document.querySelectorAll("[data-beacon-target][data-list]"),
+        i;
+      for (i = 0; i < els.length; i++) bSafeReveal(els[i]);
+    } catch (e) {}
+  }
+  function bTryApplyProps(target, payload) {
+    try {
+      applyProps(target, payload);
+    } catch (e) {
+      bLog("applyProps failed", e);
+    }
+  }
+  function reapply(target, payload, done) {
+    bTryApplyProps(target, payload);
+    setTimeout(function () {
+      bTryApplyProps(target, payload);
+      setTimeout(function () {
+        bTryApplyProps(target, payload);
+        if (typeof done === "function") done(target);
+      }, 100);
+    }, 0);
+  }
+  function bRunTarget(target, sourcesByList, sources, srcKeys) {
+    var targetKey = listKey(target),
+      i,
+      source;
+    if (!targetKey || String(target.getAttribute("data-beacon-target") || "").toLowerCase() !== "list") {
+      bLog("skip target: not a list target", {
+        key: targetKey,
+        role: String(target.getAttribute("data-beacon-target") || ""),
+      });
+      return;
+    }
+    if (target.getAttribute("data-cb-rendered") === "1") {
+      bLog("skip target: already rendered", { key: targetKey });
+      return;
+    }
+    var sourceNode = sourcesByList[targetKey];
+    if (!sourceNode) {
+      for (i = 0; i < sources.length; i++) {
+        source = sources[i];
+        if (isSource(source) && listKey(source) === targetKey) {
+          sourceNode = source;
+          break;
+        }
+      }
+    }
+    if (!sourceNode) {
+      bLog("skip target: no source list found", { key: targetKey, available: srcKeys });
+      return;
+    }
+    bDbgBump("targets", 1);
+    target.style.visibility = "hidden";
+    bArmSafetyReveal(target);
+    var raw = String(target.textContent || "").trim();
+    target.textContent = "";
+    var payload = null,
+      ok = false,
+      indices = null;
+    try {
+      payload = JSON.parse(raw);
+      var vv = +payload.v;
+      ok = !!(payload && vv === 3 && Array.isArray(payload.i));
+      if (ok) {
+        indices = payload.i;
+      }
+    } catch (e) {
+      ok = false;
+    }
+    var children = sourceNode.children,
+      cloned = 0;
+    if (ok) {
+      for (var u = 0; u < indices.length; u++) {
+        var idx = +indices[u];
+        if (idx === idx && idx >= 0 && idx % 1 === 0 && idx < children.length) {
+          target.appendChild(children[idx].cloneNode(true));
+          cloned++;
+        }
+      }
+    }
+    target.setAttribute("data-cb-rendered", "1");
+    bDbgBump("cloned", cloned);
+    bLog("clone list", {
+      list: targetKey,
+      cloned: cloned,
+      parsed: ok,
+      sourceChildren: children.length,
+      indices: ok && indices ? indices.length : null,
+      rawLen: raw.length,
+    });
+    if (ok && payload && Array.isArray(payload.p)) reapply(target, payload, bSafeReveal);
+    else {
+      bSafeReveal(target);
+    }
+  }
+  function run() {
+    try {
+      var sourcesByList = {},
+        sources = document.querySelectorAll("[data-target=beacons][data-list]");
+      for (var i = 0; i < sources.length; i++) {
+        var source = sources[i];
+        if (isSource(source)) {
+          var key = listKey(source);
+          if (key) sourcesByList[key] = source;
+        }
+      }
+      var lk = 0,
+        srcKeys = [];
+      for (var sk in sourcesByList)
+        if (Object.prototype.hasOwnProperty.call(sourcesByList, sk)) {
+          lk++;
+          srcKeys.push(sk);
+        }
+      bDbgBump("lists", lk);
+      var targets = document.querySelectorAll("[data-beacon-target][data-list]");
+      bLog("runtime start", { sourceEls: sources.length, sourceLists: srcKeys, targetEls: targets.length });
+      // One bad target must never strand the rest of the page: each is isolated and revealed on failure.
+      for (var t = 0; t < targets.length; t++) {
+        var target = targets[t];
+        try {
+          bRunTarget(target, sourcesByList, sources, srcKeys);
+        } catch (e) {
+          bLog("target failed", e);
+          bSafeReveal(target);
+        }
+      }
+    } catch (e) {
+      bLog("runtime failed", e);
+      bRevealAllTargets();
+    }
+  }
+  bDbgBindKeys();
+  bDbgRuntimeInfo(${JSON.stringify(buildVersion)}, __bRtSrc);
+  if (document.readyState === "loading") addEventListener("DOMContentLoaded", run);
+  else run();
+})();
+`;
 }
 
 function inlineScriptVersionBase(): string {

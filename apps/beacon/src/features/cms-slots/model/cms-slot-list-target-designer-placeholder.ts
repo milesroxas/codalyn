@@ -114,10 +114,12 @@ export function cmsSlotListTargetDesignerPlaceholderInlineStyle(): string {
   ).join(";");
 }
 
-/** Minified snippet embedded in {@link getCmsSlotPageInlineScriptSource}. */
+/** Runtime statements (readable JS) embedded in {@link getCmsSlotPageInlineScriptSource}. */
 export function cmsSlotListTargetDesignerPlaceholderRuntimeRemovalSource(): string {
   const keys = CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_INLINE_KEYS.map((k) => JSON.stringify(k)).join(",");
-  return `var phKeys=[${keys}];for(var pi=0;pi<phKeys.length;pi++)target.style.removeProperty(phKeys[pi]);`;
+  return `var phKeys = [${keys}];
+for (var pi = 0; pi < phKeys.length; pi++) target.style.removeProperty(phKeys[pi]);
+`;
 }
 
 export async function applyCmsSlotListTargetDesignerPlaceholderToDom(dom: DOMElement): Promise<void> {

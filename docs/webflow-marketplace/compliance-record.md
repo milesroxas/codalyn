@@ -2097,3 +2097,178 @@ It is the narrowest source CSP can express for a per-upload path, and the extens
 injection sink that could use it. Answer with this paragraph if it is raised. **Runtime dependency:**
 if Webflow ever serves bundles from another host the panel fails closed (blank), so the A5
 install-render check stays mandatory on every artifact.
+
+### R7b.16 App Review Preflight "Test the published runtime" — four findings on the runtime pushed from the 14:11 build (2026-09-14)
+
+First run of Preflight's browser test (published test page on site `6a35c562c551e2eb11bc4f1c`; runtime
+file `6aa83a58ccff73bc4fc90fe9_codalyn-beacon-runtime-ffe116af.js` on `cdn.prod.website-files.com`;
+runtime-file row: **Loaded · Hash matched · SRI mismatch · No source map**). Issued findings, no priority
+labels (treated as P1), quoted from the report:
+
+| # | Finding (issued) | Evidence listed | Next step (issued) |
+| --- | --- | --- | --- |
+| 1 | **Script integrity is missing or wrong** — "A page-loaded script does not use the SRI value saved in this test package." | the Beacon runtime file | "Add the saved integrity value and crossorigin="anonymous" to each script tag. Make sure the CDN allows cross-origin SRI." |
+| 2 | **New script elements were created** — "The runtime added script elements after the page began running." | `webflow.049b2302.3c18d83945b06000.js`, `gsap.min.js`, `ScrollTrigger.min.js`, 12 × `webflow.achunk.<hash>.js` | "Review every added script. Remove it, bundle it into reviewed code, or add it to the pinned runtime set." |
+| 3 | **Unreviewed scripts loaded** — "The page requested JavaScript that is not part of the reviewed runtime set." | the same 15 files | "Remove each script, bundle it into reviewed code, or add its immutable URL and SHA-256 to a new test package." |
+| 4 | **Runtime is not traceable to source** — "A pinned runtime served no reachable source map, so the executed code cannot be read alongside the bytes that ran." | the Beacon runtime file | "Publish a source map next to each runtime file, or supply readable source matching the served runtime for a Webflow reviewer to confirm manually." |
+
+Provenance: 1–4 are issued findings from the Webflow-controlled Preflight run (test input = the
+partner-filled test package; the observations are evidence, not acceptance). Published requirements
+behind them: SRI + `crossorigin="anonymous"` at immutable versioned URLs is "strongly recommended"
+(<https://developers.webflow.com/data-beta/apps/docs/marketplace-guidelines>); "standard minification is
+fine" and source maps are required for a *minified or generated* extension bundle
+(<https://developers.webflow.com/data-beta/docs/marketplace/submitting-your-app>); Webflow renders the
+registered `integrityHash` as the tag's `integrity` + `crossorigin="anonymous"`
+(<https://developers.webflow.com/data/docs/working-with-custom-code>).
+
+**Observed (source + CDN; the test page URL is not recorded anywhere in the repo, so the page DOM was
+not inspected in this pass):**
+
+- Served runtime: 14,347 bytes, `content-type: application/javascript`, `access-control-allow-origin: *`
+  (cross-origin SRI is allowed by the CDN), `cache-control: max-age=31536000`, `last-modified` 18:18:01 UTC
+  and upload-id ObjectId timestamp 18:18:00 UTC — pushed **after** the 14:11 build (18:11 UTC), i.e. by
+  an extension that already registers SHA-256 (R7b.14). SHA-256 `40536fa6802eded61b4dabd4c93eba7a51c5e8de0069af2b102c177a68d18603`,
+  SRI `sha256-QFNvpoAu3tYbTavUyT66elHF6N4Aaa8rECwXemjRhgM=`. `<url>.map` → 403; no `sourceMappingURL`.
+- Finding 1: "Hash matched" + "SRI mismatch" means the served bytes are the ones entered in the test
+  package and the page's `<script>` `integrity` attribute is absent or different. Candidates: (a) the
+  page's applied script still points at a SHA-384 registration — `decideCmsSlotRuntimeSyncAction` skips
+  re-registration while the source hash is unchanged, and R7b.14 changed only the digest, not the source
+  — although the 18:18 upload says a push did happen after the digest change; (b) Webflow does not render
+  the attribute for page-level hosted scripts. Only the page DOM separates them:
+  `node scripts/webflow-runtime-pin.mjs <page>` / `webflow-runtime-observe.mjs <page>` print it. Nothing
+  in the app writes the attribute (Webflow renders the tag); no source change can close this finding.
+- Findings 2–3: every listed file is Webflow's published-site runtime — `js/webflow.<site>.<hash>.js`
+  (rendered by Webflow into every published page), the `webflow.achunk.*` code-split chunks it imports on
+  demand, and GSAP + ScrollTrigger, which Webflow loads for Interactions. Evidence:
+  `node scripts/webflow-runtime-observe.mjs https://webflow.com/` lists `webflow.achunk.22b66e874d42861f`,
+  `…2aaad8b9b407aaec`, `…40144d8322818807`, `…43f4d187dbb3f1f5` with the same content hashes on
+  Webflow's own marketing site — shared platform chunks, not site or app code. Beacon's runtime creates
+  no script element, has no `import()`, `fetch`, XHR, beacon, WebSocket, storage or eval (now pinned by
+  test). Preflight attributes "the runtime added script elements" to the page as a whole; the observe
+  script records the initiator per request so the attribution is explicit.
+- Finding 4: the runtime was hand-written compact JS in template strings (53 lines, no minifier), so
+  there was no original to map to; an identity map would satisfy the check without adding readability
+  and is not on the table.
+
+**Fix (source) — the runtime is now served as its own readable source (finding 4, manual path).**
+
+- All 44 runtime fragments across `cms-slot-page-inline-script.ts`, `cms-slot-beacon-prop-runtime.ts`,
+  `cms-slot-beacon-debug.ts`, `cms-slot-list-target-designer-placeholder.ts` and
+  `cms-slot-list-target-slot-style.ts` were reformatted mechanically (Biome 2.5 formatter over each
+  fragment with its `${…}` interpolations masked, then restored) — whitespace-only, semantics preserved,
+  proven by the unit tests that execute the generated runtime in jsdom. Fragments are re-indented to their
+  seam by a new `indentRuntimeBlock` helper. The runtime opens with a header naming its version and
+  authoring module and stating it loads no other scripts and sends no network requests. Served file:
+  631 lines, 20,081 bytes (5,290 gzipped; was 14,347 / 53 lines), average line 31 chars. No build
+  transform, no source map — the served file *is* the source; the private `.sourcemaps.zip` carries the
+  same modules in `sourcesContent`. Preflight's automated "No source map" check will still fire; the
+  answer is the manual-confirmation path its own Next step names (SUBMIT.md §4 paragraph).
+- New test (`cms-slot-page-inline-script.test.ts`): >150 lines, average line <60 chars, longest <400,
+  header present, and none of `createElement("script")`, `<script`, `import(`, bare `fetch(`,
+  `XMLHttpRequest`, `sendBeacon`, `WebSocket`, storage/cookie, `eval(`, `new Function(`,
+  `sourceMappingURL`. Three exact-substring assertions updated for the formatted text; the
+  fragment-embedding test now compares whitespace-insensitively. JSDoc no longer says "Minified".
+- Registration, sync decision, upload, purge and CSP untouched. The source hash moves, so the next
+  sync on any installed page (composer save, slot rename/delete, or the Sync button) registers the
+  readable runtime by the normal "different build" path.
+- Tooling: `scripts/webflow-runtime-observe.mjs <page>` — headless Chromium (Playwright from
+  `packages/loadout`) + DevTools protocol; lists every script the page executed (served-HTML tags,
+  elements created after page start, module imports) with SHA-256/SRI, initiator, and a Beacon /
+  Webflow-platform / other label; checks the Beacon tag's `integrity` against the served bytes and prints
+  `crossorigin`; ready-selector check; "test-package rows" block; exit 1 on a missing/mismatching
+  Beacon pin. `scripts/webflow-runtime-pin.mjs` now distinguishes an absent attribute from a mismatch.
+
+**Artifact (09-14 14-50-17 build, `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod`, all
+gates green; beacon 1038/1038 tests, tsc clean, biome clean on the touched files):**
+`v0.1.0_public_09-14_14-50-17.zip` sha256 `9d9e8958fdf4ac33668a716475e6d1d444fc225559b4dda2b086ae8457e37275`
+(25 entries, 601 KB) · `.sourcemaps.zip` sha256 `eab413d3443a47cf846e2c3970e4b611da28e8fd66b8bd749e3cc42bffae17f8`
+(12 maps incl. `styles.css.map`). Shipped JS/HTML: `.map` 0 · `sourceMappingURL` 0 · `?token=` 0 ·
+localhost/ngrok/sentry 0 · `window.open(` 0 · `postMessage` 0 · bare `fetch(` 1 · `new MutationObserver(` 1
+· innerHTML/outerHTML/insertAdjacentHTML/document.write writes 0 · non-W3C `http://` 0 · `sha384` 0 ·
+readable-runtime header 1 (bundle) / 1 (private maps) · https hosts unchanged · CSP unchanged (R7b.15).
+Normalized content diff vs 14:11 (chunk hashes + build time masked): identical file set; only `bundle.js`
+differs, in the runtime template strings (875,786 → 880,953 bytes); the compact `function listKey(el){var t=`
+shape is gone. Retention: 13:55 archived (doc-referenced), 14:11 + 14:50 kept. The 14:11 artifact is
+**superseded** (compact runtime). Expected Preflight bundle-scan residue unchanged from R7b.13.
+
+States: Source ✓ · Artifact ✓ · Installed ✗ · Runtime ✗ · Submitted ✗ · Accepted ✗.
+
+**Next actions (owner: Miles; each is a Designer/site action this repo cannot perform):**
+
+1. Install the 14:50 zip on the test site (version manager) and confirm the panel renders (R7b.15 check).
+2. Make the test page minimal — beacons present, no Interactions (IX2/IX3), no custom-code embeds or
+   third-party scripts — so the only non-Beacon JavaScript is Webflow's own `webflow.<site>.<hash>.js`
+   (+ whatever chunks it imports for the page's own features).
+3. CMS Slots → page runtime **Sync** → **Publish**.
+4. `node scripts/webflow-runtime-observe.mjs <page>`: needs exit 0 (Beacon `integrity` = SRI of served
+   bytes, `crossorigin="anonymous"`), "Scripts requested by the Beacon runtime: 0", "neither Webflow
+   platform nor Beacon: 0", ready selector present. If `integrity` is **absent** on a freshly pushed
+   runtime, that is candidate (b) above — record it here and say so in the notes; the app cannot add the
+   attribute.
+5. Fill the test package from the script's rows: the Beacon runtime, plus (decision) the Webflow platform
+   scripts still present. Run the Preflight bundle scan on the 14:50 zip + sourcemaps (expect the R7b.13
+   residue) and the published-runtime test; record both receipts. Commit source + this entry before
+   submitting.
+
+**Open decisions (reviewer judgment, not code):** (a) whether Webflow's own platform scripts on a
+published page must be pinned in the partner's test package or are discounted by the reviewer — pinned
+when practical, otherwise answered by the SUBMIT.md §4 paragraph; (b) whether a served, unminified
+runtime satisfies "readable source matching the served runtime" without a separate map — Preflight's own
+Next step offers this path; (c) if Webflow renders page-level hosted scripts without `integrity`, finding
+1 is a platform behaviour outside the app's control.
+
+**Runtime observed — same day, after Miles installed the 14:50 build, pressed Sync and published
+(`https://beacon-demo.webflow.io/blog/the-power-of-resilience`, CMS page with two slot lists; asset
+upload-id timestamp 19:02:03 UTC, page "Last Published" 19:02:27 UTC).** Both scripts run against the
+live page (`webflow-runtime-pin.mjs` exit 0, `webflow-runtime-observe.mjs` exit 0):
+
+- **Finding 1 — closed by the fresh push.** The page's tag is
+  `<script src="https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6aa844abbb616acbbee14fa2_codalyn-beacon-runtime-0410d012.js" integrity="sha256-ZxZtUnSp6VCb9YqsFffIPBLHmAhfYnhGvtPy6H/eD9g=" crossorigin="anonymous">`;
+  served bytes 20,081, SHA-256 `67166d5274a9e9509bf58aac15f7c83c12c798085f627846bed3f2e87fde0fd8`, SRI equal
+  to the attribute. So Webflow does render `integrity` + `crossorigin="anonymous"` from the registered
+  `integrityHash` on page-level hosted scripts — candidate (b) is ruled out; the earlier mismatch was a
+  registration whose pin did not match the served bytes (candidate (a), most likely a push made from a
+  pre-R7b.14 extension build still loaded in the Designer). Not a platform limitation; nothing to change
+  in the app. The 18:18 asset is no longer referenced (purged by the sync).
+- **Finding 4 — the served runtime is byte-identical to the runtime the working tree generates**
+  (`cmp` of the CDN bytes against `getCmsSlotPageInlineScriptSource()` output: identical, same SHA-256).
+  "Readable source matching the served runtime" is therefore the served file itself, and the authoring
+  modules in the private `.sourcemaps.zip` reproduce it exactly. The automated "No source map" check is
+  expected to fire again; the manual-path paragraph in SUBMIT.md §4 is the answer.
+- **Findings 2/3 — full inventory of what the page runs (24 scripts):** 1 Beacon runtime (parser-loaded,
+  requests nothing — "Scripts requested by the Beacon runtime: 0"); 16 Webflow platform files — the site
+  bundle `js/webflow.049b2302.3c18d83945b06000.js` (in the served HTML), the **12 `webflow.achunk.*`
+  chunks it imports at runtime (initiator = that bundle, every one)**, `gsap/3.15.0/gsap.min.js` +
+  `ScrollTrigger.min.js` (in the served HTML, Webflow-served for Interactions) and jQuery 3.5.1 from
+  `d3e54v103j8qbb.cloudfront.net`; and **7 third-party files the demo template ("Mast" by No Code Supply
+  Co) loads from `cdn.jsdelivr.net` through HTML embeds inside its components** (accordion, modal, slider +
+  Swiper 11, inline-video, tabs, theme-toggle — three at a mutable `@latest` tag). Preflight's list
+  contained exactly the 15 `cdn.prod.website-files.com` files and neither jQuery nor the jsdelivr files,
+  which is consistent with the reviewed-runtime check being scoped to the Webflow asset host. The 12
+  chunk hashes match Preflight's list one-for-one, so the flagged set is fully explained: Webflow's own
+  runtime, imported by Webflow's own bundle.
+- Ready selector `[data-beacon-target="list"][data-cb-rendered="1"]`: present, 2 rendered lists.
+
+States for the 14:50 artifact: Source ✓ · Artifact ✓ · Installed ✓ (the page's runtime is the 14:50
+build's, byte-for-byte, pushed through the installed panel) · Runtime ✓ for finding 1 and for the
+Beacon-side facts behind 2/3/4 · Submitted ✗ · Accepted ✗. Still open before submission, all
+test-environment or reviewer-judgment items, none code: (i) pin the 16 Webflow platform rows in the test
+package (values in SUBMIT.md §5; they change on every site publish, so re-run the observe script after
+the final publish) **or** use a page/site without Interactions to shrink the set, then pin; (ii) the
+demo template's jsdelivr embeds are site content, not app code — remove the embed components from the
+test page if the reviewer raises them, otherwise leave; (iii) finding 4 rides on the manual path.
+
+**Decision on findings 2/3 (2026-09-14, Miles + docs check): do not pin Webflow's platform scripts;
+declare the Beacon runtime only and answer in the notes.** Provenance: (published requirement) the
+Marketplace Guidelines scope review to "what your App registers, discloses, and removes through Webflow,
+not how your published-site runtime behaves", and recommend immutable versioned URLs + `integrity` +
+`crossorigin="anonymous"` for *injected* scripts — all met and runtime-observed above; (published
+requirement) the submission page presents Preflight as optional ("If you run the App Review Preflight
+tool … you'll receive a receipt"); (issued finding) the runtime test's "pinned runtime set", "loaded by
+another pinned runtime" and "unreviewed scripts" concepts exist only in the tool's own form text — no
+published page asks a partner to declare Webflow's `webflow.<site>.<hash>.js`, its `achunk` imports,
+gsap/ScrollTrigger or jQuery. Pinning 16 platform files that change on every site publish buys a cleaner
+automated receipt at real cost and with no requirement behind it. Expected residue on the next run:
+findings 2, 3 (Webflow files) and 4 (no map, by design); the SUBMIT.md §4 "published-runtime test notes"
+paragraph is the answer to all three. Reversible: the 16 rows stay in SUBMIT.md §5 for the case a
+reviewer asks for them. Open decision remains with the reviewer.

@@ -92,7 +92,7 @@ for (const s of scripts) {
 
 if (mismatches > 0) {
   console.error(
-    `${mismatches} Beacon runtime tag(s) carry an integrity value that is not the SHA-256 SRI of the served bytes. Re-push the runtime from the Designer (CMS Slots → re-sync page custom code) and publish, then run again.`
+    `${mismatches} Beacon runtime tag(s) do not carry the SHA-256 SRI of the served bytes in their integrity attribute (absent, or a different value). Re-push the runtime from the Designer (CMS Slots → the page runtime Sync button), publish, then run again. If the attribute is still absent after a fresh push, Webflow is not rendering the registered integrityHash on this page — record that as a platform observation, not an app defect.`
   );
   process.exit(1);
 }

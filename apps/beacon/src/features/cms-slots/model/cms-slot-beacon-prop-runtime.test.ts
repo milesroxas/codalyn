@@ -77,11 +77,13 @@ describe("beacon prop runtime source snippets", () => {
 
   it("embeds shared empty + visibility helpers in the footer script", () => {
     const s = getCmsSlotPageInlineScriptSource();
-    expect(s).toContain(beaconPropEmptyRuntimeSource());
-    expect(s).toContain(beaconPropVisibilityRuntimeSource());
-    expect(s).toContain(beaconPropApplyValueRuntimeSource());
-    expect(s).toContain("bPropReveal(node,row)");
-    expect(s).toContain("bPropConceal(node,row)");
+    // Fragments are re-indented to their seam when composed; compare whitespace-insensitively.
+    const flat = (x: string) => x.replace(/\s+/g, "");
+    expect(flat(s)).toContain(flat(beaconPropEmptyRuntimeSource()));
+    expect(flat(s)).toContain(flat(beaconPropVisibilityRuntimeSource()));
+    expect(flat(s)).toContain(flat(beaconPropApplyValueRuntimeSource()));
+    expect(s).toContain("bPropReveal(node, row)");
+    expect(s).toContain("bPropConceal(node, row)");
     expect(s).toContain("bPropClearPublishPlaceholder(node)");
     expect(s).toContain(WEBFLOW_CONDITION_INVISIBLE_CLASS);
   });
@@ -92,7 +94,7 @@ describe("beacon prop runtime source snippets", () => {
     // (Marketplace guidelines: no app keyboard shortcuts; reviewed runtime = shipped runtime).
     const s = getCmsSlotPageInlineScriptSource();
     expect(s).not.toContain(beaconPropDebugRuntimeSource());
-    expect(s).toContain("function bDbgBindKeys(){}");
+    expect(s).toContain("function bDbgBindKeys() {}");
     expect(s).not.toContain("codalyn-beacon-debug");
     expect(s).not.toContain('createElement("style")');
   });

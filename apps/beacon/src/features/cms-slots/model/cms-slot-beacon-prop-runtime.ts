@@ -191,6 +191,21 @@ export const CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL = "codalyn-beacon-publish-placeh
 /** Non-breaking space used as a minimal text publish placeholder. */
 export const CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT = "\u00a0";
 
+/**
+ * JS string literal for a value interpolated into the published runtime, with every non-ASCII code unit written as
+ * a `\uXXXX` escape. `JSON.stringify` leaves characters such as U+00A0 as raw bytes, and the runtime is served by
+ * Webflow's CDN as `application/javascript` with no charset — any consumer that decodes the body before hashing it
+ * (App Review Preflight's browser capture, a proxy, an editor) can then disagree with the raw bytes. An ASCII-only
+ * file hashes identically under every decoding, so the runtime must stay pure ASCII (pinned by
+ * cms-slot-page-inline-script.test.ts). Pure; exported for tests.
+ */
+export function runtimeStringLiteral(value: string): string {
+  return JSON.stringify(value).replace(
+    /[\u0080-\uffff]/g,
+    (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`
+  );
+}
+
 /** True when a value is a Designer/publish seed sentinel — not real Composer content. */
 export function isBeaconPublishPlaceholderValue(v: unknown): boolean {
   if (v == null) {
@@ -244,10 +259,10 @@ export function beaconPropPickRuntimeSource(): string {
 
 /** Readable `function bPropEmpty(v) {…}` embedded in the footer runtime. */
 export function beaconPropEmptyRuntimeSource(): string {
-  const url = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
-  const email = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL);
-  const text = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT);
-  const assetName = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME);
+  const url = runtimeStringLiteral(CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
+  const email = runtimeStringLiteral(CMS_SLOT_PUBLISH_PLACEHOLDER_EMAIL);
+  const text = runtimeStringLiteral(CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT);
+  const assetName = runtimeStringLiteral(CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME);
   return `function bPropEmpty(v) {
   if (v == null) return true;
   var raw = String(v);
@@ -552,10 +567,10 @@ export function beaconPropApplyValueRuntimeSource(): string {
  * Conceal re-hides the tagged node and at most its conditional wrapper — never the whole component row.
  */
 export function beaconPropVisibilityRuntimeSource(): string {
-  const cls = JSON.stringify(WEBFLOW_CONDITION_INVISIBLE_CLASS);
-  const url = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
-  const text = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT);
-  const assetName = JSON.stringify(CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME);
+  const cls = runtimeStringLiteral(WEBFLOW_CONDITION_INVISIBLE_CLASS);
+  const url = runtimeStringLiteral(CMS_SLOT_PUBLISH_PLACEHOLDER_URL);
+  const text = runtimeStringLiteral(CMS_SLOT_PUBLISH_PLACEHOLDER_TEXT);
+  const assetName = runtimeStringLiteral(CMS_SLOT_PUBLISH_PLACEHOLDER_ASSET_NAME);
   return [
     `function bPropSetHidden(n, h) {
   if (h) {

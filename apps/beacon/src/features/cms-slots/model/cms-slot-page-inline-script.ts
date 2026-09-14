@@ -38,7 +38,7 @@ const CMS_SLOT_PAGE_SCRIPT_HASH_ATTR = "data-codalyn-beacon-src-hash";
  * runtime source changes and `cms-slot-page-inline-script.test.ts` reports a `/` or `+` in the pin (about one in four
  * revisions passes; the test names the next passing value). Deterministic, so the FNV drift marker stays stable.
  */
-export const CMS_SLOT_RUNTIME_REVISION = 2;
+export const CMS_SLOT_RUNTIME_REVISION = 3;
 
 /** 32-bit FNV-1a → 8 hex chars (stable across browsers for the same source string). */
 function hashCmsSlotRuntimeSource(source: string): string {
@@ -93,12 +93,12 @@ export function getCmsSlotPageInlineScriptSource(): string {
   const debugSource =
     String(__BUILD_CHANNEL__) === "development" ? beaconPropDebugRuntimeSource() : beaconPropDebugStubSource();
   return `/*
- * Codalyn Beacon — published-site list runtime v${buildVersion}.
+ * Codalyn Beacon - published-site list runtime v${buildVersion}.
  * Runtime revision ${CMS_SLOT_RUNTIME_REVISION}.
  * Served exactly as authored (unminified, no build step), so this file is its own readable source.
  * Authored in apps/beacon/src/features/cms-slots/model/cms-slot-page-inline-script.ts and the
- * cms-slot-beacon-*.ts / cms-slot-list-target-*.ts modules it composes. Loads no other scripts and
- * sends no network requests.
+ * cms-slot-beacon-*.ts / cms-slot-list-target-*.ts modules it composes. Loads no other scripts,
+ * sends no network requests, and is pure ASCII (served without a charset).
  */
 (function () {
   var __bRtSrc = (typeof document !== "undefined" && document.currentScript && document.currentScript.src) || "";

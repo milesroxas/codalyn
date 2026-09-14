@@ -2397,3 +2397,46 @@ test with those values and run it. **Outcome A (SRI ✓):** cause confirmed as t
 remove the SRI-mismatch sentences from SUBMIT.md §4 and keep the revision test. **Outcome B (SRI ✗):** two
 distinct valid pins rejected — record as tool-side, keep the §4 paragraph, file anyway. Either way, run the
 bundle scan on the 17:03 artifacts for the receipt.
+
+
+### R7b.19 SRI mismatch persists on a URL-safe pin; runtime made pure ASCII; 18:26 rebuild (2026-09-14)
+
+**Runtime observation (Preflight, 17:03 build, runtime `…codalyn-beacon-runtime-a92b64ed.js`):** Loaded ✓ ·
+Hash matched ✓ · **SRI mismatch ✗** · No source map ✗ — unchanged with the slash-free pin
+`sha256-BHxw…gCM=`, which the page tag carried verbatim with `crossorigin="anonymous"` (pin script exit 0,
+observe script: ready selector ×2, 0 scripts requested). The R7b.18 hypothesis (a `/` in the base64) is
+therefore ruled out. The same run reported Webflow's own **static** tags (`webflow.<site>.<hash>.js` in the
+body, `gsap.min.js` / `ScrollTrigger.min.js` in the head) as "created after the page began running", which
+says the tool reads the page through browser instrumentation rather than the served HTML.
+
+**New evidence:** the served runtime carried three non-ASCII characters — U+2014 in the header comment and
+the U+00A0 publish-placeholder sentinel as a raw byte inside two string comparisons (`JSON.stringify` does
+not escape it) — and Webflow's CDN serves the file as `application/javascript` **with no charset**. A
+consumer that captures the body through the browser, decodes it without a declared charset (Latin-1 is
+the usual default) and re-encodes before hashing gets different bytes from a raw download: hashing the
+Latin-1-decoded/UTF-8-re-encoded body gives `76004ee3…361a`, not `047c7043…8023`. That is one code path
+saying "Hash matched" (raw) and another saying "SRI mismatch" (decoded), and it holds for every pin so far,
+since all carried the same three characters. Provenance: security control / engineering hypothesis; the
+tool's internals are not published.
+
+**Change (source):** the runtime is now pure ASCII with identical behaviour. `runtimeStringLiteral()`
+(`cms-slot-beacon-prop-runtime.ts`) writes every non-ASCII code unit of an interpolated constant as a
+`\uXXXX` escape and replaces `JSON.stringify` for the five constants embedded in runtime text; the header
+em dash is a hyphen. Tests in `cms-slot-page-inline-script.test.ts`: (1) the generated runtime contains no
+code unit above 0x7F and still contains the `"\u00a0"` sentinel as an escape; (2) the URL-safe-SRI test
+from R7b.18 (retuned: `CMS_SLOT_RUNTIME_REVISION = 3`). 452 cms-slots tests pass; the existing tests that
+execute the generated runtime in jsdom are unchanged and green. Runtime: 20153 bytes = 20153 characters,
+FNV `1ebc5741`, SHA-256 `6f3be0f588c2045a90034555b0375cb082b40d42b94520a2f6679f1ed55795d3`, SRI `sha256-bzvg9YjCBFqQA0VVsDdcsIK0DUK5RSCi9mefHtVXldM=`.
+
+**Artifact:** `v0.1.0_public_09-14_18-26-19.zip` sha256
+`91b888476645008d8bbe4a65dbb1a3f8ef58f8df3411df43cafb4213687b99fd` (602 254 bytes) + `.sourcemaps.zip`
+`0684d1861a2b074552bfed856a92c32b1bf7620360d7f5d48f6adef4b4be01ea`. All gates green (one biome error in the
+new test — a control character in a regex — was fixed before the successful build); manual re-grep
+unchanged. 17:03 receipt never issued; 16:43 receipt `wfpre_5a2242e8…` superseded.
+
+**States:** Source ✓ (uncommitted) · Artifact ✓ · Installed ✗ · Runtime ✗ · Submitted ✗ · Accepted ✗.
+**Next:** commit; install the 18:26 zip; CMS Slots → Sync → Publish; pin script (expect file
+`…codalyn-beacon-runtime-1ebc5741.js`, SRI `…VXldM=`); Preflight runtime test. **SRI ✓:** cause confirmed
+as charset-sensitive hashing in the tool's browser path; keep the ASCII test, drop the SRI-mismatch
+sentences from SUBMIT.md §4. **SRI ✗:** three distinct valid pins rejected, including a pure-ASCII one —
+record as tool-side and file. Either way: bundle scan on the 18:26 artifacts → receipt → SUBMIT.md §2.

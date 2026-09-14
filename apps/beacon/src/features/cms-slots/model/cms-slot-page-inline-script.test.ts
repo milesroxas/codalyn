@@ -57,6 +57,20 @@ function runCmsSlotBeaconRuntime(doc: Document): void {
 }
 
 describe("getCmsSlotPageInlineScriptSource", () => {
+  it("is pure ASCII, so the served bytes hash identically under any charset decoding (CDN sends no charset)", () => {
+    const s = getCmsSlotPageInlineScriptSource();
+    const offenders: string[] = [];
+    for (let i = 0; i < s.length; i++) {
+      const code = s.charCodeAt(i);
+      if (code > 0x7f) {
+        offenders.push(`U+${code.toString(16).padStart(4, "0")}@${i}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+    // The no-break-space placeholder sentinel must survive as an escape, not a raw byte.
+    expect(s).toContain('"\\u00a0"');
+  });
+
   it("pins to a URL-safe SHA-256 SRI (no `/` or `+` in the base64; bump CMS_SLOT_RUNTIME_REVISION otherwise)", async () => {
     const s = getCmsSlotPageInlineScriptSource();
     expect(s).toContain(`\n * Runtime revision ${CMS_SLOT_RUNTIME_REVISION}.\n`);
@@ -87,7 +101,7 @@ describe("getCmsSlotPageInlineScriptSource", () => {
     expect(lines.length).toBeGreaterThan(150);
     expect(lines.reduce((n, l) => n + l.length, 0) / lines.length).toBeLessThan(60);
     expect(Math.max(...lines.map((l) => l.length))).toBeLessThan(400);
-    expect(s.startsWith("/*\n * Codalyn Beacon — published-site list runtime v")).toBe(true);
+    expect(s.startsWith("/*\n * Codalyn Beacon - published-site list runtime v")).toBe(true);
     expect(s).toContain("cms-slot-page-inline-script.ts");
     // The pinned runtime must be the only script the page runs because of Beacon: no script creation, no
     // dynamic import, no network, no storage, no eval — and no source-map pointer (there is no map; this is the source).

@@ -9,6 +9,8 @@ import {
 } from "./beacon-extension-csp";
 
 const PRODUCTION_TOWER_ORIGIN = "https://tower.codalyn.app";
+/** Where Webflow's hosted runtime rewrites the installed bundle's relative asset URLs to. */
+const WEBFLOW_HOSTED_BUNDLE_HOST = "https://cdn.prod.website-files.com";
 
 function directiveMap(policy: string): Map<string, string[]> {
   const map = new Map<string, string[]>();
@@ -35,7 +37,24 @@ describe("buildBeaconExtensionCspContent", () => {
 
   it("denies by default and allows first-party scripts only", () => {
     expect(directives.get("default-src")).toEqual(["'none'"]);
-    expect(directives.get("script-src")).toEqual(["'self'"]);
+    expect(directives.get("script-src")).toEqual(["'self'", WEBFLOW_HOSTED_BUNDLE_HOST]);
+  });
+
+  // Regression (2026-09-14, v0.1.0_public_09-14_13-55-57): with 'self' only, the installed extension
+  // rendered blank — Webflow serves bundle.js, the modulepreload chunks and styles.css from the CDN
+  // host, not the document origin, so the browser blocked every first-party script and stylesheet.
+  it("admits the Webflow-hosted copy of the bundle for scripts, stylesheets and fonts", () => {
+    for (const name of ["script-src", "style-src", "style-src-elem", "font-src"]) {
+      expect(directives.get(name)).toContain(WEBFLOW_HOSTED_BUNDLE_HOST);
+    }
+  });
+
+  it("admits only the exact hosted-bundle host for code, never a wildcard Webflow host", () => {
+    for (const name of ["script-src", "style-src-elem", "font-src"]) {
+      const sources = directives.get(name) ?? [];
+      expect(sources.filter((source) => source.startsWith("https://"))).toEqual([WEBFLOW_HOSTED_BUNDLE_HOST]);
+      expect(sources.some((source) => source.includes("*"))).toBe(false);
+    }
   });
 
   it("never allows eval or inline script anywhere", () => {
@@ -80,13 +99,14 @@ describe("buildBeaconExtensionCspContent", () => {
       "https://website-files.com",
       "https://*.website-files.com",
     ]);
-    expect(directives.get("font-src")).toEqual(["'self'"]);
+    expect(directives.get("font-src")).toEqual(["'self'", WEBFLOW_HOSTED_BUNDLE_HOST]);
   });
 
   it("blocks inline <style> elements in CSP3 engines while allowing React/Radix style attributes", () => {
-    expect(directives.get("style-src")).toEqual(["'self'", "'unsafe-inline'"]);
-    expect(directives.get("style-src-elem")).toEqual(["'self'"]);
+    expect(directives.get("style-src")).toEqual(["'self'", WEBFLOW_HOSTED_BUNDLE_HOST, "'unsafe-inline'"]);
+    expect(directives.get("style-src-elem")).toEqual(["'self'", WEBFLOW_HOSTED_BUNDLE_HOST]);
     expect(directives.get("style-src-attr")).toEqual(["'unsafe-inline'"]);
+    expect(directives.get("style-src-elem")).not.toContain("'unsafe-inline'");
   });
 
   it("hard-blocks iframes, workers, plugins, form submission, and base rewriting", () => {
@@ -106,13 +126,14 @@ describe("buildQualityComparePopoutCspContent", () => {
     expect(directives.get("default-src")).toEqual(["'none'"]);
     expect(directives.get("connect-src")).toEqual(["'none'"]);
     expect(policy).not.toContain("posthog");
-    expect(policy).not.toContain("https://");
+    // The only external host is the Webflow-hosted copy of the popout's own scripts/stylesheet.
+    expect(policy.split(WEBFLOW_HOSTED_BUNDLE_HOST).join("")).not.toContain("https://");
   });
 
   it("renders only blob object URLs and first-party scripts/styles", () => {
-    expect(directives.get("script-src")).toEqual(["'self'"]);
+    expect(directives.get("script-src")).toEqual(["'self'", WEBFLOW_HOSTED_BUNDLE_HOST]);
     expect(directives.get("img-src")).toEqual(["blob:"]);
-    expect(directives.get("style-src-elem")).toEqual(["'self'"]);
+    expect(directives.get("style-src-elem")).toEqual(["'self'", WEBFLOW_HOSTED_BUNDLE_HOST]);
   });
 });
 

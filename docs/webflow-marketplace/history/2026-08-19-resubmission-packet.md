@@ -1,7 +1,7 @@
 # Beacon — App Review Preflight remediation packet (2026-08-19)
 
 Partner-facing resubmission note for the two App Review Preflight blockers issued against the
-08-19 10:31 public build. Full engineering write-ups: `docs/webflow-marketplace-compliance.md`
+08-19 10:31 public build. Full engineering write-ups: `docs/webflow-marketplace/compliance-record.md`
 § R7b.8 and § R7b.9. Nothing in this file is a Webflow approval decision.
 
 ## Review target

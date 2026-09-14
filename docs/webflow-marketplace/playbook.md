@@ -14,8 +14,8 @@ Both are markdown instruction sets, not scripts. Invoke with `/webflow-app-prefl
 Marketplace work). In Cursor, name the skill in the prompt. Skill source + version:
 `.cursor/skills/*/PROVENANCE.txt` (packaged 2026-08-12 rev b).
 
-Running log of every round, finding and fix: [webflow-marketplace-compliance.md](webflow-marketplace-compliance.md).
-Reviewer-facing short response: [webflow-marketplace-response-short.md](webflow-marketplace-response-short.md).
+Running log of every round, finding and fix: [compliance-record.md](compliance-record.md).
+**What to paste into the form (current round): [SUBMIT.md](SUBMIT.md).** Earlier pasted responses: [history/responses.md](history/responses.md).
 
 ---
 
@@ -34,7 +34,7 @@ Fresh Claude Code session (skills are discovered at start):
 
 ```
 /webflow-app-preflight Run the pre-submission quality gate against apps/beacon.
-Prior findings + fixes are in docs/webflow-marketplace-compliance.md (latest round at the bottom).
+Prior findings + fixes are in docs/webflow-marketplace/compliance-record.md (latest round at the bottom).
 Report each checklist item as pass / fail / n-a with evidence (file:line or artifact check).
 ```
 
@@ -79,6 +79,7 @@ unzip -p "$Z" '*.js' | grep -c  'window.open('             # 0  (Prohibited Popu
 unzip -p "$Z" '*.js' | grep -c  'postMessage'              # 0  (Insecure postMessage, R7b.10 — scheduler patched to postTask)
 unzip -p "$Z" '*.js' | grep -oE 'https://[a-z0-9.-]+' | sort -u   # only CSP-allowlisted hosts
 unzip -p "$Z" webflow.json                                   # one manifest, real name, apiVersion "2", no telemetry
+unzip -p "$Z" index.html | grep -oE "(script-src|style-src-elem|font-src) [^;]*"  # each admits https://cdn.prod.website-files.com (R7b.15)
 unzip -p "$M" '*.map' | grep -ciE '[?&]token='               # 0 — reviewer scans the maps too
 unzip -l "$M" | grep -c 'styles.css.map'                     # 1 — every generated file needs a map (R7b.11)
 unzip -p "$Z" '*.js' | grep -oiE 'https?://[^"'"'"'` )]*' | grep -viE '^https://|www\.w3\.org' | wc -l   # 0 http:// (W3C namespaces exempt)
@@ -100,6 +101,10 @@ ones it hid.
 ### A5. Webflow-side artifacts (required by the submission form)
 
 1. **Published `.webflow.io` test site** with the new bundle installed via the version manager.
+   **Open the panel and confirm it renders** with no `script-src` / `style-src-elem` violation in
+   the extension console — Webflow serves the installed bundle's files from
+   `https://cdn.prod.website-files.com/<upload id>/`, not the document origin, so a CSP regression
+   only shows up installed (R7b.15: blank panel; `serve`, tests and the A4 greps all passed).
    Reviewer credentials still valid; demo data present; Tower backend live for the whole review
    window (10–15 business days).
 2. **App Review Preflight** Designer Extension (install link in
@@ -123,7 +128,7 @@ ones it hid.
 
 ### A6. Record + commit
 
-- Append a `### R<n>.<m>` entry to `docs/webflow-marketplace-compliance.md`: finding (or "preflight
+- Append a `### R<n>.<m>` entry to `docs/webflow-marketplace/compliance-record.md`: finding (or "preflight
   re-run"), observed, fix, artifact hashes, six-state line (see B4).
 - Commit source + doc **before** submitting, so artifact hash ↔ commit is traceable.
 - Submit at <https://developers.webflow.com/submit> (App Update → name, Client ID, "new bundle: yes",
@@ -175,7 +180,7 @@ evidence) before ordinary remediation.
 ### B5. Packet + resubmit
 
 Per finding: ID, one-line disposition, files changed, test command + result, artifact sha256,
-runtime evidence if any, remaining limitation (example: `docs/webflow-resubmission-packet-2026-08-19.md`). Then A5 (preflight re-run, confirm the finding is
+runtime evidence if any, remaining limitation (example: `docs/webflow-marketplace/history/2026-08-19-resubmission-packet.md`). Then A5 (preflight re-run, confirm the finding is
 gone, new receipt) and A6. Skill ends with **READY TO RESUBMIT** / **NOT READY** — that is your
 readiness, not Webflow's approval.
 

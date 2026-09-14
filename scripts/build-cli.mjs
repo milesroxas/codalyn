@@ -700,7 +700,7 @@ function collectForbiddenBundleMarkers(appPath, channel, appName) {
  * so the whole-artifact count is what matters, not the listed sites. A count above the pin means a
  * new call site crept in — route it through the chokepoint (`extensionFetch`) or remove it; a count
  * below means the accepted inventory here and the reviewer note in
- * docs/webflow-marketplace-compliance.md need updating together. `expected` is exact on purpose.
+ * docs/webflow-marketplace/compliance-record.md need updating together. `expected` is exact on purpose.
  */
 function pinnedMarkerCounts(appName, channel) {
   if (appName !== "beacon" || (channel !== "production" && channel !== "preview")) {

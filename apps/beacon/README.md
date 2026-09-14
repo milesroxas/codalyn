@@ -10,7 +10,7 @@ Workspace setup, monorepo commands, and the shared Webflow extension bundle work
 - [CMS slot image upload](./docs/cms-slot-image-upload.md)
 - [Uninstall / cleanup](./docs/uninstall.md)
 - [Rich-text editor design](../../docs/beacon-rich-text-editor.md)
-- [Marketplace submission playbook](../../docs/webflow-submission-playbook.md) · [compliance record](../../docs/webflow-marketplace-compliance.md) — every review round, finding, fix and artifact hash
+- [Marketplace submission playbook](../../docs/webflow-marketplace/playbook.md) · [compliance record](../../docs/webflow-marketplace/compliance-record.md) — every review round, finding, fix and artifact hash
 
 ## Network egress (one call site)
 
@@ -43,7 +43,7 @@ included, because Webflow's static review scanner flags them regardless of reach
 
 Do not write these tokens in comments either — the gates and the source sweep read raw text. Vendor libraries that
 carry one are handled with a pnpm patch (`/patches`) or a strip rule in `scripts/vite-strip-dev-host-literals.mjs`,
-never by a call-site workaround. Process: [submission playbook](../../docs/webflow-submission-playbook.md).
+never by a call-site workaround. Process: [submission playbook](../../docs/webflow-marketplace/playbook.md).
 
 ## Development
 

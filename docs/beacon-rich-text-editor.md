@@ -135,7 +135,7 @@ root when the editor mounts (`initMutationObserver`). Webflow's App Review Prefl
 constructor as "Silent Canvas Mutations" regardless of target. It is load-bearing — `$commitPendingUpdates`
 gates Lexical's DOM reconcile on it, and `flushMutations` evicts browser-inserted IME text nodes — so it is
 kept as the bundle's one accepted observer, pinned by count in the release build and answered with the
-rationale in `docs/webflow-marketplace-compliance.md` § R7b.12. Swapping to another contenteditable editor
+rationale in `docs/webflow-marketplace/compliance-record.md` § R7b.12. Swapping to another contenteditable editor
 would not change this (ProseMirror/TipTap, Slate, Quill all construct one); only a non-contenteditable
 field would. Do not add a second observer anywhere in Beacon.
 

@@ -87,7 +87,7 @@ Webflow's Marketplace review scans the compiled bundle statically; bundled vendo
 - Never introduce these shapes in Beacon source, comments, or new dependencies: `new MutationObserver(`, `window.open(`, `postMessage(`, `innerHTML`/`outerHTML` writes, `insertAdjacentHTML(`, `document.write(`, `http://`/`ws://` URLs, `?token=`/`&token=`, `.toBlob(`/`toDataURL`/`getImageData`, session-replay references, Sentry, dev hosts. The release build pins/forbids each of them on dist and zip (`scripts/build-cli.mjs`).
 - A vendor library that carries one of these gets a pnpm patch under `/patches` or a strip rule in `scripts/vite-strip-dev-host-literals.mjs` with a residual guard and a gate test — not a call-site workaround, not obfuscation.
 - Canvas mutations are user-initiated only. No timers, observers or loops writing to the Designer.
-- Every accepted exception (today: Lexical's contenteditable observer) is recorded with rationale in `docs/webflow-marketplace-compliance.md` and pinned by count in the build.
+- Every accepted exception (today: Lexical's contenteditable observer) is recorded with rationale in `docs/webflow-marketplace/compliance-record.md` and pinned by count in the build.
 
 PR checklist:
 
@@ -98,5 +98,6 @@ PR checklist:
 
 - [Agent Teams guide](docs/agent-teams.md) — how to spin up effective Claude Code agent teams (enable flag, teams vs subagents, spawn templates, monorepo patterns).
 - [Storybook guide](docs/storybook.md) — Beacon UI catalog for designers (runs without the Webflow Designer runtime); story conventions and architecture rationale.
-- [Webflow submission playbook](docs/webflow-submission-playbook.md) — end-to-end Marketplace submission runbook: `/webflow-app-preflight` gate → `build:prod` → artifact greps → App Review Preflight receipt → submit; `/webflow-app-review-remediation` loop for findings. Skills live in `.claude/skills/` + `.cursor/skills/`.
-- [Webflow Marketplace compliance record](docs/webflow-marketplace-compliance.md) — every review round and App Review Preflight finding with observed behaviour, fix, tests, artifact sha256 and the six-state line; check the latest `R<n>` entry before touching networking, DOM, popups, telemetry or the manifest.
+- [Webflow submission playbook](docs/webflow-marketplace/playbook.md) — end-to-end Marketplace submission runbook: `/webflow-app-preflight` gate → `build:prod` → artifact greps → App Review Preflight receipt → submit; `/webflow-app-review-remediation` loop for findings. Skills live in `.claude/skills/` + `.cursor/skills/`.
+- [Webflow review paste sheet](docs/webflow-marketplace/SUBMIT.md) — the only file to open when responding to Webflow: one heading per form field, current round only; update it whenever a new production artifact is built (paths + hashes + "what changed"), move the replaced response body to `docs/webflow-marketplace/history/responses.md`.
+- [Webflow Marketplace compliance record](docs/webflow-marketplace/compliance-record.md) — every review round and App Review Preflight finding with observed behaviour, fix, tests, artifact sha256 and the six-state line; check the latest `R<n>` entry before touching networking, DOM, popups, telemetry or the manifest.

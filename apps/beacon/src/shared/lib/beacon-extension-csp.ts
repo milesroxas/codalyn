@@ -45,12 +45,26 @@ const WEBFLOW_ASSET_HOST_SOURCES = [
  */
 const AWS_S3_UPLOAD_HOST_SOURCES = ["https://s3.amazonaws.com", "https://*.s3.amazonaws.com"] as const;
 
+/**
+ * Origin Webflow's hosted runtime serves the uploaded bundle's static files from. The installed
+ * extension document does not live on this origin: Webflow rewrites the bundle's relative
+ * `./bundle.js`, `<link rel="modulepreload">` and `./styles.css` references to
+ * `https://cdn.prod.website-files.com/<upload id>/…`, and chunk `import()`s, `url(./*.woff2)` and
+ * `url(images/…)` resolve against those rewritten URLs. With `'self'` alone every first-party script
+ * and stylesheet is blocked and the extension renders blank (observed 2026-09-14 on
+ * v0.1.0_public_09-14_13-55-57). The `<upload id>` path segment is minted per bundle upload, so it
+ * cannot be baked in at build time — the host is the narrowest expressible source. Only this exact
+ * host is admitted, not `*.website-files.com`.
+ */
+const WEBFLOW_HOSTED_BUNDLE_SOURCES = ["https://cdn.prod.website-files.com"] as const;
+
 function serializeCsp(directives: ReadonlyArray<readonly [string, ReadonlyArray<string>]>): string {
   return directives.map(([name, values]) => `${name} ${values.join(" ")}`).join("; ");
 }
 
 /**
- * Shared style-src posture: external stylesheets are first-party only; inline `style`
+ * Shared style-src posture: external stylesheets are first-party only (the document origin plus
+ * the Webflow-hosted copy of the bundle's own `styles.css`); inline `style`
  * *attributes* are allowed because React `style` props and the bundled Radix/vaul primitives set
  * them (CSP3 splits the two via style-src-elem/-attr — the plain style-src fallback keeps
  * `'unsafe-inline'` so pre-CSP3 engines allow attributes rather than breaking layout). Inline
@@ -58,10 +72,13 @@ function serializeCsp(directives: ReadonlyArray<readonly [string, ReadonlyArray<
  * tests to contain none regardless.
  */
 const STYLE_DIRECTIVES = [
-  ["style-src", ["'self'", "'unsafe-inline'"]],
-  ["style-src-elem", ["'self'"]],
+  ["style-src", ["'self'", ...WEBFLOW_HOSTED_BUNDLE_SOURCES, "'unsafe-inline'"]],
+  ["style-src-elem", ["'self'", ...WEBFLOW_HOSTED_BUNDLE_SOURCES]],
   ["style-src-attr", ["'unsafe-inline'"]],
 ] as const;
+
+/** First-party module scripts: `bundle.js`, its preloaded chunks and lazy `import()`s. */
+const SCRIPT_DIRECTIVE = ["script-src", ["'self'", ...WEBFLOW_HOSTED_BUNDLE_SOURCES]] as const;
 
 const HARDENING_DIRECTIVES = [
   ["object-src", ["'none'"]],
@@ -81,13 +98,15 @@ const HARDENING_DIRECTIVES = [
 export function buildBeaconExtensionCspContent(towerOrigin: string): string {
   return serializeCsp([
     ["default-src", ["'none'"]],
-    ["script-src", ["'self'"]],
+    SCRIPT_DIRECTIVE,
     ...STYLE_DIRECTIVES,
     // 'self' for the bundled images/ + logos; blob: for image-editor object URLs minted from the
-    // user's own files; Webflow hosts for site assets and avatars. No data: URIs ship or render.
+    // user's own files; Webflow hosts for site assets, avatars and the hosted bundle's images/
+    // (covered by *.website-files.com). No data: URIs ship or render.
     ["img-src", ["'self'", "blob:", ...WEBFLOW_ASSET_HOST_SOURCES]],
-    // Geist woff2 files bundled under assets/ — no external font host.
-    ["font-src", ["'self'"]],
+    // Geist woff2 files bundled under assets/, resolved against the hosted styles.css — no
+    // third-party font host.
+    ["font-src", ["'self'", ...WEBFLOW_HOSTED_BUNDLE_SOURCES]],
     [
       "connect-src",
       ["'self'", towerOrigin, CODALYN_POSTHOG_HOST, ...AWS_S3_UPLOAD_HOST_SOURCES, ...WEBFLOW_ASSET_HOST_SOURCES],
@@ -105,7 +124,7 @@ export function buildBeaconExtensionCspContent(towerOrigin: string): string {
 export function buildQualityComparePopoutCspContent(): string {
   return serializeCsp([
     ["default-src", ["'none'"]],
-    ["script-src", ["'self'"]],
+    SCRIPT_DIRECTIVE,
     ...STYLE_DIRECTIVES,
     ["img-src", ["blob:"]],
     ["connect-src", ["'none'"]],

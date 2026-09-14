@@ -1232,7 +1232,7 @@ for all three consent components (`ImageEditor/AvifTowerConsentNotice`).
 **Disclosure channel note:** Marketplace listing copy cannot be edited after the initial
 submission, so this external-service disclosure is delivered through the submission-note
 changelog on each update instead (see the round-7 AVIF body in
-[webflow-marketplace-response-short.md](webflow-marketplace-response-short.md)): AVIF
+[SUBMIT.md](SUBMIT.md)): AVIF
 conversion via `tower.codalyn.app` is user-initiated and opt-in — images are sent only after
 the user enables AVIF conversion; processed in memory, never stored.
 
@@ -1529,7 +1529,7 @@ as R7b.8 and the playbook's "don't argue the gate" rule). Resolution, disclosed 
 
 ### Before submitting (not done in this change)
 
-Partner-facing packet for R7b.8 + R7b.9: `docs/webflow-resubmission-packet-2026-08-19.md`.
+Partner-facing packet for R7b.8 + R7b.9: `docs/webflow-marketplace/history/2026-08-19-resubmission-packet.md`.
 
 1. Deploy Tower with migration `0036` applied (`pnpm app tower db:migrate:prod -- --confirm`) and
    `TOWER_TOKEN_ENCRYPTION_KEY` confirmed in Production env.
@@ -2000,3 +2000,100 @@ bare `fetch(` 1 · `new MutationObserver(` 1 · `window.open(` 0 · `postMessage
 States: Source ✓ · Artifact ✓ · Installed ✗ · Runtime ✗ (Preflight browser test not yet run) ·
 Submitted ✗ · Accepted ✗. The 13:22 artifact and its `wfpre_` run are **superseded**: scan the
 13:55 zip + its sourcemaps, expect the same two findings as R7b.13, and use that run's receipt.
+
+### R7b.15 Installed extension renders blank — shipped CSP blocked Webflow's hosted copy of the bundle (2026-09-14)
+
+Not a scanner finding; caught installing the R7b.14 artifact (`v0.1.0_public_09-14_13-55-57.zip`) on
+the test site. The Designer Extension panel opened empty. Console (extension iframe):
+`Loading the script '<URL>' violates … "script-src 'self'"` ×7 and `Loading the stylesheet
+'https://cdn.prod.website-files.com/6aa8369…/styles.css' violates … "style-src-elem 'self'"`.
+
+**Root cause:** Webflow's hosted runtime does not serve the bundle's files from the extension
+document's origin. It rewrites the relative `./bundle.js`, the six `<link rel="modulepreload">`
+chunks (the 7 blocked script loads) and `./styles.css` to
+`https://cdn.prod.website-files.com/<upload id>/…`; lazy `import()`s, `url(./*.woff2)` and
+`url(images/…)` then resolve against those URLs. The R7.4 policy admitted `'self'` only, so the
+browser blocked every first-party script and the stylesheet → nothing mounted. The `<upload id>`
+segment is an ObjectId minted at upload time (its timestamp decodes to the upload day), so a
+path-scoped source cannot be baked in at build time; the exact host is the narrowest expressible
+source. Dev serve strips the CSP meta entirely (Vite HMR), and unit tests and the artifact greps
+check the policy text, not where Webflow serves files from — so nothing short of installing the
+bundle could see it. No R7b entry records an installed-revision check of a CSP-carrying bundle
+(R7b.8/R7b.9 states: Installed ✗).
+
+Also in the console and deliberately **left blocked**: `Applying inline style violates …
+'style-src-elem'` from `entrypoint-designer-extensions-client.….js:234` — Webflow's own client
+script inserting an rrweb `<style>` rule (`html.rrweb-paused *`); nothing in Beacon depends on it.
+The `connect-src` block on that script's `.js.map` is DevTools fetching a source map, not app
+traffic.
+
+**Fix (source):** `beacon-extension-csp.ts` adds one constant, `https://cdn.prod.website-files.com`,
+to `script-src`, `style-src`, `style-src-elem` and `font-src` in both shipped documents (extension
+iframe + flag-gated compare popout). Not added: any wildcard (`*.website-files.com` stays confined
+to `img-src`/`connect-src` as before), `'unsafe-inline'`/`'unsafe-eval'` for scripts, inline
+`<style>` elements, or any third-party host. `connect-src` is unchanged. Tests
+(`beacon-extension-csp.test.ts`, 13): every pinned directive updated; new regression test asserts
+the hosted-bundle host is admitted for scripts, stylesheets and fonts; new guard asserts it is the
+**only** `https://` source in `script-src`/`style-src-elem`/`font-src` and none of them carries a
+wildcard; popout's zero-network assertion now tolerates exactly that host.
+
+**Shipped `index.html` policy:**
+
+```
+default-src 'none'; script-src 'self' https://cdn.prod.website-files.com;
+style-src 'self' https://cdn.prod.website-files.com 'unsafe-inline';
+style-src-elem 'self' https://cdn.prod.website-files.com; style-src-attr 'unsafe-inline';
+img-src 'self' blob: https://webflow.com https://*.webflow.com https://website-files.com https://*.website-files.com;
+font-src 'self' https://cdn.prod.website-files.com;
+connect-src 'self' https://tower.codalyn.app https://us.i.posthog.com
+            https://s3.amazonaws.com https://*.s3.amazonaws.com
+            https://webflow.com https://*.webflow.com https://website-files.com https://*.website-files.com;
+object-src 'none'; frame-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'
+```
+
+**Artifact (09-14 14-11-16 build, `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod`, all
+gates green):** `v0.1.0_public_09-14_14-11-16.zip` sha256 `72d12140…adceaa` (25 entries) ·
+`.sourcemaps.zip` sha256 `1902703d…7414c6`. Shipped JS/HTML: `sha384` 0 · `sha256-` 1 · bare
+`fetch(` 1 · `new MutationObserver(` 1 · `window.open(` 0 · `postMessage` 0 · `?token=` 0 · `.map`
+in bundle 0. File list identical to 13:55 apart from two chunk hashes that embed `__BUILD_TIME__`.
+States: Source ✓ · Artifact ✓ · Installed ✗ · Runtime ✗ (panel must render on the test site —
+confirm the console shows no `script-src`/`style-src-elem` violation for `cdn.prod.website-files.com`)
+· Submitted ✗ · Accepted ✗. The 13:55 artifact is **superseded** and must not be submitted or
+scanned: it cannot run installed. Scan the 14:11 zip + its sourcemaps; expected Preflight residue
+unchanged from R7b.13.
+
+**Regression review against the App Review Preflight findings (R7b.8–R7b.14), 2026-09-14.**
+Content diff of the extracted artifacts, chunk-name hashes and the `__BUILD_TIME__` literal
+normalized:
+
+- 14:11 vs 13:55 — shipped JS token-identical; `index.html` differs only in `script-src`,
+  `style-src`, `style-src-elem`, `font-src` (+ `https://cdn.prod.website-files.com`). Sourcemaps
+  differ only in the two chunks that embed the build time.
+- 14:11 vs 13:22 (last scanned build) — the R7b.14 SHA-384→SHA-256 digest in `bundle.js` plus the
+  same four CSP directives. Nothing else.
+
+Shape counts (bundle / sourcemaps), identical on 13:55 and 14:11; 13:22 differs only by `sha384` 2/2:
+`[?&]token=` 0/0 · `\brrweb\b` 0/1 · recorder|sessionrecording|fullstory 0/3 · `.toBlob(` 0/0 ·
+toDataURL|getImageData 0/4 · `postMessage` 0/3 · `MessageChannel` 0/0 · `window.open(` 0/1 ·
+`.opener` 0/0 · `.innerHTML=`/`.outerHTML=` 0/1 · insertAdjacentHTML(/document.write( 0/0 ·
+`http://` (non-W3C) 0/0 · `ws://` 0/0 · bare `fetch(` 1/4 · `new MutationObserver(` 1/5 ·
+`sourceMappingURL` 0/146 · localhost|127.0.0.1|ngrok 0/0 · sentry 0/15 · `sha384` 0/0. Bundle 25
+entries, 0 `.map`; sourcemaps 11 v3 maps incl. `styles.css.map`. The sourcemap residuals are the
+ones already present in the scanned 13:22 run (vendor `sourcesContent`), not new.
+
+Script-loading sinks in the shipped JS, checked because `script-src` now admits a second host:
+react-dom's `<script>` creation throws (R7b.11 strip rule); react-dom's hoistable-script resource
+path only runs when the app renders a `<script src>` element (it renders none); posthog-js's
+external loader is off (`disable_external_dependency_loading: true`) and targets PostHog's asset
+host, which the policy still blocks; `import(e.module)` is react-router's framework-mode route-module
+loader (Beacon mounts no route manifest); the Vite `import()`s are the bundle's own relative chunks.
+No first-party code can load the runtime script Beacon uploads to the same CDN, or any other
+Webflow-hosted file, as a script. Gates: `beacon-extension-csp.test.ts` + `extension-egress.test.ts`
++ `release-build-gates.test.mjs` 97/97; the source diff carries none of the CLAUDE.md scanner shapes.
+
+**Open decision (reviewer judgment, not code):** `cdn.prod.website-files.com` also serves customer-
+uploaded site assets, so the host-level `script-src` source is broader than "this bundle's files".
+It is the narrowest source CSP can express for a per-upload path, and the extension has no script-
+injection sink that could use it. Answer with this paragraph if it is raised. **Runtime dependency:**
+if Webflow ever serves bundles from another host the panel fails closed (blank), so the A5
+install-render check stays mandatory on every artifact.

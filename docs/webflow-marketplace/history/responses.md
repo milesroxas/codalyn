@@ -1,23 +1,8 @@
-# Webflow Marketplace Review — Short Response (≤500 chars)
+# Earlier reviewer responses (reference only — do not paste)
 
-Condensed from [webflow-marketplace-compliance.md](webflow-marketplace-compliance.md) for the
-submission form's character-limited response field. Body below is the submittable text (round 7b,
-2026-09-14 App Review Preflight third scan: single egress point / Lexical observer; the fourth scan on the 13:22 build returned only these two, one location each — compliance doc § R7b.13 — so this body is final). Keep the AVIF disclosure paragraph in the note too (listing copy is locked).
-
-> Submission-notes addendum (not in the ≤500 field; the guidelines ask Hybrid Apps to list backend
-> domains + endpoints): Backend: https://tower.codalyn.app only — `/api/auth/webflow-designer`
-> (Designer ID-token exchange, server-side), `/api/v2/webflow/*` (Data API proxy), image conversion
-> (opt-in AVIF). Webflow-issued presigned asset-upload URLs (S3 / website-files.com), no credential
-> header. Telemetry: https://us.i.posthog.com, opt-in, no site data. The bearer is sent to the Tower
-> origin only (exact-origin match at the single egress call).
->
-> Note: Marketplace listing copy is locked after the initial submission, so the external-service
-> disclosure (opt-in image conversion via `tower.codalyn.app`) is carried in this submission-note
-> changelog on every update — it must stay in the note for each resubmission.
-
----
-
-Preflight: every request now leaves through one first-party egress call (extension-egress.ts) with an explicit destination policy — our Tower origin, or the Webflow-issued presigned asset-upload URL — mirrored by the shipped CSP; the release build fails on any second fetch site. The one MutationObserver is the rich-text editor's (Lexical) contenteditable sync inside our own panel: created on editor mount, scoped to its root, driven by typing. It never observes or writes the Designer canvas.
+Bodies that were pasted into the review form's ≤500-character response field in earlier rounds,
+newest first. The current one lives in [../SUBMIT.md](../SUBMIT.md) § 3. Engineering detail per
+round: [../compliance-record.md](../compliance-record.md).
 
 ---
 

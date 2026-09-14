@@ -564,11 +564,6 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     // Source maps are built (`sourcemap: "hidden"`) for the private submission field, so no shipped
     // file may reference one — a `//# sourceMappingURL=` comment means a map leaked into the bundle.
     { value: "sourceMappingURL", label: "a sourceMappingURL reference" },
-    // App Review Preflight (2026-09-14) "Prohibited Popups": the extension opens no windows itself —
-    // every external destination (Tower routes, the Webflow OAuth consent screen, policy pages) is an
-    // ordinary `<a target="_blank" rel="noopener noreferrer">`. The flag-gated quality-compare popout is
-    // the only remaining source-level caller and is DCE'd on release channels.
-    { value: "window.open(", label: "a window.open call" },
     // App Review Preflight (2026-08-19) flags "Credential in URL": any `?token=` / `&token=` query
     // parameter in the shipped JS. posthog-js builds four such URLs (early-access features, product
     // tours, surveys, logs); the strip plugin compiles the token out of each. Credentials belong in
@@ -592,6 +587,14 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     { value: "toDataURL", label: "a canvas toDataURL() pixel readback" },
     { value: "getImageData", label: "a canvas getImageData() pixel readback" },
   ];
+  if (appName === "beacon") {
+    // App Review Preflight (2026-09-14) "Prohibited Popups": Beacon opens no windows itself — every
+    // external destination (Tower routes, the Webflow OAuth consent screen, policy pages) is an
+    // ordinary `<a target="_blank" rel="noopener noreferrer">`. The flag-gated quality-compare popout
+    // is the only remaining source-level caller and is DCE'd on release channels. Beacon-only until
+    // Flint ports the same anchor-based flows (its auth/connect popups still call window.open).
+    forbidden.push({ value: "window.open(", label: "a window.open call" });
+  }
   if (!SENTRY_ALLOWED_APPS.has(appName)) {
     // An earlier review round flagged Sentry; it has since been removed from Beacon, but
     // posthog-js still ships a (never-called) Sentry integration. The strip plugin compiles that

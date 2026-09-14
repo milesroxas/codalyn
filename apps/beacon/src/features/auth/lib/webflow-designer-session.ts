@@ -1,4 +1,5 @@
 import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
+import { extensionFetch } from "@/shared/lib/extension-egress";
 import { formatTowerReachabilityError } from "@/shared/lib/tower-reachability-error";
 import { writeBeaconTowerSessionToken } from "./beacon-tower-session-token";
 
@@ -54,9 +55,11 @@ export async function exchangeWebflowDesignerSession(): Promise<{ ok: true } | {
     siteId = null;
   }
 
+  // Deliberately not `towerFetch`: the exchange establishes the session, so no (possibly stale)
+  // bearer is attached. Same egress point, same Tower-origin policy.
   let res: Response;
   try {
-    res = await fetch(`${towerOrigin}/api/auth/webflow-designer`, {
+    res = await extensionFetch(`${towerOrigin}/api/auth/webflow-designer`, {
       method: "POST",
       credentials: "include",
       headers: {

@@ -51,6 +51,13 @@ CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod
 Output: `apps/beacon/bundle/production/public/v<ver>_public_<MM-DD_HH-mm-ss>.zip` plus the matching
 `.sourcemaps.zip` (private — submission form field only, never inside the bundle).
 
+Retention runs at the end of every build (`BUNDLE_RETENTION` in `scripts/build-cli.mjs`): the newest 2
+builds stay in place, older builds that this doc or the compliance doc names (scan targets, submitted
+artifacts) move to `apps/beacon/bundle/archive/<channel>/<recipient>/`, anything else is deleted. So:
+**record a build's zip name in the compliance doc before the next build if it was uploaded anywhere**,
+otherwise it will not survive. The whole `bundle/` tree is gitignored; the sha256 in the doc is the
+durable record.
+
 `scripts/build-cli.mjs` already fails the build on forbidden markers (`localhost`, tunnel hosts,
 Sentry in Beacon, `sourceMappingURL`, `?token=` / `&token=`, dev-only popout, telemetry block in
 `webflow.json`, …) and `scripts/vite-strip-dev-host-literals.mjs` compiles audited vendor literals
@@ -76,11 +83,14 @@ unzip -p "$M" '*.map' | grep -ciE '[?&]token='               # 0 — reviewer sc
 unzip -l "$M" | grep -c 'styles.css.map'                     # 1 — every generated file needs a map (R7b.11)
 unzip -p "$Z" '*.js' | grep -oiE 'https?://[^"'"'"'` )]*' | grep -viE '^https://|www\.w3\.org' | wc -l   # 0 http:// (W3C namespaces exempt)
 unzip -p "$Z" '*.js' | grep -cE '\.(inner|outer)HTML\s*=[^=]|insertAdjacentHTML\(|document\.write\('  # 0 HTML-sink writes
-unzip -p "$Z" '*.js' | grep -c 'new MutationObserver'        # 1 — Lexical's contenteditable observer only (R7b.11 open item)
+unzip -p "$Z" '*.js' | grep -cE '(^|[^A-Za-z0-9_$.])fetch\('  # 1 — the extensionFetch chokepoint only (R7b.12; build gate pins it)
+unzip -p "$Z" '*.js' | grep -c 'new MutationObserver'        # 1 — Lexical's contenteditable observer only (R7b.11/12 open item; build gate pins it)
 unzip -p "$Z" '*.js' | grep -c 'window.open(\|postMessage('   # 0
 ```
 
-Anything non-zero (other than the documented Lexical observer) → fix, rebuild, re-run. Never edit a zip by hand.
+Anything off its expected value → fix, rebuild, re-run. Never edit a zip by hand. The two `1`s are
+pinned by `pinnedMarkerCounts` in `scripts/build-cli.mjs` (dist + zip): a second `fetch(` or
+`MutationObserver` anywhere in the artifact fails `build:prod` before you can upload it.
 
 **App Review Preflight shows at most 3 evidence locations per finding** (R7b.8 had four `?token=`
 URLs, three listed; R7b.11 had four `MutationObserver`s, three listed). Never fix only the listed
@@ -204,6 +214,22 @@ for react-dom innerHTML (→ throws) and the yandex entry; pnpm patch drops Focu
 sanitized nodes instead of assigning `innerHTML`; regex-capable forbidden markers (`http://` minus
 W3C, `ws://`, HTML sinks). Remaining: Lexical's contenteditable observer (open reviewer judgment).
 Full write-up: compliance doc § R7b.11.
+
+## C4. Worked example — R7b.12 two REQUIRED findings on the 09-14 12:50 build (2026-09-14)
+
+Findings: External API Calls (the three first-party `fetch` sites left after R7b.11 — Designer-session
+exchange, `towerFetch`, presigned runtime-asset upload) and Silent Canvas Mutations (Lexical, as
+predicted). Lesson: the rule keys on the bare `fetch(` token — posthog's XHR/sendBeacon transport in
+the same artifact drew no evidence — so replacing a vendor request layer with first-party calls only
+moves the evidence slots. Fix: `shared/lib/extension-egress.ts` is the one `fetch` in the bundle,
+with the destination policy (exact Tower origin, Webflow asset-upload allowlist) at the call site;
+`pinnedMarkerCounts` in `build-cli.mjs` pins `fetch(` = 1 and `new MutationObserver(` = 1 on dist +
+zip; a source sweep test forbids any other first-party `fetch`/observer. Lexical: kept — its
+observer gates Lexical's own DOM reconcile and evicts browser-inserted IME nodes; stubbing it
+duplicates text for CJK users, and every contenteditable editor carries the same constructor. Answer
+with the rationale in compliance doc § R7b.12; the fallback is a product change (non-contenteditable
+CMS rich-text field), Miles's call.
+Full write-up: compliance doc § R7b.12.
 
 ## D. Don'ts (from the skills' anti-advice list)
 

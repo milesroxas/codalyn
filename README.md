@@ -118,6 +118,10 @@ pnpm app <app> build:dev       # development → bundle/development/ (local Towe
 
 Applies to `flint` and `beacon`. Tower uses `pnpm app tower dev` / `pnpm app tower build`. Local Tower dev owns host port **3100** by default; see **Tower database** above and [apps/tower/README.md](apps/tower/README.md) for Docker/Neon setup.
 
+**Release gates (production + preview channels).** The build fails, on the compiled JS and again on the archived zip, if the output contains a forbidden marker (dev hosts, `sourceMappingURL`, credential-in-query URLs, session-replay / canvas-readback APIs, `window.open(` / `postMessage(` / `http://` / HTML-sink writes for Beacon, Sentry for Beacon, local `VITE_*KEY|TOKEN|SECRET` values) or if a **pinned inventory count** drifts — Beacon must contain exactly one bare `fetch(` (the egress chokepoint) and exactly one `new MutationObserver(` (Lexical). `scripts/vite-strip-dev-host-literals.mjs` compiles audited vendor literals out before the gate runs, and source maps are moved out of `dist/` into a private `<archive>.sourcemaps.zip` for the Marketplace submission form. Everything the gates enforce, and why, is in [docs/webflow-submission-playbook.md](docs/webflow-submission-playbook.md) and the round-by-round record in [docs/webflow-marketplace-compliance.md](docs/webflow-marketplace-compliance.md).
+
+**Bundle retention (Beacon).** `bundle/` is gitignored. After each build the newest 2 builds per channel/recipient stay in place, older builds named in any `docs/*.md` (scanned or submitted artifacts, with their sha256) move to `bundle/archive/<channel>/<recipient>/`, and the rest are deleted (`BUNDLE_RETENTION` in `scripts/build-cli.mjs`). Record a zip's name in the compliance doc before the next build if it was uploaded anywhere.
+
 ## Release — @codalyn/loadout
 
 ```bash

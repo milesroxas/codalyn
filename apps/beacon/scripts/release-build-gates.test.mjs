@@ -6,19 +6,24 @@
  */
 
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  archiveBaseName,
+  assertPinnedMarkerCounts,
   assertRequiredReleaseEnv,
   collectForbiddenBundleMarkers,
   extractSourceMapsToPrivateZip,
   findSourceMapEntries,
   listDistSourceMaps,
   matchForbiddenMarker,
+  pinnedMarkerCounts,
+  pruneBundleArchives,
+  referencedArchiveBaseNames,
   resolveViteEnvValue,
   rewriteSourceMapInsecureSchemes,
 } from "../../../scripts/build-cli.mjs";
@@ -345,6 +350,141 @@ describe("matchForbiddenMarker", () => {
 
     const markers = collectForbiddenBundleMarkers(appPath, "production", "beacon");
     expect(markers.filter((m) => m.value === secret)).toHaveLength(1);
+  });
+});
+
+describe("pinnedMarkerCounts (App Review Preflight: External API Calls / Silent Canvas Mutations)", () => {
+  const pinned = pinnedMarkerCounts("beacon", "production");
+  const clean = "async function a(e,t){return fetch(e,t)}" + "e._observer=new MutationObserver((t,n)=>{yt(e,t,n)})";
+
+  it("pins exactly one bare fetch( and one MutationObserver construction in Beacon release output", () => {
+    expect(pinned.map((m) => [m.label, m.expected])).toEqual([
+      ["bare fetch( call", 1],
+      ["MutationObserver construction", 1],
+    ]);
+    expect(() => assertPinnedMarkerCounts(clean, pinned, "Build output")).not.toThrow();
+  });
+
+  it("fails the build when a second fetch call site appears anywhere in the artifact", () => {
+    const leaked = `${clean};await fetch("https://api.example.com/collect",{method:"POST"})`;
+    expect(() => assertPinnedMarkerCounts(leaked, pinned, "Archived zip")).toThrow(
+      /Archived zip contains 2 bare fetch\( calls, expected exactly 1 \(the single egress point/
+    );
+  });
+
+  it("fails the build when a dependency adds a MutationObserver", () => {
+    const leaked = `${clean};const o=new MutationObserver(()=>{})`;
+    expect(() => assertPinnedMarkerCounts(leaked, pinned, "Build output")).toThrow(/2 MutationObserver constructions/);
+  });
+
+  it("fails when the inventory shrinks too, so the compliance doc is updated with it", () => {
+    expect(() => assertPinnedMarkerCounts("fetch(e)", pinned, "Build output")).toThrow(
+      /0 MutationObserver constructions, expected exactly 1/
+    );
+  });
+
+  it("does not count property calls, longer identifiers, or posthog's transport name", () => {
+    const noise = `${clean};window.fetch(e);globalThis.fetch(e);towerFetch(e);refetch();Ye=Ke?.fetch;t.transport="fetch"`;
+    expect(() => assertPinnedMarkerCounts(noise, pinned, "Build output")).not.toThrow();
+  });
+
+  it("is inert for development builds and for Flint", () => {
+    expect(pinnedMarkerCounts("beacon", "development")).toEqual([]);
+    expect(pinnedMarkerCounts("flint", "production")).toEqual([]);
+    expect(() => assertPinnedMarkerCounts("fetch(a);fetch(b)", [], "Build output")).not.toThrow();
+  });
+});
+
+describe("bundle retention (pruneBundleArchives)", () => {
+  const BUILDS = [
+    "v0.1.0_public_09-14_12-08-01", // scanned — referenced by a doc
+    "v0.1.0_public_09-14_12-46-23", // intermediate rebuild
+    "v0.1.0_public_09-14_12-50-36", // scanned — referenced
+    "v0.1.0_public_09-14_13-22-03", // newest 2
+    "v0.1.0_public_09-15_09-00-00", // newest 2
+  ];
+
+  function seed() {
+    const outDir = join(tempAppDir(), "bundle", "production", "public");
+    mkdirSync(outDir, { recursive: true });
+    for (const base of BUILDS) {
+      writeFileSync(join(outDir, `${base}.zip`), "zip");
+      writeFileSync(join(outDir, `${base}.sourcemaps.zip`), "maps");
+    }
+    writeFileSync(join(outDir, "notes.txt"), "not a build");
+    return outDir;
+  }
+
+  it("parses both archive file names to one base name and ignores everything else", () => {
+    expect(archiveBaseName("v0.1.0_public_09-14_13-22-03.zip")).toBe("v0.1.0_public_09-14_13-22-03");
+    expect(archiveBaseName("v0.1.0_public_09-14_13-22-03.sourcemaps.zip")).toBe("v0.1.0_public_09-14_13-22-03");
+    expect(archiveBaseName("bundle.zip")).toBeNull();
+    expect(archiveBaseName("notes.txt")).toBeNull();
+  });
+
+  it("collects every build a Markdown doc names, from either file name, recursively", () => {
+    const docs = join(tempAppDir(), "docs");
+    mkdirSync(join(docs, "nested"), { recursive: true });
+    writeFileSync(join(docs, "a.md"), "scan target `v0.1.0_public_09-14_12-08-01.zip` (sha …)");
+    writeFileSync(
+      join(docs, "nested", "b.md"),
+      "maps `v0.1.0_internal_09-14_11-32-46.sourcemaps.zip`; bare v0.1.0_public_01-01_00-00-00 is prose"
+    );
+    writeFileSync(join(docs, "c.txt"), "v0.1.0_public_02-02_00-00-00.zip");
+    expect([...referencedArchiveBaseNames(docs)].sort()).toEqual([
+      "v0.1.0_internal_09-14_11-32-46",
+      "v0.1.0_public_09-14_12-08-01",
+    ]);
+    expect(referencedArchiveBaseNames(join(docs, "missing")).size).toBe(0);
+  });
+
+  it("keeps the newest builds, archives doc-referenced older ones as pairs, deletes the rest", () => {
+    const outDir = seed();
+    const archiveDir = join(outDir, "..", "..", "archive", "production", "public");
+    const result = pruneBundleArchives({
+      outDir,
+      archiveDir,
+      keepNewest: 2,
+      referenced: new Set(["v0.1.0_public_09-14_12-08-01", "v0.1.0_public_09-14_12-50-36"]),
+    });
+    expect(result).toEqual({
+      kept: ["v0.1.0_public_09-14_13-22-03", "v0.1.0_public_09-15_09-00-00"],
+      archived: ["v0.1.0_public_09-14_12-08-01", "v0.1.0_public_09-14_12-50-36"],
+      deleted: ["v0.1.0_public_09-14_12-46-23"],
+    });
+    expect(readdirSync(outDir).sort()).toEqual([
+      "notes.txt",
+      "v0.1.0_public_09-14_13-22-03.sourcemaps.zip",
+      "v0.1.0_public_09-14_13-22-03.zip",
+      "v0.1.0_public_09-15_09-00-00.sourcemaps.zip",
+      "v0.1.0_public_09-15_09-00-00.zip",
+    ]);
+    expect(readdirSync(archiveDir).sort()).toEqual([
+      "v0.1.0_public_09-14_12-08-01.sourcemaps.zip",
+      "v0.1.0_public_09-14_12-08-01.zip",
+      "v0.1.0_public_09-14_12-50-36.sourcemaps.zip",
+      "v0.1.0_public_09-14_12-50-36.zip",
+    ]);
+  });
+
+  it("is a no-op with fewer builds than the keep window, or no output dir", () => {
+    const outDir = seed();
+    const result = pruneBundleArchives({
+      outDir,
+      archiveDir: join(outDir, "archive"),
+      keepNewest: 10,
+      referenced: new Set(),
+    });
+    expect(result.archived).toEqual([]);
+    expect(result.deleted).toEqual([]);
+    expect(readdirSync(outDir)).toHaveLength(11);
+    expect(
+      pruneBundleArchives({ outDir: join(outDir, "nope"), archiveDir: outDir, keepNewest: 2, referenced: new Set() })
+    ).toEqual({
+      kept: [],
+      archived: [],
+      deleted: [],
+    });
   });
 });
 

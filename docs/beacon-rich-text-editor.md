@@ -130,6 +130,15 @@ is code-split out of the main Composer chunk and only loads when a rich-text fie
 
 Runtime footer: **no new dependencies** — it stays a hand-rolled IIFE.
 
+Marketplace review note (2026-09): Lexical's core constructs a `MutationObserver` on the contenteditable
+root when the editor mounts (`initMutationObserver`). Webflow's App Review Preflight reports every such
+constructor as "Silent Canvas Mutations" regardless of target. It is load-bearing — `$commitPendingUpdates`
+gates Lexical's DOM reconcile on it, and `flushMutations` evicts browser-inserted IME text nodes — so it is
+kept as the bundle's one accepted observer, pinned by count in the release build and answered with the
+rationale in `docs/webflow-marketplace-compliance.md` § R7b.12. Swapping to another contenteditable editor
+would not change this (ProseMirror/TipTap, Slate, Quill all construct one); only a non-contenteditable
+field would. Do not add a second observer anywhere in Beacon.
+
 ---
 
 ## 6. The primitive: `shared/ui/rich-text-editor/`
@@ -344,23 +353,28 @@ constrained editor node set already keeps output narrow, so a focused allowlist 
 marker, with the structural Webflow class as fallback:
 
 ```js
-// inside applyValue(el, v) — generated runtime source
-// rich text: marked by Designer, or a Webflow rich-text wrapper
-if (el.getAttribute && (el.getAttribute("data-cb-html") === "1" ||
-    (el.classList && el.classList.contains("w-richtext")))) {
-  el.innerHTML = bSafeHtml(v);   // minimal runtime guard, not full sanitize
+// inside applyValue(el, v) — generated runtime source (as shipped; see cms-slot-beacon-prop-runtime.ts)
+if (bIsRichTextEl(el)) {          // data-cb-html="1" from the Designer, or a .w-richtext wrapper
+  var sh = bSafeHtml(v);          // DOMParser parse → allowlisted nodes rebuilt into a detached container, or null
+  if (sh == null) { el.textContent = v; } else { bRenderNodes(el, sh); }   // moves nodes in; no innerHTML
   return;
 }
 // ...existing IMG/A/INPUT/TEXTAREA branches...
 el.textContent = v;              // unchanged default
 ```
 
+The original plan assigned `el.innerHTML = bSafeHtml(v)`; Marketplace review (compliance doc R7b.11,
+"Unsafe HTML Injection") flags every `innerHTML` write, so the runtime now renders **nodes**: `bSafeHtml`
+returns a container built from the parsed document over the same allowlist and `bRenderNodes` appends its
+children. Nothing is re-parsed from a string on the published site.
+
 - `data-cb-html="1"` is written by the **Designer** when a `richText` prop is bound (alongside
   `data-cb-c`), so the runtime matches by a stable marker, not presentation text (CLAUDE.md: match by
   stable IDs/markers). `.w-richtext` is a structural fallback for safety.
-- `bSafeHtml(v)` is a tiny belt-and-suspenders strip in the IIFE (kill `<script>`, `on*=` attributes,
-  `javascript:` URLs). The real sanitization already happened at the boundary (§9); this just ensures the
-  footer never blindly trusts the payload string.
+- `bSafeHtml(v)` is the runtime allowlist pass in the IIFE (DOMParser, tag allowlist, `bSafeHref`
+  https/mailto/tel-only links, `rel="noopener noreferrer"` on `_blank`; falls back to `textContent` when
+  parsing is unavailable). The authoritative sanitization already happened at the boundary (§9); this ensures
+  the footer never blindly trusts the payload string.
 - `bPropEmpty` updated so empty-HTML (`<p></p>`, `&nbsp;`, whitespace) hides conditional elements.
 
 Because the runtime source is a generated string, bump its hash so `data-codalyn-beacon-src-hash` drift
@@ -387,7 +401,8 @@ Wherever the Designer tags bound elements with `data-cb-c` for a `richText` prop
 
 ## 11. Security (XSS) — required
 
-`innerHTML` on the published site is the only new attack surface. Threat model: a Composer editor (an
+Rendering author-supplied markup on the published site is the only new attack surface (as nodes, never
+`innerHTML` — see §9.1). Threat model: a Composer editor (an
 authenticated site operator) is the input source, so risk is moderate — but treat it as untrusted anyway.
 
 Defense in depth, four layers:
@@ -395,8 +410,8 @@ Defense in depth, four layers:
 1. **Constrained editor** — only allowlisted nodes are registered; Lexical drops the rest on import.
 2. **Boundary sanitizer** (`sanitizeBeaconRichTextHtml`, §9) — strict tag/attr allowlist + URL scheme
    filter, runs at save time in the Beacon app. This is the authoritative pass.
-3. **Runtime guard** (`bSafeHtml`, §9.1) — minimal strip of `<script>` / `on*` / `javascript:` in the
-   footer IIFE; never trusts the payload blindly.
+3. **Runtime guard** (`bSafeHtml` + `bRenderNodes`, §9.1) — allowlist rebuild from a DOMParser parse in
+   the footer IIFE, rendered as nodes; never trusts the payload blindly.
 4. **Link hardening** — `rel="noopener noreferrer"` forced on `target="_blank"`.
 
 Test the sanitizer against the standard payloads: `<script>`, `<img onerror>`, `javascript:` href,

@@ -18,6 +18,7 @@ import {
   cmsSlotListTargetRuntimeLayoutRevealSource,
   ensureCmsSlotListTargetLayoutStyle,
 } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
+import { extensionFetch, isAllowedAssetUploadUrl } from "@/shared/lib/extension-egress";
 import { readStringLikeValue } from "@/shared/lib/read-string-like-value";
 import { getTowerOrigin, towerFetchWithRetry } from "@/shared/lib/tower-client";
 
@@ -290,59 +291,14 @@ async function createRuntimeAsset(siteId: string, fileName: string, sourceCode: 
   return data;
 }
 
-/**
- * Amazon S3 endpoint host shapes, the only AWS service Webflow's create-asset endpoint hands back a presigned
- * POST target on. Deliberately narrower than `*.amazonaws.com` (which would admit every AWS-hosted bucket and
- * every other AWS service endpoint):
- *
- * - `s3.amazonaws.com` / `s3.<region>.amazonaws.com` / `s3-<region>.amazonaws.com` — path-style (bucket in the
- *   path); this is the shape the Webflow Data API documents for `uploadUrl`.
- * - `<bucket>.s3.amazonaws.com` / `<bucket>.s3.<region>.amazonaws.com` / `<bucket>.s3-<region>.amazonaws.com` —
- *   virtual-hosted style, in case the endpoint moves to it.
- *
- * The region label must look like a real AWS region (`us-east-1`, `eu-central-1`, `us-gov-west-1`, `cn-north-1`)
- * so a service/label subdomain such as `s3.evil.amazonaws.com` cannot pose as one. The bucket label is left
- * generic on purpose: pinning Webflow's current bucket name would break the install flow the moment they rotate
- * it, and the presigned URL is already an opaque value handed back by Webflow's own authenticated endpoint.
- */
-const AWS_S3_UPLOAD_HOST_RE = /^(?:[a-z0-9][a-z0-9.-]*\.)?s3(?:[.-][a-z]{2}(?:-[a-z]+)+-\d{1,2})?\.amazonaws\.com$/;
-
-/** Webflow-owned upload/CDN hosts (apex + subdomains). */
-const WEBFLOW_UPLOAD_HOST_SUFFIXES = ["webflow.com", "website-files.com"] as const;
-
-/**
- * The presigned upload URL is the one outbound call in the install flow that does not go through
- * Tower's proxy, so it is allowlisted client-side (Marketplace review): only HTTPS endpoints on
- * Webflow's own hosts or on an Amazon S3 endpoint host are accepted. Lookalike hosts
- * (`amazonaws.com.evil.com`, `webflow.com.evil.com`) and non-S3 AWS hosts (`evil-bucket.amazonaws.com`)
- * are rejected — suffix matching is anchored on a dot-delimited label boundary.
- */
-export function isAllowedAssetUploadUrl(raw: string): boolean {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return false;
-  }
-  if (url.protocol !== "https:") {
-    return false;
-  }
-  // `URL` already lowercases and punycodes the host; it also resolves userinfo tricks
-  // (`https://s3.amazonaws.com@evil.example/`) to the real host before we ever see it.
-  const host = url.hostname;
-  for (const suffix of WEBFLOW_UPLOAD_HOST_SUFFIXES) {
-    if (host === suffix || host.endsWith(`.${suffix}`)) {
-      return true;
-    }
-  }
-  return AWS_S3_UPLOAD_HOST_RE.test(host);
-}
-
 async function uploadRuntimeAsset(
   uploadUrl: string,
   uploadDetails: Record<string, string>,
   sourceCode: string
 ): Promise<void> {
+  // The presigned upload is the one install-flow request that does not go through Tower's proxy.
+  // `extensionFetch` re-checks the same policy; this early return keeps the install-flow error
+  // message specific and guarantees no FormData is built for a refused destination.
   if (!isAllowedAssetUploadUrl(uploadUrl)) {
     throw new Error("Upload runtime asset: upload URL is not a trusted Webflow endpoint.");
   }
@@ -351,7 +307,7 @@ async function uploadRuntimeAsset(
     form.append(k, String(v));
   }
   form.append("file", sourceToBlob(sourceCode), "runtime.js");
-  const res = await fetch(uploadUrl, { method: "POST", body: form });
+  const res = await extensionFetch(uploadUrl, { method: "POST", body: form });
   if (!res.ok) {
     throw new Error(`Upload runtime asset failed (${res.status})`);
   }

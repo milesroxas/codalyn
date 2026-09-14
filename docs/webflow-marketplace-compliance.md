@@ -1795,3 +1795,124 @@ keys). Verified: biome + tsc clean (beacon), beacon **1010/1010** tests, Storybo
 Flint `vite build --mode production` still passes the shared strip plugin (it bundles the same
 react-dom and patched posthog-js). States: Source ✓ · Artifact ✓ · Installed ✗ · Runtime n/a ·
 Submitted ✗ · Accepted ✗. Not yet re-scanned by App Review Preflight.
+
+### R7b.12 Two REQUIRED findings on the 09-14 12:50 build (App Review Preflight 2026-09-14, third scan)
+
+Scan target: `v0.1.0_public_09-14_12-50-36.zip` (sha256 `a5b25eb3…b9b0`) + its `.sourcemaps.zip`
+(`6a45a437…f916e`). The other three R7b.11 findings (source map, insecure protocols, HTML injection)
+were **not** re-reported. Two came back, both `REQUIRED`, generic next-move text, no IDs or
+priorities → `unassigned` = P1 for planning.
+
+**Scanner behaviour learned on this round (playbook A4 updated):** "External API Calls" keys on the
+bare `fetch(` token. The 12:50 artifact had exactly three — all first-party, all reported — while
+posthog-js's transport in the same artifact (`XMLHttpRequest` ×3, `sendBeacon` ×9, and `fetch`
+reached through a variable) produced no evidence. Removing the vendor request layer in R7b.11 did
+not clear the finding; it moved the three evidence slots onto our own call sites. "Silent Canvas
+Mutations" keys on `new MutationObserver(` regardless of what the callback does (the Radix FocusScope
+observer cleared in R7b.11 only called `focus()`).
+
+#### Normalized findings
+
+| Finding (verbatim title) | Priority | Observed in the 12:50 artifact (source-verified) | Acceptance criterion | Provenance | Evidence state |
+| --- | --- | --- | --- | --- | --- |
+| External API Calls — "Review third-party data egress." | unassigned | `assets/label-*.js:1` ×2 — the Designer-session exchange (`features/auth/lib/webflow-designer-session.ts`, raw `fetch` to `${towerOrigin}/api/auth/webflow-designer`) and `towerFetch` (`shared/lib/tower-client.ts`); `bundle.js:80` — the presigned runtime-asset upload (`cms-slot-page-inline-script.ts`, raw `fetch(uploadUrl)` behind `isAllowedAssetUploadUrl`). No third party: two Tower sites, one Webflow-issued upload URL. | needs reviewer clarification (none issued) — resolved as: one egress call site, destination policy enforced at that site and mirrored by the CSP, release build fails on a second site | issued finding | artifact-verified |
+| Silent Canvas Mutations — "Modifications must be user-initiated. No background loops/observers writing to canvas." | unassigned | `assets/rich-text-editor-*.js:3` — Lexical's `initMutationObserver` (the R7b.11 open decision, re-flagged as predicted) | issued rule text | issued finding; **open decision** | artifact-verified (scoped to the editor root, never the canvas); reviewer judgment |
+
+Routing: External API Calls is **Behavior/build** (Automation). The Lexical observer remains a
+**policy decision** (Judgment) with an owner (below).
+
+#### Fix — one egress point (source)
+
+1. **`apps/beacon/src/shared/lib/extension-egress.ts`** is now the extension's only network call.
+   `extensionFetch(url, init)` classifies the destination with `resolveEgressDestination` before a
+   request is built and rejects with an explicit `EgressPolicyError` otherwise (nothing partially
+   applied; no invented fallback). Two destinations exist, both first-party or Webflow-issued:
+   - `tower` — exact-origin match against the origin baked into the build
+     (`__BEACON_TOWER_ORIGIN__`, `https://tower.codalyn.app` on production; scheme + host + port,
+     userinfo/lookalike/prefix hosts rejected). With no baked origin — Vitest only, every browser
+     build bakes one and release builds assert it in the output — Tower-relative paths resolve
+     against the test document and nothing else is accepted.
+   - `webflow-asset-upload` — `isAllowedAssetUploadUrl` moved here unchanged (HTTPS on
+     `webflow.com` / `website-files.com` or an Amazon S3 endpoint host; R5-era lookalike tests moved
+     with it).
+   `towerFetch`, the Designer-session exchange (deliberately not `towerFetch`: no stale bearer is
+   attached while establishing the session) and `uploadRuntimeAsset` all route through it. The
+   policy is the source-level control; the shipped CSP `connect-src` is the browser-enforced one —
+   the two now name the same destinations in one place. PostHog (opt-in telemetry) keeps its own
+   transport and disclosure; it is not first-party egress and produced no evidence.
+2. **Pinned inventory gate.** `pinnedMarkerCounts` in `scripts/build-cli.mjs` requires **exactly
+   one** bare `fetch(` and **exactly one** `new MutationObserver(` in Beacon production/preview
+   output, checked on the dist JS and again on the archived zip (`assertPinnedMarkerCounts`). Above
+   the pin = a new call site crept in (vendor or first-party); below = the accepted inventory
+   changed and this doc must change with it. The error names the chokepoint and this section.
+   This is the "stop meeting the same finding" control: App Review Preflight lists at most three
+   locations, the gate counts the whole artifact.
+3. **Source sweep test** (`extension-egress.test.ts`): walks `apps/beacon/src` (tests/stories
+   excluded) and fails if any first-party module other than the egress module calls `fetch`, or if
+   any first-party module constructs a MutationObserver — the generated published-site runtime
+   strings live in that tree, so the sweep covers the site runtime too. Plus 9 policy tests
+   (exact-origin matching, trailing slash, relative-path rule, refusal before request, bounded
+   error text) and 4 moved allowlist tests. `release-build-gates.test.mjs` +6 (pin values, second
+   fetch site fails, added observer fails, shrunken inventory fails, property-call/identifier/
+   transport-name noise ignored, inert for development + Flint).
+
+#### Open decision (Judgment) — Lexical's contenteditable `MutationObserver`, re-flagged
+
+Re-examined against `lexical@0.46.0` source before deciding again, because "resolve it" was the
+ask. Findings:
+
+- The observer is load-bearing, not a safety net that can be stubbed: `$commitPendingUpdates`
+  gates the entire DOM reconcile on `editor._observer !== null`, and `flushMutations` is what
+  evicts browser-created DOM (a text node Chrome/Safari inserts when IME composition starts in an
+  empty paragraph) and restores managed `<br>`s the browser removes. A no-op observer renders
+  nothing; an inert stub (observe/disconnect/`takeRecords() → []`) leaves the browser's node next
+  to Lexical's own → duplicated text for every CJK/IME user starting a new paragraph. Not
+  shippable.
+- Correction to the R7b.11 note: spellcheck/autocorrect replacements arrive as `beforeinput`
+  `insertReplacementText` and are handled without the observer. IME composition on an existing
+  text node is reconciled by the `input`/`compositionend` handlers. The observer's irreplaceable
+  job is the structural case above plus extension-injected DOM.
+- Swapping editors does not clear the shape: every contenteditable editor (ProseMirror/TipTap,
+  Slate, Quill, CodeMirror) constructs a MutationObserver for the same reason. The only
+  shape-clearing path is a non-contenteditable editor (a `<textarea>` with Markdown → HTML for
+  Webflow CMS rich-text fields) — a product change to a shipped feature, not a fix.
+- Obscuring the constructor token would be gaming the scanner; not done, not proposed.
+
+**Decision: keep; answer with the rationale below; owner Miles.** The pinned gate now proves the
+inventory is exactly this one observer, so the reviewer can be told "one, here, for this reason"
+with the build enforcing it. Reviewer-facing text (also in the short response):
+
+> The single `MutationObserver` in the bundle is the rich-text editor's (Lexical) contenteditable
+> sync. It is created when the CMS rich-text editor mounts inside the extension's own panel,
+> observes only that editor's root element, fires only in response to the user's typing and
+> writes only to that editor's DOM. It never observes or writes the Designer canvas: the extension
+> reaches the canvas solely through the `webflow` Designer API behind explicit user actions, and
+> the release build fails if any other observer appears.
+
+If Webflow rejects the rationale, the fallback is the product decision above (Markdown/plain
+textarea for CMS rich text), not a patch to the editor.
+
+**Artifact check (09-14 13-22-03 build, `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod`):**
+`v0.1.0_public_09-14_13-22-03.zip` sha256 `0216deb1…cea6e` (25 entries, 1.87 MB; 600 KB zip) ·
+`.sourcemaps.zip` sha256 `0392975d…c4fcb` (12 entries incl. `styles.css.map`, 6.5 MB).
+Shipped JS, whole artifact: bare `fetch(` **1** (`extensionFetch`, `bundle.js`; the evidence excerpt
+around it shows the policy — `Ct(e)===null?Promise.reject(new gt(e)):fetch(e,t)` with the
+Tower-origin and asset-upload classifiers immediately before) · `new MutationObserver` **1**
+(Lexical, rich-text chunk) · `http://` outside `www.w3.org` 0 · `ws://` 0 · HTML sink writes 0 ·
+`window.open(` 0 · `postMessage` 0 · `?token=` 0 · rrweb/`.toBlob(` 0 · `.map` in bundle 0 ·
+`sourceMappingURL` 0 · https host list unchanged (`tower.codalyn.app`, `us.i.posthog.com`, and
+doc-link hosts in vendor comments: lexical.dev, radix-ui.com, reactrouter.com, posthog.com).
+Shipped CSP `connect-src` names exactly the egress policy's destinations (Tower, PostHog, S3 /
+Webflow upload hosts). Private map zip: `styles.css.map` present · `?token=` 0 · `http://` outside
+W3C 0. Manifest unchanged (4 documented keys). Gate negative proof: injecting a second `fetch(`
+into the real dist output fails `assertPinnedMarkerCounts` with the chokepoint named. Verified:
+biome + tsc clean (beacon), beacon **1030/1030** tests (build pipeline + standalone run), `build:prod`
+gates on dist and zip. States: Source ✓ · Artifact ✓ · Installed ✗ · Runtime n/a · Submitted ✗ ·
+Accepted ✗. Not yet re-scanned by App Review Preflight; not committed at time of writing.
+
+Housekeeping in the same change: `BUNDLE_RETENTION` in `scripts/build-cli.mjs` prunes
+`apps/beacon/bundle/<channel>/<recipient>/` after every build — newest 2 stay, builds named in any
+`docs/*.md` move to `bundle/archive/`, the rest are deleted. One-off run archived the six scanned
+08-18 / 08-19 / 09-14 public builds and removed 18 unreferenced intermediates (39 MB → 20 MB). The
+zip names + sha256s in this document are what keep an artifact; write them before the next build.
+

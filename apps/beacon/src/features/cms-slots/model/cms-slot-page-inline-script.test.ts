@@ -14,7 +14,6 @@ import {
   decideCmsSlotRuntimeSyncAction,
   describeTowerFailure,
   getCmsSlotPageInlineScriptSource,
-  isAllowedAssetUploadUrl,
   isBeaconRuntimeAssetFileName,
   mergePageScriptsWithBeaconRuntime,
   normalizeBeaconRuntimeAssetRow,
@@ -1079,54 +1078,6 @@ describe("cms slot beacon runtime fail-open reveal (published site)", () => {
     expect(target.style.visibility).toBe("");
     expect(target.children.length).toBe(1);
     expect(target.textContent).toContain("hello");
-  });
-});
-
-describe("isAllowedAssetUploadUrl", () => {
-  it("accepts HTTPS upload endpoints on Webflow and Amazon S3 hosts", () => {
-    // Path-style — the shape the Webflow Data API documents for `uploadUrl`.
-    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.com/webflow-bucket/key")).toBe(true);
-    expect(isAllowedAssetUploadUrl("https://s3.us-west-2.amazonaws.com/webflow-prod-assets/key")).toBe(true);
-    expect(isAllowedAssetUploadUrl("https://s3-us-west-2.amazonaws.com/webflow-prod-assets/key")).toBe(true);
-    // Virtual-hosted style.
-    expect(isAllowedAssetUploadUrl("https://webflow-prod-assets.s3.amazonaws.com/key")).toBe(true);
-    expect(isAllowedAssetUploadUrl("https://webflow-prod-assets.s3.us-east-1.amazonaws.com/key")).toBe(true);
-    // Webflow-owned hosts.
-    expect(isAllowedAssetUploadUrl("https://uploads.webflow.com/asset")).toBe(true);
-    expect(isAllowedAssetUploadUrl("https://webflow.com/upload")).toBe(true);
-    expect(isAllowedAssetUploadUrl("https://uploads-ssl.website-files.com/asset")).toBe(true);
-  });
-
-  it("rejects non-HTTPS, lookalike, and arbitrary hosts", () => {
-    expect(isAllowedAssetUploadUrl("http://s3.amazonaws.com/webflow-bucket/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://evil.example/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://webflow.com.evil.example/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://webflow.com.evil.com/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://amazonaws.com.evil.com/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://notwebflow.com/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://website-files.com.evil.com/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("javascript:alert(1)")).toBe(false);
-    expect(isAllowedAssetUploadUrl("not a url")).toBe(false);
-    expect(isAllowedAssetUploadUrl("")).toBe(false);
-  });
-
-  it("rejects AWS hosts that are not S3 endpoints (any bucket is not any Webflow bucket)", () => {
-    // The old `*.amazonaws.com` suffix test accepted every AWS-hosted host, including attacker-controlled
-    // buckets and unrelated AWS service endpoints. Only S3 endpoint host shapes are allowed now.
-    expect(isAllowedAssetUploadUrl("https://evil-bucket.amazonaws.com/upload/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://amazonaws.com/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://execute-api.us-east-1.amazonaws.com/prod/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://lambda.us-east-1.amazonaws.com/2015-03-31/functions")).toBe(false);
-    // `s3` must be its own host label, and the region label must look like a real AWS region.
-    expect(isAllowedAssetUploadUrl("https://evils3.amazonaws.com/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://s3.evil.amazonaws.com/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.com.evil.com/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.evil.com/key")).toBe(false);
-  });
-
-  it("resolves userinfo tricks to the real host before matching", () => {
-    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.com@evil.example/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://webflow.com@evil.example/upload")).toBe(false);
   });
 });
 

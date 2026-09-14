@@ -693,11 +693,172 @@ function collectForbiddenBundleMarkers(appPath, channel, appName) {
   return forbidden;
 }
 
+/**
+ * Pinned inventory of scanner-shaped tokens that legitimately remain in a Beacon release bundle.
+ * App Review Preflight (2026-09-14) reports every bare `fetch(` as "External API Calls" and every
+ * `new MutationObserver(` as "Silent Canvas Mutations", listing at most three locations per finding,
+ * so the whole-artifact count is what matters, not the listed sites. A count above the pin means a
+ * new call site crept in — route it through the chokepoint (`extensionFetch`) or remove it; a count
+ * below means the accepted inventory here and the reviewer note in
+ * docs/webflow-marketplace-compliance.md need updating together. `expected` is exact on purpose.
+ */
+function pinnedMarkerCounts(appName, channel) {
+  if (appName !== "beacon" || (channel !== "production" && channel !== "preview")) {
+    return [];
+  }
+  return [
+    {
+      // Excludes property calls (`window.fetch(`), identifiers that end in fetch (`towerFetch(`,
+      // `refetch(`) and the `fetch` transport name posthog-js passes around as a string.
+      pattern: /(?<![\w$.])fetch\(/g,
+      label: "bare fetch( call",
+      expected: 1,
+      note: "the single egress point is extensionFetch in apps/beacon/src/shared/lib/extension-egress.ts",
+    },
+    {
+      pattern: /new MutationObserver\(/g,
+      label: "MutationObserver construction",
+      expected: 1,
+      note: "Lexical's contenteditable sync in the rich-text chunk (compliance doc R7b.11 open decision)",
+    },
+  ];
+}
+
+/**
+ * Fails when a pinned token's count in `contents` differs from its pin. `where` names the artifact
+ * in the error (dist output vs archived zip) so the operator knows which stage tripped.
+ */
+function assertPinnedMarkerCounts(contents, pinned, where) {
+  for (const marker of pinned ?? []) {
+    const found = contents.match(marker.pattern)?.length ?? 0;
+    if (found !== marker.expected) {
+      throw new Error(
+        `${where} contains ${found} ${marker.label}${found === 1 ? "" : "s"}, expected exactly ${marker.expected} ` +
+          `(${marker.note}). App Review Preflight flags this shape wherever it appears; fix the new site at the ` +
+          "source or, if the inventory changed deliberately, update pinnedMarkerCounts in scripts/build-cli.mjs " +
+          "and the compliance doc together."
+      );
+    }
+  }
+}
+
+/**
+ * Bundle retention. Every `build:prod` leaves a zip + sourcemaps pair behind, and a fix loop against
+ * App Review Preflight produces a dozen a day; only the ones that were uploaded or scanned matter
+ * afterwards. Per app: keep the newest `keepNewest` builds in place, move any older build that a doc
+ * under `docs/` names (scan targets, submission artifacts — their sha256s live next to the name) to
+ * `bundle/archive/<channel>/<recipient>/`, delete the rest. Unlisted apps are never pruned.
+ */
+const BUNDLE_RETENTION = {
+  beacon: { keepNewest: 2 },
+};
+
+/** `v0.1.0_public_09-14_13-22-03` from either archive file name, or null for anything else. */
+function archiveBaseName(fileName) {
+  const match = fileName.match(/^(v\d+\.\d+\.\d+_[a-z0-9-]+_\d{2}-\d{2}_\d{2}-\d{2}-\d{2})(?:\.sourcemaps)?\.zip$/);
+  return match ? match[1] : null;
+}
+
+/** Base names of every build artifact mentioned in a Markdown file under `docsDir` (recursive). */
+function referencedArchiveBaseNames(docsDir) {
+  const names = new Set();
+  if (!existsSync(docsDir)) {
+    return names;
+  }
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.name.endsWith(".md")) {
+        for (const match of readFileSync(full, "utf-8").matchAll(
+          /v\d+\.\d+\.\d+_[a-z0-9-]+_\d{2}-\d{2}_\d{2}-\d{2}-\d{2}(?=(?:\.sourcemaps)?\.zip)/g
+        )) {
+          names.add(match[0]);
+        }
+      }
+    }
+  };
+  walk(docsDir);
+  return names;
+}
+
+/**
+ * Applies the retention rule to one output directory. Builds are ordered by base name (the
+ * timestamp is zero-padded `MM-DD_HH-mm-ss`, so lexical order is build order within a year); a zip
+ * and its `.sourcemaps.zip` always travel together. Returns what happened so the caller can log it.
+ *
+ * @param {{ outDir: string; archiveDir: string; keepNewest: number; referenced: Set<string> }} options
+ * @returns {{ kept: string[]; archived: string[]; deleted: string[] }}
+ */
+function pruneBundleArchives({ outDir, archiveDir, keepNewest, referenced }) {
+  const result = { kept: [], archived: [], deleted: [] };
+  if (!existsSync(outDir)) {
+    return result;
+  }
+  const builds = new Map();
+  for (const fileName of readdirSync(outDir)) {
+    const base = archiveBaseName(fileName);
+    if (base) {
+      builds.set(base, [...(builds.get(base) ?? []), fileName]);
+    }
+  }
+  const ordered = [...builds.keys()].sort();
+  const kept = new Set(ordered.slice(-keepNewest));
+  for (const base of ordered) {
+    const files = builds.get(base);
+    if (kept.has(base)) {
+      result.kept.push(base);
+    } else if (referenced.has(base)) {
+      mkdirSync(archiveDir, { recursive: true });
+      for (const fileName of files) {
+        renameSync(resolve(outDir, fileName), resolve(archiveDir, fileName));
+      }
+      result.archived.push(base);
+    } else {
+      for (const fileName of files) {
+        rmSync(resolve(outDir, fileName));
+      }
+      result.deleted.push(base);
+    }
+  }
+  return result;
+}
+
+/** Runs {@link pruneBundleArchives} for an app's channel/recipient output after a successful build. */
+function pruneBundleArchivesForApp({ appName, appPath, channelDir, recipient }) {
+  const retention = BUNDLE_RETENTION[appName];
+  if (!retention) {
+    return null;
+  }
+  return pruneBundleArchives({
+    outDir: resolve(appPath, "bundle", channelDir, recipient),
+    archiveDir: resolve(appPath, "bundle", "archive", channelDir, recipient),
+    keepNewest: retention.keepNewest,
+    referenced: referencedArchiveBaseNames(resolve(ROOT, "docs")),
+  });
+}
+
+function describePrune(result) {
+  if (!result || (result.archived.length === 0 && result.deleted.length === 0)) {
+    return null;
+  }
+  const parts = [];
+  if (result.archived.length) {
+    parts.push(`archived ${result.archived.length} doc-referenced build${result.archived.length === 1 ? "" : "s"}`);
+  }
+  if (result.deleted.length) {
+    parts.push(`deleted ${result.deleted.length} unreferenced build${result.deleted.length === 1 ? "" : "s"}`);
+  }
+  return `Bundle retention: ${parts.join(", ")} (kept newest ${result.kept.length})`;
+}
+
 function expectedBundleMarkers({ appName, appPath, channel, recipient, pkg }) {
   const expected = {
     version: pkg.version,
     recipient,
     forbidden: collectForbiddenBundleMarkers(appPath, channel, appName),
+    pinned: pinnedMarkerCounts(appName, channel),
   };
   if (appName === "beacon" && channel === "production") {
     expected.towerOrigin = BEACON_PRODUCTION_TOWER_ORIGIN;
@@ -744,10 +905,11 @@ function verifyDistBundle(appPath, markers) {
     );
   }
   assertBundleOutputMatchesBuild(contents, markers);
+  assertPinnedMarkerCounts(contents, markers.pinned, "Build output");
 }
 
-function verifyArchivedZipExcludes(archivePath, forbidden) {
-  if (!forbidden?.length) {
+function verifyArchivedZipExcludes(archivePath, forbidden, pinned) {
+  if (!forbidden?.length && !pinned?.length) {
     return;
   }
   // Match in JS rather than a shell grep so forbidden values never pass through shell quoting.
@@ -759,11 +921,12 @@ function verifyArchivedZipExcludes(archivePath, forbidden) {
   if (hit) {
     throw new Error(`Archived zip contains ${hit.label} — a forbidden value leaked into the release bundle`);
   }
+  assertPinnedMarkerCounts(contents, pinned, "Archived zip");
 }
 
 function verifyArchivedZipBundle(archivePath, markers) {
   verifyArchivedZipContains(archivePath, markers);
-  verifyArchivedZipExcludes(archivePath, markers.forbidden);
+  verifyArchivedZipExcludes(archivePath, markers.forbidden, markers.pinned);
   verifyArchivedZipHasNoSourceMaps(archivePath);
   verifyArchivedManifest(archivePath);
 }
@@ -887,6 +1050,10 @@ async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
   }
 
   s.stop(`${progressBar(100)}  ${color.green("Build complete")}`);
+  const pruneNote = describePrune(pruneBundleArchivesForApp({ appName, appPath, channelDir, recipient }));
+  if (pruneNote) {
+    p.log.info(pruneNote);
+  }
   return { channelDir, archiveFilename, archivePath, sourceMapArchivePath };
 }
 
@@ -982,11 +1149,17 @@ if (isDirectInvocation()) {
 
 /** Exported for scripts/__tests__ coverage of the release gates; not part of the CLI surface. */
 export {
+  archiveBaseName,
+  assertPinnedMarkerCounts,
   assertRequiredReleaseEnv,
   collectForbiddenBundleMarkers,
   extractSourceMapsToPrivateZip,
   findSourceMapEntries,
   listDistSourceMaps,
   matchForbiddenMarker,
+  pinnedMarkerCounts,
+  pruneBundleArchives,
+  pruneBundleArchivesForApp,
+  referencedArchiveBaseNames,
   resolveViteEnvValue,
 };

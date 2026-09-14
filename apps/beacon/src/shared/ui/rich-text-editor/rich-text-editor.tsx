@@ -74,6 +74,11 @@ function EditablePlugin({ disabled }: { disabled: boolean }): null {
  * Reusable, feature-agnostic rich-text editor built on Lexical (plan §6). Controlled via an HTML `value`/`onChange`
  * pair; serializes to/from an HTML string over the registered node allowlist. This is the owning primitive — consumers
  * use its props/variants and do not restyle it at the call site (CLAUDE.md UI Styling Ownership Rule).
+ *
+ * Marketplace review note: Lexical constructs the bundle's one accepted `MutationObserver` when this editor mounts
+ * (App Review Preflight "Silent Canvas Mutations", compliance doc R7b.12). It observes only the contenteditable root
+ * below, is load-bearing for Lexical's DOM reconcile (IME composition, browser-inserted nodes) and never touches the
+ * Designer canvas. The release build pins the count to exactly one; do not add another observer anywhere in Beacon.
  */
 export function RichTextEditor({
   value,

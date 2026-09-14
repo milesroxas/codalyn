@@ -57,10 +57,10 @@ The centerpiece is an interactive terminal UI for building and distributing exte
 Under the hood, every build runs the same gated pipeline, in order:
 
 ```
-lint:all → test:run → clean dist → vite build → verify markers → webflow bundle → verify zip → archive
+lint:all → test:run → clean dist → vite build → verify markers → extract source maps → webflow bundle → verify zip → archive → prune
 ```
 
-Two design decisions matter here. First, **quality gates live inside the build** — you can't skip lint, typecheck, or tests on the way to an artifact. Second, **build markers are treated as a contract**: after the build, the tool greps the compiled JS _and_ the final zip to confirm the version, recipient, and (for Beacon) the correct Tower origin are actually baked in. If they're not, it fails loudly instead of shipping something wrong.
+Two design decisions matter here. First, **quality gates live inside the build** — you can't skip lint, typecheck, or tests on the way to an artifact. Second, **build markers are treated as a contract**: after the build, the tool greps the compiled JS _and_ the final zip to confirm the version, recipient, and (for Beacon) the correct Tower origin are actually baked in — and, since Marketplace review, that nothing forbidden is (dev hosts, popups, HTML-sink writes, credential query strings, …) and that pinned inventories hold (exactly one `fetch`, exactly one `MutationObserver`). If they're not, it fails loudly instead of shipping something wrong. The same step prunes the output folder: newest two builds stay, builds a doc names are archived, the rest go.
 
 It also runs headless. In CI or any non-TTY environment it skips the prompts, defaults to the production channel, and reads the recipient from an env var — same pipeline, no babysitting.
 

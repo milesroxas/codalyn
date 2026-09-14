@@ -1,5 +1,6 @@
 import { readBeaconTowerSessionToken } from "@/features/auth/lib/webflow-designer-session";
 import { readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
+import { extensionFetch } from "@/shared/lib/extension-egress";
 
 const beaconApiKey = import.meta.env.VITE_BEACON_API_KEY ?? "";
 
@@ -9,7 +10,8 @@ export function getTowerOrigin(): string {
 }
 
 /**
- * `fetch` to Tower with Better Auth bearer (Designer session) or optional dev `VITE_BEACON_API_KEY`.
+ * Request to Tower with the Better Auth bearer (Designer session) or optional dev `VITE_BEACON_API_KEY`,
+ * sent through the extension's single egress point (`extensionFetch`, Tower-origin policy).
  * Webflow OAuth access tokens are stored only on Tower; this client never persists them.
  */
 export function towerFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -23,7 +25,7 @@ export function towerFetch(path: string, init?: RequestInit): Promise<Response> 
   } else if (beaconApiKey) {
     headers.set("Authorization", `Bearer ${beaconApiKey}`);
   }
-  return fetch(url, {
+  return extensionFetch(url, {
     ...init,
     cache: init?.cache ?? "no-store",
     headers,

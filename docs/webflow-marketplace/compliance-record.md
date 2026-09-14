@@ -2445,4 +2445,21 @@ record as tool-side and file. Either way: bundle scan on the 18:26 artifacts →
 `wfpre_dd6e03bf4a51905c6878d8906bf1dffc` (supersedes `wfpre_5a2242e8…`); pasted into SUBMIT.md §2. The page
 was re-pushed from the 18:26 build (`6aa881c9d6e9e70f262ea057_codalyn-beacon-runtime-1ebc5741.js`; pin
 script ✓, served file 20153 bytes / 0 non-ASCII, observe script: ready selector ×2, 0 requested scripts).
-Runtime-test flags for this build: pending Miles's report. SUBMIT.md §3 carries both 500-character variants.
+Runtime-test flags for this build (Webflow observed, bound to bundle `91b88847…`): **Loaded ✓ · Hash matched ✓ ·
+SRI mismatch ✗ · No source map ✗** — identical to every earlier run. Disposition: the pure-ASCII hypothesis
+is also ruled out; three distinct valid pins (original `…6H/eD9g=`, slash-free `…gCM=`, pure-ASCII
+`…VXldM=`) have now been rejected, each carried verbatim in the DOM with `crossorigin="anonymous"`, each
+byte-verified against the CDN, each executed by the browser. Whatever Preflight compares, it is not the
+page's `integrity` attribute against its own derived SRI. Filed as a tool-side observation (open decision:
+Webflow/AppSec own the tool); no further page iteration. SUBMIT.md §3 now carries the single 484-character
+response; §4's runtime paragraph states the three-pin history; §5's result row is final. States: Source ✓
+(18:26 changes uncommitted at time of writing) · Artifact ✓ · Installed ✓ · Runtime ✓ (ours + Preflight's
+Loaded/Hash matched) · Submitted ✗ · Accepted ✗. The ASCII + URL-safe-pin tests stay: both are sound
+hygiene for a file served without a charset, independent of the tool.
+
+**Receipt reissued (2026-09-14, later):** Preflight issued `wfpre_375fcf1295cce47dcb2930eeb7b7dd57` on a
+re-upload of the same 18:26 zip + sourcemaps (bound to bundle `91b88847…`). This is the code to paste;
+`wfpre_dd6e03bf…` is superseded. SUBMIT.md §2 updated. Tower Production deploy verified (Vercel
+`codalyn-tower-ex8kvdqjz`, Ready, 18:39; live probes: no ACAO for unknown or localhost origins, extension
+origin reflected with credentials). Source committed at 4d8b6f5. States: Source ✓ · Artifact ✓ ·
+Installed ✓ · Runtime ✓ · Submitted ✗ · Accepted ✗. Next: file the form.

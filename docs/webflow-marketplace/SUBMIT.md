@@ -40,28 +40,21 @@ Issued 2026-09-14 by the Preflight run on the two files above (bundle `91b88847�
 `0684d186…01ea`). Paste as-is:
 
 ```
-wfpre_dd6e03bf4a51905c6878d8906bf1dffc
+wfpre_375fcf1295cce47dcb2930eeb7b7dd57
 ```
 
 (Expected **bundle scan** result for this build: two REQUIRED items — External API Calls, 1 location;
 Silent Canvas Mutations, 1 location. Both are answered in §3/§4. Anything else = stop, see
-[playbook.md](playbook.md) § B. Superseded receipts: `wfpre_5a2242e8…` (16:43 build), `wfpre_d7c0944a…`
-(14:50 build).)
+[playbook.md](playbook.md) § B. Superseded receipts: `wfpre_dd6e03bf…` (earlier run on this same 18:26 zip — Preflight reissued on
+re-upload; both bind to bundle `91b88847…`), `wfpre_5a2242e8…` (16:43 build), `wfpre_d7c0944a…` (14:50
+build).)
 
 ## 3. Response to the review team (≤500 characters)
 
-One field covers both scans. Pick the variant that matches the runtime-test row for the 18:26 build.
-
-**If the runtime test still shows "SRI mismatch" (484 characters):**
+484 characters (the 18:26 runtime test still reports "SRI mismatch"; see §4 for the evidence).
 
 ```
 Bundle scan: every request leaves through one egress call (extension-egress.ts) with an explicit destination policy; the release build fails on a second fetch site. The one MutationObserver is Lexical's editor sync inside our panel, never the canvas. Runtime test: Beacon adds one page-level script, pinned by a SHA-256 SRI the tag carries verbatim; served bytes match (Hash matched). It is unminified, so it is its own source. Every other listed script is Webflow's own site runtime.
-```
-
-**If the runtime test now shows SRI ✓ (490 characters):**
-
-```
-Bundle scan: every request leaves through one egress call (extension-egress.ts) with an explicit destination policy; the release build fails on a second fetch site. The one MutationObserver is Lexical's editor sync inside our panel, never the canvas. Runtime test: Beacon adds one page-level script, pinned by a SHA-256 SRI the tag carries verbatim (SRI now verified). It is unminified, so it is its own source. Every other listed script is Webflow's own site runtime, not loaded by Beacon.
 ```
 
 How to defend each item if asked (one line each; the long version is in §4):
@@ -110,7 +103,7 @@ AVIF conversion is opt-in, off by default. Selecting AVIF shows an in-context co
 ```
 PUBLISHED-RUNTIME TEST NOTES
 - Beacon applies exactly one script to a page: the hosted runtime registered with a SHA-256 integrityHash and applied through the Custom Code API. It creates no script elements, performs no dynamic import, and makes no network requests (pinned by unit test on the generated source).
-- The page tag Webflow renders for it is <script src="https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6aa881c9d6e9e70f262ea057_codalyn-beacon-runtime-1ebc5741.js" integrity="sha256-bzvg9YjCBFqQA0VVsDdcsIK0DUK5RSCi9mefHtVXldM=" crossorigin="anonymous">; the served bytes (20153, SHA-256 6f3be0f588c2045a90034555b0375cb082b40d42b94520a2f6679f1ed55795d3) hash to that SRI under Preflight's own curl/shasum/openssl steps, with or without an Origin header, for identity, gzip and br encodings, and the CDN answers Access-Control-Allow-Origin: *. Preflight's browser test still reports "Script integrity is missing or wrong" for this file with the same URL, SHA-256 and derived SRI in the package; we could not reproduce a mismatch outside the tool and would welcome the value it observed.
+- The page tag Webflow renders for it is <script src="https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6aa881c9d6e9e70f262ea057_codalyn-beacon-runtime-1ebc5741.js" integrity="sha256-bzvg9YjCBFqQA0VVsDdcsIK0DUK5RSCi9mefHtVXldM=" crossorigin="anonymous">; the served bytes (20153, SHA-256 6f3be0f588c2045a90034555b0375cb082b40d42b94520a2f6679f1ed55795d3) hash to that SRI under Preflight's own curl/shasum/openssl steps, with or without an Origin header, for identity, gzip and br encodings, and the CDN answers Access-Control-Allow-Origin: *. Preflight's browser test reports "Script integrity is missing or wrong" for this file with the same URL, SHA-256 and derived SRI in the package, while its own row says Loaded and Hash matched. We have now observed this on three successive pins of this runtime — the original, one whose base64 contains no "/" or "+", and the current pure-ASCII file (no charset-sensitive bytes; the CDN sends no charset) — each carried verbatim in the tag with crossorigin="anonymous" and each executed by the browser (a browser blocks a script whose SRI fails; our ready selector was present). We could not reproduce a mismatch outside the tool and would welcome the value it observed.
 - The runtime is served unminified and formatted, with a header naming its version and authoring module (apps/beacon/src/features/cms-slots/model/cms-slot-page-inline-script.ts). There is no build transform, so the served file is its own readable source and no separate source map exists; the same modules are in the private source-map zip attached to this submission.
 - Every other script the test page loads is Webflow's own published-site runtime (js/webflow.<site>.<hash>.js and the webflow.achunk.* chunks it imports, plus GSAP/ScrollTrigger when Interactions are present), rendered by Webflow on every published page. None is loaded by Beacon.
 ```
@@ -152,7 +145,7 @@ node scripts/webflow-runtime-pin.mjs https://<test-site>.webflow.io/<page-with-b
 | Script integrity (SRI) | `sha256-bzvg9YjCBFqQA0VVsDdcsIK0DUK5RSCi9mefHtVXldM=` — the page tag carries it with `crossorigin="anonymous"` (verified 2026-09-14) |
 | Does your app proxy or fetch another URL for customers? | **No** — Tower never fetches a URL the client supplies (`/api/v2/webflow/*` forwards path segments to the fixed Webflow Data API host; image conversion takes uploaded bytes) |
 | Ready selector | `[data-beacon-target="list"][data-cb-rendered="1"]` (set by the runtime per rendered beacon list; page must have one working beacon) |
-| Runtime file results, last run | 17:03 build (URL-safe pin, 3 non-ASCII bytes): Loaded ✓ · Hash matched ✓ · SRI mismatch ✗ · No source map ✗. 18:26 build (pure ASCII): not yet run — if SRI passes, delete the SRI-mismatch sentences from §4; if it fails, keep them (three distinct valid pins rejected = tool-side, R7b.19) |
+| Runtime file results, last run (2026-09-14, 18:26 build, bound to bundle 91b88847…) | Loaded ✓ · Hash matched ✓ · SRI mismatch ✗ · No source map ✗ — expected. Third distinct valid pin rejected (original, slash-free, pure ASCII); the first two flags prove the package matches the served bytes; all four are answered in §4. Do not iterate the page for them (compliance-record R7b.19). |
 
 **Runtime files: fill runtime file 1 (Beacon) only. Do not pin Webflow's own scripts (decision
 2026-09-14, compliance-record R7b.16).** Provenance: the published guidelines scope review to "what your

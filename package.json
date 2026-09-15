@@ -45,7 +45,6 @@
     "prepare": "simple-git-hooks",
     "dev": "turbo run dev",
     "storybook": "turbo run storybook --filter=@codalyn/beacon",
-    "chromatic": "turbo run chromatic --filter=@codalyn/beacon",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",

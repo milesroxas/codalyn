@@ -16,35 +16,6 @@ pnpm --filter @codalyn/beacon storybook:build   # static build → apps/beacon/s
 `runDevWithWorkspacePackages`): it builds `@codalyn/webflow-kit` / `@codalyn/observability` once,
 then keeps their `tsc --watch` running so edits to package source hot-reload in Storybook.
 
-## Publish (Chromatic)
-
-```bash
-pnpm chromatic    # from repo root — turbo builds workspace deps, then builds + uploads Storybook
-```
-
-Publishes the Beacon Storybook to Chromatic for hosted review and visual regression snapshots.
-Beacon has its own Chromatic project; Tower will get a separate one.
-
-- **Token** lives in `apps/beacon/.env` as `CHROMATIC_PROJECT_TOKEN` (gitignored; the chromatic
-  CLI reads it via dotenv — see `.env.example`). Get it from the Chromatic project's Manage →
-  Configure page.
-- **Config** in `apps/beacon/chromatic.config.json`: points Chromatic at the `storybook:build`
-  script (the CLI's default script name is `build-storybook`, which this repo doesn't use) and
-  sets `storybookBaseDir` for monorepo-aware change detection. TurboSnap (`onlyChanged`) only
-  snapshots stories whose dependency graph changed — `externals: ["packages/**"]` forces a full
-  re-test when workspace package source changes, because Storybook consumes their built `dist/`
-  and the bundle trace can't map dist files back to package source. `autoAcceptChanges: "main"`
-  keeps main self-baselining so PR builds always diff against an accepted baseline.
-- **Why turbo**: the `chromatic` turbo task declares `dependsOn: ["^build"]` so
-  `@codalyn/webflow-kit` / `@codalyn/observability` have fresh `dist/` before the Storybook
-  build — running the CLI bare in `apps/beacon` skips that.
-- **CI**: `.github/workflows/chromatic.yml` publishes on PRs and pushes to main (secret
-  `CHROMATIC_PROJECT_TOKEN`, already set on the repo). It checks out with `fetch-depth: 0`
-  (baseline ancestry + TurboSnap), builds workspace deps via
-  `turbo run build --filter=@codalyn/beacon^...`, then runs `chromaui/action` with
-  `workingDir: apps/beacon`. `exitOnceUploaded: true` frees the runner after upload; the
-  Chromatic GitHub integration posts UI Tests / UI Review checks on the PR itself.
-
 ## Architecture
 
 Storybook lives in `apps/beacon/.storybook/`; stories are colocated with components

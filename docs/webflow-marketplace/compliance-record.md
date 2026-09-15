@@ -2463,3 +2463,51 @@ re-upload of the same 18:26 zip + sourcemaps (bound to bundle `91b88847…`). Th
 `codalyn-tower-ex8kvdqjz`, Ready, 18:39; live probes: no ACAO for unknown or localhost origins, extension
 origin reflected with credentials). Source committed at 4d8b6f5. States: Source ✓ · Artifact ✓ ·
 Installed ✓ · Runtime ✓ · Submitted ✗ · Accepted ✗. Next: file the form.
+
+### R7b.20 Filed — App Update submitted (2026-09-15)
+
+**Submission channel (published requirement, confirmed against
+<https://developers.webflow.com/data-beta/docs/marketplace/submitting-your-app> on 2026-09-15):** two steps,
+both required. (1) Workspace settings → Apps & Integrations → Beacon → *Publish new version* with the
+Marketplace / "submit for review" distribution, bundle zip only, version notes = SUBMIT.md §4 changelog.
+(2) <https://developers.webflow.com/submit>, Submission type *App Update*, kind *App functionality,
+permissions, or bundle*. Earlier rounds that went through step 1 alone never reached the review team
+with source maps, manifest/lockfile, receipt or credentials.
+
+**Filed:** bundle `v0.1.0_public_09-14_18-26-19.zip` (`91b88847…99fd`) + `.sourcemaps.zip`
+(`0684d186…01ea`) + `apps/beacon/package.json` + root `pnpm-lock.yaml` at 5cbc79f; receipt
+`wfpre_375fcf1295cce47dcb2930eeb7b7dd57`; §3 response (484 chars); §4 notes (4930 chars, see WAF note);
+runtime file 1 only (URL `…6aa881c9d6e9e70f262ea057_codalyn-beacon-runtime-1ebc5741.js`, SHA-256
+`6f3be0f5…95d3`, SRI `…VXldM=`, live-verified again 2026-09-15: 200, 20153 bytes, page tag carries the
+SRI with `crossorigin="anonymous"`). **Webflow reference ID `7875910a-e080-40bc-9eb9-8d523a0e0e6a`.**
+Decision + feedback arrive on this submission's email thread; a further bundle goes through
+*Publish → Upload Bundle for Review* in app settings and continues the same thread.
+
+**Form values decided this round (source of truth for the next App Update):**
+- Client ID `610625f8…` (verified by the form). The local `.env.local` id `c6cff6ae…` is the dev app.
+- App install URL `https://tower.codalyn.app/api/integrations/webflow/authorize` — the docs' "direct users
+  to your platform first" option for Hybrid apps. The raw `webflow.com/oauth/authorize` link is **not**
+  usable: the callback requires the server-minted `state` cookie and answers `invalid_state` without it.
+  Scopes Tower requests must stay a subset of the app-settings scopes (`BEACON_SCOPES` in
+  `apps/tower/src/app/api/integrations/webflow/authorize/route.ts`).
+- Documentation `https://tower.codalyn.app/docs`, privacy `/privacy`, terms `/terms`, support
+  `support@codalyn.app` (also `/support`). All 200 on 2026-09-15.
+- Reviewer access: Tower's early-access gate is **on** in production (`/api/account/access-policy` →
+  `earlyAccessRequired: true`). The Designer ID-token exchange auto-provisions the reviewer's Tower user
+  but only for an email with a pending org invitation, a grant, or membership. `marketplaceteam@webflow.com`
+  is invited to the Webflow workspace (Designer access to `beacon-demo`) and to the Codalyn Tower
+  workspace (clears the gate; inherits the connected Webflow OAuth token). Dashboard password set through
+  the Better Auth admin plugin (`POST /api/auth/admin/set-user-password`, product_admin session, `Origin`
+  header required by the CSRF check; cookie name is `__Secure-tower.session_token`). Credentials live in
+  the form only; rotate after the review closes.
+
+**Form WAF (observed 2026-09-15):** the submit endpoint is behind Cloudflare and returned "Sorry, you have
+been blocked" (Ray `a3b87df4dc790f78`) for notes containing a literal `<script …>` tag, `src=`/`integrity=`
+attribute pairs, DOM-sink names (innerHTML, window.open, postMessage, document.write), a ` ` escape
+and `/*`. Rewriting those in plain words (SUBMIT.md §4, 4930 chars) went through. Keep every text field
+free of angle brackets, attribute pairs, JS API names and comment/wildcard tokens.
+
+**States:** Source ✓ (5cbc79f) · Artifact ✓ · Installed ✓ · Runtime ✓ · **Submitted ✓ (2026-09-15, ref
+`7875910a-e080-40bc-9eb9-8d523a0e0e6a`)** · Accepted ✗. Next: watch the submission email thread; on
+findings, run `/webflow-app-review-remediation` (playbook § B) and resubmit via Publish → Upload Bundle for
+Review.

@@ -141,8 +141,15 @@ ones it hid.
 - Append a `### R<n>.<m>` entry to `docs/webflow-marketplace/compliance-record.md`: finding (or "preflight
   re-run"), observed, fix, artifact hashes, six-state line (see B4).
 - Commit source + doc **before** submitting, so artifact hash ↔ commit is traceable.
-- Submit at <https://developers.webflow.com/submit> (App Update → name, Client ID, "new bundle: yes",
-  source-map upload, `wfpre_…` receipt, notes).
+- Submit in **two steps, both required** (published requirement, submitting-your-app § "Don't forget to
+  publish a new version of your Designer Extension from your workspace"):
+  1. Workspace settings → Apps & Integrations → Beacon → *Publish new version*: bundle zip only, the
+     Marketplace / "submit for review" distribution, version notes = SUBMIT.md §4 changelog.
+  2. <https://developers.webflow.com/submit> → App Update → *App functionality, permissions, or bundle*:
+     Client ID, install URL, testing site, source-map zip, manifest + lockfile, `wfpre_…` receipt, §3
+     response, §4 notes (≤5000 chars), runtime file 1, reviewer credentials, docs/privacy/terms/support.
+  Text fields sit behind Cloudflare: no angle brackets, `src=`-style attribute pairs, DOM-sink API names,
+  `\u` escapes or `/*` in any field (R7b.20). Record the reference ID in the compliance entry.
 
 ---
 

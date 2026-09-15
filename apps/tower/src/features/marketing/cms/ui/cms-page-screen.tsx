@@ -2,13 +2,11 @@ import { headers } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
 
-import { applyLimitTokens } from "@/features/marketing/cms/lib/limit-tokens";
 import { resolveCmsMedia } from "@/features/marketing/cms/lib/resolve-cms-media";
 import { CmsPageHero } from "@/features/marketing/cms/ui/blocks/page-hero";
 import { RenderBlocks } from "@/features/marketing/cms/ui/blocks/render-blocks";
 import type { Page } from "@/payload-types";
 import { auth } from "@/server/auth";
-import { getTowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 import { Card, CardContent } from "@/shared/ui/card";
 import { RichTextContent } from "@/shared/ui/rich-text-content";
 import {
@@ -43,14 +41,9 @@ export function DraftBanner({ slug }: { slug: string }) {
   );
 }
 
-async function CmsPageScreen({ page: rawPage, draft }: CmsPageScreenProps) {
+async function CmsPageScreen({ page, draft }: CmsPageScreenProps) {
   const session = await auth.api.getSession({ headers: await headers() });
   const authenticated = Boolean(session?.user);
-
-  // Resolve `{{limits.*}}` tokens against the operator-configured platform
-  // limits so marketing copy (pricing cards, compare tables) never hardcodes
-  // numbers that drift from enforcement.
-  const page = applyLimitTokens(rawPage, await getTowerLimitsSnapshot());
 
   const heroImage = resolveCmsMedia(page.hero?.image);
 

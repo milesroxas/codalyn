@@ -1,7 +1,9 @@
 import config from "@payload-config";
 import { unstable_cache } from "next/cache";
 import { getPayload } from "payload";
+import { applyLimitTokens } from "@/features/marketing/cms/lib/limit-tokens";
 import type { Page } from "@/payload-types";
+import { getTowerLimitsSnapshot } from "@/server/billing/tower-limits-config";
 import { CMS_CACHE_REVALIDATE_SECONDS, CMS_PAGES_CACHE_TAG, cmsPageCacheTag } from "@/shared/lib/cms/cache-tags";
 import { isValidTowerCmsPageSlug } from "@/shared/lib/navigation/tower-marketing-paths";
 
@@ -36,7 +38,25 @@ function findPublishedPageBySlugCached(slug: string): Promise<Page | null> {
 }
 
 /**
- * Fetch a CMS marketing page by slug via the Payload Local API.
+ * Resolve `{{limits.*}}` tokens against the operator-configured platform
+ * limits so marketing copy (pricing cards, compare tables) never hardcodes
+ * numbers that drift from enforcement. Runs outside the page cache: the raw
+ * CMS document is what gets cached, and the limits snapshot is read fresh on
+ * every request so operator edits show immediately.
+ */
+async function resolvePageLimitTokens(page: Page | null): Promise<Page | null> {
+  if (!page) {
+    return null;
+  }
+  return applyLimitTokens(page, await getTowerLimitsSnapshot());
+}
+
+/**
+ * Fetch a CMS marketing page by slug via the Payload Local API, with limit
+ * tokens resolved. Every screen that renders a CMS page reads through here, so
+ * token resolution never depends on which shell (marketing vs authenticated)
+ * ends up rendering it.
+ *
  * Anonymous reads stay behind collection access control (`overrideAccess: false`),
  * so only published documents come back outside draft mode.
  *
@@ -50,11 +70,11 @@ export async function getCmsPageBySlug(slug: string, { draft }: GetCmsPageOption
   }
 
   if (draft) {
-    return findPageBySlug(slug, true);
+    return resolvePageLimitTokens(await findPageBySlug(slug, true));
   }
 
   try {
-    return await findPublishedPageBySlugCached(slug);
+    return await resolvePageLimitTokens(await findPublishedPageBySlugCached(slug));
   } catch (error) {
     console.error(`[cms] failed to load page "${slug}", treating as unpublished`, error);
     return null;

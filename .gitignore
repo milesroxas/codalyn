@@ -69,3 +69,4 @@ public/**/*.zip
 storybook-static/
 *storybook.log
 .env*.local
+.env*

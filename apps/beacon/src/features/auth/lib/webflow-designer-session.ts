@@ -56,12 +56,12 @@ export async function exchangeWebflowDesignerSession(): Promise<{ ok: true } | {
   }
 
   // Deliberately not `towerFetch`: the exchange establishes the session, so no (possibly stale)
-  // bearer is attached. Same egress point, same Tower-origin policy.
+  // bearer is attached. Same egress point, same Tower-origin policy; no cookie either way — the
+  // session Tower mints comes back as `token` in the JSON body, never as a cookie the extension keeps.
   let res: Response;
   try {
     res = await extensionFetch(`${towerOrigin}/api/auth/webflow-designer`, {
       method: "POST",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",

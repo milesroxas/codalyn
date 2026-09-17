@@ -90,6 +90,9 @@ unzip -p "$Z" '*.js' | grep -aci 'lexical'                   # 0 — rich-text e
 unzip -p "$Z" '*.js' | grep -c 'window.open(\|postMessage('   # 0
 unzip -p "$Z" '*.js' '*.html' | grep -aci 'posthog'          # 0 — telemetry SDK withheld from Marketplace bundles (R8.2; build gate forbids it)
 unzip -p "$Z" '*.js' | grep -acE 'redirect:["'"'"'`]error'    # ≥1 — extensionFetch pins redirect mode to error (R8.3)
+unzip -p "$Z" '*.js' | grep -acE 'credentials:["'"'"'`]omit'   # 1 — extensionFetch pins the cookie mode to omit (R8.10; build gate pins it)
+unzip -p "$Z" '*.js' | grep -acE 'credentials:["'"'"'`](include|same-origin)'   # 0 — no cookie-bearing request (R8.10; build gate forbids it)
+unzip -p "$Z" '*.js' | grep -aciE '(localStorage|sessionStorage)\.(get|set|remove)Item\([^)]*(token|bearer|secret|password)'   # 0 — no credential-named storage key (R8.10; build gate forbids it)
 unzip -p "$Z" '*.js' | grep -aoE 'setAttribute\(\s*["'"'"'`]style' | wc -l   # 2 — the Designer API canvas placeholder writes only (R8.5; build gate pins it)
 unzip -p "$Z" '*.js' | grep -ac 'webflow-prod-assets'         # 1 — pinned upload bucket (R8.4)
 unzip -p "$Z" '*.js' | grep -ac 'cmsLocaleId'                 # ≥1 — locale named on every CMS write (R8.6)
@@ -98,7 +101,7 @@ unzip -p "$Z" index.html | grep -c "unsafe-inline"            # 0 (R8.5)
 ```
 
 Anything off its expected value → fix, rebuild, re-run. Never edit a zip by hand. The pinned counts
-(`fetch(` 1, `MutationObserver` 0, `setAttribute("style"` 2) are enforced by `pinnedMarkerCounts` in
+(`fetch(` 1, `MutationObserver` 0, `setAttribute("style"` 2, `credentials: omit` 1) are enforced by `pinnedMarkerCounts` in
 `scripts/build-cli.mjs` (dist + zip): a new site anywhere in the artifact fails `build:prod` before
 you can upload it.
 
@@ -111,7 +114,11 @@ ours).
 **App Review Preflight shows at most 3 evidence locations per finding** (R7b.8 had four `?token=`
 URLs, three listed; R7b.11 had four `MutationObserver`s, three listed). Never fix only the listed
 locations — grep the whole artifact for the shape and clear every hit, or the next scan lists the
-ones it hid.
+ones it hid. **Its printed excerpt is not anchored to the matched token either** (R8.7: the observer
+excerpt sat 4.2 KB before the `new MutationObserver(`; R8.10: the External API Calls excerpt sat 2.2 KB
+before the bundle's only `fetch(`, on the session-token module instead). Never infer the rule from the
+excerpt: extract the chunk, measure the column of every candidate shape on that line, and clear each
+one that can honestly go.
 
 ### A5. Webflow-side artifacts (required by the submission form)
 

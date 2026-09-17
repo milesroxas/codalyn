@@ -81,16 +81,36 @@ describe("extension egress policy (App Review Preflight: External API Calls)", (
     expect(resolveEgressDestination(UPLOAD_URL)).toBe("webflow-asset-upload");
   });
 
-  it("extensionFetch forwards an allowed request to the platform fetch with the caller's init and redirect pinned to error", async () => {
+  it("extensionFetch forwards an allowed request to the platform fetch with the caller's init, redirect pinned to error and credentials pinned to omit", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
-    const init = { method: "POST", credentials: "include" as const };
+    const init = { method: "POST", cache: "no-store" as const, headers: { Accept: "application/json" } };
 
     const res = await extensionFetch("https://tower.test/api/auth/sign-out", init);
 
     expect(res.status).toBe(204);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("https://tower.test/api/auth/sign-out", { ...init, redirect: "error" });
+    expect(fetchMock).toHaveBeenCalledWith("https://tower.test/api/auth/sign-out", {
+      ...init,
+      redirect: "error",
+      credentials: "omit",
+    });
+  });
+
+  it("never sends or stores cookies — a caller cannot opt into credentials: include or same-origin (review round 8, third-party data egress)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    grantWebflowAssetUpload(UPLOAD_URL);
+
+    await extensionFetch("https://tower.test/api/auth/get-session", { credentials: "include" });
+    await extensionFetch("https://tower.test/api/auth/get-session", { credentials: "same-origin" });
+    await extensionFetch("https://tower.test/api/auth/get-session");
+    await extensionFetch(UPLOAD_URL, { method: "POST", credentials: "include" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    for (const call of fetchMock.mock.calls) {
+      expect((call[1] as RequestInit).credentials).toBe("omit");
+    }
   });
 
   it("never follows redirects — a caller cannot opt back into redirect: follow (review round 8)", async () => {
@@ -112,7 +132,7 @@ describe("extension egress policy (App Review Preflight: External API Calls)", (
     grantWebflowAssetUpload(UPLOAD_URL);
 
     await extensionFetch(UPLOAD_URL, { method: "POST" });
-    expect(fetchMock).toHaveBeenCalledWith(UPLOAD_URL, { method: "POST", redirect: "error" });
+    expect(fetchMock).toHaveBeenCalledWith(UPLOAD_URL, { method: "POST", redirect: "error", credentials: "omit" });
 
     await expect(extensionFetch(UPLOAD_URL, { method: "POST" })).rejects.toBeInstanceOf(EgressPolicyError);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -214,6 +234,12 @@ describe("first-party source keeps to the single egress point", () => {
   const BARE_FETCH_CALL = /(?<![\w$.])fetch\(/;
   const MUTATION_OBSERVER = /new MutationObserver\(/;
   const STYLE_ATTRIBUTE_WRITE = /setAttribute\(\s*["'`]style["'`]/;
+  /** A `credentials` request option being set (string literal or forwarded from a caller's init). */
+  const REQUEST_CREDENTIALS_OPTION = /\bcredentials\s*:\s*(?:["'`]|init)/;
+  /** A Web Storage call whose literal key names a credential. */
+  const CREDENTIAL_NAMED_STORAGE_KEY =
+    /(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)\(\s*["'`][^"'`]*(?:token|bearer|secret|password|credential)[^"'`]*["'`]/i;
+  const ANY_STORAGE_API = /localStorage|sessionStorage|document\.cookie|indexedDB/;
 
   function listSourceFiles(dir: string, out: string[] = []): string[] {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -256,6 +282,27 @@ describe("first-party source keeps to the single egress point", () => {
       .filter((file) => MUTATION_OBSERVER.test(readFileSync(file, "utf-8")))
       .map((file) => relative(srcRoot, file));
     expect(offenders).toEqual([]);
+  });
+
+  it("sets the request credentials mode only at the egress point, and only to omit (review round 8, third-party data egress)", () => {
+    // `extensionFetch` pins `credentials: "omit"`; a caller setting its own mode would be overridden anyway,
+    // so a second site is dead code that still reads as a cookie-bearing request to the bundle scanner.
+    const offenders = files
+      .filter((file) => file !== egressModule && REQUEST_CREDENTIALS_OPTION.test(readFileSync(file, "utf-8")))
+      .map((file) => relative(srcRoot, file));
+    expect(offenders).toEqual([]);
+    expect(readFileSync(egressModule, "utf-8").match(/\bcredentials:\s*"omit"/g)).toHaveLength(1);
+    expect(readFileSync(egressModule, "utf-8")).not.toMatch(/credentials:\s*"(?:include|same-origin)"/);
+  });
+
+  it("keeps credentials out of Web Storage: no storage call keyed by a credential name, and the session-token module uses no storage API (review round 8)", () => {
+    const offenders = files
+      .filter((file) => CREDENTIAL_NAMED_STORAGE_KEY.test(readFileSync(file, "utf-8")))
+      .map((file) => relative(srcRoot, file));
+    expect(offenders).toEqual([]);
+    const tokenModule = join(srcRoot, "features", "auth", "lib", "beacon-tower-session-token.ts");
+    expect(files).toContain(tokenModule);
+    expect(readFileSync(tokenModule, "utf-8")).not.toMatch(ANY_STORAGE_API);
   });
 
   it("writes a style attribute only through the Designer API on the user's canvas placeholder (shipped CSP: style-src-attr 'none')", () => {

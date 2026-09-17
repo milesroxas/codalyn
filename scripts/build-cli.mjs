@@ -735,6 +735,21 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     forbidden.push({ pattern: /\.(?:inner|outer)html\s*=(?!=)/i, label: "an innerHTML/outerHTML write" });
     forbidden.push({ value: "insertAdjacentHTML(", label: "an insertAdjacentHTML call" });
     forbidden.push({ value: "document.write(", label: "a document.write call" });
+    // App Review Preflight (2026-09-17, compliance doc R8.10) "External API Calls / third-party data
+    // egress": the evidence excerpt landed on the session-token module's one-time
+    // `localStorage.removeItem("…session-token")` cleanup. The bearer lives in memory only, so no
+    // Web Storage call keyed by a credential name may ship; and no request may declare a cookie-bearing
+    // mode — `extensionFetch` pins `credentials: "omit"` for every call (Marketplace guidelines,
+    // "Credentials and secrets": credential-bearing headers never go to non-Webflow domains).
+    forbidden.push({
+      pattern:
+        /(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)\(\s*["'`][^"'`]*(?:token|bearer|secret|password|credential)[^"'`]*["'`]/i,
+      label: "a credential-named Web Storage key",
+    });
+    forbidden.push({
+      pattern: /\bcredentials\s*:\s*["'`](?:include|same-origin)["'`]/i,
+      label: "a cookie-bearing request (credentials: include / same-origin)",
+    });
   }
   if (!SENTRY_ALLOWED_APPS.has(appName)) {
     // An earlier review round flagged Sentry; it has since been removed from Beacon, but
@@ -831,6 +846,16 @@ function pinnedMarkerCounts(appName, channel) {
       label: "style-attribute write (setAttribute)",
       expected: 2,
       note: "the two Designer API canvas writes in apps/beacon/src/features/cms-slots/model (compliance doc R8.5)",
+    },
+    {
+      // Review round 8 (2026-09-17, compliance doc R8.10) "External API Calls / third-party data egress":
+      // the single egress point pins `credentials: "omit"`, so no cookie is sent to, or stored from, any
+      // destination. Exactly one occurrence — the pin in extensionFetch. A second means another request
+      // builder sets its own cookie mode; zero means the pin was dropped.
+      pattern: /\bcredentials:\s*["'`]omit["'`]/g,
+      label: "credentials: omit request option",
+      expected: 1,
+      note: "extensionFetch pins the cookie mode for every request (compliance doc R8.10)",
     },
   ];
 }

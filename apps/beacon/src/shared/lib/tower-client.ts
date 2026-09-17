@@ -10,6 +10,7 @@ export function getTowerOrigin(): string {
 /**
  * Request to Tower with the Better Auth bearer (Designer session), sent through the extension's single egress point (`extensionFetch`, Tower-origin policy).
  * Webflow OAuth access tokens are stored only on Tower; this client never persists them.
+ * The bearer is the only credential on the wire: `extensionFetch` pins the request credentials mode to omit, so no cookie is sent or stored.
  */
 export function towerFetch(path: string, init?: RequestInit): Promise<Response> {
   const normalized = path.startsWith("/") ? path : `/${path}`;
@@ -24,7 +25,6 @@ export function towerFetch(path: string, init?: RequestInit): Promise<Response> 
     ...init,
     cache: init?.cache ?? "no-store",
     headers,
-    credentials: init?.credentials ?? "include",
   });
 }
 

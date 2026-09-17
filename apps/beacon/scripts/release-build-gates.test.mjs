@@ -368,6 +368,46 @@ describe("review round 8 (2026-09-17) release gates", () => {
     );
   });
 
+  it("forbids a credential-named Web Storage key and a cookie-bearing request mode in Beacon release output (R8.10, External API Calls)", () => {
+    const markers = collectForbiddenBundleMarkers(tempAppDir(), "production", "beacon");
+    // The exact line App Review Preflight excerpted on the 09-17 16:38 build.
+    expect(
+      matchForbiddenMarker("var pl;try{localStorage.removeItem(`codalyn:beacon-tower-session-token`)}catch{}", markers)
+        ?.label
+    ).toMatch(/Web Storage/);
+    expect(matchForbiddenMarker('sessionStorage.setItem("x-bearer", v)', markers)?.label).toMatch(/Web Storage/);
+    expect(matchForbiddenMarker("localStorage.getItem( 'app_secret' )", markers)?.label).toMatch(/Web Storage/);
+    // Preference, consent and sign-out flags are not credentials.
+    expect(matchForbiddenMarker("localStorage.getItem(`codalyn:beacon-theme`)", markers)).toBeNull();
+    expect(
+      matchForbiddenMarker("localStorage.setItem(`codalyn:beacon-tower-suppress-designer-exchange`,`1`)", markers)
+    ).toBeNull();
+    expect(matchForbiddenMarker("localStorage.getItem(`codalyn:beacon-telemetry-opt-out`)", markers)).toBeNull();
+    // Cookie-bearing request modes; the pinned omit and unrelated prose pass.
+    expect(matchForbiddenMarker("fetch(e,{...t,credentials:`include`})", markers)?.label).toMatch(/cookie-bearing/);
+    expect(matchForbiddenMarker('fetch(e,{credentials: "same-origin"})', markers)?.label).toMatch(/cookie-bearing/);
+    expect(matchForbiddenMarker("fetch(e,{...t,redirect:`error`,credentials:`omit`})", markers)).toBeNull();
+    expect(matchForbiddenMarker("Incorrect email or password.", markers)).toBeNull();
+    expect(matchForbiddenMarker("flags bad credentials by code", markers)).toBeNull();
+    // Development builds are not gated.
+    expect(collectForbiddenBundleMarkers(tempAppDir(), "development", "beacon")).toEqual([]);
+  });
+
+  it("pins exactly one credentials: omit in Beacon release output — the egress point's cookie pin (R8.10)", () => {
+    const pinned = pinnedMarkerCounts("beacon", "production");
+    const omit = pinned.find((marker) => /credentials: omit/.test(marker.label));
+    expect(omit?.expected).toBe(1);
+    expect(() =>
+      assertPinnedMarkerCounts("fetch(e,{...t,redirect:`error`,credentials:`omit`})", [omit], "dist")
+    ).not.toThrow();
+    expect(() => assertPinnedMarkerCounts("fetch(e,{...t,redirect:`error`})", [omit], "dist")).toThrow(
+      /0 credentials: omit request options, expected exactly 1/
+    );
+    expect(() =>
+      assertPinnedMarkerCounts('a({credentials:`omit`});b({credentials: "omit"})', [omit], "Archived zip")
+    ).toThrow(/2 credentials: omit request options, expected exactly 1/);
+  });
+
   it("forbids any PostHog trace in a release bundle unless VITE_BEACON_TELEMETRY_ENABLED=true", () => {
     const appPath = tempAppDir();
     const off = collectForbiddenBundleMarkers(appPath, "production", "beacon");
@@ -424,15 +464,17 @@ describe("review round 8 (2026-09-17) release gates", () => {
 describe("pinnedMarkerCounts (App Review Preflight: External API Calls / Silent Canvas Mutations)", () => {
   const pinned = pinnedMarkerCounts("beacon", "production");
   const clean =
-    "async function a(e,t){return fetch(e,t)}" +
+    // The egress point: redirect and cookie modes pinned on the one platform fetch (R8.3 / R8.10).
+    "async function a(e,t){return fetch(e,{...t,redirect:`error`,credentials:`omit`})}" +
     // The two Designer API canvas placeholder writes (review round 8, CSP style-src-attr 'none').
     `r.setAttribute("style",ph());await d.setAttribute("style",ph())`;
 
-  it("pins one bare fetch(, no MutationObserver construction and two canvas style-attribute writes in Beacon release output", () => {
+  it("pins one bare fetch(, no MutationObserver construction, two canvas style-attribute writes and one credentials: omit in Beacon release output", () => {
     expect(pinned.map((m) => [m.label, m.expected])).toEqual([
       ["bare fetch( call", 1],
       ["MutationObserver construction", 0],
       ["style-attribute write (setAttribute)", 2],
+      ["credentials: omit request option", 1],
     ]);
     expect(() => assertPinnedMarkerCounts(clean, pinned, "Build output")).not.toThrow();
   });

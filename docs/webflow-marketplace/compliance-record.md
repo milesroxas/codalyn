@@ -2808,9 +2808,166 @@ extension's single network call, its destination policy is source-level and CSP-
 guidelines permit a Designer Extension calling its own backend with disclosure in the review notes
 ([SUBMIT.md](SUBMIT.md) §4). Expected next-scan result: **one** REQUIRED item, not two.
 
-**States:** Source ✓ · Artifact ✓ (16:38 zip) · Preflight-scanned ✗ (re-run required — the scanned
-artifact changed) · Installed ✗ · Runtime ✗ · Submitted ✗ · Accepted ✗. Next: commit, deploy Tower
-(privacy policy), install the 16:38 zip on `beacon-demo`, confirm the panel renders and a CMS Slots
-install/sync still uploads through the grant path with the console free of CSP violations **and the
-rich-text prop editing as a textarea**, run App Review Preflight on the zip + `.sourcemaps.zip`, then
-Publish → Upload Bundle for Review with SUBMIT.md.
+**States:** Source ✓ (`270808d` + `1cca42c`, tree clean) · Artifact ✓ (16:38 zip) ·
+Tower deployed ✓ (privacy policy live on `tower.codalyn.app/privacy`, verified 2026-09-17 17:15) ·
+Preflight-scanned ✗ (re-run required — the scanned artifact changed) · Installed ✗ · Runtime ✗
+(catalog-level CSP audit only, R8.5) · Submitted ✗ · Accepted ✗. Next: install the 16:38 zip on
+`beacon-demo`, confirm the panel renders and a CMS Slots install/sync still uploads through the grant
+path with the console free of CSP violations **and the rich-text prop editing as a textarea**, run App
+Review Preflight on the zip + `.sourcemaps.zip`, add the §6 Localization statement to the listing,
+then Publish → Upload Bundle for Review with SUBMIT.md.
+
+### R8.9 Post-commit verification sweep (2026-09-17 17:14)
+
+Re-checked the six R8 findings against the committed tree and the pinned artifact, after `1cca42c`:
+
+- `pnpm --filter beacon test:run` — **133 files / 1092 tests passed**, including the per-finding suites:
+  `beacon-app-settings-provider.test.tsx` (no POST without interaction; POST on confirmation; no
+  suggestion when signed out or already active), `telemetry-event-redaction.test.ts` (11),
+  `init-observability.test.ts`, `extension-egress.test.ts` (`redirect: "error"` pinned even when the
+  caller passes `follow`/`manual`; one-shot exact-URL upload grant), `beacon-extension-csp.test.ts`,
+  `webflow-cms-write-locale.test.ts` (17). `scripts/release-build-gates.test.mjs` — **71 passed**.
+- `pnpm --filter beacon lint:all` — typecheck clean; Biome clean (4 pre-existing CSS warnings, no errors).
+- **Artifact ↔ commit traceability:** rebuilt `CI=true BUILD_RECIPIENT=public build:prod` from the clean
+  tree (`v0.1.0_public_09-17_17-14-16.zip`) and diffed it against the pinned 16:38 zip: `bundle.js` and
+  every chunk are byte-identical once content hashes are normalized; the sole content difference is the
+  embedded `buildTime` stamp (`…20:38:03.669Z` vs `…21:14:16.041Z`), which also re-hashes the two
+  chunks that carry it (`switch-*`, `settings-preferences-panel-*`) and its `modulepreload` line in
+  `index.html`. The 16:38 zip is therefore the build of the committed source. The 17:14 pair was a
+  verification byproduct and was **deleted** right after the diff, so the 16:38 files SUBMIT.md §1 pins
+  are again the only bundles in `bundle/production/public/`. The rebuild's
+  retention step archived `v0.1.0_public_09-17_15-53-42.*` to `bundle/archive/production/public/`
+  (still on disk, still resolvable for the R8.7 entry).
+- **Shipped CSP in the 16:38 `index.html`:** `default-src 'none'; script-src 'self'
+  https://cdn.prod.website-files.com; style-src 'self' https://cdn.prod.website-files.com;
+  style-src-elem 'self' https://cdn.prod.website-files.com; style-src-attr 'none'; img-src 'self' blob:
+  <Webflow asset hosts>; font-src 'self' https://cdn.prod.website-files.com; connect-src 'self'
+  https://tower.codalyn.app https://s3.amazonaws.com; object-src 'none'; frame-src 'none'; worker-src
+  'none'; form-action 'none'; base-uri 'none'` — no `'unsafe-inline'` anywhere (R8.5), `connect-src`
+  narrowed to Tower + the one upload host, telemetry host absent (R8.2/R8.4).
+- **Artifact sweep (16:38 zip):** `new MutationObserver(` 0 · `window.open(` 0 · `postMessage(` 0 ·
+  `insertAdjacentHTML(` 0 · `document.write(` 0 · `unsafe-inline` 0 · `lexical` 0 · `posthog` 0 ·
+  `sentry` 0 · `ws://` 0 · `toDataURL`/`.toBlob(`/`getImageData` 0 · bare `fetch(` 1 (the egress
+  module). Two residual token classes, both inert and both React DOM's own code: `innerHTML` ×3 (two
+  property-name `switch` cases and the sanitizer's read of a detached `<div>`; no write from Beacon
+  source) and `http://` ×23, every one an XML namespace URI (`www.w3.org/2000/svg` ×10,
+  `/1999/xlink` ×7, `/XML/1998/namespace` ×3, `/1998/Math/MathML` ×3) — no `http://` network
+  destination ships.
+- **Tower:** the R8.2 privacy-policy revision is live — `GET https://tower.codalyn.app/privacy` returns
+  “Optional telemetry (opt-in only, and only in builds that include it) … the Beacon build distributed
+  through the Webflow Marketplace includes no analytics or error-reporting SDK”.
+
+No regression and no unresolved source-level item across R8.1–R8.6. Everything outstanding is a
+non-code state: Preflight re-run, install, runtime observation, listing text, submission.
+
+### R8.10 External API Calls re-reported on the 16:38 build — the evidence moved off `fetch(` (App Review Preflight 2026-09-17, fifth scan)
+
+Scan target: `v0.1.0_public_09-17_16-38-04.zip` (sha256 `a2252311…6ef4`, source `1cca42c`). **One**
+finding, `REQUIRED`, one evidence location, no ID, generic next-move text ("Update the implementation,
+upload a revision, and use the next scan to confirm the finding is resolved"). Silent Canvas Mutations
+was **not** reported — R8.8 held. Owner's directive for this round: resolve the finding in the
+implementation, not in the response notes.
+
+| Finding (verbatim title) | Priority | Evidence location | Printed excerpt (artifact-verified) | Change from R8.7 | Evidence state |
+| --- | --- | --- | --- | --- | --- |
+| External API Calls — "Review third-party data egress." | unassigned | `assets/label-BzOgWInz.js:41` | the sign-out coordination store, then the session-token module — `` var pl;try{localStorage.removeItem(`codalyn:beacon-tower-session-token`)}catch{} `` with its in-memory get/set/clear — then the policy-page URLs (`https://tower.codalyn.app/privacy`, `/terms`, `/docs`). **`fetch(` is not in the excerpt.** | count unchanged (1); excerpt content changed | artifact-verified |
+
+**Where the excerpt sits (measured on the extracted chunks).** Line 41 of the flagged chunk is one
+188,945-character minified line; its module order is identical to the R8.7 chunk (`label-CFNV_vRh.js`,
+one 101,122-character line), so the two scans compare column for column:
+
+| Token on the line | This scan (`label-BzOgWInz.js:41`) | R8.7 scan (`label-CFNV_vRh.js:1`) |
+| --- | --- | --- |
+| printed excerpt | cols ≈ 61,128–61,620 | cols ≈ 10,650–11,100 |
+| `` localStorage.removeItem(`codalyn:beacon-tower-session-token`) `` | 61,363 — inside the excerpt | 8,626 — 2.0 KB before the excerpt |
+| first `https://tower.codalyn.app` literal | 61,528 — inside the excerpt | 8,790 — before the excerpt |
+| bare `fetch(` in `extensionFetch` | 63,598 — **2,238 chars after** the excerpt | 10,857 — inside the excerpt |
+
+Same bundle content, same single `fetch(`, different excerpt. Two readings are possible and the artifact
+cannot separate them: (a) the rule still keys on `fetch(` and the printed window is not anchored to the
+match — R8.7 already showed that for Silent Canvas Mutations, whose excerpt (`_mutable`/`_nursery`,
+col ≈ 4,950) sat 4,164 characters before the `new MutationObserver(` at col 9,114; (b) the rule now
+keys on a credential-shaped token next to a non-Webflow origin, and the storage call keyed by a
+session-token name is the match. Byte-offset and string-stripped-offset models of the window were
+tested against all three known excerpts and fit none, so the excerpt position is not evidence of the
+matched token. Consequence: every egress-adjacent shape on that line that can honestly go, goes; the
+one that cannot — the backend call itself — is named as such below.
+
+**Published requirements consulted (live pages, 2026-09-17).**
+
+- Marketplace Guidelines, "Credentials and secrets": "Credential-bearing headers — `Authorization`,
+  `Cookie`, or equivalent — must never be forwarded to non-Webflow domains." and "Never embed API keys,
+  tokens, passwords, or other secrets as string literals in your App."
+  (<https://developers.webflow.com/apps/docs/marketplace-guidelines>)
+- Designer Extensions overview: an extension "can connect to external services and third-party APIs
+  directly from your extension's code" and "can also integrate with your own backend services and
+  Webflow's Data APIs (making it a Hybrid App)" (<https://developers.webflow.com/data/docs/designer-extensions>)
+  — the backend call is a documented App type, not a violation.
+- `webflow.json` reference: `name`, `apiVersion`, `publicDir`, `size`, `appIntents`, `appConnections`,
+  `featureFlags` — still no field to declare backend hosts
+  (<https://developers.webflow.com/designer/guides/configuring-your-app>).
+- Get user ID token: the extension sends the ID token to the developer's backend, which resolves it with
+  `POST /token/resolve` (<https://developers.webflow.com/designer/reference/get-user-id-token>) — the
+  exchange in `webflow-designer-session.ts` is that flow, ID token in the JSON body.
+
+**Fix (source).** Two changes on the flagged line's own modules; neither is an indirection.
+
+1. **No credential-named storage call ships.** `features/auth/lib/beacon-tower-session-token.ts` no
+   longer executes `localStorage.removeItem("codalyn:beacon-tower-session-token")` at module load. It was
+   a one-time cleanup for internal builds before `5129853` (2026-05-18) that had persisted the bearer; no
+   Marketplace build ever wrote the key, and the Better Auth sessions those builds stored expired months
+   ago (default seven-day session), so the line protected nobody and put a storage call keyed by a
+   session-token name in every shipped bundle. The module now references no storage API at all; the
+   bearer stays in memory only (unchanged).
+2. **No cookie on any request.** `extensionFetch` pins `credentials: "omit"` next to the existing
+   `redirect: "error"`, so no `Cookie` header leaves the extension and no `Set-Cookie` is stored, for
+   every destination; `towerFetch` and the Designer-session exchange no longer ask for the include mode
+   (a caller cannot opt back in). This is the literal form of the published rule the extension can meet
+   outright: of the two credential-bearing headers it names, `Cookie` is now never sent anywhere, and
+   `Authorization` carries only Tower's own bearer to Tower's own origin. Tower is unaffected — it
+   authenticates the extension with the Better Auth `bearer()` plugin and returns the Designer session
+   as `token` in the JSON body of `/api/auth/webflow-designer`; the include mode was inert in practice
+   (third-party cookies from the extension iframe are blocked by default) but declared a cookie-bearing
+   request in the bundle. `Access-Control-Allow-Credentials: true` in `tower-cors.ts` is now vestigial
+   for the extension and is left alone (Tower deploy lane; no bundle effect).
+
+**Kept, and why — the residue after the change, not a defence of it.** The bearer `Authorization`
+header to `https://tower.codalyn.app` stays: it is Tower's own session credential, minted by Tower after
+the documented ID-token exchange, never a Webflow credential, and there is no other transport for a
+first-party session from the extension iframe (cross-site cookies are blocked). The Tower origin literal
+and the three policy-page links stay: they are the backend and the disclosures. The single bare `fetch(`
+stays: a Hybrid App has a backend; an XHR swap, an indirect call or a renamed binding would be scanner
+evasion (R7b.13) and is not on the table. If the next scan still lists External API Calls with the
+excerpt on `extensionFetch`, that is the extension's one backend call, and no honest code change remains
+short of an extension with no backend.
+
+**Gates and tests.**
+
+- `scripts/build-cli.mjs` — `staticForbiddenMarkers` (Beacon): a credential-named Web Storage key
+  (`localStorage`/`sessionStorage` `getItem`/`setItem`/`removeItem` with a literal key containing
+  token, bearer, secret, password or credential) and a cookie-bearing request mode (`credentials:`
+  include / same-origin) fail the release build on dist and zip; `pinnedMarkerCounts`: `credentials:
+  "omit"` exactly 1 — the pin in `extensionFetch`.
+- `extension-egress.test.ts` (+3): the platform call receives `credentials: "omit"` whatever the caller
+  passes (include, same-origin, unset; Tower and the granted upload URL alike); no first-party module
+  but the egress point sets a credentials mode, and it sets only omit; no first-party storage call is
+  keyed by a credential name, and the session-token module uses no storage API.
+- `release-build-gates.test.mjs` (+2): the forbidden markers catch the exact excerpted line and a
+  bearer/secret storage key, pass the theme, consent and sign-out-suppression keys and the pinned omit;
+  the omit pin fails on 0 and on 2.
+- `pnpm --filter beacon exec vitest run` over the egress, Tower client, auth and gate suites: **11 files /
+  179 tests passed**; `pnpm --filter beacon lint:all` exit 0 (typecheck + Biome) and `pnpm --filter beacon test:run` **133 files / 1097 tests passed**, both run again after the build on the same tree (4 Biome warnings are the pre-existing CSS ones).
+
+**Artifact.** `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod` →
+`v0.1.0_public_09-17_17-51-37.zip` sha256 `f0fa56164f0447f4e8498e2933d0c8bff4d65ab2a14abc9add93495dd72a5ac8` (21 files, 453 KB) + `.sourcemaps.zip`
+sha256 `c38f915ea75453b1e92570bb5aeb6fec57b4a6599a4bc24c26d8bab51cf1d246` (private form field). The build's retention step kept the 16:38 pair in `bundle/production/public/` next to the new one (still referenced by R8.8/R8.9; it archives on the next build). Sweep of the zip (21 files, 463,722 bytes): bare `fetch(` **1** · `credentials:` omit **1** / include or same-origin **0** · credential-named storage key **0** · `beacon-tower-session-token` **0** · `redirect:` error **1** · `new MutationObserver(` **0** · `setAttribute("style"` **2** · `webflow-prod-assets` **1** · `lexical` 0 · `posthog` 0 · `sentry` 0 · `window.open(` 0 · `postMessage(` 0 · `insertAdjacentHTML(` 0 · `document.write(` 0 · `unsafe-inline` 0 · `sourceMappingURL` 0 · `?token=`/`&token=` 0 · `ws://` 0 · non-W3C `http://` 0 · `.map` entries 0. `localStorage` 11 (was 12): the sign-out suppression flag, theme, preferences and telemetry-consent keys — none a credential. External `https://` hosts unchanged: `tower.codalyn.app` ×5, `reactrouter.com` ×2 and `radix-ui.com` ×2 (vendor documentation links in `bundle.js`). CSP `connect-src 'self' https://tower.codalyn.app https://s3.amazonaws.com` unchanged; manifest unchanged; the `.sourcemaps.zip` carries no `?token=` and includes `styles.css.map`. In the new label chunk (`label-Dx-3ZKWd.js`, line 41, 188,799 chars) the session-token module is `var pl;function ml(){return pl}…` with no storage call, and the platform call reads `` fetch(e,{...t,redirect:`error`,credentials:`omit`}) `` at col 63,525.
+
+**Diff against the 16:38 zip (`a2252311…`).** Fonts, images, `styles.css`, `webflow.json` and the thumbnail are byte-identical. Five chunks re-hashed (`label-BzOgWInz` → `label-Dx-3ZKWd` and the four chunks that import it: `switch-*`, `separator-*`, `settings-account-panel-*`, `settings-preferences-panel-*`); with chunk names and the embedded `buildTime` normalised, `bundle.js`, `index.html`, `separator.js`, `settings-account-panel.js`, `settings-preferences-panel.js`, `switch.js` are identical, and the **only** content difference in the whole artifact is on the label chunk's long line — removed: `` try{localStorage.removeItem(`codalyn:beacon-tower-session-token`)}catch{} ``, `` credentials:`include`, `` and `` ,credentials:t?.credentials??`include` ``; added: `` ,credentials:`omit` ``. Nothing else moved: the 17:51 zip is the 16:38 zip minus the storage call and the include mode, plus the omit pin.
+
+**Expected next-scan result:** either **no** REQUIRED item, or External API Calls ×1 with the excerpt on `extensionFetch` — the single backend call named under "Kept, and why". Any other outcome (a second item, Silent Canvas Mutations back, or an excerpt on a token this entry does not name) is a stop condition ([playbook.md](playbook.md) § B).
+
+**States:** Source ✓ (uncommitted) · Artifact ✓ (09-17_17-51-37 zip) · Preflight-scanned ✗ · Installed ✗ ·
+Runtime ✗ · Submitted ✗ · Accepted ✗. Next: commit, install the 09-17_17-51-37 zip on `beacon-demo`, confirm
+sign-in through the Designer exchange and a CMS Slots install/sync still work with the console free of
+CSP violations (the cookie mode is the only runtime-visible change), run App Review Preflight on the zip
++ `.sourcemaps.zip`, then Publish → Upload Bundle for Review with SUBMIT.md.

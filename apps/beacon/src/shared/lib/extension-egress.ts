@@ -25,6 +25,17 @@ import { WEBFLOW_ASSET_UPLOAD_BUCKET, WEBFLOW_ASSET_UPLOAD_HOST } from "@/shared
  * "Egress check does not constrain redirects"). No caller needs a redirect — Tower answers its API
  * routes directly and the S3 POST returns a 2xx with no `success_action_redirect` field.
  *
+ * Requests never carry cookies: `credentials` is pinned to `"omit"` for every call, so no `Cookie`
+ * header leaves the extension and no `Set-Cookie` from a response is stored (Marketplace guidelines,
+ * "Credentials and secrets": credential-bearing headers — `Authorization`, `Cookie`, or equivalent —
+ * must never be forwarded to non-Webflow domains). The extension authenticates Tower with the bearer
+ * `towerFetch` sets from the in-memory Designer session (Tower's own Better Auth token, minted after
+ * the documented `webflow.getIdToken()` exchange — never a Webflow credential), and the presigned S3
+ * POST is authenticated by the URL itself; neither destination has any use for a cookie. Before review
+ * round 8 (2026-09-17, "External API Calls / third-party data egress") callers asked for the include
+ * mode, which was inert in practice (third-party cookies from the extension iframe are blocked by
+ * default) but declared a cookie-bearing request in the shipped bundle.
+ *
  * Anything outside the policy is refused before a request is built (explicit
  * {@link EgressPolicyError}; nothing is partially applied), which mirrors the shipped CSP
  * `connect-src` — the policy here is the source-level control, the CSP the browser-enforced one.
@@ -137,9 +148,9 @@ export function resolveEgressDestination(raw: string): EgressDestination | null 
  * The extension's only network call. Refuses (rejects with {@link EgressPolicyError}) before
  * building a request when the destination is outside {@link resolveEgressDestination}; otherwise a
  * plain `fetch` with the caller's `init`, `redirect` pinned to `"error"` (a caller cannot opt back
- * into following redirects). A granted upload URL is consumed by the call that uses it. Callers own
- * headers, credentials and retries (`towerFetch` adds the Designer-session bearer,
- * `towerFetchWithRetry` the 429 backoff).
+ * into following redirects) and `credentials` pinned to `"omit"` (a caller cannot attach cookies).
+ * A granted upload URL is consumed by the call that uses it. Callers own headers and retries
+ * (`towerFetch` adds the Designer-session bearer, `towerFetchWithRetry` the 429 backoff).
  */
 export function extensionFetch(url: string, init?: RequestInit): Promise<Response> {
   const destination = resolveEgressDestination(url);
@@ -149,5 +160,5 @@ export function extensionFetch(url: string, init?: RequestInit): Promise<Respons
   if (destination === "webflow-asset-upload") {
     grantedAssetUploadUrls.delete(url);
   }
-  return fetch(url, { ...init, redirect: "error" });
+  return fetch(url, { ...init, redirect: "error", credentials: "omit" });
 }

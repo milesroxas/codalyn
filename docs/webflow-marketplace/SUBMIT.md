@@ -28,12 +28,12 @@ the same email thread.
 
 | Form field | File |
 | --- | --- |
-| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_16-38-04.zip` |
-| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_16-38-04.sourcemaps.zip` |
+| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_17-51-37.zip` |
+| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_17-51-37.sourcemaps.zip` |
 | Package manifest + lockfile (required for compiled bundles since the 2026-08-19 guidelines) | `apps/beacon/package.json` + root `pnpm-lock.yaml`, as committed at the build commit |
 
-sha256 · bundle `a22523114093272af780a7414dd703ebec385e4e2aba98829ff0c626b7936ef4` ·
-sourcemaps `db4fffb4df4bb6505d285f01093ed2821dd258ba2469076a939d1a2368d9a340`
+sha256 · bundle `f0fa56164f0447f4e8498e2933d0c8bff4d65ab2a14abc9add93495dd72a5ac8` ·
+sourcemaps `c38f915ea75453b1e92570bb5aeb6fec57b4a6599a4bc24c26d8bab51cf1d246`
 
 Rebuild command if needed: `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod`
 (release flags unset = the Marketplace state: no telemetry SDK, no rich-text editor, localized-site
@@ -41,19 +41,22 @@ CMS writes blocked).
 
 ## 2. App Review Preflight receipt
 
-**Not yet run on the 16:38 artifact.** The scan of the previous build (15:53) returned two REQUIRED
-items — External API Calls and Silent Canvas Mutations — and the 16:38 build removes the second by
-withdrawing the Lexical editor (§4 item 7), so the expected result is now **one** item:
+**Not yet run on the 09-17_17-51-37 artifact.** The scan of the 16:38 build returned **one** REQUIRED item,
+External API Calls, with its excerpt on the session-token module's legacy storage cleanup and the Tower
+policy-page URLs (compliance-record R8.10); Silent Canvas Mutations was not reported. The 09-17_17-51-37
+build removes the storage call and pins the cookie mode to omit on every request (§4 item 8), so the
+expected result is:
 
 | Finding | Expected | Why |
 | --- | --- | --- |
-| External API Calls | 1 location, in the chunk holding `extensionFetch` | the bundle's only network call; destination policy + CSP `connect-src` (§4 items 3-4). No honest change clears the token — an extension with a backend has one |
-| Silent Canvas Mutations | **none** | `new MutationObserver(` count in the zip is 0, pinned by the release build; no `lexical` trace, no editable-content element |
+| External API Calls | **none**, or 1 location whose excerpt is `extensionFetch` itself | the credential-named storage call and the cookie-bearing request mode shown in the 16:38 excerpt are gone; what can remain is the bundle's single backend call — a Hybrid App has one, and no honest change clears that token |
+| Silent Canvas Mutations | **none** | not reported on the 16:38 scan; `new MutationObserver(` count in the zip is 0, pinned by the release build |
 
-An independent sweep of the 16:38 zip confirms the inventory: bare `fetch(` ×1, `new MutationObserver(`
-×0, `setAttribute("style"` ×2, `lexical` ×0, `posthog` ×0 — see
-[compliance-record.md](compliance-record.md) R8.8. Any second item, or Silent Canvas Mutations
-reappearing, = stop, see [playbook.md](playbook.md) § B.
+An independent sweep of the 09-17_17-51-37 zip confirms the inventory: bare `fetch(` ×1, `credentials:` omit
+×1 / include ×0, credential-named storage key ×0, `new MutationObserver(` ×0, `setAttribute("style"` ×2,
+`lexical` ×0, `posthog` ×0 — see [compliance-record.md](compliance-record.md) R8.10. Any second item,
+Silent Canvas Mutations reappearing, or an External API Calls excerpt that is not `extensionFetch` =
+stop, see [playbook.md](playbook.md) § B.
 
 Run Preflight on the two files in §1 and paste the `wfpre_` code from **that** run below before filing:
 
@@ -80,28 +83,30 @@ How to defend each item if asked (one line each; the long version is in §4):
 
 ## 4. Additional notes (form field, max 5000 characters)
 
-4994 characters. Paste the whole block. **WAF rule (2026-09-15):** the form backend sits behind Cloudflare and blocked a
+4975 characters. Paste the whole block. **WAF rule (2026-09-15):** the form backend sits behind Cloudflare and blocked a
 submission whose notes contained an HTML script tag, attribute pairs like `src=` / `integrity=`,
 DOM-sink names (innerHTML, window.open, postMessage, document.write), a `\u00a0` escape and `/*`. Keep
 this block free of angle brackets, key=value attribute pairs, JS API names and comment/wildcard tokens;
 describe them in words.
 
 ```
-WHAT CHANGED (bundle v0.1.0, 09-17 16:38) - items 1 to 6 answer the 2026-09-17 feedback in order; item 7 is an extra removal
+WHAT CHANGED (bundle v0.1.0, 09-17 09-17_17-51-37) - items 1 to 6 answer the 2026-09-17 feedback in order; items 7 and 8 answer the Preflight scans
 
-1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. When a signed-in user has exactly one workspace and none is active on the session, the extension holds it locally as a suggestion and shows it in the account panel and the app menu with an explicit "Use this workspace" control. The only request to that endpoint comes from that click or the multi-workspace picker. Unit tests pin zero requests after sync and exactly one after the confirmation.
+1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. A signed-in user with exactly one workspace and none active sees it as a suggestion with an explicit "Use this workspace" control; the only request to that endpoint comes from that click or the multi-workspace picker. Unit tests pin zero requests after sync and one after the confirmation.
 
-2. Exception telemetry. The Marketplace build ships no telemetry SDK at all. The dependency sits behind a build-time release flag that is off for Marketplace bundles; the release build fails if it is on and verifies the zip contains no trace of it. Verifiable in the bundle: no analytics chunk (453 KB zip, down from 1.9 MB), no telemetry host in connect-src, no consent prompt, and Settings, Privacy states that this build sends no usage or error telemetry. The privacy policy at https://tower.codalyn.app/privacy says the same. For builds that do enable telemetry, a before_send handler redacts URLs, paths, referrers, page titles, e-mail addresses, tokens and query strings from every event, including exception messages and stack-frame locations; unit tests feed synthetic sensitive values and assert none survives.
+2. Exception telemetry. The Marketplace build ships no telemetry SDK at all. The dependency sits behind a build-time release flag that is off for Marketplace bundles; the release build fails if it is on and verifies the zip contains no trace of it. Verifiable in the bundle: no analytics chunk, no telemetry host in connect-src, no consent prompt, and Settings, Privacy states that this build sends no usage or error telemetry; the privacy policy says the same. Builds that enable telemetry run a before_send redaction (URLs, referrers, titles, e-mail, tokens, query strings, exception text and frames), unit-tested with synthetic sensitive values.
 
 3. Redirects. The single network call site (extension-egress.ts) runs every request with redirect mode set to error; the caller's options cannot override it. No path needs a redirect: Tower answers its API routes directly and the presigned S3 upload returns a 2xx with no redirect field.
 
-4. Upload allowlist. Our create-asset adapter registers the exact uploadUrl string Webflow returned as a one-shot permitted destination, only if it has the documented shape: HTTPS, host exactly s3.amazonaws.com, first path segment exactly webflow-prod-assets. The egress policy accepts an upload only for a granted URL and consumes the grant with the request; sibling keys, other buckets, regional or virtual-hosted S3 hosts and Webflow-owned hosts are refused before any request is built. connect-src is exactly: self, https://tower.codalyn.app, https://s3.amazonaws.com. Webflow asset hosts stay in img-src only.
+4. Upload allowlist. The create-asset adapter registers the exact uploadUrl string Webflow returned as a one-shot permitted destination, only if it is HTTPS on host exactly s3.amazonaws.com with first path segment exactly webflow-prod-assets. The egress policy accepts an upload only for a granted URL and consumes the grant with the request; other keys, other buckets, regional or virtual-hosted S3 hosts and Webflow-owned hosts are refused before any request is built. connect-src is exactly: self, https://tower.codalyn.app, https://s3.amazonaws.com. Webflow asset hosts stay in img-src only.
 
-5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host, style-src-attr is none. The UI needs no inline style attributes: React, Radix and vaul set styles through the CSSOM, which CSP does not govern. Two style-attribute writes remain in the bundle, pinned by count in the release build; both are Webflow Designer API calls that style the CMS Slots placeholder on the user's canvas element, a different document outside the extension's policy. Every story in our UI catalog renders under the enforced policy in headless Chromium with zero violations attributed to our UI.
+5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host; style-src-attr is none. React, Radix and vaul set styles through the CSSOM, which CSP does not govern. The two style-attribute writes left in the bundle are pinned by count in the release build; both are Designer API calls that style the CMS Slots placeholder on the user's canvas element, outside the extension's policy. Every UI story renders clean under the enforced policy in headless Chromium.
 
-6. Localization. Every CMS item write now names its locale: the extension reads the site's locales (Get Site) once per session and sends the primary locale's cmsLocaleId on every write (the image editor's CMS image-field update; the CMS Slots layout save to the item's staged and live records) and on the matching staged read. Sites with secondary locales are not written: the write is refused before any request and the user is told that Beacon does not write CMS content on localized sites yet, so nothing was changed. The listing states this. Custom code and asset endpoints are not locale-scoped.
+6. Localization. Every CMS item write names its locale: the extension reads the site's locales (Get Site) once per session and sends the primary locale's cmsLocaleId on every write (the image editor's CMS image-field update; the CMS Slots layout save to staged and live) and on the matching staged read. Sites with secondary locales are not written: the write is refused before any request and the user is told that Beacon does not write CMS content on localized sites yet. The listing states this.
 
-7. Rich text editing. The WYSIWYG editor for rich-text component properties is withdrawn from this bundle, behind the same kind of release flag as item 2. It was built on Lexical, which attaches a DOM observer to its own editable element; that observer only ever watched the editor inside our panel, never the canvas, but it is the shape the automated bundle scan reports as a silent canvas mutation. Rich-text properties are now edited as HTML in a text box. Verifiable in the bundle: no observer construction and no editable-content element.
+7. Rich text editing. The WYSIWYG editor for rich-text component properties is withdrawn from this bundle behind a release flag like item 2. Its Lexical editor attached a DOM observer to its own editable element inside our panel, never the canvas — the shape the bundle scan reports as a silent canvas mutation. Rich-text properties are now edited as HTML in a text box. Verifiable in the bundle: no observer construction and no editable-content element.
+
+8. Browser storage and cookies. The 16:38 scan excerpted the session-token module, which ran a one-time removal of a legacy browser-storage key at load. That line is gone: the session bearer is held in memory only and no storage call in the bundle is keyed by a credential name. Every request now sets the cookie mode to omit at the single network call site, so no cookie is sent to or stored from any destination; the only credential on the wire is our own Tower session bearer, sent only to https://tower.codalyn.app. The release build forbids both shapes.
 
 UNCHANGED FROM 2026-09-15: one network call site with an explicit destination policy (release build fails on a second); canvas changes only through the Designer API, on explicit user action; one page-level hosted runtime with a SHA-256 integrityHash, pure ASCII and unminified, loading nothing and making no requests; Tower with allowlist-only CORS, session-only auth, server-stored OAuth state, the Webflow ID token never forwarded; no plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, no popups or cross-window messaging, no credentials in URLs, no session replay; styles.css ships a v3 source map.
 

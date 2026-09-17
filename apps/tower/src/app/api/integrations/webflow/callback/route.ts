@@ -2,23 +2,14 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
-import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
 import { normalizeWebflowAppKey, WEBFLOW_DATA_API_APP_KEY, type WebflowAppKey } from "@/server/webflow-app-registry";
-import {
-  buildWebflowOAuthFinishSignInUrl,
-  completeWebflowOAuthForOrganization,
-  resolveWebflowOAuthCallbackKind,
-  stageWebflowInitiatedInstallFromCallback,
-} from "@/server/webflow-oauth-completion";
+import { resolveWebflowOAuthCallbackKind } from "@/server/webflow-oauth-completion";
 import {
   resolveWebflowOAuthAppUrl,
   resolveWebflowOAuthRedirectUri,
-  WEBFLOW_OAUTH_FINISH_PATH,
-  WEBFLOW_OAUTH_INSTALL_PENDING_COOKIE,
   WEBFLOW_OAUTH_ORG_COOKIE,
   WEBFLOW_OAUTH_STATE_COOKIE,
-  webflowOAuthInstallPendingCookieOptions,
 } from "@/server/webflow-oauth-config";
 import {
   exchangeWebflowAuthorizationCode,
@@ -131,64 +122,6 @@ async function resolveOrganizationFromDbStateFlow(
   };
 }
 
-async function tryCompleteWebflowInitiatedInstallInSession(
-  request: Request,
-  authorizationCode: string,
-  redirectUri: string,
-  appUrl: string,
-  isPopupFlow: boolean
-): Promise<NextResponse | null> {
-  const session = await auth.api.getSession({ headers: request.headers });
-  const sessionUserId = session?.user?.id;
-  if (!sessionUserId) {
-    return null;
-  }
-
-  const activeOrganizationId = await getActiveOrganizationIdForAuthHeaders(request.headers);
-  if (!activeOrganizationId) {
-    return null;
-  }
-
-  const admin = await isTowerTeamAdminMemberOfOrg(sessionUserId, activeOrganizationId);
-  if (!admin) {
-    return null;
-  }
-
-  const result = await completeWebflowOAuthForOrganization({
-    organizationId: activeOrganizationId,
-    authorizationCode,
-    redirectUri,
-  });
-  if (!result.ok) {
-    return oauthErrorRedirect(appUrl, { error: result.error }, { popup: isPopupFlow });
-  }
-
-  return oauthSuccessRedirect(appUrl, { popup: isPopupFlow });
-}
-
-async function redirectToFinishStagedWebflowInstall(input: {
-  authorizationCode: string;
-  redirectUri: string;
-  externalState: string | null;
-  appUrl: string;
-  cookieStore: CookieStore;
-  request: Request;
-}): Promise<NextResponse> {
-  const pendingId = await stageWebflowInitiatedInstallFromCallback({
-    authorizationCode: input.authorizationCode,
-    redirectUri: input.redirectUri,
-    externalState: input.externalState,
-  });
-  input.cookieStore.set(WEBFLOW_OAUTH_INSTALL_PENDING_COOKIE, pendingId, webflowOAuthInstallPendingCookieOptions);
-
-  const session = await auth.api.getSession({ headers: input.request.headers });
-  if (session?.user?.id) {
-    return NextResponse.redirect(`${input.appUrl}${WEBFLOW_OAUTH_FINISH_PATH}`);
-  }
-
-  return NextResponse.redirect(buildWebflowOAuthFinishSignInUrl(input.appUrl));
-}
-
 export async function GET(request: Request) {
   const appUrl = resolveWebflowOAuthAppUrl();
   const redirectUri = resolveWebflowOAuthRedirectUri();
@@ -219,32 +152,14 @@ export async function GET(request: Request) {
     return oauthErrorRedirect(appUrl, { error: "missing_code" }, { popup: isPopupFlow });
   }
 
-  if (kind === "webflow_initiated_install") {
-    clearWebflowOauthCookies(cookieStore);
-    const immediate = await tryCompleteWebflowInitiatedInstallInSession(
-      request,
-      code,
-      redirectUri,
-      appUrl,
-      isPopupFlow
-    );
-    if (immediate) {
-      return immediate;
-    }
-    return redirectToFinishStagedWebflowInstall({
-      authorizationCode: code,
-      redirectUri,
-      externalState: query.state,
-      appUrl,
-      cookieStore,
-      request,
-    });
-  }
-
-  const state = query.state?.trim();
+  // No `state` = not a flow Tower started (every Tower authorize request mints one, including the
+  // Marketplace install URL, which is Tower's own authorize route). Refuse before any code exchange:
+  // exchanging a state-less code and binding it to whoever is signed in would let a forwarded callback
+  // URL plant a third party's Webflow authorization into the victim's workspace (auth review 2026-09-18).
+  const state = kind === "missing_state" ? "" : (query.state?.trim() ?? "");
   if (!state) {
     clearWebflowOauthCookies(cookieStore);
-    return oauthErrorRedirect(appUrl, { error: "missing_code" }, { popup: isPopupFlow });
+    return oauthErrorRedirect(appUrl, { error: "invalid_state" }, { popup: isPopupFlow });
   }
 
   const resolved =

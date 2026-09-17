@@ -10,7 +10,6 @@ import { fetchTeamInvitationSignUpPrefill } from "@/features/auth/lib/team-invit
 type AuthInviteSignUpPrefillInput = {
   operatorInviteToken: string | null;
   teamInvitationId: string | null;
-  skipPrefill: boolean;
 };
 
 type AuthInviteSignUpPrefillState = {
@@ -26,8 +25,8 @@ function resolveAuthInviteSignUpPrefillNeeds(input: AuthInviteSignUpPrefillInput
   operatorInviteNeedsPrefill: boolean;
   teamInviteNeedsPrefill: boolean;
 } {
-  const operatorInviteNeedsPrefill = Boolean(input.operatorInviteToken && !input.skipPrefill);
-  const teamInviteNeedsPrefill = Boolean(input.teamInvitationId && !input.skipPrefill);
+  const operatorInviteNeedsPrefill = Boolean(input.operatorInviteToken);
+  const teamInviteNeedsPrefill = Boolean(input.teamInvitationId);
   return {
     needsPrefill: operatorInviteNeedsPrefill || teamInviteNeedsPrefill,
     operatorInviteNeedsPrefill,

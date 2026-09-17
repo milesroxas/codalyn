@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { resolveSignInCardDescription } from "@/features/auth/lib/auth-surface-copy";
-import { tryFinishBeaconTowerAuthPopup } from "@/features/auth/lib/beacon-opener-auth";
 import { buildTowerAuthSurfaceHref } from "@/features/auth/lib/build-tower-auth-surface-href";
 import {
   isEmailNotVerifiedAuthError,
@@ -19,12 +18,11 @@ import {
   readPasswordResetSuccess,
 } from "@/features/auth/lib/password-reset";
 import { readEmailPasswordFromAuthForm } from "@/features/auth/lib/read-auth-form-credentials";
-import { resolveUserAndTokenAfterEmailAuth, userToBeaconPayload } from "@/features/auth/lib/resolve-email-auth-session";
+import { resolveUserAndTokenAfterEmailAuth } from "@/features/auth/lib/resolve-email-auth-session";
 import { resolvePostAuthRedirectTarget } from "@/features/auth/lib/resolve-post-auth-redirect";
 import { resolveTowerEmailLinkAuthFetchOptions } from "@/features/auth/lib/team-invitation-auth-fetch-options";
 import { authClient } from "@/features/auth/model/auth-client";
 import { completeTowerWebPostAuthNavigation } from "@/features/auth/model/tower-post-auth-navigation";
-import { useBeaconPopupSessionHandoff } from "@/features/auth/model/use-beacon-popup-session-handoff";
 import { useRedirectAuthenticatedFromAuthSurface } from "@/features/auth/model/use-redirect-authenticated-from-auth-surface";
 import { CheckEmailPrompt } from "@/features/auth/ui/email-verification-prompt";
 import { AuthCardSkeleton } from "@/features/tower-ui/auth-card-skeleton";
@@ -44,20 +42,15 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
 type SignInPostResult =
-  | { kind: "beacon_popup" }
   | { kind: "error"; message: string }
   | { kind: "done"; user: Awaited<ReturnType<typeof resolveUserAndTokenAfterEmailAuth>>["user"] };
 
 async function runAfterTowerSignIn(opts: {
   data: Parameters<typeof resolveUserAndTokenAfterEmailAuth>[0];
-  beaconOrigin: string | null;
   operatorInviteToken: string | null;
 }): Promise<SignInPostResult> {
-  const { user: u, token } = await resolveUserAndTokenAfterEmailAuth(opts.data);
-  if (tryFinishBeaconTowerAuthPopup(opts.beaconOrigin, u ? userToBeaconPayload(u) : undefined, token)) {
-    return { kind: "beacon_popup" };
-  }
-  if (opts.operatorInviteToken && !opts.beaconOrigin) {
+  const { user: u } = await resolveUserAndTokenAfterEmailAuth(opts.data);
+  if (opts.operatorInviteToken) {
     const redeemResult = await redeemOperatorInviteClient(opts.operatorInviteToken);
     if (redeemResult !== "ok") {
       return { kind: "error", message: messageForRedeemFailure(redeemResult) };
@@ -70,11 +63,9 @@ function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = sanitizeRelativePath(searchParams.get("callbackUrl") ?? "/");
-  const beaconOrigin = searchParams.get("beaconOrigin");
   const operatorInviteParam = searchParams.get("invite");
   const { sessionPending, redirecting: redirectingSignedInUser } = useRedirectAuthenticatedFromAuthSurface({
     callbackUrl,
-    beaconOrigin,
   });
   const emailId = useId();
   const passwordId = useId();
@@ -87,7 +78,6 @@ function SignInForm() {
   const passwordResetNotifiedRef = useRef(false);
 
   const authSearchParams = {
-    beaconOrigin,
     invite: operatorInviteParam,
   };
   const signUpHref = buildTowerAuthSurfaceHref("/sign-up", callbackUrl, authSearchParams);
@@ -129,7 +119,7 @@ function SignInForm() {
   }, []);
 
   useEffect(() => {
-    if (!operatorInviteParam || beaconOrigin) {
+    if (!operatorInviteParam) {
       return;
     }
     let cancelled = false;
@@ -152,9 +142,7 @@ function SignInForm() {
     return () => {
       cancelled = true;
     };
-  }, [operatorInviteParam, beaconOrigin]);
-
-  useBeaconPopupSessionHandoff(beaconOrigin);
+  }, [operatorInviteParam]);
 
   const authBusy = sessionPending || redirectingSignedInUser;
   const showAuthSkeleton = useDeferredLoadingIndicator(authBusy);
@@ -206,12 +194,8 @@ function SignInForm() {
     }
     const post = await runAfterTowerSignIn({
       data,
-      beaconOrigin,
       operatorInviteToken: operatorInviteParam?.trim() || null,
     });
-    if (post.kind === "beacon_popup") {
-      return;
-    }
     if (post.kind === "error") {
       setError(post.message);
       return;
@@ -283,7 +267,7 @@ function SignInForm() {
             <p className="text-left text-sm text-muted-foreground">
               Need access?{" "}
               <Link
-                href={`/request-access?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`}
+                href={`/request-access?callbackUrl=${encodeURIComponent(callbackUrl)}`}
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
                 Request early access

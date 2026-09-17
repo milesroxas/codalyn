@@ -22,10 +22,8 @@ import { Label } from "@/shared/ui/label";
 function ForgotPasswordForm() {
   const searchParams = useSearchParams();
   const callbackUrl = sanitizeRelativePath(searchParams.get("callbackUrl") ?? "/");
-  const beaconOrigin = searchParams.get("beaconOrigin");
   const { sessionPending, redirecting: redirectingSignedInUser } = useRedirectAuthenticatedFromAuthSurface({
     callbackUrl,
-    beaconOrigin,
   });
   const emailId = useId();
   const [email, setEmail] = useState("");
@@ -33,10 +31,7 @@ function ForgotPasswordForm() {
   const [pending, setPending] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
-  const authSearchParams = {
-    beaconOrigin,
-  };
-  const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl, authSearchParams);
+  const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl);
 
   const authBusy = sessionPending || redirectingSignedInUser;
   const showAuthSkeleton = useDeferredLoadingIndicator(authBusy);

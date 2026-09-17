@@ -1,6 +1,6 @@
 /**
- * Static origins for the Beacon Designer Extension, shared by Better Auth `trustedOrigins`,
- * `towerCorsHeadersFor` and the popup session-handoff target check. Append more via
+ * Static origins for the Beacon Designer Extension, shared by Better Auth `trustedOrigins` and
+ * `towerCorsHeadersFor`. Append more via
  * `TOWER_CORS_ORIGINS` / `BETTER_AUTH_TRUSTED_ORIGINS`.
  */
 

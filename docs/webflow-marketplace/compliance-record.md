@@ -2971,3 +2971,74 @@ Runtime ✗ · Submitted ✗ · Accepted ✗. Next: commit, install the 09-17_17
 sign-in through the Designer exchange and a CMS Slots install/sync still work with the console free of
 CSP violations (the cookie mode is the only runtime-visible change), run App Review Preflight on the zip
 + `.sourcemaps.zip`, then Publish → Upload Bundle for Review with SUBMIT.md.
+
+### R8.11 End-to-end SSO / authentication review against the live guidelines (2026-09-18)
+
+Owner's ask after R8.10: state what the cookie/storage change does to the app, then review the whole
+sign-in path from first principles against Webflow's current docs and change only what is wrong.
+
+**Behaviour delta of R8.10 — none observable.** Tower's Better Auth cookies are `SameSite=Lax`
+(default; `advanced` only sets the cross-subdomain domain and a per-environment prefix), so a
+cross-site request from the extension iframe never carried a Tower cookie and a cross-site `Set-Cookie`
+was never accepted, on every browser — `credentials: "include"` was inert and `"omit"` changes nothing on
+the wire. The Designer exchange returns the session as JSON `token` (`internalAdapter.createSession`,
+no cookie); every later call carries that bearer, unchanged. The deleted storage cleanup targeted a key
+no Marketplace build ever wrote.
+
+**Reviewed and compliant (published requirement → observed):** ID-token flow exactly as documented
+(`webflow.getIdToken()` → JSON body to Tower → `POST /beta/token/resolve` with a Data Client bearer
+carrying `authorized_user:read` → Tower's own session, bearer in memory only; ID token never stored or
+logged; per-IP exchange rate limit); OAuth `state` unique per request, single-use, 10-minute TTL,
+verified before the code exchange, bound to user + workspace + Webflow identity, approver proven via
+`token/authorized_by` for the Designer flow; redirect URI exact; scopes each backed by a call the app
+makes (`pages:read` → `GET sites/{id}/pages`, `assets:read` → `GET sites/{id}/assets`, the rest CMS,
+custom code, assets:write, sites:read, authorized_user:read); tokens AES-256-GCM at rest, server-side
+only, never returned; Webflow 401 → token deleted and the extension told to reconnect; OAuth runs once
+at connect, never on login; Tower sign-out leaves the Webflow authorization intact; CORS allowlist
+reflection, no wildcard; one-time-token handoff in the URL fragment, same-origin redemption.
+
+**Four gaps found and fixed (Tower, uncommitted, not deployed):**
+
+1. **State-less callbacks were exchanged.** `callback/route.ts` had a "Webflow-initiated install" branch
+   that took a `code` without any `state`, exchanged it and bound the token to whichever workspace admin
+   was signed in (or staged it for the next sign-in). The registered install URL is Tower's own authorize
+   route, so every flow Tower starts mints a state — the branch only ever served a forwarded URL, which
+   could plant a third party's Webflow authorization into the victim's workspace. Now `missing_state` →
+   `invalid_state` before any exchange; the staged-install module, the `finish` route and their constants
+   are deleted (`webflow_oauth_install_code` table kept until a migration drops it). Published rule:
+   "Include a unique `state` parameter on every OAuth authorization request and verify the returned value
+   before exchanging the authorization code."
+2. **Disconnect did not revoke at Webflow.** `DELETE /api/integrations/webflow/connection` deleted the
+   stored row only, leaving the authorization live in the user's workspace with no holder. It now calls
+   `POST https://webflow.com/oauth/revoke_authorization` first (best-effort, logged), then deletes.
+   Published rule: "Users must be able to fully revoke your App's access to their data."
+3. **The Data API proxy forwarded any endpoint.** `/api/v2/webflow/*` attached the workspace token to
+   whatever path and method a signed-in member sent — publish, delete collection, rewrite site custom code
+   — far beyond Beacon's features. `server/webflow-proxy-allowlist.ts` now lists exactly the 20 method +
+   path shapes Beacon calls (audited from every `/api/v2/webflow/…` site in `apps/beacon/src`), matched
+   segment by segment; anything else is a 403 `proxy_route_not_allowed` before the upstream request is
+   built. Published rule: "Gate every write and delete operation behind authenticated, verified triggers."
+4. **Designer link could arm a pre-hijacked password.** Linking a Webflow-verified identity to an
+   existing *unverified* email + password account flipped `emailVerified` and thereby switched on a
+   password an impostor may have set when pre-registering the victim's address. The link now first drops
+   the `credential` account row and every session of such an account; the owner sets a password through
+   the email reset. Same trust rule as the invite model (`emailVerified` only follows ownership proof).
+
+**Tests / checks:** new `webflow-proxy-allowlist.test.ts` (every Beacon call accepted, 14 refused shapes,
+segment-boundary case), `webflow-designer-session-logic.test.ts` (guard matrix), callback classifier
+tests updated; `pnpm --filter tower typecheck` exit 0, `lint` exit 0 (781 files), `test` **113 files /
+721 tests passed**. Bundle unaffected: no Beacon source changed, the 17:51 artifact stands.
+
+**Dead code removed in the same change (owner's follow-up, 2026-09-18):** Tower's popup session-handoff
+(`beacon-opener-auth.ts`, `use-beacon-popup-session-handoff.ts`, `/integrations/beacon-popup-next`,
+`tower-beacon-message-origin.ts`, the `beaconOrigin` query parameter and `skipPrefill` plumbing across the
+sign-in, sign-up, request-access, forgot-password and reset-password pages — Beacon has had no
+`postMessage` listener since R7b.12, so this was only a session-token-emitting path keyed on a query
+parameter); the `pending_expired` connection status; the `webflow_oauth_install_code` table
+(migration `0037_salty_cerebro.sql`, `DROP TABLE`). Kept deliberately: `Access-Control-Allow-Credentials:
+true` in `tower-cors.ts` — Flint still sends `credentials: include` to Tower and a CORS response without
+the flag would fail those requests. The in-Designer email + password form stays: allowed by the guidelines,
+redundant with the ID-token flow only when the Tower and Webflow e-mails differ.
+
+**States (Tower):** Source ✓ (uncommitted) · Deployed ✗ (manual `vercel deploy --prod` from the repo
+root) · Runtime ✗. The Marketplace artifact and its states are unchanged from R8.10.

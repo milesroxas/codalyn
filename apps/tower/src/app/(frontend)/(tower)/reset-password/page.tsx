@@ -27,12 +27,10 @@ function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = sanitizeRelativePath(searchParams.get("callbackUrl") ?? "/");
-  const beaconOrigin = searchParams.get("beaconOrigin");
   const token = readPasswordResetToken(searchParams);
   const invalidToken = isInvalidPasswordResetToken(searchParams);
   const { sessionPending, redirecting: redirectingSignedInUser } = useRedirectAuthenticatedFromAuthSurface({
     callbackUrl,
-    beaconOrigin,
   });
   const passwordId = useId();
   const confirmPasswordId = useId();
@@ -41,14 +39,8 @@ function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const authSearchParams = {
-    beaconOrigin,
-  };
-  const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl, {
-    ...authSearchParams,
-    [PASSWORD_RESET_QUERY]: "1",
-  });
-  const forgotPasswordHref = buildTowerAuthSurfaceHref("/forgot-password", callbackUrl, authSearchParams);
+  const signInHref = buildTowerAuthSurfaceHref("/sign-in", callbackUrl, { [PASSWORD_RESET_QUERY]: "1" });
+  const forgotPasswordHref = buildTowerAuthSurfaceHref("/forgot-password", callbackUrl);
 
   const authBusy = sessionPending || redirectingSignedInUser;
   const showAuthSkeleton = useDeferredLoadingIndicator(authBusy);

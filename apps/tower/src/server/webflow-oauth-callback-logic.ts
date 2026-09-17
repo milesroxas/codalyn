@@ -1,16 +1,27 @@
 /**
  * Webflow OAuth callback classification.
- * @see https://developers.webflow.com/data/v2.0.0/reference/oauth-app — callback includes `code`; `state` is optional.
+ *
+ * Every authorization request Tower starts carries a `state` it minted — the dashboard flow keeps it
+ * in an httpOnly cookie, the Designer flow in a DB row bound to the user, workspace and Webflow
+ * identity — and the registered Marketplace install URL is Tower's own `/api/integrations/webflow/authorize`,
+ * so Marketplace installs mint a state too. A callback that arrives without one therefore never
+ * belongs to a flow Tower started and is refused before any code exchange (Marketplace guidelines,
+ * "OAuth": include a unique `state` on every authorization request and verify it before exchanging
+ * the code). The former "Webflow-initiated install" branch, which exchanged a state-less code and
+ * bound the resulting token to whichever admin session happened to be signed in, is gone
+ * (auth review 2026-09-18): a forwarded callback URL could plant a third party's Webflow
+ * authorization into the victim's workspace.
+ *
+ * @see https://developers.webflow.com/data/reference/oauth-app — callback carries `code` and, when the
+ * request included it, `state`.
  */
-
-import { WEBFLOW_OAUTH_AUTHORIZATION_CODE_TTL_MS } from "@/server/webflow-oauth-config";
 
 export type WebflowOAuthCallbackRouteKind =
   | "oauth_error"
   | "missing_code"
+  | "missing_state"
   | "tower_cookie_state"
-  | "tower_db_state"
-  | "webflow_initiated_install";
+  | "tower_db_state";
 
 export type WebflowOAuthCallbackQuery = {
   code: string | null;
@@ -29,16 +40,11 @@ export function classifyWebflowOAuthCallback(query: WebflowOAuthCallbackQuery): 
   }
   const state = query.state?.trim() ?? "";
   if (!state) {
-    return "webflow_initiated_install";
+    return "missing_state";
   }
   const cookieExpected = query.cookieExpectedState?.trim() ?? "";
   if (cookieExpected && cookieExpected === state) {
     return "tower_cookie_state";
   }
   return "tower_db_state";
-}
-
-export function isWebflowOAuthAuthorizationCodeExpired(createdAt: Date, nowMs: number = Date.now()): boolean {
-  const ageMs = nowMs - createdAt.getTime();
-  return ageMs < 0 || ageMs > WEBFLOW_OAUTH_AUTHORIZATION_CODE_TTL_MS;
 }

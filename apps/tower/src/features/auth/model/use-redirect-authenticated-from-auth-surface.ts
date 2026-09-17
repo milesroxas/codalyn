@@ -9,26 +9,24 @@ import { sanitizeRelativePath } from "@/shared/lib/navigation/sanitize-relative-
 
 type UseRedirectAuthenticatedFromAuthSurfaceOptions = {
   callbackUrl: string;
-  beaconOrigin: string | null;
 };
 
 export function useRedirectAuthenticatedFromAuthSurface({
   callbackUrl,
-  beaconOrigin,
 }: UseRedirectAuthenticatedFromAuthSurfaceOptions): {
   sessionPending: boolean;
   redirecting: boolean;
 } {
   const safeCallbackUrl = sanitizeRelativePath(callbackUrl);
   const { data: session, isPending: sessionPending } = authClient.useSession();
-  const redirecting = Boolean(session?.user && readSessionEmailVerified(session.user) && !beaconOrigin);
+  const redirecting = Boolean(session?.user && readSessionEmailVerified(session.user));
 
   useEffect(() => {
-    if (beaconOrigin || sessionPending || !session?.user || !readSessionEmailVerified(session.user)) {
+    if (sessionPending || !session?.user || !readSessionEmailVerified(session.user)) {
       return;
     }
     completeTowerWebPostAuthNavigation(resolvePostAuthRedirectTarget(session.user, safeCallbackUrl));
-  }, [beaconOrigin, sessionPending, session?.user, safeCallbackUrl]);
+  }, [sessionPending, session?.user, safeCallbackUrl]);
 
   return { sessionPending, redirecting };
 }

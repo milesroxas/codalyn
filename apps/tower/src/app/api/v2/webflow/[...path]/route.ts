@@ -5,6 +5,7 @@ import { getActiveOrganizationIdForApiRequest } from "@/server/billing/session-o
 import { consumeWebflowProxy, recordMeterCost, type UsageScope } from "@/server/billing/usage-gate";
 import { verifyTowerApiRequest } from "@/server/tower-api-auth";
 import { isWebflowSiteId, linkOrganizationWebflowSites } from "@/server/webflow-organization-sites";
+import { isAllowedWebflowProxyRequest } from "@/server/webflow-proxy-allowlist";
 import { hasWebflowOAuthCredentials, resolveActiveOrganizationWebflowToken } from "@/server/webflow-proxy-token";
 import { handleWebflowUpstreamRevocation } from "@/server/webflow-upstream-revocation";
 
@@ -31,6 +32,26 @@ function assertSafeWebflowProxySegments(segments: string[]): Response | null {
     }
   }
   return null;
+}
+
+/**
+ * Only the Data API calls Beacon makes are forwarded (webflow-proxy-allowlist.ts); the workspace token
+ * never reaches an endpoint the extension has no feature for. Returns the 403 to send back, or null.
+ */
+function assertAllowedWebflowProxyRequest(req: Request, segments: string[], userId: string): Response | null {
+  if (isAllowedWebflowProxyRequest(req.method, segments)) {
+    return null;
+  }
+  console.warn(`[tower/webflow-proxy] refused ${req.method} /${segments.join("/")} for user ${userId}`);
+  return Response.json(
+    { error: "proxy_route_not_allowed", hint: "This Webflow Data API call is not part of Beacon." },
+    { status: 403, headers: { "Cache-Control": "no-store" } }
+  );
+}
+
+/** Path shape first, then the Beacon allowlist; the 4xx to send back, or null when the call may proceed. */
+function guardWebflowProxyPath(req: Request, segments: string[], userId: string): Response | null {
+  return assertSafeWebflowProxySegments(segments) ?? assertAllowedWebflowProxyRequest(req, segments, userId);
 }
 
 /** Meters the call against the caller's entitlement; returns the usage scope, or the 4xx to send back. */
@@ -68,13 +89,12 @@ async function forward(req: Request, segments: string[]) {
   if (!auth.ok) {
     return auth.response;
   }
-  const badPath = assertSafeWebflowProxySegments(segments);
+  const badPath = guardWebflowProxyPath(req, segments, auth.userId);
   if (badPath) {
     return badPath;
   }
   const stored = await resolveActiveOrganizationWebflowToken({ userId: auth.userId, request: req });
-  const webflowToken = stored?.accessToken;
-  if (!stored || !webflowToken) {
+  if (!stored) {
     return Response.json(
       {
         error: "No Webflow access token available",
@@ -101,7 +121,7 @@ async function forward(req: Request, segments: string[]) {
 
   const method = req.method;
   const outHeaders = new Headers();
-  outHeaders.set("Authorization", `Bearer ${webflowToken}`);
+  outHeaders.set("Authorization", `Bearer ${stored.accessToken}`);
   outHeaders.set("Accept", req.headers.get("Accept") ?? "application/json");
 
   const contentType = req.headers.get("Content-Type");

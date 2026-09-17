@@ -23,14 +23,12 @@ function RequestAccessLoading() {
 function RequestAccessContent() {
   const searchParams = useSearchParams();
   const callbackUrl = sanitizeRelativePath(searchParams.get("callbackUrl") ?? "/");
-  const beaconOrigin = searchParams.get("beaconOrigin");
   const { sessionPending, redirecting: redirectingSignedInUser } = useRedirectAuthenticatedFromAuthSurface({
     callbackUrl,
-    beaconOrigin,
   });
   const [available, setAvailable] = useState<boolean | null>(null);
 
-  const signInHref = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}${beaconOrigin ? `&beaconOrigin=${encodeURIComponent(beaconOrigin)}` : ""}`;
+  const signInHref = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
   useEffect(() => {
     let cancelled = false;

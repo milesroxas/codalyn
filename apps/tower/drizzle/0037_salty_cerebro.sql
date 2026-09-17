@@ -1,0 +1,1 @@
+DROP TABLE "webflow_oauth_install_code" CASCADE;

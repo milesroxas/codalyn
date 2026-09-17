@@ -1,10 +1,10 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { emailMayRegister, grantEarlyAccess, userMaySignIn } from "@/server/access/early-access";
 import { isTowerEarlyAccessGateEnabled } from "@/server/access/early-access-feature";
 import { auth } from "@/server/auth";
 import type { WebflowResolvedDesignerUser } from "@/server/webflow-resolve-designer-id-token";
 import { db } from "@/shared/lib/db";
-import { user } from "@/shared/lib/db/auth-schema";
+import { account, session, user } from "@/shared/lib/db/auth-schema";
 
 type UserRow = typeof user.$inferSelect;
 
@@ -56,6 +56,46 @@ async function findUserByEmail(email: string): Promise<UserRow | null> {
   return row ?? null;
 }
 
+/** Better Auth `account.providerId` of an email + password credential. */
+const CREDENTIAL_PROVIDER_ID = "credential";
+
+/**
+ * Whether linking a Webflow-verified Designer identity to an existing Tower account must first revoke
+ * that account's password and sessions.
+ *
+ * An unverified email + password account is not proof of anything: anyone can sign up with someone
+ * else's address and wait. If the real owner later signs in through the Designer, Webflow has verified
+ * the address, and the exchange links it to that pre-created account — and marks it verified, which
+ * would switch on the password the impostor chose (account pre-hijack; same trust rule as the invite
+ * model: `emailVerified` only ever follows genuine ownership proof, and a credential minted before
+ * that proof is not the owner's). So the credential is dropped and every session revoked; the owner
+ * sets a password through the email reset, which only their inbox can complete. Verified accounts
+ * and accounts with no password are untouched.
+ */
+export function mustRevokeCredentialBeforeDesignerLink(existing: {
+  emailVerified: boolean;
+  hasCredentialAccount: boolean;
+}): boolean {
+  return !existing.emailVerified && existing.hasCredentialAccount;
+}
+
+async function hasCredentialAccount(userId: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: account.id })
+    .from(account)
+    .where(and(eq(account.userId, userId), eq(account.providerId, CREDENTIAL_PROVIDER_ID)))
+    .limit(1);
+  return rows.length > 0;
+}
+
+/** Drops the password credential and every session of a not-yet-verified account before the Designer link. */
+async function revokeUnverifiedCredential(userId: string): Promise<void> {
+  await db.delete(account).where(and(eq(account.userId, userId), eq(account.providerId, CREDENTIAL_PROVIDER_ID)));
+  await db.delete(session).where(eq(session.userId, userId));
+  // User id only — no email in function logs.
+  console.warn(`[tower/webflow-designer] revoked the unverified password credential of user ${userId} before linking`);
+}
+
 /** Idempotently ensure a non-credential `webflow` account row links this user to the resolved Designer identity. */
 async function ensureWebflowDesignerAccountLinked(userId: string, webflowAuthorizedUserId: string): Promise<void> {
   const ctx = await auth.$context;
@@ -97,6 +137,14 @@ async function finalizeExistingDesignerUser(
 
   const linkWebflowId = row.webflowAuthorizedUserId !== resolved.id;
   const verifyEmail = !row.emailVerified;
+  if (
+    mustRevokeCredentialBeforeDesignerLink({
+      emailVerified: row.emailVerified,
+      hasCredentialAccount: verifyEmail ? await hasCredentialAccount(row.id) : false,
+    })
+  ) {
+    await revokeUnverifiedCredential(row.id);
+  }
   if (linkWebflowId || verifyEmail) {
     await db
       .update(user)

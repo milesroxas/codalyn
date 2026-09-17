@@ -1,4 +1,3 @@
-import type { BeaconTowerAuthMessageUser } from "@/features/auth/lib/beacon-opener-auth";
 import { authClient } from "@/features/auth/model/auth-client";
 
 type EmailAuthUser = {
@@ -23,13 +22,4 @@ export async function resolveUserAndTokenAfterEmailAuth(
   const u = data?.user ?? session.data?.user;
   const raw = data?.token ?? session.data?.session?.token;
   return { user: u, token: typeof raw === "string" ? raw : undefined };
-}
-
-export function userToBeaconPayload(u: EmailAuthUser): BeaconTowerAuthMessageUser {
-  return {
-    id: String(u.id),
-    email: String(u.email ?? ""),
-    name: u.name,
-    image: u.image,
-  };
 }

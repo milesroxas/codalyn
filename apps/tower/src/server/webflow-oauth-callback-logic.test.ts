@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  classifyWebflowOAuthCallback,
-  isWebflowOAuthAuthorizationCodeExpired,
-} from "@/server/webflow-oauth-callback-logic";
+import { classifyWebflowOAuthCallback } from "@/server/webflow-oauth-callback-logic";
 
 describe("classifyWebflowOAuthCallback", () => {
   it("returns oauth_error when Webflow sends error", () => {
@@ -29,7 +26,7 @@ describe("classifyWebflowOAuthCallback", () => {
     ).toBe("missing_code");
   });
 
-  it("returns webflow_initiated_install when code is present without state", () => {
+  it("returns missing_state when code is present without state — a state-less callback never belongs to a flow Tower started", () => {
     expect(
       classifyWebflowOAuthCallback({
         code: "auth_code",
@@ -38,10 +35,10 @@ describe("classifyWebflowOAuthCallback", () => {
         oauthErrorDescription: null,
         cookieExpectedState: undefined,
       })
-    ).toBe("webflow_initiated_install");
+    ).toBe("missing_state");
   });
 
-  it("returns webflow_initiated_install when state is empty", () => {
+  it("returns missing_state when state is empty", () => {
     expect(
       classifyWebflowOAuthCallback({
         code: "auth_code",
@@ -50,7 +47,7 @@ describe("classifyWebflowOAuthCallback", () => {
         oauthErrorDescription: null,
         cookieExpectedState: undefined,
       })
-    ).toBe("webflow_initiated_install");
+    ).toBe("missing_state");
   });
 
   it("returns tower_cookie_state when state matches the Tower OAuth cookie", () => {
@@ -75,17 +72,5 @@ describe("classifyWebflowOAuthCallback", () => {
         cookieExpectedState: undefined,
       })
     ).toBe("tower_db_state");
-  });
-});
-
-describe("isWebflowOAuthAuthorizationCodeExpired", () => {
-  it("is false within 15 minutes", () => {
-    const createdAt = new Date("2026-06-11T16:00:00.000Z");
-    expect(isWebflowOAuthAuthorizationCodeExpired(createdAt, Date.parse("2026-06-11T16:14:00.000Z"))).toBe(false);
-  });
-
-  it("is true after 15 minutes", () => {
-    const createdAt = new Date("2026-06-11T16:00:00.000Z");
-    expect(isWebflowOAuthAuthorizationCodeExpired(createdAt, Date.parse("2026-06-11T16:15:01.000Z"))).toBe(true);
   });
 });

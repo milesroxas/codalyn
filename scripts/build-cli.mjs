@@ -493,6 +493,20 @@ const FORBIDDEN_RELEASE_ENV = {
         "remove the override from your .env* files or CI environment, or delete this " +
         "FORBIDDEN_RELEASE_ENV entry once telemetry is cleared to ship (and update the disclosure)",
     },
+    // App Review Preflight "Silent Canvas Mutations" (re-flagged on every scan through 2026-09-17). The
+    // Lexical rich-text editor is withheld from Marketplace bundles: it constructs a MutationObserver on
+    // editor-root attach, which the scanner reports regardless of what the observer watches. `true`
+    // bundles the editor again and needs an App Update review of its own.
+    {
+      key: "VITE_BEACON_RICH_TEXT_EDITOR_ENABLED",
+      rejected: "true",
+      problem:
+        "bundles the Lexical rich-text editor, which is withheld from the current Marketplace submission — " +
+        "it reintroduces the MutationObserver that App Review Preflight flags as a silent canvas mutation",
+      hint:
+        "remove the override from your .env* files or CI environment, or delete this " +
+        "FORBIDDEN_RELEASE_ENV entry once the editor is cleared to ship",
+    },
     // Review round 8 (2026-09-17, Localization). The Marketplace build refuses CMS item writes on sites
     // with secondary locales instead of writing their primary locale; the listing says so. `primary`
     // is the documented alternative and needs its own review + listing change.
@@ -634,6 +648,28 @@ function telemetryForbiddenMarker({ appName, appPath, channel }) {
   return [{ value: "posthog", label: "a flag-gated PostHog telemetry reference" }];
 }
 
+/**
+ * The Lexical rich-text editor is flag-gated (apps/beacon/vite.config.ts,
+ * `__BEACON_RICH_TEXT_EDITOR_ENABLED__`). With the flag off — every Marketplace bundle — no trace of
+ * it may ship, which is what proves the dead-code elimination took the whole dependency (and its
+ * MutationObserver) rather than just the call site. Residual guard for the pinned count above.
+ */
+function richTextEditorForbiddenMarker({ appName, appPath, channel }) {
+  if (appName !== "beacon") {
+    return null;
+  }
+  const editorFlag = resolveViteEnvValue({
+    appPath,
+    mode: channel,
+    key: "VITE_BEACON_RICH_TEXT_EDITOR_ENABLED",
+    inlineEnv: process.env,
+  });
+  if (editorFlag?.trim() === "true") {
+    return null;
+  }
+  return [{ value: "lexical", label: "a flag-gated Lexical rich-text editor reference" }];
+}
+
 function staticForbiddenMarkers(appPath, channel, appName) {
   // Marketplace round 4 (2026-08): reviewers flag dev hosts and URL-like placeholder domains in
   // shipped bundles. Bare substrings so any scheme/port/derivative form is caught; the Vite
@@ -714,6 +750,10 @@ function staticForbiddenMarkers(appPath, channel, appName) {
   if (telemetryMarkers) {
     forbidden.push(...telemetryMarkers);
   }
+  const richTextEditorMarkers = richTextEditorForbiddenMarker({ appName, appPath, channel });
+  if (richTextEditorMarkers) {
+    forbidden.push(...richTextEditorMarkers);
+  }
   return forbidden;
 }
 
@@ -769,10 +809,15 @@ function pinnedMarkerCounts(appName, channel) {
       note: "the single egress point is extensionFetch in apps/beacon/src/shared/lib/extension-egress.ts",
     },
     {
+      // App Review Preflight reported "Silent Canvas Mutations" on this token in four consecutive scans
+      // (R7b.11 → R8.7). The only construction was Lexical's contenteditable sync, scoped to the editor
+      // inside the extension panel; it is now flag-gated out of Marketplace bundles
+      // (VITE_BEACON_RICH_TEXT_EDITOR_ENABLED, compliance doc R8.8), so the shipped inventory is zero.
+      // Beacon writes to the canvas only through the Designer API, on an explicit user action.
       pattern: /new MutationObserver\(/g,
       label: "MutationObserver construction",
-      expected: 1,
-      note: "Lexical's contenteditable sync in the rich-text chunk (compliance doc R7b.11 open decision)",
+      expected: 0,
+      note: "Beacon ships none; the rich-text editor that constructed one is withheld by release flag (R8.8)",
     },
     {
       // Review round 8 (2026-09-17) "CSP permits inline style attributes": the shipped policy is now

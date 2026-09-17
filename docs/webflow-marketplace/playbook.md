@@ -85,7 +85,8 @@ unzip -l "$M" | grep -c 'styles.css.map'                     # 1 — every gener
 unzip -p "$Z" '*.js' | grep -oiE 'https?://[^"'"'"'` )]*' | grep -viE '^https://|www\.w3\.org' | wc -l   # 0 http:// (W3C namespaces exempt)
 unzip -p "$Z" '*.js' | grep -cE '\.(inner|outer)HTML\s*=[^=]|insertAdjacentHTML\(|document\.write\('  # 0 HTML-sink writes
 unzip -p "$Z" '*.js' | grep -cE '(^|[^A-Za-z0-9_$.])fetch\('  # 1 — the extensionFetch chokepoint only (R7b.12; build gate pins it)
-unzip -p "$Z" '*.js' | grep -c 'new MutationObserver'        # 1 — Lexical's contenteditable observer only (R7b.11/12 open item; build gate pins it)
+unzip -p "$Z" '*.js' | grep -c 'new MutationObserver'        # 0 — Beacon ships none; the Lexical editor that had one is flag-gated out (R8.8; build gate pins it)
+unzip -p "$Z" '*.js' | grep -aci 'lexical'                   # 0 — rich-text editor withheld from Marketplace bundles (R8.8; build gate forbids it)
 unzip -p "$Z" '*.js' | grep -c 'window.open(\|postMessage('   # 0
 unzip -p "$Z" '*.js' '*.html' | grep -aci 'posthog'          # 0 — telemetry SDK withheld from Marketplace bundles (R8.2; build gate forbids it)
 unzip -p "$Z" '*.js' | grep -acE 'redirect:["'"'"'`]error'    # ≥1 — extensionFetch pins redirect mode to error (R8.3)
@@ -97,7 +98,7 @@ unzip -p "$Z" index.html | grep -c "unsafe-inline"            # 0 (R8.5)
 ```
 
 Anything off its expected value → fix, rebuild, re-run. Never edit a zip by hand. The pinned counts
-(`fetch(` 1, `MutationObserver` 1, `setAttribute("style"` 2) are enforced by `pinnedMarkerCounts` in
+(`fetch(` 1, `MutationObserver` 0, `setAttribute("style"` 2) are enforced by `pinnedMarkerCounts` in
 `scripts/build-cli.mjs` (dist + zip): a new site anywhere in the artifact fails `build:prod` before
 you can upload it.
 
@@ -271,13 +272,16 @@ predicted). Lesson: the rule keys on the bare `fetch(` token — posthog's XHR/s
 the same artifact drew no evidence — so replacing a vendor request layer with first-party calls only
 moves the evidence slots. Fix: `shared/lib/extension-egress.ts` is the one `fetch` in the bundle,
 with the destination policy (exact Tower origin, Webflow asset-upload allowlist) at the call site;
-`pinnedMarkerCounts` in `build-cli.mjs` pins `fetch(` = 1 and `new MutationObserver(` = 1 on dist +
-zip; a source sweep test forbids any other first-party `fetch`/observer. Lexical: kept — its
-observer gates Lexical's own DOM reconcile and evicts browser-inserted IME nodes; stubbing it
-duplicates text for CJK users, and every contenteditable editor carries the same constructor. Answer
-with the rationale in compliance doc § R7b.12; the fallback is a product change (non-contenteditable
-CMS rich-text field), Miles's call.
-Full write-up: compliance doc § R7b.12.
+`pinnedMarkerCounts` in `build-cli.mjs` pins `fetch(` = 1 and `new MutationObserver(` = 0 on dist +
+zip; a source sweep test forbids any other first-party `fetch`/observer. Lexical: **withdrawn**
+(2026-09-17, R8.8) after the finding recurred on four consecutive scans — stubbing the observer was
+never an option (it gates Lexical's own DOM reconcile and evicts browser-inserted IME nodes, so a stub
+duplicates text for CJK users) and every contenteditable editor carries the same constructor, so the
+editor itself moved behind a release flag and the reduced build composes `richText` props as HTML in a
+textarea. Lesson: when a scanner finding is the token rather than the behaviour, the two honest exits
+are a rationale the reviewer accepts or removing the feature from the artifact — decide which after the
+second recurrence, not the fourth.
+Full write-up: compliance doc § R7b.12 → § R8.8.
 Outcome: the fourth scan on the 13:22 build reported exactly the pinned inventory — one `fetch`
 location (`extensionFetch`, policy visible in the excerpt) and the one Lexical observer. That is
 the floor for a backend-backed extension shipping a contenteditable editor; do not chase it

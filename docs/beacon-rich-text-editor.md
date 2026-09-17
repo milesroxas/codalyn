@@ -130,14 +130,18 @@ is code-split out of the main Composer chunk and only loads when a rich-text fie
 
 Runtime footer: **no new dependencies** — it stays a hand-rolled IIFE.
 
-Marketplace review note (2026-09): Lexical's core constructs a `MutationObserver` on the contenteditable
-root when the editor mounts (`initMutationObserver`). Webflow's App Review Preflight reports every such
-constructor as "Silent Canvas Mutations" regardless of target. It is load-bearing — `$commitPendingUpdates`
-gates Lexical's DOM reconcile on it, and `flushMutations` evicts browser-inserted IME text nodes — so it is
-kept as the bundle's one accepted observer, pinned by count in the release build and answered with the
-rationale in `docs/webflow-marketplace/compliance-record.md` § R7b.12. Swapping to another contenteditable editor
-would not change this (ProseMirror/TipTap, Slate, Quill all construct one); only a non-contenteditable
-field would. Do not add a second observer anywhere in Beacon.
+Marketplace review note (2026-09-17, superseding the earlier "kept as the one accepted observer" note):
+**the editor is withheld from Marketplace bundles.** Lexical's core constructs a `MutationObserver` on the
+contenteditable root when the editor mounts (`initMutationObserver`), and Webflow's App Review Preflight
+reports every such constructor as "Silent Canvas Mutations" regardless of target — four scans in a row.
+The observer is load-bearing (`$commitPendingUpdates` gates Lexical's DOM reconcile on it, `flushMutations`
+evicts browser-inserted IME text nodes), so it cannot be stubbed, and every other contenteditable editor
+carries the same constructor (ProseMirror/TipTap, Slate, Quill). The editor therefore sits behind the
+`VITE_BEACON_RICH_TEXT_EDITOR_ENABLED` release flag: unset (every Marketplace bundle) the dynamic import
+is dead-code-eliminated, `new MutationObserver(` in the zip is pinned to **0**, any `lexical` trace fails
+the release build, and a `richText` prop is composed as HTML in a plain `<Textarea>`. Flag on, everything
+below applies unchanged. Full write-up: `docs/webflow-marketplace/compliance-record.md` § R8.8.
+Do not add an observer anywhere in Beacon.
 
 ---
 

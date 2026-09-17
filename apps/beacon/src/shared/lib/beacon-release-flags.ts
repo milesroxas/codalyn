@@ -11,6 +11,7 @@
  * | --------------------------------------- | ----------------- | --------------------------------------------- |
  * | `VITE_BEACON_TELEMETRY_ENABLED`         | unset / `false`   | `true` bundles posthog-js (opt-in, redacted)  |
  * | `VITE_BEACON_LOCALIZED_SITE_CMS_WRITES` | unset / `blocked` | `primary` writes the primary locale explicitly |
+ * | `VITE_BEACON_RICH_TEXT_EDITOR_ENABLED`   | unset / `false`   | `true` bundles the Lexical editor              |
  *
  * Read the flags only through these helpers so tests can mock one module.
  */
@@ -41,4 +42,24 @@ export type LocalizedSiteCmsWritePolicy = "blocked" | "primary";
 
 export function resolveLocalizedSiteCmsWritePolicy(): LocalizedSiteCmsWritePolicy {
   return import.meta.env.VITE_BEACON_LOCALIZED_SITE_CMS_WRITES?.trim() === "primary" ? "primary" : "blocked";
+}
+
+/**
+ * The Lexical rich-text editor for Webflow `richText` props in the CMS Slots composer. Off — every
+ * Marketplace bundle — the editor's dynamic import folds away, Lexical is not in the zip, and the
+ * prop is composed as HTML in a plain multiline textarea (what shipped before commit `11baf76`).
+ * On, the composer mounts the WYSIWYG editor.
+ *
+ * Why it is withheld: Lexical constructs a `MutationObserver` unconditionally when its editor root
+ * attaches and gates every DOM reconcile on it, which App Review Preflight reports as "Silent Canvas
+ * Mutations" on every scan (compliance doc R7b.11 → R8.8). The observer only ever watched the
+ * editor's own `contenteditable` inside the extension panel — it never touched the Webflow canvas —
+ * but with the flag off the shape is absent from the artifact rather than argued about.
+ *
+ * Backed by the `__BEACON_RICH_TEXT_EDITOR_ENABLED__` build constant rather than `import.meta.env`
+ * so `__BEACON_RICH_TEXT_EDITOR_ENABLED__ ? lazy(() => import(…)) : null` folds to `null` and Rollup
+ * drops the chunk entirely.
+ */
+export function isBeaconRichTextEditorEnabled(): boolean {
+  return __BEACON_RICH_TEXT_EDITOR_ENABLED__;
 }

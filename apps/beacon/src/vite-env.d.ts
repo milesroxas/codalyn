@@ -17,6 +17,14 @@ declare const __QUALITY_COMPARE_POPOUT_ENABLED__: boolean;
  * consent prompt renders and the CSP carries no telemetry host. Marketplace bundles ship it off.
  */
 declare const __BEACON_TELEMETRY_ENABLED__: boolean;
+/**
+ * Build-time gate for the Lexical rich-text editor (see vite.config.ts and
+ * shared/lib/beacon-release-flags.ts). `false` unless `VITE_BEACON_RICH_TEXT_EDITOR_ENABLED=true`:
+ * the editor's dynamic import is dead-code-eliminated, a Webflow `richText` prop is composed in a
+ * plain multiline textarea, and no `MutationObserver` ships. Marketplace bundles ship it off
+ * (App Review Preflight "Silent Canvas Mutations", compliance doc R8.8).
+ */
+declare const __BEACON_RICH_TEXT_EDITOR_ENABLED__: boolean;
 
 interface ImportMetaEnv {
   readonly VITE_BUNDLE_RECIPIENT?: string;
@@ -50,4 +58,11 @@ interface ImportMetaEnv {
    * Release builds refuse `primary` (FORBIDDEN_RELEASE_ENV in scripts/build-cli.mjs).
    */
   readonly VITE_BEACON_LOCALIZED_SITE_CMS_WRITES?: string;
+  /**
+   * Enable switch for the Lexical rich-text editor in the CMS Slots composer: off unless exactly
+   * `"true"`. Off, a `richText` prop is edited as HTML in a plain textarea and Lexical is not
+   * bundled. Release builds refuse `true` (FORBIDDEN_RELEASE_ENV in scripts/build-cli.mjs); the
+   * `__BEACON_RICH_TEXT_EDITOR_ENABLED__` constant is what code reads.
+   */
+  readonly VITE_BEACON_RICH_TEXT_EDITOR_ENABLED?: string;
 }

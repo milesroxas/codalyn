@@ -425,14 +425,13 @@ describe("pinnedMarkerCounts (App Review Preflight: External API Calls / Silent 
   const pinned = pinnedMarkerCounts("beacon", "production");
   const clean =
     "async function a(e,t){return fetch(e,t)}" +
-    "e._observer=new MutationObserver((t,n)=>{yt(e,t,n)})" +
     // The two Designer API canvas placeholder writes (review round 8, CSP style-src-attr 'none').
     `r.setAttribute("style",ph());await d.setAttribute("style",ph())`;
 
-  it("pins exactly one bare fetch(, one MutationObserver construction and two canvas style-attribute writes in Beacon release output", () => {
+  it("pins one bare fetch(, no MutationObserver construction and two canvas style-attribute writes in Beacon release output", () => {
     expect(pinned.map((m) => [m.label, m.expected])).toEqual([
       ["bare fetch( call", 1],
-      ["MutationObserver construction", 1],
+      ["MutationObserver construction", 0],
       ["style-attribute write (setAttribute)", 2],
     ]);
     expect(() => assertPinnedMarkerCounts(clean, pinned, "Build output")).not.toThrow();
@@ -446,13 +445,17 @@ describe("pinnedMarkerCounts (App Review Preflight: External API Calls / Silent 
   });
 
   it("fails the build when a dependency adds a MutationObserver", () => {
-    const leaked = `${clean};const o=new MutationObserver(()=>{})`;
-    expect(() => assertPinnedMarkerCounts(leaked, pinned, "Build output")).toThrow(/2 MutationObserver constructions/);
+    // Lexical's editor observer is the shape this pin exists for; it is flag-gated out of Marketplace
+    // bundles (R8.8), so even one construction now fails the build.
+    const leaked = `${clean};e._observer=new MutationObserver((t,n)=>{yt(e,t,n)})`;
+    expect(() => assertPinnedMarkerCounts(leaked, pinned, "Build output")).toThrow(
+      /1 MutationObserver construction, expected exactly 0/
+    );
   });
 
   it("fails when the inventory shrinks too, so the compliance doc is updated with it", () => {
     expect(() => assertPinnedMarkerCounts("fetch(e)", pinned, "Build output")).toThrow(
-      /0 MutationObserver constructions, expected exactly 1/
+      /0 style-attribute write \(setAttribute\)s, expected exactly 2/
     );
   });
 

@@ -31,6 +31,9 @@ export default defineConfig({
     // consent prompt / Privacy switch stories render the enabled UI, and the telemetry-off variants
     // take the state as a prop.
     __BEACON_TELEMETRY_ENABLED__: JSON.stringify(true),
+    // The Lexical rich-text editor is flag-gated off in Marketplace bundles; the catalog still
+    // documents it (`UI/RichTextEditor`), so Storybook builds it with the flag on.
+    __BEACON_RICH_TEXT_EDITOR_ENABLED__: JSON.stringify(true),
   },
   resolve: {
     alias: {

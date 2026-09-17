@@ -2683,3 +2683,134 @@ the panel renders and a CMS Slots install/sync still uploads (grant path) with t
 free of CSP violations, run App Review Preflight on the zip + `.sourcemaps.zip`, then Publish → Upload
 Bundle for Review + the submit form (App Update) with SUBMIT.md.
 
+
+### R8.7 App Review Preflight bundle scan on the 09-17 15:53 artifact — the two pinned residue items, as predicted (2026-09-17)
+
+Scan target confirmed by the evidence paths: `assets/label-CFNV_vRh.js` and
+`assets/rich-text-editor-_M_BWMpT.js` are chunk names that exist only in
+`v0.1.0_public_09-17_15-53-42.zip` (sha256 `27372473…e0cf`, source `270808d`) — the artifact filed
+under R8 and listed in [SUBMIT.md](SUBMIT.md) §1. Two findings, both `REQUIRED`, **one evidence
+location each**, no IDs, generic next-move text. This is the outcome SUBMIT.md §2 recorded in
+advance as the expected pass condition.
+
+| Finding (verbatim title) | Priority | Evidence location | Actual match (artifact-verified) | Change from R7b.13 | Evidence state |
+| --- | --- | --- | --- | --- | --- |
+| External API Calls — "Review third-party data egress." | unassigned | `assets/label-CFNV_vRh.js:1` | `extensionFetch` — the bundle's only bare `fetch(`. The printed excerpt is the function itself: destination classifier (`` `webflow-asset-upload` `` / `null` → `Promise.reject(new EgressPolicyError)`), grant consumption, `fetch(e,{...t,redirect:`error`})`, then the Tower reachability message. | unchanged (1) | artifact-verified |
+| Silent Canvas Mutations — "Modifications must be user-initiated. No background loops/observers writing to canvas." | unassigned | `assets/rich-text-editor-_M_BWMpT.js:3` | Lexical's `initMutationObserver` (`e._observer=new MutationObserver(...)`) — the R7b.11 open decision. **The printed excerpt is offset:** it shows Lexical's internal immutable-map class (`_mutable` / `_nursery` / `clone`), which sits ~5 KB into the same 31,676-byte minified line. Line 3 carries exactly one `new MutationObserver(`. | unchanged (1) | artifact-verified |
+
+**Independent sweep on the scanned zip (2026-09-17, read-only, extracted from the same sha256):**
+pinned inventory is exactly as gated — bare `fetch(` **1**, `new MutationObserver(` **1**,
+`setAttribute("style"` **2**. Forbidden shapes: `window.open(` 0 · `postMessage(` 0 · `outerHTML` 0 ·
+`insertAdjacentHTML(` 0 · `document.write(` 0 · `ws://` 0 · `?token=`/`&token=` 0 · `.toBlob(` 0 ·
+`toDataURL` 0 · `getImageData` 0 · `posthog` 0 · `sentry` 0 · `unsafe-inline` 0 · `sourceMappingURL` 0.
+Two residual token classes checked and cleared: `http://` ×23 is **only** XML namespace URIs
+(`w3.org/2000/svg` ×10, `1999/xlink` ×7, `XML/1998/namespace` ×3, `1998/Math/MathML` ×3 — no network
+destination); `innerHTML` ×4 is React DOM's property-name switch cases plus `@lexical/html`'s
+serializer **reading** `.innerHTML` off a detached `div` to produce an HTML string. No write sink, no
+first-party occurrence. Nothing new appeared relative to R8.
+
+**Disposition — no code change for either finding.** Both are the enforced residue, not drift:
+
+- **External API Calls.** The token is the extension's single network call. Its destination policy is
+  source-level (`extension-egress.ts`: exact Tower origin match, or the one-shot granted create-asset
+  `uploadUrl` on the pinned host/bucket) and browser-enforced (`connect-src 'self'
+  https://tower.codalyn.app https://s3.amazonaws.com`). The Tower origin literal
+  `https://tower.codalyn.app` is already in the same chunk as the flagged excerpt, so the destination
+  is legible to a human reading it. The finding is a review prompt ("Review …"); the R7b.13 reading
+  stands — Webflow's guidelines permit a Designer Extension calling its own backend and ask for
+  disclosure in the review notes, which [SUBMIT.md](SUBMIT.md) §4 carries. The only shape-clearing
+  change would be an extension with no backend; an indirect call, a renamed binding or an XHR swap
+  would be scanner evasion and is not on the table.
+- **Silent Canvas Mutations.** The R7b.11/R7b.12/R7b.13 **open decision** is unchanged: Lexical 0.46
+  constructs the observer unconditionally on root attach and gates every DOM reconcile on it, it is
+  scoped to the editor's `contenteditable` inside the extension panel, and it never touches the
+  canvas — canvas writes go through the Designer API on explicit user action only. Fallback if the
+  rationale is ever rejected: revert `richText: "richText"` → `"multiline"` in
+  `cms-slot-composable-props.ts`, delete `shared/ui/rich-text-editor/` + the field wrapper + the eight
+  `lexical` deps, drop the observer pin to 0 (~20 files, mostly deletions; cost is the feature
+  regression, users hand-type HTML). Owner Miles.
+
+**Round-8 review-team precedent:** the same two items were answered in R7b.20 and the review team did
+**not** raise them in the 2026-09-17 feedback. Preflight re-flags them mechanically on every build
+because the tokens are present by design.
+
+**States for the 15:53 artifact:** Source ✓ (`270808d`) · Artifact ✓ · **Preflight-scanned ✓
+(2026-09-17; residue = pinned inventory)** · Installed ✗ · Runtime ✗ (CSP style audit only, see R8.5) ·
+Submitted ✗ · Accepted ✗. The `wfpre_` receipt from **this** run is the one to paste into the form —
+it is the run on the artifact being submitted. Next: deploy Tower (privacy policy), install the zip on
+`beacon-demo`, confirm the panel renders and a CMS Slots install/sync still uploads through the grant
+path with the extension console free of CSP violations, then Publish → Upload Bundle for Review with
+SUBMIT.md.
+
+### R8.8 Silent Canvas Mutations closed — the Lexical rich-text editor is withheld by release flag (2026-09-17)
+
+**Decision (owner Miles, 2026-09-17):** end the R7b.11 open decision by removing the shape instead of
+arguing it, and keep the feature in the repo behind a build-time release flag — the same mechanism the
+telemetry SDK uses (R8.2), not a deletion. Four consecutive Preflight scans (R7b.11 → R8.7) reported
+"Silent Canvas Mutations" on Lexical's `initMutationObserver`; the observer only ever watched the
+editor's own `contenteditable` inside the extension panel and never the canvas, but reachability is not
+a defense against a static scan and the finding was never going to stop recurring on its own.
+
+| Flag | Marketplace build | Other value (needs its own App Update) |
+| --- | --- | --- |
+| `VITE_BEACON_RICH_TEXT_EDITOR_ENABLED` | unset → no Lexical bundled; a `richText` prop is composed as HTML in a plain multiline textarea | `true` → the WYSIWYG editor, as shipped since `11baf76` |
+
+**Change**
+
+- `shared/lib/beacon-release-flags.ts`: `isBeaconRichTextEditorEnabled()`, backed by the
+  `__BEACON_RICH_TEXT_EDITOR_ENABLED__` build constant (`vite.config.ts` `define`, resolved from
+  `VITE_BEACON_RICH_TEXT_EDITOR_ENABLED`; Vitest and Storybook pin it **on** so the editor stays
+  testable and catalogued).
+- `features/cms-slots/ui/cms-slot-composer-panel/composer-rich-text-field.tsx`: the module-scope
+  binding is now `__BEACON_RICH_TEXT_EDITOR_ENABLED__ ? lazy(() => import("@/shared/ui/rich-text-editor")…) : null`,
+  so with the flag off the ternary folds to `null` at build time and Rollup drops the whole `import()`.
+  The reduced render path is the editable multiline `Textarea` this field used before `11baf76`;
+  `value`/`onChange` are still the prop's HTML string and sanitization still happens at the model
+  boundary (`cms-slot-rich-text-html.ts`), so nothing about the draft shape or the write path changed.
+  A `richTextEditorAvailable` prop defaults to the build constant so stories and tests cover both
+  states (the `telemetryAvailable` pattern from R8.2).
+- Nothing was deleted: `shared/ui/rich-text-editor/`, its plugins, its stories and the eight `lexical`
+  dependencies stay in the repo, and the model layer never imported Lexical in the first place (it uses
+  only the pure `rich-text-empty.ts` / `rich-text-url.ts` helpers), so the flag-off build is a straight
+  subtraction.
+
+**Gates (all in `scripts/build-cli.mjs`)**
+
+- `pinnedMarkerCounts`: `new MutationObserver(` **1 → 0**. Beacon now ships none; a single construction
+  fails the release build on dist *and* on the zip.
+- `FORBIDDEN_RELEASE_ENV`: `VITE_BEACON_RICH_TEXT_EDITOR_ENABLED=true` is refused on release channels.
+- `richTextEditorForbiddenMarker`: with the flag off, any `lexical` trace in dist or the zip fails the
+  build — the residual guard that proves the DCE took the dependency, not just the call site.
+- `apps/beacon/scripts/release-build-gates.test.mjs` updated to pin the new inventory and to assert that
+  one observer construction now throws.
+
+**Tests** — `composer-rich-text-field.test.tsx` (reduced form: editable textarea labelled by the prop,
+raw HTML passed through `onChange` unchanged, disabled while busy), `beacon-release-flags.test.ts`,
+story `CmsSlots/ComposerRichTextField` (`RichTextEditor` / `HtmlTextarea` / `Busy`). Full suite green
+inside the release build.
+
+**Artifact** — `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod` at the working tree after
+`270808d` (uncommitted at time of writing — commit before upload so artifact ↔ commit is traceable).
+`v0.1.0_public_09-17_16-38-04.zip` sha256
+`a22523114093272af780a7414dd703ebec385e4e2aba98829ff0c626b7936ef4` (21 files, 453 KB — down from 25
+files / 536 KB: the `rich-text-editor-*`, `dropdown-menu-*`, `badge-*` and `popover-*` chunks are gone,
+Rollup re-chunked the rest) + `.sourcemaps.zip` sha256
+`db4fffb4df4bb6505d285f01093ed2821dd258ba2469076a939d1a2368d9a340` (private form field).
+
+**Independent sweep on the zip:** bare `fetch(` **1** · `new MutationObserver(` **0** ·
+`setAttribute("style"` **2** · `lexical` **0** · `posthog` **0** · `sentry` **0** · `unsafe-inline` **0**.
+`contenteditable` ×6 are React DOM's own property-name switch cases and selection-restore checks — Beacon
+renders no editable element. Every chunk name in the R8.7 evidence paths is gone, so the next scan cannot
+be confused with the previous artifact.
+
+**What is left.** External API Calls ×1 stands, with the R7b.13/R8.7 disposition unchanged: it is the
+extension's single network call, its destination policy is source-level and CSP-enforced, and Webflow's
+guidelines permit a Designer Extension calling its own backend with disclosure in the review notes
+([SUBMIT.md](SUBMIT.md) §4). Expected next-scan result: **one** REQUIRED item, not two.
+
+**States:** Source ✓ · Artifact ✓ (16:38 zip) · Preflight-scanned ✗ (re-run required — the scanned
+artifact changed) · Installed ✗ · Runtime ✗ · Submitted ✗ · Accepted ✗. Next: commit, deploy Tower
+(privacy policy), install the 16:38 zip on `beacon-demo`, confirm the panel renders and a CMS Slots
+install/sync still uploads through the grant path with the console free of CSP violations **and the
+rich-text prop editing as a textarea**, run App Review Preflight on the zip + `.sourcemaps.zip`, then
+Publish → Upload Bundle for Review with SUBMIT.md.

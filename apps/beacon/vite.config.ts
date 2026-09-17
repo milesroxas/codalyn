@@ -107,6 +107,21 @@ function resolveTelemetryEnabled(mode: string): boolean {
 }
 
 /**
+ * Lexical rich-text editor gate (App Review Preflight "Silent Canvas Mutations", 2026-09-17). Unless
+ * `VITE_BEACON_RICH_TEXT_EDITOR_ENABLED=true`, `__BEACON_RICH_TEXT_EDITOR_ENABLED__` is defined
+ * `false`: the guarded `import("@/shared/ui/rich-text-editor")` in the CMS Slots composer is
+ * dead-code-eliminated, so the Lexical chunk — and with it the only `MutationObserver` construction
+ * in the bundle — is not in the zip, and a Webflow `richText` prop is composed in a plain multiline
+ * textarea (the pre-11baf76 behaviour). Release builds refuse an enabled flag (FORBIDDEN_RELEASE_ENV
+ * in scripts/build-cli.mjs) and forbid any "lexical" trace in the archived zip.
+ */
+function resolveRichTextEditorEnabled(mode: string): boolean {
+  const beaconEnv = loadEnv(mode, beaconRoot, "");
+  const raw = beaconEnv.VITE_BEACON_RICH_TEXT_EDITOR_ENABLED ?? process.env.VITE_BEACON_RICH_TEXT_EDITOR_ENABLED;
+  return raw?.trim() === "true";
+}
+
+/**
  * `public/` is copied into dist verbatim and Vite has no per-file exclude, so when the popout is
  * disabled its stylesheet is deleted after the copy. Runs in `closeBundle` (after Vite's public-dir
  * copy) so the file cannot ship in the extension zip.
@@ -154,6 +169,9 @@ export default defineConfig(({ mode }) => {
   // Same rule for telemetry: Vitest pins it on so the SDK wiring (consent gate, before_send redaction)
   // stays unit-testable; real builds decide what ships.
   const telemetryEnabled = isVitest || resolveTelemetryEnabled(mode);
+  // Same rule for the rich-text editor: Vitest pins it on so the Lexical field's unit/UI tests keep
+  // exercising the real editor; real builds decide what ships.
+  const richTextEditorEnabled = isVitest || resolveRichTextEditorEnabled(mode);
   return {
     base: "./",
     plugins: [
@@ -177,6 +195,7 @@ export default defineConfig(({ mode }) => {
       __BEACON_TOWER_ORIGIN__: JSON.stringify(towerOrigin),
       __QUALITY_COMPARE_POPOUT_ENABLED__: JSON.stringify(qualityPopoutEnabled),
       __BEACON_TELEMETRY_ENABLED__: JSON.stringify(telemetryEnabled),
+      __BEACON_RICH_TEXT_EDITOR_ENABLED__: JSON.stringify(richTextEditorEnabled),
     },
     resolve: {
       alias: {

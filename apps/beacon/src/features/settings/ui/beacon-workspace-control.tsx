@@ -3,8 +3,10 @@ import type {
   BeaconTowerWorkspace,
 } from "@/features/settings/model/beacon-app-settings-provider";
 import { cn } from "@/shared/lib/utils";
+import { Button } from "@/shared/ui/button";
 import {
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -12,6 +14,13 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
 const BEACON_WORKSPACE_SELECT_NONE = "__beacon_workspace_none__";
+
+/**
+ * Copy for the one-workspace, none-active state. The workspace is shown as a default but nothing is
+ * persisted until the user confirms it here (review round 8, 2026-09-17: no automatic POST).
+ */
+export const SINGLE_WORKSPACE_CONFIRM_LABEL = "Use this workspace";
+export const SINGLE_WORKSPACE_CONFIRM_HINT = "Confirm your workspace to sync team presets";
 
 type BeaconWorkspaceControlBaseProps = {
   syncState: BeaconSettingsSyncState;
@@ -65,10 +74,17 @@ export function BeaconWorkspaceSelectField({
   }
 
   if (workspaces.length === 1) {
+    const only = workspaces[0];
     return (
       <div className={wrapperClass}>
         <span className={captionClass}>Workspace</span>
-        <span className="max-w-40 truncate text-xs font-medium leading-tight">{workspaces[0].name}</span>
+        <span className="max-w-40 truncate text-xs font-medium leading-tight">{only.name}</span>
+        {activeOrganizationId === only.id ? null : (
+          // Single-workspace default is only a suggestion until the user confirms it (review round 8).
+          <Button type="button" variant="outline" size="2xs" onClick={() => onSelectWorkspace(only.id)}>
+            {SINGLE_WORKSPACE_CONFIRM_LABEL}
+          </Button>
+        )}
       </div>
     );
   }
@@ -141,10 +157,24 @@ export function BeaconWorkspaceMenuGroup({
   }
 
   if (workspaces.length === 1) {
+    const only = workspaces[0];
+    if (activeOrganizationId === only.id) {
+      return (
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className={beaconMenuSectionLabelClass}>Workspace</DropdownMenuLabel>
+          <p className="px-2 pb-1 text-foreground text-xs font-medium leading-snug">{only.name}</p>
+        </DropdownMenuGroup>
+      );
+    }
     return (
       <DropdownMenuGroup>
         <DropdownMenuLabel className={beaconMenuSectionLabelClass}>Workspace</DropdownMenuLabel>
-        <p className="px-2 pb-1 text-foreground text-xs font-medium leading-snug">{workspaces[0].name}</p>
+        <p className="px-2 pb-1 text-muted-foreground text-xs leading-snug">{SINGLE_WORKSPACE_CONFIRM_HINT}</p>
+        <DropdownMenuItem onSelect={() => onSelectWorkspace(only.id)}>
+          <span className="truncate">
+            {SINGLE_WORKSPACE_CONFIRM_LABEL}: {only.name}
+          </span>
+        </DropdownMenuItem>
       </DropdownMenuGroup>
     );
   }

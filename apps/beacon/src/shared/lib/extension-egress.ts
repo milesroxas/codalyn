@@ -1,4 +1,5 @@
 import { readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
+import { WEBFLOW_ASSET_UPLOAD_BUCKET, WEBFLOW_ASSET_UPLOAD_HOST } from "@/shared/lib/webflow-asset-upload-endpoint";
 
 /**
  * The extension's single network egress point (Webflow Marketplace review, App Review Preflight
@@ -11,16 +12,22 @@ import { readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
  *
  * 1. **Tower** — the first-party backend origin baked into this build (`__BEACON_TOWER_ORIGIN__`,
  *    `https://tower.codalyn.app` on the production channel). Auth, Webflow Data API proxying, AVIF
- *    conversion, telemetry consent state.
+ *    conversion, settings.
  * 2. **Webflow asset upload** — the presigned `uploadUrl` Webflow's create-asset endpoint hands back
- *    for the published-site runtime script: HTTPS on a Webflow-owned host or an Amazon S3 endpoint
- *    host, nothing else.
+ *    for the published-site runtime script. Only the *exact* URL string from that response is
+ *    accepted, once, after it has been registered through {@link grantWebflowAssetUpload} by the
+ *    create-asset response adapter — and only when it has the documented shape (HTTPS,
+ *    `s3.amazonaws.com`, bucket `webflow-prod-assets`). A URL that merely looks like an S3 endpoint
+ *    is refused (review round 8, 2026-09-17: "Upload allowlist accepts any S3 bucket").
+ *
+ * Requests never follow redirects: `redirect` is pinned to `"error"` for every call, so a permitted
+ * endpoint cannot bounce the request to another host the CSP happens to admit (review round 8:
+ * "Egress check does not constrain redirects"). No caller needs a redirect — Tower answers its API
+ * routes directly and the S3 POST returns a 2xx with no `success_action_redirect` field.
  *
  * Anything outside the policy is refused before a request is built (explicit
  * {@link EgressPolicyError}; nothing is partially applied), which mirrors the shipped CSP
  * `connect-src` — the policy here is the source-level control, the CSP the browser-enforced one.
- * The third-party telemetry SDK (PostHog, opt-in) ships its own transport and is disclosed
- * separately; it is not routed through this module.
  */
 
 export type EgressDestination = "tower" | "webflow-asset-upload";
@@ -28,10 +35,8 @@ export type EgressDestination = "tower" | "webflow-asset-upload";
 export class EgressPolicyError extends Error {
   readonly url: string;
 
-  constructor(url: string) {
-    super(
-      `Extension egress refused: "${describeUrlForError(url)}" is neither the Tower origin nor a Webflow asset-upload endpoint.`
-    );
+  constructor(url: string, reason = "is neither the Tower origin nor a granted Webflow asset-upload URL") {
+    super(`Extension egress refused: "${describeUrlForError(url)}" ${reason}.`);
     this.name = "EgressPolicyError";
     this.url = url;
   }
@@ -51,46 +56,51 @@ function parseUrl(raw: string): URL | null {
 }
 
 /**
- * Amazon S3 endpoint host shapes, the only AWS service Webflow's create-asset endpoint hands back a presigned
- * POST target on. Deliberately narrower than `*.amazonaws.com` (which would admit every AWS-hosted bucket and
- * every other AWS service endpoint):
- *
- * - `s3.amazonaws.com` / `s3.<region>.amazonaws.com` / `s3-<region>.amazonaws.com` — path-style (bucket in the
- *   path); this is the shape the Webflow Data API documents for `uploadUrl`.
- * - `<bucket>.s3.amazonaws.com` / `<bucket>.s3.<region>.amazonaws.com` / `<bucket>.s3-<region>.amazonaws.com` —
- *   virtual-hosted style, in case the endpoint moves to it.
- *
- * The region label must look like a real AWS region (`us-east-1`, `eu-central-1`, `us-gov-west-1`, `cn-north-1`)
- * so a service/label subdomain such as `s3.evil.amazonaws.com` cannot pose as one. The bucket label is left
- * generic on purpose: pinning Webflow's current bucket name would break the install flow the moment they rotate
- * it, and the presigned URL is already an opaque value handed back by Webflow's own authenticated endpoint.
+ * True when `raw` has the documented shape of a Webflow presigned upload URL: HTTPS, exactly the
+ * pinned S3 host (no regional, virtual-hosted or lookalike variants) and the pinned bucket as the
+ * first path segment (`webflow-asset-upload-endpoint.ts`). Shape only — the egress policy additionally requires the exact URL to
+ * have been granted from a create-asset response ({@link grantWebflowAssetUpload}).
  */
-const AWS_S3_UPLOAD_HOST_RE = /^(?:[a-z0-9][a-z0-9.-]*\.)?s3(?:[.-][a-z]{2}(?:-[a-z]+)+-\d{1,2})?\.amazonaws\.com$/;
-
-/** Webflow-owned upload/CDN hosts (apex + subdomains). */
-const WEBFLOW_UPLOAD_HOST_SUFFIXES = ["webflow.com", "website-files.com"] as const;
-
-/**
- * The presigned upload URL is the one outbound call in the install flow that does not go through
- * Tower's proxy, so it is allowlisted client-side: only HTTPS endpoints on Webflow's own hosts or on
- * an Amazon S3 endpoint host are accepted. Lookalike hosts (`amazonaws.com.evil.com`,
- * `webflow.com.evil.com`) and non-S3 AWS hosts (`evil-bucket.amazonaws.com`) are rejected — suffix
- * matching is anchored on a dot-delimited label boundary.
- */
-export function isAllowedAssetUploadUrl(raw: string): boolean {
+export function isWebflowAssetUploadUrlShape(raw: string): boolean {
   const url = parseUrl(raw);
   if (url === null || url.protocol !== "https:") {
     return false;
   }
   // `URL` already lowercases and punycodes the host; it also resolves userinfo tricks
   // (`https://s3.amazonaws.com@evil.example/`) to the real host before we ever see it.
-  const host = url.hostname;
-  for (const suffix of WEBFLOW_UPLOAD_HOST_SUFFIXES) {
-    if (host === suffix || host.endsWith(`.${suffix}`)) {
-      return true;
-    }
+  if (url.hostname !== WEBFLOW_ASSET_UPLOAD_HOST || url.username !== "" || url.password !== "") {
+    return false;
   }
-  return AWS_S3_UPLOAD_HOST_RE.test(host);
+  const [bucket] = url.pathname.split("/").filter((segment) => segment.length > 0);
+  return bucket === WEBFLOW_ASSET_UPLOAD_BUCKET;
+}
+
+/**
+ * Upload URLs the create-asset response adapter has handed to the policy, keyed by the exact string
+ * Webflow returned. One grant serves one request: {@link extensionFetch} consumes it. The set only
+ * ever holds URLs that passed {@link isWebflowAssetUploadUrlShape}.
+ */
+const grantedAssetUploadUrls = new Set<string>();
+
+/**
+ * Registers the exact `uploadUrl` from a Webflow create-asset response as a one-shot permitted
+ * destination. Called by the boundary adapter that parses that response, nowhere else. Throws
+ * {@link EgressPolicyError} (and grants nothing) when the value does not have the documented shape.
+ */
+export function grantWebflowAssetUpload(uploadUrl: string): string {
+  if (!isWebflowAssetUploadUrlShape(uploadUrl)) {
+    throw new EgressPolicyError(
+      uploadUrl,
+      "is not a Webflow presigned upload URL (expected the documented S3 host and bucket)"
+    );
+  }
+  grantedAssetUploadUrls.add(uploadUrl);
+  return uploadUrl;
+}
+
+/** Test seam only: drops every outstanding grant. */
+export function resetWebflowAssetUploadGrantsForTests(): void {
+  grantedAssetUploadUrls.clear();
 }
 
 /**
@@ -117,7 +127,7 @@ export function resolveEgressDestination(raw: string): EgressDestination | null 
   if (isTowerUrl(raw)) {
     return "tower";
   }
-  if (isAllowedAssetUploadUrl(raw)) {
+  if (grantedAssetUploadUrls.has(raw) && isWebflowAssetUploadUrlShape(raw)) {
     return "webflow-asset-upload";
   }
   return null;
@@ -126,12 +136,18 @@ export function resolveEgressDestination(raw: string): EgressDestination | null 
 /**
  * The extension's only network call. Refuses (rejects with {@link EgressPolicyError}) before
  * building a request when the destination is outside {@link resolveEgressDestination}; otherwise a
- * plain `fetch` with the caller's `init`. Callers own headers, credentials and retries
- * (`towerFetch` adds the Designer-session bearer, `towerFetchWithRetry` the 429 backoff).
+ * plain `fetch` with the caller's `init`, `redirect` pinned to `"error"` (a caller cannot opt back
+ * into following redirects). A granted upload URL is consumed by the call that uses it. Callers own
+ * headers, credentials and retries (`towerFetch` adds the Designer-session bearer,
+ * `towerFetchWithRetry` the 429 backoff).
  */
 export function extensionFetch(url: string, init?: RequestInit): Promise<Response> {
-  if (resolveEgressDestination(url) === null) {
+  const destination = resolveEgressDestination(url);
+  if (destination === null) {
     return Promise.reject(new EgressPolicyError(url));
   }
-  return fetch(url, init);
+  if (destination === "webflow-asset-upload") {
+    grantedAssetUploadUrls.delete(url);
+  }
+  return fetch(url, { ...init, redirect: "error" });
 }

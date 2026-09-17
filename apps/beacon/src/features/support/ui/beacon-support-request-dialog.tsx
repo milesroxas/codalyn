@@ -4,13 +4,13 @@ import {
   TOWER_SUPPORT_REQUEST_EMAIL_PLACEHOLDER,
   type TowerSupportRequestKind,
 } from "@codalyn/webflow-kit";
-import posthog from "posthog-js";
 import { type FormEvent, useState } from "react";
 import {
   postBeaconSupportRequest,
   supportRequestSubmitErrorMessage,
   validateSupportRequestForm,
 } from "@/features/support/model/submit-beacon-support-request";
+import { captureObservabilityEvent } from "@/shared/lib/init-observability";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
@@ -38,10 +38,7 @@ type BeaconSupportRequestDialogProps = {
  * (consent prompt, Settings → Privacy, privacy policy).
  */
 function captureBeaconSupportRequest(kind: TowerSupportRequestKind, payload: { topic: string; signedIn: boolean }) {
-  if (!posthog.__loaded) {
-    return;
-  }
-  posthog.capture(BEACON_SUPPORT_CAPTURE_EVENTS[kind], { kind, ...payload });
+  captureObservabilityEvent(BEACON_SUPPORT_CAPTURE_EVENTS[kind], { kind, ...payload });
 }
 
 function notifyUser(type: "Success" | "Error", message: string) {

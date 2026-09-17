@@ -53,6 +53,7 @@ import {
   CMS_SLOTS_ROUTE_TASK_UPDATING_LIST_TARGET,
 } from "@/shared/lib/cms-slots-feature-copy";
 import { getTowerOrigin } from "@/shared/lib/tower-client";
+import { LocalizedSiteCmsWriteBlockedError } from "@/shared/lib/webflow-cms-write-locale";
 
 type ActiveComposerState = {
   beacon: CmsSlotListOnPage;
@@ -186,6 +187,7 @@ async function applyComposerSaveCmsTemplatePath(args: {
     });
   }
   let cmsLayoutSaveFailed = false;
+  let cmsLayoutSaveBlockedMessage: string | null = null;
   try {
     onProgress?.(CMS_SLOTS_ROUTE_TASK_SAVING_CMS_LAYOUT);
     await saveCmsSlotListRuntimePayloadToCmsItem({
@@ -198,6 +200,9 @@ async function applyComposerSaveCmsTemplatePath(args: {
     });
   } catch (e) {
     cmsLayoutSaveFailed = true;
+    if (e instanceof LocalizedSiteCmsWriteBlockedError) {
+      cmsLayoutSaveBlockedMessage = e.message;
+    }
     console.warn("[cms-slots] CMS list text save", e);
   }
   if (!cmsLayoutSaveFailed) {
@@ -213,7 +218,7 @@ async function applyComposerSaveCmsTemplatePath(args: {
   if (cmsLayoutSaveFailed) {
     void webflow.notify({
       type: "Warning",
-      message: "The CMS list text field was not saved. Check Tower and try again.",
+      message: cmsLayoutSaveBlockedMessage ?? "The CMS list text field was not saved. Check Tower and try again.",
     });
   } else {
     void webflow.notify({

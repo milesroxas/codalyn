@@ -479,6 +479,33 @@ const FORBIDDEN_RELEASE_ENV = {
         "remove the override from your .env* files or CI environment, or delete this " +
         "FORBIDDEN_RELEASE_ENV entry once the popout is cleared to ship",
     },
+    // Review round 8 (2026-09-17). PostHog telemetry is withheld from Marketplace bundles: four rounds of
+    // findings targeted the SDK (web experiments, token-in-query URLs, session-replay code, now
+    // exception redaction). The reduced build ships no telemetry SDK at all; `true` bundles it again
+    // (opt-in, `before_send`-redacted) and needs an App Update review of its own.
+    {
+      key: "VITE_BEACON_TELEMETRY_ENABLED",
+      rejected: "true",
+      problem:
+        "bundles the PostHog telemetry SDK, which is withheld from the current Marketplace submission — " +
+        "the submitted privacy disclosure states this build sends no telemetry",
+      hint:
+        "remove the override from your .env* files or CI environment, or delete this " +
+        "FORBIDDEN_RELEASE_ENV entry once telemetry is cleared to ship (and update the disclosure)",
+    },
+    // Review round 8 (2026-09-17, Localization). The Marketplace build refuses CMS item writes on sites
+    // with secondary locales instead of writing their primary locale; the listing says so. `primary`
+    // is the documented alternative and needs its own review + listing change.
+    {
+      key: "VITE_BEACON_LOCALIZED_SITE_CMS_WRITES",
+      rejected: "primary",
+      problem:
+        "lets Beacon write the primary locale of sites that use Webflow Localization, which the current " +
+        "Marketplace listing states Beacon does not do",
+      hint:
+        "remove the override from your .env* files or CI environment, or delete this " +
+        "FORBIDDEN_RELEASE_ENV entry once localized-site writes are cleared to ship (and update the listing)",
+    },
   ],
 };
 
@@ -585,6 +612,28 @@ function qualityPopoutForbiddenMarker({ appName, appPath, channel }) {
   ];
 }
 
+/**
+ * PostHog telemetry is flag-gated (apps/beacon/vite.config.ts, `__BEACON_TELEMETRY_ENABLED__`). With
+ * the flag off — every Marketplace bundle — no trace of the SDK may ship: not the vendor chunk, not
+ * the consent prompt copy that names the processor, not the ingestion host in the CSP. This marker
+ * verifies the dead-code elimination end to end in dist and in the archived zip.
+ */
+function telemetryForbiddenMarker({ appName, appPath, channel }) {
+  if (appName !== "beacon") {
+    return null;
+  }
+  const telemetryFlag = resolveViteEnvValue({
+    appPath,
+    mode: channel,
+    key: "VITE_BEACON_TELEMETRY_ENABLED",
+    inlineEnv: process.env,
+  });
+  if (telemetryFlag?.trim() === "true") {
+    return null;
+  }
+  return [{ value: "posthog", label: "a flag-gated PostHog telemetry reference" }];
+}
+
 function staticForbiddenMarkers(appPath, channel, appName) {
   // Marketplace round 4 (2026-08): reviewers flag dev hosts and URL-like placeholder domains in
   // shipped bundles. Bare substrings so any scheme/port/derivative form is caught; the Vite
@@ -661,6 +710,10 @@ function staticForbiddenMarkers(appPath, channel, appName) {
   if (popoutMarkers) {
     forbidden.push(...popoutMarkers);
   }
+  const telemetryMarkers = telemetryForbiddenMarker({ appName, appPath, channel });
+  if (telemetryMarkers) {
+    forbidden.push(...telemetryMarkers);
+  }
   return forbidden;
 }
 
@@ -720,6 +773,19 @@ function pinnedMarkerCounts(appName, channel) {
       label: "MutationObserver construction",
       expected: 1,
       note: "Lexical's contenteditable sync in the rich-text chunk (compliance doc R7b.11 open decision)",
+    },
+    {
+      // Review round 8 (2026-09-17) "CSP permits inline style attributes": the shipped policy is now
+      // `style-src-attr 'none'`. React, Radix, vaul and Lexical style the extension document through
+      // the CSSOM (not governed by CSP), so the only attribute-style writes that may ship are the two
+      // Webflow Designer API calls that set the CMS Slots placeholder style on the user's *canvas*
+      // element (`DOMElement.setAttribute` in cms-slot-list-target-designer-placeholder.ts and
+      // create-cms-slot-list-target-component.ts) — a different document, outside the extension's CSP.
+      // A third site means something now writes a style attribute in the extension document.
+      pattern: /setAttribute\(\s*["'`]style["'`]/g,
+      label: "style-attribute write (setAttribute)",
+      expected: 2,
+      note: "the two Designer API canvas writes in apps/beacon/src/features/cms-slots/model (compliance doc R8.5)",
     },
   ];
 }

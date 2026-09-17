@@ -19,8 +19,19 @@ import { Button } from "@/shared/ui/button";
  * opt-in: no analytics or error reporting runs until the user chooses here (or in Settings →
  * Privacy). Escape leaves the decision unset — telemetry stays off and the prompt returns next
  * launch — so a dismissal is never silently recorded as consent either way.
+ *
+ * Builds without telemetry (`__BEACON_TELEMETRY_ENABLED__` false — every Marketplace bundle) render
+ * nothing: there is no processor to consent to, and the branch below compiles out with the copy
+ * that names it.
  */
 export function TelemetryConsentPrompt() {
+  if (!__BEACON_TELEMETRY_ENABLED__) {
+    return null;
+  }
+  return <TelemetryConsentGate />;
+}
+
+function TelemetryConsentGate() {
   const [open, setOpen] = useState(() => readTelemetryConsent() === null);
 
   if (!open) {

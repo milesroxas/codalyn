@@ -12,14 +12,20 @@ vi.mock("@/shared/lib/beacon-tower-origin", () => ({
 import {
   EgressPolicyError,
   extensionFetch,
-  isAllowedAssetUploadUrl,
+  grantWebflowAssetUpload,
   isTowerUrl,
+  isWebflowAssetUploadUrlShape,
+  resetWebflowAssetUploadGrantsForTests,
   resolveEgressDestination,
 } from "./extension-egress";
+
+/** The documented `uploadUrl` shape (Webflow create-asset reference), with a presigned key path. */
+const UPLOAD_URL = "https://s3.amazonaws.com/webflow-prod-assets/abc123/runtime.js";
 
 describe("extension egress policy (App Review Preflight: External API Calls)", () => {
   beforeEach(() => {
     towerOrigin.value = "https://tower.test";
+    resetWebflowAssetUploadGrantsForTests();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -45,14 +51,20 @@ describe("extension egress policy (App Review Preflight: External API Calls)", (
     expect(isTowerUrl("https://tower.test/api")).toBe(true);
   });
 
-  it("classifies a presigned Webflow asset upload as webflow-asset-upload", () => {
-    expect(resolveEgressDestination("https://s3.amazonaws.com/webflow-prod-assets")).toBe("webflow-asset-upload");
-    expect(resolveEgressDestination("https://uploads.webflow.com/asset")).toBe("webflow-asset-upload");
+  it("classifies a presigned upload URL as webflow-asset-upload only after the create-asset adapter granted it", () => {
+    expect(resolveEgressDestination(UPLOAD_URL)).toBeNull();
+    grantWebflowAssetUpload(UPLOAD_URL);
+    expect(resolveEgressDestination(UPLOAD_URL)).toBe("webflow-asset-upload");
+    // The grant is for the exact string — a sibling key on the same bucket is still refused.
+    expect(resolveEgressDestination("https://s3.amazonaws.com/webflow-prod-assets/abc123/other.js")).toBeNull();
+    expect(resolveEgressDestination(`${UPLOAD_URL}?x=1`)).toBeNull();
   });
 
   it("refuses every other destination, including relative paths once an origin is baked", () => {
     expect(resolveEgressDestination("https://api.example.com/v1")).toBeNull();
     expect(resolveEgressDestination("https://us.i.posthog.com/e/")).toBeNull();
+    expect(resolveEgressDestination("https://uploads.webflow.com/asset")).toBeNull();
+    expect(resolveEgressDestination("https://cdn.prod.website-files.com/x.js")).toBeNull();
     expect(resolveEgressDestination("/api/auth/get-session")).toBeNull();
     expect(resolveEgressDestination("//tower.test/api")).toBeNull();
     expect(resolveEgressDestination("javascript:alert(1)")).toBeNull();
@@ -64,10 +76,12 @@ describe("extension egress policy (App Review Preflight: External API Calls)", (
     expect(resolveEgressDestination("/api/auth/get-session")).toBe("tower");
     expect(resolveEgressDestination("//evil.example/api")).toBeNull();
     expect(resolveEgressDestination("https://evil.example/api")).toBeNull();
-    expect(resolveEgressDestination("https://s3.amazonaws.com/webflow-prod-assets")).toBe("webflow-asset-upload");
+    expect(resolveEgressDestination(UPLOAD_URL)).toBeNull();
+    grantWebflowAssetUpload(UPLOAD_URL);
+    expect(resolveEgressDestination(UPLOAD_URL)).toBe("webflow-asset-upload");
   });
 
-  it("extensionFetch forwards an allowed request to the platform fetch with the caller's init", async () => {
+  it("extensionFetch forwards an allowed request to the platform fetch with the caller's init and redirect pinned to error", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
     const init = { method: "POST", credentials: "include" as const };
@@ -76,7 +90,32 @@ describe("extension egress policy (App Review Preflight: External API Calls)", (
 
     expect(res.status).toBe(204);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("https://tower.test/api/auth/sign-out", init);
+    expect(fetchMock).toHaveBeenCalledWith("https://tower.test/api/auth/sign-out", { ...init, redirect: "error" });
+  });
+
+  it("never follows redirects — a caller cannot opt back into redirect: follow (review round 8)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await extensionFetch("https://tower.test/api/v1/beacon/settings", { redirect: "follow" });
+    await extensionFetch("https://tower.test/api/v1/beacon/settings", { redirect: "manual" });
+    await extensionFetch("https://tower.test/api/v1/beacon/settings");
+
+    for (const call of fetchMock.mock.calls) {
+      expect((call[1] as RequestInit).redirect).toBe("error");
+    }
+  });
+
+  it("consumes an upload grant with the request that uses it (one grant, one POST)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    grantWebflowAssetUpload(UPLOAD_URL);
+
+    await extensionFetch(UPLOAD_URL, { method: "POST" });
+    expect(fetchMock).toHaveBeenCalledWith(UPLOAD_URL, { method: "POST", redirect: "error" });
+
+    await expect(extensionFetch(UPLOAD_URL, { method: "POST" })).rejects.toBeInstanceOf(EgressPolicyError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("extensionFetch rejects a refused destination before any request is made", async () => {
@@ -86,6 +125,7 @@ describe("extension egress policy (App Review Preflight: External API Calls)", (
     await expect(extensionFetch("https://api.example.com/collect", { method: "POST" })).rejects.toBeInstanceOf(
       EgressPolicyError
     );
+    await expect(extensionFetch(UPLOAD_URL, { method: "POST" })).rejects.toBeInstanceOf(EgressPolicyError);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -98,58 +138,74 @@ describe("extension egress policy (App Review Preflight: External API Calls)", (
   });
 });
 
-describe("isAllowedAssetUploadUrl", () => {
-  it("accepts HTTPS upload endpoints on Webflow and Amazon S3 hosts", () => {
-    // Path-style — the shape the Webflow Data API documents for `uploadUrl`.
-    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.com/webflow-bucket/key")).toBe(true);
-    expect(isAllowedAssetUploadUrl("https://s3.us-west-2.amazonaws.com/webflow-prod-assets/key")).toBe(true);
-    expect(isAllowedAssetUploadUrl("https://s3-us-west-2.amazonaws.com/webflow-prod-assets/key")).toBe(true);
-    // Virtual-hosted style.
-    expect(isAllowedAssetUploadUrl("https://webflow-prod-assets.s3.amazonaws.com/key")).toBe(true);
-    expect(isAllowedAssetUploadUrl("https://webflow-prod-assets.s3.us-east-1.amazonaws.com/key")).toBe(true);
-    // Webflow-owned hosts.
-    expect(isAllowedAssetUploadUrl("https://uploads.webflow.com/asset")).toBe(true);
-    expect(isAllowedAssetUploadUrl("https://webflow.com/upload")).toBe(true);
-    expect(isAllowedAssetUploadUrl("https://uploads-ssl.website-files.com/asset")).toBe(true);
+describe("grantWebflowAssetUpload (create-asset response boundary)", () => {
+  beforeEach(() => {
+    towerOrigin.value = "https://tower.test";
+    resetWebflowAssetUploadGrantsForTests();
   });
 
-  it("rejects non-HTTPS, lookalike, and arbitrary hosts", () => {
-    expect(isAllowedAssetUploadUrl("http://s3.amazonaws.com/webflow-bucket/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://evil.example/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://webflow.com.evil.example/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://webflow.com.evil.com/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://amazonaws.com.evil.com/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://notwebflow.com/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://website-files.com.evil.com/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("javascript:alert(1)")).toBe(false);
-    expect(isAllowedAssetUploadUrl("not a url")).toBe(false);
-    expect(isAllowedAssetUploadUrl("")).toBe(false);
+  it("returns the exact URL it granted", () => {
+    expect(grantWebflowAssetUpload(UPLOAD_URL)).toBe(UPLOAD_URL);
   });
 
-  it("rejects AWS hosts that are not S3 endpoints (any bucket is not any Webflow bucket)", () => {
-    // The old `*.amazonaws.com` suffix test accepted every AWS-hosted host, including attacker-controlled
-    // buckets and unrelated AWS service endpoints. Only S3 endpoint host shapes are allowed now.
-    expect(isAllowedAssetUploadUrl("https://evil-bucket.amazonaws.com/upload/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://amazonaws.com/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://execute-api.us-east-1.amazonaws.com/prod/upload")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://lambda.us-east-1.amazonaws.com/2015-03-31/functions")).toBe(false);
-    // `s3` must be its own host label, and the region label must look like a real AWS region.
-    expect(isAllowedAssetUploadUrl("https://evils3.amazonaws.com/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://s3.evil.amazonaws.com/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.com.evil.com/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.evil.com/key")).toBe(false);
-  });
-
-  it("resolves userinfo tricks to the real host before matching", () => {
-    expect(isAllowedAssetUploadUrl("https://s3.amazonaws.com@evil.example/key")).toBe(false);
-    expect(isAllowedAssetUploadUrl("https://webflow.com@evil.example/upload")).toBe(false);
+  it("refuses (and grants nothing for) a value outside the documented shape", () => {
+    for (const bad of [
+      "https://s3.amazonaws.com/evil-bucket/key",
+      "https://webflow-prod-assets.s3.amazonaws.com/key",
+      "http://s3.amazonaws.com/webflow-prod-assets/key",
+      "https://uploads.webflow.com/asset",
+      "",
+    ]) {
+      expect(() => grantWebflowAssetUpload(bad)).toThrow(EgressPolicyError);
+      expect(resolveEgressDestination(bad)).toBeNull();
+    }
   });
 });
+
+describe("isWebflowAssetUploadUrlShape", () => {
+  it("accepts only HTTPS on the pinned S3 host with the pinned bucket as the first path segment", () => {
+    expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com/webflow-prod-assets/key")).toBe(true);
+    expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com/webflow-prod-assets")).toBe(true);
+    expect(isWebflowAssetUploadUrlShape("https://S3.AMAZONAWS.COM/webflow-prod-assets/key")).toBe(true);
+  });
+
+  it("rejects every other bucket on the same host (any bucket is not Webflow's bucket)", () => {
+    expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com/webflow-bucket/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com/evil-bucket/webflow-prod-assets/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com/webflow-prod-assets-evil/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com/")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com")).toBe(false);
+  });
+
+  it("rejects regional, virtual-hosted, non-S3 AWS, Webflow-owned and lookalike hosts", () => {
+    expect(isWebflowAssetUploadUrlShape("https://s3.us-west-2.amazonaws.com/webflow-prod-assets/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://s3-us-west-2.amazonaws.com/webflow-prod-assets/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://webflow-prod-assets.s3.amazonaws.com/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://evil-bucket.amazonaws.com/webflow-prod-assets/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://execute-api.us-east-1.amazonaws.com/webflow-prod-assets")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://uploads.webflow.com/webflow-prod-assets/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://uploads-ssl.website-files.com/webflow-prod-assets")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com.evil.com/webflow-prod-assets/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://evils3.amazonaws.com/webflow-prod-assets/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.evil.com/webflow-prod-assets/key")).toBe(false);
+  });
+
+  it("rejects non-HTTPS, userinfo tricks and non-URLs", () => {
+    expect(isWebflowAssetUploadUrlShape("http://s3.amazonaws.com/webflow-prod-assets/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com@evil.example/webflow-prod-assets/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://user:pw@s3.amazonaws.com/webflow-prod-assets/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("javascript:alert(1)")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("not a url")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("")).toBe(false);
+  });
+});
+
 /**
  * Source-level pin for the bundle gate (scripts/build-cli.mjs pins exactly one bare `fetch(` and one
- * `new MutationObserver(` in Beacon release output): no first-party module other than this one may
- * call `fetch` directly, and no first-party module may construct a MutationObserver. Generated
- * site-runtime source strings live in these files too, so the sweep covers the published-site
+ * `new MutationObserver(` in Beacon release output, and forbids `setAttribute("style"`): no first-party
+ * module other than this one may call `fetch` directly, no first-party module may construct a
+ * MutationObserver, and none may write a `style` attribute (the shipped CSP is `style-src-attr 'none'`).
+ * Generated site-runtime source strings live in these files too, so the sweep covers the published-site
  * runtime as well as the extension.
  */
 describe("first-party source keeps to the single egress point", () => {
@@ -157,6 +213,7 @@ describe("first-party source keeps to the single egress point", () => {
   const egressModule = join(srcRoot, "shared", "lib", "extension-egress.ts");
   const BARE_FETCH_CALL = /(?<![\w$.])fetch\(/;
   const MUTATION_OBSERVER = /new MutationObserver\(/;
+  const STYLE_ATTRIBUTE_WRITE = /setAttribute\(\s*["'`]style["'`]/;
 
   function listSourceFiles(dir: string, out: string[] = []): string[] {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -199,5 +256,18 @@ describe("first-party source keeps to the single egress point", () => {
       .filter((file) => MUTATION_OBSERVER.test(readFileSync(file, "utf-8")))
       .map((file) => relative(srcRoot, file));
     expect(offenders).toEqual([]);
+  });
+
+  it("writes a style attribute only through the Designer API on the user's canvas placeholder (shipped CSP: style-src-attr 'none')", () => {
+    // Both sites call `DOMElement.setAttribute` on a Designer canvas element — a different document,
+    // outside the extension iframe's CSP. Nothing writes a style attribute in the extension document.
+    const offenders = files
+      .filter((file) => STYLE_ATTRIBUTE_WRITE.test(readFileSync(file, "utf-8")))
+      .map((file) => relative(srcRoot, file))
+      .sort();
+    expect(offenders).toEqual([
+      "features/cms-slots/model/cms-slot-list-target-designer-placeholder.ts",
+      "features/cms-slots/model/create-cms-slot-list-target-component.ts",
+    ]);
   });
 });

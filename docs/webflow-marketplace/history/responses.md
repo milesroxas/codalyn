@@ -76,3 +76,36 @@ PUBLISHED-RUNTIME TEST NOTES
 - Every other script the test page loads is Webflow's own published-site runtime (js/webflow.<site>.<hash>.js and the webflow.achunk.* chunks it imports, plus GSAP/ScrollTrigger when Interactions are present), rendered by Webflow on every published page. None is loaded by Beacon.
 ```
 
+## 2026-09-15 — filed form text (App Update ref 7875910a-e080-40bc-9eb9-8d523a0e0e6a), replaced by round 8 on 2026-09-17
+
+### §3 Response to the review team (484 chars, as filed)
+
+```
+Bundle scan: every request leaves through one egress call (extension-egress.ts) with an explicit destination policy; the release build fails on a second fetch site. The one MutationObserver is Lexical's editor sync inside our panel, never the canvas. Runtime test: Beacon adds one page-level script, pinned by a SHA-256 SRI the tag carries verbatim; served bytes match (Hash matched). It is unminified, so it is its own source. Every other listed script is Webflow's own site runtime.
+```
+
+### §4 Additional notes (4930 chars, as filed)
+
+```
+WHAT CHANGED
+- Bundle v0.1.0 (09-14 18:26). All extension network requests go through one first-party call site (extension-egress.ts) with an explicit destination policy; the release build fails if a second fetch site appears. The one MutationObserver is the rich-text editor's (Lexical) contenteditable sync inside our own panel; it never observes or writes the Designer canvas. Canvas changes happen only through the Designer API on explicit user actions.
+- Hosted runtime is pure ASCII (a header em dash and a non-breaking-space sentinel are now a hyphen and a Unicode escape sequence; behaviour unchanged, unit-pinned). Webflow's CDN serves it with no charset, so it hashes identically under every decoding.
+- Tower CORS is allowlist-only (no Access-Control-Allow-Origin header for non-allowlisted origins; no wildcard). The shared API-key bearer was removed; every request is attributed to a signed-in user session.
+- react-router-dom 7.18.3 (clears published advisories); our patch removing its inline script emission is re-applied.
+- Shipped CSP now admits cdn.prod.website-files.com for the extension's own script, stylesheet and fonts (the bundle's install origin). No wildcard, no inline script, connect-src unchanged.
+- The last-slot-list deletion hint now tells users to run page uninstall on every page before removing Beacon, and what to delete by hand if the app was removed first.
+- No plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, no popup or cross-window messaging calls, no credentials in URLs, no session replay. styles.css ships a v3 source map.
+
+PUBLISHED-RUNTIME TEST
+- Beacon applies exactly one page-level script, registered via the Custom Code API with a SHA-256 integrityHash; Webflow renders the tag with the integrity attribute and anonymous crossorigin. It creates no script elements, imports nothing and makes no network requests (unit-pinned).
+- Runtime file 1 on the test page: https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6aa881c9d6e9e70f262ea057_codalyn-beacon-runtime-1ebc5741.js. SRI sha256-bzvg9YjCBFqQA0VVsDdcsIK0DUK5RSCi9mefHtVXldM= is carried verbatim in the page tag. Served bytes: 20153, SHA-256 6f3be0f588c2045a90034555b0375cb082b40d42b94520a2f6679f1ed55795d3, identical for identity, gzip and br encodings, with or without an Origin header; the CDN answers a wildcard Access-Control-Allow-Origin. Preflight's row says Loaded and Hash matched but also "SRI mismatch"; the tag carries the exact derived SRI and the browser executed the script (ready selector present), which is impossible if SRI had failed. We saw the same on three successive valid pins (original, slash-free base64, pure ASCII) and could not reproduce outside the tool; we would welcome the value it observed.
+- "Not traceable to source": the runtime is served unminified and formatted, with a header naming its version and authoring module (cms-slot-page-inline-script.ts). There is no build transform, so the served file is its own source; the same modules are in the private source-map zip.
+- Every other script on the test page is Webflow's own site runtime (the per-site webflow bundle, its achunk imports, GSAP and ScrollTrigger for Interactions, jQuery). None is loaded by Beacon; we pin runtime file 1 only.
+
+BACKEND (Hybrid): https://tower.codalyn.app only, HTTPS, production. Paths: /api/auth/webflow-designer (Designer ID-token exchange, server-side); /api/auth/get-session, sign-in/email, sign-out, one-time-token/generate (our session; the one-time token is consumed by Tower's sign-in handoff, never a Webflow credential); /api/integrations/webflow/authorize (server-stored OAuth state, returns the Webflow consent URL); /api/v1/beacon/ settings, active-workspace, access-policy, usage, early-access-request, support-request; /api/v2/webflow/ (all subpaths: proxy to the Webflow Data API with the server-stored OAuth token, path segments only, fixed upstream host); image conversion (opt-in AVIF only). All require a server-resolved session. The bearer is sent only to the Tower origin; the Webflow ID token is never forwarded to a third party. Also: Webflow-issued presigned upload URLs (S3, website-files.com) for our runtime, no credential header; https://us.i.posthog.com analytics, opt-in only, no site content.
+
+UNINSTALL: page-level code only, never site-level. Deleting the last slot list offers a one-click page uninstall (removes the footer script entry and orphaned runtime assets, prompts to publish). Manual path: Page settings, Custom code, Footer code. Docs: https://tower.codalyn.app/docs.
+
+EXTERNAL-SERVICE DISCLOSURE: AVIF conversion is opt-in, off by default. Selecting AVIF shows a consent prompt disclosing the image is sent to tower.codalyn.app for conversion, in memory, never stored; revocable in Settings, Privacy; persistent indicator while active. A guard at the single call site refuses AVIF without consent. WebP stays fully in-Designer.
+```
+

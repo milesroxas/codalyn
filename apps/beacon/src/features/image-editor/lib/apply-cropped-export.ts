@@ -7,6 +7,11 @@ import {
 } from "@/features/image-editor/lib/element-cms-image-binding";
 import { towerFetch } from "@/shared/lib/tower-client";
 import { isTowerUsageLimitError, type TowerUsageLimitDetails } from "@/shared/lib/tower-usage-limit-error";
+import {
+  assertCmsWriteAllowed,
+  cmsLocaleRequestFields,
+  resolveCurrentSiteCmsWriteLocale,
+} from "@/shared/lib/webflow-cms-write-locale";
 import { renderCroppedRegionToCanvas } from "./crop-image";
 import { encodeCanvasToOptimizedFile } from "./encode-image-blob";
 import { placeImageOnCanvasAtBody, placeImageOnCanvasWithAsset } from "./insert-on-canvas";
@@ -203,7 +208,9 @@ async function resolveCollectionFieldSlug(collectionId: string, fieldId: string)
 
 /**
  * PATCH live collection item — publishes field updates to the live CMS item (not staged-only draft).
- * Image field in `fieldData` (Image type: `fileId` + `url` or `{ url }` per Data API).
+ * Image field in `fieldData` (Image type: `fileId` + `url` or `{ url }` per Data API). The intended
+ * locale is resolved first (`webflow-cms-write-locale.ts`): the primary locale is named explicitly via
+ * `cmsLocaleId`, and on a site with secondary locales the write is refused before any request.
  * @see https://developers.webflow.com/data/reference/cms/collection-items/live-items/update-item-live
  * @see https://developers.webflow.com/data/reference/field-types-item-values (Image write)
  */
@@ -214,6 +221,7 @@ async function updateCmsImageField(options: {
   asset: Asset;
 }): Promise<void> {
   const { binding, cmsItemId, imageUrl, asset } = options;
+  const locale = cmsLocaleRequestFields(assertCmsWriteAllowed(await resolveCurrentSiteCmsWriteLocale()));
   const fieldSlug = await resolveCollectionFieldSlug(binding.collectionId, binding.fieldId);
   const path = `/api/v2/webflow/collections/${encodeURIComponent(binding.collectionId)}/items/${encodeURIComponent(cmsItemId)}/live?skipInvalidFiles=false`;
   const headers = {
@@ -222,11 +230,13 @@ async function updateCmsImageField(options: {
   } as const;
 
   const bodyWithAsset = {
+    ...locale,
     fieldData: {
       [fieldSlug]: { fileId: asset.id, url: imageUrl },
     },
   };
   const bodyUrlOnly = {
+    ...locale,
     fieldData: {
       [fieldSlug]: { url: imageUrl },
     },

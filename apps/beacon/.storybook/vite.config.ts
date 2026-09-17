@@ -27,6 +27,10 @@ export default defineConfig({
     // The quality-compare popout is flag-gated off in shipped bundles, but Storybook catalogs the
     // full UI surface — keep the popout page and "Pop out" button stories rendering.
     __QUALITY_COMPARE_POPOUT_ENABLED__: JSON.stringify(true),
+    // Telemetry is flag-gated off in Marketplace bundles; Storybook catalogs both states — the
+    // consent prompt / Privacy switch stories render the enabled UI, and the telemetry-off variants
+    // take the state as a prop.
+    __BEACON_TELEMETRY_ENABLED__: JSON.stringify(true),
   },
   resolve: {
     alias: {

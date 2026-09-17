@@ -68,7 +68,13 @@ type BeaconAppSettingsContextValue = {
   beaconWorkspaces: BeaconTowerWorkspace[];
   activeOrganizationId: string | null;
   activeOrganizationName: string | null;
-  /** Switch active Tower workspace (session); refetches settings on success. */
+  /**
+   * The only workspace the user belongs to while none is active on the session: a local default the
+   * UI offers for confirmation. Nothing is persisted until the user confirms it (or picks one)
+   * through {@link setActiveBeaconWorkspace}.
+   */
+  suggestedWorkspaceId: string | null;
+  /** Switch active Tower workspace (session) on an explicit user selection; refetches settings on success. */
   setActiveBeaconWorkspace: (organizationId: string) => void;
 };
 
@@ -505,15 +511,14 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
     });
   }, [syncState, user?.id, towerPutPolicy]);
 
-  useEffect(() => {
-    if (syncState !== "synced" || !user?.id || activeOrganizationId || beaconWorkspaces.length !== 1) {
-      return;
-    }
-    const onlyWorkspaceId = beaconWorkspaces[0]?.id;
-    if (onlyWorkspaceId) {
-      setActiveBeaconWorkspace(onlyWorkspaceId);
-    }
-  }, [syncState, user?.id, activeOrganizationId, beaconWorkspaces, setActiveBeaconWorkspace]);
+  // Review round 8 (2026-09-17, "Workspace state persisted without explicit user interaction"): a
+  // single-workspace default is held locally as a *suggestion* and persisted to Tower only through
+  // `setActiveBeaconWorkspace` from an explicit selection/confirmation in the workspace controls —
+  // never from an effect.
+  const suggestedWorkspaceId =
+    syncState === "synced" && user?.id && !activeOrganizationId && beaconWorkspaces.length === 1
+      ? (beaconWorkspaces[0]?.id ?? null)
+      : null;
 
   const handleThemeChange = useCallback(
     (theme: BeaconAppSettings["theme"]) => {
@@ -547,6 +552,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
       beaconWorkspaces,
       activeOrganizationId,
       activeOrganizationName,
+      suggestedWorkspaceId,
       setActiveBeaconWorkspace,
     }),
     [
@@ -569,6 +575,7 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
       beaconWorkspaces,
       activeOrganizationId,
       activeOrganizationName,
+      suggestedWorkspaceId,
       setActiveBeaconWorkspace,
     ]
   );

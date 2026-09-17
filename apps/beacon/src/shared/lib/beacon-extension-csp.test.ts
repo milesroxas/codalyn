@@ -32,7 +32,7 @@ function directiveMap(policy: string): Map<string, string[]> {
  * shipped documents.
  */
 describe("buildBeaconExtensionCspContent", () => {
-  const policy = buildBeaconExtensionCspContent(PRODUCTION_TOWER_ORIGIN);
+  const policy = buildBeaconExtensionCspContent(PRODUCTION_TOWER_ORIGIN, { telemetryEnabled: false });
   const directives = directiveMap(policy);
 
   it("denies by default and allows first-party scripts only", () => {
@@ -63,29 +63,33 @@ describe("buildBeaconExtensionCspContent", () => {
     expect(directives.get("script-src-elem")).toBeUndefined();
   });
 
-  it("allowlists exactly the documented connect-src endpoints (PostHog is the only telemetry host)", () => {
-    expect(directives.get("connect-src")).toEqual([
+  // Review round 8 (2026-09-17): connect-src names exactly the hosts the extension can POST to — Tower and
+  // the single pinned presigned-upload host. No wildcard S3 subdomains, no Webflow asset hosts (img-src
+  // only) and, in the Marketplace build, no telemetry host at all.
+  it("allowlists exactly the documented connect-src endpoints for the Marketplace (telemetry-off) build", () => {
+    expect(directives.get("connect-src")).toEqual(["'self'", PRODUCTION_TOWER_ORIGIN, "https://s3.amazonaws.com"]);
+    expect(policy).not.toContain("posthog");
+    expect(policy).not.toContain("*.s3.amazonaws.com");
+    expect(directives.get("connect-src")).not.toContain("https://*.webflow.com");
+    expect(directives.get("connect-src")).not.toContain("https://*.website-files.com");
+  });
+
+  it("adds the PostHog host exactly once in a telemetry-enabled build — no assets host, no second telemetry endpoint", () => {
+    const withTelemetry = buildBeaconExtensionCspContent(PRODUCTION_TOWER_ORIGIN, { telemetryEnabled: true });
+    expect(CODALYN_POSTHOG_HOST).toBe("https://us.i.posthog.com");
+    expect(directiveMap(withTelemetry).get("connect-src")).toEqual([
       "'self'",
       PRODUCTION_TOWER_ORIGIN,
       CODALYN_POSTHOG_HOST,
       "https://s3.amazonaws.com",
-      "https://*.s3.amazonaws.com",
-      "https://webflow.com",
-      "https://*.webflow.com",
-      "https://website-files.com",
-      "https://*.website-files.com",
     ]);
-  });
-
-  it("mentions the PostHog host exactly once — no assets host, no second telemetry endpoint", () => {
-    expect(CODALYN_POSTHOG_HOST).toBe("https://us.i.posthog.com");
-    expect(policy.split(CODALYN_POSTHOG_HOST).length - 1).toBe(1);
-    expect(policy).not.toContain("us-assets.i.posthog.com");
-    expect(policy).not.toContain("sentry");
+    expect(withTelemetry.split(CODALYN_POSTHOG_HOST).length - 1).toBe(1);
+    expect(withTelemetry).not.toContain("us-assets.i.posthog.com");
+    expect(withTelemetry).not.toContain("sentry");
   });
 
   it("bakes the build-resolved Tower origin into connect-src", () => {
-    const preview = buildBeaconExtensionCspContent("https://tower-preview.codalyn.app");
+    const preview = buildBeaconExtensionCspContent("https://tower-preview.codalyn.app", { telemetryEnabled: false });
     expect(directiveMap(preview).get("connect-src")).toContain("https://tower-preview.codalyn.app");
     expect(preview).not.toContain(PRODUCTION_TOWER_ORIGIN);
   });
@@ -102,11 +106,13 @@ describe("buildBeaconExtensionCspContent", () => {
     expect(directives.get("font-src")).toEqual(["'self'", WEBFLOW_HOSTED_BUNDLE_HOST]);
   });
 
-  it("blocks inline <style> elements in CSP3 engines while allowing React/Radix style attributes", () => {
-    expect(directives.get("style-src")).toEqual(["'self'", WEBFLOW_HOSTED_BUNDLE_HOST, "'unsafe-inline'"]);
+  // Review round 8 (2026-09-17): no 'unsafe-inline' in any style directive. React/Radix/vaul/Lexical set
+  // styles through the CSSOM, which CSP does not govern; the release build forbids setAttribute("style".
+  it("blocks inline <style> elements and style attributes alike — no 'unsafe-inline' anywhere", () => {
+    expect(directives.get("style-src")).toEqual(["'self'", WEBFLOW_HOSTED_BUNDLE_HOST]);
     expect(directives.get("style-src-elem")).toEqual(["'self'", WEBFLOW_HOSTED_BUNDLE_HOST]);
-    expect(directives.get("style-src-attr")).toEqual(["'unsafe-inline'"]);
-    expect(directives.get("style-src-elem")).not.toContain("'unsafe-inline'");
+    expect(directives.get("style-src-attr")).toEqual(["'none'"]);
+    expect(policy).not.toContain("'unsafe-inline'");
   });
 
   it("hard-blocks iframes, workers, plugins, form submission, and base rewriting", () => {

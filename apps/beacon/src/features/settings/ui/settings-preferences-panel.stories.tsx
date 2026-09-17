@@ -26,3 +26,11 @@ export const Guest: Story = {};
 export const SignedIn: Story = {
   parameters: beaconScreen("freeUser"),
 };
+
+/**
+ * Marketplace build (`VITE_BEACON_TELEMETRY_ENABLED` unset): no telemetry SDK is bundled, so the
+ * opt-in switch is absent and the disclosure states that the build sends no telemetry.
+ */
+export const TelemetryUnavailable: Story = {
+  args: { telemetryAvailable: false },
+};

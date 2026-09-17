@@ -1,4 +1,5 @@
 import { CODALYN_POSTHOG_HOST } from "@codalyn/observability";
+import { WEBFLOW_ASSET_UPLOAD_HOST } from "./webflow-asset-upload-endpoint";
 
 /**
  * Enforced Content-Security-Policy for the shipped extension documents (Webflow Marketplace,
@@ -22,11 +23,9 @@ import { CODALYN_POSTHOG_HOST } from "@codalyn/observability";
 export const BEACON_CSP_PLACEHOLDER = "__BEACON_CSP__";
 
 /**
- * Webflow-owned asset/CDN hosts. Needed in `img-src` (site assets returned by the Designer API's
- * `asset.getUrl()` / `asset.url` and Webflow-hosted account avatars render in the extension UI)
- * and in `connect-src` (the CMS Slots install flow POSTs the runtime JS to the presigned upload
- * URL handed back by Webflow's create-asset endpoint, allowlist-checked in
- * `isAllowedAssetUploadUrl` before any request is made).
+ * Webflow-owned asset/CDN hosts, `img-src` only: site assets returned by the Designer API's
+ * `asset.getUrl()` / `asset.url` and Webflow-hosted account avatars render in the extension UI.
+ * They are deliberately absent from `connect-src` — the extension makes no request to them.
  */
 const WEBFLOW_ASSET_HOST_SOURCES = [
   "https://webflow.com",
@@ -36,14 +35,15 @@ const WEBFLOW_ASSET_HOST_SOURCES = [
 ] as const;
 
 /**
- * Amazon S3 endpoint hosts for the same presigned upload (the shape Webflow's Data API documents
- * for `uploadUrl`). Deliberately narrower than the defensive runtime validator
- * (`AWS_S3_UPLOAD_HOST_RE` also tolerates regional endpoints, which CSP host-source syntax cannot
- * express without admitting all of `*.amazonaws.com`): if Webflow ever moves the endpoint to a
- * regional host, the upload fails closed with a visible error and this list gets the new host —
- * the policy never widens preemptively.
+ * The one host the CMS Slots install flow POSTs the runtime JS to: the presigned `uploadUrl` from
+ * Webflow's create-asset endpoint (`https://s3.amazonaws.com/webflow-prod-assets/…`). The exact URL
+ * is granted per response in `extension-egress.ts` (`grantWebflowAssetUpload`); CSP host-source
+ * syntax cannot express a bucket path, so the policy pins the host and the egress policy pins the
+ * bucket and the exact URL. No wildcard subdomains: if Webflow ever moves the endpoint, the upload
+ * fails closed with a visible error and this value changes through an App Update — the policy
+ * never widens preemptively (review round 8, 2026-09-17).
  */
-const AWS_S3_UPLOAD_HOST_SOURCES = ["https://s3.amazonaws.com", "https://*.s3.amazonaws.com"] as const;
+const WEBFLOW_ASSET_UPLOAD_SOURCES = [`https://${WEBFLOW_ASSET_UPLOAD_HOST}`] as const;
 
 /**
  * Origin Webflow's hosted runtime serves the uploaded bundle's static files from. The installed
@@ -63,18 +63,21 @@ function serializeCsp(directives: ReadonlyArray<readonly [string, ReadonlyArray<
 }
 
 /**
- * Shared style-src posture: external stylesheets are first-party only (the document origin plus
- * the Webflow-hosted copy of the bundle's own `styles.css`); inline `style`
- * *attributes* are allowed because React `style` props and the bundled Radix/vaul primitives set
- * them (CSP3 splits the two via style-src-elem/-attr — the plain style-src fallback keeps
- * `'unsafe-inline'` so pre-CSP3 engines allow attributes rather than breaking layout). Inline
- * `<style>` elements stay blocked in every CSP3 browser; both shipped documents are pinned by
- * tests to contain none regardless.
+ * Shared style-src posture: stylesheets are first-party only (the document origin plus the
+ * Webflow-hosted copy of the bundle's own `styles.css`) and inline styles are blocked in both forms
+ * — no `<style>` element and no `style="…"` attribute (`style-src-attr 'none'`; review round 8,
+ * 2026-09-17). The shipped UI needs neither: React `style` props, Radix, vaul and Lexical all set
+ * styles through the CSSOM (`element.style.x = …`, `style.cssText`), which CSP does not govern;
+ * only markup and `setAttribute` writes of the `style` attribute are attribute styles, and the
+ * release build pins that shape in the bundle to the two Webflow Designer API calls that style the
+ * user's canvas placeholder — a different document (`pinnedMarkerCounts`, scripts/build-cli.mjs).
+ * Rendering under the enforced policy is verified by `scripts/csp-style-audit.mjs` over the
+ * Storybook catalog.
  */
 const STYLE_DIRECTIVES = [
-  ["style-src", ["'self'", ...WEBFLOW_HOSTED_BUNDLE_SOURCES, "'unsafe-inline'"]],
+  ["style-src", ["'self'", ...WEBFLOW_HOSTED_BUNDLE_SOURCES]],
   ["style-src-elem", ["'self'", ...WEBFLOW_HOSTED_BUNDLE_SOURCES]],
-  ["style-src-attr", ["'unsafe-inline'"]],
+  ["style-src-attr", ["'none'"]],
 ] as const;
 
 /** First-party module scripts: `bundle.js`, its preloaded chunks and lazy `import()`s. */
@@ -88,14 +91,22 @@ const HARDENING_DIRECTIVES = [
   ["base-uri", ["'none'"]],
 ] as const;
 
+export type BeaconExtensionCspOptions = {
+  /**
+   * Whether this build bundles the PostHog SDK (`VITE_BEACON_TELEMETRY_ENABLED=true`). Off — the
+   * Marketplace build — the telemetry host is absent from `connect-src` altogether; on, it is
+   * reachable only after opt-in consent (the SDK is not initialized before a grant).
+   */
+  telemetryEnabled: boolean;
+};
+
 /**
  * Policy for the Designer Extension iframe (index.html). `connect-src` is the complete external
- * endpoint list from the review submission: the first-party Tower backend, the single telemetry
- * processor (PostHog US ingestion, reachable only after opt-in consent — the SDK is not
- * initialized before a grant), and the Webflow/S3 presigned-upload hosts used by the
- * user-initiated CMS Slots install. No other host is reachable even if code regressed.
+ * endpoint list from the review submission: the first-party Tower backend, the single presigned
+ * upload host used by the user-initiated CMS Slots install, and — only in telemetry-enabled builds
+ * — the single telemetry processor. No other host is reachable even if code regressed.
  */
-export function buildBeaconExtensionCspContent(towerOrigin: string): string {
+export function buildBeaconExtensionCspContent(towerOrigin: string, options: BeaconExtensionCspOptions): string {
   return serializeCsp([
     ["default-src", ["'none'"]],
     SCRIPT_DIRECTIVE,
@@ -109,7 +120,12 @@ export function buildBeaconExtensionCspContent(towerOrigin: string): string {
     ["font-src", ["'self'", ...WEBFLOW_HOSTED_BUNDLE_SOURCES]],
     [
       "connect-src",
-      ["'self'", towerOrigin, CODALYN_POSTHOG_HOST, ...AWS_S3_UPLOAD_HOST_SOURCES, ...WEBFLOW_ASSET_HOST_SOURCES],
+      [
+        "'self'",
+        towerOrigin,
+        ...(options.telemetryEnabled ? [CODALYN_POSTHOG_HOST] : []),
+        ...WEBFLOW_ASSET_UPLOAD_SOURCES,
+      ],
     ],
     ...HARDENING_DIRECTIVES,
   ]);

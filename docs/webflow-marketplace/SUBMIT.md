@@ -5,99 +5,93 @@ rationale; that lives in [compliance-record.md](compliance-record.md). Keep this
 **one** round only: when a new build is made, update the artifact block and the "what changed"
 list, then copy.
 
-Current round: **7b — SUBMITTED 2026-09-15**, Webflow reference ID `7875910a-e080-40bc-9eb9-8d523a0e0e6a`
-(compliance-record R7b.20). Everything below is what was filed; do not edit until the review thread
-answers. Next bundle goes through Publish → Upload Bundle for Review and continues the same thread. Latest findings and their answers: compliance-record R7b.16; the 16:43
-rebuild and the backend fixes that go with it are R7b.17; the 17:03 rebuild (URL-safe runtime SRI experiment) is R7b.18; the 18:26 rebuild (pure-ASCII runtime) is R7b.19.
+Current round: **8 — answering the 2026-09-17 review-team feedback on App Update
+`7875910a-e080-40bc-9eb9-8d523a0e0e6a`** (six findings; compliance-record Round 8, R8.1–R8.6). The
+filed 2026-09-15 text is in [history/responses.md](history/responses.md). The next bundle goes through
+Publish → Upload Bundle for Review in app settings **and** the submit form (App Update), and continues
+the same email thread.
 
 ## Before you paste (30 seconds)
 
 - [ ] The zip below is the **newest** file in `apps/beacon/bundle/production/public/`.
 - [ ] The `wfpre_` receipt came from a Preflight run on **that** zip + its `.sourcemaps.zip`.
 - [ ] Source is committed (so the artifact hash maps to a commit).
-- [ ] Tower is deployed to Production at commit 302edc7 or later — the notes below claim allowlist-only
-  CORS and session-only auth; a reviewer probing `tower.codalyn.app` must see that behaviour.
-- [ ] **That** zip is installed on the test site and the Beacon panel renders (no CSP violation for
-  `cdn.prod.website-files.com` in the extension console) — see compliance-record R7b.15.
-- [ ] The test page's runtime was re-pushed **from that zip** (CMS Slots → page runtime **Sync**) and the
-  site published; `node scripts/webflow-runtime-observe.mjs <page>` exits 0 (§5).
+- [ ] Tower is deployed to Production with the amended privacy policy (§1 "Beacon Designer Extension":
+  the Marketplace build includes no analytics SDK) — `apps/tower/src/features/legal/content/privacy-policy.md`.
+- [ ] **That** zip is installed on the test site, the Beacon panel renders, and the extension console
+  shows no CSP violation (the style policy is now `style-src-attr 'none'`; see compliance-record R8.5).
+- [ ] A CMS Slots page runtime **Sync** on the test page still uploads (the presigned upload now goes
+  through an exact-URL grant, R8.4) and the site is published; `node scripts/webflow-runtime-observe.mjs <page>` exits 0 (§5).
+- [ ] The Marketplace **listing** carries the Localization statement from §6.
 
 ## 1. Files to upload
 
 | Form field | File |
 | --- | --- |
-| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-14_18-26-19.zip` |
-| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-14_18-26-19.sourcemaps.zip` |
+| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_15-53-42.zip` |
+| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_15-53-42.sourcemaps.zip` |
 | Package manifest + lockfile (required for compiled bundles since the 2026-08-19 guidelines) | `apps/beacon/package.json` + root `pnpm-lock.yaml`, as committed at the build commit |
 
-sha256 · bundle `91b888476645008d8bbe4a65dbb1a3f8ef58f8df3411df43cafb4213687b99fd` ·
-sourcemaps `0684d1861a2b074552bfed856a92c32b1bf7620360d7f5d48f6adef4b4be01ea`
+sha256 · bundle `27372473eeef9abea8c8a8a898c8a4f3bd076286cefa6469f713471de321e0cf` ·
+sourcemaps `37c449ee009f3eb211c5bce6a0b32790c60a71900d5f10579c16016c083cc24b`
 
 Rebuild command if needed: `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod`
+(release flags unset = the Marketplace state: no telemetry SDK, localized-site CMS writes blocked).
 
 ## 2. App Review Preflight receipt
 
-Issued 2026-09-14 by the Preflight run on the two files above (bundle `91b88847…99fd` + sourcemaps
-`0684d186…01ea`). Paste as-is:
+**Not yet issued for this build.** Run Preflight in the Designer on the two files above and paste the
+`wfpre_` code here before filing. Expected **bundle scan** result: at most the two items already
+answered in R7b.20 — External API Calls (1 location: the egress chokepoint) and Silent Canvas
+Mutations (1 location: Lexical's editor observer). Anything else = stop, see [playbook.md](playbook.md) § B.
 
 ```
-wfpre_375fcf1295cce47dcb2930eeb7b7dd57
+wfpre_<pending>
 ```
-
-(Expected **bundle scan** result for this build: two REQUIRED items — External API Calls, 1 location;
-Silent Canvas Mutations, 1 location. Both are answered in §3/§4. Anything else = stop, see
-[playbook.md](playbook.md) § B. Superseded receipts: `wfpre_dd6e03bf…` (earlier run on this same 18:26 zip — Preflight reissued on
-re-upload; both bind to bundle `91b88847…`), `wfpre_5a2242e8…` (16:43 build), `wfpre_d7c0944a…` (14:50
-build).)
 
 ## 3. Response to the review team (≤500 characters)
 
-484 characters (the 18:26 runtime test still reports "SRI mismatch"; see §4 for the evidence).
+496 characters. Free of angle brackets, attribute pairs and JS API names (form WAF, see §4).
 
 ```
-Bundle scan: every request leaves through one egress call (extension-egress.ts) with an explicit destination policy; the release build fails on a second fetch site. The one MutationObserver is Lexical's editor sync inside our panel, never the canvas. Runtime test: Beacon adds one page-level script, pinned by a SHA-256 SRI the tag carries verbatim; served bytes match (Hash matched). It is unminified, so it is its own source. Every other listed script is Webflow's own site runtime.
+1) No automatic workspace request; a single workspace is held locally and saved only when the user confirms it. 2) This build ships no telemetry SDK; a redaction handler exists for builds that do. 3) Every request uses redirect mode error. 4) Uploads go only to the exact create-asset uploadUrl on the documented S3 host and bucket; connect-src matches. 5) No unsafe-inline; style attributes are blocked. 6) cmsLocaleId on every CMS write; localized sites are not written and the listing says so.
 ```
 
 How to defend each item if asked (one line each; the long version is in §4):
-- **External API Calls (1)** — that one `fetch(` is the chokepoint; its allowlist is the Tower origin or the Webflow-issued presigned upload URL, mirrored by the shipped CSP.
-- **Silent Canvas Mutations (1)** — Lexical's contenteditable observer, created on editor mount, scoped to the editor root inside our iframe; the Designer canvas is only changed through the Designer API on explicit user actions.
-- **Script integrity** — the tag carries the exact derived SRI with crossorigin="anonymous"; the CDN serves the same bytes for every encoding with ACAO *; the browser executed it (ready selector present), which is impossible if SRI failed in the browser.
-- **New / unreviewed scripts** — all are Webflow's published-site runtime (webflow.<site>.js, its achunk imports, GSAP for Interactions); Beacon requests zero scripts (unit-pinned).
-- **Not traceable to source** — the runtime is served unminified; the file is the source. The same modules are in the private source-map zip.
+- **Workspace persistence** — the effect was deleted; `suggestedWorkspaceId` is local state and the only POST is behind the "Use this workspace" click (unit-pinned: zero POSTs after sync, one after the click).
+- **Telemetry redaction** — the Marketplace build has no analytics SDK (536 KB zip, no posthog trace, no telemetry host in connect-src); the before_send redaction is unit-tested with synthetic sensitive values for builds that enable telemetry.
+- **Redirects** — the single fetch site pins redirect mode to error and callers cannot override it (unit-pinned).
+- **Upload allowlist** — exact uploadUrl string granted per create-asset response, single use, host and bucket pinned; CSP connect-src is Tower plus that one host.
+- **CSP styles** — no unsafe-inline anywhere; React/Radix/vaul/Lexical use the CSSOM; the only style-attribute writes in the bundle are the two Designer API calls on the user's canvas element; every Storybook story renders under the enforced policy with zero violations.
+- **Localization** — cmsLocaleId on every CMS item write (primary, named explicitly); sites with secondary locales are refused in-app with a message; stated in the listing.
 
 ## 4. Additional notes (form field, max 5000 characters)
 
-4930 characters. Paste the whole block.
-
-**WAF rule (2026-09-15):** the form backend sits behind Cloudflare and blocked a submission whose notes
-contained an HTML script tag, attribute pairs like `src=` / `integrity=`, DOM-sink names (innerHTML,
-window.open, postMessage, document.write), a `\u00a0` escape and `/*`. Keep this block free of angle
-brackets, key=value attribute pairs, JS API names and comment/wildcard tokens; describe them in words.
+4993 characters. Paste the whole block. **WAF rule (2026-09-15):** the form backend sits behind Cloudflare and blocked a
+submission whose notes contained an HTML script tag, attribute pairs like `src=` / `integrity=`,
+DOM-sink names (innerHTML, window.open, postMessage, document.write), a `\u00a0` escape and `/*`. Keep
+this block free of angle brackets, key=value attribute pairs, JS API names and comment/wildcard tokens;
+describe them in words.
 
 ```
-WHAT CHANGED
-- Bundle v0.1.0 (09-14 18:26). All extension network requests go through one first-party call site (extension-egress.ts) with an explicit destination policy; the release build fails if a second fetch site appears. The one MutationObserver is the rich-text editor's (Lexical) contenteditable sync inside our own panel; it never observes or writes the Designer canvas. Canvas changes happen only through the Designer API on explicit user actions.
-- Hosted runtime is pure ASCII (a header em dash and a non-breaking-space sentinel are now a hyphen and a Unicode escape sequence; behaviour unchanged, unit-pinned). Webflow's CDN serves it with no charset, so it hashes identically under every decoding.
-- Tower CORS is allowlist-only (no Access-Control-Allow-Origin header for non-allowlisted origins; no wildcard). The shared API-key bearer was removed; every request is attributed to a signed-in user session.
-- react-router-dom 7.18.3 (clears published advisories); our patch removing its inline script emission is re-applied.
-- Shipped CSP now admits cdn.prod.website-files.com for the extension's own script, stylesheet and fonts (the bundle's install origin). No wildcard, no inline script, connect-src unchanged.
-- The last-slot-list deletion hint now tells users to run page uninstall on every page before removing Beacon, and what to delete by hand if the app was removed first.
-- No plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, no popup or cross-window messaging calls, no credentials in URLs, no session replay. styles.css ships a v3 source map.
+WHAT CHANGED (bundle v0.1.0, 09-17 15:53) - one entry per item in the 2026-09-17 feedback, in order
 
-PUBLISHED-RUNTIME TEST
-- Beacon applies exactly one page-level script, registered via the Custom Code API with a SHA-256 integrityHash; Webflow renders the tag with the integrity attribute and anonymous crossorigin. It creates no script elements, imports nothing and makes no network requests (unit-pinned).
-- Runtime file 1 on the test page: https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6aa881c9d6e9e70f262ea057_codalyn-beacon-runtime-1ebc5741.js. SRI sha256-bzvg9YjCBFqQA0VVsDdcsIK0DUK5RSCi9mefHtVXldM= is carried verbatim in the page tag. Served bytes: 20153, SHA-256 6f3be0f588c2045a90034555b0375cb082b40d42b94520a2f6679f1ed55795d3, identical for identity, gzip and br encodings, with or without an Origin header; the CDN answers a wildcard Access-Control-Allow-Origin. Preflight's row says Loaded and Hash matched but also "SRI mismatch"; the tag carries the exact derived SRI and the browser executed the script (ready selector present), which is impossible if SRI had failed. We saw the same on three successive valid pins (original, slash-free base64, pure ASCII) and could not reproduce outside the tool; we would welcome the value it observed.
-- "Not traceable to source": the runtime is served unminified and formatted, with a header naming its version and authoring module (cms-slot-page-inline-script.ts). There is no build transform, so the served file is its own source; the same modules are in the private source-map zip.
-- Every other script on the test page is Webflow's own site runtime (the per-site webflow bundle, its achunk imports, GSAP and ScrollTrigger for Interactions, jQuery). None is loaded by Beacon; we pin runtime file 1 only.
+1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. When a signed-in user has exactly one workspace and none is active on the session, the extension holds it locally as a suggestion and shows it in the account panel and the app menu with an explicit "Use this workspace" control. The only request to that endpoint comes from that click or from the multi-workspace picker. Unit tests pin zero requests after sync and exactly one after the confirmation.
 
-BACKEND (Hybrid): https://tower.codalyn.app only, HTTPS, production. Paths: /api/auth/webflow-designer (Designer ID-token exchange, server-side); /api/auth/get-session, sign-in/email, sign-out, one-time-token/generate (our session; the one-time token is consumed by Tower's sign-in handoff, never a Webflow credential); /api/integrations/webflow/authorize (server-stored OAuth state, returns the Webflow consent URL); /api/v1/beacon/ settings, active-workspace, access-policy, usage, early-access-request, support-request; /api/v2/webflow/ (all subpaths: proxy to the Webflow Data API with the server-stored OAuth token, path segments only, fixed upstream host); image conversion (opt-in AVIF only). All require a server-resolved session. The bearer is sent only to the Tower origin; the Webflow ID token is never forwarded to a third party. Also: Webflow-issued presigned upload URLs (S3, website-files.com) for our runtime, no credential header; https://us.i.posthog.com analytics, opt-in only, no site content.
+2. Exception telemetry. A before_send handler now exists for every telemetry event: it drops every property carrying a URL, path, host, referrer, IP address or page title at any depth, scrubs URLs, e-mail addresses, bearer tokens, JWTs, query strings and long opaque tokens out of every remaining string (including exception messages), and reduces stack-frame locations to a bare file name; unit tests feed synthetic sensitive values (e-mail, bearer token, JWT, presigned S3 URL with signature, token in a query string, session token) and assert none survives. More important for this submission: the Marketplace build ships no telemetry SDK at all. The dependency sits behind a build-time release flag that is off for Marketplace bundles; the release build fails if it is on and verifies the zip contains no trace of it. Verifiable in the bundle: no analytics chunk (536 KB zip, down from 1.9 MB), no telemetry host in connect-src, no consent prompt, and Settings, Privacy states that this build sends no usage or error telemetry. The privacy policy at https://tower.codalyn.app/privacy says the same.
 
-UNINSTALL: page-level code only, never site-level. Deleting the last slot list offers a one-click page uninstall (removes the footer script entry and orphaned runtime assets, prompts to publish). Manual path: Page settings, Custom code, Footer code. Docs: https://tower.codalyn.app/docs.
+3. Redirects. The single network call site (extension-egress.ts) runs every request with redirect mode set to error; the caller's options cannot override it. No path needs a redirect: Tower answers its API routes directly and the presigned S3 upload returns a 2xx with no redirect field.
 
-EXTERNAL-SERVICE DISCLOSURE: AVIF conversion is opt-in, off by default. Selecting AVIF shows a consent prompt disclosing the image is sent to tower.codalyn.app for conversion, in memory, never stored; revocable in Settings, Privacy; persistent indicator while active. A guard at the single call site refuses AVIF without consent. WebP stays fully in-Designer.
+4. Upload allowlist. The create-asset response adapter registers the exact uploadUrl string Webflow returned as a one-shot permitted destination, only if it has the documented shape: HTTPS, host exactly s3.amazonaws.com, first path segment exactly webflow-prod-assets. The egress policy accepts an upload only for a granted URL and consumes the grant with the request; sibling keys, other buckets, regional or virtual-hosted S3 hosts and Webflow-owned hosts are refused before any request is built. connect-src is exactly: self, https://tower.codalyn.app, https://s3.amazonaws.com. Webflow asset hosts remain in img-src only.
+
+5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host, style-src-attr is none. The UI needs no inline style attributes: React, Radix, vaul and Lexical set styles through the CSSOM, which CSP does not govern. Two style-attribute writes remain in the bundle, pinned by count in the release build; both are Webflow Designer API calls that style the CMS Slots placeholder on the user's canvas element, a different document outside the extension's policy. Rendering under the enforced policy was verified by opening all 309 stories of our Storybook catalog (the full UI surface) in headless Chromium with the policy injected and recording every violation event: zero attributed to our UI.
+
+6. Localization. Every CMS item write now names its locale: the extension reads the site's locales (Get Site) once per session and sends the primary locale's cmsLocaleId on every write (the image editor's CMS image-field update; the CMS Slots layout save to the item's staged and live records) and on the matching staged read. Sites with secondary locales are not written: the write is refused before any request and the user sees "This site uses Webflow Localization. Beacon does not write CMS content on localized sites yet, so nothing was changed." The listing states this. Custom code and asset endpoints are not locale-scoped.
+
+UNCHANGED FROM 2026-09-15: one network call site with an explicit destination policy (release build fails on a second); the one MutationObserver is the rich-text editor's (Lexical) contenteditable sync inside our panel, canvas changes only through the Designer API on explicit user actions; one page-level hosted runtime with a SHA-256 integrityHash, pure ASCII, unminified, loading nothing and making no requests (SRI observations as filed); Tower with allowlist-only CORS, session-only auth, server-stored OAuth state, the Webflow ID token never forwarded; no plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, no popups or cross-window messaging, no credentials in URLs, no session replay; styles.css ships a v3 source map.
+
+BACKEND (Hybrid): https://tower.codalyn.app only, HTTPS, production; paths as filed on 2026-09-15. Other destination: the presigned upload URL in item 4. No telemetry host. Uninstall and AVIF disclosure unchanged.
 ```
-
-(The long-form version this replaces is in [history/responses.md](history/responses.md) under 2026-09-15.)
 
 ## 5. "Test the published runtime" (Preflight browser test)
 
@@ -190,3 +184,5 @@ page now loads exactly the 17 scripts above: Beacon's runtime plus Webflow's own
 | Testing site | `https://beacon-demo.webflow.io` — bundle above installed via the version manager; beacon page `https://beacon-demo.webflow.io/blog/the-power-of-resilience` |
 | Reviewer credentials | enter in the form's credentials field only — never in this repo |
 | 2FA | enabled on a Workspace admin account before submitting |
+| **Listing description — Localization statement (required, R8.6)** | Add verbatim: "Localization: Beacon does not write CMS content on sites that use Webflow Localization (secondary locales). On such sites, CMS writes from the image editor and CMS Slots are refused in-app with a message; nothing is changed. Sites without secondary locales are fully supported, and every CMS write names the site's primary locale explicitly." |
+| **Listing description — Privacy statement (R8.2)** | Add or keep: "Beacon sends no usage or error telemetry. AVIF conversion is opt-in and sends only the image being converted to tower.codalyn.app; it is off by default." |

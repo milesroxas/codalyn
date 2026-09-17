@@ -353,14 +353,87 @@ describe("matchForbiddenMarker", () => {
   });
 });
 
+describe("review round 8 (2026-09-17) release gates", () => {
+  it("pins exactly two style-attribute writes in Beacon release output — the Designer API canvas placeholder calls (shipped CSP: style-src-attr 'none')", () => {
+    const pinned = pinnedMarkerCounts("beacon", "production");
+    const styleAttr = pinned.find((marker) => /style-attribute/.test(marker.label));
+    expect(styleAttr?.expected).toBe(2);
+    const twoCanvasWrites = `a.setAttribute("style", x); b.setAttribute('style', y); el.style.cssText = "a:b"; el.setAttribute("data-style", "x")`;
+    expect(() => assertPinnedMarkerCounts(twoCanvasWrites, [styleAttr], "dist")).not.toThrow();
+    expect(() =>
+      assertPinnedMarkerCounts(`${twoCanvasWrites}; c.setAttribute("style", z)`, [styleAttr], "dist")
+    ).toThrow(/style-attribute write/);
+    expect(() => assertPinnedMarkerCounts(`a.setAttribute("style", x)`, [styleAttr], "dist")).toThrow(
+      /style-attribute write/
+    );
+  });
+
+  it("forbids any PostHog trace in a release bundle unless VITE_BEACON_TELEMETRY_ENABLED=true", () => {
+    const appPath = tempAppDir();
+    const off = collectForbiddenBundleMarkers(appPath, "production", "beacon");
+    expect(matchForbiddenMarker("https://us.i.posthog.com/e/", off)?.label).toMatch(/PostHog/);
+    expect(matchForbiddenMarker("processed by PostHog", off)?.label).toMatch(/PostHog/);
+
+    writeFileSync(join(appPath, ".env.production"), "VITE_BEACON_TELEMETRY_ENABLED=true\n");
+    const on = collectForbiddenBundleMarkers(appPath, "production", "beacon");
+    expect(matchForbiddenMarker("https://us.i.posthog.com/e/", on)).toBeNull();
+  });
+
+  it("refuses a release build that bundles telemetry or writes localized sites' primary locale", () => {
+    const appPath = tempAppDir();
+    expect(() =>
+      assertRequiredReleaseEnv({
+        appName: "beacon",
+        appPath,
+        channel: "production",
+        inlineEnv: { VITE_BEACON_TELEMETRY_ENABLED: "true" },
+      })
+    ).toThrow(/VITE_BEACON_TELEMETRY_ENABLED/);
+    expect(() =>
+      assertRequiredReleaseEnv({
+        appName: "beacon",
+        appPath,
+        channel: "preview",
+        inlineEnv: { VITE_BEACON_LOCALIZED_SITE_CMS_WRITES: "primary" },
+      })
+    ).toThrow(/VITE_BEACON_LOCALIZED_SITE_CMS_WRITES/);
+    // Unset (the Marketplace state) and the explicit reduced values pass.
+    expect(() =>
+      assertRequiredReleaseEnv({ appName: "beacon", appPath, channel: "production", inlineEnv: {} })
+    ).not.toThrow();
+    expect(() =>
+      assertRequiredReleaseEnv({
+        appName: "beacon",
+        appPath,
+        channel: "production",
+        inlineEnv: { VITE_BEACON_TELEMETRY_ENABLED: "false", VITE_BEACON_LOCALIZED_SITE_CMS_WRITES: "blocked" },
+      })
+    ).not.toThrow();
+    // Development builds may run with either value.
+    expect(() =>
+      assertRequiredReleaseEnv({
+        appName: "beacon",
+        appPath,
+        channel: "development",
+        inlineEnv: { VITE_BEACON_TELEMETRY_ENABLED: "true" },
+      })
+    ).not.toThrow();
+  });
+});
+
 describe("pinnedMarkerCounts (App Review Preflight: External API Calls / Silent Canvas Mutations)", () => {
   const pinned = pinnedMarkerCounts("beacon", "production");
-  const clean = "async function a(e,t){return fetch(e,t)}" + "e._observer=new MutationObserver((t,n)=>{yt(e,t,n)})";
+  const clean =
+    "async function a(e,t){return fetch(e,t)}" +
+    "e._observer=new MutationObserver((t,n)=>{yt(e,t,n)})" +
+    // The two Designer API canvas placeholder writes (review round 8, CSP style-src-attr 'none').
+    `r.setAttribute("style",ph());await d.setAttribute("style",ph())`;
 
-  it("pins exactly one bare fetch( and one MutationObserver construction in Beacon release output", () => {
+  it("pins exactly one bare fetch(, one MutationObserver construction and two canvas style-attribute writes in Beacon release output", () => {
     expect(pinned.map((m) => [m.label, m.expected])).toEqual([
       ["bare fetch( call", 1],
       ["MutationObserver construction", 1],
+      ["style-attribute write (setAttribute)", 2],
     ]);
     expect(() => assertPinnedMarkerCounts(clean, pinned, "Build output")).not.toThrow();
   });

@@ -87,11 +87,25 @@ unzip -p "$Z" '*.js' | grep -cE '\.(inner|outer)HTML\s*=[^=]|insertAdjacentHTML\
 unzip -p "$Z" '*.js' | grep -cE '(^|[^A-Za-z0-9_$.])fetch\('  # 1 — the extensionFetch chokepoint only (R7b.12; build gate pins it)
 unzip -p "$Z" '*.js' | grep -c 'new MutationObserver'        # 1 — Lexical's contenteditable observer only (R7b.11/12 open item; build gate pins it)
 unzip -p "$Z" '*.js' | grep -c 'window.open(\|postMessage('   # 0
+unzip -p "$Z" '*.js' '*.html' | grep -aci 'posthog'          # 0 — telemetry SDK withheld from Marketplace bundles (R8.2; build gate forbids it)
+unzip -p "$Z" '*.js' | grep -acE 'redirect:["'"'"'`]error'    # ≥1 — extensionFetch pins redirect mode to error (R8.3)
+unzip -p "$Z" '*.js' | grep -aoE 'setAttribute\(\s*["'"'"'`]style' | wc -l   # 2 — the Designer API canvas placeholder writes only (R8.5; build gate pins it)
+unzip -p "$Z" '*.js' | grep -ac 'webflow-prod-assets'         # 1 — pinned upload bucket (R8.4)
+unzip -p "$Z" '*.js' | grep -ac 'cmsLocaleId'                 # ≥1 — locale named on every CMS write (R8.6)
+unzip -p "$Z" index.html | grep -oE "(connect-src|style-src-attr) [^;]*"  # connect-src 'self' <tower> https://s3.amazonaws.com · style-src-attr 'none' (R8.4/R8.5)
+unzip -p "$Z" index.html | grep -c "unsafe-inline"            # 0 (R8.5)
 ```
 
-Anything off its expected value → fix, rebuild, re-run. Never edit a zip by hand. The two `1`s are
-pinned by `pinnedMarkerCounts` in `scripts/build-cli.mjs` (dist + zip): a second `fetch(` or
-`MutationObserver` anywhere in the artifact fails `build:prod` before you can upload it.
+Anything off its expected value → fix, rebuild, re-run. Never edit a zip by hand. The pinned counts
+(`fetch(` 1, `MutationObserver` 1, `setAttribute("style"` 2) are enforced by `pinnedMarkerCounts` in
+`scripts/build-cli.mjs` (dist + zip): a new site anywhere in the artifact fails `build:prod` before
+you can upload it.
+
+**Rendering under the enforced style CSP (R8.5)** — run once per bundle after `pnpm --filter beacon
+storybook:build`: `node apps/beacon/scripts/csp-style-audit.mjs` opens every story under
+`style-src-attr 'none'` / `style-src-elem 'self'` and must end with "CSP style violations attributed
+to Beacon UI: 0" (Storybook's own preview-runtime inline styles are listed separately and are not
+ours).
 
 **App Review Preflight shows at most 3 evidence locations per finding** (R7b.8 had four `?token=`
 URLs, three listed; R7b.11 had four `MutationObserver`s, three listed). Never fix only the listed

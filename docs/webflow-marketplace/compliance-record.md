@@ -7,8 +7,10 @@ round-3 feedback (2026-08) in [Round 3](#round-3--2026-08-senior-engineer--revie
 round-4 feedback (2026-08-05) in [Round 4](#round-4--2026-08-05-review-team-flags); the
 pre-submission full-guideline re-audit in
 [Round 5](#round-5--2026-08-05-full-guideline-re-audit-pre-submission); round-6 feedback
-(2026-08-11) in [Round 6](#round-6--2026-08-11-review-team-flags); and round-7 feedback
-(2026-08-12) in [Round 7](#round-7--2026-08-12-senior-engineer--review-team-flags).
+(2026-08-11) in [Round 6](#round-6--2026-08-11-review-team-flags); round-7 feedback
+(2026-08-12) in [Round 7](#round-7--2026-08-12-senior-engineer--review-team-flags); and round-8
+feedback (2026-09-17, on the 2026-09-15 App Update submission) in
+[Round 8](#round-8--2026-09-17-review-team-flags-on-submission-7875910a).
 Where a later-round fix supersedes an earlier answer, the original item notes it.
 
 ## 1. Direct DOM manipulation / unsafe patterns
@@ -2511,3 +2513,173 @@ free of angle brackets, attribute pairs, JS API names and comment/wildcard token
 `7875910a-e080-40bc-9eb9-8d523a0e0e6a`)** · Accepted ✗. Next: watch the submission email thread; on
 findings, run `/webflow-app-review-remediation` (playbook § B) and resubmit via Publish → Upload Bundle for
 Review.
+
+## Round 8 — 2026-09-17 review-team flags on submission 7875910a
+
+Feedback email on App Update `7875910a-e080-40bc-9eb9-8d523a0e0e6a` (bundle
+`v0.1.0_public_09-14_18-26-19.zip`, `91b88847…99fd`). Six findings, each with a file/function
+location in the submitted source maps and a category, none with an ID or priority → all `unassigned`
+= P1 (skill rule). Provenance per finding below. The two Preflight items answered in R7b.20
+(External API Calls ×1, Silent Canvas Mutations ×1) were **not** raised again.
+
+**Strategy for this round (decided 2026-09-17):** each flagged feature ships in a *reduced* form that
+matches the reviewer's stated acceptance criterion verbatim, selected by build-time release flags
+(`apps/beacon/src/shared/lib/beacon-release-flags.ts`) so the withheld variant is dead-code-eliminated
+from the Marketplace bundle and the release build refuses the non-Marketplace value on release channels
+(`FORBIDDEN_RELEASE_ENV`, `scripts/build-cli.mjs`). Nothing is merely hidden.
+
+| Flag | Marketplace build | Other value (needs its own App Update) |
+| --- | --- | --- |
+| `VITE_BEACON_TELEMETRY_ENABLED` | unset → no telemetry SDK bundled at all | `true` → posthog-js, opt-in, `before_send`-redacted |
+| `VITE_BEACON_LOCALIZED_SITE_CMS_WRITES` | unset → `blocked` (CMS writes refused on sites with secondary locales; stated in the listing) | `primary` → explicit primary-locale writes |
+| `VITE_CMS_SLOTS_SURFACE_ENABLED` (existing) | on | `false` = kill switch, refused on release channels |
+
+### Normalized findings
+
+| Finding (verbatim title) | Priority | Observed (source-verified at 2b90a11) | Acceptance criterion (quoted) | Provenance | Evidence state |
+| --- | --- | --- | --- | --- | --- |
+| R8.1 Workspace state persisted without explicit user interaction — `beacon-app-settings-provider.tsx:508–516` | unassigned | Effect: `syncState === "synced" && !activeOrganizationId && beaconWorkspaces.length === 1` → `setActiveBeaconWorkspace(id)` → `POST /api/v1/beacon/active-workspace` with no user action | "Remove the automatic POST. Hold the single-workspace default locally and persist it only on an explicit user selection or confirmation." | issued finding (User interaction) | source-verified |
+| R8.2 Exception telemetry has no application-level redaction — `init-observability.ts`, `initObservability` | unassigned | `posthog.init` with `capture_exceptions` and no `before_send`; groups registered with site/workspace names | "Add a before_send handler that redacts URLs and message payloads, and verify outgoing events with synthetic sensitive values before resubmitting." | issued finding (Privacy and Data Protection) | source-verified |
+| R8.3 Egress check does not constrain redirects — `extension-egress.ts`, `extensionFetch` | unassigned | `fetch(url, init)` — Fetch default `redirect: "follow"` | "Set redirect: 'error' as the default in extensionFetch and enable redirects explicitly only where required." | issued finding (Request handling) + published requirement (Marketplace Guidelines: external redirects only where strictly necessary, to declared trusted domains) | source-verified |
+| R8.4 Upload allowlist accepts any S3 bucket — `extension-egress.ts`, `isAllowedAssetUploadUrl` | unassigned | `AWS_S3_UPLOAD_HOST_RE` admitted any bucket on `s3.amazonaws.com` / regional / virtual-hosted hosts, plus `*.webflow.com` and `*.website-files.com`; CSP `connect-src` mirrored that | "Restrict the upload destination to the exact uploadUrl returned by Webflow's create-asset response, and narrow CSP connect-src to match." | issued finding (Request handling) | source-verified |
+| R8.5 CSP permits inline style attributes — `index.html:7` | unassigned | `style-src … 'unsafe-inline'`, `style-src-attr 'unsafe-inline'` | "Remove 'unsafe-inline' from both directives, or provide justification if the shipped UI requires it, and verify rendering under the enforced policy." | issued finding (Technical) + published requirement (Marketplace Guidelines: CSP compatibility) | source-verified |
+| R8.6 Locale parameters absent from client operations | unassigned | No `localeId` / `cmsLocaleId` in the extension; two locale-aware write paths existed (image editor CMS image field PATCH `…/items/{id}/live`; CMS Slots composition PATCH `…/items` + `…/items/live`), both writing the primary locale implicitly | "If Beacon supports sites with Webflow Localization enabled, ensure Tower specifies the intended locale on every locale-aware write and never overwrites localized content with primary-locale values. If localized sites are not supported, state this in your listing." | issued finding (Localization) + published requirement (Marketplace Guidelines, Localization: specify the intended locale on every write) | source-verified |
+
+Routing: all six are **Behavior** (extension source / build); none is an open policy decision. The
+reviewer's own language for R8.6 offers a stated non-support path, which is the one taken.
+
+### R8.1 Workspace persistence — explicit confirmation only
+
+- **Change** — the effect is deleted. The provider now exposes `suggestedWorkspaceId` (the only
+  workspace while none is active on the session, held locally) and the two workspace controls
+  (`features/settings/ui/beacon-workspace-control.tsx`: account-panel field and app-menu group) show
+  it with a **"Use this workspace"** confirmation. `POST /api/v1/beacon/active-workspace` is reachable
+  only through `setActiveBeaconWorkspace`, called from the user's click/selection.
+- **Tests** — `beacon-app-settings-provider.test.tsx` (envelope with one workspace, none active →
+  zero POSTs after sync, suggestion exposed; POST exactly once after the confirm click, then
+  refetch), `beacon-workspace-control.test.tsx`; stories `Settings/WorkspaceControl` (both
+  controls, unconfirmed / confirmed / multi).
+- **Note (honest scope):** Tower's own session resolution (`resolveActiveOrganizationId`) still falls
+  back to the user's preferred or only membership when a session carries no active workspace; that
+  is a server-side default for the session, unchanged this round and not driven by the extension.
+
+### R8.2 Telemetry — `before_send` redaction, and withheld from the Marketplace build
+
+- **Redaction (the stated criterion)** — `shared/lib/telemetry-event-redaction.ts` is wired as
+  PostHog `before_send`: property denylist (any key carrying a URL, path, host, referrer, IP, page
+  title or campaign/click id, at any depth of `properties` / `$set` / `$set_once`), and string
+  scrubbing of every remaining value (URLs → `[url]`, e-mail → `[email]`, bearer/JWT/40+-char
+  opaque tokens → `[token]`, query strings → `?[query]`); stack-frame `filename`/`abs_path` reduced
+  to the bare file name; exception messages keep their sentence structure. Disclosed 24-hex
+  Webflow ids and group identifiers are kept. `telemetry-event-redaction.test.ts` pins the outgoing
+  shape with synthetic sensitive values (e-mail, bearer, JWT, presigned S3 URL with signature,
+  Tower URL with `?token=`, opaque session token, `$current_url`/`$referrer`/`$ip`/`title`) and
+  asserts none survives serialization; `init-observability.test.ts` pins that `before_send` is the
+  redaction function and that nothing initializes before consent.
+- **Reduced form shipped** — `VITE_BEACON_TELEMETRY_ENABLED` unset: `__BEACON_TELEMETRY_ENABLED__`
+  is `false`, the guarded `import("posthog-js")` / `import("@codalyn/observability")` in
+  `init-observability.ts` are dead-code-eliminated, the consent prompt renders nothing (its copy
+  compiles out), Settings → Privacy states "This build of Beacon sends no usage or error telemetry"
+  and has no switch, the CSP `connect-src` carries no PostHog host, and the release build forbids
+  any `posthog` trace in dist and the zip (`telemetryForbiddenMarker`). Four review rounds targeted
+  this SDK (R6.5, R7b.8, R7b.9, R8.2); removing it from the Marketplace artifact removes the class.
+  `init-observability.ts` remains the single SDK touchpoint (support-dialog captures and the error
+  boundary go through it), so the flag-on build is the redacted, consent-gated one.
+- **Disclosure** — Tower privacy policy §1 "Beacon Designer Extension" amended to say the current
+  Marketplace build includes no analytics SDK (opt-in telemetry described as available only in builds
+  that include it). Requires a Tower production deploy (manual) before submission.
+
+### R8.3 Redirects — pinned to `error`
+
+- `extensionFetch` now calls `fetch(url, { ...init, redirect: "error" })`; a caller cannot opt back
+  in (`init.redirect` is overwritten). No caller needs a redirect: Tower answers its API routes
+  directly, and the S3 presigned POST returns 2xx (Webflow's `uploadDetails` carry no
+  `success_action_redirect`). Tests: `extension-egress.test.ts` ("never follows redirects").
+
+### R8.4 Upload destination — exact URL grant + pinned host/bucket + narrowed CSP
+
+- **Egress** — `createRuntimeAsset` (the create-asset response adapter) calls
+  `grantWebflowAssetUpload(data.uploadUrl)`: the exact string is registered as a one-shot permitted
+  destination, and only if it has the documented shape — HTTPS, host exactly `s3.amazonaws.com`,
+  first path segment exactly `webflow-prod-assets` (`shared/lib/webflow-asset-upload-endpoint.ts`,
+  the value Webflow's create-asset reference documents and every install since round 3 observed).
+  `resolveEgressDestination` classifies `webflow-asset-upload` only for a granted URL;
+  `extensionFetch` consumes the grant with the request. Regional/virtual-hosted S3, other buckets,
+  Webflow-owned hosts, sibling keys and the same URL twice are refused before any request.
+- **CSP** — `connect-src 'self' https://tower.codalyn.app https://s3.amazonaws.com` (no
+  `*.s3.amazonaws.com`, no `webflow.com`/`website-files.com` — those stay in `img-src` only). Pinned
+  by `beacon-extension-csp.test.ts`.
+- Bucket rotation on Webflow's side fails closed with a visible install error; the constant changes
+  through an App Update. Accepted trade-off for exactness.
+
+### R8.5 CSP — no `unsafe-inline` for styles, verified at runtime
+
+- **Policy** — `style-src 'self' https://cdn.prod.website-files.com; style-src-elem 'self'
+  https://cdn.prod.website-files.com; style-src-attr 'none'`. React, Radix, vaul and Lexical style
+  the extension document through the CSSOM (`element.style.x`, `cssText`, `setProperty`), which CSP
+  does not govern; only markup and `setAttribute("style", …)` writes are attribute styles.
+- **Gate** — the bundle's `setAttribute("style"` count is pinned to exactly **2**
+  (`pinnedMarkerCounts`): the two Webflow Designer API calls that set the CMS Slots placeholder style
+  on the user's *canvas* element (`cms-slot-list-target-designer-placeholder.ts`,
+  `create-cms-slot-list-target-component.ts`) — a different document, outside the extension's CSP.
+  The first-party source sweep in `extension-egress.test.ts` pins the same two files.
+- **Runtime verification** — `apps/beacon/scripts/csp-style-audit.mjs` serves the static Storybook
+  catalog (the whole UI surface, no Designer runtime) with an *enforced*
+  `style-src 'self'; style-src-elem 'self'; style-src-attr 'none'` meta tag injected into the preview
+  document, opens every story in headless Chromium and records every `securitypolicyviolation`.
+  Violations are attributed by source file: Storybook's own preview runtime (`assets/iframe-*.js`,
+  backgrounds/measure/a11y/test addons styling Storybook chrome) is tallied separately; anything from
+  React DOM, story or vendor chunks fails the run. Result on 2026-09-17: 309 stories rendered, **0 violations attributed to
+  Beacon UI**; Storybook's runtime accounted for every event (`assets/iframe-*.js:778` style-src-elem
+  ×309, `:1108` style-src-attr ×304). Rendering under the enforced policy is therefore verified for
+  the catalog; the installed-extension check (panel renders, console free of CSP violations) is the
+  next state.
+
+### R8.6 Localization — explicit locale on every CMS write; localized sites not written (stated)
+
+- **Research** — Data API: items are updated in the primary locale unless `cmsLocaleId` is given
+  ([update-items-live](https://developers.webflow.com/data/reference/cms/collection-items/live-items/update-items-live));
+  `GET /sites/{site_id}` exposes `locales.primary` / `locales.secondary` with `cmsLocaleId` once
+  Localization is enabled ([working-with-localization](https://developers.webflow.com/data/docs/working-with-localization)).
+  The Designer Extension API exposes no "locale being edited", so the intended locale is resolved from
+  the site.
+- **Change** — `shared/lib/webflow-cms-write-locale.ts`: boundary normalizer
+  `parseWebflowSiteLocales` (canonical / wrapped `{ value }` / missing / malformed shapes; matched by
+  `cmsLocaleId`, never `displayName`/`tag`) and pure `resolveCmsWriteLocale` → `unscoped` (no locale
+  ids: endpoint not locale-aware) | `primary` (explicit `cmsLocaleId`) | `blocked` (secondary
+  locales present). `resolveCurrentSiteCmsWriteLocale()` reads the site through Tower's proxy once
+  per session (failed lookup not cached, fails closed). Both write paths await it first — the image
+  editor's `updateCmsImageField` (body `{ cmsLocaleId?, fieldData }`) and CMS Slots'
+  `patchBeaconListCmsTextFieldData` (items `[{ id, cmsLocaleId?, fieldData }]`, staged and live) —
+  and the staged read in `fetchCmsSlotListCmsTextForItem` passes the same `cmsLocaleId`. A blocked
+  decision throws `LocalizedSiteCmsWriteBlockedError` before any request; the composer save surfaces
+  its message in the Designer notification.
+- **Reduced form shipped** — `VITE_BEACON_LOCALIZED_SITE_CMS_WRITES` unset → `blocked`. Listing and
+  form text (SUBMIT.md) state: Beacon does not write CMS content on sites that use Webflow
+  Localization; on such sites CMS writes are refused in-app. Page/site custom code and asset writes
+  are not locale-scoped; Designer API edits apply where the user is working in the Designer.
+- **Tests** — `webflow-cms-write-locale.test.ts` (boundary shapes, decisions per policy, cache,
+  fail-closed).
+
+### Artifact
+
+Build: `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod` at the working tree after `2b90a11` (uncommitted at time of writing — commit before upload so artifact ↔ commit is traceable).
+`v0.1.0_public_09-17_15-53-42.zip` sha256
+`27372473eeef9abea8c8a8a898c8a4f3bd076286cefa6469f713471de321e0cf` (25 files, 536 KB — down from
+1.89 MB: no posthog-js, no observability chunk) + `.sourcemaps.zip` sha256
+`37c449ee009f3eb211c5bce6a0b32790c60a71900d5f10579c16016c083cc24b` (private form field). Gates that
+ran inside the build: lint + typecheck, 1088 unit tests, forbidden markers on dist and zip (`posthog`,
+dev hosts, Sentry, token-in-query, session replay, canvas readback, `window.open(`, `postMessage(`,
+`http://`/`ws://`, HTML-injection sinks, sourceMappingURL, quality-compare) and pinned counts (bare
+`fetch(` = 1, `new MutationObserver(` = 1, `setAttribute("style"` = 2). Independent artifact greps on
+the zip: `posthog` 0 · `sentry` 0 · `unsafe-inline` 0 · `cmsLocaleId` 12 · `webflow-prod-assets` 1 ·
+"Use this workspace" 1 · "sends no usage or error telemetry" 1 · shipped CSP
+`connect-src 'self' https://tower.codalyn.app https://s3.amazonaws.com`,
+`style-src-attr 'none'`.
+
+**States:** Source ✓ · Artifact ✓ (15:53 zip) · Installed ✗ · Runtime ✗ (CSP style audit: see R8.5) ·
+Submitted ✗ · Accepted ✗. Next: deploy Tower (privacy policy), install the zip on `beacon-demo`, confirm
+the panel renders and a CMS Slots install/sync still uploads (grant path) with the extension console
+free of CSP violations, run App Review Preflight on the zip + `.sourcemaps.zip`, then Publish → Upload
+Bundle for Review + the submit form (App Update) with SUBMIT.md.
+

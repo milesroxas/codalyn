@@ -51,7 +51,7 @@ function createStripMainCssFromPopoutPlugin() {
  * (Vite HMR needs websockets and inline preamble a production policy must not allow). A missing
  * placeholder fails the build — the CSP cannot silently drop out of a shipped document.
  */
-function createBeaconCspPlugin(towerOrigin: string) {
+function createBeaconCspPlugin(towerOrigin: string, telemetryEnabled: boolean) {
   const placeholderMeta = `<meta http-equiv="Content-Security-Policy" content="${BEACON_CSP_PLACEHOLDER}" />`;
   return {
     name: "beacon-enforced-csp",
@@ -66,7 +66,7 @@ function createBeaconCspPlugin(towerOrigin: string) {
         }
         const content = ctx.filename.endsWith("quality-compare.html")
           ? buildQualityComparePopoutCspContent()
-          : buildBeaconExtensionCspContent(towerOrigin);
+          : buildBeaconExtensionCspContent(towerOrigin, { telemetryEnabled });
         return html.replace(placeholderMeta, `<meta http-equiv="Content-Security-Policy" content="${content}" />`);
       },
     },
@@ -89,6 +89,20 @@ const isVitest = Boolean(process.env.VITEST);
 function resolveQualityPopoutEnabled(mode: string): boolean {
   const beaconEnv = loadEnv(mode, beaconRoot, "");
   const raw = beaconEnv.VITE_QUALITY_COMPARE_POPOUT_ENABLED ?? process.env.VITE_QUALITY_COMPARE_POPOUT_ENABLED;
+  return raw?.trim() === "true";
+}
+
+/**
+ * PostHog telemetry gate (review round 8, 2026-09-17). Unless `VITE_BEACON_TELEMETRY_ENABLED=true`,
+ * `__BEACON_TELEMETRY_ENABLED__` is defined `false`: the guarded `import("posthog-js")` in
+ * src/shared/lib/init-observability.ts is dead-code-eliminated (no SDK chunk in the zip), the consent
+ * prompt and the Privacy telemetry switch compile out, and the CSP carries no telemetry host. The
+ * Marketplace build ships it off; release builds refuse an enabled flag (FORBIDDEN_RELEASE_ENV in
+ * scripts/build-cli.mjs) and forbid any "posthog" trace in the archived zip.
+ */
+function resolveTelemetryEnabled(mode: string): boolean {
+  const beaconEnv = loadEnv(mode, beaconRoot, "");
+  const raw = beaconEnv.VITE_BEACON_TELEMETRY_ENABLED ?? process.env.VITE_BEACON_TELEMETRY_ENABLED;
   return raw?.trim() === "true";
 }
 
@@ -137,6 +151,9 @@ export default defineConfig(({ mode }) => {
   // Vitest pins the flag on so popout unit/UI tests always exercise the real code paths; the
   // shipped state is decided by real builds, not the test runner.
   const qualityPopoutEnabled = isVitest || resolveQualityPopoutEnabled(mode);
+  // Same rule for telemetry: Vitest pins it on so the SDK wiring (consent gate, before_send redaction)
+  // stays unit-testable; real builds decide what ships.
+  const telemetryEnabled = isVitest || resolveTelemetryEnabled(mode);
   return {
     base: "./",
     plugins: [
@@ -146,7 +163,7 @@ export default defineConfig(({ mode }) => {
       createStripDevHostLiteralsPlugin({ strict: mode !== "development" }),
       createStripMainCssFromPopoutPlugin(),
       ...(qualityPopoutEnabled ? [] : [createDropQualityPopoutCssPlugin()]),
-      createBeaconCspPlugin(towerOrigin),
+      createBeaconCspPlugin(towerOrigin, telemetryEnabled),
       // Marketplace submission form + App Review Preflight require a source map for styles.css too;
       // Vite emits none for CSS, so this plugin minifies the stylesheet itself (needs cssMinify: false
       // below) and writes styles.css.map, which build-cli moves into the private sourcemaps zip.
@@ -159,6 +176,7 @@ export default defineConfig(({ mode }) => {
       __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
       __BEACON_TOWER_ORIGIN__: JSON.stringify(towerOrigin),
       __QUALITY_COMPARE_POPOUT_ENABLED__: JSON.stringify(qualityPopoutEnabled),
+      __BEACON_TELEMETRY_ENABLED__: JSON.stringify(telemetryEnabled),
     },
     resolve: {
       alias: {

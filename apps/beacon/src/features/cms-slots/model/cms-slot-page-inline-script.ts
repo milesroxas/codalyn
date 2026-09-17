@@ -18,7 +18,7 @@ import {
   cmsSlotListTargetRuntimeLayoutRevealSource,
   ensureCmsSlotListTargetLayoutStyle,
 } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
-import { extensionFetch, isAllowedAssetUploadUrl } from "@/shared/lib/extension-egress";
+import { extensionFetch, grantWebflowAssetUpload, isWebflowAssetUploadUrlShape } from "@/shared/lib/extension-egress";
 import { readStringLikeValue } from "@/shared/lib/read-string-like-value";
 import { getTowerOrigin, towerFetchWithRetry } from "@/shared/lib/tower-client";
 
@@ -557,6 +557,10 @@ async function createRuntimeAsset(siteId: string, fileName: string, sourceCode: 
   if (!data || typeof data.uploadUrl !== "string" || !data.uploadDetails || typeof data.uploadDetails !== "object") {
     throw new Error("Create runtime asset: unexpected response.");
   }
+  // Boundary: the exact `uploadUrl` Webflow returned becomes the one permitted upload destination for
+  // the request that follows (egress policy grant; refused here, before any upload, if it is not the
+  // documented S3 host + bucket). Nothing else the install flow computes can widen where bytes go.
+  grantWebflowAssetUpload(data.uploadUrl);
   return data;
 }
 
@@ -566,10 +570,11 @@ async function uploadRuntimeAsset(
   sourceCode: string
 ): Promise<void> {
   // The presigned upload is the one install-flow request that does not go through Tower's proxy.
-  // `extensionFetch` re-checks the same policy; this early return keeps the install-flow error
-  // message specific and guarantees no FormData is built for a refused destination.
-  if (!isAllowedAssetUploadUrl(uploadUrl)) {
-    throw new Error("Upload runtime asset: upload URL is not a trusted Webflow endpoint.");
+  // `extensionFetch` enforces the grant (exact URL from the create-asset response, single use); this
+  // early shape check keeps the install-flow error message specific and guarantees no FormData is
+  // built for a destination outside the documented Webflow host + bucket.
+  if (!isWebflowAssetUploadUrlShape(uploadUrl)) {
+    throw new Error("Upload runtime asset: upload URL is not the documented Webflow upload endpoint.");
   }
   const form = new FormData();
   for (const [k, v] of Object.entries(uploadDetails)) {

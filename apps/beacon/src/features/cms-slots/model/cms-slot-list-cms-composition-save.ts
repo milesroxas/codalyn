@@ -11,6 +11,11 @@ import { listCmsSlotListTargetInstancesOnPageByName } from "@/features/cms-slots
 import { getCmsSlotListTargetTextPropId } from "@/features/cms-slots/model/cms-slot-list-target-text-field";
 import { getCmsSlotListTargetComponentOrNull } from "@/features/cms-slots/model/create-cms-slot-list-target-component";
 import { getTowerOrigin, towerFetch } from "@/shared/lib/tower-client";
+import {
+  assertCmsWriteAllowed,
+  cmsLocaleRequestFields,
+  resolveCurrentSiteCmsWriteLocale,
+} from "@/shared/lib/webflow-cms-write-locale";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -79,7 +84,10 @@ export async function fetchCmsSlotListCmsTextForItem(options: {
   cmsItemId: string;
 }): Promise<string | null> {
   const slug = await resolveCmsFieldSlug(options.collectionId, options.fieldId);
-  const path = `/api/v2/webflow/collections/${encodeURIComponent(options.collectionId)}/items/${encodeURIComponent(options.cmsItemId)}`;
+  // Read the same locale the save writes (primary, named explicitly when the site exposes it).
+  const locale = cmsLocaleRequestFields(await resolveCurrentSiteCmsWriteLocale());
+  const query = locale.cmsLocaleId ? `?cmsLocaleId=${encodeURIComponent(locale.cmsLocaleId)}` : "";
+  const path = `/api/v2/webflow/collections/${encodeURIComponent(options.collectionId)}/items/${encodeURIComponent(options.cmsItemId)}${query}`;
   const res = await towerFetch(path, { method: "GET", headers: { Accept: "application/json" } });
   if (res.status === 404) {
     return null;
@@ -192,9 +200,11 @@ export async function readCmsSlotListRuntimePayloadText(options: {
 type PatchKind = "staged" | "live";
 
 /**
- * Data API: Webflow v2 updates **per item** with `PATCH` + body `{ items: [ { id, fieldData } ] }` (not a lone
- * `fieldData` on `/items/{id}/live`). Staged = CMS/Designer; live = published site (what the list target renders
- * and the footer **runtime** reads as text for `{"v":1,"i":[…]}`).
+ * Data API: Webflow v2 updates **per item** with `PATCH` + body `{ items: [ { id, cmsLocaleId?, fieldData } ] }`
+ * (not a lone `fieldData` on `/items/{id}/live`). Staged = CMS/Designer; live = published site (what the list
+ * target renders and the footer **runtime** reads as text for `{"v":1,"i":[…]}`). `cmsLocaleId` names the
+ * intended (primary) locale explicitly whenever the site exposes one — items would otherwise be updated in the
+ * primary locale implicitly, which is the shape review round 8 flagged.
  * @see https://developers.webflow.com/data/reference/cms/collection-items/staged-items/update-items
  * @see https://developers.webflow.com/data/reference/cms/collection-items/live-items/update-items-live
  */
@@ -204,8 +214,9 @@ async function patchBeaconListCmsTextFieldData(options: {
   fieldSlug: string;
   text: string;
   kind: PatchKind;
+  locale: { cmsLocaleId?: string };
 }): Promise<void> {
-  const { collectionId, cmsItemId, fieldSlug, text, kind } = options;
+  const { collectionId, cmsItemId, fieldSlug, text, kind, locale } = options;
   const tail = kind === "live" ? "items/live" : "items";
   const path = `/api/v2/webflow/collections/${encodeURIComponent(collectionId)}/${tail}?skipInvalidFiles=true`;
   const res = await towerFetch(path, {
@@ -215,6 +226,7 @@ async function patchBeaconListCmsTextFieldData(options: {
       items: [
         {
           id: cmsItemId,
+          ...locale,
           fieldData: {
             [fieldSlug]: text,
           },
@@ -249,6 +261,9 @@ export async function saveCmsSlotListRuntimePayloadToCmsItem(options: {
   if (!options.cmsItemId.trim()) {
     throw new Error("Missing CMS item id.");
   }
+  // Locale first: on a site with secondary locales the Marketplace build refuses the whole save before any
+  // request (LocalizedSiteCmsWriteBlockedError; message shown to the user), so staged and live never diverge.
+  const locale = cmsLocaleRequestFields(assertCmsWriteAllowed(await resolveCurrentSiteCmsWriteLocale()));
   const fieldSlug = await resolveCmsFieldSlug(options.collectionId, options.fieldId);
   const text = serializeCmsSlotListRuntimePayload(
     [...options.hiddenListIndices],
@@ -258,8 +273,8 @@ export async function saveCmsSlotListRuntimePayloadToCmsItem(options: {
   assertValidRuntimePayloadJson(text);
   const id = options.cmsItemId.trim();
   const cid = options.collectionId;
-  await patchBeaconListCmsTextFieldData({ collectionId: cid, cmsItemId: id, fieldSlug, text, kind: "staged" });
-  await patchBeaconListCmsTextFieldData({ collectionId: cid, cmsItemId: id, fieldSlug, text, kind: "live" });
+  await patchBeaconListCmsTextFieldData({ collectionId: cid, cmsItemId: id, fieldSlug, text, kind: "staged", locale });
+  await patchBeaconListCmsTextFieldData({ collectionId: cid, cmsItemId: id, fieldSlug, text, kind: "live", locale });
 }
 
 /**

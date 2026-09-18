@@ -30,15 +30,15 @@ const CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE = "runtime";
 const CMS_SLOT_PAGE_SCRIPT_HASH_ATTR = "data-codalyn-beacon-src-hash";
 
 /**
- * Revision counter embedded in the runtime's header comment. It exists so the SHA-256 SRI of the served runtime is
- * URL-safe: App Review Preflight's published-runtime test reported "Script integrity is missing or wrong" for a page
- * whose `integrity` attribute matched the derived pin exactly — the only distinguishing feature of that pin was a
- * `/` in its base64. Standard base64 SRI values may contain `/` and `+`, and browsers accept them, but a value made of
- * `[A-Za-z0-9=]` only survives any URL-, regex- or base64url-based comparison as well. Bump this number whenever the
- * runtime source changes and `cms-slot-page-inline-script.test.ts` reports a `/` or `+` in the pin (about one in four
- * revisions passes; the test names the next passing value). Deterministic, so the FNV drift marker stays stable.
+ * Revision counter embedded in the runtime's header comment. Bump it whenever the format of the sibling source map
+ * changes without the runtime text changing: the map is content-addressed by the runtime source hash and reused
+ * across syncs (see {@link buildCmsSlotRuntimeSourceMap}), so a format change must move the hash. History:
+ * revisions 2–3 were chosen so the SHA-256 SRI of the source alone contained no `/` or `+`, a hypothesis for App
+ * Review Preflight's "Script integrity is missing or wrong" that R7b.19 ruled out. The served bytes now end with
+ * the map pointer (a per-site asset URL), so the pin is fixed at sync time, not build time, and that constraint is
+ * retired. Deterministic, so the FNV drift marker stays stable.
  */
-export const CMS_SLOT_RUNTIME_REVISION = 3;
+export const CMS_SLOT_RUNTIME_REVISION = 4;
 
 /** 32-bit FNV-1a → 8 hex chars (stable across browsers for the same source string). */
 function hashCmsSlotRuntimeSource(source: string): string {
@@ -96,6 +96,8 @@ export function getCmsSlotPageInlineScriptSource(): string {
  * Codalyn Beacon - published-site list runtime v${buildVersion}.
  * Runtime revision ${CMS_SLOT_RUNTIME_REVISION}.
  * Served exactly as authored (unminified, no build step), so this file is its own readable source.
+ * Its last line points at an identity source map published beside it in this site's assets
+ * (codalyn-beacon-runtime-<hash>.map.json; sourcesContent is this file minus that last line).
  * Authored in apps/beacon/src/features/cms-slots/model/cms-slot-page-inline-script.ts and the
  * cms-slot-beacon-*.ts / cms-slot-list-target-*.ts modules it composes. Loads no other scripts,
  * sends no network requests, and is pure ASCII (served without a charset).
@@ -511,8 +513,75 @@ function sourceToBytes(sourceCode: string): Uint8Array {
   return new TextEncoder().encode(sourceCode);
 }
 
-function sourceToBlob(sourceCode: string): Blob {
-  return new Blob([sourceCode], { type: "application/javascript; charset=utf-8" });
+const RUNTIME_JS_BLOB_TYPE = "application/javascript; charset=utf-8";
+const RUNTIME_SOURCE_MAP_BLOB_TYPE = "application/json; charset=utf-8";
+
+/** File names of the runtime JS asset and its sibling source map for a runtime source hash. */
+export function cmsSlotRuntimeAssetFileNames(runtimeHash: string): { js: string; map: string } {
+  const base = `${CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX}${runtimeHash}`;
+  return { js: `${base}.js`, map: `${base}${CMS_SLOT_RUNTIME_SOURCE_MAP_SUFFIX}` };
+}
+
+/**
+ * The runtime text as served minus its source-map trailer: no trailing newline, so the served file with its last
+ * line removed equals this byte for byte (that is what the source map's `sourcesContent` carries).
+ */
+export function cmsSlotRuntimeSourceBody(sourceCode: string): string {
+  return sourceCode.replace(/\n+$/, "");
+}
+
+/**
+ * Source map v3 for the hosted runtime. The runtime is authored source served without a build step, so the map is
+ * an identity map: one segment per line, generated line N column 0 → source line N column 0 of the same text, with
+ * `sourcesContent` carrying that text verbatim. It exists so a reviewer's tooling (App Review Preflight's
+ * published-runtime test, "Runtime is not traceable to source") can open the executed bytes as source — which they
+ * are. Deterministic for a given source, so the map is content-addressed by the runtime hash like the JS.
+ * @see https://tc39.es/ecma426/ (Source Map format, `mappings` VLQ)
+ */
+export function buildCmsSlotRuntimeSourceMap(sourceBody: string, fileNames: { js: string; map: string }): string {
+  const lineCount = sourceBody.split("\n").length;
+  // "AAAA" = [generated col 0, source 0, source line 0, source col 0]; every later line "AACA" = [0, 0, +1, 0].
+  const mappings = Array.from({ length: lineCount }, (_, i) => (i === 0 ? "AAAA" : "AACA")).join(";");
+  return JSON.stringify({
+    version: 3,
+    file: fileNames.js,
+    sources: [fileNames.js],
+    sourcesContent: [sourceBody],
+    names: [],
+    mappings,
+  });
+}
+
+const SOURCE_MAP_TRAILER_PREFIX = "//# sourceMappingURL=";
+
+/** Webflow-hosted asset URL (`https://cdn.prod.website-files.com/…`): absolute HTTPS on a Webflow asset host, no whitespace. */
+function isWebflowHostedAssetUrl(raw: string): boolean {
+  if (/\s/.test(raw)) {
+    return false;
+  }
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.username !== "" || url.password !== "") {
+    return false;
+  }
+  const host = url.hostname;
+  return host === "website-files.com" || host.endsWith(".website-files.com") || host.endsWith(".webflow.com");
+}
+
+/**
+ * Appends the source-map pointer as the runtime's last line. Nothing follows it — no trailing newline — so the served
+ * bytes end with the map URL and a consumer that trims the body before hashing still reproduces the registered SRI.
+ * Refuses a URL that is not a Webflow-hosted asset URL or that could break out of the comment line.
+ */
+export function withCmsSlotRuntimeSourceMapTrailer(sourceCode: string, mapUrl: string): string {
+  if (!isWebflowHostedAssetUrl(mapUrl)) {
+    throw new Error("Runtime source map URL is not a Webflow-hosted asset URL.");
+  }
+  return `${cmsSlotRuntimeSourceBody(sourceCode)}\n${SOURCE_MAP_TRAILER_PREFIX}${mapUrl}`;
 }
 
 function sourceMd5Hex(sourceCode: string): string {
@@ -567,7 +636,9 @@ async function createRuntimeAsset(siteId: string, fileName: string, sourceCode: 
 async function uploadRuntimeAsset(
   uploadUrl: string,
   uploadDetails: Record<string, string>,
-  sourceCode: string
+  content: string,
+  fileName: string,
+  blobType: string
 ): Promise<void> {
   // The presigned upload is the one install-flow request that does not go through Tower's proxy.
   // `extensionFetch` enforces the grant (exact URL from the create-asset response, single use); this
@@ -580,7 +651,7 @@ async function uploadRuntimeAsset(
   for (const [k, v] of Object.entries(uploadDetails)) {
     form.append(k, String(v));
   }
-  form.append("file", sourceToBlob(sourceCode), "runtime.js");
+  form.append("file", new Blob([content], { type: blobType }), fileName);
   const res = await extensionFetch(uploadUrl, { method: "POST", body: form });
   if (!res.ok) {
     throw new Error(`Upload runtime asset failed (${res.status})`);
@@ -616,43 +687,93 @@ async function registerHostedScript(
   return { id: data.id, version: data.version };
 }
 
-async function registerHostedAssetScript(
+/** Create-asset (Tower proxy) + presigned upload (granted exact URL) for one site asset; returns its hosted URL. */
+async function createAndUploadSiteAsset(
   siteId: string,
-  sourceCode: string,
-  version: string,
-  options: { fileName: string; displayName: string }
-): Promise<{ id: string; version: string; hostedLocation: string }> {
-  const asset = await createRuntimeAsset(siteId, options.fileName, sourceCode);
+  fileName: string,
+  content: string,
+  blobType: string
+): Promise<string> {
+  const asset = await createRuntimeAsset(siteId, fileName, content);
   const uploadUrl = typeof asset.uploadUrl === "string" ? asset.uploadUrl : "";
   const uploadDetails = asset.uploadDetails;
   if (uploadUrl.length === 0 || uploadDetails == null) {
     throw new Error("Create runtime asset: missing upload payload.");
   }
-  await uploadRuntimeAsset(uploadUrl, uploadDetails, sourceCode);
+  await uploadRuntimeAsset(uploadUrl, uploadDetails, content, fileName, blobType);
   const hostedLocation = asset.hostedUrl ?? asset.assetUrl;
   if (typeof hostedLocation !== "string" || hostedLocation.length === 0) {
     throw new Error("Create runtime asset: missing hosted URL.");
   }
-  const registered = await registerHostedScript(
-    siteId,
-    hostedLocation,
-    await sourceSRIHash(sourceCode),
-    version,
-    options.displayName
-  );
-  return { ...registered, hostedLocation };
+  return hostedLocation;
 }
 
+/**
+ * The site's existing source map for this runtime hash, if one is already uploaded. The map is content-addressed
+ * (same hash ⇒ same bytes), so reusing it keeps a forced re-sync from minting a duplicate asset and keeps the
+ * served JS — whose last line carries this URL — byte-identical across re-syncs of the same build. Best-effort: a
+ * failed listing means a fresh upload, never a blocked sync.
+ */
+async function findExistingRuntimeSourceMap(siteId: string, mapFileName: string): Promise<string | null> {
+  try {
+    const assets = await listBeaconRuntimeAssets(siteId);
+    const hit = assets.find(
+      (asset) => asset.originalFileName === mapFileName && isWebflowHostedAssetUrl(asset.hostedUrl)
+    );
+    return hit ? hit.hostedUrl : null;
+  } catch (e) {
+    console.warn(LOG_PREFIX, "list runtime source maps failed (non-fatal); uploading a fresh map", e);
+    return null;
+  }
+}
+
+/**
+ * Hosted URL of the runtime's source map, reused or uploaded. Best-effort: the runtime works without a map, so a
+ * failed map upload (e.g. Webflow refusing the file type) logs and yields null — the JS is then served without a
+ * trailer, and `scripts/webflow-runtime-pin.mjs` reports the missing pointer instead of the install failing.
+ */
+async function ensureRuntimeSourceMapAsset(
+  siteId: string,
+  fileNames: { js: string; map: string },
+  sourceBody: string
+): Promise<string | null> {
+  try {
+    const existing = await findExistingRuntimeSourceMap(siteId, fileNames.map);
+    if (existing != null) {
+      return existing;
+    }
+    const map = buildCmsSlotRuntimeSourceMap(sourceBody, fileNames);
+    return await createAndUploadSiteAsset(siteId, fileNames.map, map, RUNTIME_SOURCE_MAP_BLOB_TYPE);
+  } catch (e) {
+    console.warn(LOG_PREFIX, "runtime source map upload failed (non-fatal); runtime ships without a map pointer", e);
+    return null;
+  }
+}
+
+/**
+ * Uploads the runtime's source map, then the runtime JS whose last line points at it, and registers the JS as a
+ * hosted script with the SHA-256 SRI of exactly the uploaded bytes.
+ */
 async function registerHostedRuntimeScript(
   siteId: string,
   sourceCode: string,
   version: string
-): Promise<{ id: string; version: string; hostedLocation: string }> {
+): Promise<{ id: string; version: string; hostedLocation: string; sourceMapLocation: string | null }> {
   const runtimeHash = hashCmsSlotRuntimeSource(sourceCode);
-  return registerHostedAssetScript(siteId, sourceCode, version, {
-    fileName: `codalyn-beacon-runtime-${runtimeHash}.js`,
-    displayName: REGISTER_DISPLAY_NAME,
-  });
+  const fileNames = cmsSlotRuntimeAssetFileNames(runtimeHash);
+  const sourceBody = cmsSlotRuntimeSourceBody(sourceCode);
+  const sourceMapLocation = await ensureRuntimeSourceMapAsset(siteId, fileNames, sourceBody);
+  const servedSource =
+    sourceMapLocation == null ? sourceBody : withCmsSlotRuntimeSourceMapTrailer(sourceBody, sourceMapLocation);
+  const hostedLocation = await createAndUploadSiteAsset(siteId, fileNames.js, servedSource, RUNTIME_JS_BLOB_TYPE);
+  const registered = await registerHostedScript(
+    siteId,
+    hostedLocation,
+    await sourceSRIHash(servedSource),
+    version,
+    REGISTER_DISPLAY_NAME
+  );
+  return { ...registered, hostedLocation, sourceMapLocation };
 }
 
 async function getPageCustomScripts(pageId: string): Promise<PageCustomScript[]> {
@@ -812,8 +933,26 @@ type RegisteredScriptRow = {
   hostedLocation?: string;
 };
 
+/** Sibling source map of a runtime JS asset: `codalyn-beacon-runtime-<hash>.map.json` ({@link buildCmsSlotRuntimeSourceMap}). */
+const CMS_SLOT_RUNTIME_SOURCE_MAP_SUFFIX = ".map.json";
+
+function hasBeaconRuntimeAssetExtension(fileName: string): boolean {
+  return fileName.endsWith(".js") || fileName.endsWith(CMS_SLOT_RUNTIME_SOURCE_MAP_SUFFIX);
+}
+
+/** Runtime JS assets and their sibling source maps — everything the purge and uninstall paths may delete. */
 export function isBeaconRuntimeAssetFileName(fileName: string): boolean {
-  return fileName.startsWith(CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX) && fileName.endsWith(".js");
+  return fileName.startsWith(CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX) && hasBeaconRuntimeAssetExtension(fileName);
+}
+
+export function isBeaconRuntimeSourceMapFileName(fileName: string): boolean {
+  return isBeaconRuntimeAssetFileName(fileName) && fileName.endsWith(CMS_SLOT_RUNTIME_SOURCE_MAP_SUFFIX);
+}
+
+/** The 8-hex runtime source hash carried by a runtime JS / source-map file name or hosted URL, else null. */
+export function readBeaconRuntimeHashFromName(value: string): string | null {
+  const m = /codalyn-beacon-runtime-([0-9a-f]{8})\.(?:js|map\.json)(?:[?#]|$)/.exec(value);
+  return m ? m[1] : null;
 }
 
 function readBeaconRuntimeFileNameFromAssetRow(raw: Record<string, unknown>): string | null {
@@ -826,7 +965,7 @@ function readBeaconRuntimeFileNameFromAssetRow(raw: Record<string, unknown>): st
       return value;
     }
     const prefixIndex = value.indexOf(CMS_SLOT_RUNTIME_ASSET_FILE_PREFIX);
-    if (prefixIndex >= 0 && value.endsWith(".js")) {
+    if (prefixIndex >= 0 && hasBeaconRuntimeAssetExtension(value)) {
       return value.slice(prefixIndex);
     }
   }
@@ -865,9 +1004,21 @@ export function selectBeaconRuntimeAssetIdsToPurge(options: {
   appliedHostedUrls: Iterable<string>;
 }): string[] {
   const applied = new Set([...options.appliedHostedUrls].map(normalizeHostedAssetUrl));
+  // A source map is referenced from inside its runtime JS (the trailer line), not from custom code, so it is live
+  // exactly when a runtime JS with the same source hash is applied — the map is content-addressed by that hash.
+  const appliedHashes = new Set(
+    [...applied].map(readBeaconRuntimeHashFromName).filter((hash): hash is string => hash != null)
+  );
   return options.assets
     .filter((asset) => isBeaconRuntimeAssetFileName(asset.originalFileName))
     .filter((asset) => !applied.has(normalizeHostedAssetUrl(asset.hostedUrl)))
+    .filter((asset) => {
+      if (!isBeaconRuntimeSourceMapFileName(asset.originalFileName)) {
+        return true;
+      }
+      const hash = readBeaconRuntimeHashFromName(asset.originalFileName);
+      return hash == null || !appliedHashes.has(hash);
+    })
     .map((asset) => asset.id);
 }
 
@@ -1227,7 +1378,12 @@ export async function syncCmsSlotPageInlineScript(options: { force?: boolean } =
   );
 
   await putPageCustomScripts(pageId, merged);
-  await purgeUnreferencedBeaconRuntimeAssets(siteId, [registered.hostedLocation]);
+  await purgeUnreferencedBeaconRuntimeAssets(
+    siteId,
+    registered.sourceMapLocation == null
+      ? [registered.hostedLocation]
+      : [registered.hostedLocation, registered.sourceMapLocation]
+  );
 }
 
 export type CmsSlotPageRuntimeRemovalResult =
@@ -1238,7 +1394,7 @@ export type CmsSlotPageRuntimeRemovalResult =
 
 /**
  * Removes the Codalyn beacon **footer** custom code from the current page (Tower + Data API) and deletes unreferenced
- * `codalyn-beacon-runtime-*.js` assets from the site. No-op if Tower is not configured or the page has no matching
+ * `codalyn-beacon-runtime-*.js` assets and their `.map.json` source maps from the site. No-op if Tower is not configured or the page has no matching
  * script.
  */
 export async function removeCmsSlotPageRuntimeFromPage(): Promise<CmsSlotPageRuntimeRemovalResult> {

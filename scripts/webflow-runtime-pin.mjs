@@ -10,8 +10,14 @@
  *   node scripts/webflow-runtime-pin.mjs https://<test-site>.webflow.io/<page-with-beacons>
  *   node scripts/webflow-runtime-pin.mjs <url> --all     # every external <script src> on the page, not only ours
  *
+ * Also checks what Preflight's "Runtime is not traceable to source" looks at: the runtime's last line must point at a
+ * reachable version-3 source map whose sourcesContent is the served file minus that line (R8.13), and reports
+ * whether the served bytes end with a newline (a consumer that trims the body before hashing would then hash
+ * different bytes than the SRI covers).
+ *
  * Exit 1 when a Beacon runtime is present but its DOM integrity attribute does not match the downloaded bytes
- * (Preflight would report the same mismatch), or when no runtime script is found at all.
+ * (Preflight would report the same mismatch), when its source map is missing or unreachable, or when no runtime
+ * script is found at all.
  */
 import { createHash } from "node:crypto";
 
@@ -62,6 +68,7 @@ if (scripts.length === 0) {
 }
 
 let mismatches = 0;
+let mapProblems = 0;
 let index = 0;
 for (const s of scripts) {
   index += 1;
@@ -87,12 +94,62 @@ for (const s of scripts) {
   if (!contentType.includes("javascript")) {
     console.log("  ! content-type is not JavaScript — check the URL is the script request, not an error page");
   }
+  const endsWithNewline = bytes.length > 0 && bytes[bytes.length - 1] === 0x0a;
+  console.log(
+    `  trailing newline      : ${endsWithNewline ? "yes  ! a body-trimming consumer would hash different bytes" : "no"}`
+  );
+  const text = new TextDecoder().decode(bytes);
+  const lastBreak = text.lastIndexOf("\n");
+  const trailer = /^\/\/# sourceMappingURL=(\S+)$/.exec(text.slice(lastBreak + 1));
+  if (!trailer) {
+    console.log(
+      "  source map            : (no sourceMappingURL trailer)  ✗ Preflight: runtime not traceable to source"
+    );
+    if (s.ours) {
+      mapProblems += 1;
+    }
+  } else {
+    const mapUrl = new URL(trailer[1], s.src).href;
+    try {
+      const mapRes = await fetchOrDie(mapUrl, "application/json,*/*");
+      const mapBytes = new Uint8Array(await mapRes.arrayBuffer());
+      const map = JSON.parse(new TextDecoder().decode(mapBytes));
+      const body = text.slice(0, lastBreak);
+      const sourceMatches = Array.isArray(map.sourcesContent) && map.sourcesContent[0] === body;
+      const ok = map.version === 3 && Array.isArray(map.sources) && typeof map.mappings === "string" && sourceMatches;
+      console.log(`  source map            : ${mapUrl}`);
+      console.log(
+        `  source map check      : version ${map.version}, ${mapBytes.length} bytes, sha256 ${createHash("sha256").update(mapBytes).digest("hex")}` +
+          `${ok ? "  ✓ v3, sourcesContent == served file minus its last line" : "  ✗ DOES NOT MATCH the served file"}`
+      );
+      if (!ok && s.ours) {
+        mapProblems += 1;
+      }
+    } catch (err) {
+      console.log(
+        `  source map            : ${mapUrl}  ✗ unreachable (${err instanceof Error ? err.message : String(err)})`
+      );
+      if (s.ours) {
+        mapProblems += 1;
+      }
+    }
+  }
   console.log("");
+}
+
+if (mapProblems > 0) {
+  console.error(
+    `${mapProblems} Beacon runtime(s) have no reachable identity source map behind their sourceMappingURL trailer. Preflight reports this as "Runtime is not traceable to source". Re-push the runtime from the Designer (CMS Slots → Sync) and check the extension console for a "runtime source map upload failed" warning — Webflow refusing the .map.json asset is the likely cause.`
+  );
 }
 
 if (mismatches > 0) {
   console.error(
     `${mismatches} Beacon runtime tag(s) do not carry the SHA-256 SRI of the served bytes in their integrity attribute (absent, or a different value). Re-push the runtime from the Designer (CMS Slots → the page runtime Sync button), publish, then run again. If the attribute is still absent after a fresh push, Webflow is not rendering the registered integrityHash on this page — record that as a platform observation, not an app defect.`
   );
+  process.exit(1);
+}
+
+if (mapProblems > 0) {
   process.exit(1);
 }

@@ -317,8 +317,15 @@ describe("matchForbiddenMarker", () => {
     expect(() => assertBundleOutputMatchesBuild('var v="0.1.0";e.innerHTML=h', expected)).toThrow(/innerHTML/);
   });
 
-  it("catches a sourceMappingURL comment — a map reference must never ship in the bundle", () => {
-    expect(matchForbiddenMarker("//# sourceMappingURL=bundle.js.map", forbidden)?.value).toBe("sourceMappingURL");
+  it("catches a leaked bundle map reference (.js.map / .css.map) but not the page runtime's trailer builder", () => {
+    expect(matchForbiddenMarker("//# sourceMappingURL=bundle.js.map", forbidden)?.label).toMatch(
+      /leaked bundle source-map/
+    );
+    expect(matchForbiddenMarker("/*# sourceMappingURL=styles.css.map */", forbidden)?.label).toMatch(
+      /leaked bundle source-map/
+    );
+    // R8.13: the published-site runtime's trailer is built from this literal plus a Webflow asset URL at sync time.
+    expect(matchForbiddenMarker("`${a}\n//# sourceMappingURL=${b}`", forbidden)).toBeNull();
   });
 
   it("is inert on development builds, which may legitimately point at a local Tower", () => {
@@ -467,16 +474,29 @@ describe("pinnedMarkerCounts (App Review Preflight: External API Calls / Silent 
     // The egress point: redirect and cookie modes pinned on the one platform fetch (R8.3 / R8.10).
     "async function a(e,t){return fetch(e,{...t,redirect:`error`,credentials:`omit`})}" +
     // The two Designer API canvas placeholder writes (review round 8, CSP style-src-attr 'none').
-    `r.setAttribute("style",ph());await d.setAttribute("style",ph())`;
+    `r.setAttribute("style",ph());await d.setAttribute("style",ph())` +
+    // The published-site runtime's source-map trailer builder (R8.13): the token's one occurrence.
+    ";const T=`//# sourceMappingURL=`;";
 
-  it("pins one bare fetch(, no MutationObserver construction, two canvas style-attribute writes and one credentials: omit in Beacon release output", () => {
+  it("pins one bare fetch(, no MutationObserver construction, two canvas style-attribute writes, one credentials: omit and one sourceMappingURL token in Beacon release output", () => {
     expect(pinned.map((m) => [m.label, m.expected])).toEqual([
       ["bare fetch( call", 1],
       ["MutationObserver construction", 0],
       ["style-attribute write (setAttribute)", 2],
       ["credentials: omit request option", 1],
+      ["sourceMappingURL token", 1],
     ]);
     expect(() => assertPinnedMarkerCounts(clean, pinned, "Build output")).not.toThrow();
+  });
+
+  it("fails the build when a second sourceMappingURL appears — a bundle map reference next to the runtime trailer (R8.13)", () => {
+    const leaked = `${clean}\n//# sourceMappingURL=label-abc.js.map`;
+    expect(() => assertPinnedMarkerCounts(leaked, pinned, "Build output")).toThrow(
+      /2 sourceMappingURL tokens, expected exactly 1/
+    );
+    expect(() => assertPinnedMarkerCounts(clean.replace("//# sourceMappingURL=", ""), pinned, "Build output")).toThrow(
+      /0 sourceMappingURL tokens, expected exactly 1/
+    );
   });
 
   it("fails the build when a second fetch call site appears anywhere in the artifact", () => {

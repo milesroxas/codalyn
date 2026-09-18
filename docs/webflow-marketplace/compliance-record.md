@@ -3121,3 +3121,74 @@ Mutations. Expect the identical single item on the 19:58 zip.
 
 **States:** Source ✓ (uncommitted) · Artifact ✓ (19:58) · Tower deployed ✗ · Installed ✗ ·
 Runtime ✓ (unchanged pin) · Submitted ✗ · Accepted ✗.
+
+### R8.13 Preflight runtime-test items resolved in code where code can resolve them — identity source map beside the runtime, trailing-newline hygiene, platform-script reduction (2026-09-17, night)
+
+**Trigger (Miles):** "why explanation not code? … think deeply with first principles and actually resolve it."
+R8.12 still filed the four browser-test items and External API Calls as "tool-side, expected, change nothing".
+Evidence gathered before changing anything: served tag is exactly `src type integrity crossorigin="anonymous"`
+with no whitespace; one tag on the page; CDN answers `Access-Control-Allow-Origin: *` with and without an `Origin`
+header (`Vary: Origin`); file is 632 lines, no CR, no trailing spaces, **ends with a newline**; Webflow's docs
+state Data API operations (script registration, CMS writes) are backend-only for a Designer Extension, and that
+Webflow assets accept `application/json` (the runtime's `.js` is likewise undocumented and has worked since round 3).
+
+1. **External API Calls (bundle scan) — structural, not resolvable in code.** The rule flags egress to a
+   non-Webflow host; Beacon's one egress is the Hybrid App backend (Tower) that performs hosted-script registration,
+   page custom code and CMS item writes — surfaces the Designer API does not have. Removing the call removes CMS
+   Slots and CMS image writes. Disclosed in the notes; the review team did not raise it in round 8.
+
+2. **"Runtime is not traceable to source" — resolved in code.** `registerHostedRuntimeScript` now uploads a
+   version-3 identity source map as a second site asset (`codalyn-beacon-runtime-<hash>.map.json`, MIME
+   `application/json`) before the runtime JS, and the JS's last line is `//# sourceMappingURL=<map hostedUrl>`.
+   The map is honest: the runtime is authored source with no build step, so `file`/`sources` name the JS,
+   `sourcesContent[0]` is the served file minus its last line, `mappings` is line identity (`AAAA;AACA;…`).
+   Content-addressed by the runtime hash and reused across syncs (`findExistingRuntimeSourceMap`), so a forced
+   re-sync mints no duplicate and the served JS stays byte-identical for a build. Best-effort: if Webflow refuses
+   the map asset the JS ships without a trailer and `scripts/webflow-runtime-pin.mjs` reports it — the install
+   never fails because of the map. Purge and uninstall keep a map while a runtime with its hash is applied
+   (`selectBeaconRuntimeAssetIdsToPurge`, `isBeaconRuntimeSourceMapFileName`, `readBeaconRuntimeHashFromName`)
+   and delete it after. The trailer URL is validated (HTTPS, Webflow asset host, no whitespace) before it is
+   written into a comment line (`withCmsSlotRuntimeSourceMapTrailer`). Header comment names the map;
+   `CMS_SLOT_RUNTIME_REVISION = 4`.
+   Build gate: the `sourceMappingURL` forbidden marker (R7b.1) is replaced by a regex for a leaked *bundle* map
+   (`sourceMappingURL=….js.map` / `.css.map`) plus a pinned count of exactly one bare token — the trailer builder.
+   The Preflight skill requires maps in the form; nothing forbids a runtime map pointer.
+   Retired: the URL-safe-SRI revision rule (R7b.18). The served bytes now end with a per-site URL, so the pin is
+   fixed at sync time; R7b.19 had already falsified that hypothesis.
+
+3. **"Script integrity is missing or wrong" — one untested hypothesis left, now removed as a side effect.** A
+   consumer that trims the body before hashing (a common shortcut) says "Hash matched" on the raw download and
+   "mismatch" against its own text of a file that ends with a newline. The trailer change makes the file end with
+   the map URL — no trailing newline. The pin script now prints `trailing newline` and the map check. If the item
+   persists on the next run, the next move is data, not another guess: the run's "Evidence artifact details"
+   (8 artifacts) show what the tool compared — download them before anything else changes.
+
+4. **"New script elements were created" / "Unreviewed scripts loaded" — reduced, not removable.** Every listed
+   file is Webflow's published-site runtime (site JS, `achunk` imports, GSAP/ScrollTrigger for Interactions). The
+   site runtime is on every Webflow page; pinning it moves each file into item 3 (Webflow's own tags carry no SRI,
+   and the form says page-loaded files must carry their SRI in the DOM). What the page's own content pulls in —
+   Interactions and template components — is reducible: SUBMIT step 3 now asks for a bare test page (blank page,
+   one beacon list, no Interactions), so the residual list is the site runtime alone.
+
+**Tests:** `cms-slot-page-inline-script.test.ts` — body/trailer shape (no trailing newline; served minus last
+line == body), trailer URL refusals (http, foreign host, whitespace/newline, userinfo, garbage), v3 identity map
+(`version`, `file`, `sources`, `sourcesContent`, one segment per line, deterministic), file-name / hash helpers,
+purge keeps live maps and drops stale ones (URL and hash paths). `cms-slot-page-inline-script-sync.test.ts` —
+two uploads per register (map then JS), trailer points at the map's hosted URL, SRI covers the trailer bytes,
+map reuse on forced re-sync (one upload), best-effort fallback when Webflow refuses the map (runtime still
+registered, no trailer, no trailing newline). `release-build-gates.test.mjs` — leaked `.js.map`/`.css.map`
+caught, trailer builder not caught, pinned token count 1 (0 and 2 fail). 162 + 74 tests green; full Beacon
+suite green; tsc clean. `scripts/webflow-runtime-pin.mjs` — fetches the map behind the trailer, checks v3 and
+`sourcesContent == served minus last line`, prints its sha256, reports trailing newline; exit 1 on a missing or
+unreachable map for a Beacon runtime.
+
+**Artifact:** `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod` → `v0.1.0_public_09-17_20-30-02.zip` sha256 `941b15692972d0bfd9d64c94ed9a4cb82763d06ee42091b978e3928ad55a761e` +
+`.sourcemaps.zip` sha256 `d6c08330ae7e674e35fb8644b8a0258e7f4bbac02d31d484fa42a4085a369269`. A4 greps as R8.12 except `sourceMappingURL` = 1 (the trailer builder) and
+`.js.map` / `.css.map` = 0; 21 files, 464 459 B; connect-src bucket path; `Runtime revision 4` in the bundle. The 19:58
+zip (R8.12) is superseded and was never uploaded.
+
+**Runtime:** changes on the next Sync — revision 4 header + trailer ⇒ new hash, new file name, new SHA-256/SRI.
+The Preflight test package must be refilled from the pin script's output (SUBMIT step 5).
+
+**States:** Source ✓ (uncommitted) · Artifact ✓ · Tower deployed ✗ · Installed ✗ · Runtime ✗ (re-push needed) ·
+Submitted ✗ · Accepted ✗.

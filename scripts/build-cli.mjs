@@ -683,8 +683,14 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     { value: "codalyn.invalid", label: "the legacy placeholder email domain" },
     { value: "codalyn.beacon/", label: "the legacy publish-placeholder URL" },
     // Source maps are built (`sourcemap: "hidden"`) for the private submission field, so no shipped
-    // file may reference one — a `//# sourceMappingURL=` comment means a map leaked into the bundle.
-    { value: "sourceMappingURL", label: "a sourceMappingURL reference" },
+    // file may reference its own map: a `//# sourceMappingURL=<chunk>.js.map` / `.css.map` comment
+    // means a map leaked into the bundle. The bare token is pinned separately (pinnedMarkerCounts):
+    // its one occurrence is the page runtime's trailer builder, which points the *published-site*
+    // runtime at the identity source map uploaded beside it (compliance doc R8.13), not a bundle map.
+    {
+      pattern: /sourceMappingURL=\S*\.(?:js|css)\.map\b/i,
+      label: "a leaked bundle source-map reference (.js.map / .css.map)",
+    },
     // App Review Preflight (2026-08-19) flags "Credential in URL": any `?token=` / `&token=` query
     // parameter in the shipped JS. posthog-js builds four such URLs (early-access features, product
     // tours, surveys, logs); the strip plugin compiles the token out of each. Credentials belong in
@@ -856,6 +862,18 @@ function pinnedMarkerCounts(appName, channel) {
       label: "credentials: omit request option",
       expected: 1,
       note: "extensionFetch pins the cookie mode for every request (compliance doc R8.10)",
+    },
+    {
+      // Compliance doc R8.13 (App Review Preflight published-runtime test, "Runtime is not traceable
+      // to source"): the published-site runtime's last line points at the identity source map uploaded
+      // beside it. The token's only occurrence is that trailer builder in
+      // cms-slot-page-inline-script.ts. The extension bundle itself ships no map reference — the
+      // forbidden `.js.map` / `.css.map` marker catches a leaked bundle map — and a second occurrence
+      // means a new map pointer appeared somewhere else.
+      pattern: /sourceMappingURL/g,
+      label: "sourceMappingURL token",
+      expected: 1,
+      note: "the page runtime's source-map trailer builder in cms-slot-page-inline-script.ts (compliance doc R8.13)",
     },
   ];
 }

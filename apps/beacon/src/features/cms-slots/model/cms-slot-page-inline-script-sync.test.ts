@@ -33,6 +33,9 @@ type PageScript = {
 type FakeSite = {
   pageScripts: PageScript[];
   registered: { id: string; displayName: string; hostedLocation: string }[];
+  assets: { id: string; hostedUrl: string; originalFileName: string }[];
+  /** When set, Webflow refuses to create `.map.json` assets (simulates an unsupported file type). */
+  refuseSourceMapAssets: boolean;
   counts: { register: number; createAsset: number; upload: number; putPageCode: number; getPageCode: number };
 };
 
@@ -46,14 +49,24 @@ function body<T>(init: RequestInit | undefined): T {
   return JSON.parse(String(init?.body ?? "{}")) as T;
 }
 
-/** What the last install flow actually sent: the uploaded runtime bytes and the SRI pin registered for them. */
-let captured: { source: string; integrity: string } = { source: "", integrity: "" };
+/**
+ * What the install flow actually sent: every presigned upload in order (file name + bytes), the runtime bytes of
+ * the last JS upload, and the SRI pin registered for them.
+ */
+let captured: { source: string; integrity: string; uploads: { name: string; text: string }[] } = {
+  source: "",
+  integrity: "",
+  uploads: [],
+};
 
 /** Minimal `METHOD /path` router over the Tower proxy endpoints `cms-slot-page-inline-script` calls. */
 const TOWER_ROUTES: Record<string, (init: RequestInit | undefined) => Response> = {
   [`POST /api/v2/webflow/sites/${SITE_ID}/assets`]: (init) => {
-    site.counts.createAsset += 1;
     const { fileName } = body<{ fileName?: string }>(init);
+    if (site.refuseSourceMapAssets && String(fileName ?? "").endsWith(".map.json")) {
+      return json({ message: "Unsupported file type" }, 400);
+    }
+    site.counts.createAsset += 1;
     return json({
       uploadUrl: UPLOAD_URL,
       uploadDetails: { key: "k", policy: "p" },
@@ -61,7 +74,7 @@ const TOWER_ROUTES: Record<string, (init: RequestInit | undefined) => Response> 
     });
   },
   [`GET /api/v2/webflow/sites/${SITE_ID}/assets`]: () =>
-    json({ assets: [], pagination: { limit: 100, offset: 0, total: 0 } }),
+    json({ assets: site.assets, pagination: { limit: 100, offset: 0, total: site.assets.length } }),
   [`POST /api/v2/webflow/sites/${SITE_ID}/registered_scripts/hosted`]: (init) => {
     site.counts.register += 1;
     const { hostedLocation, version, integrityHash } = body<{
@@ -108,10 +121,12 @@ function appliedBeaconScript(): PageScript | undefined {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  captured = { source: "", integrity: "" };
+  captured = { source: "", integrity: "", uploads: [] };
   site = {
     pageScripts: [],
     registered: [],
+    assets: [],
+    refuseSourceMapAssets: false,
     counts: { register: 0, createAsset: 0, upload: 0, putPageCode: 0, getPageCode: 0 },
   };
   vi.stubGlobal("webflow", {
@@ -124,7 +139,12 @@ beforeEach(() => {
       if (String(url) === UPLOAD_URL) {
         site.counts.upload += 1;
         const file = init?.body instanceof FormData ? init.body.get("file") : null;
-        captured.source = file instanceof Blob ? await file.text() : "";
+        const text = file instanceof Blob ? await file.text() : "";
+        const name = file instanceof File ? file.name : "";
+        captured.uploads.push({ name, text });
+        if (name.endsWith(".js")) {
+          captured.source = text;
+        }
         return new Response(null, { status: 204 });
       }
       return new Response(null, { status: 500 });
@@ -145,10 +165,10 @@ async function sync(options?: { force?: boolean }): Promise<void> {
 }
 
 describe("syncCmsSlotPageInlineScript registration budget", () => {
-  it("registers exactly once on the first sync of a page", async () => {
+  it("registers exactly once on the first sync of a page (two assets: the source map, then the runtime JS)", async () => {
     await sync();
-    expect(site.counts.createAsset).toBe(1);
-    expect(site.counts.upload).toBe(1);
+    expect(site.counts.createAsset).toBe(2);
+    expect(site.counts.upload).toBe(2);
     expect(site.counts.register).toBe(1);
     expect(site.counts.putPageCode).toBe(1);
     expect(appliedBeaconScript()?.attributes?.["data-codalyn-beacon-src-hash"]).toMatch(/^[0-9a-f]{8}$/);
@@ -189,8 +209,8 @@ describe("syncCmsSlotPageInlineScript registration budget", () => {
     }
 
     await sync();
-    expect(site.counts.createAsset).toBe(2);
-    expect(site.counts.upload).toBe(2);
+    expect(site.counts.createAsset).toBe(4);
+    expect(site.counts.upload).toBe(4);
     expect(site.counts.register).toBe(2);
     expect(site.counts.putPageCode).toBe(2);
 
@@ -215,6 +235,8 @@ describe("syncCmsSlotPageInlineScript registration budget", () => {
       site = {
         pageScripts: [],
         registered: [],
+        assets: [],
+        refuseSourceMapAssets: false,
         counts: { register: 0, createAsset: 0, upload: 0, putPageCode: 0, getPageCode: 0 },
       };
       await sync();
@@ -244,7 +266,7 @@ describe("syncCmsSlotPageInlineScript registration budget", () => {
 
     await sync({ force: true });
     expect(site.counts.register).toBe(2);
-    expect(site.counts.upload).toBe(2);
+    expect(site.counts.upload).toBe(4);
   });
 
   it("keeps exactly one beacon runtime on the page across many syncs", async () => {
@@ -255,5 +277,53 @@ describe("syncCmsSlotPageInlineScript registration budget", () => {
     const beacons = site.pageScripts.filter((s) => s.attributes?.["data-codalyn-beacon"] === "runtime");
     expect(beacons).toHaveLength(1);
     expect(site.pageScripts).toHaveLength(1);
+  });
+
+  it("uploads an identity source map beside the runtime and points the runtime's last line at it — no trailing newline", async () => {
+    await sync();
+    expect(captured.uploads.map((u) => u.name)).toEqual([
+      expect.stringMatching(/^codalyn-beacon-runtime-[0-9a-f]{8}\.map\.json$/),
+      expect.stringMatching(/^codalyn-beacon-runtime-[0-9a-f]{8}\.js$/),
+    ]);
+    const [map, js] = captured.uploads;
+    const mapUrl = `https://cdn.prod.website-files.com/${map.name}`;
+    expect(js.text.endsWith(`\n//# sourceMappingURL=${mapUrl}`)).toBe(true);
+    expect(js.text.endsWith("\n")).toBe(false);
+    const parsed = JSON.parse(map.text) as { version: number; file: string; sourcesContent: string[] };
+    expect(parsed.version).toBe(3);
+    expect(parsed.file).toBe(js.name);
+    // The served file minus its last line is exactly what the map carries as source.
+    expect(parsed.sourcesContent[0]).toBe(js.text.slice(0, js.text.lastIndexOf("\n")));
+    // The registered SRI covers the bytes that ship, trailer included.
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(js.text));
+    expect(captured.integrity).toBe(`sha256-${Buffer.from(digest).toString("base64")}`);
+  });
+
+  it("reuses the site's existing source map for the same build instead of uploading a duplicate", async () => {
+    await sync();
+    const [firstMap] = captured.uploads;
+    const reusedUrl = `https://cdn.prod.website-files.com/reused_${firstMap.name}`;
+    site.assets = [{ id: "map-asset", hostedUrl: reusedUrl, originalFileName: firstMap.name }];
+    captured.uploads = [];
+    const before = { ...site.counts };
+
+    await sync({ force: true });
+
+    expect(site.counts.createAsset).toBe(before.createAsset + 1);
+    expect(site.counts.upload).toBe(before.upload + 1);
+    expect(captured.uploads.map((u) => u.name)).toEqual([expect.stringMatching(/\.js$/)]);
+    expect(captured.uploads[0].text.endsWith(`\n//# sourceMappingURL=${reusedUrl}`)).toBe(true);
+  });
+
+  it("still registers the runtime, without a map pointer, when Webflow refuses the map asset (best-effort map)", async () => {
+    site.refuseSourceMapAssets = true;
+    await sync();
+    expect(site.counts.register).toBe(1);
+    expect(site.counts.upload).toBe(1);
+    expect(captured.uploads.map((u) => u.name)).toEqual([expect.stringMatching(/\.js$/)]);
+    expect(captured.source).not.toContain("sourceMappingURL");
+    expect(captured.source.endsWith("\n")).toBe(false);
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(captured.source));
+    expect(captured.integrity).toBe(`sha256-${Buffer.from(digest).toString("base64")}`);
   });
 });

@@ -72,7 +72,8 @@ Z=v0.1.0_public_<stamp>.zip; M=${Z%.zip}.sourcemaps.zip
 shasum -a 256 "$Z" "$M"                                      # record both hashes
 unzip -l "$Z" | tail -1                                      # entry count, must be < 5 MB total
 unzip -l "$Z" | grep -c '\.map$'                             # 0
-unzip -p "$Z" '*.js' | grep -c  'sourceMappingURL'           # 0
+unzip -p "$Z" '*.js' | grep -c  'sourceMappingURL'           # 1 — the page runtime's source-map trailer builder only (R8.13; build gate pins it)
+unzip -p "$Z" '*.js' | grep -cE 'sourceMappingURL=[^ ]*\.(js|css)\.map'   # 0 — no bundle map reference (R7b.1; build gate forbids it)
 unzip -p "$Z" '*.js' | grep -ciE '[?&]token='                # 0  (credential-in-URL)
 unzip -p "$Z" '*.js' | grep -ciE 'localhost|ngrok|sentry'    # 0
 unzip -p "$Z" '*.js' | grep -c  'window.open('             # 0  (Prohibited Popups, R7b.10)

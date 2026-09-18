@@ -9,19 +9,25 @@ import {
 import { CMS_SLOT_LIST_TARGET_DESIGNER_PLACEHOLDER_INLINE_KEYS } from "@/features/cms-slots/model/cms-slot-list-target-designer-placeholder";
 import { CMS_SLOT_LIST_RENDER_LAYOUT_STYLE_NAME } from "@/features/cms-slots/model/cms-slot-list-target-slot-style";
 import {
+  buildCmsSlotRuntimeSourceMap,
   CMS_SLOT_RUNTIME_REVISION,
   CMS_SLOT_RUNTIME_SAFETY_REVEAL_MS,
+  cmsSlotRuntimeAssetFileNames,
   cmsSlotRuntimeScriptVersion,
+  cmsSlotRuntimeSourceBody,
   decideCmsSlotRuntimeSyncAction,
   describeTowerFailure,
   getCmsSlotPageInlineScriptSource,
   isBeaconRuntimeAssetFileName,
+  isBeaconRuntimeSourceMapFileName,
   mergePageScriptsWithBeaconRuntime,
   normalizeBeaconRuntimeAssetRow,
   normalizeHostedAssetUrl,
   PURGE_MAX_PAGES_SCANNED,
   planBoundedPageScan,
+  readBeaconRuntimeHashFromName,
   selectBeaconRuntimeAssetIdsToPurge,
+  withCmsSlotRuntimeSourceMapTrailer,
   withoutAnyBeaconRuntimeScripts,
 } from "@/features/cms-slots/model/cms-slot-page-inline-script";
 
@@ -71,26 +77,62 @@ describe("getCmsSlotPageInlineScriptSource", () => {
     expect(s).toContain('"\\u00a0"');
   });
 
-  it("pins to a URL-safe SHA-256 SRI (no `/` or `+` in the base64; bump CMS_SLOT_RUNTIME_REVISION otherwise)", async () => {
+  it("serves body + one source-map trailer line and nothing after it (no trailing newline)", () => {
     const s = getCmsSlotPageInlineScriptSource();
     expect(s).toContain(`\n * Runtime revision ${CMS_SLOT_RUNTIME_REVISION}.\n`);
-    const sriOf = async (source: string) =>
-      Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source))).toString("base64");
-    const current = await sriOf(s);
-    if (/[+/]/.test(current)) {
-      // Find the next revision whose pin is URL-safe so the failure message says exactly what to change.
-      const line = ` * Runtime revision ${CMS_SLOT_RUNTIME_REVISION}.\n`;
-      let next = CMS_SLOT_RUNTIME_REVISION + 1;
-      for (; next < CMS_SLOT_RUNTIME_REVISION + 200; next++) {
-        if (!/[+/]/.test(await sriOf(s.replace(line, ` * Runtime revision ${next}.\n`)))) {
-          break;
-        }
-      }
-      throw new Error(
-        `Runtime SRI sha256-${current} contains '/' or '+'. Set CMS_SLOT_RUNTIME_REVISION = ${next} in cms-slot-page-inline-script.ts.`
-      );
+    const body = cmsSlotRuntimeSourceBody(s);
+    expect(body.endsWith("\n")).toBe(false);
+    expect(s.startsWith(body)).toBe(true);
+    const mapUrl = "https://cdn.prod.website-files.com/site/abc_codalyn-beacon-runtime-1a2b3c4d.map.json";
+    const served = withCmsSlotRuntimeSourceMapTrailer(s, mapUrl);
+    const lastNewline = served.lastIndexOf("\n");
+    // The served file minus its last line is exactly the map's sourcesContent; the last line is the pointer.
+    expect(served.slice(0, lastNewline)).toBe(body);
+    expect(served.slice(lastNewline + 1)).toBe(`//# sourceMappingURL=${mapUrl}`);
+    expect(served.endsWith("\n")).toBe(false);
+  });
+
+  it("refuses a source-map URL that is not a Webflow-hosted HTTPS asset URL or could break the comment line", () => {
+    for (const bad of [
+      "http://cdn.prod.website-files.com/x.map.json",
+      "https://evil.example/x.map.json",
+      "https://cdn.prod.website-files.com/x.map.json\n//evil",
+      "https://cdn.prod.website-files.com/x.map.json evil",
+      "https://user:pw@cdn.prod.website-files.com/x.map.json",
+      "not a url",
+      "",
+    ]) {
+      expect(() => withCmsSlotRuntimeSourceMapTrailer("var a = 1;", bad)).toThrow();
     }
-    expect(current).toMatch(/^[A-Za-z0-9]{43}=$/);
+  });
+
+  it("builds a version-3 identity source map whose sourcesContent is the served body (published-runtime test: traceable to source)", () => {
+    const body = cmsSlotRuntimeSourceBody(getCmsSlotPageInlineScriptSource());
+    const names = cmsSlotRuntimeAssetFileNames("1a2b3c4d");
+    expect(names).toEqual({
+      js: "codalyn-beacon-runtime-1a2b3c4d.js",
+      map: "codalyn-beacon-runtime-1a2b3c4d.map.json",
+    });
+    const map = JSON.parse(buildCmsSlotRuntimeSourceMap(body, names)) as {
+      version: number;
+      file: string;
+      sources: string[];
+      sourcesContent: string[];
+      names: string[];
+      mappings: string;
+    };
+    expect(map.version).toBe(3);
+    expect(map.file).toBe(names.js);
+    expect(map.sources).toEqual([names.js]);
+    expect(map.sourcesContent).toEqual([body]);
+    expect(map.names).toEqual([]);
+    // One segment per line: "AAAA" = [0,0,0,0] for line 1, then "AACA" = [0,0,+1,0] (same source, next line).
+    const segments = map.mappings.split(";");
+    expect(segments).toHaveLength(body.split("\n").length);
+    expect(segments[0]).toBe("AAAA");
+    expect(new Set(segments.slice(1))).toEqual(new Set(["AACA"]));
+    // Deterministic: content-addressed by the runtime hash like the JS, so a sync can reuse the uploaded map.
+    expect(buildCmsSlotRuntimeSourceMap(body, names)).toBe(buildCmsSlotRuntimeSourceMap(body, names));
   });
 
   it("is served as its own readable source and loads nothing else (App Review Preflight published-runtime test)", () => {
@@ -104,7 +146,8 @@ describe("getCmsSlotPageInlineScriptSource", () => {
     expect(s.startsWith("/*\n * Codalyn Beacon - published-site list runtime v")).toBe(true);
     expect(s).toContain("cms-slot-page-inline-script.ts");
     // The pinned runtime must be the only script the page runs because of Beacon: no script creation, no
-    // dynamic import, no network, no storage, no eval — and no source-map pointer (there is no map; this is the source).
+    // dynamic import, no network, no storage, no eval — and no source-map pointer in the authored text (the
+    // trailer that points at the uploaded identity map is appended at upload time, withCmsSlotRuntimeSourceMapTrailer).
     for (const shape of [
       /createElement\(\s*["']script["']/i,
       /<script/i,
@@ -163,9 +206,23 @@ describe("getCmsSlotPageInlineScriptSource", () => {
 });
 
 describe("beacon runtime asset cleanup helpers", () => {
-  it("recognizes codalyn beacon runtime asset filenames", () => {
+  it("recognizes codalyn beacon runtime asset filenames — the JS and its sibling source map", () => {
     expect(isBeaconRuntimeAssetFileName("codalyn-beacon-runtime-deadbeef.js")).toBe(true);
+    expect(isBeaconRuntimeAssetFileName("codalyn-beacon-runtime-deadbeef.map.json")).toBe(true);
+    expect(isBeaconRuntimeSourceMapFileName("codalyn-beacon-runtime-deadbeef.map.json")).toBe(true);
+    expect(isBeaconRuntimeSourceMapFileName("codalyn-beacon-runtime-deadbeef.js")).toBe(false);
     expect(isBeaconRuntimeAssetFileName("runtime.js")).toBe(false);
+    expect(isBeaconRuntimeAssetFileName("codalyn-beacon-runtime-deadbeef.json")).toBe(false);
+  });
+
+  it("reads the runtime hash from JS / map file names and hosted URLs, by stable name shape only", () => {
+    expect(readBeaconRuntimeHashFromName("https://cdn.example.com/6aa8_codalyn-beacon-runtime-1ebc5741.js")).toBe(
+      "1ebc5741"
+    );
+    expect(readBeaconRuntimeHashFromName("codalyn-beacon-runtime-1ebc5741.map.json")).toBe("1ebc5741");
+    expect(readBeaconRuntimeHashFromName("codalyn-beacon-runtime-1ebc5741.js.bak")).toBeNull();
+    expect(readBeaconRuntimeHashFromName("codalyn-beacon-runtime-xyz.js")).toBeNull();
+    expect(readBeaconRuntimeHashFromName("logo.png")).toBeNull();
   });
 
   it("normalizes hosted asset URLs for comparison", () => {
@@ -224,6 +281,45 @@ describe("beacon runtime asset cleanup helpers", () => {
         appliedHostedUrls: ["https://cdn.example.com/codalyn-beacon-runtime-abc.js?cache=1"],
       })
     ).toEqual(["drop"]);
+  });
+
+  it("keeps a source map while a runtime JS with its hash is applied; purges it once no runtime carries that hash", () => {
+    const assets = [
+      {
+        id: "js-live",
+        hostedUrl: "https://cdn.example.com/a1_codalyn-beacon-runtime-1ebc5741.js",
+        originalFileName: "codalyn-beacon-runtime-1ebc5741.js",
+      },
+      {
+        id: "map-live",
+        hostedUrl: "https://cdn.example.com/a2_codalyn-beacon-runtime-1ebc5741.map.json",
+        originalFileName: "codalyn-beacon-runtime-1ebc5741.map.json",
+      },
+      {
+        id: "map-stale",
+        hostedUrl: "https://cdn.example.com/a3_codalyn-beacon-runtime-0badf00d.map.json",
+        originalFileName: "codalyn-beacon-runtime-0badf00d.map.json",
+      },
+      {
+        id: "js-stale",
+        hostedUrl: "https://cdn.example.com/a4_codalyn-beacon-runtime-0badf00d.js",
+        originalFileName: "codalyn-beacon-runtime-0badf00d.js",
+      },
+    ];
+    // The map is referenced from inside the JS (its trailer line), so it is live exactly when its hash is.
+    expect(
+      selectBeaconRuntimeAssetIdsToPurge({
+        assets,
+        appliedHostedUrls: ["https://cdn.example.com/a1_codalyn-beacon-runtime-1ebc5741.js"],
+      })
+    ).toEqual(["map-stale", "js-stale"]);
+    // A just-uploaded map passed as a protected URL is kept by URL as well as by hash.
+    expect(
+      selectBeaconRuntimeAssetIdsToPurge({
+        assets,
+        appliedHostedUrls: ["https://cdn.example.com/a3_codalyn-beacon-runtime-0badf00d.map.json"],
+      })
+    ).toEqual(["js-live", "map-live", "js-stale"]);
   });
 });
 

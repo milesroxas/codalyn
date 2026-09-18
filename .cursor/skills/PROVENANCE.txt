@@ -1,0 +1,42 @@
+Webflow App developer skills — webflow-app-preflight + webflow-app-review-remediation
+
+Packaged:        2026-09-16 (development-build evidence: no false residue flags)
+Source commit:   d453c2b462e86ae9ba1d7705d5aff77c0119cea0
+Linear issue:    CRE-2020
+Contents:        2 skill directories + README-START-HERE.md (toolkit overview)
+
+This revision stops treating three production-build facts as development
+residue: a react-router 7.x source-map path under dist/development (the
+package routes every consumer there; its production folder differs by one
+warnings flag), a http://localhost literal in a library URL fallback or an
+app's own hostname blocklist, and the telemetry.global block that Webflow CLI
+2.3.0 and earlier write into webflow.json. A development-build finding now
+needs a marker that differs between the dependency's development and
+production output. The telemetry block is packaging hygiene: strip it or
+upgrade the CLI.
+
+The token and scope authority classification from the 2026-08-27 revision is
+unchanged.
+
+Reference claims were checked against the public Webflow developer documentation,
+the npm registry (react-router 7.7.1–8.4.0, @webflow/webflow-cli 2.3.0 and 2.7.1),
+and the production App submission form on 2026-09-16. Public documentation and
+Marketplace expectations change — re-verify links and rerun the included evals
+before reuse.
+
+Validation:
+  - webflow-app-preflight static evals: 151/151
+  - webflow-app-review-remediation static evals: 79/79
+
+These skills are developer aids. They do not make, predict, or substitute for a
+Webflow Marketplace review decision.
+
+How to use:
+  - In a skill-capable coding agent: copy the two skill directories into the
+    agent's skills location.
+  - Or read them directly — SKILL.md in each directory is the entry point.
+  - Start with webflow-app-preflight before submitting.
+  - Use webflow-app-review-remediation only after receiving findings.
+
+Verify integrity:
+  shasum -a 256 -c SHA256SUMS.txt

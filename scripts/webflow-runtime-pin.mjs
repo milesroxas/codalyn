@@ -9,6 +9,12 @@
  *
  *   node scripts/webflow-runtime-pin.mjs https://<test-site>.webflow.io/<page-with-beacons>
  *   node scripts/webflow-runtime-pin.mjs <url> --all     # every external <script src> on the page, not only ours
+ *   node scripts/webflow-runtime-pin.mjs <url> --expect-url=<saved url> --expect-sri=<saved sri>
+ *
+ * `--expect-*` compares the page against the values already saved in App Review Preflight's runtime test
+ * package. A package saved before a re-Sync holds a superseded URL or SRI, and the tool then reports
+ * "Script integrity is missing or wrong" against a page tag that is itself correct (R8.16) — this check
+ * separates that case from a real defect before the run.
  *
  * Also checks what Preflight's "Runtime is not traceable to source" looks at: the runtime's last line must point at a
  * reachable version-3 source map whose sourcesContent is the served file minus that line (R8.13), and reports
@@ -25,8 +31,20 @@ const args = process.argv.slice(2);
 const pageUrl = args.find((a) => !a.startsWith("--"));
 const includeAll = args.includes("--all");
 
+/** Value of `--name=value`, or null when the flag is absent. */
+function flagValue(name) {
+  const hit = args.find((a) => a.startsWith(`--${name}=`));
+  return hit == null ? null : hit.slice(name.length + 3).trim();
+}
+
+const expectUrl = flagValue("expect-url");
+const expectSri = flagValue("expect-sri");
+const expectSha256 = flagValue("expect-sha256");
+
 if (!pageUrl) {
-  console.error("usage: node scripts/webflow-runtime-pin.mjs <published page url> [--all]");
+  console.error(
+    "usage: node scripts/webflow-runtime-pin.mjs <published page url> [--all] [--expect-url=…] [--expect-sha256=…] [--expect-sri=…]"
+  );
   process.exit(2);
 }
 
@@ -69,6 +87,7 @@ if (scripts.length === 0) {
 
 let mismatches = 0;
 let mapProblems = 0;
+let staleExpectations = 0;
 let index = 0;
 for (const s of scripts) {
   index += 1;
@@ -91,6 +110,24 @@ for (const s of scripts) {
     `  DOM integrity attr    : ${s.integrity ?? "(absent)"}${domMatches === null ? "" : domMatches ? "  ✓ matches" : "  ✗ DOES NOT MATCH"}`
   );
   console.log(`  crossorigin           : ${s.crossorigin ?? "(absent)"}`);
+  if (s.ours) {
+    for (const [label, expected, actual] of [
+      ["saved URL", expectUrl, s.src],
+      ["saved SHA-256", expectSha256, sha256Hex],
+      ["saved SRI", expectSri, sri],
+    ]) {
+      if (expected == null || expected.length === 0) {
+        continue;
+      }
+      const same = expected === actual;
+      if (!same) {
+        staleExpectations += 1;
+      }
+      console.log(
+        `  ${label.padEnd(21)} : ${expected}${same ? "  \u2713 matches the page" : "  \u2717 SUPERSEDED \u2014 the page serves the value above"}`
+      );
+    }
+  }
   if (!contentType.includes("javascript")) {
     console.log("  ! content-type is not JavaScript — check the URL is the script request, not an error page");
   }
@@ -146,6 +183,13 @@ if (mapProblems > 0) {
 if (mismatches > 0) {
   console.error(
     `${mismatches} Beacon runtime tag(s) do not carry the SHA-256 SRI of the served bytes in their integrity attribute (absent, or a different value). Re-push the runtime from the Designer (CMS Slots → the page runtime Sync button), publish, then run again. If the attribute is still absent after a fresh push, Webflow is not rendering the registered integrityHash on this page — record that as a platform observation, not an app defect.`
+  );
+  process.exit(1);
+}
+
+if (staleExpectations > 0) {
+  console.error(
+    `${staleExpectations} value(s) saved in the Preflight test package no longer describe this page. Re-fill the runtime file rows from the output above and save the test setup again; a stale package reports "Script integrity is missing or wrong" against a correct page tag (R8.16).`
   );
   process.exit(1);
 }

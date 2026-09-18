@@ -2,6 +2,10 @@
 
 Use these two public-safe skills at different points in a Webflow App's lifecycle. They are developer aids, not review decisions.
 
+Both skills ask for proof before calling a bundle a development build: a marker that differs between a dependency's development and production output. A `dist/development` source-map path (react-router 7.x routes every consumer there), a `http://localhost` literal in a URL fallback or hostname blocklist, and the `telemetry.global` block the Webflow CLI writes into `webflow.json` all ship in production builds and are not development residue.
+
+Both skills classify token and scope authority before applying OAuth rules. They distinguish Webflow-issued credentials and Webflow Data API scopes from an App's own session and a third-party provider's OAuth tokens or scopes; inapplicable Webflow checks are `N/A`, not failures.
+
 ## Before review: `webflow-app-preflight`
 
 Use during architecture, implementation, packaging, and submission preparation.

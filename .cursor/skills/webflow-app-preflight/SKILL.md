@@ -21,6 +21,22 @@ Everything below reduces to three questions a reviewer asks:
 
 If you can answer yes to all three with evidence, the submission is ready for review.
 
+## Classify authority before applying OAuth rules
+
+Before treating any token, scope, consent screen, session, `Authorization` header, or 401 as Webflow authorization, identify:
+
+| Field | Required classification |
+| --- | --- |
+| Issuer | Webflow, the App developer, or a named third-party provider |
+| Audience | The service that accepts the credential |
+| Protected resource | Webflow Data API/site/user data, the App's own backend, or third-party data |
+| App capability | Designer Extension, Data Client, or Hybrid |
+| Credential type | Webflow OAuth token, Webflow Designer ID token, App session, or third-party token |
+
+Do not infer Webflow authority from the words `token`, `scope`, `OAuth`, `session`, `consent`, `Authorization`, or `401`. Apply Webflow OAuth scopes, install-consent, token-storage, revocation, and Data API lifecycle requirements only when the credential is issued by Webflow or carries authority over Webflow APIs, sites, users, or data. A Designer Extension-only App with no Data Client has no Webflow OAuth scopes to minimize and needs no developer-built Webflow consent screen.
+
+For an App-owned session or third-party OAuth flow, use the provider's documented architecture and general security controls. Record the result as `published requirement`, `security control`, `review-required`, or `N/A`; do not present a security recommendation as a confirmed Marketplace violation. A client-side third-party token is not automatically a defect when the provider's documented browser SDK requires it—verify its scope, lifetime, storage, exposure, and revocation before assigning severity or prescribing a proxy.
+
 ## Phase 1 — Choose the App type
 
 Webflow Apps are built from two building blocks. An App can use one or both.
@@ -64,7 +80,7 @@ This is where reviews are won or lost. Follow these while writing code, not afte
 
 - **No dangerous patterns in Designer Extension code.** No `eval()`, no direct DOM manipulation of the Designer, no excessive global variables. Use the Designer APIs.
 - **Iframes for auth only.** Your extension already runs inside a sandboxed iframe, so the objection isn't the technology — it's that an externally hosted surface can change after approval, which puts your real behavior outside what was reviewed. Fine for an authentication flow; never as your primary App UI or runtime surface. This is the same requirement as pinning injected scripts: **behavior that reaches a user must be versioned and re-reviewable, whichever transport delivers it.**
-- **Ship production builds, not dev builds.** Development bundles embed `eval()` (webpack dev mode) and framework error-decoder URLs that security scanners flag as prohibited code execution or unexplained external connections. Bundle for production.
+- **Ship production builds, not dev builds, and know what proves it.** Development bundles embed `eval()` (webpack dev mode), unreplaced `process.env.NODE_ENV` checks, `react-dom.development`, and full-text framework warnings that security scanners flag as prohibited code execution or unexplained external connections. Bundle for production, then verify the artifact. Three things look like development residue and are not: a source-map path under a package's `dist/development` folder when that package routes every consumer there (react-router 7.x does; its production folder differs by one warnings flag), a `http://localhost` literal inside a library's URL-parsing fallback or your own hostname blocklist (react-router's production build carries the same string), and the `telemetry.global` block the Webflow CLI itself writes into `webflow.json`. Judge a build by a marker that differs between the package's development and production output, not by a path name or a string.
 - **Never touch credential fields.** Do not read, collect, modify, transmit, or act on password/login/authentication inputs in a user's site. Apps that inspect forms or DOM must exclude those fields from collection and from any rule actions.
 - **Use official APIs for data, not DOM scraping.** If you need form structure, use the Forms API. Scraping the published DOM for data the API should provide is fragile and reads as an attempt to reach data you weren't granted.
 
@@ -92,7 +108,7 @@ Four exemplar controls set the tone. The authoritative item-by-item set is the *
 
 ### Scopes
 
-- **Request the minimum scopes your App actually uses.** Each Data API endpoint lists its required scope; take the union of what you actually call and nothing more. Over-asking makes users hesitant and gives the reviewer more to verify.
+- **For Data Clients and Hybrid Apps, request the minimum Webflow scopes your App actually uses.** Each Data API endpoint lists its required scope; take the union of what you actually call and nothing more. Over-asking makes users hesitant and gives the reviewer more to verify. Mark this `N/A` for a Designer Extension-only App that does not call the Webflow Data API.
 - Keep the scopes in your Install URL equal to or a subset of the scopes configured in app settings, or installs will error.
 
 See `reference/oauth-scopes-and-security.md` for the full scope list and the OAuth flow.
@@ -148,6 +164,7 @@ Measured failure modes from an unaided review of the same fixture app. Each soun
 - ❌ "Webflow removes injected scripts automatically on uninstall." → It does not. Removal is the App's responsibility, at site _and_ page level.
 - ❌ "The endpoint is safe because CORS restricts which origins can call it." → CORS is a browser policy, not authorization. A non-browser client ignores it. Authenticate and authorize server-side.
 - ❌ "Only our extension knows that site ID, so it's safe to key on." → Site IDs appear in published page source. Any client-supplied value is attacker-controlled.
+- ❌ "The source map points at `dist/development`, so rebuild for production." → A path name is not a build mode. react-router 7.x publishes every consumer's code under `dist/development`, and the `localhost` literal in its URL fallback ships in its production build too. Prove a development build with a marker that differs from the package's production output, or drop the finding.
 
 If a review produces any of these, it has inverted a consent, lifecycle, or authorization requirement.
 

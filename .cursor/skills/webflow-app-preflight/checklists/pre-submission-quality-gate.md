@@ -2,6 +2,8 @@
 
 Every item must pass before submitting. If one fails, fix it — a failed submission costs another 10–15 business days.
 
+First complete the authority classification in `SKILL.md`. Mark conditional items `N/A` with a reason when the App capability or credential provenance makes them inapplicable. `N/A` is not a failure. Do not classify a token or scope as Webflow-owned without evidence of its issuer, audience, and protected resource.
+
 **Provenance:** items trace to Webflow's published Marketplace Guidelines and developer documentation unless tagged **`[control]`** — a security or engineering control that generalizes recurring review risk and prepares evidence, but is not verbatim published Webflow policy. (These are the same labels the toolkit defines: published requirement vs. security control.)
 
 ## Is it real?
@@ -24,7 +26,7 @@ Every item must pass before submitting. If one fails, fix it — a failed submis
 - [ ] Client Secret is server-side only — not in the bundle, client JS, or repo.
 - [ ] Designer Extension source code is readable and uploaded through the version manager.
 - [ ] Archive contains exactly one canonical `webflow.json`, and the app title is the real product name — no scaffold defaults like "My React App".
-- [ ] The **bundled** `webflow.json` carries no CLI telemetry block (`telemetry.global.allowTelemetry`) — the CLI can inject one at bundle time even when your source manifest is clean, so check the artifact you upload, not the file in your repo.
+- [ ] The **bundled** `webflow.json` carries no CLI telemetry block (`telemetry.global.allowTelemetry`). Webflow CLI 2.3.0 and earlier write that block into the project's `webflow.json` when you answer the telemetry prompt (2.7.x moved the global preference out of the project file), so it appears without you adding it. Strip it or upgrade the CLI. It is packaging hygiene, not a security finding, and not evidence of a development build.
 - [ ] The artifact you verify is the artifact you upload — run production checks against the contents of `bundle.zip`, not a working-directory build output that a dev server can overwrite.
 - [ ] `bundle.zip` does not exceed the 5MB Designer Extension bundle limit — an oversized bundle fails at upload, before review starts.
 - [ ] The bundled `webflow.json` declares the required manifest fields — `name`, `apiVersion` (`"2"`), and `publicDir` matching your build output directory.
@@ -36,25 +38,25 @@ Reviewers verify these by calling your endpoints and asking for evidence, not by
 - [ ] Every backend endpoint requires verified caller authentication.
 - [ ] No endpoint authorizes on a client-supplied identifier alone (site ID, account ID, project ID — site IDs are visible in published page source); identity is resolved server-side from the Webflow ID token.
 - [ ] Object-level authorization tested: a caller authorized for one site/tenant cannot read or write another's records, and gets a non-enumerating failure.
-- [ ] No reusable credential (third-party API key, access token, connection secret) is returned to the extension or visible in browser network traffic.
+- [ ] No reusable secret is returned contrary to the provider's documented client architecture. A provider-required short-lived browser token is reviewed for scope, lifetime, storage, exposure, and revocation rather than automatically failed. `[control]`
 - [ ] Outbound request destinations resolve from a server-side allowlist; HTTPS enforced; no user-supplied hosts.
 - [ ] CORS allowlists your production origins — not `*`, and never `*` together with `Allow-Credentials: true`; CORS is defense-in-depth, not authorization.
 - [ ] `[control]` Credentials encrypted at rest and scoped per tenant; decrypted values server-side only.
-- [ ] No identity, session, or entitlement state derived from `localStorage`/`sessionStorage`.
+- [ ] No privileged identity or entitlement decision trusts `localStorage`/`sessionStorage`; ordinary UI/session persistence is assessed separately and privileged requests are verified server-side. `[control]`
 - [ ] Values interpolated into generated scripts, markup, or custom attributes are JSON-serialized and format-validated.
 - [ ] Uploads validated server-side for type, size, count, and file signature; archive contents inspected.
 - [ ] Actions are attributed to the authenticated user — no hardcoded owner or service identity standing in for real users.
 - [ ] `[control]` Dependency audit clean of High/Critical advisories, or a documented function-level reachability analysis; production manifest and lockfile available on request.
-- [ ] No staging, localhost, or tunnel hostnames anywhere in the artifact, and the declared installation URL is a production host.
+- [ ] No staging, localhost, or tunnel hostname is used as a request destination in the artifact, and the declared installation URL is a production host. A `localhost` string in a hostname blocklist, in a library's URL-parsing fallback, or in a test fixture is not a development artifact — check what the string does, not that it exists.
 - [ ] `[control]` OAuth callback validates a single-use, server-stored `state` bound to the pending authorization — the CSRF control in Webflow's OAuth flow (PKCE is not part of Webflow's documented flow; use PKCE on third-party OAuth flows your app performs that support it).
 - [ ] Client bundle contains client code only — no server handlers, database schema, JWT logic, or backend dependencies (check the source map, which will reveal whatever the bundle contains).
 - [ ] Production logs contain no personal data or credentials; sensitive fields redacted at the logging boundary.
 
 ## Consent & lifecycle
 
-- [ ] Requested scopes are the minimum the App actually calls.
-- [ ] Install URL scopes are equal to or a subset of configured scopes.
-- [ ] App stops calling the Data API immediately on revoke/uninstall — a persistent 401 on a previously valid token is revocation, not an error to retry past.
+- [ ] Data Client/Hybrid only: requested **Webflow** scopes are the minimum Webflow Data API scopes the App actually calls. Designer Extension-only with no Data API access: `N/A`.
+- [ ] Data Client/Hybrid only: Webflow Install URL scopes are equal to or a subset of configured Webflow scopes. Designer Extension-only with no Webflow Install URL: `N/A`.
+- [ ] Webflow Data API only: App stops calling immediately on revoke/uninstall — a persistent 401 on a previously valid token is revocation, not an error to retry past. This sentence applies to the previously classified Webflow token; third-party 401 behavior follows that provider's documented contract.
 - [ ] Code on customer sites is delivered via the Custom Code API, not manual paste.
 - [ ] Injected scripts are version-pinned (hosted scripts use SRI `integrityHash`); no runtime loaders unless declared + pinned at submission.
 - [ ] Any change to injected code ships as a new script version + App update — never edited in place.

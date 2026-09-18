@@ -3227,3 +3227,164 @@ example; the first Sync after changing the upload policy is part of the change, 
 
 **States:** Source ✓ (uncommitted) · Artifact ✓ · Tower deployed ✗ · Installed ✗ · Runtime ✗ (re-push needed) ·
 Submitted ✗ · Accepted ✗.
+
+### R8.15 Bundle scan of the 09-17 20:41 build — External API Calls excerpt on the policy-link constants; new "Generated code is not traceable to readable source" (App Review Preflight 2026-09-18)
+
+| Finding (verbatim title) | Priority | Evidence location | Observed (artifact-verified on the scanned zip) | Provenance |
+| --- | --- | --- | --- | --- |
+| External API Calls — "Review third-party data egress." | REQUIRED, unassigned | `assets/label-DYKmFoTP.js:41` | Excerpt cols 61 218–61 716, centre 61 467; the first policy-page literal (`https://tower.codalyn.app/privacy`, `codalyn-links.ts`) starts at 61 455. Same line: `/terms`, `/docs`, the Tower origin ×2, the one `fetch(` at 63 688 | issued finding |
+| Generated code is not traceable to readable source — "No matching version-3 source map was found for this generated file." | REQUIRED, unassigned | `` `;function:1 `` | `bundle.js` carried `` var Mx=`//# sourceMappingURL=`;function Nx(e){… `` — the R8.13 trailer builder's prefix constant. The text after the token up to the next whitespace is exactly the reported "file" name. All 7 shipped JS/CSS files had a v3 map with full `sourcesContent` in the private zip | issued finding |
+
+**Excerpt model (supersedes R8.10's "fits none").** A window of ≈ ±250 characters centred on the match start
+fits all three External API Calls scans: R8.7 centre 10 875 / `fetch(` at 10 857; R8.10 centre 61 374 /
+`localStorage.removeItem(` at 61 363; this scan centre 61 467 / policy URL at 61 455. The rule therefore has
+several patterns (network call, credential-named storage, external-host literal) and prints one location per
+file:line; each round removed the printed match and the next one on the line was printed instead.
+
+**Fix 1 — traceability (code).** `cms-slot-page-inline-script.ts`: the prefix constant is replaced by
+`SOURCE_MAP_PRAGMA_HALVES` (`"//# source"`, `"MappingURL="`) joined with the map URL in `sourceMapTrailerLine`
+when the trailer is written — the split Vite and webpack use in their own sources so tooling does not read the
+string as the containing file's pragma. The published-site runtime's bytes are unchanged (trailer tests still pin
+the exact last line; the live runtime stayed `…9b7da263.js` after a Sync from the new bundle). The minifier emits
+`` [`//# source`,`MappingURL=`] `` + `concat(e).join(``)` — not re-folded. Gate: `pinnedMarkerCounts`
+`sourceMappingURL token` **1 → 0** on dist and zip (`scripts/build-cli.mjs`), so a re-folded literal or a leaked
+bundle-map pointer fails the build. Tests: `release-build-gates.test.mjs` (pin table, the `` `;function `` literal
+and a leaked `.js.map` pointer both throw), `cms-slot-page-inline-script*.test.ts` unchanged and green.
+
+**Fix 2 — External API Calls (code where code applies).** `codalyn-links.ts` no longer carries absolute policy
+URLs: `codalynPolicyLinkProps("privacy" | "terms" | "docs")` builds the href from `readBeaconTowerOrigin()` plus a
+path. Same targets in a production build; callers `Header.tsx`, `settings-preferences-panel.tsx`,
+`telemetry-consent-prompt.tsx`; `codalyn-links.test.ts` rewritten (href per page, follows the build origin). No
+visual change — Storybook exempt. The shipped JS now names one external host next to a network call: the Tower
+origin, ×2 in `readBeaconTowerOrigin` (baked constant + env fallback), in the chunk holding the one `fetch(`.
+
+**Re-scan of the new build (2026-09-18, issued finding):** External API Calls ×1, `assets/label-B6a4y7OV.js:41`,
+excerpt on `` function _l(){let e=`https://tower.codalyn.app`.replace(… `` — the Tower origin, as the model
+predicts. The traceability item was not re-reported. **Open decision, owner Webflow review:** this item cannot
+reach zero while the app has a backend (script registration and CMS writes need the Data API server-side); moving
+the origin out of the scanned JS would hide real egress from a security scan and is refused. Disposition:
+disclosed in the BACKEND paragraph of the notes; controls are the single egress point (destination policy,
+`redirect: "error"`, `credentials: "omit"`) and the shipped `connect-src`.
+
+**Verification:** tsc clean; Beacon suite 1 107 / 1 107; `build:prod` gates green. **Artifact:**
+`v0.1.0_public_09-18_10-25-07.zip` sha256 `b9b2d587c001a5e20d2f43167f891027be7d7c859fb06db5d173a47d17dc5617` +
+`.sourcemaps.zip` sha256 `eb69c8554acd3e222ed67ecf888ce153d20f613d44c8406c24216acb933a9947`; zip greps:
+`sourceMappingURL` 0, `.map` entries 0, 7 / 7 JS+CSS files mapped v3 in the private zip. Source committed at
+`fdcd65a`.
+
+**States:** Source ✓ (`fdcd65a`) · Artifact ✓ · Installed — see R8.17 · Runtime ✓ (unchanged bytes) ·
+Submitted — see R8.17 · Accepted ✗.
+
+### R8.16 "Script integrity is missing or wrong" on the 09-18 runtime — published page re-verified correct; first suspect is a stale test package (2026-09-18)
+
+**Finding (issued, priority unassigned, App Review Preflight runtime test):** "Script integrity is missing or
+wrong — A page-loaded script does not use the SRI value saved in this test package.
+`6aac8a88596e00b6a2967e15_codalyn-beacon-runtime-9b7da263.js`". Next step as issued: "Add the saved integrity
+value and `crossorigin="anonymous"` to each script tag. Make sure the CDN allows cross-origin SRI."
+
+**Runtime-observed (2026-09-18 14:55 UTC, `beacon-demo.webflow.io/blog/the-power-of-resilience`), before any
+change:** the named file is the runtime pushed on 2026-09-18 00:49 UTC (asset id timestamp), map asset
+`6aac87907113fb9205fb2380_…map.json` created 00:36 UTC and reused — i.e. at least two Syncs of this build,
+the second of which minted a new JS asset id for byte-identical content.
+
+- One `codalyn-beacon-runtime-*` tag on the page, rendered as
+  `src type="text/javascript" integrity="sha256-SbM4+njh+BNrGrGpg7P3LmGFNsknGBWNaqciq2kkBf0=" crossorigin="anonymous"`
+  plus the two `data-codalyn-beacon*` markers.
+- Served bytes 20 486, SHA-256 `49b338fa78e1f8136b1ab1a983b3f72e618536c92718158d6aa722ab692405fd`, SRI equal to
+  the DOM attribute (`webflow-runtime-pin.mjs` exit 0).
+- Identity, `--compressed` (gzip) and `br` responses decode to the same bytes and the same SHA-256.
+- CDN: `access-control-allow-origin: *` with and without an `Origin` header, `access-control-allow-methods:
+  GET, HEAD`, `content-type: application/javascript` (no charset), `etag "7b3e9bfb…"`, no redirect.
+- File hygiene: 635 lines, 0 non-ASCII bytes, no CR, **no trailing newline**, last line is the map pointer.
+- Source map behind the trailer: v3, 24 786 bytes, `sourcesContent[0]` == served file minus its last line.
+- The runtime does not touch its own script element (it only reads `document.currentScript.src` for the
+  debug info call), so the tag carrying `integrity` is still in the DOM after load.
+
+So the acceptance criterion as written ("add the saved integrity value and `crossorigin="anonymous"` to each
+script tag; CDN allows cross-origin SRI") is already met on the published page, and the R8.13 hypothesis
+(trailing newline) is now falsified along with R7b.18's (`/`, `+` in the base64) and R7b.19's (non-ASCII bytes).
+
+**Leading hypothesis, not yet tested: the saved test package is bound to a superseded runtime.** The message
+compares a page-loaded script against a value *saved in the package*, and the package's values only stay
+correct until the next Sync. Two ways this build can invalidate them, both observed in the asset timestamps:
+the 09-18 runtime supersedes the 09-14 file `…1ebc5741.js` (different bytes, different SRI), and a forced
+re-Sync mints a **new asset id for identical bytes**, so the saved URL can point at an asset that
+`purgeUnreferencedBeaconRuntimeAssets` has since deleted. Discriminating data, from the run itself: the
+runtime-file row's Loaded / Hash matched / SRI / source map states, and the URL + SHA-256 the package holds.
+Hash matched ✓ on the current file means the package is current and the item is the unexplained one carried
+since R7b.17; Loaded ✗ or Hash ✗ means the package is stale and refilling it (SUBMIT step 5, now carrying the
+verified values) is the whole fix.
+
+**If the package is current:** do not change the runtime bytes again — expand "Evidence artifact details",
+download all 8 artifacts and read what the tool compared (unchanged instruction from R8.13).
+
+**Structural fix available either way (not yet implemented):** the runtime asset URL is not stable across
+Syncs. `registerHostedRuntimeScript` reuses the source map by file name (`findExistingRuntimeSourceMap`) but
+always calls `createAndUploadSiteAsset` for the JS, so a forced Sync changes the URL — and the registered SRI's
+asset — without changing a byte. Reusing the existing `codalyn-beacon-runtime-<hash>.js` asset (and its
+registration, whose version already encodes the same hash) would keep a reviewer's saved package valid across
+re-syncs, stop minting permanent registrations for identical content, and remove this whole failure mode.
+
+**States:** Source ✓ (unchanged) · Artifact ✓ (09-18 10:25 zip, not installed) · Installed ✗ (test site runs
+the 09-17 20:41 bundle) · Runtime ✓ (09-18 00:49 push, re-verified 14:55) · Submitted ✗ · Accepted ✗.
+
+### R8.17 App Update submitted (2026-09-18)
+
+**Filed through the submission form** (App Update, new bundle): bundle `v0.1.0_public_09-18_10-25-07.zip`
+(`b9b2d587…5617`) + `.sourcemaps.zip` (`eb69c855…9947`), SUBMIT.md response (494 chars) and notes (4 984 chars)
+as they stand at this commit. **Webflow reference ID `16838bba-c288-47ee-93e2-a0a19cfd7ece`.** Form
+confirmation: evaluation against the Marketplace Guidelines, typically 10–15 business days; feedback and the
+decision arrive by email on this submission's thread; if changes are required, a new bundle goes through
+*Publish → Upload Bundle for Review* in app settings and the review continues on the same thread.
+
+**Known at filing:** the bundle scan carried External API Calls ×1 on the Tower origin (R8.15, open decision,
+disclosed). Published runtime verified from the terminal before filing: page republished 2026-09-18 14:43 UTC
+after a Sync from the new bundle, runtime still `…6aac8a88596e00b6a2967e15_codalyn-beacon-runtime-9b7da263.js`,
+SHA-256 `49b338fa…05fd`, DOM integrity matches, no trailing newline, v3 source map reachable
+(`webflow-runtime-pin.mjs` and `webflow-runtime-observe.mjs` exit 0). Tower: the policy page carries the
+"Marketplace build includes no analytics or error-reporting SDK" text (SUBMIT step 1 check).
+
+**Not recorded here (operator to fill in):** the `wfpre_…` receipt pasted into the form; whether the runtime
+test's "Script integrity" item (R8.16) was still listed on the filed run; confirmation that the R8.11/R8.12
+Tower code and migration 0037 are live in production.
+
+**While under review — do not invalidate what was filed:** no Sync on beacon-demo (a forced Sync mints a new
+runtime asset id, R8.16, and the filed runtime URL stops resolving to the page's tag); no republish that changes
+the test page; keep Tower production up and the reviewer account working; no new bundle upload unless the
+review thread asks for one.
+
+**States:** Source ✓ (`fdcd65a`) · Artifact ✓ · Installed ✓ (operator-reported; Sync from the new bundle
+observed via the 14:43 UTC republish) · Runtime ✓ · **Submitted ✓ (2026-09-18, reference
+`16838bba-c288-47ee-93e2-a0a19cfd7ece`)** · Accepted ✗.
+
+**R8.16 addendum (2026-09-18, same day): the test package is current — stale-package hypothesis falsified.**
+The saved Preflight runtime test holds exactly the live values: URL
+`…6aac8a88596e00b6a2967e15_codalyn-beacon-runtime-9b7da263.js`, SHA-256 `49b338fa…05fd`, derived SRI
+`sha256-SbM4+njh+BNrGrGpg7P3LmGFNsknGBWNaqciq2kkBf0=`, "Loaded directly by the published page". The form's own
+text states it calculates the SRI from the SHA-256 field, so the saved SRI is arithmetically the SRI of the
+bytes the page serves, and the page tag carries that string verbatim. Also checked: the page HTML served to a
+Chrome UA with browser navigation headers is **byte-identical** to the curl fetch (same sha256), so the DOM the
+tool parses carries the same tag.
+
+**One app-side variable left — tag shape.** Every tag on the test page that Preflight does not flag ends at
+`crossorigin="anonymous">`; ours continues with `data-codalyn-beacon="runtime"
+data-codalyn-beacon-src-hash="9b7da263"`, because the page custom-code entry carries them as `attributes`. A
+matcher anchored on the end of the tag, or one that reads a fixed attribute set, fails on exactly our tag and on
+nothing else on this page.
+
+**Discriminating run before any code change (zero risk — no new asset, no registration, package stays valid):**
+add Webflow's jQuery tag as a second pinned runtime file in the same run, as a control with a clean tag shape and
+a correct sha256 pin:
+`https://d3e54v103j8qbb.cloudfront.net/js/jquery-3.5.1.min.dc5e7f18c8.js?site=6a35c562c551e2eb11bc4f1c`,
+SHA-256 `f7f6a5894f1d19ddad6fa392b2ece2c5e578cbf7da4ea805b6885eb6985b6e3d`, derived SRI
+`sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=` (verified present verbatim in its tag). Diagnostic run
+only — the submission run keeps "More runtime files" empty (R7b.16).
+
+- Control ✓ / Beacon ✗ ⇒ the two `data-*` attributes are the differentiator. Fix: apply the page entry with no
+  attributes, identifying our runtime by registered-script id and by the `+beacon.<hash>` tag already inside the
+  registered version, with a PUT-only "reapply" path so the migration mints no asset and no registration (the
+  URL, bytes and SRI, and therefore the saved package, stay valid).
+- Control ✗ and Beacon ✗ ⇒ the check fails on a valid Webflow-authored pin too; that is the evidence to hand the
+  reviewer, and no app change can resolve it.
+- Note the control's base64 carries `/` where ours carries `+`, so a control failure is not by itself proof of a
+  general fault.

@@ -31,6 +31,8 @@ Before planning code changes:
 - Do not probe another tenant, enumerate records, attempt a write, or retrieve a response body merely to prove that an authorization flaw exists.
 - Use dedicated test tenants and records for cross-tenant tests. Stop if two authorized test identities are not available.
 
+Before applying any issued token, scope, consent, OAuth, session, or revocation finding, classify the credential's issuer, audience, protected resource, App capability, and type. Preserve the reviewer's wording, but do not silently assume an App-owned or third-party token/scope is a Webflow token/scope. Webflow OAuth and Data API requirements apply only to Webflow-issued credentials or credentials carrying authority over Webflow APIs, sites, users, or data. For third-party credentials, use the provider's documented architecture and label any additional recommendation as a `security control` or `open decision`. If the issued finding itself conflates authorities, mark `needs reviewer clarification` rather than implementing an unrelated Webflow consent screen or scope change.
+
 If a finding indicates a live credential exposure, unauthorized cross-tenant access, or an actively exploitable production path, open a separate containment lane first:
 
 1. Name the authorized security owner.
@@ -53,6 +55,7 @@ Create one row per finding:
 | Acceptance criteria | Copy the issued criteria or mark them `needs reviewer clarification`.                               |
 | Provenance          | Label as `published requirement`, `issued finding`, `security control`, or `open decision`.         |
 | Evidence state      | `missing`, `source-verified`, `artifact-verified`, `runtime-observed`, or `reviewer-accepted`.      |
+| Authority           | Issuer, audience, protected resource, App capability, and credential type; use `N/A` where a Webflow OAuth check does not apply. |
 
 Resolve P1 items first, but keep containment ahead of ordinary P1 implementation. Treat `unassigned` findings as P1 for planning and evidence purposes unless the reviewer states otherwise — most real rejection emails carry no P0/P1 nomenclature, and an unlabeled finding still blocks resubmission.
 
@@ -100,6 +103,7 @@ For code changes:
 - Add the failing test or reproduction first when it is safe and deterministic.
 - Make the narrowest change that satisfies the acceptance criterion.
 - Keep development fallbacks out of the production artifact, including source maps and generated archives when those are submitted.
+- Prove a development-build claim with a marker that differs between the dependency's development and production output. Not proof on its own: a `dist/development` source-map path (react-router 7.x routes every consumer there; its production folder differs by one warnings flag), a `localhost` literal in a URL-parsing fallback or hostname blocklist (present in production builds too), or the `telemetry.global` block the Webflow CLI writes into `webflow.json` (packaging hygiene: strip it or upgrade the CLI). When an issued finding rests only on those, record it as `needs reviewer clarification` with the artifact evidence instead of performing a rebuild that changes nothing.
 - Validate the final `bundle.zip`, manifest, source maps, dependency manifest, installation URL, and requested scopes—not only source files.
 - For backend changes, test authentication, object ownership, response minimization, and failure behavior independently.
 - For Custom Code changes, test registration, application, update, removal at site and page level, and the user-facing publish prompt.

@@ -1,7 +1,14 @@
 # SUBMIT — Round 8 runbook (App Update answering the 2026-09-17 review feedback)
 
+> **SUBMITTED 2026-09-18 — Webflow reference ID `16838bba-c288-47ee-93e2-a0a19cfd7ece`.** Review typically takes
+> 10–15 business days; feedback and the decision arrive by email on this submission's thread — reply there.
+> If changes are required: fix, rebuild, *Publish → Upload Bundle for Review* in app settings; the same thread continues.
+> **Until the decision: do not Sync or republish beacon-demo** (a Sync mints a new runtime asset URL and breaks the
+> filed runtime values, R8.16), keep Tower production and the reviewer account working, upload no new bundle unless asked.
+> The steps below are what was done for this submission; they are the runbook again only if feedback needs a new build.
+
 **Build under review:** `v0.1.0_public_09-18_10-25-07.zip` (built 2026-09-18 10:25). Everything on this page is for this build only.
-Why each thing is the way it is: [compliance-record.md](compliance-record.md) Round 8, R8.1–R8.12.
+Why each thing is the way it is: [compliance-record.md](compliance-record.md) Round 8, R8.1–R8.17.
 Anything Preflight shows that is not listed under step 4 or step 5 below → stop and follow [playbook.md](playbook.md) § B.
 
 ## What the six findings became in code
@@ -24,7 +31,7 @@ Every finding is a code change you can point to; none is answered with an explan
 | External API Calls (bundle scan) | The one backend call (Tower). Webflow's docs put script registration and CMS writes on the backend; the Designer API has no such surface. The 09-17 20:41 scan's excerpt sat on the in-app privacy/terms/docs link constants (anchors, never requests) | Link constants are now paths on the Tower origin: the bundle names one external host (`https://tower.codalyn.app`), in the chunk holding the one `fetch(`. The backend call itself stays — expect the item to persist with its excerpt on the Tower origin or `fetch(`. Disclosed in the notes (BACKEND paragraph). Not raised by the human review team in round 8 |
 | Generated code is not traceable to readable source (bundle scan, evidence `` `;function:1 ``) | The runtime trailer builder minified to `` `//# sourceMappingURL=`;function `` in bundle.js; the scanner read `` `;function `` as a map file name and found no such map. Every real JS/CSS file already had its v3 map in the private zip | **Fixed.** The pragma is joined from two halves at sync time; no shipped file carries the token (release build pins the count to 0 on dist and zip). Published runtime bytes unchanged |
 | Runtime is not traceable to source | No source map behind the runtime | **Fixed.** Sync uploads a v3 identity source map beside the runtime; the runtime's last line points at it |
-| Script integrity is missing or wrong | Unknown tool internals. Tag, CORS and bytes verified correct; the one untested cause was the file's trailing newline | The runtime now ends with the map pointer, no trailing newline. If it persists: download the run's 8 evidence artifacts before changing anything else |
+| Script integrity is missing or wrong | Re-issued on the 09-18 runtime (`…9b7da263.js`). Page tag, CORS, bytes, encodings, hygiene and the saved test package were all re-verified correct on 09-18 (R8.16 + addendum); trailing newline, base64 charset, non-ASCII bytes and a stale package are falsified causes. Submitted with the item open | If it comes back: [history/sri-item-investigation.md](history/sri-item-investigation.md) — the falsified list, the zero-risk control run that discriminates next, and the code change to make if the control passes. Download the run's 8 evidence artifacts before changing anything |
 | New script elements / Unreviewed scripts | Webflow's own site runtime plus what the page's Interactions pull in (GSAP, ScrollTrigger, achunks) | Test on a bare page (Step 3) so only Webflow's site runtime remains. Pinning Webflow's files would only move them into the SRI item |
 
 ## Do these in order
@@ -91,14 +98,28 @@ Open **App Review Preflight** in the Designer ([install it into the Workspace](h
 
 Fill exactly these values, save the test setup (it binds to the uploaded bundle), run the test.
 
+**Before running, check the package against the page.** A saved package that still holds a superseded runtime
+(different asset id, different SRI) reports "Script integrity is missing or wrong" against the page's current,
+correct tag — rule that out before reading the result as an app defect (R8.16):
+
+```bash
+node scripts/webflow-runtime-pin.mjs https://beacon-demo.webflow.io/blog/the-power-of-resilience \
+  --expect-url=https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6aac8a88596e00b6a2967e15_codalyn-beacon-runtime-9b7da263.js \
+  --expect-sha256=49b338fa78e1f8136b1ab1a983b3f72e618536c92718158d6aa722ab692405fd \
+  --expect-sri=sha256-SbM4+njh+BNrGrGpg7P3LmGFNsknGBWNaqciq2kkBf0=
+```
+
+Pass whatever the Preflight form currently holds. Exit 0 = the package describes this page; exit 1 names the
+superseded value to replace. Verified exit 0 for the values in the table on 2026-09-18 14:55 UTC.
+
 | Field | Paste |
 | --- | --- |
 | Published Webflow test URL | `https://beacon-demo.webflow.io/blog/the-power-of-resilience` — or the bare page from Step 3 |
 | Webflow installation or site ID | prefilled by Preflight — `6a35c562c551e2eb11bc4f1c` |
-| Runtime file 1 — Versioned runtime URL | the `Versioned runtime URL` line the pin script printed in Step 3 (`…codalyn-beacon-runtime-<new hash>.js`; the 09-14 file `…1ebc5741.js` is superseded) |
+| Runtime file 1 — Versioned runtime URL | `https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6aac8a88596e00b6a2967e15_codalyn-beacon-runtime-9b7da263.js` — the runtime pushed on 2026-09-18 00:49 UTC and re-verified 14:55 UTC. Re-run the pin script and replace this row **after any further Sync**: a forced Sync mints a new asset id, so the URL changes even when the bytes do not. The 09-14 file `…1ebc5741.js` is superseded |
 | How runtime file 1 loads | **Loaded directly by the published page** |
-| SHA-256 | the `SHA-256` line the pin script printed |
-| Script integrity (SRI) | derived by the form — must equal the `Script integrity (SRI)` line the pin script printed |
+| SHA-256 | `49b338fa78e1f8136b1ab1a983b3f72e618536c92718158d6aa722ab692405fd` |
+| Script integrity (SRI) | derived by the form — must come out as `sha256-SbM4+njh+BNrGrGpg7P3LmGFNsknGBWNaqciq2kkBf0=`, the value the page tag carries. If the saved package shows anything else (an older runtime's SRI), that alone produces "Script integrity is missing or wrong" |
 | More runtime files | leave empty — Webflow's own scripts are not pinned (decision R7b.16) |
 | Does your app proxy or fetch another URL for customers? | **No** |
 | Ready selector | `[data-beacon-target="list"][data-cb-rendered="1"]` |
@@ -130,7 +151,7 @@ Webflow app settings → Publish → **Upload Bundle for Review**, then the subm
 | Testing site | `https://beacon-demo.webflow.io` — bundle above installed; beacon page `https://beacon-demo.webflow.io/blog/the-power-of-resilience` |
 | Reviewer credentials | enter in the form only, never in this repo; 2FA on a Workspace admin account |
 
-**Response to the review team** (form limit 500 characters; this is 4984). Paste as is:
+**Response to the review team** (form limit 500 characters; this is 494). Paste as is:
 
 ```
 1) No automatic workspace request: a lone workspace is only suggested and saved on the user's click; the server sets no default for extension sessions. 2) No telemetry SDK in this build; a redaction handler covers builds with one. 3) All requests use redirect mode error. 4) Uploads only to the exact create-asset uploadUrl; connect-src allows only that bucket. 5) No unsafe-inline; style attributes blocked. 6) cmsLocaleId on every CMS write; localized sites are not written (listing says so).

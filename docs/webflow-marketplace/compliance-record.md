@@ -3325,8 +3325,10 @@ asset — without changing a byte. Reusing the existing `codalyn-beacon-runtime-
 registration, whose version already encodes the same hash) would keep a reviewer's saved package valid across
 re-syncs, stop minting permanent registrations for identical content, and remove this whole failure mode.
 
-**States:** Source ✓ (unchanged) · Artifact ✓ (09-18 10:25 zip, not installed) · Installed ✗ (test site runs
-the 09-17 20:41 bundle) · Runtime ✓ (09-18 00:49 push, re-verified 14:55) · Submitted ✗ · Accepted ✗.
+**States (as observed while writing this entry — Installed and Submitted superseded by R8.17 later the same
+day):** Source ✓ (unchanged) · Artifact ✓ (09-18 10:25 zip, not installed *at the time of this entry*) ·
+Installed ✗ → ✓ per R8.17 (Sync from the new bundle, republished 14:43 UTC) · Runtime ✓ (09-18 00:49 push,
+re-verified 14:55) · Submitted ✗ → ✓ per R8.17 · Accepted ✗.
 
 ### R8.17 App Update submitted (2026-09-18)
 
@@ -3345,17 +3347,30 @@ SHA-256 `49b338fa…05fd`, DOM integrity matches, no trailing newline, v3 source
 "Marketplace build includes no analytics or error-reporting SDK" text (SUBMIT step 1 check).
 
 **Not recorded here (operator to fill in):** the `wfpre_…` receipt pasted into the form; whether the runtime
-test's "Script integrity" item (R8.16) was still listed on the filed run; confirmation that the R8.11/R8.12
-Tower code and migration 0037 are live in production.
+test's "Script integrity" item (R8.16) was still listed on the filed run.
+
+**Tower production state — closed 2026-09-18 (runtime-observed, read-only probes of our own service).** The
+R8.11/R8.12 code is live: `GET /api/integrations/webflow/finish` → **404** and
+`GET /api/integrations/beacon-popup-next` → **404** (both routes deleted in `cc810d2`; a deploy older than that
+commit would still serve them), and `GET /api/integrations/webflow/callback?code=…` with no `state` → **307** to
+`…/integrations/webflow/error?error=invalid_state`, i.e. refused before any code exchange
+(`callback/route.ts` § "No `state` = not a flow Tower started"). `/privacy`, `/terms`, `/docs` → 200, so the
+in-app policy links the 09-18 bundle builds from the Tower origin resolve. Migration `0037_salty_cerebro.sql` is
+only `DROP TABLE "webflow_oauth_install_code" CASCADE` — the table has no remaining reader, so leaving it
+unapplied is dead-schema residue, **not** a functional or review-visible gap; apply it at the next convenient
+deploy. Not covered by these probes: the `/api/v2/webflow/*` proxy allowlist, which needs an authenticated call
+and was therefore left as source-verified (`cc810d2`, 721 Tower tests).
 
 **While under review — do not invalidate what was filed:** no Sync on beacon-demo (a forced Sync mints a new
 runtime asset id, R8.16, and the filed runtime URL stops resolving to the page's tag); no republish that changes
 the test page; keep Tower production up and the reviewer account working; no new bundle upload unless the
 review thread asks for one.
 
-**States:** Source ✓ (`fdcd65a`) · Artifact ✓ · Installed ✓ (operator-reported; Sync from the new bundle
-observed via the 14:43 UTC republish) · Runtime ✓ · **Submitted ✓ (2026-09-18, reference
-`16838bba-c288-47ee-93e2-a0a19cfd7ece`)** · Accepted ✗.
+**States:** Source ✓ (`fdcd65a`) · Artifact ✓ (zip sha256 re-verified on disk 2026-09-18 after filing:
+`b9b2d587…5617`, maps `eb69c855…9947`) · Installed ✓ (operator-reported; Sync from the new bundle observed via
+the 14:43 UTC republish) · Runtime ✓ (`webflow-runtime-pin.mjs` re-run post-filing with the filed
+`--expect-*` values → exit 0) · Tower deployed ✓ (probe above) · **Submitted ✓ (2026-09-18,
+reference `16838bba-c288-47ee-93e2-a0a19cfd7ece`)** · Accepted ✗.
 
 **R8.16 addendum (2026-09-18, same day): the test package is current — stale-package hypothesis falsified.**
 The saved Preflight runtime test holds exactly the live values: URL

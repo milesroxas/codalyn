@@ -14,7 +14,9 @@
  * `--expect-*` compares the page against the values already saved in App Review Preflight's runtime test
  * package. A package saved before a re-Sync holds a superseded URL or SRI, and the tool then reports
  * "Script integrity is missing or wrong" against a page tag that is itself correct (R8.16) — this check
- * separates that case from a real defect before the run.
+ * separates that case from a real defect before the run. The comparison only ever runs against the Beacon
+ * runtime, so a page carrying none is an error whenever an `--expect-*` value was given (with `--all` the
+ * run would otherwise print the page's other scripts and exit 0 on a package that pins a missing file).
  *
  * Also checks what Preflight's "Runtime is not traceable to source" looks at: the runtime's last line must point at a
  * reachable version-3 source map whose sourcesContent is the served file minus that line (R8.13), and reports
@@ -40,6 +42,7 @@ function flagValue(name) {
 const expectUrl = flagValue("expect-url");
 const expectSri = flagValue("expect-sri");
 const expectSha256 = flagValue("expect-sha256");
+const expectationsGiven = [expectUrl, expectSri, expectSha256].some((v) => v != null && v.length > 0);
 
 if (!pageUrl) {
   console.error(
@@ -88,6 +91,7 @@ if (scripts.length === 0) {
 let mismatches = 0;
 let mapProblems = 0;
 let staleExpectations = 0;
+let ourRuntimesChecked = 0;
 let index = 0;
 for (const s of scripts) {
   index += 1;
@@ -111,6 +115,7 @@ for (const s of scripts) {
   );
   console.log(`  crossorigin           : ${s.crossorigin ?? "(absent)"}`);
   if (s.ours) {
+    ourRuntimesChecked += 1;
     for (const [label, expected, actual] of [
       ["saved URL", expectUrl, s.src],
       ["saved SHA-256", expectSha256, sha256Hex],
@@ -183,6 +188,16 @@ if (mapProblems > 0) {
 if (mismatches > 0) {
   console.error(
     `${mismatches} Beacon runtime tag(s) do not carry the SHA-256 SRI of the served bytes in their integrity attribute (absent, or a different value). Re-push the runtime from the Designer (CMS Slots → the page runtime Sync button), publish, then run again. If the attribute is still absent after a fresh push, Webflow is not rendering the registered integrityHash on this page — record that as a platform observation, not an app defect.`
+  );
+  process.exit(1);
+}
+
+// `--expect-*` values are compared against the Beacon runtime only. With `--all` on a page that carries no
+// Beacon runtime the loop has other scripts to print, so without this check the run would exit 0 and read as
+// "the saved package describes this page" while the pinned file is not on the page at all (R8.16).
+if (expectationsGiven && ourRuntimesChecked === 0) {
+  console.error(
+    'This page carries no Beacon hosted runtime, so the --expect-* values saved in the Preflight test package were not compared against anything. The package pins a file that this page does not load, which Preflight reports as "Script integrity is missing or wrong". Install beacons on the page, re-push the runtime, publish, then run again.'
   );
   process.exit(1);
 }

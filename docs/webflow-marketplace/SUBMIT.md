@@ -110,7 +110,8 @@ node scripts/webflow-runtime-pin.mjs https://beacon-demo.webflow.io/blog/the-pow
 ```
 
 Pass whatever the Preflight form currently holds. Exit 0 = the package describes this page; exit 1 names the
-superseded value to replace. Verified exit 0 for the values in the table on 2026-09-18 14:55 UTC.
+superseded value to replace, or says the page carries no Beacon runtime at all. Verified exit 0 for the values
+in the table on 2026-09-18 14:55 UTC and again after filing.
 
 | Field | Paste |
 | --- | --- |

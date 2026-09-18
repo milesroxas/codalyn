@@ -20,7 +20,8 @@ vi.mock("@/features/cms-slots/model/cms-slot-list-target-slot-style", async (imp
 
 const SITE_ID = "site-1";
 const PAGE_ID = "page-1";
-const UPLOAD_URL = "https://s3.amazonaws.com/webflow-prod-assets";
+/** The `uploadUrl` production returns (virtual-hosted form; observed 2026-09-17). */
+const UPLOAD_URL = "https://webflow-prod-assets.s3.amazonaws.com/";
 
 type PageScript = {
   id: string;

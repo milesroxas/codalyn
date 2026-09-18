@@ -1,6 +1,6 @@
 # SUBMIT — Round 8 runbook (App Update answering the 2026-09-17 review feedback)
 
-**Build under review:** `v0.1.0_public_09-17_20-30-02.zip` (built 2026-09-17 20:30). Everything on this page is for this build only.
+**Build under review:** `v0.1.0_public_09-17_20-41-41.zip` (built 2026-09-17 20:41). Everything on this page is for this build only.
 Why each thing is the way it is: [compliance-record.md](compliance-record.md) Round 8, R8.1–R8.12.
 Anything Preflight shows that is not listed under step 4 or step 5 below → stop and follow [playbook.md](playbook.md) § B.
 
@@ -13,7 +13,7 @@ Every finding is a code change you can point to; none is answered with an explan
 | 1 | Workspace persisted without user interaction | Auto-POST effect deleted; a single workspace is only a local suggestion with a **Use this workspace** button. Tower no longer defaults a workspace onto extension sessions (bearer sessions resolve with no membership fallback and no write) | Beacon `settings/model/beacon-app-settings-provider.tsx`, `settings/ui/beacon-workspace-control.tsx` · Tower `server/resolve-active-organization-id.ts`, `server/billing/session-org.ts`, `server/beacon-settings-context.ts` |
 | 2 | Telemetry without redaction | Redaction handler wired as PostHog `before_send`, unit-tested with synthetic secrets. On top: the Marketplace build ships no telemetry SDK at all (release flag off; build gate forbids any trace) | `shared/lib/telemetry-event-redaction.ts`, `shared/lib/init-observability.ts`, `shared/lib/beacon-release-flags.ts` |
 | 3 | Redirects followed | `redirect` pinned to `error` at the single fetch site; callers cannot override | `shared/lib/extension-egress.ts` |
-| 4 | Any S3 bucket accepted | Exact `uploadUrl` granted once per create-asset response; CSP `connect-src` names the bucket path (`https://s3.amazonaws.com/webflow-prod-assets`), never the bare host | `shared/lib/extension-egress.ts`, `shared/lib/webflow-asset-upload-endpoint.ts`, `shared/lib/beacon-extension-csp.ts` |
+| 4 | Any S3 bucket accepted | Exact `uploadUrl` granted once per create-asset response; CSP connect-src names Webflow's bucket only (`https://webflow-prod-assets.s3.amazonaws.com`, the form production returns, plus the path-style form the docs show), never the bare S3 host | `shared/lib/extension-egress.ts`, `shared/lib/webflow-asset-upload-endpoint.ts`, `shared/lib/beacon-extension-csp.ts` |
 | 5 | `unsafe-inline` styles | Removed; `style-src-attr 'none'`; every Storybook story rendered under the enforced policy with zero Beacon violations | `shared/lib/beacon-extension-csp.ts`, `apps/beacon/scripts/csp-style-audit.mjs` |
 | 6 | No locale on CMS writes | `cmsLocaleId` (primary locale) on every CMS write and the staged read; sites with secondary locales are refused before any request; listing states it | `shared/lib/webflow-cms-write-locale.ts`, image-editor `apply-cropped-export.ts`, cms-slots `cms-slot-list-cms-composition-save.ts` |
 
@@ -46,7 +46,7 @@ Beacon CSP change, Tower workspace change, their tests and these docs are uncomm
 ### Step 3 — Install the bundle on the test site and push the runtime
 
 1. Webflow → Apps & integrations → Beacon → version manager → upload
-   `apps/beacon/bundle/production/public/v0.1.0_public_09-17_20-30-02.zip`.
+   `apps/beacon/bundle/production/public/v0.1.0_public_09-17_20-41-41.zip`.
 2. Open Beacon on **beacon-demo**. The panel must render; the extension console must show **no CSP violation**.
 3. Sign in. With one workspace you must see **Use this workspace** — click it.
    If the workspace is already active without a click, Tower is not deployed yet → Step 1.
@@ -57,9 +57,10 @@ Beacon CSP change, Tower workspace change, their tests and these docs are uncomm
 5. CMS Slots → page runtime **Sync** on that page. It must succeed. This Sync uploads **two** assets — the
    source map (`codalyn-beacon-runtime-<hash>.map.json`), then the runtime JS — both through the presigned
    upload under the new `connect-src`. Watch the extension console:
-   - a `connect-src` violation → Webflow's `uploadUrl` is not the documented
-     `https://s3.amazonaws.com/webflow-prod-assets`; copy the exact URL from the console into the compliance
-     record before touching anything;
+   - a `connect-src` violation or an "Extension egress refused" error → Webflow's `uploadUrl` is neither
+     `https://webflow-prod-assets.s3.amazonaws.com/` (what production returned on 2026-09-17) nor the
+     documented path-style form; copy the exact URL from the error into the compliance record before
+     touching anything;
    - a "runtime source map upload failed" warning → Webflow refused the `.map.json` asset; the runtime still
      installed, without a map pointer. Copy the warning's error into the compliance record.
 6. **Publish** the site.
@@ -78,8 +79,8 @@ SHA-256 and SRI. Those printed values are what Step 5 needs — copy them from t
 Open **App Review Preflight** in the Designer ([install it into the Workspace](https://webflow.com/oauth/authorize?response_type=code&client_id=0b5411e62233387925e082350666ef374377f81a9abba0dcc2542d6b5b1e4388&scope=authorized_user%3Aread) if it is missing).
 
 1. Upload both files from `apps/beacon/bundle/production/public/`:
-   - bundle → `v0.1.0_public_09-17_20-30-02.zip`
-   - source maps → `v0.1.0_public_09-17_20-30-02.sourcemaps.zip`
+   - bundle → `v0.1.0_public_09-17_20-41-41.zip`
+   - source maps → `v0.1.0_public_09-17_20-41-41.sourcemaps.zip`
 2. Expected **Review feedback: exactly one item, "External API Calls" (REQUIRED), 1 evidence location** in `assets/label-*.js`.
    That is the extension's single backend call (Hybrid App: Tower). It cannot go away while the app has a backend; the notes in Step 6 disclose it. The excerpt's position moves between scans (it has sat on the storage cleanup, then on the Tower policy-page links) — the rule is the same.
 3. Anything else — a second item, "Silent Canvas Mutations", an External API Calls excerpt outside the `label-*.js` chunk — → stop, [playbook.md](playbook.md) § B.
@@ -121,31 +122,31 @@ Webflow app settings → Publish → **Upload Bundle for Review**, then the subm
 | Submission type | App Update |
 | App name | Beacon |
 | New or changed bundle? | Yes |
-| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_20-30-02.zip` — sha256 `941b15692972d0bfd9d64c94ed9a4cb82763d06ee42091b978e3928ad55a761e` |
-| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_20-30-02.sourcemaps.zip` — sha256 `d6c08330ae7e674e35fb8644b8a0258e7f4bbac02d31d484fa42a4085a369269` |
+| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_20-41-41.zip` — sha256 `400bae8b903daafbe40158a80c66f79d51cfe2157e3a610aa4de9d32679fd3b5` |
+| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_20-41-41.sourcemaps.zip` — sha256 `093621bec5b757167671fc1e8e5e1340fbe1907199115b1266db0cabf976c6fd` |
 | Package manifest + lockfile | `apps/beacon/package.json` + root `pnpm-lock.yaml` as committed at the build commit |
 | App Review Preflight receipt | the `wfpre_…` code from Step 4 |
 | Testing site | `https://beacon-demo.webflow.io` — bundle above installed; beacon page `https://beacon-demo.webflow.io/blog/the-power-of-resilience` |
 | Reviewer credentials | enter in the form only, never in this repo; 2FA on a Workspace admin account |
 
-**Response to the review team** (form limit 500 characters; this is 499). Paste as is:
+**Response to the review team** (form limit 500 characters; this is 494). Paste as is:
 
 ```
-1) No automatic workspace request: a lone workspace is only suggested and saved on the user's click; the server sets no default for extension sessions. 2) No telemetry SDK in this build; a redaction handler covers builds with one. 3) All requests use redirect mode error. 4) Uploads only to the exact create-asset uploadUrl; connect-src allows only that bucket path. 5) No unsafe-inline; style attributes blocked. 6) cmsLocaleId on every CMS write; localized sites are not written (listing says so).
+1) No automatic workspace request: a lone workspace is only suggested and saved on the user's click; the server sets no default for extension sessions. 2) No telemetry SDK in this build; a redaction handler covers builds with one. 3) All requests use redirect mode error. 4) Uploads only to the exact create-asset uploadUrl; connect-src allows only that bucket. 5) No unsafe-inline; style attributes blocked. 6) cmsLocaleId on every CMS write; localized sites are not written (listing says so).
 ```
 
-**Additional notes** (form limit 5000 characters; this is 4946). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
+**Additional notes** (form limit 5000 characters; this is 4959). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
 
 ```
-WHAT CHANGED (bundle v0.1.0, 09-17_20-30-02) - 1 to 6 answer the 2026-09-17 feedback in order; 7 and 8 the Preflight scans
+WHAT CHANGED (bundle v0.1.0, 09-17_20-41-41) - 1 to 6 answer the 2026-09-17 feedback in order; 7 and 8 the Preflight scans
 
-1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. A user with one workspace and none active sees it as a suggestion with an explicit "Use this workspace" control; the only request to that endpoint comes from that click or the multi-workspace picker. The server changed too: an extension session without a chosen workspace stays without one (no default from memberships, nothing written) until the user confirms. Unit tests pin zero requests after sync, one after the click, and no server fallback for extension sessions.
+1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. A user with one workspace and none active sees it as a suggestion with an explicit "Use this workspace" control; the only request to that endpoint comes from that click or the multi-workspace picker. The server changed too: an extension session without a chosen workspace stays without one (no default from memberships, nothing written) until the user confirms. Unit tests pin zero requests after sync, one after the click, no server fallback.
 
-2. Exception telemetry. The Marketplace build ships no telemetry SDK: the dependency sits behind a build-time release flag that is off for Marketplace bundles; the release build fails if it is on and verifies the zip has no trace of it (no analytics chunk, no telemetry host, no consent prompt). Settings and the privacy policy say so. Builds that enable telemetry run a redaction handler on every event (URLs, referrers, titles, e-mail, tokens, query strings, exception text), unit-tested with synthetic sensitive values.
+2. Exception telemetry. The Marketplace build ships no telemetry SDK: the dependency sits behind a build-time release flag that is off for Marketplace bundles; the release build fails if it is on and verifies the zip has no trace of it (no analytics chunk, no telemetry host, no consent prompt). Settings and the privacy policy say so. Builds that enable telemetry run a redaction handler on every event (URLs, referrers, titles, e-mail, tokens, query strings), unit-tested with synthetic sensitive values.
 
 3. Redirects. The single network call site (extension-egress.ts) runs every request with redirect mode set to error; callers cannot override it. No path needs a redirect: Tower answers its API routes directly and the presigned S3 upload returns a 2xx with no redirect field.
 
-4. Upload allowlist. The create-asset adapter registers the exact uploadUrl string Webflow returned as a one-shot permitted destination, only if it is HTTPS on host exactly s3.amazonaws.com with first path segment exactly webflow-prod-assets. The egress policy accepts an upload only for a granted URL and consumes the grant; other keys, buckets, S3 host variants and Webflow-owned hosts are refused before any request. connect-src names the bucket path, not the host: self, https://tower.codalyn.app, https://s3.amazonaws.com/webflow-prod-assets (the documented uploadUrl) and that path as a prefix; any other bucket is blocked by the browser. Webflow asset hosts stay in img-src only.
+4. Upload allowlist. The create-asset adapter registers the exact uploadUrl string Webflow returned as a one-shot permitted destination, only if it names the webflow-prod-assets bucket: host exactly webflow-prod-assets.s3.amazonaws.com (the form production returns) or host s3.amazonaws.com with first path segment webflow-prod-assets (the form the reference documents). The egress policy accepts an upload only for a granted URL and consumes the grant; other buckets, regional S3 hosts, lookalikes and Webflow-owned hosts are refused before any request. connect-src names that bucket, never the bare S3 host: self, https://tower.codalyn.app, https://webflow-prod-assets.s3.amazonaws.com and https://s3.amazonaws.com/webflow-prod-assets. Any other bucket is blocked by the browser.
 
 5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host; style-src-attr is none. The UI sets styles through the CSSOM, which CSP does not govern. The two style-attribute writes left in the bundle are pinned by count in the release build; both are Designer API calls styling the CMS Slots placeholder on the user's canvas element, outside the extension's policy. All UI stories render clean under the enforced policy.
 
@@ -153,7 +154,7 @@ WHAT CHANGED (bundle v0.1.0, 09-17_20-30-02) - 1 to 6 answer the 2026-09-17 feed
 
 7. Rich text editing. The rich-text property editor is withdrawn behind a release flag like item 2; its Lexical editor observed its own editable element inside our panel, never the canvas, the shape the bundle scan flagged. Rich-text properties are edited as HTML in a text box; the bundle has no observer construction and no editable-content element.
 
-8. Browser storage and cookies. The session bearer is held in memory only; no storage call in the bundle is keyed by a credential name. Every request sets the cookie mode to omit at the single call site, so no cookie is sent or stored; the only credential on the wire is our Tower session bearer, sent only to tower.codalyn.app. The release build forbids both shapes.
+8. Browser storage and cookies. The session bearer is held in memory only; no storage call in the bundle is keyed by a credential name. Every request sets the cookie mode to omit at the single call site, so no cookie is sent or stored; the only credential on the wire is our Tower session bearer, sent only to tower.codalyn.app.
 
 UNCHANGED FROM 2026-09-15: one network call site with an explicit destination policy (release build fails on a second); canvas changes only through the Designer API on explicit user action; Tower with allowlist-only CORS, session-only auth, server-stored OAuth state, the Webflow ID token never forwarded; no plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, no popups or cross-window messaging, no credentials in URLs, no session replay; styles.css ships a v3 source map.
 

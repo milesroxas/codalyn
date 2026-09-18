@@ -171,7 +171,8 @@ describe("grantWebflowAssetUpload (create-asset response boundary)", () => {
   it("refuses (and grants nothing for) a value outside the documented shape", () => {
     for (const bad of [
       "https://s3.amazonaws.com/evil-bucket/key",
-      "https://webflow-prod-assets.s3.amazonaws.com/key",
+      "https://evil-bucket.s3.amazonaws.com/key",
+      "https://webflow-prod-assets.s3.us-east-1.amazonaws.com/key",
       "http://s3.amazonaws.com/webflow-prod-assets/key",
       "https://uploads.webflow.com/asset",
       "",
@@ -183,10 +184,27 @@ describe("grantWebflowAssetUpload (create-asset response boundary)", () => {
 });
 
 describe("isWebflowAssetUploadUrlShape", () => {
-  it("accepts only HTTPS on the pinned S3 host with the pinned bucket as the first path segment", () => {
+  it("accepts Webflow's bucket in the virtual-hosted form production returns (observed 2026-09-17)", () => {
+    expect(isWebflowAssetUploadUrlShape("https://webflow-prod-assets.s3.amazonaws.com/")).toBe(true);
+    expect(isWebflowAssetUploadUrlShape("https://webflow-prod-assets.s3.amazonaws.com")).toBe(true);
+    expect(isWebflowAssetUploadUrlShape("https://webflow-prod-assets.s3.amazonaws.com/key")).toBe(true);
+    expect(isWebflowAssetUploadUrlShape("https://WEBFLOW-PROD-ASSETS.S3.AMAZONAWS.COM/")).toBe(true);
+  });
+
+  it("accepts the documented path-style form: HTTPS on the S3 host with the bucket as the first path segment", () => {
     expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com/webflow-prod-assets/key")).toBe(true);
     expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com/webflow-prod-assets")).toBe(true);
     expect(isWebflowAssetUploadUrlShape("https://S3.AMAZONAWS.COM/webflow-prod-assets/key")).toBe(true);
+  });
+
+  it("rejects every other bucket in the virtual-hosted form, and lookalikes of the bucket host", () => {
+    expect(isWebflowAssetUploadUrlShape("https://evil-bucket.s3.amazonaws.com/")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://webflow-prod-assets-evil.s3.amazonaws.com/")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://evil.webflow-prod-assets.s3.amazonaws.com/")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://webflow-prod-assets.s3.amazonaws.com.evil.com/")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://webflow-prod-assets.s3.us-east-1.amazonaws.com/")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://webflow-prod-assets.s3-us-east-1.amazonaws.com/")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://webflow-prod-assets.amazonaws.com/")).toBe(false);
   });
 
   it("rejects every other bucket on the same host (any bucket is not Webflow's bucket)", () => {
@@ -197,10 +215,9 @@ describe("isWebflowAssetUploadUrlShape", () => {
     expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com")).toBe(false);
   });
 
-  it("rejects regional, virtual-hosted, non-S3 AWS, Webflow-owned and lookalike hosts", () => {
+  it("rejects regional, non-S3 AWS, Webflow-owned and lookalike hosts in the path-style form", () => {
     expect(isWebflowAssetUploadUrlShape("https://s3.us-west-2.amazonaws.com/webflow-prod-assets/key")).toBe(false);
     expect(isWebflowAssetUploadUrlShape("https://s3-us-west-2.amazonaws.com/webflow-prod-assets/key")).toBe(false);
-    expect(isWebflowAssetUploadUrlShape("https://webflow-prod-assets.s3.amazonaws.com/key")).toBe(false);
     expect(isWebflowAssetUploadUrlShape("https://evil-bucket.amazonaws.com/webflow-prod-assets/key")).toBe(false);
     expect(isWebflowAssetUploadUrlShape("https://execute-api.us-east-1.amazonaws.com/webflow-prod-assets")).toBe(false);
     expect(isWebflowAssetUploadUrlShape("https://uploads.webflow.com/webflow-prod-assets/key")).toBe(false);
@@ -214,6 +231,8 @@ describe("isWebflowAssetUploadUrlShape", () => {
     expect(isWebflowAssetUploadUrlShape("http://s3.amazonaws.com/webflow-prod-assets/key")).toBe(false);
     expect(isWebflowAssetUploadUrlShape("https://s3.amazonaws.com@evil.example/webflow-prod-assets/key")).toBe(false);
     expect(isWebflowAssetUploadUrlShape("https://user:pw@s3.amazonaws.com/webflow-prod-assets/key")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("https://user:pw@webflow-prod-assets.s3.amazonaws.com/")).toBe(false);
+    expect(isWebflowAssetUploadUrlShape("http://webflow-prod-assets.s3.amazonaws.com/")).toBe(false);
     expect(isWebflowAssetUploadUrlShape("javascript:alert(1)")).toBe(false);
     expect(isWebflowAssetUploadUrlShape("not a url")).toBe(false);
     expect(isWebflowAssetUploadUrlShape("")).toBe(false);

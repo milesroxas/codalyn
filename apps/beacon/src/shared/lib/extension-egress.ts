@@ -1,5 +1,9 @@
 import { readBeaconTowerOrigin } from "@/shared/lib/beacon-tower-origin";
-import { WEBFLOW_ASSET_UPLOAD_BUCKET, WEBFLOW_ASSET_UPLOAD_HOST } from "@/shared/lib/webflow-asset-upload-endpoint";
+import {
+  WEBFLOW_ASSET_UPLOAD_BUCKET,
+  WEBFLOW_ASSET_UPLOAD_BUCKET_HOST,
+  WEBFLOW_ASSET_UPLOAD_HOST,
+} from "@/shared/lib/webflow-asset-upload-endpoint";
 
 /**
  * The extension's single network egress point (Webflow Marketplace review, App Review Preflight
@@ -67,19 +71,24 @@ function parseUrl(raw: string): URL | null {
 }
 
 /**
- * True when `raw` has the documented shape of a Webflow presigned upload URL: HTTPS, exactly the
- * pinned S3 host (no regional, virtual-hosted or lookalike variants) and the pinned bucket as the
- * first path segment (`webflow-asset-upload-endpoint.ts`). Shape only — the egress policy additionally requires the exact URL to
- * have been granted from a create-asset response ({@link grantWebflowAssetUpload}).
+ * True when `raw` names Webflow's upload bucket the way a create-asset `uploadUrl` does: HTTPS and
+ * either the bucket as a virtual-hosted S3 host (`https://webflow-prod-assets.s3.amazonaws.com/`, what
+ * production returns) or the documented path-style form (host exactly `s3.amazonaws.com`, the bucket as
+ * the first path segment). No regional endpoints, no other bucket in either form, no lookalike hosts
+ * (`webflow-asset-upload-endpoint.ts`). Shape only — the egress policy additionally requires the exact
+ * URL to have been granted from a create-asset response ({@link grantWebflowAssetUpload}).
  */
 export function isWebflowAssetUploadUrlShape(raw: string): boolean {
   const url = parseUrl(raw);
-  if (url === null || url.protocol !== "https:") {
+  if (url === null || url.protocol !== "https:" || url.username !== "" || url.password !== "") {
     return false;
   }
   // `URL` already lowercases and punycodes the host; it also resolves userinfo tricks
   // (`https://s3.amazonaws.com@evil.example/`) to the real host before we ever see it.
-  if (url.hostname !== WEBFLOW_ASSET_UPLOAD_HOST || url.username !== "" || url.password !== "") {
+  if (url.hostname === WEBFLOW_ASSET_UPLOAD_BUCKET_HOST) {
+    return true;
+  }
+  if (url.hostname !== WEBFLOW_ASSET_UPLOAD_HOST) {
     return false;
   }
   const [bucket] = url.pathname.split("/").filter((segment) => segment.length > 0);
@@ -102,7 +111,7 @@ export function grantWebflowAssetUpload(uploadUrl: string): string {
   if (!isWebflowAssetUploadUrlShape(uploadUrl)) {
     throw new EgressPolicyError(
       uploadUrl,
-      "is not a Webflow presigned upload URL (expected the documented S3 host and bucket)"
+      "is not a Webflow presigned upload URL (expected the webflow-prod-assets bucket on s3.amazonaws.com, virtual-hosted or path-style)"
     );
   }
   grantedAssetUploadUrls.add(uploadUrl);

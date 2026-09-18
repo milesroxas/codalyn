@@ -3192,3 +3192,38 @@ The Preflight test package must be refilled from the pin script's output (SUBMIT
 
 **States:** Source ✓ (uncommitted) · Artifact ✓ · Tower deployed ✗ · Installed ✗ · Runtime ✗ (re-push needed) ·
 Submitted ✗ · Accepted ✗.
+
+### R8.14 R8.4 / R8.12 pinned the documented upload URL; production returns the virtual-hosted form — corrected to the observed destination (2026-09-17, night)
+
+**Observed (Miles, first Sync on the round-8 build):** `Extension egress refused:
+"https://webflow-prod-assets.s3.amazonaws.com/" is not a Webflow presigned upload URL (expected the documented S3
+host and bucket).` Webflow's create-asset reference shows `uploadUrl: https://s3.amazonaws.com/webflow-prod-assets`
+(path-style); production returns the same bucket in S3's virtual-hosted syntax,
+`https://webflow-prod-assets.s3.amazonaws.com/` (the object key travels in `uploadDetails`). R8.4's shape check
+refused exactly that form by design ("no regional, virtual-hosted or lookalike variants"), so every Sync since the
+15:53 build failed closed — before R8.4 the check accepted any S3 bucket, which is why the real shape was never
+noticed, and the R8.4 comment's "observed on every install since round 3" was wrong. R8.12's CSP path pin encoded
+the same assumption; on a Sync that got past the egress check, the browser would have blocked the POST too.
+
+**Change:** `WEBFLOW_ASSET_UPLOAD_BUCKET_HOST = "webflow-prod-assets.s3.amazonaws.com"` in
+`webflow-asset-upload-endpoint.ts`. `isWebflowAssetUploadUrlShape` accepts HTTPS on exactly that host (any path —
+the host *is* the bucket) or the documented path-style form (host exactly `s3.amazonaws.com`, first segment
+`webflow-prod-assets`). Still refused: any other bucket in either syntax, regional endpoints
+(`…s3.us-east-1.amazonaws.com`), lookalike and suffixed hosts, userinfo, http. CSP `connect-src` = `'self'`, Tower,
+`https://webflow-prod-assets.s3.amazonaws.com`, `https://s3.amazonaws.com/webflow-prod-assets`,
+`https://s3.amazonaws.com/webflow-prod-assets/` — the one bucket in both syntaxes, never the bare S3 host. The
+exact-URL grant (one shot, from the create-asset response) is unchanged. Error text now names both accepted forms.
+
+**Tests:** `extension-egress.test.ts` — virtual-hosted accepted (including the exact observed `…/`), other buckets /
+regional / lookalikes / userinfo / http in the virtual-hosted form refused, path-style cases unchanged, grant
+refusals updated; `beacon-extension-csp.test.ts` — the three sources pinned, bare host absent;
+`cms-slot-page-inline-script-sync.test.ts` uses the observed URL. Full Beacon suite green; tsc + biome clean.
+
+**Artifact:** `v0.1.0_public_09-17_20-41-41.zip` sha256 `400bae8b903daafbe40158a80c66f79d51cfe2157e3a610aa4de9d32679fd3b5` + `.sourcemaps.zip` sha256 `093621bec5b757167671fc1e8e5e1340fbe1907199115b1266db0cabf976c6fd`. A4 greps as R8.13;
+`webflow-prod-assets` in JS = 2 (constant + host); 21 files, 464 487 B; shipped connect-src carries the three bucket sources and no bare host. The 20:30 zip (R8.13) is superseded and was never uploaded.
+
+**Lesson (recorded for the playbook):** a boundary pin must come from an observed response, never from a docs
+example; the first Sync after changing the upload policy is part of the change, not a later verification step.
+
+**States:** Source ✓ (uncommitted) · Artifact ✓ · Tower deployed ✗ · Installed ✗ · Runtime ✗ (re-push needed) ·
+Submitted ✗ · Accepted ✗.

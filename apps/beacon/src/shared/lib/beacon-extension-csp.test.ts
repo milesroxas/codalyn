@@ -64,13 +64,15 @@ describe("buildBeaconExtensionCspContent", () => {
   });
 
   // Review round 8 (2026-09-17): connect-src names exactly the destinations the extension can POST to —
-  // Tower and the presigned-upload bucket path (exact `uploadUrl` plus the same bucket as a prefix). The
+  // Tower and Webflow's upload bucket in both S3 syntaxes (virtual-hosted host, the form production
+  // returns; path-style exact `uploadUrl` plus the same bucket as a prefix, the documented form). The
   // bare S3 host would admit every bucket, so it is not a source. No wildcard S3 subdomains, no Webflow
   // asset hosts (img-src only) and, in the Marketplace build, no telemetry host at all.
   it("allowlists exactly the documented connect-src endpoints for the Marketplace (telemetry-off) build", () => {
     expect(directives.get("connect-src")).toEqual([
       "'self'",
       PRODUCTION_TOWER_ORIGIN,
+      "https://webflow-prod-assets.s3.amazonaws.com",
       "https://s3.amazonaws.com/webflow-prod-assets",
       "https://s3.amazonaws.com/webflow-prod-assets/",
     ]);
@@ -88,6 +90,7 @@ describe("buildBeaconExtensionCspContent", () => {
       "'self'",
       PRODUCTION_TOWER_ORIGIN,
       CODALYN_POSTHOG_HOST,
+      "https://webflow-prod-assets.s3.amazonaws.com",
       "https://s3.amazonaws.com/webflow-prod-assets",
       "https://s3.amazonaws.com/webflow-prod-assets/",
     ]);

@@ -3042,3 +3042,82 @@ redundant with the ID-token flow only when the Tower and Webflow e-mails differ.
 
 **States (Tower):** Source ✓ (uncommitted) · Deployed ✗ (manual `vercel deploy --prod` from the repo
 root) · Runtime ✗. The Marketplace artifact and its states are unchanged from R8.10.
+
+### R8.12 R8.1 and R8.4 closed in code, not in notes — no server-side workspace default for extension sessions; connect-src pinned to the bucket path (2026-09-17, evening)
+
+**Trigger (Miles):** "make sure we did not simply address their feedback with a defense or explanation
+but rather actual correct implementation." Audit of R8.1–R8.6 against source and the 17:51 zip: R8.2,
+R8.3, R8.5 and R8.6 are code changes verifiable in the bundle. Two were implementation plus a caveat
+that, read honestly, left the reviewer's outcome in place:
+
+- **R8.1 — the finding had moved one layer down.** The extension no longer POSTs, but Tower's
+  `resolveActiveOrganizationId` (called by `resolveBeaconMembershipContext` on every Beacon settings
+  read, and through `getActiveOrganizationIdForAuthHeaders` by the Webflow proxy, connection and
+  billing routes) still defaulted a session without a workspace to the preferred/first membership
+  **and wrote it to the session row**. Observable outcome for a single-workspace user: the workspace
+  became active on the first sync with no click, so the "Use this workspace" control could never
+  appear and the client fix was dead in practice.
+  **Change (Tower):** `resolveActiveOrganizationId(userId, sessionId, fallback)` with
+  `fallback: "memberships" | "none"` (`ActiveOrganizationFallback`). `"none"` stops after the session's
+  own workspace and the most recent live session that holds one (a workspace the user chose
+  elsewhere); it never queries memberships and never writes. `resolveBeaconMembershipContext` passes
+  `"none"`. `getActiveOrganizationIdForAuthHeaders` passes `"none"` for bearer-authenticated requests
+  (`activeOrganizationFallbackForHeaders` in `billing/session-org.ts`: Designer Extension clients use
+  the Better Auth bearer plugin, Tower's web app only ever sends its session cookie), so the proxy,
+  connection and billing routes behave the same for the extension. Tower dashboard cookie sessions
+  keep the membership default, unchanged. Flint: its own settings context still uses the default; the
+  shared routes it reaches with a bearer now return no workspace until that context has resolved the
+  session, which its startup does first. The only write to `session.activeOrganizationId` reachable
+  from the extension is `POST /api/v1/beacon/active-workspace` from the user's click.
+  **Tests:** `resolve-active-organization-id.test.ts` +3 (`"none"`: null and no write despite
+  memberships; own workspace; inherited live-session workspace); new `billing/session-org.test.ts`
+  (bearer → none, cookie → memberships, no session → null, header parsing); new
+  `beacon-settings-context.test.ts` (Beacon context resolves with `"none"` and reports no active
+  workspace). 27/27 across the five touched suites; tsc + biome clean. **Needs the Tower production
+  deploy** (together with R8.11).
+
+- **R8.4 — `connect-src` still admitted every bucket.** The policy named the bare host
+  `https://s3.amazonaws.com`; the reviewer asked for connect-src to match the exact upload
+  destination. The R8.4 note claimed CSP "cannot express a bucket path" — wrong: a CSP source
+  expression carries a path-part (CSP Level 2+; exact match without a trailing slash, prefix match
+  with one; path matching is skipped only after a redirect, which `extensionFetch` refuses).
+  **Change (Beacon):** `WEBFLOW_ASSET_UPLOAD_CSP_SOURCES` in `webflow-asset-upload-endpoint.ts` =
+  `https://s3.amazonaws.com/webflow-prod-assets` (the documented `uploadUrl`, exact — the create-asset
+  reference shows `"uploadUrl": "https://s3.amazonaws.com/webflow-prod-assets"`; the object key
+  travels in `uploadDetails`) plus `https://s3.amazonaws.com/webflow-prod-assets/` (the same bucket as
+  a prefix, should a keyed URL ever be returned). `beacon-extension-csp.ts` consumes it; shipped
+  `connect-src 'self' https://tower.codalyn.app https://s3.amazonaws.com/webflow-prod-assets
+  https://s3.amazonaws.com/webflow-prod-assets/`. `beacon-extension-csp.test.ts` pins the array and
+  asserts the bare host is absent. Egress policy unchanged (exact granted URL, one shot).
+  **Verify installed:** CMS Slots → Sync must upload under the new policy. A `connect-src` violation
+  in the extension console means Webflow's `uploadUrl` differs from the documented shape — capture
+  the value before touching the policy; never widen back to the host.
+
+**Artifact:** `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod` (lint, typecheck, tests
+and gates green) → `v0.1.0_public_09-17_19-58-15.zip` sha256
+`6f731eb7c744233aee15c7fe33e6da4719433a98282e5b86ce47608bbbe0a067` (21 files, 463 763 B) +
+`.sourcemaps.zip` sha256 `50562fe4a012a0ac0c6fe248b573048af7214d6255312ab855da144c179c075b`. Playbook
+A4 greps: `.map` 0, `sourceMappingURL` 0, `window.open(` 0, `new MutationObserver` 0, posthog 0,
+lexical 0, unsafe-inline 0, bare `fetch(` 1, redirect error 1, credentials omit 1 / include 0,
+`setAttribute("style"` 2, `webflow-prod-assets` in JS 1 (+2 in index.html connect-src), cmsLocaleId
+present, token-in-URL 0, localhost/ngrok/sentry 0; hosts in JS: tower.codalyn.app plus
+radix-ui.com / reactrouter.com documentation links inside vendor error messages (no request, unchanged).
+The 17:51 zip was moved to `bundle/archive/` by retention; its sha remains in R8.10.
+
+**Runtime:** unchanged — `…codalyn-beacon-runtime-1ebc5741.js` (today's commits touch no runtime
+source); pin script at 19:55 exit 0 (DOM `integrity` equals the served bytes' SRI, crossorigin
+anonymous). The four browser-test items reported on the 17:51 run are the 09-14 set (R7b.19, R7b.16).
+
+**Preflight bundle scan on the 17:51 zip (sixth scan, bound to bundle f0fa5616…):** External API Calls
+×1, excerpt on `assets/label-Dx-3ZKWd.js:41` at the Tower policy-page URL constants
+(`codalyn-links.ts`) — the R8.10 storage cleanup is gone from the excerpt; the bundle's one `fetch(`
+sits 2,064 characters later on the same 188,799-character line, with `redirect` error and
+`credentials` omit next to it. Same rule as every scan: the Hybrid App's backend call. No Silent Canvas
+Mutations. Expect the identical single item on the 19:58 zip.
+
+**Docs:** SUBMIT.md rewritten as an ordered runbook for this build (platform script rows moved to
+`history/webflow-platform-script-rows-2026-09-14.md`, the unfiled 17:51 draft text to
+`history/responses.md`); playbook A4 connect-src expectation updated.
+
+**States:** Source ✓ (uncommitted) · Artifact ✓ (19:58) · Tower deployed ✗ · Installed ✗ ·
+Runtime ✓ (unchanged pin) · Submitted ✗ · Accepted ✗.

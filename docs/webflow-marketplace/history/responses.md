@@ -28,6 +28,57 @@ Earlier round-7 response (kept for reference, DOM-manipulation flag): The compar
 
 Previous round (kept for reference, round 6): All flags resolved: URL validation is https-only (http:/sms: rejected; the bundled editor lib is patched so those schemes are absent). The site runtime no longer touches iframe/embed sources. The auth one-time token moved from query string to URL fragment + POST body redemption (same-origin enforced). PostHog web-experiment code is excised from the bundle, not just disabled, and all privacy flags are pinned by tests. Runtime behavior + full endpoint list documented in the submission notes.
 
+## 2026-09-17 — draft form text for the 17:51 build (never filed; superseded the same evening by the 19:58 build, compliance-record R8.12)
+
+## 3. Response to the review team (≤500 characters)
+
+496 characters. Free of angle brackets, attribute pairs and JS API names (form WAF, see §4).
+
+```
+1) No automatic workspace request; a single workspace is held locally and saved only when the user confirms it. 2) This build ships no telemetry SDK; a redaction handler exists for builds that do. 3) Every request uses redirect mode error. 4) Uploads go only to the exact create-asset uploadUrl on the documented S3 host and bucket; connect-src matches. 5) No unsafe-inline; style attributes are blocked. 6) cmsLocaleId on every CMS write; localized sites are not written and the listing says so.
+```
+
+How to defend each item if asked (one line each; the long version is in §4):
+- **Workspace persistence** — the effect was deleted; `suggestedWorkspaceId` is local state and the only POST is behind the "Use this workspace" click (unit-pinned: zero POSTs after sync, one after the click).
+- **Telemetry redaction** — the Marketplace build has no analytics SDK (453 KB zip, no posthog trace, no telemetry host in connect-src); the before_send redaction is unit-tested with synthetic sensitive values for builds that enable telemetry.
+- **Redirects** — the single fetch site pins redirect mode to error and callers cannot override it (unit-pinned).
+- **Upload allowlist** — exact uploadUrl string granted per create-asset response, single use, host and bucket pinned; CSP connect-src is Tower plus that one host.
+- **CSP styles** — no unsafe-inline anywhere; React/Radix/vaul use the CSSOM; the only style-attribute writes in the bundle are the two Designer API calls on the user's canvas element; every Storybook story renders under the enforced policy with zero violations.
+- **Rich text editing (item 7, not one of the six)** — the Lexical editor is flag-gated out of this bundle, so it carries no `MutationObserver` at all; `richText` props are composed as HTML in a textarea. Pinned by count in the release build and by a forbidden-marker sweep for any `lexical` trace.
+- **Localization** — cmsLocaleId on every CMS item write (primary, named explicitly); sites with secondary locales are refused in-app with a message; stated in the listing.
+
+## 4. Additional notes (form field, max 5000 characters)
+
+4975 characters. Paste the whole block. **WAF rule (2026-09-15):** the form backend sits behind Cloudflare and blocked a
+submission whose notes contained an HTML script tag, attribute pairs like `src=` / `integrity=`,
+DOM-sink names (innerHTML, window.open, postMessage, document.write), a `\u00a0` escape and `/*`. Keep
+this block free of angle brackets, key=value attribute pairs, JS API names and comment/wildcard tokens;
+describe them in words.
+
+```
+WHAT CHANGED (bundle v0.1.0, 09-17 09-17_17-51-37) - items 1 to 6 answer the 2026-09-17 feedback in order; items 7 and 8 answer the Preflight scans
+
+1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. A signed-in user with exactly one workspace and none active sees it as a suggestion with an explicit "Use this workspace" control; the only request to that endpoint comes from that click or the multi-workspace picker. Unit tests pin zero requests after sync and one after the confirmation.
+
+2. Exception telemetry. The Marketplace build ships no telemetry SDK at all. The dependency sits behind a build-time release flag that is off for Marketplace bundles; the release build fails if it is on and verifies the zip contains no trace of it. Verifiable in the bundle: no analytics chunk, no telemetry host in connect-src, no consent prompt, and Settings, Privacy states that this build sends no usage or error telemetry; the privacy policy says the same. Builds that enable telemetry run a before_send redaction (URLs, referrers, titles, e-mail, tokens, query strings, exception text and frames), unit-tested with synthetic sensitive values.
+
+3. Redirects. The single network call site (extension-egress.ts) runs every request with redirect mode set to error; the caller's options cannot override it. No path needs a redirect: Tower answers its API routes directly and the presigned S3 upload returns a 2xx with no redirect field.
+
+4. Upload allowlist. The create-asset adapter registers the exact uploadUrl string Webflow returned as a one-shot permitted destination, only if it is HTTPS on host exactly s3.amazonaws.com with first path segment exactly webflow-prod-assets. The egress policy accepts an upload only for a granted URL and consumes the grant with the request; other keys, other buckets, regional or virtual-hosted S3 hosts and Webflow-owned hosts are refused before any request is built. connect-src is exactly: self, https://tower.codalyn.app, https://s3.amazonaws.com. Webflow asset hosts stay in img-src only.
+
+5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host; style-src-attr is none. React, Radix and vaul set styles through the CSSOM, which CSP does not govern. The two style-attribute writes left in the bundle are pinned by count in the release build; both are Designer API calls that style the CMS Slots placeholder on the user's canvas element, outside the extension's policy. Every UI story renders clean under the enforced policy in headless Chromium.
+
+6. Localization. Every CMS item write names its locale: the extension reads the site's locales (Get Site) once per session and sends the primary locale's cmsLocaleId on every write (the image editor's CMS image-field update; the CMS Slots layout save to staged and live) and on the matching staged read. Sites with secondary locales are not written: the write is refused before any request and the user is told that Beacon does not write CMS content on localized sites yet. The listing states this.
+
+7. Rich text editing. The WYSIWYG editor for rich-text component properties is withdrawn from this bundle behind a release flag like item 2. Its Lexical editor attached a DOM observer to its own editable element inside our panel, never the canvas — the shape the bundle scan reports as a silent canvas mutation. Rich-text properties are now edited as HTML in a text box. Verifiable in the bundle: no observer construction and no editable-content element.
+
+8. Browser storage and cookies. The 16:38 scan excerpted the session-token module, which ran a one-time removal of a legacy browser-storage key at load. That line is gone: the session bearer is held in memory only and no storage call in the bundle is keyed by a credential name. Every request now sets the cookie mode to omit at the single network call site, so no cookie is sent to or stored from any destination; the only credential on the wire is our own Tower session bearer, sent only to https://tower.codalyn.app. The release build forbids both shapes.
+
+UNCHANGED FROM 2026-09-15: one network call site with an explicit destination policy (release build fails on a second); canvas changes only through the Designer API, on explicit user action; one page-level hosted runtime with a SHA-256 integrityHash, pure ASCII and unminified, loading nothing and making no requests; Tower with allowlist-only CORS, session-only auth, server-stored OAuth state, the Webflow ID token never forwarded; no plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, no popups or cross-window messaging, no credentials in URLs, no session replay; styles.css ships a v3 source map.
+
+BACKEND (Hybrid): https://tower.codalyn.app only, HTTPS, production; paths as filed on 2026-09-15. Other destination: the presigned upload URL in item 4. No telemetry host. Uninstall and AVIF disclosure unchanged.
+```
+
 ## 2026-09-15 — long-form §4 notes (8122 chars) superseded by the 5000-char form field version
 
 The App submission form caps "Additional notes" at 5000 characters. The condensed block now in SUBMIT.md §4 replaces the two blocks below; nothing was dropped in substance.

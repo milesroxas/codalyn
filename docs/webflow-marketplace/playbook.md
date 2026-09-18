@@ -96,7 +96,8 @@ unzip -p "$Z" '*.js' | grep -aciE '(localStorage|sessionStorage)\.(get|set|remov
 unzip -p "$Z" '*.js' | grep -aoE 'setAttribute\(\s*["'"'"'`]style' | wc -l   # 2 — the Designer API canvas placeholder writes only (R8.5; build gate pins it)
 unzip -p "$Z" '*.js' | grep -ac 'webflow-prod-assets'         # 1 — pinned upload bucket (R8.4)
 unzip -p "$Z" '*.js' | grep -ac 'cmsLocaleId'                 # ≥1 — locale named on every CMS write (R8.6)
-unzip -p "$Z" index.html | grep -oE "(connect-src|style-src-attr) [^;]*"  # connect-src 'self' <tower> https://s3.amazonaws.com · style-src-attr 'none' (R8.4/R8.5)
+unzip -p "$Z" index.html | grep -oE "(connect-src|style-src-attr) [^;]*"  # connect-src 'self' <tower> https://s3.amazonaws.com/webflow-prod-assets https://s3.amazonaws.com/webflow-prod-assets/ (bucket path; R8.4/R8.12) · style-src-attr 'none' (R8.5)
+unzip -p "$Z" index.html | grep -cE 'https://s3\.amazonaws\.com[ ;"]'   # 0 — the bare S3 host is never a source (R8.12)
 unzip -p "$Z" index.html | grep -c "unsafe-inline"            # 0 (R8.5)
 ```
 

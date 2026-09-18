@@ -1,5 +1,5 @@
 import { CODALYN_POSTHOG_HOST } from "@codalyn/observability";
-import { WEBFLOW_ASSET_UPLOAD_HOST } from "./webflow-asset-upload-endpoint";
+import { WEBFLOW_ASSET_UPLOAD_CSP_SOURCES } from "./webflow-asset-upload-endpoint";
 
 /**
  * Enforced Content-Security-Policy for the shipped extension documents (Webflow Marketplace,
@@ -35,15 +35,17 @@ const WEBFLOW_ASSET_HOST_SOURCES = [
 ] as const;
 
 /**
- * The one host the CMS Slots install flow POSTs the runtime JS to: the presigned `uploadUrl` from
- * Webflow's create-asset endpoint (`https://s3.amazonaws.com/webflow-prod-assets/…`). The exact URL
- * is granted per response in `extension-egress.ts` (`grantWebflowAssetUpload`); CSP host-source
- * syntax cannot express a bucket path, so the policy pins the host and the egress policy pins the
- * bucket and the exact URL. No wildcard subdomains: if Webflow ever moves the endpoint, the upload
- * fails closed with a visible error and this value changes through an App Update — the policy
- * never widens preemptively (review round 8, 2026-09-17).
+ * The one destination the CMS Slots install flow POSTs the runtime JS to: the presigned `uploadUrl`
+ * from Webflow's create-asset endpoint, `https://s3.amazonaws.com/webflow-prod-assets` (path-style;
+ * the object key travels in `uploadDetails`). The policy names the bucket path, not the host: a CSP
+ * source expression carries a path-part (exact without a trailing slash, prefix with one), so every
+ * other bucket on the same host is blocked by the browser as well as by the egress policy, which
+ * additionally requires the exact URL to have been granted from a create-asset response
+ * (`grantWebflowAssetUpload` in `extension-egress.ts`). No wildcard subdomains, no bare host: if
+ * Webflow ever moves the endpoint, the upload fails closed with a visible error and the constant
+ * changes through an App Update — the policy never widens preemptively (review round 8, 2026-09-17).
  */
-const WEBFLOW_ASSET_UPLOAD_SOURCES = [`https://${WEBFLOW_ASSET_UPLOAD_HOST}`] as const;
+const WEBFLOW_ASSET_UPLOAD_SOURCES = WEBFLOW_ASSET_UPLOAD_CSP_SOURCES;
 
 /**
  * Origin Webflow's hosted runtime serves the uploaded bundle's static files from. The installed

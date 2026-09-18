@@ -13,16 +13,30 @@ async function isActiveOrganizationId(organizationId: string): Promise<boolean> 
 }
 
 /**
+ * What happens when neither the current session nor any live session of the user holds a workspace.
+ *
+ * - `"memberships"` — Tower's own web (cookie) sessions: default to the preferred organization, else
+ *   the first membership, and persist that default on the current session.
+ * - `"none"` — Designer Extension (bearer) sessions: no default and no write. Beacon holds a
+ *   single-workspace default locally and persists it only through `POST /api/v1/beacon/active-workspace`
+ *   from the user's explicit "Use this workspace" confirmation (Marketplace review round 8,
+ *   "Workspace state persisted without explicit user interaction", 2026-09-17).
+ */
+export type ActiveOrganizationFallback = "memberships" | "none";
+
+/**
  * Single source of truth for active Tower workspace on a session.
  * Used by dashboard summary, Beacon membership APIs, billing/Webflow routes (`getActiveOrganizationIdForAuthHeaders`).
- * Falls back to preferred org, then first membership, and persists on the current session when possible.
+ * Reads the session's own workspace, then the most recent live session that holds one; what happens
+ * after that is the caller's `fallback` (see {@link ActiveOrganizationFallback}).
  *
- * Request-memoized via `cache()` (keyed by user + session) so the layout, dashboard, and billing
+ * Request-memoized via `cache()` (keyed by user + session + fallback) so the layout, dashboard, and billing
  * surfaces share one resolution per render instead of repeating these queries (and the fallback write).
  */
 export const resolveActiveOrganizationId = cache(async function resolveActiveOrganizationId(
   userId: string,
-  rawSessionId?: string
+  rawSessionId?: string,
+  fallback: ActiveOrganizationFallback = "memberships"
 ): Promise<string | null> {
   if (rawSessionId) {
     const rows = await db
@@ -55,6 +69,10 @@ export const resolveActiveOrganizationId = cache(async function resolveActiveOrg
   const recentSessionActiveOrgId = recentSessionRows[0]?.activeOrganizationId ?? null;
   if (recentSessionActiveOrgId && (await isActiveOrganizationId(recentSessionActiveOrgId))) {
     return recentSessionActiveOrgId;
+  }
+
+  if (fallback === "none") {
+    return null;
   }
 
   const [preferredRow, orgRows] = await Promise.all([

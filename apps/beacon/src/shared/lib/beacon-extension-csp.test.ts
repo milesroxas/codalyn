@@ -63,11 +63,18 @@ describe("buildBeaconExtensionCspContent", () => {
     expect(directives.get("script-src-elem")).toBeUndefined();
   });
 
-  // Review round 8 (2026-09-17): connect-src names exactly the hosts the extension can POST to — Tower and
-  // the single pinned presigned-upload host. No wildcard S3 subdomains, no Webflow asset hosts (img-src
-  // only) and, in the Marketplace build, no telemetry host at all.
+  // Review round 8 (2026-09-17): connect-src names exactly the destinations the extension can POST to —
+  // Tower and the presigned-upload bucket path (exact `uploadUrl` plus the same bucket as a prefix). The
+  // bare S3 host would admit every bucket, so it is not a source. No wildcard S3 subdomains, no Webflow
+  // asset hosts (img-src only) and, in the Marketplace build, no telemetry host at all.
   it("allowlists exactly the documented connect-src endpoints for the Marketplace (telemetry-off) build", () => {
-    expect(directives.get("connect-src")).toEqual(["'self'", PRODUCTION_TOWER_ORIGIN, "https://s3.amazonaws.com"]);
+    expect(directives.get("connect-src")).toEqual([
+      "'self'",
+      PRODUCTION_TOWER_ORIGIN,
+      "https://s3.amazonaws.com/webflow-prod-assets",
+      "https://s3.amazonaws.com/webflow-prod-assets/",
+    ]);
+    expect(directives.get("connect-src")).not.toContain("https://s3.amazonaws.com");
     expect(policy).not.toContain("posthog");
     expect(policy).not.toContain("*.s3.amazonaws.com");
     expect(directives.get("connect-src")).not.toContain("https://*.webflow.com");
@@ -81,7 +88,8 @@ describe("buildBeaconExtensionCspContent", () => {
       "'self'",
       PRODUCTION_TOWER_ORIGIN,
       CODALYN_POSTHOG_HOST,
-      "https://s3.amazonaws.com",
+      "https://s3.amazonaws.com/webflow-prod-assets",
+      "https://s3.amazonaws.com/webflow-prod-assets/",
     ]);
     expect(withTelemetry.split(CODALYN_POSTHOG_HOST).length - 1).toBe(1);
     expect(withTelemetry).not.toContain("us-assets.i.posthog.com");

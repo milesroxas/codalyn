@@ -70,7 +70,10 @@ export async function resolveBeaconMembershipContext(request: Request): Promise<
   const appUserRole = userRows[0]?.role ?? null;
 
   const rawSession = sessionData.session as { id?: string } | undefined;
-  const activeOrganizationId = await resolveActiveOrganizationId(userId, rawSession?.id);
+  // The extension's own endpoint: a session without a workspace stays without one. Beacon shows the
+  // single membership as a suggestion and persists it only on the user's "Use this workspace" click
+  // (POST /api/v1/beacon/active-workspace) — never a server-side default (review round 8, 2026-09-17).
+  const activeOrganizationId = await resolveActiveOrganizationId(userId, rawSession?.id, "none");
 
   if (!activeOrganizationId) {
     return {

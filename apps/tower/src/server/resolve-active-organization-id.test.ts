@@ -139,3 +139,44 @@ describe("resolveActiveOrganizationId", () => {
     expect(mocks.dbUpdate).not.toHaveBeenCalled();
   });
 });
+
+describe('resolveActiveOrganizationId with fallback "none" (Designer Extension sessions)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns null and never writes when no live session holds a workspace, even though memberships exist", async () => {
+    // Review round 8: the extension holds a single-workspace default locally and persists it only on
+    // the user's confirmation — the server must neither pick a membership nor write it to the session.
+    enqueueSelects(queryChain([{ activeOrganizationId: null }]), queryChain([]));
+
+    const result = await resolveActiveOrganizationId("user-ext-none", "sess-ext-none", "none");
+
+    expect(result).toBeNull();
+    // Only the session read and the live-session read ran: no preferred-org / membership queries.
+    expect(mocks.dbSelect).toHaveBeenCalledTimes(2);
+    expect(mocks.dbUpdate).not.toHaveBeenCalled();
+  });
+
+  it("still returns the session's own workspace", async () => {
+    enqueueSelects(queryChain([{ activeOrganizationId: "org-chosen" }]), queryChain([{ id: "org-chosen" }]));
+
+    const result = await resolveActiveOrganizationId("user-ext-own", "sess-ext-own", "none");
+
+    expect(result).toBe("org-chosen");
+    expect(mocks.dbUpdate).not.toHaveBeenCalled();
+  });
+
+  it("still inherits a workspace the user holds on another live session, without writing", async () => {
+    enqueueSelects(
+      queryChain([{ activeOrganizationId: null }]),
+      queryChain([{ activeOrganizationId: "org-web" }]),
+      queryChain([{ id: "org-web" }])
+    );
+
+    const result = await resolveActiveOrganizationId("user-ext-inherit", "sess-ext-inherit", "none");
+
+    expect(result).toBe("org-web");
+    expect(mocks.dbUpdate).not.toHaveBeenCalled();
+  });
+});

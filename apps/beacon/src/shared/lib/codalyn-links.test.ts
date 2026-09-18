@@ -1,30 +1,28 @@
-import { describe, expect, it } from "vitest";
-import {
-  CODALYN_BEACON_DOCS_URL,
-  CODALYN_EXTERNAL_LINK_REL,
-  CODALYN_PRIVACY_POLICY_URL,
-  CODALYN_TERMS_URL,
-  codalynPolicyLinkProps,
-} from "./codalyn-links";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { CODALYN_EXTERNAL_LINK_REL, codalynPolicyLinkProps } from "./codalyn-links";
 
 describe("codalynPolicyLinkProps", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it.each([
-    CODALYN_PRIVACY_POLICY_URL,
-    CODALYN_TERMS_URL,
-    CODALYN_BEACON_DOCS_URL,
-  ] as const)("renders %s as a new-tab anchor with no opener and no referrer", (url) => {
-    expect(codalynPolicyLinkProps(url)).toEqual({ href: url, target: "_blank", rel: "noopener noreferrer" });
+    ["privacy", "https://tower.codalyn.app/privacy"],
+    ["terms", "https://tower.codalyn.app/terms"],
+    ["docs", "https://tower.codalyn.app/docs"],
+  ] as const)("renders the %s page as a new-tab anchor on the Tower origin with no opener and no referrer", (page, href) => {
+    vi.stubEnv("VITE_TOWER_ORIGIN", "https://tower.codalyn.app/");
+    expect(codalynPolicyLinkProps(page)).toEqual({ href, target: "_blank", rel: "noopener noreferrer" });
   });
 
   it("pins the rel value every external anchor must carry", () => {
     expect(CODALYN_EXTERNAL_LINK_REL.split(" ").sort()).toEqual(["noopener", "noreferrer"]);
   });
 
-  it("only points at production Tower policy/docs pages over https", () => {
-    for (const url of [CODALYN_PRIVACY_POLICY_URL, CODALYN_TERMS_URL, CODALYN_BEACON_DOCS_URL]) {
-      const parsed = new URL(url);
-      expect(parsed.protocol).toBe("https:");
-      expect(parsed.hostname).toBe("tower.codalyn.app");
+  it("follows the build's Tower origin rather than naming a host of its own", () => {
+    vi.stubEnv("VITE_TOWER_ORIGIN", "https://tower.preview.example");
+    for (const page of ["privacy", "terms", "docs"] as const) {
+      expect(new URL(codalynPolicyLinkProps(page).href).origin).toBe("https://tower.preview.example");
     }
   });
 });

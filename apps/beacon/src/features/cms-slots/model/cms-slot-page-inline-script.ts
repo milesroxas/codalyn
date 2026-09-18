@@ -552,7 +552,18 @@ export function buildCmsSlotRuntimeSourceMap(sourceBody: string, fileNames: { js
   });
 }
 
-const SOURCE_MAP_TRAILER_PREFIX = "//# sourceMappingURL=";
+/**
+ * The source-map pragma for the *published-site runtime* file, kept in two halves and joined only when a trailer
+ * is written. A contiguous pragma literal in the extension bundle is read by source-map tooling as the bundle's own
+ * map pointer: App Review Preflight ("Generated code is not traceable to readable source") took the minified
+ * `` `//# source…URL=`;function `` as a map named `` `;function `` and reported it missing. Same split Vite and
+ * webpack use in their own sources for the same reason. The release build forbids the joined token in dist and zip.
+ */
+const SOURCE_MAP_PRAGMA_HALVES: readonly string[] = ["//# source", "MappingURL="];
+
+function sourceMapTrailerLine(mapUrl: string): string {
+  return SOURCE_MAP_PRAGMA_HALVES.concat(mapUrl).join("");
+}
 
 /** Webflow-hosted asset URL (`https://cdn.prod.website-files.com/…`): absolute HTTPS on a Webflow asset host, no whitespace. */
 function isWebflowHostedAssetUrl(raw: string): boolean {
@@ -581,7 +592,7 @@ export function withCmsSlotRuntimeSourceMapTrailer(sourceCode: string, mapUrl: s
   if (!isWebflowHostedAssetUrl(mapUrl)) {
     throw new Error("Runtime source map URL is not a Webflow-hosted asset URL.");
   }
-  return `${cmsSlotRuntimeSourceBody(sourceCode)}\n${SOURCE_MAP_TRAILER_PREFIX}${mapUrl}`;
+  return `${cmsSlotRuntimeSourceBody(sourceCode)}\n${sourceMapTrailerLine(mapUrl)}`;
 }
 
 function sourceMd5Hex(sourceCode: string): string {

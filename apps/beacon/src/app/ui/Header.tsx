@@ -36,7 +36,7 @@ import { BeaconSupportRequestDialog } from "@/features/support/ui/beacon-support
 import { IMAGE_UPLOAD_FEATURE_NAME } from "@/shared/lib/beacon-feature-route-copy";
 import { CMS_SLOTS_FEATURE_NAME } from "@/shared/lib/cms-slots-feature-copy";
 import { isCmsSlotsSurfaceEnabled } from "@/shared/lib/cms-slots-surface-enabled";
-import { CODALYN_BEACON_DOCS_URL, codalynPolicyLinkProps } from "@/shared/lib/codalyn-links";
+import { codalynPolicyLinkProps } from "@/shared/lib/codalyn-links";
 import { useCmsCollectionTemplatePage } from "@/shared/lib/use-cms-collection-template-page";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
@@ -277,7 +277,7 @@ function BeaconMenuHelpGroup(props: { onOpenSupportDialog: (kind: TowerSupportRe
     <DropdownMenuGroup>
       <BeaconMenuSectionLabel>Help</BeaconMenuSectionLabel>
       <DropdownMenuItem asChild>
-        <a {...codalynPolicyLinkProps(CODALYN_BEACON_DOCS_URL)}>
+        <a {...codalynPolicyLinkProps("docs")}>
           <BookOpen aria-hidden />
           Documentation
         </a>

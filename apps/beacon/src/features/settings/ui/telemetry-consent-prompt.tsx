@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CODALYN_PRIVACY_POLICY_URL, codalynPolicyLinkProps } from "@/shared/lib/codalyn-links";
+import { codalynPolicyLinkProps } from "@/shared/lib/codalyn-links";
 import { applyTelemetryConsent } from "@/shared/lib/init-observability";
 import { readTelemetryConsent } from "@/shared/lib/telemetry-preference";
 import {
@@ -70,7 +70,7 @@ function TelemetryConsentGate() {
                 Settings &rarr; Privacy.
               </p>
               <Button asChild variant="link" size="2xs" className="justify-self-start px-0">
-                <a {...codalynPolicyLinkProps(CODALYN_PRIVACY_POLICY_URL)}>Read the privacy policy</a>
+                <a {...codalynPolicyLinkProps("privacy")}>Read the privacy policy</a>
               </Button>
             </div>
           </AlertDialogDescription>

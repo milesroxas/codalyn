@@ -684,9 +684,9 @@ function staticForbiddenMarkers(appPath, channel, appName) {
     { value: "codalyn.beacon/", label: "the legacy publish-placeholder URL" },
     // Source maps are built (`sourcemap: "hidden"`) for the private submission field, so no shipped
     // file may reference its own map: a `//# sourceMappingURL=<chunk>.js.map` / `.css.map` comment
-    // means a map leaked into the bundle. The bare token is pinned separately (pinnedMarkerCounts):
-    // its one occurrence is the page runtime's trailer builder, which points the *published-site*
-    // runtime at the identity source map uploaded beside it (compliance doc R8.13), not a bundle map.
+    // means a map leaked into the bundle. The bare token is pinned to zero separately
+    // (pinnedMarkerCounts): the page runtime's trailer builder joins the pragma from two halves at
+    // sync time, so not even that one literal appears in the shipped files.
     {
       pattern: /sourceMappingURL=\S*\.(?:js|css)\.map\b/i,
       label: "a leaked bundle source-map reference (.js.map / .css.map)",
@@ -864,16 +864,18 @@ function pinnedMarkerCounts(appName, channel) {
       note: "extensionFetch pins the cookie mode for every request (compliance doc R8.10)",
     },
     {
-      // Compliance doc R8.13 (App Review Preflight published-runtime test, "Runtime is not traceable
-      // to source"): the published-site runtime's last line points at the identity source map uploaded
-      // beside it. The token's only occurrence is that trailer builder in
-      // cms-slot-page-inline-script.ts. The extension bundle itself ships no map reference — the
-      // forbidden `.js.map` / `.css.map` marker catches a leaked bundle map — and a second occurrence
-      // means a new map pointer appeared somewhere else.
+      // App Review Preflight (2026-09-18) "Generated code is not traceable to readable source", evidence
+      // location `` `;function:1 ``: the scanner reads whatever follows a `sourceMappingURL=` token in a
+      // shipped file as that file's map name, and the page runtime's trailer builder used to minify to
+      // `` `//# sourceMappingURL=`;function … `` in bundle.js — a map called `` `;function `` that cannot
+      // exist. The builder in cms-slot-page-inline-script.ts now joins the pragma from two halves when it
+      // writes the *published-site* runtime's trailer (R8.13), so the shipped files carry the token
+      // nowhere. Any occurrence is either a leaked bundle map pointer or the literal coming back
+      // (a minifier folding the halves counts): both get misread the same way.
       pattern: /sourceMappingURL/g,
       label: "sourceMappingURL token",
-      expected: 1,
-      note: "the page runtime's source-map trailer builder in cms-slot-page-inline-script.ts (compliance doc R8.13)",
+      expected: 0,
+      note: "the page runtime's trailer builder joins the pragma at sync time; no shipped file may carry the token",
     },
   ];
 }

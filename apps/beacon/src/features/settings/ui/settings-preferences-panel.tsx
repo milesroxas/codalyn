@@ -2,7 +2,7 @@ import { Monitor, Moon, Sun } from "lucide-react";
 import { useId, useState } from "react";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { AVIF_TOWER_SETTINGS_TOGGLE_LABEL } from "@/shared/lib/avif-tower-consent-copy";
-import { CODALYN_PRIVACY_POLICY_URL, CODALYN_TERMS_URL, codalynPolicyLinkProps } from "@/shared/lib/codalyn-links";
+import { codalynPolicyLinkProps } from "@/shared/lib/codalyn-links";
 import { applyTelemetryConsent } from "@/shared/lib/init-observability";
 import { isTelemetryGranted } from "@/shared/lib/telemetry-preference";
 import { Button } from "@/shared/ui/button";
@@ -122,10 +122,10 @@ export function SettingsPreferencesPanel({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild variant="link" size="2xs" className="px-0">
-            <a {...codalynPolicyLinkProps(CODALYN_PRIVACY_POLICY_URL)}>Privacy policy</a>
+            <a {...codalynPolicyLinkProps("privacy")}>Privacy policy</a>
           </Button>
           <Button asChild variant="link" size="2xs" className="px-0">
-            <a {...codalynPolicyLinkProps(CODALYN_TERMS_URL)}>Terms</a>
+            <a {...codalynPolicyLinkProps("terms")}>Terms</a>
           </Button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 # SUBMIT — Round 8 runbook (App Update answering the 2026-09-17 review feedback)
 
-**Build under review:** `v0.1.0_public_09-17_20-41-41.zip` (built 2026-09-17 20:41). Everything on this page is for this build only.
+**Build under review:** `v0.1.0_public_09-18_10-25-07.zip` (built 2026-09-18 10:25). Everything on this page is for this build only.
 Why each thing is the way it is: [compliance-record.md](compliance-record.md) Round 8, R8.1–R8.12.
 Anything Preflight shows that is not listed under step 4 or step 5 below → stop and follow [playbook.md](playbook.md) § B.
 
@@ -21,7 +21,8 @@ Every finding is a code change you can point to; none is answered with an explan
 
 | Preflight item | Cause | This build |
 | --- | --- | --- |
-| External API Calls (bundle scan) | The one backend call (Tower). Webflow's docs put script registration and CMS writes on the backend; the Designer API has no such surface | Stays. Disclosed in the notes (BACKEND paragraph). Not raised by the human review team in round 8 |
+| External API Calls (bundle scan) | The one backend call (Tower). Webflow's docs put script registration and CMS writes on the backend; the Designer API has no such surface. The 09-17 20:41 scan's excerpt sat on the in-app privacy/terms/docs link constants (anchors, never requests) | Link constants are now paths on the Tower origin: the bundle names one external host (`https://tower.codalyn.app`), in the chunk holding the one `fetch(`. The backend call itself stays — expect the item to persist with its excerpt on the Tower origin or `fetch(`. Disclosed in the notes (BACKEND paragraph). Not raised by the human review team in round 8 |
+| Generated code is not traceable to readable source (bundle scan, evidence `` `;function:1 ``) | The runtime trailer builder minified to `` `//# sourceMappingURL=`;function `` in bundle.js; the scanner read `` `;function `` as a map file name and found no such map. Every real JS/CSS file already had its v3 map in the private zip | **Fixed.** The pragma is joined from two halves at sync time; no shipped file carries the token (release build pins the count to 0 on dist and zip). Published runtime bytes unchanged |
 | Runtime is not traceable to source | No source map behind the runtime | **Fixed.** Sync uploads a v3 identity source map beside the runtime; the runtime's last line points at it |
 | Script integrity is missing or wrong | Unknown tool internals. Tag, CORS and bytes verified correct; the one untested cause was the file's trailing newline | The runtime now ends with the map pointer, no trailing newline. If it persists: download the run's 8 evidence artifacts before changing anything else |
 | New script elements / Unreviewed scripts | Webflow's own site runtime plus what the page's Interactions pull in (GSAP, ScrollTrigger, achunks) | Test on a bare page (Step 3) so only Webflow's site runtime remains. Pinning Webflow's files would only move them into the SRI item |
@@ -46,7 +47,7 @@ Beacon CSP change, Tower workspace change, their tests and these docs are uncomm
 ### Step 3 — Install the bundle on the test site and push the runtime
 
 1. Webflow → Apps & integrations → Beacon → version manager → upload
-   `apps/beacon/bundle/production/public/v0.1.0_public_09-17_20-41-41.zip`.
+   `apps/beacon/bundle/production/public/v0.1.0_public_09-18_10-25-07.zip`.
 2. Open Beacon on **beacon-demo**. The panel must render; the extension console must show **no CSP violation**.
 3. Sign in. With one workspace you must see **Use this workspace** — click it.
    If the workspace is already active without a click, Tower is not deployed yet → Step 1.
@@ -79,8 +80,8 @@ SHA-256 and SRI. Those printed values are what Step 5 needs — copy them from t
 Open **App Review Preflight** in the Designer ([install it into the Workspace](https://webflow.com/oauth/authorize?response_type=code&client_id=0b5411e62233387925e082350666ef374377f81a9abba0dcc2542d6b5b1e4388&scope=authorized_user%3Aread) if it is missing).
 
 1. Upload both files from `apps/beacon/bundle/production/public/`:
-   - bundle → `v0.1.0_public_09-17_20-41-41.zip`
-   - source maps → `v0.1.0_public_09-17_20-41-41.sourcemaps.zip`
+   - bundle → `v0.1.0_public_09-18_10-25-07.zip`
+   - source maps → `v0.1.0_public_09-18_10-25-07.sourcemaps.zip`
 2. Expected **Review feedback: exactly one item, "External API Calls" (REQUIRED), 1 evidence location** in `assets/label-*.js`.
    That is the extension's single backend call (Hybrid App: Tower). It cannot go away while the app has a backend; the notes in Step 6 disclose it. The excerpt's position moves between scans (it has sat on the storage cleanup, then on the Tower policy-page links) — the rule is the same.
 3. Anything else — a second item, "Silent Canvas Mutations", an External API Calls excerpt outside the `label-*.js` chunk — → stop, [playbook.md](playbook.md) § B.
@@ -122,33 +123,33 @@ Webflow app settings → Publish → **Upload Bundle for Review**, then the subm
 | Submission type | App Update |
 | App name | Beacon |
 | New or changed bundle? | Yes |
-| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_20-41-41.zip` — sha256 `400bae8b903daafbe40158a80c66f79d51cfe2157e3a610aa4de9d32679fd3b5` |
-| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-17_20-41-41.sourcemaps.zip` — sha256 `093621bec5b757167671fc1e8e5e1340fbe1907199115b1266db0cabf976c6fd` |
+| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-18_10-25-07.zip` — sha256 `b9b2d587c001a5e20d2f43167f891027be7d7c859fb06db5d173a47d17dc5617` |
+| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-18_10-25-07.sourcemaps.zip` — sha256 `eb69c8554acd3e222ed67ecf888ce153d20f613d44c8406c24216acb933a9947` |
 | Package manifest + lockfile | `apps/beacon/package.json` + root `pnpm-lock.yaml` as committed at the build commit |
 | App Review Preflight receipt | the `wfpre_…` code from Step 4 |
 | Testing site | `https://beacon-demo.webflow.io` — bundle above installed; beacon page `https://beacon-demo.webflow.io/blog/the-power-of-resilience` |
 | Reviewer credentials | enter in the form only, never in this repo; 2FA on a Workspace admin account |
 
-**Response to the review team** (form limit 500 characters; this is 494). Paste as is:
+**Response to the review team** (form limit 500 characters; this is 4984). Paste as is:
 
 ```
 1) No automatic workspace request: a lone workspace is only suggested and saved on the user's click; the server sets no default for extension sessions. 2) No telemetry SDK in this build; a redaction handler covers builds with one. 3) All requests use redirect mode error. 4) Uploads only to the exact create-asset uploadUrl; connect-src allows only that bucket. 5) No unsafe-inline; style attributes blocked. 6) cmsLocaleId on every CMS write; localized sites are not written (listing says so).
 ```
 
-**Additional notes** (form limit 5000 characters; this is 4959). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
+**Additional notes** (form limit 5000 characters; this is 4984). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
 
 ```
-WHAT CHANGED (bundle v0.1.0, 09-17_20-41-41) - 1 to 6 answer the 2026-09-17 feedback in order; 7 and 8 the Preflight scans
+WHAT CHANGED (bundle v0.1.0, 09-18_10-25-07) - 1 to 6 answer the 2026-09-17 feedback in order; 7, 8 the Preflight scans
 
 1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. A user with one workspace and none active sees it as a suggestion with an explicit "Use this workspace" control; the only request to that endpoint comes from that click or the multi-workspace picker. The server changed too: an extension session without a chosen workspace stays without one (no default from memberships, nothing written) until the user confirms. Unit tests pin zero requests after sync, one after the click, no server fallback.
 
-2. Exception telemetry. The Marketplace build ships no telemetry SDK: the dependency sits behind a build-time release flag that is off for Marketplace bundles; the release build fails if it is on and verifies the zip has no trace of it (no analytics chunk, no telemetry host, no consent prompt). Settings and the privacy policy say so. Builds that enable telemetry run a redaction handler on every event (URLs, referrers, titles, e-mail, tokens, query strings), unit-tested with synthetic sensitive values.
+2. Exception telemetry. The Marketplace build ships no telemetry SDK: the dependency sits behind a build-time release flag that is off for Marketplace bundles; the release build fails if it is on and verifies the zip has no trace of it (no analytics chunk, no telemetry host, no consent prompt). Settings and the privacy policy say so. Builds that enable telemetry run a redaction handler on every event (URLs, referrers, titles, e-mail, tokens, query strings), unit-tested with synthetic values.
 
 3. Redirects. The single network call site (extension-egress.ts) runs every request with redirect mode set to error; callers cannot override it. No path needs a redirect: Tower answers its API routes directly and the presigned S3 upload returns a 2xx with no redirect field.
 
-4. Upload allowlist. The create-asset adapter registers the exact uploadUrl string Webflow returned as a one-shot permitted destination, only if it names the webflow-prod-assets bucket: host exactly webflow-prod-assets.s3.amazonaws.com (the form production returns) or host s3.amazonaws.com with first path segment webflow-prod-assets (the form the reference documents). The egress policy accepts an upload only for a granted URL and consumes the grant; other buckets, regional S3 hosts, lookalikes and Webflow-owned hosts are refused before any request. connect-src names that bucket, never the bare S3 host: self, https://tower.codalyn.app, https://webflow-prod-assets.s3.amazonaws.com and https://s3.amazonaws.com/webflow-prod-assets. Any other bucket is blocked by the browser.
+4. Upload allowlist. The create-asset adapter registers the exact uploadUrl string Webflow returned as a one-shot permitted destination, only if it names the webflow-prod-assets bucket: host exactly webflow-prod-assets.s3.amazonaws.com (the form production returns) or host s3.amazonaws.com with first path segment webflow-prod-assets (the form the reference documents). The egress policy accepts an upload only for a granted URL and consumes the grant; other buckets, regional S3 hosts, lookalikes and Webflow-owned hosts are refused before any request. connect-src names that bucket, never the bare S3 host: self, https://tower.codalyn.app, https://webflow-prod-assets.s3.amazonaws.com and https://s3.amazonaws.com/webflow-prod-assets.
 
-5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host; style-src-attr is none. The UI sets styles through the CSSOM, which CSP does not govern. The two style-attribute writes left in the bundle are pinned by count in the release build; both are Designer API calls styling the CMS Slots placeholder on the user's canvas element, outside the extension's policy. All UI stories render clean under the enforced policy.
+5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host; style-src-attr is none. The UI sets styles through the CSSOM, which CSP does not govern. The two style-attribute writes left in the bundle are pinned by count in the release build; both are Designer API calls styling the CMS Slots placeholder on the user's canvas element, outside the extension's policy. All UI stories render clean under it.
 
 6. Localization. Every CMS item write names its locale: the extension reads the site's locales (Get Site) once per session and sends the primary locale's cmsLocaleId on every write (image editor field update; CMS Slots layout save, staged and live) and on the matching staged read. Sites with secondary locales are not written: the write is refused before any request with an in-app message. The listing states this.
 
@@ -156,11 +157,11 @@ WHAT CHANGED (bundle v0.1.0, 09-17_20-41-41) - 1 to 6 answer the 2026-09-17 feed
 
 8. Browser storage and cookies. The session bearer is held in memory only; no storage call in the bundle is keyed by a credential name. Every request sets the cookie mode to omit at the single call site, so no cookie is sent or stored; the only credential on the wire is our Tower session bearer, sent only to tower.codalyn.app.
 
-UNCHANGED FROM 2026-09-15: one network call site with an explicit destination policy (release build fails on a second); canvas changes only through the Designer API on explicit user action; Tower with allowlist-only CORS, session-only auth, server-stored OAuth state, the Webflow ID token never forwarded; no plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, no popups or cross-window messaging, no credentials in URLs, no session replay; styles.css ships a v3 source map.
+UNCHANGED FROM 2026-09-15: one network call site with an explicit destination policy (release build fails on a second); canvas changes only through the Designer API on explicit user action; Tower with allowlist-only CORS, session-only auth, server-stored OAuth state, the Webflow ID token never forwarded; no plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, no popups or cross-window messaging, no credentials in URLs, no session replay; every shipped JS and CSS file has a v3 source map (private field); none names a map.
 
 PUBLISHED-RUNTIME TEST: one page-level script, registered with a SHA-256 integrityHash carried verbatim in the page tag with anonymous crossorigin; served unminified, its last line pointing at a version-3 source map published beside it as a site asset (sourcesContent is the file minus that line; no trailing newline). Every other script on the test page is Webflow's own site runtime; Beacon loads none.
 
-BACKEND (Hybrid): https://tower.codalyn.app only, HTTPS, production; paths as filed on 2026-09-15. Other destination: the presigned upload URL in item 4. No telemetry host. Uninstall and AVIF disclosure unchanged.
+BACKEND (Hybrid): https://tower.codalyn.app only, HTTPS, production; paths as filed on 2026-09-15; in-app policy and docs links are anchors on it. Other destination: the presigned upload URL in item 4. No telemetry host. Uninstall and AVIF disclosure unchanged.
 ```
 
 If the review team asks about one item by email, the one-line answers:

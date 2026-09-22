@@ -165,13 +165,19 @@ one that can honestly go.
 - Append a `### R<n>.<m>` entry to `docs/webflow-marketplace/compliance-record.md`: finding (or "preflight
   re-run"), observed, fix, artifact hashes, six-state line (see B4).
 - Commit source + doc **before** submitting, so artifact hash ↔ commit is traceable.
-- Submit in **two steps, both required** (published requirement, submitting-your-app § "Don't forget to
-  publish a new version of your Designer Extension from your workspace"):
+- Submit in **two steps, both required, neither a substitute for the other** (published requirement,
+  submitting-your-app § "Don't forget to publish a new version of your Designer Extension from your
+  workspace"). The docs fix no order; publish first so the form describes a version already in review:
   1. Workspace settings → Apps & Integrations → Beacon → *Publish new version*: bundle zip only, the
-     Marketplace / "submit for review" distribution, version notes = SUBMIT.md §4 changelog.
-  2. <https://developers.webflow.com/submit> → App Update → *App functionality, permissions, or bundle*:
-     Client ID, install URL, testing site, source-map zip, manifest + lockfile, `wfpre_…` receipt, §3
-     response, §4 notes (≤5000 chars), runtime file 1, reviewer credentials, docs/privacy/terms/support.
+     **"Publish new version to the App Marketplace (submit for review)"** distribution — not internal
+     testing — then version notes (**≤500 chars**, four pre-filled headings; the block in SUBMIT.md
+     Step 6a). Only this puts a bundle into review. Confirm the version manager shows it as submitted.
+  2. <https://developers.webflow.com/submit> → App Update → *App functionality, permissions, or bundle*.
+     Required for an update: App Name + Client ID + testing site + source-map zip (new/changed generated
+     bundle). Everything else is optional — "complete only the fields you wish to modify": bundle zip,
+     manifest + lockfile, `wfpre_…` receipt, notes (≤5000 chars), runtime file 1, reviewer credentials.
+     There is **no response-to-reviewer field** on the form (R8.19); per-item answers go in the email
+     thread.
   Text fields sit behind Cloudflare: no angle brackets, `src=`-style attribute pairs, DOM-sink API names,
   `\u` escapes or `/*` in any field (R7b.20). Record the reference ID in the compliance entry.
 

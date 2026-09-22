@@ -2,9 +2,12 @@
 
 > **2026-09-22 — the 2026-09-18 filing (form ref `16838bba-c288-47ee-93e2-a0a19cfd7ece`) never entered review.** Webflow
 > reports the extension version behind it was published for **internal testing (Workspace only)**, not to the App
-> Marketplace, so the form had no bundle under review behind it (R8.18). Only the *Publish new version* dialog in
-> Workspace settings puts a bundle into review; the form at developers.webflow.com/submit uploads none. **Step 6a below
-> now spells out the radio.** No review feedback exists for the 09-18 build; it is replaced anyway (R8.18: a vendor
+> Marketplace, so the form had no bundle under review behind it (R8.18). The two steps are both required and neither
+> substitutes for the other ([Submitting your app](https://developers.webflow.com/data-beta/docs/marketplace/submitting-your-app)
+> § *Updating a Designer Extension?*: "Don't forget to publish a new version of your Designer Extension from your
+> workspace"): only the *Publish new version* dialog in Workspace settings, on the Marketplace distribution, puts a
+> bundle into review; the form at developers.webflow.com/submit records the update and its review artifacts.
+> **Step 6a below now spells out the radio.** No review feedback exists for the 09-18 build; it is replaced anyway (R8.18: a vendor
 > `MutationObserver` the literal gate never saw). Run every step again for the new build; reply on the existing thread.
 
 **Build to submit:** `v0.1.0_public_09-22_15-25-46.zip` (built 2026-09-22 15:25). Everything on this page is for this build only.
@@ -148,53 +151,61 @@ If a reviewer explicitly asks for Webflow's platform scripts to be pinned: [hist
 
 ### Step 6 — Publish the version for review, then file the form
 
-**6a — the publish that enters review (the step missed on 09-18, R8.18).** Published requirement: an App Update must
-publish a new Designer Extension version from the Workspace before the form is filed
+**6a — the publish that enters review (the step missed on 09-18, R8.18).** Published requirement: an App Update that
+changes the Designer Extension must publish a new version from the Workspace *in addition to* the form
 ([Publishing your app](https://developers.webflow.com/data-beta/docs/publishing-your-app),
-[Submitting your app](https://developers.webflow.com/data-beta/docs/marketplace/submitting-your-app)). In the current
-dialog that is a distribution choice: Workspace settings → Apps & Integrations → Beacon → **Publish new version** →
+[Submitting your app](https://developers.webflow.com/data-beta/docs/marketplace/submitting-your-app) §
+*Updating a Designer Extension?*). The docs fix no order; do the publish first anyway, so the form's artifacts
+describe a version that is already in review. In the current dialog the distribution is a radio: Workspace settings → Apps & Integrations → Beacon → **Publish new version** →
 *Upload zip file* → the same `v0.1.0_public_09-22_15-25-46.zip` as Step 3 → **Select distribution: "Publish new
 version to the App Marketplace (submit for review)"** — not "Publish for internal testing (Workspace only)" →
 *Submission version notes* (the four headings the dialog pre-fills; paste the block below) → **Submit for review**.
 Afterwards the version manager must show this version as submitted for review, not as another internal version; if it
 does not, the radio was wrong — repeat with the Marketplace radio.
 
-Version notes for the dialog (plain text, no angle brackets):
+Version notes for the dialog — **this field is the 500-character one** (the form's notes field is 5000; do not swap
+them). Plain text, no angle brackets. The block below is 496 characters including the four pre-filled headings:
 
 ```
 # New Features
-None. App Update answering the 2026-09-17 review feedback (six findings) and the App Review Preflight scans.
+None.
 
 # Changes/Fixes
-1) Workspace is saved only on the user's "Use this workspace" click; the server sets no default for extension sessions. 2) No telemetry SDK in this build. 3) Every request runs with redirect mode error. 4) Uploads only to the exact create-asset uploadUrl; connect-src names only that bucket. 5) No unsafe-inline; style attributes blocked (style-src-attr none). 6) cmsLocaleId on every CMS write; sites with secondary locales are refused in-app. 7) No DOM observer in the bundle: the rich-text editor is withheld behind a release flag and the drag-and-drop library's re-measuring observer is patched out.
+Answers the 2026-09-17 review: workspace saved only on the user's click, no server default; no telemetry SDK; every request uses redirect mode error; uploads only to the exact create-asset URL; no unsafe-inline, style attributes blocked; cmsLocaleId on every CMS write, localized sites refused.
 
 # Improvements
-The release build pins the shipped inventory (one network call site, zero observers, two Designer API style writes, cookie mode omit) and fails on any change; every shipped JS and CSS file has a version-3 source map in the private field.
+No MutationObserver in the bundle; release build pins the shipped inventory; v3 source maps for every file.
 
 # Resolution notes
-Each 2026-09-17 finding is answered in code; details are in the Additional notes on the submission form (items 1 to 8). The published-page runtime is unchanged: one page-level script with a SHA-256 integrityHash and an identity source map beside it.
+Detail in the form.
 ```
 
 **6b — the form.** <https://developers.webflow.com/submit> → App Update → *App functionality, permissions, or bundle*
 (reply in the same email thread).
 
+Published requirement for an App Update: **App Name and Client ID are required**, plus the artifacts the form
+validates (published testing site; source maps, because this update ships a new generated bundle). *"All other fields
+are optional… complete only the fields you wish to modify"* — so leave listing copy, install URL, scopes, pricing and
+support fields untouched this round; nothing about them changed.
+
 | Field | Value |
 | --- | --- |
 | Submission type | App Update |
 | App name | Beacon |
+| Client ID (required) | `610625f8…` — the production app. Copy the full value from Workspace settings → Apps & Integrations → Beacon → **…** → *Edit App*. The `.env.local` id `c6cff6ae…` is the **dev** app; never paste that |
 | New or changed bundle? | Yes |
-| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-22_15-25-46.zip` — sha256 `0fef7fb9833df00876fb2b4491e677f812f491c0250716286825008bd3848d26` |
+| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-22_15-25-46.zip` — sha256 `0fef7fb9833df00876fb2b4491e677f812f491c0250716286825008bd3848d26`. Same zip as Step 6a; the form copy is only so review can reconcile the artifact — the bundle that *enters* review is the version published in 6a |
 | Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-22_15-25-46.sourcemaps.zip` — sha256 `8259c35c8435a7aa764ff7b83d79ff0031f9a2f56646922bf90e34b8547e7676` |
 | Package manifest + lockfile | `apps/beacon/package.json` + root `pnpm-lock.yaml` as committed at the build commit |
 | App Review Preflight receipt | the `wfpre_…` code from Step 4 |
 | Testing site | `https://beacon-demo.webflow.io` — bundle above installed; beacon page `https://beacon-demo.webflow.io/blog/the-power-of-resilience` |
 | Reviewer credentials | enter in the form only, never in this repo; 2FA on a Workspace admin account |
 
-**Response to the review team** (form limit 500 characters; this is 494). Paste as is:
-
-```
-1) No automatic workspace request: a lone workspace is only suggested and saved on the user's click; the server sets no default for extension sessions. 2) No telemetry SDK in this build; a redaction handler covers builds with one. 3) All requests use redirect mode error. 4) Uploads only to the exact create-asset uploadUrl; connect-src allows only that bucket. 5) No unsafe-inline; style attributes blocked. 6) cmsLocaleId on every CMS write; localized sites are not written (listing says so).
-```
+> **There is no "response to the review team" field on the form.** Rounds 6–7b pasted a 500-character body into one;
+> it is not in the current form and not in the published submission flow (the 500-character field is the version-notes
+> dialog in 6a). The condensed six-item body is kept for the email thread in
+> [history/responses.md](history/responses.md); per-item email answers are below. Nothing is lost: items 1–6 of
+> **Additional notes** say the same thing in full.
 
 **Additional notes** (form limit 5000 characters; this is 4967). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
 

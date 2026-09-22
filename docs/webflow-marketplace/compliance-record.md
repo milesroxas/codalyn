@@ -3506,3 +3506,36 @@ Sync is forced.
 **States:** Source ✓ (uncommitted) · Artifact ✓ (`0fef7fb9…8d26`, maps `8259c35c…7676`, sweep above) · Installed ✗ ·
 Runtime ✓ unchanged (R8.16 values; re-run the pin script before filing) · Tower deployed ✓ (R8.17; no server change in
 this round) · Submitted ✗ · Accepted ✗.
+
+### R8.19 SUBMIT.md had the 500-character limit on the wrong field and a form field that does not exist (2026-09-22)
+
+**Trigger (operator, 2026-09-22).** The 500-character counter is on the *Publish new version* dialog's version-notes
+field (Step 6a), not on the form; and the form has no "response to the review team" field at all. SUBMIT.md carried a
+~1,500-character version-notes block (it would have been truncated or refused on paste) and a 494-character response
+body for a field that is not in the flow.
+
+**Checked against the published docs.**
+[Submitting your app](https://developers.webflow.com/data-beta/docs/marketplace/submitting-your-app) §§ *Submission
+artifacts*, *Updating your app on the Marketplace*, *Updating a Designer Extension?* and
+[Publishing your app](https://developers.webflow.com/data-beta/docs/publishing-your-app):
+
+- An App Update requires **App Name and Client ID**, plus the artifacts the form validates — published `.webflow.io`
+  testing site, and source maps when the update ships a new or changed minified/generated bundle (plus the package
+  manifest and lockfile for that build); the Preflight receipt is optional. *"All other fields are optional… complete
+  only the fields you wish to modify."* No response/reviewer-reply field is documented anywhere in the flow.
+- The version publish is required **in addition to** the form ("Don't forget to publish a new version of your
+  Designer Extension from your workspace"); the docs fix no order between them. SUBMIT.md's earlier "must publish
+  before the form is filed" was an over-claim, now stated as both-required with publish-first as our own reason
+  (the form then describes a version already in review).
+- The docs describe the dialog as "select the `bundle.zip` file and add notes about the changes in this version" and
+  state no limit; the 500-character cap and the distribution radio are observed UI, recorded here as such.
+
+**Fix (docs only, no code).** SUBMIT.md Step 6a: version notes rewritten to 496 characters under the four pre-filled
+headings, with the limit named and a warning not to swap it with the form's 5000-character notes. Step 6b: Client ID
+added as a required row (production `610625f8…`; the `.env.local` `c6cff6ae…` is the dev app), the bundle row notes
+that the reviewed bundle is the one published in 6a, the optional-fields rule is stated, and the response block is
+replaced by a note that the field does not exist. The 494-character body moved to
+[history/responses.md](history/responses.md) as email-thread material (per CLAUDE.md). playbook.md § A6 updated to
+match. Nothing about the artifact, the bundle or the runtime changes; the same six items remain in the form's
+*Additional notes* in full.
+

@@ -1,8 +1,18 @@
-# Earlier reviewer responses (reference only — do not paste)
+# Earlier reviewer responses (reference only — do not paste into the form)
 
-Bodies that were pasted into the review form's ≤500-character response field in earlier rounds,
-newest first. The current one lives in [../SUBMIT.md](../SUBMIT.md) § 3. Engineering detail per
-round: [../compliance-record.md](../compliance-record.md).
+Bodies that were pasted into the review form's ≤500-character response field in rounds 6–7b, newest
+first. **That field no longer exists on the submission form** (R8.19): the 500-character field in the
+current flow is the *Publish new version* dialog's version notes, drafted in
+[../SUBMIT.md](../SUBMIT.md) Step 6a. These bodies are now only email-thread material. Engineering
+detail per round: [../compliance-record.md](../compliance-record.md).
+
+---
+
+Round 8 body, drafted for the form field that turned out not to exist (2026-09-22). Usable verbatim
+as a reply on the review email thread; the same six items are in SUBMIT.md Step 6b *Additional notes*
+in full:
+
+1) No automatic workspace request: a lone workspace is only suggested and saved on the user's click; the server sets no default for extension sessions. 2) No telemetry SDK in this build; a redaction handler covers builds with one. 3) All requests use redirect mode error. 4) Uploads only to the exact create-asset uploadUrl; connect-src allows only that bucket. 5) No unsafe-inline; style attributes blocked. 6) cmsLocaleId on every CMS write; localized sites are not written (listing says so).
 
 ---
 

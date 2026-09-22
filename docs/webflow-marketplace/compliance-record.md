@@ -2744,6 +2744,11 @@ SUBMIT.md.
 
 ### R8.8 Silent Canvas Mutations closed — the Lexical rich-text editor is withheld by release flag (2026-09-17)
 
+> **Correction (2026-09-22, R8.18):** "Beacon now ships none" held for the literal `new MutationObserver(` only.
+> `@dnd-kit/core` 6.3.1 constructed one through an alias read off `window`, invisible to this pin and to the R7b.11
+> enumeration, in every Marketplace bundle up to and including 09-18. The pin is now the bare identifier; the vendor
+> observer is patched out. See R8.18.
+
 **Decision (owner Miles, 2026-09-17):** end the R7b.11 open decision by removing the shape instead of
 arguing it, and keep the feature in the repo behind a build-time release flag — the same mechanism the
 telemetry SDK uses (R8.2), not a deletion. Four consecutive Preflight scans (R7b.11 → R8.7) reported
@@ -3332,6 +3337,9 @@ re-verified 14:55) · Submitted ✗ → ✓ per R8.17 · Accepted ✗.
 
 ### R8.17 App Update submitted (2026-09-18)
 
+> **2026-09-22 (R8.18):** per Webflow, the extension version behind this filing was published for *internal testing
+> (Workspace only)* and never entered review. "Submitted ✓" below is withdrawn; the build is superseded — see R8.18.
+
 **Filed through the submission form** (App Update, new bundle): bundle `v0.1.0_public_09-18_10-25-07.zip`
 (`b9b2d587…5617`) + `.sourcemaps.zip` (`eb69c855…9947`), SUBMIT.md response (494 chars) and notes (4 984 chars)
 as they stand at this commit. **Webflow reference ID `16838bba-c288-47ee-93e2-a0a19cfd7ece`.** Form
@@ -3403,3 +3411,98 @@ only — the submission run keeps "More runtime files" empty (R7b.16).
   reviewer, and no app change can resolve it.
 - Note the control's base64 carries `/` where ours carries `+`, so a control failure is not by itself proof of a
   general fault.
+
+### R8.18 The 09-18 version was published for internal testing, not for review; a vendor `MutationObserver` the literal pin never saw (@dnd-kit/core) (2026-09-22)
+
+**Trigger (operator relay, 2026-09-22).** Webflow indicates the bundle behind the 2026-09-18 filing (form reference
+`16838bba-c288-47ee-93e2-a0a19cfd7ece`) was published as an **internal testing (Workspace only)** version and never
+submitted for review; the operator could not recall completing the *Publish new version → App Marketplace (submit for
+review)* step and had only the form submission to point to. Nothing in the repository can confirm or refute which
+distribution was chosen — a Webflow bundle carries no distribution flag; the `internal` / `public` in this repo's
+archive names is the build tool's recipient label, stamped as `recipient:` in `bundle.js`, and the filed zip carries
+`public` — so this is recorded as reported. Consequence: R8.17's "Submitted ✓" is withdrawn; no review feedback exists
+for the 09-18 build.
+
+**Root cause (process).** The two-step requirement is in [playbook.md](playbook.md) § A6 (published requirement:
+*Publishing your app* — "Publish extension version" from Workspace settings; *Submitting your app* — the form), but
+SUBMIT.md — the file CLAUDE.md names as the only one to open when responding to Webflow — never named the distribution
+radio: Step 3 ("version manager → upload", the internal-testing publish that installs the build on beacon-demo) and
+Step 6 ("Publish → Upload Bundle for Review", then the form) read as one upload plus one form. Followed literally,
+that sequence produces exactly an internal version and a form entry with no Marketplace version behind it. Fix:
+SUBMIT.md Step 3 now says which radio it is and that it is not the submission; Step 6 spells out the dialog
+(upload → *Publish new version to the App Marketplace (submit for review)* → the four version-note headings →
+*Submit for review*) and what the version manager must show afterwards, before the form.
+
+**Finding (artifact, self-identified while checking the filed bundle).** `bundle.js` in
+`v0.1.0_public_09-18_10-25-07.zip` (sha256 `b9b2d587…5617`) carries the identifier `MutationObserver` twice and
+constructs one observer:
+
+```
+function hM(e){let{callback:t,disabled:n}=e,r=vA(t),i=(0,Y.useMemo)(()=>{if(n||typeof window>`u`||window.MutationObserver===void 0)return;let{MutationObserver:e}=window;return new e(r)},[r,n]);…
+… o?.observe(document.body,{childList:!0,subtree:!0}) …
+```
+
+That is `useRect` → `useMutationObserver` in `@dnd-kit/core` 6.3.1 (`dist/core.esm.js` 2098–2215): the constructor is
+destructured from `window` and the minifier renames the alias, so the shipped text never contains
+`new MutationObserver(` while a live observer exists. `DndContext` (CMS Slots composer, `composer-order-section.tsx`)
+constructs it on mount and attaches it to `document.body` (`childList`, `subtree`) for the duration of a drag, to
+re-measure the dragged row. It observes the extension panel's own document, never the Designer canvas — the same
+rationale as the withdrawn Lexical observer — and reachability is not a defense (CLAUDE.md). The gate
+`pinnedMarkerCounts` pattern `/new MutationObserver\(/` scored 0 and passed on every build; the R7b.11 audit that
+enumerated four observers (Radix FocusScope, Lexical, Vite polyfill, drawer guard) used the same literal and could not
+see this one. `@dnd-kit/core` entered Beacon on 2026-04-30 (`ecc5aa5`), so the observer has been in every Marketplace
+bundle since. The 09-17 and 09-18 Preflight scans ran on bundles carrying it and reported no Silent Canvas Mutations,
+so Preflight's rule does not key on the bare identifier — a reviewer's `grep -i MutationObserver` over the zip does,
+and it made two filed statements false for the artifact: R8.8 "Beacon now ships none" and notes item 7 "the bundle
+has no observer construction" (both true for the literal token only).
+
+**Fix**
+
+- Gate (`scripts/build-cli.mjs` `pinnedMarkerCounts`): the pin is now the bare identifier `/\bMutationObserver\b/` =
+  **0** on dist and zip (label "MutationObserver reference"). A minifier can rename a local alias, never the property
+  it is read from, so every construction path — literal, `window`/`globalThis` alias, property read — counts. Tests
+  (`apps/beacon/scripts/release-build-gates.test.mjs`): the literal form still fails; the exact minified dnd-kit shape
+  from the 09-18 bundle fails with 2 references; a bare `globalThis.MutationObserver` read fails with 1. Test-first:
+  4 red before the gate/patch change, 77/77 green after.
+- Vendor: `patches/@dnd-kit__core@6.3.1.patch` removes `useMutationObserver` and its use in `useRect` from all three
+  dist entries (`core.esm.js` — what Vite bundles; `core.cjs.development.js` — what Vitest loads;
+  `core.cjs.production.min.js`). The ResizeObserver beside it keeps re-measuring the node on its own size changes and
+  `useRect` re-measures whenever the element changes; `@dnd-kit/sortable` moves rows with transforms during a drag, so
+  the DOM around the active node does not change until drop — no behavioural loss in the composer
+  (`cms-slot-composer-panel` tests green under the patched module). Residual guard: a gate test reads the installed
+  package and asserts no `MutationObserver` in any entry and that `useRect` / `useResizeObserver` /
+  `resizeObserver.observe(element)` remain. Registered in root `package.json` `pnpm.patchedDependencies`; lockfile
+  updated (both peer instances — Beacon's and Flint's — are patched). Upstream's dist mixes CRLF into its JSDoc
+  lines; the patch was generated from a pristine copy with `git diff --no-index`, in the format `pnpm patch-commit`
+  writes.
+- Corrections: `composer-rich-text-field.tsx`, `vite-env.d.ts`, `extension-egress.test.ts` comments no longer call
+  Lexical's observer "the bundle's only" one; `apps/beacon/README.md`, `apps/beacon/AGENTS.md` and
+  [playbook.md](playbook.md) § A4 (artifact grep: `grep -ao 'MutationObserver' | wc -l` = 0) describe the
+  identifier-level rule. R8.8 carries a correction note pointing here.
+
+**Private source maps.** The 09-18 `.sourcemaps.zip` carried the identifier 11× in `sourcesContent` (dnd-kit 7,
+`@radix-ui/react-collection` 1, react-router's development chunk 1, two first-party comments); this build: 4 (dnd-kit
+0; the rest are comments and dead code in vendor sources that the bundle does not contain, plus the two first-party
+comments). No scan has keyed on map content for this rule (R8.15 scanned the 09-18 maps and reported no Silent Canvas
+Mutations); recorded, not acted on. `[?&]token=` in the maps: 0.
+
+**Artifact** — `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod` at the working tree after `9981acf`
+(uncommitted at time of writing — commit before upload so artifact ↔ commit is traceable):
+`v0.1.0_public_09-22_15-25-46.zip` sha256
+`0fef7fb9833df00876fb2b4491e677f812f491c0250716286825008bd3848d26` (21 files, 464,409 bytes; `bundle.js` 890,908
+bytes, 456 bytes smaller than 09-18 — the observer) + `.sourcemaps.zip` sha256
+`8259c35c8435a7aa764ff7b83d79ff0031f9a2f56646922bf90e34b8547e7676` (private form field). Independent sweep on the
+zip: `MutationObserver` **0** · bare `fetch(` **1** · `setAttribute("style"` **2** · `credentials: omit` **1** ·
+`sourceMappingURL` **0** · `.map` files **0** · `window.open(` / `postMessage` / HTML sinks / `ws://` / non-W3C
+`http://` / `?token=` / canvas readback / sentry / posthog / lexical / localhost **0** · manifest 4 keys ·
+`recipient:` `public`. The published-page runtime is untouched by this build (`cms-slot-page-inline-script.ts`
+unchanged), so the runtime file filed in R8.16/R8.17 (`…9b7da263.js`, sha256 `49b338fa…05fd`) stays valid unless a
+Sync is forced.
+
+**Next (SUBMIT.md, all steps).** Commit → install the new zip on beacon-demo as an *internal testing* version (Step 3)
+→ Preflight bundle scan on zip + maps, expect External API Calls only (Step 4) → runtime test with the existing values
+(Step 5) → **Publish new version with the Marketplace radio** (Step 6a) → form (Step 6b).
+
+**States:** Source ✓ (uncommitted) · Artifact ✓ (`0fef7fb9…8d26`, maps `8259c35c…7676`, sweep above) · Installed ✗ ·
+Runtime ✓ unchanged (R8.16 values; re-run the pin script before filing) · Tower deployed ✓ (R8.17; no server change in
+this round) · Submitted ✗ · Accepted ✗.

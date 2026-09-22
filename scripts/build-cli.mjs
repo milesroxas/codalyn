@@ -835,10 +835,18 @@ function pinnedMarkerCounts(appName, channel) {
       // inside the extension panel; it is now flag-gated out of Marketplace bundles
       // (VITE_BEACON_RICH_TEXT_EDITOR_ENABLED, compliance doc R8.8), so the shipped inventory is zero.
       // Beacon writes to the canvas only through the Designer API, on an explicit user action.
-      pattern: /new MutationObserver\(/g,
-      label: "MutationObserver construction",
+      //
+      // The pin is on the bare identifier, not on `new MutationObserver(`: @dnd-kit/core 6.3.1 reads the
+      // constructor off `window` (`const { MutationObserver } = window; return new MutationObserver(…)`),
+      // which the minifier ships as `let{MutationObserver:e}=window;return new e(r)` — a live observer on
+      // `document.body` that the literal pin scored as 0 in every build up to 09-18 (compliance doc
+      // R8.18). A minifier can rename the local alias but never the property it is read from, and the
+      // identifier is what a reviewer's `grep -i MutationObserver` over the zip finds. That vendor
+      // observer is removed by patches/@dnd-kit__core@6.3.1.patch.
+      pattern: /\bMutationObserver\b/g,
+      label: "MutationObserver reference",
       expected: 0,
-      note: "Beacon ships none; the rich-text editor that constructed one is withheld by release flag (R8.8)",
+      note: "Beacon ships none; the rich-text editor (R8.8) and @dnd-kit/core's useRect observer (R8.18) are both withheld",
     },
     {
       // Review round 8 (2026-09-17) "CSP permits inline style attributes": the shipped policy is now

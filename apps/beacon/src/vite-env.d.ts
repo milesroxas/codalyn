@@ -21,7 +21,7 @@ declare const __BEACON_TELEMETRY_ENABLED__: boolean;
  * Build-time gate for the Lexical rich-text editor (see vite.config.ts and
  * shared/lib/beacon-release-flags.ts). `false` unless `VITE_BEACON_RICH_TEXT_EDITOR_ENABLED=true`:
  * the editor's dynamic import is dead-code-eliminated, a Webflow `richText` prop is composed in a
- * plain multiline textarea, and no `MutationObserver` ships. Marketplace bundles ship it off
+ * plain multiline textarea, and Lexical's `MutationObserver` does not ship. Marketplace bundles ship it off
  * (App Review Preflight "Silent Canvas Mutations", compliance doc R8.8).
  */
 declare const __BEACON_RICH_TEXT_EDITOR_ENABLED__: boolean;

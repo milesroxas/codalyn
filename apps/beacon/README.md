@@ -34,8 +34,9 @@ PostHog (opt-in telemetry) ships its own transport and is disclosed separately.
 The release build (`build:prod` / `build:preview`) fails on any of these anywhere in the compiled output, vendor code
 included, because Webflow's static review scanner flags them regardless of reachability:
 
-- a second bare `fetch(` or `new MutationObserver(` (the one observer is Lexical's contenteditable sync in the
-  rich-text editor — see the JSDoc on `RichTextEditor`);
+- a second bare `fetch(`, or any `MutationObserver` reference — constructor, `window` alias or property read; the
+  gate pins the identifier, not the call (Lexical's editor is flag-gated out, R8.8; `@dnd-kit/core`'s drag-measuring
+  observer is patched out, R8.18);
 - `window.open(`, `postMessage(`, `http://` / `ws://` URLs (W3C namespaces exempt), `.innerHTML =` /
   `.outerHTML =` / `insertAdjacentHTML(` / `document.write(`;
 - `?token=` / `&token=` query strings, `rrweb` / session-recording / `recorder`, `.toBlob(` / `toDataURL` /

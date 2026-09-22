@@ -6,7 +6,7 @@ import { Textarea } from "@/shared/ui/textarea";
  * Lazy so Lexical code-splits out of the main Composer chunk and only loads when a rich-text field opens (plan §12),
  * and conditional so it does not ship at all when the editor is flag-gated off: with
  * `__BEACON_RICH_TEXT_EDITOR_ENABLED__` false the ternary folds to `null` at build time and Rollup drops the whole
- * `import()` — the Lexical chunk, and with it the bundle's only `MutationObserver`, is absent from Marketplace
+ * `import()` — the Lexical chunk, and with it its `MutationObserver`, is absent from Marketplace
  * artifacts (App Review Preflight "Silent Canvas Mutations"; see shared/lib/beacon-release-flags.ts).
  */
 const RichTextEditor = __BEACON_RICH_TEXT_EDITOR_ENABLED__

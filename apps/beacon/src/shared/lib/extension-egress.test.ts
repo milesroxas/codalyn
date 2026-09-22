@@ -240,8 +240,8 @@ describe("isWebflowAssetUploadUrlShape", () => {
 });
 
 /**
- * Source-level pin for the bundle gate (scripts/build-cli.mjs pins exactly one bare `fetch(` and one
- * `new MutationObserver(` in Beacon release output, and forbids `setAttribute("style"`): no first-party
+ * Source-level pin for the bundle gate (scripts/build-cli.mjs pins exactly one bare `fetch(` and zero
+ * `MutationObserver` references in Beacon release output, and forbids `setAttribute("style"`): no first-party
  * module other than this one may call `fetch` directly, no first-party module may construct a
  * MutationObserver, and none may write a `style` attribute (the shipped CSP is `style-src-attr 'none'`).
  * Generated site-runtime source strings live in these files too, so the sweep covers the published-site

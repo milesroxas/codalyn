@@ -476,10 +476,10 @@ describe("pinnedMarkerCounts (App Review Preflight: External API Calls / Silent 
     // The published-site runtime's source-map trailer builder: the pragma ships as two halves, never the token.
     ";const T=[`//# source`,`MappingURL=`];";
 
-  it("pins one bare fetch(, no MutationObserver construction, two canvas style-attribute writes, one credentials: omit and no sourceMappingURL token in Beacon release output", () => {
+  it("pins one bare fetch(, no MutationObserver reference, two canvas style-attribute writes, one credentials: omit and no sourceMappingURL token in Beacon release output", () => {
     expect(pinned.map((m) => [m.label, m.expected])).toEqual([
       ["bare fetch( call", 1],
-      ["MutationObserver construction", 0],
+      ["MutationObserver reference", 0],
       ["style-attribute write (setAttribute)", 2],
       ["credentials: omit request option", 1],
       ["sourceMappingURL token", 0],
@@ -511,8 +511,26 @@ describe("pinnedMarkerCounts (App Review Preflight: External API Calls / Silent 
     // bundles (R8.8), so even one construction now fails the build.
     const leaked = `${clean};e._observer=new MutationObserver((t,n)=>{yt(e,t,n)})`;
     expect(() => assertPinnedMarkerCounts(leaked, pinned, "Build output")).toThrow(
-      /1 MutationObserver construction, expected exactly 0/
+      /1 MutationObserver reference, expected exactly 0/
     );
+  });
+
+  it("fails the build when a dependency constructs the observer through an alias read off window (R8.18)", () => {
+    // @dnd-kit/core 6.3.1's useMutationObserver as esbuild shipped it in bundle.js on 09-18: the constructor
+    // is destructured from `window` and renamed, so `new MutationObserver(` never appears while a live
+    // observer on document.body does. The identifier survives minification in the property read and the
+    // destructuring key — the two references below — and it is what a reviewer's grep over the zip finds.
+    const aliased =
+      `${clean};function hM(e){let{callback:t,disabled:n}=e,r=vA(t),i=(0,Y.useMemo)(()=>{` +
+      "if(n||typeof window>`u`||window.MutationObserver===void 0)return;let{MutationObserver:e}=window;return new e(r)},[r,n]);" +
+      "return(0,Y.useEffect)(()=>()=>i?.disconnect(),[i]),i}";
+    expect(() => assertPinnedMarkerCounts(aliased, pinned, "Archived zip")).toThrow(
+      /Archived zip contains 2 MutationObserver references, expected exactly 0/
+    );
+    // A bare property read (globalThis, window) is a reference too: one is enough to fail the build.
+    expect(() =>
+      assertPinnedMarkerCounts(`${clean};const M=globalThis.MutationObserver;`, pinned, "Build output")
+    ).toThrow(/1 MutationObserver reference, expected exactly 0/);
   });
 
   it("fails when the inventory shrinks too, so the compliance doc is updated with it", () => {
@@ -925,5 +943,31 @@ describe("CSS source map (Marketplace submission form + App Review Preflight: tr
     expect(entries).toEqual(["bundle.js.map", "styles.css.map"]);
     expect(existsSync(join(appPath, "dist", "styles.css"))).toBe(true);
     expect(existsSync(join(appPath, "dist", "styles.css.map"))).toBe(false);
+  });
+});
+
+describe("@dnd-kit/core / MutationObserver (pnpm patch applied)", () => {
+  // Compliance doc R8.18: @dnd-kit/core 6.3.1's useRect constructed a MutationObserver on document.body
+  // (childList + subtree, live for the duration of a drag) — the shape App Review Preflight reports as
+  // "Silent Canvas Mutations" — and the literal `new MutationObserver(` pin never saw it because the
+  // constructor is destructured from window and renamed by the minifier. patches/@dnd-kit__core@6.3.1.patch
+  // removes the hook; these tests prove the installed package is clean in every entry Vite or Vitest can
+  // resolve, and that the drag measuring path it sat in is otherwise intact.
+  const dndKitCoreDist = join(dirname(require.resolve("@dnd-kit/core/package.json")), "dist");
+  const entries = ["core.esm.js", "core.cjs.development.js", "core.cjs.production.min.js"];
+
+  it("installs a @dnd-kit/core with the document-body observer excised from every entry", () => {
+    for (const entry of entries) {
+      const source = readFileSync(join(dndKitCoreDist, entry), "utf-8");
+      expect(source, entry).not.toContain("MutationObserver");
+      expect(source, entry).not.toContain("useMutationObserver");
+    }
+  });
+
+  it("keeps the rest of the drag measuring path — ResizeObserver, useRect — in place", () => {
+    const esm = readFileSync(join(dndKitCoreDist, "core.esm.js"), "utf-8");
+    expect(esm).toContain("function useRect(");
+    expect(esm).toContain("function useResizeObserver(");
+    expect(esm).toContain("resizeObserver.observe(element)");
   });
 });

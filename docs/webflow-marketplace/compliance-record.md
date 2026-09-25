@@ -3631,7 +3631,7 @@ release gates all green) → `v0.1.0_public_09-22_19-44-58.zip` sha256
 never installed, never published, never filed). Runtime unchanged (`…9b7da263.js`; no runtime source touched).
 Tower unchanged (the 09-18 deploy stands; no server file in this change).
 
-**States:** Source ✓ (uncommitted) · Artifact ✓ (19:44) · Tower deployed ✓ (unchanged since 09-18) ·
+**States:** Source ✓ (`26b5200`) · Artifact ✓ (19:44, superseded by 17:27 — R8.21) · Tower deployed ✓ (unchanged since 09-18) ·
 Installed ✗ · Runtime ✗ · Submitted ✗ · Accepted ✗.
 
 **Verify installed (Step 3):** open Beacon signed out → **Continue with Webflow** signs in with no password
@@ -3639,3 +3639,61 @@ Installed ✗ · Runtime ✗ · Submitted ✗ · Accepted ✗.
 workspace / Use this workspace** (single) or the pick list; after the click, the app unlocks when beacon-demo is
 in the workspace's grant, else the consent link renders and the mint succeeds (no `no_active_workspace`).
 Console: only the two Webflow-client CSP lines above.
+
+### R8.21 Guideline audit of the R8.20 fixes — one mount-time Tower request removed from the workspace step (2026-09-25)
+
+**Trigger (operator, 2026-09-25).** "Make sure your bug fixes do not violate Webflow developer guidelines" —
+`/webflow-app-preflight` + `/webflow-app-review-remediation` over the R8.20 change set (commit `26b5200`).
+
+**Authority classification.** Webflow ID token (issuer Webflow, audience Tower, resource: identity only) — used as
+documented ([Get ID token](https://developers.webflow.com/designer/reference/get-user-id-token), 15-minute token,
+fetched just in time, sent in a POST body, never stored). Tower session bearer (issuer Tower, audience Tower) — App
+session, memory only. Tower one-time handoff token (issuer Tower, audience Tower, 3 min, fragment-only). No Webflow
+OAuth token touches the extension; no scope changed. Rules applied are the published
+[Marketplace guidelines](https://developers.webflow.com/data-beta/apps/docs/marketplace-guidelines) (quoted).
+
+| R8.20 change | Published rule (verbatim) | Result |
+| --- | --- | --- |
+| **Continue with Webflow** (`BeaconWebflowSignInButton` → `signInWithWebflow`): `getIdToken` → Tower `POST /api/auth/webflow-designer` → session bearer, on the click; retries `[0, 400, 1200] ms` inside the click, stop on permanent codes incl. `rate_limited`; `webflow.notify({ type: "Success" })` on success | "Every state-changing action must be traceable to a direct user interaction event, not fired on load or on a timer." · "Complete the OAuth flow once at install or upon explicit re-authorization. Do not re-trigger the Webflow OAuth flow on login…" · "Tokens must never be stored in browser local storage or session storage…" · "Signing out of your App must not invalidate the underlying Webflow authorization…" | ✓ click-traceable; ✓ the ID-token exchange is not the OAuth flow (nothing at `webflow.com/oauth/authorize`); ✓ bearer in memory, the localStorage key it clears is a boolean suppress flag, not a token; ✓ sign-out clears the bearer only; `notify` matches the [documented signature](https://developers.webflow.com/designer/reference/notify-user). No popup, no redirect, no `message` handler. |
+| **Workspace step** (`resolveBeaconSiteLinkGateState`, `BeaconWorkspaceGateView`): confirm / pick / none, before the consent link | same "state-changing action … not fired on load" sentence; R8.1 acceptance ("persist it only on an explicit user selection or confirmation") | ✓ the only write is `POST /api/v1/beacon/active-workspace` from the click; "Check again" is a GET on click; names render as text nodes. **One defect found, below.** |
+| **Open Tower** link (zero-workspace screen): `<a target="_blank" rel="noopener noreferrer">` to the Tower origin, handoff token in the URL **fragment** | "External redirects must be strictly necessary for OAuth or login, lead only to trusted domains you declare, and never expose sensitive data in URL query strings." | ✓ declared origin (`connect-src`, submission), login handoff, fragment never query (R6.3); same builder and shape as the Header / billing / sign-up links in every reviewed build since R7b.13. It is an anchor, not a redirect of the extension. |
+| Console residue (two CSP lines from Webflow's own `entrypoint-designer-extensions-client`) | "Ensure your App code is compatible with Webflow's enforced Content Security Policy" | ✓ not Beacon code; unchanged (R7b.15). |
+
+**Finding (self-issued, `security control` under the published "not fired on load" sentence).** `BeaconWorkspaceGate`
+called `useTowerAppLink(TOWER_APP_ENTRY_PATH)` unconditionally, and that hook pre-mints its one-time token on
+mount (`GET /api/auth/one-time-token/generate`, Tower bearer) — so the confirm and pick screens, which never render
+the "Open Tower" link, issued one Tower request on mount with nothing to show for it. Same class as the Header
+connection indicator's mount-time mint (present in every reviewed build since R7b.13, never raised), but the
+confirm screen is the one a reviewer watches after R8.1, and the request would read as a second unexplained write.
+**Fix:** `BeaconNoWorkspaceGate` (`features/auth/ui/beacon-site-link-gate.tsx`) mounts the hook only on the
+zero-workspace branch; confirm/pick render the view with `towerLinkProps={null}`. View, state and stories unchanged.
+**Test:** `beacon-site-link-gate.test.tsx` (5): single workspace → confirm screen, no handoff mint, no consent mint, no
+write; several → pick list, same; none → anchor `_blank` / `noopener noreferrer`, href
+`…/beacon-handoff#ott=…&callbackUrl=…` (never `?ott=`), exactly one mint, no consent mint; workspace active + site
+granted → routes render, nothing minted; active + ungranted → consent URL minted once (explicit re-authorization),
+no handoff mint.
+
+**Not a published requirement either way — recorded as `open decision`.** Neither [Get ID token](https://developers.webflow.com/designer/reference/get-user-id-token)
+nor the hybrid-app guide says *when* to call `getIdToken` (the reference page shows only the call; the guide's body is
+not served as Markdown — checked `.md` and `llms.txt` 2026-09-25). The silent exchange on load (`use-beacon-tower-session.ts`
+mount effect → Tower session, and on first contact a Tower account) predates round 8 and has never been raised across
+eight rounds; under a strict reading of "state-changing action … not fired on load" it is the one remaining
+load-time write. The explicit button (R8.20) is the user-initiated path if it is ever raised; nothing else in this
+change adds load-time behaviour.
+
+**Artifact.** `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod` (lint, typecheck, tests, Vite, release
+gates green) → `v0.1.0_public_09-25_17-27-35.zip` sha256
+`773e5ff247a216e91c1fc59a8f90d1227a1e7d8d84219dbd24eeafab5715c7ee` + `.sourcemaps.zip` sha256
+`bce9c39f137099435fae8fd84dea5599c78c4fe45089d6860247aaeee5e5c85f`. Replaces 19:44 (never installed, published or
+filed). Marker sweep 19:44 → 17:27, identical on every pin: bare `fetch(` 1 · `MutationObserver` 0 · `window.open(` 0 ·
+`window.opener` 0 · `postMessage(` 0 · `eval(` 0 · `sentry` 0 · `ws://` 0 · `one-time-token` 1 · `beacon-handoff#ott=` 1 ·
+`getIdToken` 1 · `localStorage` 11 · `sessionStorage` 3 · `setAttribute("style"` 0. File set identical except two
+content-hashed chunk names; `webflow.json` byte-identical. Runtime unchanged (`…9b7da263.js`). Tower unchanged.
+`pnpm --filter beacon typecheck` exit 0 · `lint` exit 0 (4 pre-existing CSS `!important` warnings) ·
+`vitest run src/features/auth src/features/settings` 112/112.
+
+**States:** Source ✓ (uncommitted; R8.20 is `26b5200`) · Artifact ✓ (17:27) · Tower deployed ✓ (unchanged since
+09-18) · Installed ✗ · Runtime ✗ · Submitted ✗ · Accepted ✗.
+
+**Verify installed (Step 3):** on "Confirm your workspace", Network filtered to `tower.codalyn.app` shows nothing
+after the settings pull until the click; the click issues exactly one `POST /api/v1/beacon/active-workspace`.

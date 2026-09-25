@@ -7,7 +7,10 @@ import { TOWER_APP_ENTRY_PATH } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
 import { useTowerAppLink } from "@/features/auth/model/use-tower-app-link";
 import { useWebflowAuthorizeLink } from "@/features/auth/model/use-webflow-authorize-link";
-import { BeaconWorkspaceGateView } from "@/features/auth/ui/beacon-workspace-gate-view";
+import {
+  BeaconWorkspaceGateView,
+  type BeaconWorkspaceGateViewProps,
+} from "@/features/auth/ui/beacon-workspace-gate-view";
 import { WebflowAuthorizeGateView } from "@/features/auth/ui/webflow-authorize-gate-view";
 import { useBeaconAppSettings } from "@/features/settings/model/beacon-app-settings-provider";
 import { beaconAppRouteSurfaceClass } from "@/shared/lib/beacon-app-route-surface";
@@ -30,6 +33,17 @@ function siteLabelFor(site: BeaconCurrentSite): string {
 }
 
 /**
+ * "No workspace at all" body. The only way forward is Tower, so this is the one branch that mounts
+ * the session-handoff link — `useTowerAppLink` pre-mints its one-time token on mount, and that Tower
+ * request must not fire on the confirm/pick screens, which never render the link (Marketplace
+ * guidelines: state-changing actions are not "fired on load").
+ */
+function BeaconNoWorkspaceGate(props: Omit<BeaconWorkspaceGateViewProps, "towerLinkProps">) {
+  const towerLinkProps = useTowerAppLink(TOWER_APP_ENTRY_PATH);
+  return <BeaconWorkspaceGateView {...props} towerLinkProps={towerLinkProps} />;
+}
+
+/**
  * Workspace step: the session holds no active Tower workspace, so Tower can neither list the sites
  * in the workspace's Webflow grant nor mint a consent URL. The user confirms the single workspace or
  * picks one; only that click persists anything (`POST /api/v1/beacon/active-workspace`, review round
@@ -39,7 +53,6 @@ function BeaconWorkspaceGate(props: { site: BeaconCurrentSite }) {
   const { site } = props;
   const { beaconWorkspaces, setActiveBeaconWorkspace, refreshBeaconSettings } = useBeaconAppSettings();
   const { clearStoredSession } = useBeaconTowerSession();
-  const towerLinkProps = useTowerAppLink(TOWER_APP_ENTRY_PATH);
   // A successful confirmation triggers a settings re-pull, which flips the guard to its loading state
   // and unmounts this gate — so only a refused confirmation has to reset the selection here.
   const [selectingId, setSelectingId] = useState<string | null>(null);
@@ -59,17 +72,19 @@ function BeaconWorkspaceGate(props: { site: BeaconCurrentSite }) {
     [setActiveBeaconWorkspace]
   );
 
-  return (
-    <BeaconWorkspaceGateView
-      siteLabel={siteLabelFor(site)}
-      workspaces={beaconWorkspaces}
-      selectingId={selectingId}
-      selectFailed={selectFailed}
-      towerLinkProps={towerLinkProps}
-      onSelectWorkspace={onSelectWorkspace}
-      onCheckAgain={refreshBeaconSettings}
-      onSignOut={clearStoredSession}
-    />
+  const viewProps: Omit<BeaconWorkspaceGateViewProps, "towerLinkProps"> = {
+    siteLabel: siteLabelFor(site),
+    workspaces: beaconWorkspaces,
+    selectingId,
+    selectFailed,
+    onSelectWorkspace,
+    onCheckAgain: refreshBeaconSettings,
+    onSignOut: clearStoredSession,
+  };
+  return beaconWorkspaces.length === 0 ? (
+    <BeaconNoWorkspaceGate {...viewProps} />
+  ) : (
+    <BeaconWorkspaceGateView {...viewProps} towerLinkProps={null} />
   );
 }
 

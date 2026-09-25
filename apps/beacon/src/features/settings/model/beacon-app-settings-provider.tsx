@@ -74,8 +74,11 @@ type BeaconAppSettingsContextValue = {
    * through {@link setActiveBeaconWorkspace}.
    */
   suggestedWorkspaceId: string | null;
-  /** Switch active Tower workspace (session) on an explicit user selection; refetches settings on success. */
-  setActiveBeaconWorkspace: (organizationId: string) => void;
+  /**
+   * Switch active Tower workspace (session) on an explicit user selection; refetches settings on
+   * success. Resolves `{ ok: false }` when Tower refused or could not be reached (nothing changed).
+   */
+  setActiveBeaconWorkspace: (organizationId: string) => Promise<{ ok: boolean }>;
 };
 
 const BeaconAppSettingsContext = createContext<BeaconAppSettingsContextValue | undefined>(undefined);
@@ -457,19 +460,24 @@ export function BeaconAppSettingsProvider({ children }: { children: ReactNode })
   );
 
   const setActiveBeaconWorkspace = useCallback(
-    (organizationId: string) => {
+    async (organizationId: string): Promise<{ ok: boolean }> => {
       if (!user?.id || !organizationId.trim()) {
-        return;
+        return { ok: false };
       }
-      void towerFetch("/api/v1/beacon/active-workspace", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organizationId: organizationId.trim() }),
-      }).then((r) => {
-        if (r.ok) {
-          pullSettingsFromTower();
+      try {
+        const r = await towerFetch("/api/v1/beacon/active-workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ organizationId: organizationId.trim() }),
+        });
+        if (!r.ok) {
+          return { ok: false };
         }
-      });
+      } catch {
+        return { ok: false };
+      }
+      pullSettingsFromTower();
+      return { ok: true };
     },
     [user?.id, pullSettingsFromTower]
   );

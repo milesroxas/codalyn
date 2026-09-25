@@ -3539,3 +3539,103 @@ replaced by a note that the field does not exist. The 494-character body moved t
 match. Nothing about the artifact, the bundle or the runtime changes; the same six items remain in the form's
 *Additional notes* in full.
 
+### R8.20 Every signed-in extension session dead-ended at the consent link; the documented Webflow sign-in was disabled after one sign-out (2026-09-22)
+
+**Trigger (operator, 2026-09-22, testing the 09-22 15:25 build per SUBMIT.md Step 3).** Opening Beacon on
+beacon-demo showed the *Welcome / Sign in to Tower* screen (no silent Designer sign-in). After an email sign-in
+the panel showed the site-authorization gate ("Authorize Beacon Demo in Webflow to continue") with the error
+"No active Tower workspace"; the console showed `POST https://tower.codalyn.app/api/integrations/webflow/authorize
+400 (Bad Request)`. Ask: audit the whole sign-in path from first principles against the published hybrid-app
+docs, fix what is actually wrong, no rebuild for its own sake.
+
+**Audited against the published docs** ([Authenticating hybrid apps](https://developers.webflow.com/data-beta/docs/authenticating-users-with-id-tokens),
+[Get ID token](https://developers.webflow.com/designer/reference/get-user-id-token),
+[Resolve token](https://developers.webflow.com/data/v2.0.0-beta/reference/token/resolve),
+[Submitting your app](https://developers.webflow.com/data-beta/docs/marketplace/submitting-your-app) § Hybrid install URL,
+[Marketplace guidelines](https://developers.webflow.com/data-beta/apps/docs/marketplace-guidelines) § OAuth session behaviour, popups, CSP).
+The Webflow-facing parts are as documented and unchanged since R8.11: install = one OAuth via the registered
+install URL (Tower's authorize route — the docs' "direct users to your platform first" option); in the Designer,
+`getIdToken` → Tower `POST /beta/token/resolve` with a Data Client bearer → "create an account or match to an
+existing user" (`establishDesignerBetterAuthSession`) → Tower session as a JSON bearer, memory only; OAuth never
+re-triggered on login; sign-out leaves the Webflow authorization intact; the consent screen is an anchor, never
+`window.open`. **What broke is the Tower tenant step Tower inserts between "user identified" and "Data API
+usable", in two places — both ours, neither a Webflow requirement.**
+
+1. **The site gate could not tell "no workspace on this session" from "site not authorized".** Tower keys Data
+   API access on the session's active workspace; since R8.12 a bearer session gets no default. Without a
+   workspace `listWebflowSitesForUser` has no token and returns `webflowSites: null`, and
+   `POST /api/integrations/webflow/authorize` answers 400 `no_active_workspace`. `BeaconSiteLinkGuard` read
+   `null` as "site not in the grant", rendered the consent gate, minted the URL and showed Tower's refusal —
+   for every extension session, including the reviewer's; the only "Use this workspace" control sat in the
+   header menu and the error text pointed at Tower instead. R8.1 was closed correctly on the server (no
+   silent default) but the gate was never taught the missing step.
+   **Fix (Beacon):** the gate decision is now the pure `resolveBeaconSiteLinkGateState`
+   (`features/auth/lib/beacon-site-link-gate-state.ts`): `pass` · `loading` · `choose_workspace` ·
+   `no_workspace` · `authorize`, in that order — the workspace step runs before the site is judged, and the
+   consent link renders only with a workspace active. New `BeaconWorkspaceGateView`
+   (`features/auth/ui/beacon-workspace-gate-view.tsx`): one workspace → shown as the default with the existing
+   **Use this workspace** confirmation; several → a pick list; none → "Open Tower" new-tab link + "Check
+   again". Nothing is persisted until the click (the R8.1 acceptance holds: the only write is still
+   `POST /api/v1/beacon/active-workspace` from that click). `setActiveBeaconWorkspace` now resolves
+   `{ ok }` so a refused confirmation re-enables the control with an inline error instead of hanging.
+   The `no_active_workspace` message no longer sends the user to Tower.
+
+2. **One sign-out disabled the documented sign-in path for good.** `clearStoredSession` and the stale-token
+   reaper write `codalyn:beacon-tower-suppress-designer-exchange=1` to localStorage so the silent
+   `getIdToken` exchange does not undo a sign-out; only an email + password sign-in cleared it, and the welcome
+   screen offered nothing else. A Tower account provisioned from the Designer has no password
+   (`provisionNewDesignerUser` creates none), so such a user was locked out until a reset e-mail. The 09-22
+   console (no Tower request at all on load — a failed exchange logs a 4xx/5xx line, as the authorize 400 did)
+   matches the suppression being set, not the exchange failing.
+   **Fix (Beacon):** **Continue with Webflow** on the welcome screen (`BeaconWebflowSignInButton` →
+   `signInWithWebflow` in `use-beacon-tower-session.ts`): the same exchange, run on the click; it clears the
+   suppression and the after-failure block (both exist only to stop *automatic* re-sign-in), never flips the
+   exchange phase (which feeds `isPending` and would unmount the screen before its error could show), and
+   holds the reaper like an email sign-in. Error codes map to copy in `webflow-sign-in-error.ts`
+   (`early_access_required` → request access; operator-side resolve failures → one "can't verify Webflow
+   sign-ins right now" line). Email + password stays beneath it for accounts whose Tower and Webflow e-mails
+   differ. Nothing runs on load that did not before; no window; bearer still memory-only.
+
+**Not defects — expected console residue (R7b.15), runbook corrected:** the two CSP lines in the 09-22
+console come from Webflow's own injected `entrypoint-designer-extensions-client.….js`: `Applying inline style
+violates … style-src-elem` (its rrweb `<style>`) and `Connecting to https://d3e54v103j8qbb.cloudfront.net/…js…
+violates … connect-src` (DevTools fetching its `.js.map`). Both are deliberately blocked; nothing in Beacon depends
+on them, and admitting them would reopen finding 5 (`unsafe-inline`). The PayPal 400 and the `start_url` manifest
+warning are the Designer's top frame. SUBMIT.md Step 3.2 said "no CSP violation" — it now names these lines as
+the expected set and anything else as a stop.
+
+**Not changed, on purpose.** No server-side workspace default for bearer sessions (that *is* the reviewer's
+finding). No Tower change at all: the extension owned the missing step. The whole-app gate for a signed-in user
+on an unauthorized site is kept (product decision, not a Webflow rule). Direction if the workspace click ever
+becomes a review point: derive the Data API tenant for a Designer request from the site the ID token was issued
+on (`organization_webflow_site` already maps site → org since R7b.3) instead of from persisted session state —
+that is Webflow's own key and would make the step disappear for the common case; not done here because the
+straightforward fix suffices.
+
+**Tests.** New: `beacon-site-link-gate-state.test.ts` (9: every state, the 09-22 dead end pinned —
+`hasActiveWorkspace: false` + `authorizedSiteIds: null` → `choose_workspace`, never `authorize`; id match,
+label rejected), `beacon-workspace-gate-view.test.tsx` (7: confirm only on click, pick by id, disabled while
+persisting, Tower anchor `target=_blank rel=noopener noreferrer`, failure line, sign-out),
+`use-beacon-tower-session.test.tsx` (2: explicit sign-in runs the exchange with the suppression set and clears
+it; refused exchange surfaces the code, no refetch, no retry), `webflow-sign-in-error.test.ts` (3). Existing
+R8.1 pins untouched and green (`beacon-app-settings-provider.test.tsx`, `beacon-workspace-control.test.tsx`).
+Stories: `Auth/BeaconWorkspaceGateView` (6 variants), `Auth/WebflowAuthorizeGateView` +
+`ErrorNoActiveWorkspace`, `Auth/BeaconOnboarding` doc updated (button is live, fails soft without a Designer).
+`pnpm --filter beacon typecheck` exit 0 · `lint` exit 0 (4 pre-existing CSS `!important` warnings) ·
+`vitest run src/features/auth src/features/settings` 107/107.
+
+**Artifact:** `CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod` (lint, typecheck, tests, Vite,
+release gates all green) → `v0.1.0_public_09-22_19-44-58.zip` sha256
+`43e21b8af6ceaae9f0ccf09ae99a0c772f26206dcb8a89126c4797031049fcb0` + `.sourcemaps.zip` sha256
+`eb6c23c9e0e46285a29b6015c73659fbf7936e8ebae793fa07150b0c1efb67bd`. Replaces the 15:25 zip (sha `0fef7fb9…`,
+never installed, never published, never filed). Runtime unchanged (`…9b7da263.js`; no runtime source touched).
+Tower unchanged (the 09-18 deploy stands; no server file in this change).
+
+**States:** Source ✓ (uncommitted) · Artifact ✓ (19:44) · Tower deployed ✓ (unchanged since 09-18) ·
+Installed ✗ · Runtime ✗ · Submitted ✗ · Accepted ✗.
+
+**Verify installed (Step 3):** open Beacon signed out → **Continue with Webflow** signs in with no password
+(or the silent exchange does, on a profile that never signed out); the next screen is **Confirm your
+workspace / Use this workspace** (single) or the pick list; after the click, the app unlocks when beacon-demo is
+in the workspace's grant, else the consent link renders and the mint succeeds (no `no_active_workspace`).
+Console: only the two Webflow-client CSP lines above.

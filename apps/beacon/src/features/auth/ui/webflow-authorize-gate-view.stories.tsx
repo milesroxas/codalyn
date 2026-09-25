@@ -55,3 +55,12 @@ export const ErrorTeamAdminRequired: Story = {
 export const ErrorTowerUnreachable: Story = {
   args: { state: { kind: "error", error: "tower_unreachable" }, linkProps: null },
 };
+
+/**
+ * Tower declined because the session holds no active workspace. The gate's workspace step normally
+ * runs first (`BeaconWorkspaceGateView`), so this is only reachable if the workspace was cleared
+ * between the two.
+ */
+export const ErrorNoActiveWorkspace: Story = {
+  args: { state: { kind: "error", error: "no_active_workspace" }, linkProps: null },
+};

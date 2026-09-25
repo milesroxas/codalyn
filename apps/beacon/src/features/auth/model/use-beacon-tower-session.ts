@@ -27,13 +27,16 @@ let designerExchangeInFlight = false;
 /** Permanent auth failures stop silent auto-retry until an explicit sign-in clears this flag. */
 let designerExchangeBlockedAfterFailure = false;
 /**
- * True while an inline email/password sign-in is writing its token and refetching. Guards the stale-token
- * reaper (token is written before the session resolves) WITHOUT flipping `isPending` — the login form must
- * stay mounted so its inline error/spinner are not lost mid-submit.
+ * True while an explicit sign-in — inline email/password, or the "Continue with Webflow" click — is
+ * writing its token and refetching. Guards the stale-token reaper (token is written before the session
+ * resolves) WITHOUT flipping `isPending` — the login screen must stay mounted so its inline
+ * error/spinner are not lost mid-submit.
  */
-let emailSignInInFlight = false;
+let explicitSignInInFlight = false;
 
 const DESIGNER_EXCHANGE_RETRY_DELAYS_MS = [0, 400, 1200] as const;
+
+export type WebflowSignInResult = { ok: true } | { ok: false; error: string };
 
 export type BridgedTowerUser = {
   id: string;
@@ -84,7 +87,7 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
-async function runSilentDesignerExchangeWithRetries(): Promise<{ ok: true } | { ok: false; error: string }> {
+async function runDesignerExchangeWithRetries(): Promise<{ ok: true } | { ok: false; error: string }> {
   let lastError = "exchange_failed";
   for (let attempt = 0; attempt < DESIGNER_EXCHANGE_RETRY_DELAYS_MS.length; attempt += 1) {
     const delay = DESIGNER_EXCHANGE_RETRY_DELAYS_MS[attempt] ?? 0;
@@ -113,6 +116,8 @@ export function useBeaconTowerSession(): {
   refetch: () => Promise<void>;
   clearStoredSession: () => void;
   signInWithEmail: (email: string, password: string) => Promise<TowerEmailSignInResult>;
+  /** Explicit, user-initiated Designer ID-token exchange (the "Continue with Webflow" click). */
+  signInWithWebflow: () => Promise<WebflowSignInResult>;
 } {
   const { data: session, isPending: authSessionPending, refetch } = useTowerSession();
   const hasStoredSessionToken = Boolean(readBeaconTowerSessionToken());
@@ -150,7 +155,7 @@ export function useBeaconTowerSession(): {
       designerExchangeBlockedAfterFailure = false;
       // Guard the reaper across the token write + refetch, but DON'T touch the exchange phase: that feeds
       // `isPending`, which would hide the login gate and unmount this form before its error could show.
-      emailSignInInFlight = true;
+      explicitSignInInFlight = true;
       try {
         const result = await signInToTowerWithEmail(email, password);
         if (result.ok) {
@@ -158,11 +163,45 @@ export function useBeaconTowerSession(): {
         }
         return result;
       } finally {
-        emailSignInInFlight = false;
+        explicitSignInInFlight = false;
       }
     },
     [refetch]
   );
+
+  /**
+   * The documented hybrid-app sign-in (`webflow.getIdToken()` → Tower `token/resolve` → Tower session),
+   * run on the user's click. Unlike the silent run on load it ignores the sign-out suppression and the
+   * after-failure block — both exist only to stop *automatic* re-sign-in — and clears them, so a later
+   * silent run behaves normally again. Never flips the exchange phase (that feeds `isPending` and would
+   * unmount the welcome screen before its error could show); the reaper is held like an email sign-in.
+   */
+  const signInWithWebflow = useCallback(async (): Promise<WebflowSignInResult> => {
+    if (!towerOrigin) {
+      return { ok: false, error: "tower_not_configured" };
+    }
+    if (designerExchangeInFlight) {
+      return { ok: false, error: "exchange_in_flight" };
+    }
+    invalidateBeaconTowerSignOut();
+    setSuppressDesignerSessionExchange(false);
+    designerExchangeBlockedAfterFailure = false;
+    designerExchangeInFlight = true;
+    explicitSignInInFlight = true;
+    try {
+      const result = await runDesignerExchangeWithRetries();
+      if (result.ok) {
+        await refetch();
+      } else {
+        // Keep focus/visibility from re-running the same failing exchange; the next click clears this.
+        designerExchangeBlockedAfterFailure = true;
+      }
+      return result;
+    } finally {
+      designerExchangeInFlight = false;
+      explicitSignInInFlight = false;
+    }
+  }, [refetch, towerOrigin]);
 
   useEffect(() => {
     if (!towerOrigin) {
@@ -189,7 +228,7 @@ export function useBeaconTowerSession(): {
       }
       designerExchangeInFlight = true;
       setBeaconTowerDesignerExchangePhase("running");
-      void runSilentDesignerExchangeWithRetries()
+      void runDesignerExchangeWithRetries()
         .then(async (r) => {
           if (r.ok) {
             designerExchangeBlockedAfterFailure = false;
@@ -201,8 +240,8 @@ export function useBeaconTowerSession(): {
           } else {
             // Exhausted the retry ladder (or hit a permanent failure). Stop further SILENT auto-retries
             // so focus/visibilitychange don't re-storm Tower with the same failing exchange; the user
-            // lands in the guest gate. A manual "Sign in to Tower" (email sign-in) clears this flag and
-            // re-enables sign-in.
+            // lands in the welcome gate. An explicit sign-in ("Continue with Webflow" or email) clears
+            // this flag.
             designerExchangeBlockedAfterFailure = true;
           }
         })
@@ -240,7 +279,7 @@ export function useBeaconTowerSession(): {
     if (
       authSessionPending ||
       designerExchangePhase === "running" ||
-      emailSignInInFlight ||
+      explicitSignInInFlight ||
       !hasStoredSessionToken ||
       user
     ) {
@@ -262,5 +301,6 @@ export function useBeaconTowerSession(): {
     refetch,
     clearStoredSession,
     signInWithEmail,
+    signInWithWebflow,
   };
 }

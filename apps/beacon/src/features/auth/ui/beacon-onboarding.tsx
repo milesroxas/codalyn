@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BeaconEarlyAccessRequestForm } from "@/features/auth/ui/beacon-early-access-request-form";
 import { BeaconTowerSignInForm } from "@/features/auth/ui/beacon-tower-sign-in-form";
+import { BeaconWebflowSignInButton } from "@/features/auth/ui/beacon-webflow-sign-in-button";
 import { Button } from "@/shared/ui/button";
 
 type BeaconOnboardingProps = {
@@ -13,6 +14,10 @@ type BeaconOnboardingProps = {
 /**
  * App-level welcome/auth screen: Tower sign-in (recommended) vs continue as guest.
  * Rendered by the home screen and the image editor before a session or guest choice exists.
+ *
+ * Sign-in offers the documented hybrid-app path first — "Continue with Webflow" runs the Designer
+ * ID-token exchange on the click — with email + password beneath it for accounts whose Tower and
+ * Webflow e-mails differ.
  */
 export function BeaconOnboarding(props: BeaconOnboardingProps) {
   const { towerConfigured, earlyAccessRequired, onContinueAsGuest } = props;
@@ -46,6 +51,8 @@ export function BeaconOnboarding(props: BeaconOnboardingProps) {
               <BeaconEarlyAccessRequestForm onBackToSignIn={() => setRequestingAccess(false)} />
             ) : (
               <>
+                <BeaconWebflowSignInButton />
+                <p className="text-center text-[11px] uppercase tracking-wide text-muted-foreground">or with email</p>
                 <BeaconTowerSignInForm />
                 {!publicSignUpOpen ? (
                   <Button type="button" variant="outline" className="w-full" onClick={() => setRequestingAccess(true)}>

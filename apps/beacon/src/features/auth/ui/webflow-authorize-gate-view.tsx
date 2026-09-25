@@ -12,7 +12,7 @@ export function messageForAuthorizeError(error: string): string {
     case "team_admin_required":
       return "Only a workspace admin can authorize sites in Webflow. Ask an admin to connect this site.";
     case "no_active_workspace":
-      return "No active Tower workspace. Open Tower to select a workspace, then try again.";
+      return "No workspace is active for this session. Choose one from the menu, then try again.";
     case "unauthorized":
       return "Your Tower session expired. Sign out and sign in again.";
     case "webflow_identity_required":

@@ -9,9 +9,14 @@
 > bundle into review; the form at developers.webflow.com/submit records the update and its review artifacts.
 > **Step 6a below now spells out the radio.** No review feedback exists for the 09-18 build; it is replaced anyway (R8.18: a vendor
 > `MutationObserver` the literal gate never saw). Run every step again for the new build; reply on the existing thread.
+>
+> **2026-09-22 evening — the 15:25 build is replaced by 19:44 (R8.20).** Testing Step 3 on 15:25 dead-ended every
+> signed-in session at the consent link (`no_active_workspace`: the gate had no workspace step after R8.12) and a
+> single sign-out disabled the Webflow sign-in for good. Both fixed in the extension; Tower unchanged. 15:25 was never
+> installed, published or filed.
 
-**Build to submit:** `v0.1.0_public_09-22_15-25-46.zip` (built 2026-09-22 15:25). Everything on this page is for this build only.
-Why each thing is the way it is: [compliance-record.md](compliance-record.md) Round 8, R8.1–R8.18.
+**Build to submit:** `v0.1.0_public_09-22_19-44-58.zip` (built 2026-09-22 19:44). Everything on this page is for this build only.
+Why each thing is the way it is: [compliance-record.md](compliance-record.md) Round 8, R8.1–R8.20.
 Anything Preflight shows that is not listed under step 4 or step 5 below → stop and follow [playbook.md](playbook.md) § B.
 
 ## What the six findings became in code
@@ -20,7 +25,7 @@ Every finding is a code change you can point to; none is answered with an explan
 
 | # | Review finding | What changed | Where |
 | --- | --- | --- | --- |
-| 1 | Workspace persisted without user interaction | Auto-POST effect deleted; a single workspace is only a local suggestion with a **Use this workspace** button. Tower no longer defaults a workspace onto extension sessions (bearer sessions resolve with no membership fallback and no write) | Beacon `settings/model/beacon-app-settings-provider.tsx`, `settings/ui/beacon-workspace-control.tsx` · Tower `server/resolve-active-organization-id.ts`, `server/billing/session-org.ts`, `server/beacon-settings-context.ts` |
+| 1 | Workspace persisted without user interaction | Auto-POST effect deleted; a single workspace is only a local suggestion with a **Use this workspace** button — now the first screen after sign-in (the site gate's workspace step, R8.20). Tower no longer defaults a workspace onto extension sessions (bearer sessions resolve with no membership fallback and no write) | Beacon `settings/model/beacon-app-settings-provider.tsx`, `settings/ui/beacon-workspace-control.tsx`, `auth/ui/beacon-workspace-gate-view.tsx`, `auth/lib/beacon-site-link-gate-state.ts` · Tower `server/resolve-active-organization-id.ts`, `server/billing/session-org.ts`, `server/beacon-settings-context.ts` |
 | 2 | Telemetry without redaction | Redaction handler wired as PostHog `before_send`, unit-tested with synthetic secrets. On top: the Marketplace build ships no telemetry SDK at all (release flag off; build gate forbids any trace) | `shared/lib/telemetry-event-redaction.ts`, `shared/lib/init-observability.ts`, `shared/lib/beacon-release-flags.ts` |
 | 3 | Redirects followed | `redirect` pinned to `error` at the single fetch site; callers cannot override | `shared/lib/extension-egress.ts` |
 | 4 | Any S3 bucket accepted | Exact `uploadUrl` granted once per create-asset response; CSP connect-src names Webflow's bucket only (`https://webflow-prod-assets.s3.amazonaws.com`, the form production returns, plus the path-style form the docs show), never the bare S3 host | `shared/lib/extension-egress.ts`, `shared/lib/webflow-asset-upload-endpoint.ts`, `shared/lib/beacon-extension-csp.ts` |
@@ -55,18 +60,29 @@ Check: `https://tower.codalyn.app/privacy` § 1 says the Marketplace build inclu
 
 ### Step 2 — Commit
 
-The R8.18 change set — gate pin, `patches/@dnd-kit__core@6.3.1.patch`, lockfile, gate tests, comment fixes and these docs — is uncommitted. Commit before uploading anything, so the artifact hash maps to a commit.
+The R8.18 change set — gate pin, `patches/@dnd-kit__core@6.3.1.patch`, lockfile, gate tests, comment fixes — and the
+R8.20 change set (site-gate workspace step, "Continue with Webflow", their tests and stories, these docs) are
+uncommitted. Commit before uploading anything, so the artifact hash maps to a commit.
 
 ### Step 3 — Install the bundle on the test site and push the runtime
 
 1. Workspace settings → Apps & Integrations → Beacon → **Publish new version** → upload
-   `apps/beacon/bundle/production/public/v0.1.0_public_09-22_15-25-46.zip` → distribution **"Publish for internal
+   `apps/beacon/bundle/production/public/v0.1.0_public_09-22_19-44-58.zip` → distribution **"Publish for internal
    testing (Workspace only)"** → publish. This installs the build on beacon-demo for Steps 3–5 and is **not** the
    submission: an internal version never enters review (what happened on 09-18, R8.18). Step 6a publishes the same
    zip again with the Marketplace radio.
-2. Open Beacon on **beacon-demo**. The panel must render; the extension console must show **no CSP violation**.
-3. Sign in. With one workspace you must see **Use this workspace** — click it.
-   If the workspace is already active without a click, Tower is not deployed yet → Step 1.
+2. Open Beacon on **beacon-demo**. The panel must render. The extension console may show exactly two CSP lines,
+   both from Webflow's own injected `entrypoint-designer-extensions-client.….js` and expected (R7b.15, R8.20):
+   `Applying inline style violates … 'style-src-elem'` (its rrweb `<style>`) and `Connecting to
+   https://d3e54v103j8qbb.cloudfront.net/…js… violates … "connect-src"` (DevTools fetching its `.js.map`). The
+   PayPal 400 and the `start_url` manifest warning are the Designer's top frame. **Any CSP line naming a Beacon
+   file, or any Tower request error, → stop** and record it.
+3. Sign in. If the welcome screen shows, click **Continue with Webflow** (no password; a profile that never
+   signed out is signed in silently). The next screen must be **Confirm your workspace → Use this workspace**
+   (one workspace) or a pick list — click. If the app opens with a workspace already active and no click, Tower
+   is not deployed yet → Step 1. If the consent gate shows instead ("Authorize Beacon Demo in Webflow…"), the
+   site is outside the workspace's grant: click **Open Webflow authorization**, approve beacon-demo, return —
+   Beacon unlocks on its own. A "No workspace is active" error on that gate is a defect → record it.
 4. **Test page.** Prefer a bare page: a new blank page with one working beacon list, no Interactions, no
    template components, no embeds. Webflow's site runtime still loads (it is on every page), but GSAP,
    ScrollTrigger and most `achunk` files disappear from Preflight's "unreviewed" list. If you keep
@@ -100,8 +116,8 @@ Without a Sync the pin script must print the 09-18 values already in Step 5 (fil
 Open **App Review Preflight** in the Designer ([install it into the Workspace](https://webflow.com/oauth/authorize?response_type=code&client_id=0b5411e62233387925e082350666ef374377f81a9abba0dcc2542d6b5b1e4388&scope=authorized_user%3Aread) if it is missing).
 
 1. Upload both files from `apps/beacon/bundle/production/public/`:
-   - bundle → `v0.1.0_public_09-22_15-25-46.zip`
-   - source maps → `v0.1.0_public_09-22_15-25-46.sourcemaps.zip`
+   - bundle → `v0.1.0_public_09-22_19-44-58.zip`
+   - source maps → `v0.1.0_public_09-22_19-44-58.sourcemaps.zip`
 2. Expected **Review feedback: exactly one item, "External API Calls" (REQUIRED), 1 evidence location** in `assets/label-*.js`.
    That is the extension's single backend call (Hybrid App: Tower). It cannot go away while the app has a backend; the notes in Step 6 disclose it. The excerpt's position moves between scans (it has sat on the storage cleanup, then on the Tower policy-page links) — the rule is the same.
 3. Anything else — a second item, "Silent Canvas Mutations", an External API Calls excerpt outside the `label-*.js` chunk — → stop, [playbook.md](playbook.md) § B.
@@ -157,7 +173,7 @@ changes the Designer Extension must publish a new version from the Workspace *in
 [Submitting your app](https://developers.webflow.com/data-beta/docs/marketplace/submitting-your-app) §
 *Updating a Designer Extension?*). The docs fix no order; do the publish first anyway, so the form's artifacts
 describe a version that is already in review. In the current dialog the distribution is a radio: Workspace settings → Apps & Integrations → Beacon → **Publish new version** →
-*Upload zip file* → the same `v0.1.0_public_09-22_15-25-46.zip` as Step 3 → **Select distribution: "Publish new
+*Upload zip file* → the same `v0.1.0_public_09-22_19-44-58.zip` as Step 3 → **Select distribution: "Publish new
 version to the App Marketplace (submit for review)"** — not "Publish for internal testing (Workspace only)" →
 *Submission version notes* (the four headings the dialog pre-fills; paste the block below) → **Submit for review**.
 Afterwards the version manager must show this version as submitted for review, not as another internal version; if it
@@ -194,8 +210,8 @@ support fields untouched this round; nothing about them changed.
 | App name | Beacon |
 | Client ID (required) | `610625f8…` — the production app. Copy the full value from Workspace settings → Apps & Integrations → Beacon → **…** → *Edit App*. The `.env.local` id `c6cff6ae…` is the **dev** app; never paste that |
 | New or changed bundle? | Yes |
-| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-22_15-25-46.zip` — sha256 `0fef7fb9833df00876fb2b4491e677f812f491c0250716286825008bd3848d26`. Same zip as Step 6a; the form copy is only so review can reconcile the artifact — the bundle that *enters* review is the version published in 6a |
-| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-22_15-25-46.sourcemaps.zip` — sha256 `8259c35c8435a7aa764ff7b83d79ff0031f9a2f56646922bf90e34b8547e7676` |
+| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-22_19-44-58.zip` — sha256 `43e21b8af6ceaae9f0ccf09ae99a0c772f26206dcb8a89126c4797031049fcb0`. Same zip as Step 6a; the form copy is only so review can reconcile the artifact — the bundle that *enters* review is the version published in 6a |
+| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-22_19-44-58.sourcemaps.zip` — sha256 `eb6c23c9e0e46285a29b6015c73659fbf7936e8ebae793fa07150b0c1efb67bd` |
 | Package manifest + lockfile | `apps/beacon/package.json` + root `pnpm-lock.yaml` as committed at the build commit |
 | App Review Preflight receipt | the `wfpre_…` code from Step 4 |
 | Testing site | `https://beacon-demo.webflow.io` — bundle above installed; beacon page `https://beacon-demo.webflow.io/blog/the-power-of-resilience` |
@@ -210,7 +226,7 @@ support fields untouched this round; nothing about them changed.
 **Additional notes** (form limit 5000 characters; this is 4967). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
 
 ```
-WHAT CHANGED (bundle v0.1.0, 09-22_15-25-46) - 1 to 6 answer the 2026-09-17 feedback in order; 7, 8 the Preflight scans
+WHAT CHANGED (bundle v0.1.0, 09-22_19-44-58) - 1 to 6 answer the 2026-09-17 feedback in order; 7, 8 the Preflight scans
 
 1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. A user with one workspace and none active sees it as a suggestion with an explicit "Use this workspace" control; the only request to that endpoint comes from that click or the multi-workspace picker. The server sets no default either: an extension session without a chosen workspace stays without one until the user confirms. Unit tests pin zero requests after sync, one after the click, no server fallback.
 

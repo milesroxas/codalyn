@@ -180,3 +180,49 @@ describe('resolveActiveOrganizationId with fallback "none" (Designer Extension s
     expect(mocks.dbUpdate).not.toHaveBeenCalled();
   });
 });
+
+describe("resolveActiveOrganizationId — membership, not the session pointer, carries authority", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("checks the session's workspace against the member table, not only the organization row", async () => {
+    const membership = queryChain([{ id: "member-row" }]);
+    enqueueSelects(queryChain([{ activeOrganizationId: "org-own" }]), membership);
+
+    await resolveActiveOrganizationId("user-own", "sess-own", "none");
+
+    expect(membership.innerJoin).toHaveBeenCalledTimes(1);
+    const sql = renderWhereSql(membership);
+    expect(sql).toContain('"member"."user_id"');
+    expect(sql).toContain('"member"."organization_id"');
+    expect(sql).toContain('"organization"."deleted_at" is null');
+  });
+
+  it("refuses the session's workspace once an admin has removed the user from it (bearer session, no fallback)", async () => {
+    // The removed member's Designer session still points at the workspace; without a membership row the
+    // pointer must not resolve to the workspace's Webflow token.
+    enqueueSelects(
+      queryChain([{ activeOrganizationId: "org-removed-from" }]),
+      queryChain([]), // no live membership
+      queryChain([]) // no other live session holding a workspace
+    );
+
+    const result = await resolveActiveOrganizationId("user-removed", "sess-designer", "none");
+
+    expect(result).toBeNull();
+    expect(mocks.dbUpdate).not.toHaveBeenCalled();
+  });
+
+  it("refuses a workspace inherited from another live session when the membership is gone", async () => {
+    enqueueSelects(
+      queryChain([{ activeOrganizationId: null }]),
+      queryChain([{ activeOrganizationId: "org-removed-from" }]),
+      queryChain([]) // no live membership
+    );
+
+    const result = await resolveActiveOrganizationId("user-removed", "sess-designer", "none");
+
+    expect(result).toBeNull();
+  });
+});

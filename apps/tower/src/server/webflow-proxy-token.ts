@@ -4,6 +4,7 @@ import { auth } from "@/server/auth";
 import { getActiveOrganizationIdForAuthHeaders } from "@/server/billing/session-org";
 import { decryptStoredSecret } from "@/server/security/secret-encryption";
 import {
+  normalizeWebflowAppKey,
   resolveWebflowAppClientCredentials,
   WEBFLOW_DATA_API_APP_KEY,
   type WebflowAppKey,
@@ -115,6 +116,34 @@ export async function listOrganizationWebflowTokensForSite(
       const stored = r.accessToken?.trim() ?? "";
       const accessToken = stored ? (decryptStoredSecret(stored)?.trim() ?? "") : "";
       return { organizationId: r.organizationId, accessToken };
+    })
+    .filter((r) => r.accessToken.length > 0);
+}
+
+export type OrganizationWebflowAppToken = OrganizationWebflowToken & { app: WebflowAppKey };
+
+/**
+ * Every stored Webflow OAuth token, for every app, of the given organizations — decrypted, so the
+ * authorization can be revoked at Webflow before the rows go (workspace deletion, compliance doc R8.22).
+ * Undecryptable rows are skipped: there is nothing usable to revoke.
+ */
+export async function listOrganizationWebflowTokens(organizationIds: string[]): Promise<OrganizationWebflowAppToken[]> {
+  if (organizationIds.length === 0) {
+    return [];
+  }
+  const rows = await db
+    .select({
+      organizationId: organizationWebflowOAuthToken.organizationId,
+      appKey: organizationWebflowOAuthToken.appKey,
+      accessToken: organizationWebflowOAuthToken.accessToken,
+    })
+    .from(organizationWebflowOAuthToken)
+    .where(inArray(organizationWebflowOAuthToken.organizationId, organizationIds));
+  return rows
+    .map((r) => {
+      const stored = r.accessToken?.trim() ?? "";
+      const accessToken = stored ? (decryptStoredSecret(stored)?.trim() ?? "") : "";
+      return { organizationId: r.organizationId, app: normalizeWebflowAppKey(r.appKey), accessToken };
     })
     .filter((r) => r.accessToken.length > 0);
 }

@@ -41,6 +41,9 @@ patchedDependencies:
   scheduler@0.27.0:
     hash: 72e8755781ed7d8d68bf9e597633bdbed3fad138c0459bc7229dff04af83e118
     path: patches/scheduler@0.27.0.patch
+  spark-md5@3.0.2:
+    hash: 69c8b2c14047739d0a879bc278280db452bf0e0a7be4a340e58eadea1dfab432
+    path: patches/spark-md5@3.0.2.patch
   vaul@1.1.2:
     hash: 0730bcbf737c9d2d7e73d0ef26e63e0c595a3dcb61a208acf534f4eb633aff90
     path: patches/vaul@1.1.2.patch
@@ -150,7 +153,7 @@ importers:
         version: 7.18.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       spark-md5:
         specifier: ^3.0.2
-        version: 3.0.2
+        version: 3.0.2(patch_hash=69c8b2c14047739d0a879bc278280db452bf0e0a7be4a340e58eadea1dfab432)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -23451,7 +23454,7 @@ snapshots:
 
   space-separated-tokens@2.0.2: {}
 
-  spark-md5@3.0.2: {}
+  spark-md5@3.0.2(patch_hash=69c8b2c14047739d0a879bc278280db452bf0e0a7be4a340e58eadea1dfab432): {}
 
   spawndamnit@3.0.1:
     dependencies:

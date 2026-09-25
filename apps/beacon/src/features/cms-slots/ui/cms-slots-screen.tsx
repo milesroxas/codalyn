@@ -50,7 +50,6 @@ import {
   resolveCmsSlotListTargetCmsCollectionIdForCleanup,
   verifyCmsSlotListTargetPlainTextField,
 } from "@/features/cms-slots/model/cms-slot-list-target-cms-text-binding";
-import { clearAllCmsSlotListTargetDesignerPreviewsOnPage } from "@/features/cms-slots/model/cms-slot-list-target-designer-preview";
 import {
   countCmsSlotListTargetInstancesOnPageByName,
   isCmsSlotListTargetInstanceSelected,
@@ -121,6 +120,7 @@ import {
   CMS_SLOTS_CMS_FIELD_LINK_TOAST_SUCCESS,
   CMS_SLOTS_CMS_FIELD_NOT_VISIBLE_NOTIFY,
   CMS_SLOTS_DESIGNER_LIST_CHANGED_SYNC_REASON,
+  CMS_SLOTS_PUBLISH_TO_APPLY_HINT,
   CMS_SLOTS_ROUTE_TASK_ADDING_COMPONENT,
   CMS_SLOTS_ROUTE_TASK_CHECKING_INSTALL,
   CMS_SLOTS_ROUTE_TASK_CREATING_LIST,
@@ -228,41 +228,6 @@ function useCmsSlotsInvalidSegmentRedirect(
   }, [segmentFromPath, routePathname, routeHash, defaultSegment, navigate]);
 }
 
-function useBeaconsListTargetPreviewOnModeChange() {
-  const lastDesignerAppModeRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (typeof webflow.getCurrentMode !== "function" || typeof webflow.subscribe !== "function") {
-      return undefined;
-    }
-
-    const syncPreviewsForCurrentMode = async () => {
-      try {
-        const mode = await webflow.getCurrentMode();
-        const key = String(mode);
-        if (lastDesignerAppModeRef.current === key) {
-          return;
-        }
-        lastDesignerAppModeRef.current = key;
-        if (mode === "preview") {
-          await clearAllCmsSlotListTargetDesignerPreviewsOnPage();
-        }
-      } catch {
-        /* designer preview is best-effort */
-      }
-    };
-
-    void syncPreviewsForCurrentMode();
-    const unsubMode = webflow.subscribe("currentappmode", () => {
-      void syncPreviewsForCurrentMode();
-    });
-    return () => {
-      lastDesignerAppModeRef.current = null;
-      unsubMode();
-    };
-  }, []);
-}
-
 type BeaconsPageChangeReset = {
   setPicking: (v: boolean) => void;
   setCreateFormOpen: (v: boolean) => void;
@@ -362,17 +327,6 @@ function useBeaconsPageChangeReset(
         reset.listTargetDefinitionIdRef.current = null;
         reset.setDesignerListCompositionStale(false);
         void refreshPageBeacons();
-        if (typeof webflow.getCurrentMode === "function") {
-          void (async () => {
-            try {
-              if ((await webflow.getCurrentMode()) === "preview") {
-                await clearAllCmsSlotListTargetDesignerPreviewsOnPage();
-              }
-            } catch {
-              /* best-effort */
-            }
-          })();
-        }
       });
     })();
 
@@ -1130,8 +1084,6 @@ export function CmsSlotsScreen() {
       cancelled = true;
     };
   }, [isComposer, currentCmsItemId]);
-
-  useBeaconsListTargetPreviewOnModeChange();
 
   const beaconsPageChangeResetRef = useRef<BeaconsPageChangeReset | null>(null);
   beaconsPageChangeResetRef.current = {
@@ -1981,7 +1933,7 @@ export function CmsSlotsScreen() {
       setDesignerListCompositionStale(false);
       void webflow.notify({
         type: "Success",
-        message: "Page custom code updated. Publish the site to apply on the live site.",
+        message: `Page custom code updated. ${CMS_SLOTS_PUBLISH_TO_APPLY_HINT}`,
       });
       const runtime = await fetchPageBeaconsAndRuntime();
       if (isComposer) {
@@ -2002,9 +1954,9 @@ export function CmsSlotsScreen() {
     try {
       const r = await installCmsSlotsWrapperOnPage({ onProgress: setRouteTaskPhase });
       const message = r.reparented
-        ? `Installed. Moved ${r.reparented} beacon(s) into the wrapper.`
+        ? `Installed. Moved ${r.reparented} beacon(s) into the wrapper. ${CMS_SLOTS_PUBLISH_TO_APPLY_HINT}`
         : r.created
-          ? "Installed."
+          ? `Installed. ${CMS_SLOTS_PUBLISH_TO_APPLY_HINT}`
           : "Already installed.";
       void webflow.notify({ type: "Success", message });
       try {

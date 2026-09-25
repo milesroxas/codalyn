@@ -143,6 +143,16 @@ const SESSION_REPLAY_RESIDUAL = {
   pattern: /rrweb|fullstory|recorder|replay|recording/i,
 };
 /**
+ * A native-prototype reassignment (Marketplace guidelines, Technical: "Do not override, proxy, or reassign
+ * native browser functions, Webflow globals, or native prototypes"). spark-md5's conditional
+ * `ArrayBuffer.prototype.slice` polyfill is the only one a Beacon dependency ships; the excision lives in
+ * patches/spark-md5@3.0.2.patch and this guard proves it held for the installed module.
+ */
+const NATIVE_PROTOTYPE_RESIDUAL = {
+  label: "native-prototype assignment",
+  pattern: /(?<![\w$.])ArrayBuffer\.prototype\.slice\s*=/,
+};
+/**
  * An HTML-injection sink write (App Review Preflight: "Unsafe HTML Injection"). Matches assignments
  * only (`.innerHTML =`, `.outerHTML =`) plus the call-shaped sinks; reads such as
  * `container.innerHTML` (Lexical's HTML export, the rich-text sanitizer) and the `case "innerHTML":`
@@ -310,6 +320,7 @@ const WATCHED_MODULES = [
   },
   { idIncludes: "react-router/dist/", residuals: [DEV_HOST_RESIDUAL, INSECURE_SCHEME_RESIDUAL] },
   { idIncludes: "better-auth/dist/utils/url", residuals: [DEV_HOST_RESIDUAL] },
+  { idIncludes: "spark-md5/spark-md5.js", residuals: [NATIVE_PROTOTYPE_RESIDUAL] },
   {
     idIncludes: "posthog-js/dist/",
     residuals: [

@@ -11,7 +11,13 @@ export const CMS_SLOTS_RENAME_SLOT_MENU_LABEL = "Rename";
 
 export const CMS_SLOTS_RENAME_SLOT_DIALOG_TITLE = "Rename slot";
 
-export const CMS_SLOTS_TOAST_LIST_RENAMED = "CMS slot renamed.";
+/**
+ * Appended to every toast that follows a Designer or Custom Code API change: the change reaches the live site only
+ * once the user publishes (Webflow docs, "Working with custom code": prompt users to publish, never publish for them).
+ */
+export const CMS_SLOTS_PUBLISH_TO_APPLY_HINT = "Publish the site to apply on the live site.";
+
+export const CMS_SLOTS_TOAST_LIST_RENAMED = `CMS slot renamed. ${CMS_SLOTS_PUBLISH_TO_APPLY_HINT}`;
 
 /** Section heading for CMS slot lists already on the page (home grid). */
 export const CMS_SLOTS_PUBLISHED_SECTION_LABEL = "Published Slots";
@@ -109,8 +115,7 @@ export const CMS_SLOTS_TOAST_LIST_CREATED = "CMS slot list created.";
 
 export const CMS_SLOTS_TOAST_LIST_REMOVED = "CMS slot list removed.";
 
-export const CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_REMOVED =
-  "CMS slot list removed. Page install cleared and footer beacon script removed. Publish the site to apply on the live site.";
+export const CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_REMOVED = `CMS slot list removed. Page install cleared and footer beacon script removed. ${CMS_SLOTS_PUBLISH_TO_APPLY_HINT}`;
 
 export const CMS_SLOTS_TOAST_UNINSTALL_RUNTIME_NOT_FOUND =
   "CMS slot list removed. Page install cleared. No beacon footer script was on this page.";

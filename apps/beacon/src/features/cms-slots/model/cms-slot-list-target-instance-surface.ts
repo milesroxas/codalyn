@@ -69,22 +69,6 @@ export async function verifyCmsSlotListTargetDomRoot(
 }
 
 /**
- * Clears the mirror surface so clones can be appended. Removes all children and clears root `textContent` when the
- * list-target root is a DOM node so bound CMS JSON is not left as visible text next to mirrored instances.
- */
-async function clearListTargetMirrorContentForResync(
-  contentRoot: ListTargetMirrorParent,
-  listTargetRoot: AnyElement
-): Promise<void> {
-  for (const c of await contentRoot.getChildren()) {
-    await c.remove();
-  }
-  if (listTargetRoot.type === "DOM" && typeof (listTargetRoot as DOMElement).setTextContent === "function") {
-    await (listTargetRoot as DOMElement).setTextContent("");
-  }
-}
-
-/**
  * Mirror only ever inserts `ComponentInstance` nodes (plus an optional Codalyn hint `<p>`). If we see
  * other node types, this is not the real list-target inner surface — do not bulk-remove children.
  */
@@ -127,78 +111,6 @@ async function mirrorParentForEnteredListTarget(
     return null;
   }
   return root as AnyElement & ListTargetMirrorParent;
-}
-
-/**
- * Runs `fn` on the list-target mirror surface only after verifying the component root and child shapes.
- * Avoids treating Body/page nodes as the mirror (which would delete the whole page).
- * @returns whether `fn` ran (surface was valid and child shapes were safe).
- */
-export async function withListTargetMirrorSurface(
-  instance: ComponentElement,
-  dataList: string,
-  listContainer: BlockElement,
-  fn: (contentRoot: ListTargetMirrorParent) => Promise<void>
-): Promise<boolean> {
-  if (webflow.getCurrentComponent && (await webflow.getCurrentComponent()) != null) {
-    await webflow.exitComponent();
-  }
-  await webflow.enterComponent(instance);
-  try {
-    const root = await webflow.getRootElement();
-    if (root == null) {
-      return false;
-    }
-    const contentRoot = await mirrorParentForEnteredListTarget(instance, root, dataList, listContainer);
-    if (contentRoot == null) {
-      return false;
-    }
-    if (!(await mirrorChildrenAreOnlyComponentInstances(contentRoot))) {
-      await clearListTargetMirrorContentForResync(contentRoot, root);
-    }
-    if (!(await mirrorChildrenAreOnlyComponentInstances(contentRoot))) {
-      return false;
-    }
-    await fn(contentRoot);
-    return true;
-  } finally {
-    await webflow.exitComponent();
-  }
-}
-
-/**
- * Removes only component instances from the mirror surface after verifying the list-target DOM root.
- * Does not require children to already be “mirror clean” (mixed nodes are left alone).
- */
-export async function clearListTargetMirrorSurfaceComponentInstances(
-  instance: ComponentElement,
-  dataList: string,
-  listContainer: BlockElement
-): Promise<void> {
-  if (webflow.getCurrentComponent && (await webflow.getCurrentComponent()) != null) {
-    await webflow.exitComponent();
-  }
-  await webflow.enterComponent(instance);
-  try {
-    const root = await webflow.getRootElement();
-    if (root == null) {
-      return;
-    }
-    const contentRoot = await mirrorParentForEnteredListTarget(instance, root, dataList, listContainer);
-    if (contentRoot == null) {
-      return;
-    }
-    for (const c of await contentRoot.getChildren()) {
-      if (c.type === "ComponentInstance") {
-        await c.remove();
-      }
-    }
-    if (root != null && root.type === "DOM" && typeof (root as DOMElement).setTextContent === "function") {
-      await (root as DOMElement).setTextContent("");
-    }
-  } finally {
-    await webflow.exitComponent();
-  }
 }
 
 /** True when this instance’s inner surface matches this CMS slot (for filtering name collisions). */

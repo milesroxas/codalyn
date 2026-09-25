@@ -12,6 +12,7 @@ import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-
 import { resolveMembershipSeatCapFromOrg } from "@/server/billing/team-billing-config";
 import { sendOrganizationInvitationEmail } from "@/server/email/organization-invitation-email";
 import { markEmailVerifiedForUserId } from "@/server/membership/email-verification-trust";
+import { forgetWorkspaceOnUserSessions } from "@/server/membership/forget-workspace-on-user-sessions";
 import { clearAccountDeletedInvitationGhosts } from "@/server/membership/invitation-hygiene";
 import { resolveUserWorkspaceCreationEligibility } from "@/server/membership/user-workspace-creation-eligibility";
 import {
@@ -143,7 +144,11 @@ export const towerOrganization = organization({
       await grantEarlyAccess(user.id);
       await syncOrganizationSeatQuantityWithStripe(org.id);
     },
-    afterRemoveMember: async ({ organization: org }) => {
+    afterRemoveMember: async ({ member: removed, organization: org }) => {
+      // The removed member's live sessions must stop resolving this workspace at once (R8.22): Better Auth
+      // clears the pointer only on self-removal, and `resolveActiveOrganizationId` now refuses a pointer
+      // without a membership row — this keeps the row and the pointer in step.
+      await forgetWorkspaceOnUserSessions(removed.userId, org.id);
       await syncOrganizationSeatQuantityWithStripe(org.id);
     },
     afterCancelInvitation: async ({ organization: org }) => {

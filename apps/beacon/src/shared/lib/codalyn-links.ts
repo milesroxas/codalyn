@@ -12,6 +12,8 @@ const CODALYN_PUBLIC_PAGE_PATHS = {
   terms: "/terms",
   /** Public Beacon documentation (setup, CMS Slots, custom-code removal). */
   docs: "/docs",
+  /** Tower plans and limits, linked from the sign-in card so fees are disclosed before any commitment. */
+  pricing: "/pricing",
 } as const;
 
 export type CodalynPublicPage = keyof typeof CODALYN_PUBLIC_PAGE_PATHS;

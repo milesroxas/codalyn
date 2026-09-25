@@ -849,6 +849,21 @@ function pinnedMarkerCounts(appName, channel) {
       note: "Beacon ships none; the rich-text editor (R8.8) and @dnd-kit/core's useRect observer (R8.18) are both withheld",
     },
     {
+      // Marketplace guidelines, "Technical (Designer Extensions)": "Do not override, proxy, or reassign native
+      // browser functions, Webflow globals, or native prototypes." spark-md5 3.0.2 (the MD5 `fileHash` Webflow's
+      // create-asset endpoint requires) ships a conditional `ArrayBuffer.prototype.slice` polyfill for pre-2013
+      // engines. It never runs in a browser that can run the Designer, but the assignment is what a reviewer's
+      // grep over the zip finds; patches/spark-md5@3.0.2.patch removes it (compliance doc R8.22). The pin names
+      // the built-ins, and refuses a property-accessed name, so a minified first-party or React class
+      // (`Ip.prototype.render=`) and spark-md5's own `SparkMD5.ArrayBuffer` class (`m.ArrayBuffer.prototype.append=`)
+      // never match: only the global built-in's prototype is a native prototype.
+      pattern:
+        /(?<![\w$.])(?:ArrayBuffer|Array|Object|String|Number|Boolean|Function|Promise|Map|Set|WeakMap|Symbol|Date|RegExp|Error|Element|Node|HTMLElement|Document|Window|EventTarget|Response|Request|Headers|Blob|File|Uint8Array)\.prototype\.[\w$]+\s*=(?!=)/g,
+      label: "native prototype assignment",
+      expected: 0,
+      note: "Beacon never reassigns a native prototype; spark-md5's ArrayBuffer.prototype.slice polyfill is removed by patches/spark-md5@3.0.2.patch (compliance doc R8.22)",
+    },
+    {
       // Review round 8 (2026-09-17) "CSP permits inline style attributes": the shipped policy is now
       // `style-src-attr 'none'`. React, Radix, vaul and Lexical style the extension document through
       // the CSSOM (not governed by CSP), so the only attribute-style writes that may ship are the two

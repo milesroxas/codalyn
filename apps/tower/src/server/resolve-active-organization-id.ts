@@ -3,11 +3,21 @@ import { cache } from "react";
 import { db } from "@/shared/lib/db";
 import { member, organization, session as sessionTable, user } from "@/shared/lib/db/auth-schema";
 
-async function isActiveOrganizationId(organizationId: string): Promise<boolean> {
+/**
+ * The organization exists, is not soft-deleted, and `userId` is still a member of it.
+ *
+ * A session's `activeOrganizationId` is a pointer the user set earlier; an admin can have removed them
+ * since, and Better Auth clears the pointer only when the remover is the member themself. Membership,
+ * not the pointer, is what carries authority over the workspace's Webflow token, settings and billing
+ * (Marketplace guidelines: "Gate every write and delete operation behind authenticated, verified
+ * triggers"), so a stale pointer resolves to nothing and the caller falls back or refuses.
+ */
+async function isLiveMembership(userId: string, organizationId: string): Promise<boolean> {
   const [row] = await db
-    .select({ id: organization.id })
-    .from(organization)
-    .where(and(eq(organization.id, organizationId), isNull(organization.deletedAt)))
+    .select({ id: member.id })
+    .from(member)
+    .innerJoin(organization, eq(member.organizationId, organization.id))
+    .where(and(eq(member.userId, userId), eq(member.organizationId, organizationId), isNull(organization.deletedAt)))
     .limit(1);
   return Boolean(row);
 }
@@ -27,8 +37,9 @@ export type ActiveOrganizationFallback = "memberships" | "none";
 /**
  * Single source of truth for active Tower workspace on a session.
  * Used by dashboard summary, Beacon membership APIs, billing/Webflow routes (`getActiveOrganizationIdForAuthHeaders`).
- * Reads the session's own workspace, then the most recent live session that holds one; what happens
- * after that is the caller's `fallback` (see {@link ActiveOrganizationFallback}).
+ * Reads the session's own workspace, then the most recent live session that holds one — each accepted
+ * only while the user is still a member of it — and what happens after that is the caller's `fallback`
+ * (see {@link ActiveOrganizationFallback}).
  *
  * Request-memoized via `cache()` (keyed by user + session + fallback) so the layout, dashboard, and billing
  * surfaces share one resolution per render instead of repeating these queries (and the fallback write).
@@ -45,7 +56,7 @@ export const resolveActiveOrganizationId = cache(async function resolveActiveOrg
       .where(eq(sessionTable.id, rawSessionId))
       .limit(1);
     const sessionActiveOrgId = rows[0]?.activeOrganizationId ?? null;
-    if (sessionActiveOrgId && (await isActiveOrganizationId(sessionActiveOrgId))) {
+    if (sessionActiveOrgId && (await isLiveMembership(userId, sessionActiveOrgId))) {
       return sessionActiveOrgId;
     }
   }
@@ -67,7 +78,7 @@ export const resolveActiveOrganizationId = cache(async function resolveActiveOrg
     .orderBy(desc(sessionTable.updatedAt))
     .limit(1);
   const recentSessionActiveOrgId = recentSessionRows[0]?.activeOrganizationId ?? null;
-  if (recentSessionActiveOrgId && (await isActiveOrganizationId(recentSessionActiveOrgId))) {
+  if (recentSessionActiveOrgId && (await isLiveMembership(userId, recentSessionActiveOrgId))) {
     return recentSessionActiveOrgId;
   }
 

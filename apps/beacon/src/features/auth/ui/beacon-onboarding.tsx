@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BeaconEarlyAccessRequestForm } from "@/features/auth/ui/beacon-early-access-request-form";
 import { BeaconTowerSignInForm } from "@/features/auth/ui/beacon-tower-sign-in-form";
 import { BeaconWebflowSignInButton } from "@/features/auth/ui/beacon-webflow-sign-in-button";
+import { codalynPolicyLinkProps } from "@/shared/lib/codalyn-links";
 import { Button } from "@/shared/ui/button";
 
 type BeaconOnboardingProps = {
@@ -17,7 +18,9 @@ type BeaconOnboardingProps = {
  *
  * Sign-in offers the documented hybrid-app path first — "Continue with Webflow" runs the Designer
  * ID-token exchange on the click — with email + password beneath it for accounts whose Tower and
- * Webflow e-mails differ.
+ * Webflow e-mails differ. The card names the free plan and that paid Tower plans raise limits, with a
+ * pricing link, before the user commits to anything (Marketplace guidelines: fees, subscriptions and
+ * in-App purchases must be disclosed clearly).
  */
 export function BeaconOnboarding(props: BeaconOnboardingProps) {
   const { towerConfigured, earlyAccessRequired, onContinueAsGuest } = props;
@@ -41,7 +44,16 @@ export function BeaconOnboarding(props: BeaconOnboardingProps) {
         </h3>
         {requestingAccess ? null : (
           <p className="mt-1 text-xs leading-snug text-muted-foreground">
-            {towerConfigured ? "Access all advanced features" : "Tower isn’t available in this environment."}
+            {towerConfigured ? (
+              <>
+                Advanced features, with a free plan included. Paid Tower plans raise monthly limits.{" "}
+                <Button asChild variant="link" size="2xs" className="px-0">
+                  <a {...codalynPolicyLinkProps("pricing")}>See pricing</a>
+                </Button>
+              </>
+            ) : (
+              "Tower isn’t available in this environment."
+            )}
           </p>
         )}
 

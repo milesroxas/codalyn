@@ -6,6 +6,7 @@ import {
   sendWorkspaceDeletionPreNoticeEmail,
   sendWorkspacePurgedMemberNotificationEmail,
 } from "@/server/email/workspace-deletion-member-email";
+import { revokeAndForgetWorkspaceWebflowTokens } from "@/server/membership/revoke-workspace-webflow-tokens";
 import { computePurgeScheduledAt } from "@/server/membership/workspace-deletion-preview";
 import { assertUserIsWorkspaceOwner } from "@/server/membership/workspace-ownership";
 import { ActorPasswordVerificationError, assertActorPassword } from "@/server/security/verify-actor-password";
@@ -88,6 +89,8 @@ async function removeWorkspaceRecords(organizationIds: string[]): Promise<void> 
   if (organizationIds.length === 0) {
     return;
   }
+  // Revoke at Webflow before the token rows cascade away with the organization (compliance doc R8.22).
+  await revokeAndForgetWorkspaceWebflowTokens(organizationIds);
   await db.transaction(async (tx) => {
     await tx
       .update(sessionTable)
@@ -186,6 +189,10 @@ async function softDeleteWorkspaceTarget(
   }
 
   await cancelWorkspaceStripeSubscription(target.stripeSubscriptionId);
+  // A workspace in its recovery window is unusable (every resolver filters `deletedAt`), so its Webflow
+  // authorization would otherwise sit live at Webflow with no holder until the purge. Revoke and forget
+  // it now; recovering the workspace means reconnecting Webflow (compliance doc R8.22).
+  await revokeAndForgetWorkspaceWebflowTokens([target.id]);
 
   const deletedAt = new Date();
   const purgeScheduledAt = computePurgeScheduledAt(deletedAt);

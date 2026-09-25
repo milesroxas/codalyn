@@ -15,13 +15,21 @@
 > single sign-out disabled the Webflow sign-in for good. Both fixed in the extension; Tower unchanged. 15:25 was never
 > installed, published or filed.
 >
+> **2026-09-25 — 17:27 is replaced by 18:02 (R8.22).** Whole-app audit against the live guideline text. Extension: the
+> canvas clear that ran from the Designer mode/page subscriptions is removed (every canvas write now follows a click),
+> install and rename toasts prompt to publish, the sign-in card discloses the free plan and paid limits with a pricing
+> link, and spark-md5's `ArrayBuffer.prototype.slice` polyfill is removed by patch with a build pin. Tower: membership
+> re-checked on every active-workspace resolution, revoke-before-delete on workspace deletion, revoked-token prune on
+> the settings pull, PII anonymization on account deletion (privacy policy updated), Flint form rate limit, Sentry
+> scrub — **Tower must be deployed (Step 1) before Step 3.** Runtime unchanged.
+>
 > **2026-09-25 — 19:44 is replaced by 17:27 (R8.21).** Guideline audit of the R8.20 fixes against the published
 > Marketplace guidelines ("every state-changing action must be traceable to a direct user interaction event, not
 > fired on load"): the workspace step pre-minted a Tower session-handoff token on mount even on the confirm/pick
 > screens that never render the "Open Tower" link. The mint now happens only on the zero-workspace screen. One
 > file plus a container test; scanner markers identical to 19:44. 19:44 was never installed, published or filed.
 
-**Build to submit:** `v0.1.0_public_09-25_17-27-35.zip` (built 2026-09-25 17:27). Everything on this page is for this build only.
+**Build to submit:** `v0.1.0_public_09-25_18-02-30.zip` (built 2026-09-25 18:02). Everything on this page is for this build only.
 Why each thing is the way it is: [compliance-record.md](compliance-record.md) Round 8, R8.1–R8.21.
 Anything Preflight shows that is not listed under step 4 or step 5 below → stop and follow [playbook.md](playbook.md) § B.
 
@@ -62,18 +70,28 @@ vercel deploy --prod --yes
 pnpm --filter tower db:migrate:prod -- --confirm   # applies migration 0037 (R8.11); needs NEON_PROJECT_ID + TOWER_NEON_BRANCH_PROD (or TOWER_DATABASE_URL_PROD)
 ```
 
+R8.22 (2026-09-25) adds Tower-side changes with **no migration**: membership re-check in the active-workspace resolver
+and session clearing on admin removal, Webflow revoke before workspace delete/purge, revoked-token prune in the settings
+pull, personal-data anonymization on account deletion, the privacy-policy text (§1 Beacon bullet, §6), Flint beta-form
+rate limits, Sentry `beforeSend` scrubbing. They ship with the same `vercel deploy --prod` above. Verify after deploy:
+`https://tower.codalyn.app/privacy` shows the "Uninstalling Beacon or disconnecting Webflow" bullet.
+
 Check: `https://tower.codalyn.app/privacy` § 1 says the Marketplace build includes no analytics SDK.
 
 ### Step 2 — Commit
 
-R8.18 and R8.20 are committed (`c86fce6`, `26b5200`). The R8.21 change set — `auth/ui/beacon-site-link-gate.tsx`
-(handoff mint only on the zero-workspace branch), `auth/ui/beacon-site-link-gate.test.tsx`, these docs — is
-uncommitted. Commit before uploading anything, so the artifact hash maps to a commit.
+R8.18 and R8.20 are committed (`c86fce6`, `26b5200`). The R8.21 and R8.22 change sets are uncommitted: R8.21 =
+`auth/ui/beacon-site-link-gate.tsx` + its test; R8.22 = `cms-slots/ui/cms-slots-screen.tsx`, the deleted
+`cms-slot-list-target-designer-preview.ts`, `cms-slot-list-target-instance-surface.ts`, `cms-slots-feature-copy.ts`,
+`auth/ui/beacon-onboarding.tsx`, `shared/lib/codalyn-links.ts` (+test), `patches/spark-md5@3.0.2.patch` +
+`package.json`/`pnpm-lock.yaml`, `scripts/build-cli.mjs`, `scripts/vite-strip-dev-host-literals.mjs`,
+`apps/beacon/scripts/release-build-gates.test.mjs`, the Tower files listed in Step 1 with their tests, and these docs.
+Commit before uploading anything, so the artifact hash maps to a commit.
 
 ### Step 3 — Install the bundle on the test site and push the runtime
 
 1. Workspace settings → Apps & Integrations → Beacon → **Publish new version** → upload
-   `apps/beacon/bundle/production/public/v0.1.0_public_09-25_17-27-35.zip` → distribution **"Publish for internal
+   `apps/beacon/bundle/production/public/v0.1.0_public_09-25_18-02-30.zip` → distribution **"Publish for internal
    testing (Workspace only)"** → publish. This installs the build on beacon-demo for Steps 3–5 and is **not** the
    submission: an internal version never enters review (what happened on 09-18, R8.18). Step 6a publishes the same
    zip again with the Marketplace radio.
@@ -124,8 +142,8 @@ Without a Sync the pin script must print the 09-18 values already in Step 5 (fil
 Open **App Review Preflight** in the Designer ([install it into the Workspace](https://webflow.com/oauth/authorize?response_type=code&client_id=0b5411e62233387925e082350666ef374377f81a9abba0dcc2542d6b5b1e4388&scope=authorized_user%3Aread) if it is missing).
 
 1. Upload both files from `apps/beacon/bundle/production/public/`:
-   - bundle → `v0.1.0_public_09-25_17-27-35.zip`
-   - source maps → `v0.1.0_public_09-25_17-27-35.sourcemaps.zip`
+   - bundle → `v0.1.0_public_09-25_18-02-30.zip`
+   - source maps → `v0.1.0_public_09-25_18-02-30.sourcemaps.zip`
 2. Expected **Review feedback: exactly one item, "External API Calls" (REQUIRED), 1 evidence location** in `assets/label-*.js`.
    That is the extension's single backend call (Hybrid App: Tower). It cannot go away while the app has a backend; the notes in Step 6 disclose it. The excerpt's position moves between scans (it has sat on the storage cleanup, then on the Tower policy-page links) — the rule is the same.
 3. Anything else — a second item, "Silent Canvas Mutations", an External API Calls excerpt outside the `label-*.js` chunk — → stop, [playbook.md](playbook.md) § B.
@@ -181,7 +199,7 @@ changes the Designer Extension must publish a new version from the Workspace *in
 [Submitting your app](https://developers.webflow.com/data-beta/docs/marketplace/submitting-your-app) §
 *Updating a Designer Extension?*). The docs fix no order; do the publish first anyway, so the form's artifacts
 describe a version that is already in review. In the current dialog the distribution is a radio: Workspace settings → Apps & Integrations → Beacon → **Publish new version** →
-*Upload zip file* → the same `v0.1.0_public_09-25_17-27-35.zip` as Step 3 → **Select distribution: "Publish new
+*Upload zip file* → the same `v0.1.0_public_09-25_18-02-30.zip` as Step 3 → **Select distribution: "Publish new
 version to the App Marketplace (submit for review)"** — not "Publish for internal testing (Workspace only)" →
 *Submission version notes* (the four headings the dialog pre-fills; paste the block below) → **Submit for review**.
 Afterwards the version manager must show this version as submitted for review, not as another internal version; if it
@@ -218,8 +236,8 @@ support fields untouched this round; nothing about them changed.
 | App name | Beacon |
 | Client ID (required) | `610625f8…` — the production app. Copy the full value from Workspace settings → Apps & Integrations → Beacon → **…** → *Edit App*. The `.env.local` id `c6cff6ae…` is the **dev** app; never paste that |
 | New or changed bundle? | Yes |
-| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-25_17-27-35.zip` — sha256 `773e5ff247a216e91c1fc59a8f90d1227a1e7d8d84219dbd24eeafab5715c7ee`. Same zip as Step 6a; the form copy is only so review can reconcile the artifact — the bundle that *enters* review is the version published in 6a |
-| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-25_17-27-35.sourcemaps.zip` — sha256 `bce9c39f137099435fae8fd84dea5599c78c4fe45089d6860247aaeee5e5c85f` |
+| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-25_18-02-30.zip` — sha256 `1b88dfd01ceafb95738ba0acbe174aa7ac12e7d7a5756dcd6b484161d33820e8`. Same zip as Step 6a; the form copy is only so review can reconcile the artifact — the bundle that *enters* review is the version published in 6a |
+| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-25_18-02-30.sourcemaps.zip` — sha256 `68234f4dd45f2314627c64fe67f7c688658a603db09910f78d2a045969b056cd` |
 | Package manifest + lockfile | `apps/beacon/package.json` + root `pnpm-lock.yaml` as committed at the build commit |
 | App Review Preflight receipt | the `wfpre_…` code from Step 4 |
 | Testing site | `https://beacon-demo.webflow.io` — bundle above installed; beacon page `https://beacon-demo.webflow.io/blog/the-power-of-resilience` |
@@ -231,10 +249,10 @@ support fields untouched this round; nothing about them changed.
 > [history/responses.md](history/responses.md); per-item email answers are below. Nothing is lost: items 1–6 of
 > **Additional notes** say the same thing in full.
 
-**Additional notes** (form limit 5000 characters; this is 4967). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
+**Additional notes** (form limit 5000 characters; this is 4944). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
 
 ```
-WHAT CHANGED (bundle v0.1.0, 09-25_17-27-35) - 1 to 6 answer the 2026-09-17 feedback in order; 7, 8 the Preflight scans
+WHAT CHANGED (bundle v0.1.0, 09-25_18-02-30) - 1 to 6 answer the 2026-09-17 feedback in order; 7, 8 the Preflight scans; 9 our audit of 2026-09-25
 
 1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. A user with one workspace and none active sees it as a suggestion with an explicit "Use this workspace" control; the only request to that endpoint comes from that click or the multi-workspace picker. The server sets no default either: an extension session without a chosen workspace stays without one until the user confirms. Unit tests pin zero requests after sync, one after the click, no server fallback.
 
@@ -242,17 +260,19 @@ WHAT CHANGED (bundle v0.1.0, 09-25_17-27-35) - 1 to 6 answer the 2026-09-17 feed
 
 3. Redirects. The single network call site (extension-egress.ts) runs every request with redirect mode set to error; callers cannot override it. No path needs a redirect: Tower answers its API routes directly and the presigned S3 upload returns a 2xx with no redirect field.
 
-4. Upload allowlist. The create-asset adapter registers the exact uploadUrl string Webflow returned as a one-shot permitted destination, only if it names the webflow-prod-assets bucket: host exactly webflow-prod-assets.s3.amazonaws.com or host s3.amazonaws.com with first path segment webflow-prod-assets. The egress policy accepts an upload only for a granted URL and consumes the grant; other buckets, regional S3 hosts, lookalikes and Webflow-owned hosts are refused before any request. connect-src names that bucket, never the bare S3 host: self, https://tower.codalyn.app, https://webflow-prod-assets.s3.amazonaws.com and https://s3.amazonaws.com/webflow-prod-assets.
+4. Upload allowlist. The create-asset adapter registers the exact uploadUrl Webflow returned as a one-shot permitted destination, only if it names the webflow-prod-assets bucket (host exactly webflow-prod-assets.s3.amazonaws.com, or host s3.amazonaws.com with first path segment webflow-prod-assets). The egress policy accepts an upload only for a granted URL and consumes the grant; other buckets, regional hosts, lookalikes and Webflow-owned hosts are refused before any request. connect-src names that bucket in both syntaxes, never the bare S3 host.
 
-5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host; style-src-attr is none. The UI sets styles through the CSSOM, which CSP does not govern. The two style-attribute writes left in the bundle are pinned by count in the release build; both are Designer API calls styling the CMS Slots placeholder on the user's canvas element, outside the extension's policy. All UI stories render clean under it.
+5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host; style-src-attr is none. The UI styles through the CSSOM. The two style-attribute writes left in the bundle are pinned by count and are Designer API calls styling the CMS Slots placeholder on the user's canvas element, outside the extension's policy.
 
-6. Localization. Every CMS item write names its locale: the extension reads the site's locales (Get Site) once per session and sends the primary locale's cmsLocaleId on every write (image editor field update; CMS Slots layout save) and on the matching staged read. Sites with secondary locales are not written: the write is refused before any request with an in-app message. The listing states this.
+6. Localization. Every CMS item write names its locale: the extension reads the site's locales once per session and sends the primary locale's cmsLocaleId on every write and on the matching staged read. Sites with secondary locales are refused before any request, with an in-app message. The listing states this.
 
-7. DOM observers. The rich-text property editor is withdrawn behind a release flag like item 2; its Lexical editor observed its own editable element inside our panel, never the canvas. Rich-text properties are edited as HTML in a text box. The drag-and-drop library's re-measuring observer, attached to our panel's own body only during a drag, is removed by a dependency patch. The release build pins the observer identifier to zero across every shipped file: the bundle has no observer construction and no editable-content element.
+7. DOM observers. The rich-text property editor is withdrawn behind a release flag like item 2; its editor observed its own editable element inside our panel, never the canvas. Rich-text properties are edited as HTML in a text box. The drag-and-drop library's re-measuring observer is removed by a dependency patch. The release build pins the observer identifier to zero across every shipped file.
 
-8. Browser storage and cookies. The session bearer is held in memory only; no storage call in the bundle is keyed by a credential name. Every request sets the cookie mode to omit at the single call site, so no cookie is sent or stored; the only credential on the wire is our Tower session bearer, sent only to tower.codalyn.app.
+8. Browser storage and cookies. The session bearer is held in memory only; no storage call in the bundle is keyed by a credential name. Every request sets the cookie mode to omit at the single call site; the only credential on the wire is our Tower session bearer, sent only to tower.codalyn.app.
 
-UNCHANGED FROM 2026-09-15: one network call site with an explicit destination policy (release build fails on a second); canvas changes only through the Designer API on explicit user action; Tower with allowlist-only CORS, session-only auth, server-stored OAuth state, the Webflow ID token never forwarded; no plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, no popups or cross-window messaging, no credentials in URLs, no session replay; every shipped JS and CSS file has a v3 source map (private field); none names a map.
+UNCHANGED FROM 2026-09-15: one network call site with an explicit destination policy; canvas changes only through the Designer API on explicit user action; Tower with allowlist-only CORS, session-only auth, server-stored OAuth state, the Webflow ID token never forwarded; no plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, no popups or cross-window messaging, no credentials in URLs, no session replay; every shipped JS and CSS file has a v3 source map (private field); none names a map.
+
+9. Audit of 2026-09-25 against the current guideline text. The canvas clear that ran on Designer mode and page changes is removed: every canvas write now follows a click. Install and rename toasts prompt to publish. The sign-in card names the free plan, that paid plans raise monthly limits, and links pricing. A dependency polyfill that assigned ArrayBuffer.prototype.slice is removed by patch; the build pins native prototype assignments to zero.
 
 PUBLISHED-RUNTIME TEST: one page-level script, registered with a SHA-256 integrityHash carried verbatim in the page tag with anonymous crossorigin; served unminified, its last line pointing at a version-3 source map published beside it as a site asset (sourcesContent is the file minus that line; no trailing newline). Every other script on the test page is Webflow's own site runtime; Beacon loads none.
 

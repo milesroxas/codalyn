@@ -1,10 +1,19 @@
 import { APIError } from "better-auth/api";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { isOrganizationTeamEntitled } from "@/server/billing/organization-billing";
 import { syncOrganizationSeatQuantityWithStripe } from "@/server/billing/stripe-org-seat-sync";
 import { cancelPendingInvitationsForEmail } from "@/server/membership/invitation-hygiene";
 import { db } from "@/shared/lib/db";
-import { invitation, member, organization, user } from "@/shared/lib/db/auth-schema";
+import {
+  earlyAccessRequest,
+  flintBetaGroupRequest,
+  invitation,
+  member,
+  organization,
+  supportRequest,
+  towerOperatorInviteRedemption,
+  user,
+} from "@/shared/lib/db/auth-schema";
 import { TOWER_INVITATION_STATUS } from "@/shared/lib/membership/tower-invitation-status";
 import {
   ACCOUNT_DELETION_BLOCKED_CODE,
@@ -153,7 +162,45 @@ async function releaseSharedTeamMembershipsForAccountDeletion(
   await Promise.all(organizationIds.map((organizationId) => syncOrganizationSeatQuantityWithStripe(organizationId)));
 }
 
-/** Validates account deletion eligibility and releases non-owner memberships. Workspaces are never modified. */
+/**
+ * Privacy Policy §6 ("When you delete your account ... we delete or anonymize personal information"):
+ * the rows that outlive the `user` row and carry the address in plain text. Access requests (name, note,
+ * team e-mails) are removed outright; support requests, operator-invite redemptions and non-pending team
+ * invitations keep their operational content with the address replaced by a per-row, non-reversible
+ * placeholder (`deleted-<row key>@deleted.invalid`), so no surviving record identifies the person.
+ * Pending invitations were cancelled just before by `cancelPendingInvitationsForEmail`.
+ */
+export async function anonymizePersonalDataForDeletedAccount(userId: string, email: string): Promise<void> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    return;
+  }
+
+  await db.delete(earlyAccessRequest).where(sql`lower(${earlyAccessRequest.email}) = ${normalizedEmail}`);
+  await db.delete(flintBetaGroupRequest).where(sql`lower(${flintBetaGroupRequest.email}) = ${normalizedEmail}`);
+
+  await db
+    .update(supportRequest)
+    .set({ email: sql`'deleted-' || ${supportRequest.id} || '@deleted.invalid'` })
+    .where(or(eq(supportRequest.userId, userId), sql`lower(${supportRequest.email}) = ${normalizedEmail}`));
+
+  await db
+    .update(towerOperatorInviteRedemption)
+    .set({ email: sql`'deleted-' || left(${towerOperatorInviteRedemption.tokenHash}, 16) || '@deleted.invalid'` })
+    .where(sql`lower(${towerOperatorInviteRedemption.email}) = ${normalizedEmail}`);
+
+  await db
+    .update(invitation)
+    .set({ email: sql`'deleted-' || ${invitation.id} || '@deleted.invalid'` })
+    .where(
+      and(sql`lower(${invitation.email}) = ${normalizedEmail}`, ne(invitation.status, TOWER_INVITATION_STATUS.pending))
+    );
+}
+
+/**
+ * Validates account deletion eligibility, releases non-owner memberships and anonymizes the personal data
+ * that outlives the user row. Workspaces are never modified.
+ */
 export async function prepareUserAccountDeletion(userId: string): Promise<UserAccountDeletionPlan> {
   const plan = await assertUserMayDeleteAccount(userId);
 
@@ -167,6 +214,7 @@ export async function prepareUserAccountDeletion(userId: string): Promise<UserAc
   const [userRow] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1);
   if (userRow) {
     await cancelPendingInvitationsForEmail(userRow.email);
+    await anonymizePersonalDataForDeletedAccount(userId, userRow.email);
   }
 
   return plan;

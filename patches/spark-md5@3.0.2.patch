@@ -1,0 +1,58 @@
+diff --git a/spark-md5.js b/spark-md5.js
+index d2bdbbb061aab6a2213ca31a709362f186161078..40ee49bc079e1d6e399f3f9faa001c5ec9b5c670 100644
+--- a/spark-md5.js
++++ b/spark-md5.js
+@@ -325,53 +325,6 @@
+ 
+     // ---------------------------------------------------
+ 
+-    /**
+-     * ArrayBuffer slice polyfill.
+-     *
+-     * @see https://github.com/ttaubert/node-arraybuffer-slice
+-     */
+-
+-    if (typeof ArrayBuffer !== 'undefined' && !ArrayBuffer.prototype.slice) {
+-        (function () {
+-            function clamp(val, length) {
+-                val = (val | 0) || 0;
+-
+-                if (val < 0) {
+-                    return Math.max(val + length, 0);
+-                }
+-
+-                return Math.min(val, length);
+-            }
+-
+-            ArrayBuffer.prototype.slice = function (from, to) {
+-                var length = this.byteLength,
+-                    begin = clamp(from, length),
+-                    end = length,
+-                    num,
+-                    target,
+-                    targetArray,
+-                    sourceArray;
+-
+-                if (to !== undefined) {
+-                    end = clamp(to, length);
+-                }
+-
+-                if (begin > end) {
+-                    return new ArrayBuffer(0);
+-                }
+-
+-                num = end - begin;
+-                target = new ArrayBuffer(num);
+-                targetArray = new Uint8Array(target);
+-
+-                sourceArray = new Uint8Array(this, begin, num);
+-                targetArray.set(sourceArray);
+-
+-                return target;
+-            };
+-        })();
+-    }
+-
+     // ---------------------------------------------------
+ 
+     /**

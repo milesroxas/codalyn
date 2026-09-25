@@ -227,6 +227,18 @@ describe("strip-dev-host-literals / react-dom + better-auth", () => {
     expect(() => transform(moved, REACT_DOM_ID, { strict: true })).toThrow(/react\.dev error-decoder URL/);
   });
 
+  it("leaves no native-prototype assignment in spark-md5 (patches/spark-md5@3.0.2.patch, R8.22)", () => {
+    // spark-md5 computes the MD5 fileHash Webflow's create-asset endpoint requires. Upstream 3.0.2 carries a
+    // conditional ArrayBuffer.prototype.slice polyfill; the pnpm patch removes it and the residual guard
+    // proves the installed module is the patched one.
+    const SPARK_ID = require.resolve("spark-md5");
+    const source = readFileSync(SPARK_ID, "utf-8");
+    expect(source).not.toMatch(/ArrayBuffer\.prototype\.slice\s*=/);
+    expect(() => transform(source, SPARK_ID, { strict: true })).not.toThrow();
+    const polyfilled = `${source}\nif(!ArrayBuffer.prototype.slice){ArrayBuffer.prototype.slice=function(){}}\n`;
+    expect(() => transform(polyfilled, SPARK_ID, { strict: true })).toThrow(/native-prototype assignment/);
+  });
+
   it("leaves no dev-host literal in better-auth's URL util (rule tracks the installed version)", () => {
     const result = transform(readFileSync(BETTER_AUTH_URL_ID, "utf-8"), BETTER_AUTH_URL_ID, { strict: true });
     expect(result).not.toBeNull();
@@ -480,6 +492,7 @@ describe("pinnedMarkerCounts (App Review Preflight: External API Calls / Silent 
     expect(pinned.map((m) => [m.label, m.expected])).toEqual([
       ["bare fetch( call", 1],
       ["MutationObserver reference", 0],
+      ["native prototype assignment", 0],
       ["style-attribute write (setAttribute)", 2],
       ["credentials: omit request option", 1],
       ["sourceMappingURL token", 0],
@@ -504,6 +517,24 @@ describe("pinnedMarkerCounts (App Review Preflight: External API Calls / Silent 
     expect(() => assertPinnedMarkerCounts(leaked, pinned, "Archived zip")).toThrow(
       /Archived zip contains 2 bare fetch\( calls, expected exactly 1 \(the single egress point/
     );
+  });
+
+  it("fails the build when a dependency reassigns a native prototype (spark-md5's ArrayBuffer.prototype.slice polyfill, R8.22)", () => {
+    // spark-md5 3.0.2 as esbuild shipped it in bundle.js up to 09-25: a conditional polyfill that assigns the
+    // built-in prototype. It is removed by patches/spark-md5@3.0.2.patch; one assignment fails the build.
+    const polyfill =
+      `${clean};typeof ArrayBuffer<\`u\`&&!ArrayBuffer.prototype.slice&&(function(){function t(e,t){return e=e|0||0,e<0?Math.max(e+t,0):Math.min(e,t)}` +
+      "ArrayBuffer.prototype.slice=function(n,r){return new ArrayBuffer(0)}})()";
+    expect(() => assertPinnedMarkerCounts(polyfill, pinned, "Build output")).toThrow(
+      /1 native prototype assignment, expected exactly 0/
+    );
+    // React's own minified class prototypes (ReactDOMRoot) and spark-md5's own `SparkMD5.ArrayBuffer` class
+    // (a property, not the global) are not native prototypes and must not count, nor does a comparison or a
+    // `.call(` on a native prototype method.
+    const benign =
+      `${clean};Ip.prototype.render=function(e){};m.ArrayBuffer.prototype.append=function(e){};` +
+      "if(ArrayBuffer.prototype.slice===void 0){}Object.prototype.hasOwnProperty.call(e,t)";
+    expect(() => assertPinnedMarkerCounts(benign, pinned, "Build output")).not.toThrow();
   });
 
   it("fails the build when a dependency adds a MutationObserver", () => {

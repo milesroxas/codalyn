@@ -3840,3 +3840,101 @@ side — but the cause stays unproven until a Preflight run on the migrated page
 
 **States.** Source ✓ (uncommitted) · Artifact ✓ (12:24) · Tower ✓ deployed 09-25 19:03 (unchanged by this entry) ·
 Installed ✗ · Runtime ✗ (page entry not yet migrated; file unchanged since 09-18) · Submitted ✗ · Accepted ✗.
+
+### R8.24 The four open Preflight items traced to the tool's source — "Script integrity" is a request-time DOM race in the runner (reproduced locally), the script rows are a same-host rule, the bundle-scan excerpt is a display offset; no app change (2026-09-26, afternoon)
+
+**Findings (issued, priority unassigned, App Review Preflight 2026-09-26, screenshots).** Bundle scan of the 12:24
+zip: one item, "External API Calls — Review third-party data egress." (REQUIRED, 1 evidence location,
+`assets/label-DdsX26u2.js:41`, excerpt `` …ion ll(e){return sl.add(e),()=>{sl.delete(e)}}function ul(){return ol}…
+bl=`noopener noreferrer`… ``). Runtime test on the unchanged 09-18 runtime, "What to fix" 3: (1) "Script integrity is
+missing or wrong", `6aac8a88596e00b6a2967e15_codalyn-beacon-runtime-9b7da263.js`; (2) "New script elements were
+created" — `webflow.049b2302.3c18d83945b06000.js`, `gsap.min.js`, `ScrollTrigger.min.js`, twelve `webflow.achunk.*.js`;
+(3) "Unreviewed scripts loaded" — the same fifteen files. Authority: N/A (no credential in any item).
+
+**Research first (published requirements re-read 2026-09-26).** Marketplace guidelines: SRI + `crossorigin="anonymous"`
+at immutable URLs sits under *Recommended practices for published-site code*; "Remotely loaded or externally controlled
+resources that affect App behavior must be disclosed at submission"; every URL production + HTTPS. Submitting your app:
+Preflight optional, the `wfpre_` receipt reconciles artifacts, a published `.webflow.io` test site is required. Working
+with custom code: `integrityHash` is a SHA-256 SRI. No public Webflow page documents the runtime test's predicates or
+the bundle scanner's rules. Miles's link <https://github.com/createsomethingtoday/webflow-app-preflight>
+(`docs/WEBFLOW_RUNTIME_VALIDATION_GUIDE.md`, "edition 1.0, July 22 2026", an operator guide) — that repository is the
+tool's source: `packages/webflow-app-review-runtime-template/src/production-origin.ts` names
+`https://webflow-app-review-preflight.webflow-inc.workers.dev`, `worker/wrangler.production.jsonc` the same origin for
+the OAuth callback, `extension/src/App.tsx` carries the exact "What to fix" strings,
+`packages/bundle-scanner-core/src/policy/default-ruleset.ts` the "External API Calls" rule, and
+`docs/incidents/2026-09-08-runtime-origin.md` a Webflow support case. Read at commit `53705c5` (2026-09-08). Caveat:
+the deployed Worker may run a later revision; every observation below matches this revision byte-for-byte, so it is
+treated as current. The guide adds two usable facts (child files need no DOM SRI; a hash change means a new package)
+and one description that does not hold for us (it assumes the SRI check reads the tag).
+
+**Item 1 — the predicate (`runner/src/index.ts`).** `context.route('**/*')`: on the *first* request whose URL equals a
+pinned artifact URL and whose resource type is `script`, the runner takes a CDP snapshot (`DOM.getDocument` depth −1 →
+`DOM.querySelectorAll('script[src]')` → `DOM.getAttributes`) and stores the element whose resolved `src` equals the pin
+**if one exists at that instant** (`requestBoundaryScripts`). `observeRuntimeArtifact` sets `domIntegrity` from that
+map only — `null` when there is no entry — and the Worker's `evaluateRuntimeSecurity` requires
+`domIntegrity === pin.integrity` for a page-loaded file. The settled-DOM captures taken after the ready selector go
+into the `dom_snapshot` artifact and are never consulted by the predicate. The design is deliberate (tests "does not
+let the page forge the pinned script integrity attribute", "does not accept an integrity attribute added after the
+script loaded"), but every fixture in the tool's tests is a one-line document whose pinned tag is the first script.
+
+**Runtime-observed, local replica (new `scripts/webflow-runtime-sri-replica.mjs`, a port of the runner's snapshot
+code; Chromium 1228 via packages/loadout Playwright 1.59.1; 2026-09-26 ≈16:45 UTC).** On
+`beacon-demo.webflow.io/blog/the-power-of-resilience`, 3/3 runs: at the instant Chromium first requests the Beacon
+runtime, `document.readyState` is `loading` and the DOM holds **zero** `script[src]` elements — jQuery, webflow.js,
+GSAP, ScrollTrigger and our runtime are all requested by the preload scanner (CDP initiator `parser`) before the parser
+has inserted any of them; the settled DOM carries `integrity="sha256-SbM4+…Bf0="` on our tag and `sha256-9/al…` on
+jQuery's. The tool's `domIntegrity` for our file is therefore `null` in every run, and would be `null` for Webflow's
+own jQuery tag too (the R8.16 control run, answered without spending a Preflight run). Minimal fixture on a local HTTP
+server: the pinned tag as the only script → element present at request time 3/3 (the shape of the tool's own tests);
+the same tag preceded by one synchronous script that arrives after 400 ms → element absent 3/3. Cause: Chromium's
+preload scanner fetches every `<script src>` after a parser-blocking script before the tree builder reaches them; on a
+published Webflow page jQuery and webflow.js (both synchronous, end of `<body>`) precede footer custom code, so a
+page-level registered script is never in the DOM at its first request. No tag shape, byte, encoding, CDN header,
+package value or attribute change on our side can alter that — which is the observed history (R7b.17, R7b.18, R7b.19,
+R8.13, R8.16, R8.23: six changes, same item). R8.23's attribute-free page entry stays (a cleaner tag) but is no longer
+expected to clear the item.
+
+**Items 2 and 3 — the rule (`collectTrustedExecutionEvidence`).** `runtimeHosts` = hostnames of the pinned files =
+`cdn.prod.website-files.com`, because Webflow serves our uploaded asset from its own CDN. Every parsed script or script
+request on that host that is not itself pinned is added to `unreviewedRuntimeScripts`, and every such *request* is
+also added to `runtimeCreatedScripts` regardless of initiator (`if (initiatedByPinnedRuntime || isRuntimeHostScript)
+runtimeCreatedScripts.add(label)`), which is why parser-inserted webflow.js and GSAP appear under "New script elements
+were created". jQuery (cloudfront) and the jsdelivr embeds are on other hosts and are never listed — R7b.16's
+observation, now explained. A bare page removes GSAP/ScrollTrigger and most achunks; webflow.js and the chunks it
+imports remain on every Webflow page. Pinning them as child files needs their per-publish hashes and moves
+webflow.js/GSAP into item 1 (page-loaded; webflow.js carries a sha384 pin the tool cannot match). Structural to any
+script hosted as a Webflow site asset.
+
+**Item 4 — the rule (`default-ruleset.ts`, NET-EXTERNAL-EGRESS).** Matchers: `\bfetch\s*\(` and
+`new\s+XMLHttpRequest` — nothing else. `severity: MEDIUM` → the UI label "Required update" (`create-review.ts` maps HIGH
+and MEDIUM to it), `reviewBucket: NEEDS_EXPLANATION`, `disposition: INFO`, confidence LOW on minified files. The 12:24
+zip has exactly one match: `label-DdsX26u2.js` line 41, column 63 691; no `XMLHttpRequest`. The excerpt:
+`getContextualSnippet(…, contextLines 3)` returns lines 38–41 (191 576 characters); `boundedEvidenceSnippet` then
+applies the *line-relative* column to that multi-line string and opens a 498-character window at `col − 1 − 160`, i.e.
+2 470 characters before the match. Replaying that arithmetic on the shipped chunk reproduces the screenshot's excerpt
+exactly (head `…ion ll(e){return sl.add(e)…`, tail `` bl=`noopener noreferrer`… ``). Consequence: the excerpt was never
+centred on the evidence in any round; the R8.10 "±250 around the match" and R8.15 "several patterns" models are
+withdrawn. The R8.10 storage-cleanup deletion and the R8.15 path-only link constants stand on their own merits (fewer
+credential-named storage calls; one external host literal) but were not required by this rule. Disposition unchanged
+and now exact: the rule asks for an explanation, and the notes' BACKEND paragraph is it.
+
+**Fix (none in the app).** Added `scripts/webflow-runtime-sri-replica.mjs` (exit 1 when the pinned element is absent at
+request time; run it before spending a Preflight run; biome clean);
+[history/preflight-runtime-sri-request-boundary.md](history/preflight-runtime-sri-request-boundary.md) — an issue
+draft for the tool's repository with the fixture, the evidence and a fix that keeps the anti-forgery tests (read the
+tag's attributes from the served document bytes for parser-initiated requests) plus the same-host and excerpt
+observations — Miles files it; [history/sri-item-investigation.md](history/sri-item-investigation.md) closed;
+SUBMIT.md Step 5 expectations, the item table and the notes' PUBLISHED-RUNTIME TEST paragraph rewritten (WAF-safe,
+under 5 000 characters); playbook § B0 says to read the tool's source before changing code. No rebuild: the 12:24
+artifact is unchanged and remains the build to submit. (Unrelated, committed the same day as `5802349`: the `--purpose marketplace` /
+`build:marketplace` distribution-lane guard in `scripts/build-cli.mjs`, 89/89 gate tests green.)
+
+**Provenance.** Published requirement: SRI recommended, disclosure, HTTPS/production (guidelines); Preflight optional
++ receipt (submitting-your-app); `integrityHash` SHA-256 (custom code). Issued finding: the four items above. Security
+control: none new. Open decision (Webflow review): whether a runtime-test item produced by the runner's request-time
+snapshot counts against a page whose served tag verifies correct, and whether Webflow's own site runtime on the shared
+CDN host is expected residue — both `needs reviewer clarification`, with this evidence attached.
+
+**States.** Source ✓ (script + docs, uncommitted; no app source change) · Artifact ✓ (12:24, unchanged) · Tower ✓
+(09-25 19:03) · Installed ✗ · Runtime — page unchanged since 09-18 (tag still carries the R8.23 legacy attributes;
+migration not yet triggered) · Submitted ✗ · Accepted ✗.

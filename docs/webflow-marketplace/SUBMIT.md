@@ -31,6 +31,14 @@
 > `+beacon.<hash>` in its version; an old entry migrates with one PUT (no new asset, URL/SRI unchanged). **Step 3
 > now requires a non-forced sync + publish, and forbids the Sync button.** Runtime file and Tower unchanged.
 >
+> **2026-09-26, afternoon — no new build (R8.24).** The re-issued items were traced to the tool's own source
+> (createsomethingtoday/webflow-app-preflight is the deployed App Review Preflight). "Script integrity" is a
+> request-time DOM race in the runner (the tag is read at the file's first request, which Chromium's preload scanner
+> issues before the parser inserts it) — reproduced locally 3/3 for our tag and for Webflow's jQuery; nothing on our
+> side can clear it. The script rows are a same-host rule (Webflow serves our asset from its own CDN host). The
+> bundle-scan excerpt opens ≈2 470 characters before the single `fetch(` match. **Step 5 now expects the three runtime
+> items and says what to attach; the notes carry the explanation.** 12:24 stays the build to submit.
+>
 > **2026-09-25 — 19:44 is replaced by 17:27 (R8.21).** Guideline audit of the R8.20 fixes against the published
 > Marketplace guidelines ("every state-changing action must be traceable to a direct user interaction event, not
 > fired on load"): the workspace step pre-minted a Tower session-handoff token on mount even on the confirm/pick
@@ -58,12 +66,12 @@ Every finding is a code change you can point to; none is answered with an explan
 
 | Preflight item | Cause | This build |
 | --- | --- | --- |
-| External API Calls (bundle scan) | The one backend call (Tower). Webflow's docs put script registration and CMS writes on the backend; the Designer API has no such surface. The 09-17 20:41 scan's excerpt sat on the in-app privacy/terms/docs link constants (anchors, never requests) | Link constants are now paths on the Tower origin: the bundle names one external host (`https://tower.codalyn.app`), in the chunk holding the one `fetch(`. The backend call itself stays — expect the item to persist with its excerpt on the Tower origin or `fetch(`. Disclosed in the notes (BACKEND paragraph). Not raised by the human review team in round 8 |
+| External API Calls (bundle scan) | The one backend call (Tower). Webflow's docs put script registration and CMS writes on the backend; the Designer API has no such surface. The rule (NET-EXTERNAL-EGRESS in the tool's source) matches `fetch(` / `new XMLHttpRequest` only; the zip has exactly one `fetch(`. The excerpt the tool prints opens ≈2 470 characters *before* the match — a column-offset display bug (R8.24) — so the storage cleanup, the policy links and the Tower origin it has "sat on" were never the evidence | Persists by design (the rule's bucket is "needs explanation"). Explained in the notes' BACKEND paragraph; the single `fetch(` and the Tower origin stay. Not raised by the human review team in round 8 |
 | Silent Canvas Mutations (bundle scan) | Never reported by a scan — but `@dnd-kit/core`'s drag re-measuring observer sat in every bundle through 09-18, constructed through an alias read off `window`, so neither Preflight's rule nor the release gate's literal `new MutationObserver(` pin saw it; a reviewer's `grep -i MutationObserver` does (R8.18) | **Removed** by pnpm patch; the release gate now pins the bare identifier to 0 on dist and zip. Expected absent |
 | Generated code is not traceable to readable source (bundle scan, evidence `` `;function:1 ``) | The runtime trailer builder minified to `` `//# sourceMappingURL=`;function `` in bundle.js; the scanner read `` `;function `` as a map file name and found no such map. Every real JS/CSS file already had its v3 map in the private zip | **Fixed.** The pragma is joined from two halves at sync time; no shipped file carries the token (release build pins the count to 0 on dist and zip). Published runtime bytes unchanged |
 | Runtime is not traceable to source | No source map behind the runtime | **Fixed.** Sync uploads a v3 identity source map beside the runtime; the runtime's last line points at it |
-| Script integrity is missing or wrong | Re-issued 09-26 on the same 09-18 runtime (`…9b7da263.js`) after the page was re-verified correct (pin script exit 0 against the saved package). Page tag, CORS, bytes, encodings, hygiene and the package are falsified causes (R8.16, [history/sri-item-investigation.md](history/sri-item-investigation.md)). The one difference left: our tag carried two `data-codalyn-beacon*` attributes after `crossorigin="anonymous"`; every tag Preflight does not flag ends there | **Changed (R8.23).** The page entry is applied with no `attributes`; the runtime is identified by registered id + the `+beacon.<hash>` in its version; a non-forced sync migrates the existing entry with one PUT — same file, same URL, same SRI, package still valid. Step 3 triggers it; Step 5 re-runs the test with the package untouched. If the item persists: the control run in the history file, then the evidence artifacts |
-| New script elements / Unreviewed scripts | Webflow's own site runtime plus what the page's Interactions pull in (GSAP, ScrollTrigger, achunks) | Test on a bare page (Step 3) so only Webflow's site runtime remains. Pinning Webflow's files would only move them into the SRI item |
+| Script integrity is missing or wrong | Tool-side (R8.24, reproduced): the runner reads the tag from a DOM snapshot taken at the file's *first request*; Chromium's preload scanner issues that request while the parser is still blocked on jQuery/webflow.js, so no script element exists yet and `domIntegrity` is null — the served tag (verified correct every round) is never read. Same for Webflow's own jQuery tag | **No change on our side can clear it.** R8.23's attribute-free entry stays (cleaner tag). Evidence: `scripts/webflow-runtime-sri-replica.mjs` (exit 1, 3/3), the notes' PUBLISHED-RUNTIME TEST paragraph, [history/preflight-runtime-sri-request-boundary.md](history/preflight-runtime-sri-request-boundary.md) (issue for the tool; Miles files). Expect the item; attach the evidence; do not rebuild for it |
+| New script elements / Unreviewed scripts | The tool lists every script on the pinned file's *host* that is not pinned — and Webflow serves our asset from its own CDN host (`cdn.prod.website-files.com`), the same host as webflow.js, its achunk imports and GSAP (R8.24). Script *requests* on that host are labelled "runtime created" whatever their initiator | Structural. A bare page (Step 3) drops GSAP/ScrollTrigger and most achunks; webflow.js + its chunks remain on every Webflow page. Pinning them needs per-publish hashes and moves webflow.js/GSAP into the SRI item. Answered in the notes |
 
 ## Do these in order
 
@@ -127,8 +135,9 @@ Commit before uploading anything, so the artifact hash maps to a commit.
    ScrollTrigger and most `achunk` files disappear from Preflight's "unreviewed" list. If you keep
    `/blog/the-power-of-resilience`, expect those files to be listed again.
 5. **This build changes the page entry, not the runtime file** (R8.23): the runtime pushed on 09-18
-   (`…9b7da263.js`) stays the one on the page and the Step 5 values still hold. The entry must be migrated once so
-   Webflow renders the tag without the two `data-codalyn-beacon*` attributes. **Trigger a non-forced sync: open
+   (`…9b7da263.js`) stays the one on the page and the Step 5 values still hold. Migrate the entry once so
+   Webflow renders the tag without the two `data-codalyn-beacon*` attributes — a cleaner tag; R8.24 shows it cannot
+   by itself clear the Preflight item, so do this once and do not loop on it. **Trigger a non-forced sync: open
    the page's beacon in the Composer, change one value, Save; then change it back, Save** (a save with no change
    returns before syncing; the second save is the no-op that proves it settled). A list rename + rename back does
    the same. **Do not press the page runtime Sync button**: it is the forced repair path, mints a new asset id
@@ -166,7 +175,7 @@ Open **App Review Preflight** in the Designer ([install it into the Workspace](h
    - bundle → `v0.1.0_public_09-26_12-24-24.zip`
    - source maps → `v0.1.0_public_09-26_12-24-24.sourcemaps.zip`
 2. Expected **Review feedback: exactly one item, "External API Calls" (REQUIRED), 1 evidence location** in `assets/label-*.js`.
-   That is the extension's single backend call (Hybrid App: Tower). It cannot go away while the app has a backend; the notes in Step 6 disclose it. The excerpt's position moves between scans (it has sat on the storage cleanup, then on the Tower policy-page links) — the rule is the same.
+   That is the extension's single backend call (Hybrid App: Tower). It cannot go away while the app has a backend; the notes in Step 6 disclose it. The rule matches `fetch(` / `new XMLHttpRequest` only (one match in the zip); the excerpt the tool prints opens ≈2 470 characters *before* that match (a column-offset display bug, R8.24), so whatever code it shows is not the evidence — do not change code because of the excerpt.
 3. Anything else — a second item, "Silent Canvas Mutations", an External API Calls excerpt outside the `label-*.js` chunk — → stop, [playbook.md](playbook.md) § B.
 4. Copy the receipt code (`wfpre_…`) into Step 6. (It was issued with this item present on 09-14.)
 
@@ -206,10 +215,10 @@ Expected result for this build, and what to do with each item:
 | Result | Expected now | If it shows |
 | --- | --- | --- |
 | Runtime is not traceable to source | **Gone** — the runtime's last line points at the uploaded v3 source map | The pin script's `source map` line tells you why (no trailer = map upload refused; unreachable = CDN). Copy it into the compliance record. |
-| Script integrity is missing or wrong | Expected **gone** — the tag now ends at `crossorigin="anonymous">` like every tag the tool accepts (R8.23); file, URL and SRI unchanged, package untouched | Do **not** change the runtime. Run the control from [history/sri-item-investigation.md](history/sri-item-investigation.md) step 1 (Webflow's jQuery tag as a second pinned file, diagnostic run only), then expand "Evidence artifact details", download all artifacts, and share them: they show what the tool compared. |
-| New script elements · Unreviewed scripts | Only Webflow's site runtime (`webflow.<site>.<hash>.js`, maybe jQuery / an achunk) on a bare page; the full list on the blog page | Expected. Webflow's own files on every Webflow page; pinning them only moves them into the SRI item. Answered in the notes. |
+| Script integrity is missing or wrong | **Expected to persist** — the runner's request-time DOM snapshot never contains a preload-scanned tag (R8.24); the page tag, CORS, bytes and package are correct and verified | Do **not** change the runtime, the tag or the package, and do **not** add Webflow's jQuery as a control row: a saved runtime file cannot be removed from the form (R7b.16) and its hash changes on every publish, which would turn the submission package into a "Runtime bytes changed" blocker. Run `node scripts/webflow-runtime-sri-replica.mjs <page>` once (exit 1, 3/3 = same cause, jQuery included) and keep the output; attach it to the submission thread if asked. |
+| New script elements · Unreviewed scripts | Only Webflow's site runtime (`webflow.<site>.<hash>.js` + the achunks it imports) on a bare page; the full list with GSAP/ScrollTrigger on the blog page | Expected — every script on our asset's CDN host that is not pinned (R8.24). Pinning them only moves them into the SRI item. Answered in the notes. |
 
-Runtime file row should read **Loaded ✓ · Hash matched ✓ · SRI ✓ · Source map ✓**.
+Runtime file row will read **Loaded ✓ · Hash matched ✓ · SRI ✗ · Source map ✓** — the SRI ✗ is the tool's request-time snapshot (R8.24), not the page; "Runtime security blocked" is the expected headline.
 If a reviewer explicitly asks for Webflow's platform scripts to be pinned: [history/webflow-platform-script-rows-2026-09-14.md](history/webflow-platform-script-rows-2026-09-14.md) — re-run the observe script first, the values change on every publish.
 
 ### Step 6 — Publish the version for review, then file the form
@@ -270,32 +279,32 @@ support fields untouched this round; nothing about them changed.
 > [history/responses.md](history/responses.md); per-item email answers are below. Nothing is lost: items 1–6 of
 > **Additional notes** say the same thing in full.
 
-**Additional notes** (form limit 5000 characters; this is 4987). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
+**Additional notes** (form limit 5000 characters; this is 4995). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
 
 ```
-WHAT CHANGED (bundle v0.1.0, 09-26_12-24-24) - 1 to 6 answer the 2026-09-17 feedback in order; 7, 8 the Preflight scans; 9 our audit of 2026-09-25
+WHAT CHANGED (bundle v0.1.0, 09-26_12-24-24) - 1 to 6 answer the 2026-09-17 feedback; 7, 8 Preflight scans; 9 our 2026-09-25 audit
 
 1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. A user with one workspace and none active sees it as a suggestion with an explicit "Use this workspace" control; the only request to that endpoint comes from that click or the multi-workspace picker. The server sets no default either: an extension session without a chosen workspace stays without one until the user confirms. Unit tests pin zero requests after sync, one after the click, no server fallback.
 
 2. Exception telemetry. The Marketplace build ships no telemetry SDK: the dependency sits behind a build-time release flag that is off for Marketplace bundles; the release build fails if it is on and verifies the zip has no trace of it (no analytics chunk, no telemetry host, no consent prompt). Settings and the privacy policy say so. Builds that enable telemetry run a unit-tested redaction handler on every event.
 
-3. Redirects. The single network call site (extension-egress.ts) runs every request with redirect mode set to error; callers cannot override it. No path needs a redirect: Tower answers its API routes directly and the presigned S3 upload returns a 2xx with no redirect field.
+3. Redirects. The single network call site (extension-egress.ts) runs every request with redirect mode set to error; callers cannot override it. No path needs a redirect: Tower answers directly and the presigned upload returns 2xx with no redirect.
 
-4. Upload allowlist. The create-asset adapter registers the exact uploadUrl Webflow returned as a one-shot permitted destination, only if it names the webflow-prod-assets bucket (host exactly webflow-prod-assets.s3.amazonaws.com, or host s3.amazonaws.com with first path segment webflow-prod-assets). The egress policy accepts an upload only for a granted URL and consumes the grant; other buckets, regional hosts, lookalikes and Webflow-owned hosts are refused before any request. connect-src names that bucket in both syntaxes, never the bare S3 host.
+4. Upload allowlist. The create-asset adapter registers the exact uploadUrl Webflow returned as a one-shot permitted destination, only if it names the webflow-prod-assets bucket (host exactly webflow-prod-assets.s3.amazonaws.com, or host s3.amazonaws.com with first path segment webflow-prod-assets). The egress policy accepts an upload only for a granted URL and consumes the grant; every other bucket or host is refused before any request. connect-src names that bucket in both syntaxes, never the bare S3 host.
 
-5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host; style-src-attr is none. The UI styles through the CSSOM. The two style-attribute writes left in the bundle are pinned by count and are Designer API calls styling the CMS Slots placeholder on the user's canvas element, outside the extension's policy.
+5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host; style-src-attr is none. The UI styles through the CSSOM. The two style-attribute writes left are pinned by count and are Designer API calls styling the CMS Slots placeholder on the user's canvas, outside the extension's policy.
 
-6. Localization. Every CMS item write names its locale: the extension reads the site's locales once per session and sends the primary locale's cmsLocaleId on every write and on the matching staged read. Sites with secondary locales are refused before any request, with an in-app message. The listing states this.
+6. Localization. Every CMS item write names its locale: the extension reads the site's locales once per session and sends the primary locale's cmsLocaleId on every write and on the matching staged read. Sites with secondary locales are refused before any request. The listing states this.
 
-7. DOM observers. The rich-text property editor is withdrawn behind a release flag like item 2; its editor observed its own editable element inside our panel, never the canvas. Rich-text properties are edited as HTML in a text box. The drag-and-drop library's re-measuring observer is removed by a dependency patch. The release build pins the observer identifier to zero across every shipped file.
+7. DOM observers. The rich-text property editor is withdrawn behind a release flag like item 2. Rich-text properties are edited as HTML in a text box. The drag-and-drop library's re-measuring observer is removed by a dependency patch. The release build pins the observer identifier to zero across every shipped file.
 
 8. Browser storage and cookies. The session bearer is held in memory only; no storage call in the bundle is keyed by a credential name. Every request sets the cookie mode to omit at the single call site; the only credential on the wire is our Tower session bearer, sent only to tower.codalyn.app.
 
-UNCHANGED FROM 2026-09-15: one network call site with an explicit destination policy; canvas changes only through the Designer API on explicit user action; Tower with allowlist-only CORS, session-only auth, server-stored OAuth state, the Webflow ID token never forwarded; no plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, no popups or cross-window messaging, no credentials in URLs, no session replay; every shipped JS and CSS file has a v3 source map (private field); none names a map.
+UNCHANGED FROM 2026-09-15: one network call site with an explicit destination policy; canvas changes only through the Designer API on explicit user action; Tower with allowlist-only CORS, session-only auth, server-stored OAuth state, the Webflow ID token never forwarded; no plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, popups, cross-window messaging, credentials in URLs or session replay; every shipped JS and CSS file has a private v3 source map; none names a map.
 
-9. Audit of 2026-09-25 against the current guideline text. The canvas clear that ran on Designer mode and page changes is removed: every canvas write now follows a click. Install and rename toasts prompt to publish. The sign-in card names the free plan, that paid plans raise monthly limits, and links pricing. A dependency polyfill that assigned ArrayBuffer.prototype.slice is removed by patch; the build pins native prototype assignments to zero.
+9. Audit of 2026-09-25 against the guidelines. The canvas clear that ran on Designer mode and page changes is removed: every canvas write now follows a click. Install and rename toasts prompt to publish. The sign-in card names the free plan, that paid plans raise monthly limits, and links pricing. A dependency polyfill that assigned ArrayBuffer.prototype.slice is removed by patch; the build pins native prototype assignments to zero.
 
-PUBLISHED-RUNTIME TEST: one page-level script, registered with a SHA-256 integrityHash carried verbatim in the page tag with anonymous crossorigin; the page entry carries no other attribute; served unminified, its last line pointing at a version-3 source map published beside it as a site asset (sourcesContent is the file minus that line; no trailing newline). Every other script on the test page is Webflow's own site runtime; Beacon loads none.
+PUBLISHED-RUNTIME TEST: one page-level script, registered with a SHA-256 integrityHash carried verbatim in the page tag with anonymous crossorigin; served unminified with a version-3 source map beside it. Every other script on the test page is Webflow's own site runtime; Beacon loads none. The Script integrity row is tool-side: the runner reads the tag at the file's first request, issued by the preload scanner before the parser inserts any script element after jQuery and webflow.js, so the attribute is never read; reproduced locally 3 of 3, also for Webflow's jQuery tag; the served tag and CDN CORS verify correct. The unreviewed rows are Webflow's site runtime on our asset's CDN host.
 
 BACKEND (Hybrid): https://tower.codalyn.app only, HTTPS, production; paths as filed on 2026-09-15; in-app policy and docs links are anchors on it. Other destination: the presigned upload URL in item 4. No telemetry host. Uninstall and AVIF disclosure unchanged.
 ```

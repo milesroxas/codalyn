@@ -1,5 +1,16 @@
 # "Script integrity is missing or wrong" — investigation state (last updated 2026-09-26)
 
+> **CLOSED 2026-09-26 (R8.24) — cause found in the tool, not the page.** The runner sets `domIntegrity` from a DOM
+> snapshot taken inside the route handler of the file's *first* network request; Chromium's preload scanner issues
+> that request while the parser is still blocked on jQuery/webflow.js, so no `script[src]` element exists yet and the
+> value is `null` — the served tag is never read. Reproduced 3/3 with `scripts/webflow-runtime-sri-replica.mjs` on the
+> live page (zero script elements in the DOM at request time, `readyState` loading) and with a two-route fixture
+> (pinned tag alone → present; one synchronous script ahead of it → absent). Step 1 below (jQuery as a control) is
+> answered by the replica: Webflow's own tag fails the same way — do not run it on the submission package (a saved
+> runtime file row cannot be removed, R7b.16, and jQuery's hash changes on every publish). Step 2 (attribute removal, R8.23) is harmless but
+> cannot clear the item. Nothing else in this file needs doing; the evidence and the upstream issue draft are in
+> [preflight-runtime-sri-request-boundary.md](preflight-runtime-sri-request-boundary.md).
+
 > **2026-09-26 — the item came back (third round on the same 09-18 runtime); Step 2 below is implemented without
 > waiting for the Step 1 control run** (compliance record R8.23, bundle `v0.1.0_public_09-26_12-24-24.zip`). The
 > page still verified correct first (`webflow-runtime-pin.mjs --expect-*` exit 0, all three saved values match).

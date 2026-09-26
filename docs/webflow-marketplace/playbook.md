@@ -213,6 +213,17 @@ App: Beacon (Designer Extension + Tower backend). Source: this repo. Last submit
 <zip name + sha256 from compliance doc>.
 ```
 
+### B0. Read the tool before touching code (added 2026-09-26, R8.24)
+
+App Review Preflight is open source and the repository is the deployed tool:
+<https://github.com/createsomethingtoday/webflow-app-preflight> (`packages/bundle-scanner-core/src/policy/default-ruleset.ts`
+= bundle-scan rules, `runner/src/index.ts` + `worker/src/runtime-observations.ts` = runtime-test predicates,
+`extension/src/App.tsx` = the "What to fix" strings). For every Preflight item: clone it shallow, grep the finding's
+title, read the matcher or predicate, and only then decide between code, disclosure and "tool-side, attach evidence".
+Six rebuilds of the runtime (R7b.17–R8.23) chased an item whose predicate never reads the tag. Known tool-side items
+and their evidence: SUBMIT.md Step 5 and
+[history/preflight-runtime-sri-request-boundary.md](history/preflight-runtime-sri-request-boundary.md).
+
 ### B1. Normalize
 
 One row per finding, before touching code:

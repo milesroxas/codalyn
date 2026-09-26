@@ -26,9 +26,11 @@ import {
   PURGE_MAX_PAGES_SCANNED,
   planBoundedPageScan,
   readBeaconRuntimeHashFromName,
+  readBeaconRuntimeHashFromVersion,
   selectBeaconRuntimeAssetIdsToPurge,
   withCmsSlotRuntimeSourceMapTrailer,
   withoutAnyBeaconRuntimeScripts,
+  withoutBeaconRuntimeAttributes,
 } from "@/features/cms-slots/model/cms-slot-page-inline-script";
 
 type PageScript = {
@@ -38,14 +40,16 @@ type PageScript = {
   attributes?: Record<string, string>;
 };
 
-const beaconFooter = (id: string, attrs?: Record<string, string>): PageScript => ({
+const beaconFooter = (id: string, attrs?: Record<string, string>, version = "1.0.0"): PageScript => ({
   id,
   location: "footer",
-  version: "1.0.0",
+  version,
   attributes: attrs,
 });
 const isBeaconScript = (s: PageScript, registeredIds: Set<string>): boolean =>
-  s.attributes?.["data-codalyn-beacon"] === "runtime" || registeredIds.has(s.id);
+  registeredIds.has(s.id) ||
+  readBeaconRuntimeHashFromVersion(s.version) != null ||
+  s.attributes?.["data-codalyn-beacon"] === "runtime";
 
 function runCmsSlotBeaconRuntime(doc: Document): void {
   const win = doc.defaultView;
@@ -326,13 +330,22 @@ describe("beacon runtime asset cleanup helpers", () => {
 describe("beacon runtime page-script dedup (root-cause guard)", () => {
   // The published-page bug was two runtime scripts co-existing and stomping each other. These lock the invariant that
   // applying the runtime always leaves exactly one beacon footer script, no matter what was on the page before.
-  const newScript = beaconFooter("new-runtime", {
-    "data-codalyn-beacon": "runtime",
-    "data-codalyn-beacon-src-hash": "c7b4796e",
+  // The applied entry is `{ id, location, version }` only — no attributes reach the published tag.
+  const newScript = beaconFooter("new-runtime", undefined, "0.1.0+beacon.c7b4796e");
+
+  it("applies the runtime with no attributes at all (the published tag must be `src type integrity crossorigin` only)", () => {
+    const merged = mergePageScriptsWithBeaconRuntime([], newScript, new Set());
+    expect(merged).toEqual([{ id: "new-runtime", location: "footer", version: "0.1.0+beacon.c7b4796e" }]);
   });
 
-  it("strips a stale beacon script that carries the current marker", () => {
+  it("strips a stale beacon script that carries the legacy marker attribute", () => {
     const existing = [beaconFooter("stale-marked", { "data-codalyn-beacon": "runtime" })];
+    const merged = mergePageScriptsWithBeaconRuntime(existing, newScript, new Set());
+    expect(merged.map((s) => s.id)).toEqual(["new-runtime"]);
+  });
+
+  it("strips a stale beacon script identified only by its `+beacon.<hash>` registered version", () => {
+    const existing = [beaconFooter("stale-by-version", undefined, "0.1.0+beacon.deadbeef")];
     const merged = mergePageScriptsWithBeaconRuntime(existing, newScript, new Set());
     expect(merged.map((s) => s.id)).toEqual(["new-runtime"]);
   });
@@ -370,16 +383,43 @@ describe("beacon runtime page-script dedup (root-cause guard)", () => {
     }
   });
 
-  it("withoutAnyBeaconRuntimeScripts removes by marker AND by registered id together", () => {
+  it("withoutAnyBeaconRuntimeScripts removes by registered id, by version tag AND by legacy marker together", () => {
     const kept = withoutAnyBeaconRuntimeScripts(
       [
         beaconFooter("marked", { "data-codalyn-beacon": "runtime" }),
         beaconFooter("by-id", undefined),
+        beaconFooter("by-version", undefined, "0.1.0+beacon.0a1b2c3d.2"),
         beaconFooter("keep", { src: "x.js" }),
+        beaconFooter("keep-lookalike", undefined, "0.1.0+beacon.1726000000000"),
       ],
       new Set(["by-id"])
     );
-    expect(kept.map((s) => s.id)).toEqual(["keep"]);
+    expect(kept.map((s) => s.id)).toEqual(["keep", "keep-lookalike"]);
+  });
+
+  it("withoutBeaconRuntimeAttributes reduces only our entries to { id, location, version }, in place, others untouched", () => {
+    const analytics: PageScript = {
+      id: "analytics",
+      location: "header",
+      version: "2.0.0",
+      attributes: { "data-x": "1" },
+    };
+    const legacy = beaconFooter(
+      "legacy",
+      { "data-codalyn-beacon": "runtime", "data-codalyn-beacon-src-hash": "c7b4796e" },
+      "0.1.0+beacon.c7b4796e"
+    );
+    const byId = { id: "by-id", location: "Footer", version: "1.0.0", attributes: { stray: "x" } };
+    const consent = beaconFooter("consent", undefined);
+    const next = withoutBeaconRuntimeAttributes([analytics, legacy, byId, consent], new Set(["by-id"]));
+    expect(next).toEqual([
+      analytics,
+      { id: "legacy", location: "footer", version: "0.1.0+beacon.c7b4796e" },
+      { id: "by-id", location: "footer", version: "1.0.0" },
+      consent,
+    ]);
+    expect(next[0]).toBe(analytics);
+    expect(next[3]).toBe(consent);
   });
 });
 
@@ -1246,77 +1286,114 @@ describe("cms slot beacon runtime fail-open reveal (published site)", () => {
 describe("decideCmsSlotRuntimeSyncAction", () => {
   const HASH = "a1b2c3d4";
   const NO_REGISTERED = new Set<string>();
-  const applied = (attrs?: Record<string, unknown>, over: Partial<PageScript> = {}): PageScript =>
+  /** Canonical applied entry since 2026-09-26: no attributes; the build is the `+beacon.<hash>` tag in the version. */
+  const applied = (
+    over: Omit<Partial<PageScript>, "attributes"> & { attributes?: Record<string, unknown> } = {}
+  ): PageScript =>
     ({
       id: "reg-1",
       location: "footer",
-      version: "1.0.0",
-      attributes: attrs as Record<string, string> | undefined,
+      version: `0.1.0+beacon.${HASH}`,
       ...over,
     }) as PageScript;
-  const marked = (hash: unknown): Record<string, unknown> => ({
-    "data-codalyn-beacon": "runtime",
-    "data-codalyn-beacon-src-hash": hash,
-  });
-  const decide = (existing: unknown, force?: boolean) =>
+  /** The legacy markers builds before 2026-09-26 wrote; the version then carried a timestamp, not the hash. */
+  const legacy = (hash: unknown, over: Partial<PageScript> = {}): PageScript =>
+    applied({
+      version: "0.1.0+beacon.1726000000000",
+      attributes: { "data-codalyn-beacon": "runtime", "data-codalyn-beacon-src-hash": hash },
+      ...over,
+    });
+  const decide = (
+    existing: unknown,
+    options: { force?: boolean; hashById?: ReadonlyMap<string, string>; registeredIds?: ReadonlySet<string> } = {}
+  ) =>
     decideCmsSlotRuntimeSyncAction({
       existing: existing as never,
       expectedHash: HASH,
-      registeredBeaconScriptIds: NO_REGISTERED,
-      force,
+      registeredBeaconScriptIds: options.registeredIds ?? NO_REGISTERED,
+      registeredBeaconRuntimeHashesById: options.hashById,
+      force: options.force,
     });
 
-  it("skips when the applied footer runtime already carries the expected hash (canonical shape)", () => {
-    expect(decide([applied(marked(HASH))]).action).toBe("skip");
+  it("skips when the applied footer runtime carries the expected hash in its version and no attributes (canonical shape)", () => {
+    expect(decide([applied()]).action).toBe("skip");
+    expect(decide([applied({ version: `0.1.0+beacon.${HASH}.3` })]).action).toBe("skip");
   });
 
-  it("skips regardless of attribute-name casing (Webflow varies it)", () => {
+  it("skips when Webflow echoes an empty attributes object (equivalent runtime shape)", () => {
+    expect(decide([applied({ attributes: {} })]).action).toBe("skip");
+  });
+
+  it("skips a registry-known entry whose version carries no build tag when the registry maps its id to this build", () => {
+    const entry = applied({ version: "0.1.0" });
+    expect(decide([entry], { registeredIds: new Set(["reg-1"]), hashById: new Map([["reg-1", HASH]]) }).action).toBe(
+      "skip"
+    );
+  });
+
+  it("registers a registry-known entry whose build cannot be read anywhere (never silently skips)", () => {
+    const entry = applied({ version: "0.1.0" });
+    expect(decide([entry], { registeredIds: new Set(["reg-1"]) }).action).toBe("register");
+  });
+
+  it("the registry's hosted file wins over the version tag when they disagree (ground truth for what the id serves)", () => {
+    const entry = applied();
+    expect(decide([entry], { hashById: new Map([["reg-1", "ffffffff"]]) }).action).toBe("register");
+    const stale = applied({ version: "0.1.0+beacon.ffffffff" });
+    expect(decide([stale], { hashById: new Map([["reg-1", HASH]]) }).action).toBe("skip");
+  });
+
+  it("reapplies (PUT only) when this build is applied but the entry still carries the legacy markers", () => {
+    expect(decide([legacy(HASH)]).action).toBe("reapply");
+    // Same build tag in the version, markers still present — also a reapply.
+    expect(decide([applied({ attributes: { "data-codalyn-beacon": "runtime" } })]).action).toBe("reapply");
+  });
+
+  it("reads the legacy markers regardless of attribute-name casing (Webflow varies it)", () => {
     const attrs = { "Data-Codalyn-Beacon": "runtime", "DATA-CODALYN-BEACON-SRC-HASH": HASH };
-    expect(decide([applied(attrs)]).action).toBe("skip");
+    expect(decide([legacy(undefined, { attributes: attrs })]).action).toBe("reapply");
   });
 
-  it("accepts the wrapped `{ value }` attribute shape for the hash (alternate runtime shape)", () => {
-    expect(decide([applied(marked({ value: HASH }))]).action).toBe("skip");
+  it("accepts the wrapped `{ value }` shape for the legacy hash attribute and for the version (alternate runtime shapes)", () => {
+    expect(decide([legacy({ value: HASH })]).action).toBe("reapply");
+    expect(decide([applied({ version: { value: `0.1.0+beacon.${HASH}` } as never })]).action).toBe("skip");
   });
 
-  it("registers when the applied hash is a different build", () => {
-    expect(decide([applied(marked("ffffffff"))].concat()).action).toBe("register");
+  it("registers when the applied build is a different one — by version tag or by legacy marker", () => {
+    expect(decide([applied({ version: "0.1.0+beacon.ffffffff" })]).action).toBe("register");
+    expect(decide([legacy("ffffffff")]).action).toBe("register");
   });
 
   it("registers when no beacon runtime is applied at all (missing field)", () => {
     expect(decide([]).action).toBe("register");
-    expect(decide([applied(undefined, { id: "someone-elses" })]).action).toBe("register");
+    expect(decide([{ id: "someone-elses", location: "footer", version: "1.0.0" }]).action).toBe("register");
   });
 
-  it("registers on a missing or garbled hash attribute — never silently skips", () => {
+  it("registers on a missing or garbled legacy hash attribute — never silently skips", () => {
     for (const hash of [undefined, null, "", "   ", 42, {}, { value: "" }, [], true]) {
-      expect(decide([applied(marked(hash))]).action).toBe("register");
+      expect(decide([legacy(hash)]).action).toBe("register");
     }
   });
 
-  it("registers when the marker attribute is absent", () => {
-    expect(decide([applied({ "data-codalyn-beacon-src-hash": HASH })]).action).toBe("register");
+  it("registers on a garbled version build tag with no other identity", () => {
+    for (const version of ["0.1.0+beacon.zzzzzzzz", "0.1.0+beacon.a1b2c3d", "0.1.0+beacon.1726000000000", ""]) {
+      expect(decide([applied({ version, id: "unknown" })]).action).toBe("register");
+    }
   });
 
   it("registers when the applied runtime is not in the footer", () => {
-    expect(decide([applied(marked(HASH), { location: "header" })]).action).toBe("register");
-    expect(decide([applied(marked(HASH), { location: undefined })]).action).toBe("register");
+    expect(decide([applied({ location: "header" })]).action).toBe("register");
+    expect(decide([applied({ location: undefined })]).action).toBe("register");
   });
 
   it("registers when more than one beacon runtime is applied (restores the exactly-one invariant)", () => {
-    const dupes = [applied(marked(HASH)), applied(marked(HASH), { id: "reg-2" })];
-    expect(decide(dupes).action).toBe("register");
+    expect(decide([applied(), applied({ id: "reg-2" })]).action).toBe("register");
+    expect(decide([applied(), legacy(HASH, { id: "reg-2" })]).action).toBe("register");
   });
 
-  it("counts registry-known scripts as ours even without the marker attribute", () => {
+  it("counts registry-known scripts as ours even without a version tag or marker", () => {
     const stale = { id: "reg-legacy", location: "footer", version: "0.9.0" } as PageScript;
-    const decision = decideCmsSlotRuntimeSyncAction({
-      existing: [applied(marked(HASH)), stale],
-      expectedHash: HASH,
-      registeredBeaconScriptIds: new Set(["reg-legacy"]),
-      force: false,
-    });
-    expect(decision.action).toBe("register");
+    expect(decide([applied(), stale], { registeredIds: new Set(["reg-legacy"]) }).action).toBe("register");
   });
 
   it("registers on malformed `existing` input rather than assuming a clean page", () => {
@@ -1329,7 +1406,7 @@ describe("decideCmsSlotRuntimeSyncAction", () => {
   it("registers when the expected hash itself is missing or malformed", () => {
     for (const expectedHash of ["", "   ", null, undefined, 5]) {
       const decision = decideCmsSlotRuntimeSyncAction({
-        existing: [applied(marked(HASH))],
+        existing: [applied()],
         expectedHash: expectedHash as never,
         registeredBeaconScriptIds: NO_REGISTERED,
       });
@@ -1338,12 +1415,58 @@ describe("decideCmsSlotRuntimeSyncAction", () => {
   });
 
   it("force always registers, even on an exact match", () => {
-    expect(decide([applied(marked(HASH))], true).action).toBe("register");
+    expect(decide([applied()], { force: true }).action).toBe("register");
+    expect(decide([legacy(HASH)], { force: true }).action).toBe("register");
   });
 
   it("always explains itself (the reason is surfaced in warnings)", () => {
-    expect(decide([applied(marked(HASH))]).reason.length).toBeGreaterThan(0);
+    expect(decide([applied()]).reason.length).toBeGreaterThan(0);
+    expect(decide([legacy(HASH)]).reason.length).toBeGreaterThan(0);
     expect(decide([]).reason.length).toBeGreaterThan(0);
+  });
+});
+
+describe("readBeaconRuntimeHashFromVersion (build tag inside the registered version)", () => {
+  it("reads the hash from the canonical and the suffixed version", () => {
+    expect(readBeaconRuntimeHashFromVersion("0.1.0+beacon.1a2b3c4d")).toBe("1a2b3c4d");
+    expect(readBeaconRuntimeHashFromVersion("0.1.0+beacon.1a2b3c4d.2")).toBe("1a2b3c4d");
+    expect(readBeaconRuntimeHashFromVersion("12.0.7+beacon.ffffffff.10")).toBe("ffffffff");
+  });
+
+  it("round-trips whatever cmsSlotRuntimeScriptVersion mints, including the collision suffix", () => {
+    const taken = new Set(["0.1.0+beacon.0f0f0f0f"]);
+    expect(
+      readBeaconRuntimeHashFromVersion(
+        cmsSlotRuntimeScriptVersion({ base: "0.1.0", sourceHash: "0f0f0f0f", takenVersions: taken })
+      )
+    ).toBe("0f0f0f0f");
+  });
+
+  it("accepts the wrapped `{ value }` shape (alternate runtime shape)", () => {
+    expect(readBeaconRuntimeHashFromVersion({ value: "0.1.0+beacon.1a2b3c4d" })).toBe("1a2b3c4d");
+    expect(readBeaconRuntimeHashFromVersion({ value: "  0.1.0+beacon.1a2b3c4d  " })).toBe("1a2b3c4d");
+  });
+
+  it("is null for a missing, malformed or lookalike version — never a partial read", () => {
+    for (const raw of [
+      undefined,
+      null,
+      "",
+      "   ",
+      42,
+      {},
+      { value: "" },
+      "1.0.0",
+      "0.1.0+beacon.1726000000000", // the pre-content-hash timestamp tag
+      "0.1.0+beacon.1a2b3c4", // 7 hex
+      "0.1.0+beacon.1a2b3c4d5", // 9 hex
+      "0.1.0+beacon.zzzzzzzz", // non-hex
+      "0.1.0+beacon.1A2B3C4D", // upper-case is not what we mint
+      "0.1.0+beacon.1a2b3c4d.x", // non-numeric suffix
+      "0.1.0+beacon.1a2b3c4d-rc", // trailing garbage
+    ]) {
+      expect(readBeaconRuntimeHashFromVersion(raw)).toBeNull();
+    }
   });
 });
 

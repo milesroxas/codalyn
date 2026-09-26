@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readBeaconRuntimeHashFromVersion } from "@/features/cms-slots/model/cms-slot-page-inline-script";
 
 /**
  * Registration records cannot be deleted through the Webflow Data API, so every redundant
@@ -33,14 +34,34 @@ type PageScript = {
 /** Mutable fake of the customer's site as the Data API would report it. */
 type FakeSite = {
   pageScripts: PageScript[];
-  registered: { id: string; displayName: string; hostedLocation: string }[];
+  registered: { id: string; displayName: string; hostedLocation: string; version: string }[];
   assets: { id: string; hostedUrl: string; originalFileName: string }[];
   /** When set, Webflow refuses to create `.map.json` assets (simulates an unsupported file type). */
   refuseSourceMapAssets: boolean;
-  counts: { register: number; createAsset: number; upload: number; putPageCode: number; getPageCode: number };
+  /** When set, `GET /registered_scripts` fails (the registry read is best-effort and must never block a sync). */
+  registryUnavailable: boolean;
+  counts: {
+    register: number;
+    createAsset: number;
+    upload: number;
+    putPageCode: number;
+    getPageCode: number;
+    getRegistry: number;
+  };
 };
 
 let site: FakeSite;
+
+function freshSite(): FakeSite {
+  return {
+    pageScripts: [],
+    registered: [],
+    assets: [],
+    refuseSourceMapAssets: false,
+    registryUnavailable: false,
+    counts: { register: 0, createAsset: 0, upload: 0, putPageCode: 0, getPageCode: 0, getRegistry: 0 },
+  };
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -85,14 +106,24 @@ const TOWER_ROUTES: Record<string, (init: RequestInit | undefined) => Response> 
     }>(init);
     captured.integrity = String(integrityHash ?? "");
     const id = `reg-${site.counts.register}`;
-    site.registered.push({ id, displayName: "CodalynBeaconRuntime", hostedLocation: String(hostedLocation ?? "") });
+    site.registered.push({
+      id,
+      displayName: "CodalynBeaconRuntime",
+      hostedLocation: String(hostedLocation ?? ""),
+      version: String(version ?? "1.0.0"),
+    });
     return json({ id, version: String(version ?? "1.0.0") });
   },
-  [`GET /api/v2/webflow/sites/${SITE_ID}/registered_scripts`]: () =>
-    json({
+  [`GET /api/v2/webflow/sites/${SITE_ID}/registered_scripts`]: () => {
+    site.counts.getRegistry += 1;
+    if (site.registryUnavailable) {
+      return json({ message: "Service unavailable" }, 503);
+    }
+    return json({
       registeredScripts: site.registered,
       pagination: { limit: 100, offset: 0, total: site.registered.length },
-    }),
+    });
+  },
   [`GET /api/v2/webflow/pages/${PAGE_ID}/custom_code`]: () => {
     site.counts.getPageCode += 1;
     return json({ scripts: site.pageScripts });
@@ -115,21 +146,30 @@ async function towerRoute(path: string, init?: RequestInit): Promise<Response> {
   return handler ? handler(init) : json({ message: `unrouted ${method} ${pathname}` }, 500);
 }
 
-/** The applied footer entry, as the runtime-sync status check would read it. */
+/** The applied footer entry — ours by registered-script id, the stable identifier the Data API hands back. */
 function appliedBeaconScript(): PageScript | undefined {
-  return site.pageScripts.find((s) => s.attributes?.["data-codalyn-beacon"] === "runtime");
+  return site.pageScripts.find((s) => site.registered.some((r) => r.id === s.id));
+}
+
+/** Every page entry that is ours (registered id, `+beacon.<hash>` version or the legacy marker). */
+function beaconScriptsOnPage(): PageScript[] {
+  return site.pageScripts.filter(
+    (s) =>
+      site.registered.some((r) => r.id === s.id) ||
+      readBeaconRuntimeHashFromVersion(s.version) != null ||
+      s.attributes?.["data-codalyn-beacon"] === "runtime"
+  );
+}
+
+/** A page entry as a build before 2026-09-26 applied it: the two `data-*` markers Webflow rendered onto the tag. */
+function legacyAttributes(hash: string): Record<string, string> {
+  return { "data-codalyn-beacon": "runtime", "data-codalyn-beacon-src-hash": hash };
 }
 
 beforeEach(() => {
   vi.useFakeTimers();
   captured = { source: "", integrity: "", uploads: [] };
-  site = {
-    pageScripts: [],
-    registered: [],
-    assets: [],
-    refuseSourceMapAssets: false,
-    counts: { register: 0, createAsset: 0, upload: 0, putPageCode: 0, getPageCode: 0 },
-  };
+  site = freshSite();
   vi.stubGlobal("webflow", {
     getSiteInfo: async () => ({ siteId: SITE_ID }),
     getCurrentPage: async () => ({ id: PAGE_ID }),
@@ -165,6 +205,11 @@ async function sync(options?: { force?: boolean }): Promise<void> {
   await mod.syncCmsSlotPageInlineScript(options);
 }
 
+async function status(): Promise<{ synced: boolean; reason?: string }> {
+  const mod = await import("@/features/cms-slots/model/cms-slot-page-inline-script");
+  return mod.getCmsSlotPageRuntimeSyncStatus();
+}
+
 describe("syncCmsSlotPageInlineScript registration budget", () => {
   it("registers exactly once on the first sync of a page (two assets: the source map, then the runtime JS)", async () => {
     await sync();
@@ -172,7 +217,16 @@ describe("syncCmsSlotPageInlineScript registration budget", () => {
     expect(site.counts.upload).toBe(2);
     expect(site.counts.register).toBe(1);
     expect(site.counts.putPageCode).toBe(1);
-    expect(appliedBeaconScript()?.attributes?.["data-codalyn-beacon-src-hash"]).toMatch(/^[0-9a-f]{8}$/);
+    expect(readBeaconRuntimeHashFromVersion(appliedBeaconScript()?.version)).toMatch(/^[0-9a-f]{8}$/);
+  });
+
+  it("applies the page entry as `{ id, location, version }` only — no attributes, so Webflow renders the tag as `src type integrity crossorigin` (App Review Preflight: script integrity)", async () => {
+    await sync();
+    const applied = appliedBeaconScript();
+    expect(applied).toBeDefined();
+    expect(Object.keys(applied ?? {}).sort()).toEqual(["id", "location", "version"]);
+    expect(applied?.location).toBe("footer");
+    expect(applied?.attributes).toBeUndefined();
   });
 
   it("pins the hosted runtime with a SHA-256 SRI of the exact uploaded bytes (Webflow's integrityHash format)", async () => {
@@ -203,10 +257,14 @@ describe("syncCmsSlotPageInlineScript registration budget", () => {
   it("changed source → exactly one upload and one register", async () => {
     await sync();
 
-    // Simulate a new extension build: the applied hash no longer matches the source about to be uploaded.
+    // Simulate a new extension build: the page's applied entry (and the registration behind it) carry a hash that no
+    // longer matches the source about to be uploaded.
     const applied = appliedBeaconScript();
-    if (applied?.attributes) {
-      applied.attributes["data-codalyn-beacon-src-hash"] = "deadbeef";
+    const row = site.registered.find((r) => r.id === applied?.id);
+    if (applied && row) {
+      applied.version = "0.1.0+beacon.deadbeef";
+      row.version = applied.version;
+      row.hostedLocation = "https://cdn.prod.website-files.com/codalyn-beacon-runtime-deadbeef.js";
     }
 
     await sync();
@@ -220,45 +278,114 @@ describe("syncCmsSlotPageInlineScript registration budget", () => {
     expect(site.counts.register).toBe(2);
   });
 
-  it("missing hash attribute → treated as changed (fails toward re-registering)", async () => {
+  it("registry-known entry whose version carries no build tag (Webflow echoing a normalized version) → resolved through the registry, no re-register", async () => {
     await sync();
     const applied = appliedBeaconScript();
-    if (applied?.attributes) {
-      delete applied.attributes["data-codalyn-beacon-src-hash"];
+    if (applied) {
+      applied.version = "0.1.0";
     }
+
+    await sync();
+    expect(site.counts.register).toBe(1);
+    expect(site.counts.putPageCode).toBe(1);
+  });
+
+  it("entry with no build tag, no legacy marker and a registry the sync cannot read → treated as changed (fails toward re-registering)", async () => {
+    await sync();
+    const applied = appliedBeaconScript();
+    if (applied) {
+      applied.version = "0.1.0";
+    }
+    site.registryUnavailable = true;
 
     await sync();
     expect(site.counts.register).toBe(2);
   });
 
-  it("garbled hash attribute → treated as changed (fails toward re-registering)", async () => {
-    for (const garbled of ["", "   ", "not-a-hash"]) {
-      site = {
-        pageScripts: [],
-        registered: [],
-        assets: [],
-        refuseSourceMapAssets: false,
-        counts: { register: 0, createAsset: 0, upload: 0, putPageCode: 0, getPageCode: 0 },
-      };
+  it("garbled version build tag with an unreadable registry → treated as changed (fails toward re-registering)", async () => {
+    for (const garbled of ["", "   ", "not-a-version", "0.1.0+beacon.zzzzzzzz", "0.1.0+beacon.1726000000000"]) {
+      site = freshSite();
       await sync();
       const applied = appliedBeaconScript();
-      if (applied?.attributes) {
-        applied.attributes["data-codalyn-beacon-src-hash"] = garbled;
+      if (applied) {
+        applied.version = garbled;
       }
+      site.registryUnavailable = true;
       await sync();
       expect(site.counts.register).toBe(2);
     }
   });
 
-  it("missing marker attribute → treated as changed (never silently skips an unmarked page)", async () => {
+  it("legacy-attribute page entry (pre-2026-09-26 build) migrates through one PUT: no upload, no registration, attributes gone, other scripts untouched", async () => {
     await sync();
     const applied = appliedBeaconScript();
-    if (applied) {
-      applied.attributes = { "data-codalyn-beacon-src-hash": "whatever" };
+    const hash = readBeaconRuntimeHashFromVersion(applied?.version);
+    expect(hash).not.toBeNull();
+    if (applied && hash) {
+      applied.attributes = legacyAttributes(hash);
+    }
+    const analytics: PageScript = {
+      id: "analytics",
+      location: "header",
+      version: "2.0.0",
+      attributes: { "data-x": "1" },
+    };
+    site.pageScripts.unshift(analytics);
+    const before = { ...site.counts };
+
+    await sync();
+    expect(site.counts.register).toBe(before.register);
+    expect(site.counts.createAsset).toBe(before.createAsset);
+    expect(site.counts.upload).toBe(before.upload);
+    expect(site.counts.putPageCode).toBe(before.putPageCode + 1);
+    expect(site.pageScripts).toEqual([analytics, { id: applied?.id, location: "footer", version: applied?.version }]);
+
+    // …and it settles: the migrated entry is the canonical shape, so the next sync is a no-op.
+    await sync();
+    expect(site.counts.putPageCode).toBe(before.putPageCode + 1);
+    expect(site.counts.register).toBe(before.register);
+  });
+
+  it("legacy entry whose version predates the content-derived tag (`+beacon.<timestamp>`) still migrates by marker + registry, never re-registers", async () => {
+    await sync();
+    const applied = appliedBeaconScript();
+    const hash = readBeaconRuntimeHashFromVersion(applied?.version);
+    const row = site.registered.find((r) => r.id === applied?.id);
+    if (applied && row && hash) {
+      applied.version = "0.1.0+beacon.1726000000000";
+      row.version = applied.version;
+      applied.attributes = legacyAttributes(hash);
+    }
+
+    await sync();
+    expect(site.counts.register).toBe(1);
+    expect(site.counts.putPageCode).toBe(2);
+    expect(appliedBeaconScript()).toEqual({
+      id: applied?.id,
+      location: "footer",
+      version: "0.1.0+beacon.1726000000000",
+    });
+
+    await sync();
+    expect(site.counts.register).toBe(1);
+    expect(site.counts.putPageCode).toBe(2);
+  });
+
+  it("legacy entry whose marker hash is a different build → re-registers (a stale runtime is never left on the page)", async () => {
+    await sync();
+    const applied = appliedBeaconScript();
+    const row = site.registered.find((r) => r.id === applied?.id);
+    if (applied && row) {
+      applied.version = "0.1.0+beacon.1726000000000";
+      row.version = applied.version;
+      row.hostedLocation = "https://cdn.prod.website-files.com/codalyn-beacon-runtime-deadbeef.js";
+      applied.attributes = legacyAttributes("deadbeef");
     }
 
     await sync();
     expect(site.counts.register).toBe(2);
+    expect(beaconScriptsOnPage()).toHaveLength(1);
+    expect(appliedBeaconScript()?.attributes).toBeUndefined();
   });
 
   it("force re-registers even when the applied runtime already matches", async () => {
@@ -275,8 +402,7 @@ describe("syncCmsSlotPageInlineScript registration budget", () => {
     for (let i = 0; i < 4; i++) {
       await sync({ force: true });
     }
-    const beacons = site.pageScripts.filter((s) => s.attributes?.["data-codalyn-beacon"] === "runtime");
-    expect(beacons).toHaveLength(1);
+    expect(beaconScriptsOnPage()).toHaveLength(1);
     expect(site.pageScripts).toHaveLength(1);
   });
 
@@ -326,5 +452,52 @@ describe("syncCmsSlotPageInlineScript registration budget", () => {
     expect(captured.source.endsWith("\n")).toBe(false);
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(captured.source));
     expect(captured.integrity).toBe(`sha256-${Buffer.from(digest).toString("base64")}`);
+  });
+});
+
+describe("getCmsSlotPageRuntimeSyncStatus without page-entry attributes", () => {
+  it("reports synced from the registered version alone — one page GET, no registry read", async () => {
+    await sync();
+    const before = { ...site.counts };
+    await expect(status()).resolves.toEqual({ synced: true });
+    expect(site.counts.getPageCode).toBe(before.getPageCode + 1);
+    expect(site.counts.getRegistry).toBe(before.getRegistry);
+  });
+
+  it("resolves a registry-known entry whose version carries no build tag through the registry", async () => {
+    await sync();
+    const applied = appliedBeaconScript();
+    if (applied) {
+      applied.version = "0.1.0";
+    }
+    const before = { ...site.counts };
+    await expect(status()).resolves.toEqual({ synced: true });
+    expect(site.counts.getRegistry).toBe(before.getRegistry + 1);
+  });
+
+  it("still reports synced for a legacy-attribute entry (page synced by an older build, not yet migrated)", async () => {
+    await sync();
+    const applied = appliedBeaconScript();
+    const hash = readBeaconRuntimeHashFromVersion(applied?.version);
+    if (applied && hash) {
+      applied.version = "0.1.0+beacon.1726000000000";
+      applied.attributes = legacyAttributes(hash);
+    }
+    site.registryUnavailable = true;
+    await expect(status()).resolves.toEqual({ synced: true });
+  });
+
+  it("reports out of date when the applied entry is a different build, and missing when the page has no runtime", async () => {
+    await sync();
+    const applied = appliedBeaconScript();
+    const row = site.registered.find((r) => r.id === applied?.id);
+    if (applied && row) {
+      applied.version = "0.1.0+beacon.deadbeef";
+      row.hostedLocation = "https://cdn.prod.website-files.com/codalyn-beacon-runtime-deadbeef.js";
+    }
+    await expect(status()).resolves.toMatchObject({ synced: false, reason: expect.stringMatching(/out of date/) });
+
+    site.pageScripts = [{ id: "someone-elses", location: "footer", version: "1.0.0" }];
+    await expect(status()).resolves.toMatchObject({ synced: false, reason: expect.stringMatching(/No beacon script/) });
   });
 });

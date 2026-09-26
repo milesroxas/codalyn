@@ -22,12 +22,18 @@ import { extensionFetch, grantWebflowAssetUpload, isWebflowAssetUploadUrlShape }
 import { readStringLikeValue } from "@/shared/lib/read-string-like-value";
 import { getTowerOrigin, towerFetchWithRetry } from "@/shared/lib/tower-client";
 
-/** Matches `attributes` on the applied page script so we can replace it on sync. */
-const CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR = "data-codalyn-beacon";
-const CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE = "runtime";
-
-/** Fingerprint of {@link getCmsSlotPageInlineScriptSource} so we can detect drift vs the page footer script. */
-const CMS_SLOT_PAGE_SCRIPT_HASH_ATTR = "data-codalyn-beacon-src-hash";
+/**
+ * Legacy page-entry markers. Builds before 2026-09-26 applied the runtime with two `data-*` `attributes`, which Webflow
+ * rendered onto the published `<script>` tag after `crossorigin="anonymous"` — the one shape difference between our
+ * tag and Webflow's own pinned scripts on the page, and the last app-side variable behind App Review Preflight's
+ * "Script integrity is missing or wrong" item (compliance record R8.16–R8.23). The applied entry now carries only
+ * `{ id, location, version }`; the runtime identifies itself through its registered-script id and the `+beacon.<hash>`
+ * build tag inside its registered version. These constants remain solely to recognize entries applied by older builds
+ * so a sync can migrate them in place (a PUT with no attributes — no new asset, no new registration).
+ */
+const CMS_SLOT_PAGE_SCRIPT_LEGACY_MARKER_ATTR = "data-codalyn-beacon";
+const CMS_SLOT_PAGE_SCRIPT_LEGACY_MARKER_VALUE = "runtime";
+const CMS_SLOT_PAGE_SCRIPT_LEGACY_HASH_ATTR = "data-codalyn-beacon-src-hash";
 
 /**
  * Revision counter embedded in the runtime's header comment. Bump it whenever the format of the sibling source map
@@ -423,6 +429,20 @@ export function cmsSlotRuntimeScriptVersion(input: {
   }
   // Pathological: thousands of identical registrations on one site. Fall back to a unique build tag.
   return `${candidate}.${Date.now()}`;
+}
+
+/**
+ * The 8-hex runtime source hash a registered-script version carries (`<semver>+beacon.<hash>[.<n>]`, the inverse of
+ * {@link cmsSlotRuntimeScriptVersion}), else null. Accepts the primitive and the wrapped `{ value }` shape; anything
+ * that is not exactly that build tag (no tag, wrong length, non-hex) is null, never a partial read.
+ */
+export function readBeaconRuntimeHashFromVersion(raw: unknown): string | null {
+  const version = readStringLikeValue(raw);
+  if (version == null) {
+    return null;
+  }
+  const m = /\+beacon\.([0-9a-f]{8})(?:\.\d+)?$/.exec(version);
+  return m ? m[1] : null;
 }
 
 type PageCustomScript = {
@@ -831,31 +851,74 @@ async function putPageCustomScripts(pageId: string, scripts: PageCustomScript[])
   }
 }
 
-function withoutCmsSlotMarkedScripts(scripts: PageCustomScript[]): PageCustomScript[] {
-  return scripts.filter(
-    (s) => scriptAttrCI(s.attributes, CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR) !== CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE
+const NO_REGISTERED_BEACON_SCRIPT_IDS: ReadonlySet<string> = new Set<string>();
+
+function hasLegacyBeaconMarker(s: PageCustomScript): boolean {
+  return (
+    scriptAttrCI(s.attributes, CMS_SLOT_PAGE_SCRIPT_LEGACY_MARKER_ATTR) === CMS_SLOT_PAGE_SCRIPT_LEGACY_MARKER_VALUE
   );
 }
 
-/** True when a page custom-code entry is one of ours — by marker attribute or by registered-script id. */
+/** True when a page entry carries any `attributes` at all — the applied runtime must carry none (see the legacy note). */
+function hasAnyAttributes(s: PageCustomScript): boolean {
+  const attrs = s.attributes;
+  return attrs != null && typeof attrs === "object" && Object.keys(attrs).length > 0;
+}
+
+/**
+ * True when a page custom-code entry is one of ours — by registered-script id (stable identifier, preferred), by the
+ * `+beacon.<hash>` build tag in its registered version, or by the legacy marker attribute older builds applied.
+ */
 function isBeaconRuntimeScript(s: PageCustomScript, registeredBeaconScriptIds: ReadonlySet<string>): boolean {
   return (
-    scriptAttrCI(s.attributes, CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR) === CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE ||
-    registeredBeaconScriptIds.has(s.id)
+    registeredBeaconScriptIds.has(s.id) ||
+    readBeaconRuntimeHashFromVersion(s.version) != null ||
+    hasLegacyBeaconMarker(s)
   );
 }
 
 /**
- * Removes every beacon runtime script from a page's custom code — both ones carrying the current marker attribute
- * **and** any whose id is a registered `CodalynBeaconRuntime` script. The id cross-reference catches stale runtimes
- * applied before the marker scheme (or under an older marker), which otherwise survive every sync and run alongside
- * the new runtime, stomping each other's DOM mutations on the published page.
+ * The runtime build an applied page entry points at, as an 8-hex source hash: the site registry's record for the entry's
+ * id (its `hostedLocation` file name — ground truth for what the id serves), then the `+beacon.<hash>` tag in the entry's
+ * version, then the legacy `data-codalyn-beacon-src-hash` attribute. Null when none is readable.
+ */
+function readAppliedBeaconRuntimeHash(
+  s: PageCustomScript,
+  registeredBeaconRuntimeHashesById: ReadonlyMap<string, string> | undefined
+): string | null {
+  return (
+    registeredBeaconRuntimeHashesById?.get(s.id) ??
+    readBeaconRuntimeHashFromVersion(s.version) ??
+    readStringLikeValue(scriptAttrCI(s.attributes, CMS_SLOT_PAGE_SCRIPT_LEGACY_HASH_ATTR))
+  );
+}
+
+/**
+ * Removes every beacon runtime script from a page's custom code — by registered `CodalynBeaconRuntime` id, by the
+ * `+beacon.<hash>` version tag **and** by the legacy marker attribute. The id cross-reference catches stale runtimes
+ * applied before either scheme, which otherwise survive every sync and run alongside the new runtime, stomping each
+ * other's DOM mutations on the published page.
  */
 export function withoutAnyBeaconRuntimeScripts(
   scripts: PageCustomScript[],
   registeredBeaconScriptIds: ReadonlySet<string>
 ): PageCustomScript[] {
-  return withoutCmsSlotMarkedScripts(scripts).filter((s) => !registeredBeaconScriptIds.has(s.id));
+  return scripts.filter((s) => !isBeaconRuntimeScript(s, registeredBeaconScriptIds));
+}
+
+/**
+ * The same page list with every beacon runtime entry reduced to `{ id, location: "footer", version }` and every other
+ * script untouched, in place. This is the `reapply` migration for pages synced by builds that still wrote the legacy
+ * `data-*` attributes: one PUT, no upload, no registration, so the hosted URL, bytes and SRI pin stay exactly as they
+ * are. Pure and exported for tests.
+ */
+export function withoutBeaconRuntimeAttributes(
+  scripts: PageCustomScript[],
+  registeredBeaconScriptIds: ReadonlySet<string>
+): PageCustomScript[] {
+  return scripts.map((s) =>
+    isBeaconRuntimeScript(s, registeredBeaconScriptIds) ? { id: s.id, location: "footer", version: s.version } : s
+  );
 }
 
 /**
@@ -872,16 +935,18 @@ export function mergePageScriptsWithBeaconRuntime(
   return [...withoutAnyBeaconRuntimeScripts(existing, registeredBeaconScriptIds), beaconScript];
 }
 
-export type CmsSlotRuntimeSyncDecision = { action: "skip" | "register"; reason: string };
+export type CmsSlotRuntimeSyncDecision = { action: "skip" | "register" | "reapply"; reason: string };
 
 /**
- * Decides whether a sync must upload + register a new hosted script, or can no-op.
+ * Decides whether a sync must upload + register a new hosted script, can no-op, or only needs to re-PUT the page's
+ * custom code (`reapply`: the applied runtime is this build but its entry still carries the legacy `data-*` attributes).
  *
  * Webflow's Data API exposes **no delete for a registration record**, so every `registered_scripts/hosted` POST is a
  * permanent entry against the customer's site budget. Sync fires on composer save, slot rename, slot delete and
  * install — many times per editing session — and previously registered a brand-new script every time (the version is
- * `…+beacon.${Date.now()}`, so no two calls dedupe server-side). The page already carries the runtime's source hash
- * in `data-codalyn-beacon-src-hash`, so an unchanged build is detectable without touching the registry.
+ * `…+beacon.${Date.now()}`, so no two calls dedupe server-side). The applied entry's registered version carries the
+ * runtime's source hash (`+beacon.<hash>`), and the site registry maps its id to the hosted file name that carries the
+ * same hash, so an unchanged build is detectable from the two GETs the sync already makes.
  *
  * Pure and exported so the skip condition is unit-testable without the Data API. Every ambiguous or malformed input
  * fails **toward** registering: a redundant registration is waste, but a wrongly-skipped one ships a page whose
@@ -891,6 +956,8 @@ export function decideCmsSlotRuntimeSyncAction(input: {
   existing: readonly PageCustomScript[] | null | undefined;
   expectedHash: string;
   registeredBeaconScriptIds: ReadonlySet<string>;
+  /** Registered-script id → the runtime source hash its hosted file carries (from the site registry); optional. */
+  registeredBeaconRuntimeHashesById?: ReadonlyMap<string, string>;
   force?: boolean;
 }): CmsSlotRuntimeSyncDecision {
   if (input.force === true) {
@@ -916,15 +983,15 @@ export function decideCmsSlotRuntimeSyncAction(input: {
   if (scriptLocation(current) !== "footer") {
     return { action: "register", reason: "Applied beacon runtime is not in the page footer." };
   }
-  if (scriptAttrCI(current.attributes, CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR) !== CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE) {
-    return { action: "register", reason: "Applied beacon runtime is missing its marker attribute." };
-  }
-  const appliedHash = readStringLikeValue(scriptAttrCI(current.attributes, CMS_SLOT_PAGE_SCRIPT_HASH_ATTR));
+  const appliedHash = readAppliedBeaconRuntimeHash(current, input.registeredBeaconRuntimeHashesById);
   if (appliedHash == null) {
     return { action: "register", reason: "Applied beacon runtime has no source hash." };
   }
   if (appliedHash !== expectedHash) {
     return { action: "register", reason: "Applied beacon runtime is a different build." };
+  }
+  if (hasAnyAttributes(current)) {
+    return { action: "reapply", reason: "Applied beacon runtime still carries legacy marker attributes." };
   }
   return { action: "skip", reason: "Applied beacon runtime already matches this build." };
 }
@@ -1127,15 +1194,30 @@ async function registeredBeaconRuntimeScriptIdSet(siteId: string): Promise<Set<s
   return (await registeredBeaconRuntimeScriptIndex(siteId)).ids;
 }
 
+type RegisteredBeaconRuntimeIndex = {
+  ids: Set<string>;
+  versions: Set<string>;
+  /** Registered id → the runtime source hash its hosted file name carries (falling back to its version's build tag). */
+  hashById: Map<string, string>;
+};
+
 /**
- * Ids and taken versions of every registered beacon runtime script on the site. Same best-effort contract as
- * {@link registeredBeaconRuntimeScriptIdSet}: a failed registry read yields empty sets, never a blocked sync.
+ * Ids, taken versions and per-id runtime hashes of every registered beacon runtime script on the site. Same
+ * best-effort contract as {@link registeredBeaconRuntimeScriptIdSet}: a failed registry read yields empty
+ * collections, never a blocked sync.
  */
-async function registeredBeaconRuntimeScriptIndex(
-  siteId: string
-): Promise<{ ids: Set<string>; versions: Set<string> }> {
+async function registeredBeaconRuntimeScriptIndex(siteId: string): Promise<RegisteredBeaconRuntimeIndex> {
   try {
     const scripts = await listRegisteredBeaconRuntimeScripts(siteId);
+    const hashById = new Map<string, string>();
+    for (const s of scripts) {
+      const hash =
+        (typeof s.hostedLocation === "string" ? readBeaconRuntimeHashFromName(s.hostedLocation) : null) ??
+        readBeaconRuntimeHashFromVersion(s.version);
+      if (typeof s.id === "string" && s.id.length > 0 && hash != null) {
+        hashById.set(s.id, hash);
+      }
+    }
     return {
       ids: new Set(scripts.map((s) => s.id)),
       versions: new Set(
@@ -1143,10 +1225,11 @@ async function registeredBeaconRuntimeScriptIndex(
           .filter((s) => s.displayName === REGISTER_DISPLAY_NAME && typeof s.version === "string")
           .map((s) => s.version as string)
       ),
+      hashById,
     };
   } catch (e) {
     console.warn(LOG_PREFIX, "list registered beacon scripts failed (non-fatal)", e);
-    return { ids: new Set<string>(), versions: new Set<string>() };
+    return { ids: new Set<string>(), versions: new Set<string>(), hashById: new Map<string, string>() };
   }
 }
 
@@ -1362,9 +1445,17 @@ export async function syncCmsSlotPageInlineScript(options: { force?: boolean } =
     existing,
     expectedHash,
     registeredBeaconScriptIds,
+    registeredBeaconRuntimeHashesById: registry.hashById,
     force: options.force,
   });
   if (decision.action === "skip") {
+    return;
+  }
+  if (decision.action === "reapply") {
+    // This build is already registered and applied; only the legacy `data-*` attributes remain on the page entry.
+    // One PUT migrates it in place — no upload, no registration, no purge — so the hosted URL, bytes and SRI pin
+    // (and any reviewer's saved runtime test package) stay valid.
+    await putPageCustomScripts(pageId, withoutBeaconRuntimeAttributes(existing, registeredBeaconScriptIds));
     return;
   }
 
@@ -1374,17 +1465,11 @@ export async function syncCmsSlotPageInlineScript(options: { force?: boolean } =
     takenVersions: registry.versions,
   });
   const registered = await registerHostedRuntimeScript(siteId, sourceCode, version);
+  // The page entry is `{ id, location, version }` only: Webflow then renders the tag exactly as it renders its own
+  // hosted scripts — `src type integrity crossorigin` — with the registered `integrityHash` as the SRI pin.
   const merged = mergePageScriptsWithBeaconRuntime(
     existing,
-    {
-      id: registered.id,
-      location: "footer",
-      version: registered.version,
-      attributes: {
-        [CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR]: CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE,
-        [CMS_SLOT_PAGE_SCRIPT_HASH_ATTR]: expectedHash,
-      },
-    },
+    { id: registered.id, location: "footer", version: registered.version },
     registeredBeaconScriptIds
   );
 
@@ -1456,18 +1541,26 @@ export async function getCmsSlotPageRuntimeSyncStatus(): Promise<CmsSlotPageRunt
   try {
     const pageId = (await webflow.getCurrentPage()).id as string;
     const existing = await getPageCustomScripts(pageId);
-    const beacon = existing.find(
-      (s) =>
-        scriptLocation(s) === "footer" &&
-        scriptAttrCI(s.attributes, CMS_SLOT_PAGE_SCRIPT_MARKER_ATTR) === CMS_SLOT_PAGE_SCRIPT_MARKER_VALUE
-    );
+    const footer = existing.filter((s) => scriptLocation(s) === "footer");
+    // The applied entry normally identifies itself and its build through the `+beacon.<hash>` tag in its registered
+    // version (or, on pages synced by older builds, the legacy marker attributes) — one GET. Only when the page
+    // yields no self-identifying entry, or an entry whose build cannot be read (Webflow echoing a normalized
+    // version), is the site registry consulted: it maps the entry's id to the hosted file name carrying the hash.
+    let beacon = footer.find((s) => isBeaconRuntimeScript(s, NO_REGISTERED_BEACON_SCRIPT_IDS));
+    let hashById: ReadonlyMap<string, string> | undefined;
+    if (beacon == null || readAppliedBeaconRuntimeHash(beacon, undefined) == null) {
+      const siteId = (await webflow.getSiteInfo()).siteId;
+      const registry = await registeredBeaconRuntimeScriptIndex(siteId);
+      hashById = registry.hashById;
+      beacon ??= footer.find((s) => isBeaconRuntimeScript(s, registry.ids));
+    }
     if (beacon == null) {
       return {
         synced: false,
         reason: "No beacon script in footer — sync from Designer.",
       };
     }
-    const applied = scriptAttrCI(beacon.attributes, CMS_SLOT_PAGE_SCRIPT_HASH_ATTR);
+    const applied = readAppliedBeaconRuntimeHash(beacon, hashById);
     if (applied !== expectedHash) {
       return {
         synced: false,

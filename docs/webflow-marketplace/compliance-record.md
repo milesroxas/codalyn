@@ -3777,3 +3777,66 @@ warnings), Beacon 1138/1138, Tower 738/738, `build:prod` gates green. The publis
 **States.** Source ✓ (uncommitted) · Artifact ✓ (18:02) · Tower ✗ NOT deployed (T1–T6 + the privacy text) ·
 Installed ✗ · Runtime ✗ (unchanged since 09-18) · Submitted ✗ · Accepted ✗.
 
+
+### R8.23 "Script integrity is missing or wrong" re-issued on the unchanged 09-18 runtime — the page entry's legacy `data-*` attributes removed; identity moves to the registered id + version build tag; PUT-only in-place migration; 12:24 rebuild (2026-09-26)
+
+**Finding (issued, priority unassigned, App Review Preflight runtime test run 2026-09-26, "What to fix" count 3):**
+item 1, verbatim the R8.16 text — "Script integrity is missing or wrong — A page-loaded script does not use the SRI
+value saved in this test package. `6aac8a88596e00b6a2967e15_codalyn-beacon-runtime-9b7da263.js`. Next step: Add the
+saved integrity value and crossorigin="anonymous" to each script tag. Make sure the CDN allows cross-origin SRI." Items
+2–3 were not captured; on the blog page they are the Webflow-platform "New script elements / Unreviewed scripts" rows
+expected since R7b.16 (SUBMIT.md Step 5). Authority: N/A (no credential; a Webflow-hosted asset and a Webflow-rendered
+tag).
+
+**Runtime-observed before any change (2026-09-26, `webflow-runtime-pin.mjs` with the saved package's three
+`--expect-*` values): exit 0.** URL, SHA-256 `49b338fa…05fd` and SRI `sha256-SbM4+…Bf0=` all "✓ matches the page";
+DOM `integrity` attribute equal to the SRI of the served bytes; `crossorigin="anonymous"`; no trailing newline; source
+map v3 ✓. The acceptance criterion as issued is therefore met on the published page for the third round running, so
+the item is not about the attribute's presence, value or the CDN — every one of those is falsified in
+[history/sri-item-investigation.md](history/sri-item-investigation.md).
+
+**The one shape difference left (served HTML, 2026-09-26).** The page carries five `<script src>` tags. Webflow's
+jQuery and site runtime end at `crossorigin="anonymous">`; GSAP and ScrollTrigger carry no pin; ours reads
+`src … type="text/javascript" integrity="sha256-SbM4+…Bf0=" crossorigin="anonymous" data-codalyn-beacon="runtime"
+data-codalyn-beacon-src-hash="9b7da263">` — two attributes after `crossorigin`, written by
+`syncCmsSlotPageInlineScript` as the page entry's `attributes` (identity marker + drift fingerprint). The Data API
+reference for `PUT /pages/{page_id}/custom_code` requires `id`, `location`, `version` only; `attributes` is optional
+(published requirement, <https://developers.webflow.com/data/reference/custom-code/custom-code-pages/upsert-custom-code>).
+R8.16's addendum named this as the last app-side variable and proposed a control run (Webflow's jQuery tag pinned as a
+second runtime file) to discriminate first. That control run has not been executed; the change below is made anyway
+because it costs the runtime nothing — no byte, URL, SRI, asset or registration changes; the saved test package stays
+valid — and it removes the only remaining difference between our tag and the tags Preflight does not flag. If the
+item persists on the migrated page, the control run (same history file, step 1) is the next and last step before
+handing the reviewer the evidence artifacts.
+
+**Fix (extension only; `apps/beacon/src/features/cms-slots/model/cms-slot-page-inline-script.ts`).**
+
+| # | What | How |
+| --- | --- | --- |
+| 1 | The applied page entry is `{ id, location: "footer", version }` — no `attributes` | `syncCmsSlotPageInlineScript` register path and `mergePageScriptsWithBeaconRuntime`. Webflow then renders `src type integrity crossorigin` only, the shape of its own pinned scripts, with the registered `integrityHash` as the pin. |
+| 2 | Identity without a DOM marker | `isBeaconRuntimeScript`: registered-script id (site registry, `GET /sites/{id}/registered_scripts` filtered by display name / hosted file prefix — the stable identifier) **or** the `+beacon.<hash>` build tag in the entry's version (`readBeaconRuntimeHashFromVersion`, inverse of `cmsSlotRuntimeScriptVersion`, exported) **or** the legacy marker attribute (pages synced by earlier builds). |
+| 3 | Applied build without a DOM fingerprint | `readAppliedBeaconRuntimeHash`: registry `hostedLocation` file name for the entry's id (ground truth for what the id serves) → version build tag → legacy hash attribute. The registry index (`registeredBeaconRuntimeScriptIndex`) now also yields `hashById`; the sync already made this GET, so no new request. |
+| 4 | In-place migration, no re-push | `decideCmsSlotRuntimeSyncAction` gains `reapply`: this build is applied and matches, but the entry still carries attributes → one `PUT /pages/{id}/custom_code` with our entries reduced in place (`withoutBeaconRuntimeAttributes`, exported), every other script untouched; no upload, no registration, no purge. The hosted URL, bytes and SRI — and a reviewer's saved package — stay exactly as they are. The user still publishes (prompted, R8.22 E2). |
+| 5 | Status check stays one GET | `getCmsSlotPageRuntimeSyncStatus` identifies the footer entry by version tag or legacy marker; only when the page yields no entry, or one whose build cannot be read (Webflow echoing a normalized version), does it consult the registry. |
+| 6 | Fail-toward-register preserved | No readable build anywhere → register; registry unreadable + no tag + no marker → register; garbled tag → register; duplicates → register; not footer → register; force → register. |
+
+**Runbook consequence.** The migration runs on any *non-forced* sync — a Composer save with a changed draft (`executeCmsSlotComposerSave`), a list rename (`renameCmsSlotListOnPage`), a published-slot rename, or the Install click on a not-yet-installed page (`installCmsSlotsWrapperOnPage`). The page runtime **Sync** button is the forced repair path (`force: true`): it mints a new asset + registration and *does* change the URL and SRI, which invalidates the saved package. SUBMIT.md Step 3 now says which to use.
+
+**Tests.** `cms-slot-page-inline-script-sync.test.ts` (Tower-route fake, 21): entry keys exactly `id, location, version`; unchanged build → 0 uploads / 0 registers / 0 PUTs across five syncs; legacy-attribute entry → one PUT, zero uploads/registers, attributes gone, a third-party header script with its own attributes untouched, then settles; legacy `+beacon.<timestamp>` version migrates by marker + registry and never re-registers; legacy marker naming another build → register, exactly one runtime left; registry-known entry with a normalized version → resolved through the registry, no re-register; registry unreadable + no tag → register; five garbled versions → register; forced sync still re-registers; exactly-one invariant across forced syncs; status: synced from the version alone (page GET only, zero registry reads), through the registry for a normalized version, legacy entry still synced, "out of date" and "No beacon script" reasons. `cms-slot-page-inline-script.test.ts`: `readBeaconRuntimeHashFromVersion` canonical / suffixed / wrapped `{ value }` / round-trip with the minted version / 15 malformed or lookalike inputs → null; dedup strips by version tag; `withoutBeaconRuntimeAttributes` in place with identity preserved on foreign entries; decision matrix (empty `attributes: {}` = canonical, registry wins over the version tag both ways, reapply on legacy markers or lingering attributes, casing, wrapped shapes, force). Beacon 1158/1158 (was 1138), `tsc` 0, `biome` 0 errors (the four pre-existing CSS warnings), `build:prod` gates green.
+
+**Artifact.** `v0.1.0_public_09-26_12-24-24.zip` sha256
+`29f1087c54a4aed157f23a2f2b239bae779d839944435234f8c303cabb414142` (465,597 bytes); source maps
+`v0.1.0_public_09-26_12-24-24.sourcemaps.zip` sha256
+`e0524504a2c6c6fa4c756eba9225354ca48089444febef68de803a5e63611d2f`. File set identical to 18:02 modulo chunk
+hashes; `webflow.json` byte-identical to source; marker sweep identical to 18:02 (`fetch(` 1, `MutationObserver` 0,
+`window.open(` 0, `postMessage(` 0, `innerHTML` 3 vendor, `credentials:\`omit\`` 1, `sourceMappingURL` 0,
+`new Function(` 0, sentry/posthog 0, `ArrayBuffer.prototype.slice=` 0). The two `data-codalyn-beacon` literals left in
+the bundle are the legacy constants that recognize old entries; nothing writes them. **The published runtime bytes are
+unchanged** (`…9b7da263.js`, SRI `sha256-SbM4+…Bf0=`): this build changes the page entry, not the file.
+
+**Provenance.** Published requirement: the PUT body fields above; SRI + `crossorigin="anonymous"` at immutable URLs for
+injected scripts (Marketplace guidelines, cited R7b.17). Issued finding: the item text. Open decision: none on our
+side — but the cause stays unproven until a Preflight run on the migrated page; the control run is the fallback.
+
+**States.** Source ✓ (uncommitted) · Artifact ✓ (12:24) · Tower ✓ deployed 09-25 19:03 (unchanged by this entry) ·
+Installed ✗ · Runtime ✗ (page entry not yet migrated; file unchanged since 09-18) · Submitted ✗ · Accepted ✗.

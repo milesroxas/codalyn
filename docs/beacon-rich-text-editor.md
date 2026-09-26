@@ -381,8 +381,9 @@ children. Nothing is re-parsed from a string on the published site.
   the footer never blindly trusts the payload string.
 - `bPropEmpty` updated so empty-HTML (`<p></p>`, `&nbsp;`, whitespace) hides conditional elements.
 
-Because the runtime source is a generated string, bump its hash so `data-codalyn-beacon-src-hash` drift
-detection re-syncs published pages.
+Because the runtime source is a generated string, its content hash changes with it; the hash lives in the
+registered script's version (`<semver>+beacon.<hash>`), which is what drift detection compares to re-sync
+published pages (the page entry itself carries no attributes since 2026-09-26).
 
 ### 9.2 Designer marker write
 

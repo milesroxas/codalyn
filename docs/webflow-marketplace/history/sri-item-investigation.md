@@ -1,4 +1,21 @@
-# "Script integrity is missing or wrong" — investigation state (last updated 2026-09-18)
+# "Script integrity is missing or wrong" — investigation state (last updated 2026-09-26)
+
+> **2026-09-26 — the item came back (third round on the same 09-18 runtime); Step 2 below is implemented without
+> waiting for the Step 1 control run** (compliance record R8.23, bundle `v0.1.0_public_09-26_12-24-24.zip`). The
+> page still verified correct first (`webflow-runtime-pin.mjs --expect-*` exit 0, all three saved values match).
+> The page entry is now `{ id, location, version }` with no `attributes`; identity = registered id **or**
+> `+beacon.<hash>` version tag **or** the legacy marker; the applied build is read from the registry's hosted
+> file name, then the version tag, then the legacy attribute; a `reapply` decision migrates an old entry with one
+> PUT (no upload, no registration, URL/bytes/SRI/package unchanged). **Trigger the migration with a non-forced
+> sync** — a Composer save with a real change, or a list rename (the Install button only shows pre-install) —
+> **not** the page runtime Sync button, which is
+> forced and mints a new asset (new URL + SRI = stale package). Then publish, re-run the pin script with the same
+> `--expect-*` values (must still exit 0: nothing about the file changed), confirm the served tag ends at
+> `crossorigin="anonymous">`, and re-run the Preflight runtime test with the package untouched.
+> - Item gone → cause was the tag shape; record it in the compliance record and close this file.
+> - Item persists → run Step 1 (the control) exactly as written; it is the only discriminator left. Download the
+>   run's evidence artifacts first. Do not touch the runtime bytes.
+
 
 Working note for the App Review Preflight runtime-test item that has survived rounds 7b and 8. Nothing here is
 blocking the 2026-09-18 submission, which went out with the values in the table below. Open this only if the
@@ -67,7 +84,7 @@ Refresh these with `node scripts/webflow-runtime-pin.mjs <page url> --all` — t
 - Do **not** change runtime bytes again in either branch. Before anything else, expand "Evidence artifact
   details" on the failing run and download all 8 artifacts — they show what the tool compared.
 
-### Step 2 — drop the `data-*` attributes (only if the control passes)
+### Step 2 — drop the `data-*` attributes (implemented 2026-09-26, R8.23 — kept as the design record)
 
 Goal: Webflow renders `<script src type integrity crossorigin>` for us too, **without** minting a new asset or a
 new registration — so the URL, the bytes, the SRI and the saved Preflight package all stay valid, and the change

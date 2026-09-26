@@ -23,14 +23,22 @@
 > the settings pull, PII anonymization on account deletion (privacy policy updated), Flint form rate limit, Sentry
 > scrub — **Tower must be deployed (Step 1) before Step 3.** Runtime unchanged.
 >
+> **2026-09-26 — 18:02 is replaced by 12:24 (R8.23).** Preflight re-issued "Script integrity is missing or wrong"
+> on the unchanged 09-18 runtime. The page tag was re-verified correct first (pin script with the saved package's
+> values: exit 0). The one shape difference left between our tag and the tags Preflight does not flag was the two
+> `data-codalyn-beacon*` attributes after `crossorigin="anonymous"`, written as the page entry's `attributes`. The
+> entry is now `{ id, location, version }` only; the runtime identifies itself by registered id and the
+> `+beacon.<hash>` in its version; an old entry migrates with one PUT (no new asset, URL/SRI unchanged). **Step 3
+> now requires a non-forced sync + publish, and forbids the Sync button.** Runtime file and Tower unchanged.
+>
 > **2026-09-25 — 19:44 is replaced by 17:27 (R8.21).** Guideline audit of the R8.20 fixes against the published
 > Marketplace guidelines ("every state-changing action must be traceable to a direct user interaction event, not
 > fired on load"): the workspace step pre-minted a Tower session-handoff token on mount even on the confirm/pick
 > screens that never render the "Open Tower" link. The mint now happens only on the zero-workspace screen. One
 > file plus a container test; scanner markers identical to 19:44. 19:44 was never installed, published or filed.
 
-**Build to submit:** `v0.1.0_public_09-25_18-02-30.zip` (built 2026-09-25 18:02). Everything on this page is for this build only.
-Why each thing is the way it is: [compliance-record.md](compliance-record.md) Round 8, R8.1–R8.21.
+**Build to submit:** `v0.1.0_public_09-26_12-24-24.zip` (built 2026-09-26 12:24). Everything on this page is for this build only.
+Why each thing is the way it is: [compliance-record.md](compliance-record.md) Round 8, R8.1–R8.23.
 Anything Preflight shows that is not listed under step 4 or step 5 below → stop and follow [playbook.md](playbook.md) § B.
 
 ## What the six findings became in code
@@ -54,7 +62,7 @@ Every finding is a code change you can point to; none is answered with an explan
 | Silent Canvas Mutations (bundle scan) | Never reported by a scan — but `@dnd-kit/core`'s drag re-measuring observer sat in every bundle through 09-18, constructed through an alias read off `window`, so neither Preflight's rule nor the release gate's literal `new MutationObserver(` pin saw it; a reviewer's `grep -i MutationObserver` does (R8.18) | **Removed** by pnpm patch; the release gate now pins the bare identifier to 0 on dist and zip. Expected absent |
 | Generated code is not traceable to readable source (bundle scan, evidence `` `;function:1 ``) | The runtime trailer builder minified to `` `//# sourceMappingURL=`;function `` in bundle.js; the scanner read `` `;function `` as a map file name and found no such map. Every real JS/CSS file already had its v3 map in the private zip | **Fixed.** The pragma is joined from two halves at sync time; no shipped file carries the token (release build pins the count to 0 on dist and zip). Published runtime bytes unchanged |
 | Runtime is not traceable to source | No source map behind the runtime | **Fixed.** Sync uploads a v3 identity source map beside the runtime; the runtime's last line points at it |
-| Script integrity is missing or wrong | Re-issued on the 09-18 runtime (`…9b7da263.js`). Page tag, CORS, bytes, encodings, hygiene and the saved test package were all re-verified correct on 09-18 (R8.16 + addendum); trailing newline, base64 charset, non-ASCII bytes and a stale package are falsified causes. Submitted with the item open | If it comes back: [history/sri-item-investigation.md](history/sri-item-investigation.md) — the falsified list, the zero-risk control run that discriminates next, and the code change to make if the control passes. Download the run's 8 evidence artifacts before changing anything |
+| Script integrity is missing or wrong | Re-issued 09-26 on the same 09-18 runtime (`…9b7da263.js`) after the page was re-verified correct (pin script exit 0 against the saved package). Page tag, CORS, bytes, encodings, hygiene and the package are falsified causes (R8.16, [history/sri-item-investigation.md](history/sri-item-investigation.md)). The one difference left: our tag carried two `data-codalyn-beacon*` attributes after `crossorigin="anonymous"`; every tag Preflight does not flag ends there | **Changed (R8.23).** The page entry is applied with no `attributes`; the runtime is identified by registered id + the `+beacon.<hash>` in its version; a non-forced sync migrates the existing entry with one PUT — same file, same URL, same SRI, package still valid. Step 3 triggers it; Step 5 re-runs the test with the package untouched. If the item persists: the control run in the history file, then the evidence artifacts |
 | New script elements / Unreviewed scripts | Webflow's own site runtime plus what the page's Interactions pull in (GSAP, ScrollTrigger, achunks) | Test on a bare page (Step 3) so only Webflow's site runtime remains. Pinning Webflow's files would only move them into the SRI item |
 
 ## Do these in order
@@ -86,12 +94,14 @@ R8.18 and R8.20 are committed (`c86fce6`, `26b5200`). The R8.21 and R8.22 change
 `auth/ui/beacon-onboarding.tsx`, `shared/lib/codalyn-links.ts` (+test), `patches/spark-md5@3.0.2.patch` +
 `package.json`/`pnpm-lock.yaml`, `scripts/build-cli.mjs`, `scripts/vite-strip-dev-host-literals.mjs`,
 `apps/beacon/scripts/release-build-gates.test.mjs`, the Tower files listed in Step 1 with their tests, and these docs.
+R8.23 (2026-09-26, uncommitted) = `cms-slots/model/cms-slot-page-inline-script.ts` + its two test files,
+`docs/beacon-rich-text-editor.md`, and these docs (compliance record R8.23, this file, the history note).
 Commit before uploading anything, so the artifact hash maps to a commit.
 
 ### Step 3 — Install the bundle on the test site and push the runtime
 
 1. Workspace settings → Apps & Integrations → Beacon → **Publish new version** → upload
-   `apps/beacon/bundle/production/public/v0.1.0_public_09-25_18-02-30.zip` → distribution **"Publish for internal
+   `apps/beacon/bundle/production/public/v0.1.0_public_09-26_12-24-24.zip` → distribution **"Publish for internal
    testing (Workspace only)"** → publish. This installs the build on beacon-demo for Steps 3–5 and is **not** the
    submission: an internal version never enters review (what happened on 09-18, R8.18). Step 6a publishes the same
    zip again with the Marketplace radio.
@@ -113,11 +123,16 @@ Commit before uploading anything, so the artifact hash maps to a commit.
    template components, no embeds. Webflow's site runtime still loads (it is on every page), but GSAP,
    ScrollTrigger and most `achunk` files disappear from Preflight's "unreviewed" list. If you keep
    `/blog/the-power-of-resilience`, expect those files to be listed again.
-5. **This build does not change the page runtime** (R8.18 touched the extension only): the runtime pushed on 09-18
-   (`…9b7da263.js`) is still the one on the page and the Step 5 values still hold — **do not force a Sync** (it mints
-   a new asset id and invalidates them, R8.16). Run the pin script in step 7 and skip 5–6. Only if the page carries no
-   Beacon runtime, or the pin script reports a mismatch: CMS Slots → page runtime **Sync** on that page. It must
-   succeed. This Sync uploads **two** assets — the
+5. **This build changes the page entry, not the runtime file** (R8.23): the runtime pushed on 09-18
+   (`…9b7da263.js`) stays the one on the page and the Step 5 values still hold. The entry must be migrated once so
+   Webflow renders the tag without the two `data-codalyn-beacon*` attributes. **Trigger a non-forced sync: open
+   the page's beacon in the Composer, change one value, Save; then change it back, Save** (a save with no change
+   returns before syncing; the second save is the no-op that proves it settled). A list rename + rename back does
+   the same. **Do not press the page runtime Sync button**: it is the forced repair path, mints a new asset id
+   and registration, and changes the URL and SRI (R8.16) — the saved Preflight package would then be stale. The
+   migration is one `PUT pages/{id}/custom_code` and no upload; the extension console must show no asset request.
+   Only if the page carries no Beacon runtime at all, or the pin script in step 7 reports a mismatch, use the Sync
+   button. It must succeed. That forced Sync uploads **two** assets — the
    source map (`codalyn-beacon-runtime-<hash>.map.json`), then the runtime JS — both through the presigned
    upload under the new `connect-src`. Watch the extension console:
    - a `connect-src` violation or an "Extension egress refused" error → Webflow's `uploadUrl` is neither
@@ -126,24 +141,27 @@ Commit before uploading anything, so the artifact hash maps to a commit.
      touching anything;
    - a "runtime source map upload failed" warning → Webflow refused the `.map.json` asset; the runtime still
      installed, without a map pointer. Copy the warning's error into the compliance record.
-6. **Publish** the site — only if you synced.
-7. Confirm the page from the terminal (replace the URL if you used a bare page):
+6. **Publish** the site — required this round (the migrated entry reaches the published page only on publish).
+7. Confirm the page from the terminal (replace the URL if you used a bare page). After the migration the Beacon
+   `<script>` tag in the served HTML must end at `crossorigin="anonymous">` — check with
+   `curl -s <page> | grep -o '<script[^>]*codalyn-beacon-runtime[^>]*>'`:
 
 ```bash
 node scripts/webflow-runtime-observe.mjs https://beacon-demo.webflow.io/blog/the-power-of-resilience   # must exit 0: Beacon requested 0 scripts, integrity matches
 node scripts/webflow-runtime-pin.mjs     https://beacon-demo.webflow.io/blog/the-power-of-resilience   # must exit 0: "✓ matches", "trailing newline: no", source map "✓ v3"
 ```
 
-Without a Sync the pin script must print the 09-18 values already in Step 5 (file `…9b7da263.js`, SHA-256
-`49b338fa…05fd`, SRI `sha256-SbM4+…Bf0=`). After a Sync it prints **new** values — replace the Step 5 rows with them.
+After the non-forced migration the pin script must still print the 09-18 values already in Step 5 (file
+`…9b7da263.js`, SHA-256 `49b338fa…05fd`, SRI `sha256-SbM4+…Bf0=`) — nothing about the file changed. Only after a
+forced Sync does it print **new** values — then replace the Step 5 rows with them and re-save the Preflight package.
 
 ### Step 4 — App Review Preflight: bundle scan
 
 Open **App Review Preflight** in the Designer ([install it into the Workspace](https://webflow.com/oauth/authorize?response_type=code&client_id=0b5411e62233387925e082350666ef374377f81a9abba0dcc2542d6b5b1e4388&scope=authorized_user%3Aread) if it is missing).
 
 1. Upload both files from `apps/beacon/bundle/production/public/`:
-   - bundle → `v0.1.0_public_09-25_18-02-30.zip`
-   - source maps → `v0.1.0_public_09-25_18-02-30.sourcemaps.zip`
+   - bundle → `v0.1.0_public_09-26_12-24-24.zip`
+   - source maps → `v0.1.0_public_09-26_12-24-24.sourcemaps.zip`
 2. Expected **Review feedback: exactly one item, "External API Calls" (REQUIRED), 1 evidence location** in `assets/label-*.js`.
    That is the extension's single backend call (Hybrid App: Tower). It cannot go away while the app has a backend; the notes in Step 6 disclose it. The excerpt's position moves between scans (it has sat on the storage cleanup, then on the Tower policy-page links) — the rule is the same.
 3. Anything else — a second item, "Silent Canvas Mutations", an External API Calls excerpt outside the `label-*.js` chunk — → stop, [playbook.md](playbook.md) § B.
@@ -185,10 +203,10 @@ Expected result for this build, and what to do with each item:
 | Result | Expected now | If it shows |
 | --- | --- | --- |
 | Runtime is not traceable to source | **Gone** — the runtime's last line points at the uploaded v3 source map | The pin script's `source map` line tells you why (no trailer = map upload refused; unreachable = CDN). Copy it into the compliance record. |
-| Script integrity is missing or wrong | Unknown — the last untested cause (trailing newline) is removed in this build | Do **not** change the runtime again. Expand "Evidence artifact details", download all 8 artifacts, and share them: they show what the tool compared. |
+| Script integrity is missing or wrong | Expected **gone** — the tag now ends at `crossorigin="anonymous">` like every tag the tool accepts (R8.23); file, URL and SRI unchanged, package untouched | Do **not** change the runtime. Run the control from [history/sri-item-investigation.md](history/sri-item-investigation.md) step 1 (Webflow's jQuery tag as a second pinned file, diagnostic run only), then expand "Evidence artifact details", download all artifacts, and share them: they show what the tool compared. |
 | New script elements · Unreviewed scripts | Only Webflow's site runtime (`webflow.<site>.<hash>.js`, maybe jQuery / an achunk) on a bare page; the full list on the blog page | Expected. Webflow's own files on every Webflow page; pinning them only moves them into the SRI item. Answered in the notes. |
 
-Runtime file row should read **Loaded ✓ · Hash matched ✓ · Source map ✓**; SRI is the open question above.
+Runtime file row should read **Loaded ✓ · Hash matched ✓ · SRI ✓ · Source map ✓**.
 If a reviewer explicitly asks for Webflow's platform scripts to be pinned: [history/webflow-platform-script-rows-2026-09-14.md](history/webflow-platform-script-rows-2026-09-14.md) — re-run the observe script first, the values change on every publish.
 
 ### Step 6 — Publish the version for review, then file the form
@@ -199,7 +217,7 @@ changes the Designer Extension must publish a new version from the Workspace *in
 [Submitting your app](https://developers.webflow.com/data-beta/docs/marketplace/submitting-your-app) §
 *Updating a Designer Extension?*). The docs fix no order; do the publish first anyway, so the form's artifacts
 describe a version that is already in review. In the current dialog the distribution is a radio: Workspace settings → Apps & Integrations → Beacon → **Publish new version** →
-*Upload zip file* → the same `v0.1.0_public_09-25_18-02-30.zip` as Step 3 → **Select distribution: "Publish new
+*Upload zip file* → the same `v0.1.0_public_09-26_12-24-24.zip` as Step 3 → **Select distribution: "Publish new
 version to the App Marketplace (submit for review)"** — not "Publish for internal testing (Workspace only)" →
 *Submission version notes* (the four headings the dialog pre-fills; paste the block below) → **Submit for review**.
 Afterwards the version manager must show this version as submitted for review, not as another internal version; if it
@@ -236,8 +254,8 @@ support fields untouched this round; nothing about them changed.
 | App name | Beacon |
 | Client ID (required) | `610625f8…` — the production app. Copy the full value from Workspace settings → Apps & Integrations → Beacon → **…** → *Edit App*. The `.env.local` id `c6cff6ae…` is the **dev** app; never paste that |
 | New or changed bundle? | Yes |
-| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-25_18-02-30.zip` — sha256 `1b88dfd01ceafb95738ba0acbe174aa7ac12e7d7a5756dcd6b484161d33820e8`. Same zip as Step 6a; the form copy is only so review can reconcile the artifact — the bundle that *enters* review is the version published in 6a |
-| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-25_18-02-30.sourcemaps.zip` — sha256 `68234f4dd45f2314627c64fe67f7c688658a603db09910f78d2a045969b056cd` |
+| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-26_12-24-24.zip` — sha256 `29f1087c54a4aed157f23a2f2b239bae779d839944435234f8c303cabb414142`. Same zip as Step 6a; the form copy is only so review can reconcile the artifact — the bundle that *enters* review is the version published in 6a |
+| Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-26_12-24-24.sourcemaps.zip` — sha256 `e0524504a2c6c6fa4c756eba9225354ca48089444febef68de803a5e63611d2f` |
 | Package manifest + lockfile | `apps/beacon/package.json` + root `pnpm-lock.yaml` as committed at the build commit |
 | App Review Preflight receipt | the `wfpre_…` code from Step 4 |
 | Testing site | `https://beacon-demo.webflow.io` — bundle above installed; beacon page `https://beacon-demo.webflow.io/blog/the-power-of-resilience` |
@@ -249,10 +267,10 @@ support fields untouched this round; nothing about them changed.
 > [history/responses.md](history/responses.md); per-item email answers are below. Nothing is lost: items 1–6 of
 > **Additional notes** say the same thing in full.
 
-**Additional notes** (form limit 5000 characters; this is 4944). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
+**Additional notes** (form limit 5000 characters; this is 4987). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
 
 ```
-WHAT CHANGED (bundle v0.1.0, 09-25_18-02-30) - 1 to 6 answer the 2026-09-17 feedback in order; 7, 8 the Preflight scans; 9 our audit of 2026-09-25
+WHAT CHANGED (bundle v0.1.0, 09-26_12-24-24) - 1 to 6 answer the 2026-09-17 feedback in order; 7, 8 the Preflight scans; 9 our audit of 2026-09-25
 
 1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. A user with one workspace and none active sees it as a suggestion with an explicit "Use this workspace" control; the only request to that endpoint comes from that click or the multi-workspace picker. The server sets no default either: an extension session without a chosen workspace stays without one until the user confirms. Unit tests pin zero requests after sync, one after the click, no server fallback.
 
@@ -274,7 +292,7 @@ UNCHANGED FROM 2026-09-15: one network call site with an explicit destination po
 
 9. Audit of 2026-09-25 against the current guideline text. The canvas clear that ran on Designer mode and page changes is removed: every canvas write now follows a click. Install and rename toasts prompt to publish. The sign-in card names the free plan, that paid plans raise monthly limits, and links pricing. A dependency polyfill that assigned ArrayBuffer.prototype.slice is removed by patch; the build pins native prototype assignments to zero.
 
-PUBLISHED-RUNTIME TEST: one page-level script, registered with a SHA-256 integrityHash carried verbatim in the page tag with anonymous crossorigin; served unminified, its last line pointing at a version-3 source map published beside it as a site asset (sourcesContent is the file minus that line; no trailing newline). Every other script on the test page is Webflow's own site runtime; Beacon loads none.
+PUBLISHED-RUNTIME TEST: one page-level script, registered with a SHA-256 integrityHash carried verbatim in the page tag with anonymous crossorigin; the page entry carries no other attribute; served unminified, its last line pointing at a version-3 source map published beside it as a site asset (sourcesContent is the file minus that line; no trailing newline). Every other script on the test page is Webflow's own site runtime; Beacon loads none.
 
 BACKEND (Hybrid): https://tower.codalyn.app only, HTTPS, production; paths as filed on 2026-09-15; in-app policy and docs links are anchors on it. Other destination: the presigned upload URL in item 4. No telemetry host. Uninstall and AVIF disclosure unchanged.
 ```

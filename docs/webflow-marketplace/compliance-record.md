@@ -2025,9 +2025,12 @@ bundle could see it. No R7b entry records an installed-revision check of a CSP-c
 
 Also in the console and deliberately **left blocked**: `Applying inline style violates …
 'style-src-elem'` from `entrypoint-designer-extensions-client.….js:234` — Webflow's own client
-script inserting an rrweb `<style>` rule (`html.rrweb-paused *`); nothing in Beacon depends on it.
-The `connect-src` block on that script's `.js.map` is DevTools fetching a source map, not app
-traffic.
+script setting the text of its `<style id="webflow-style-system-x-bridge">`, the element through
+which the Designer delivers its hosted theme variables (`--background1`, `--actionPrimaryBackground`,
+…) to an extension iframe; Beacon references none of those variables. (Originally recorded here as
+an rrweb `html.rrweb-paused` rule; corrected in R8.25 — that rule lives in rrweb's replayer and
+never runs in the iframe.) The `connect-src` block on that script's `.js.map` is DevTools fetching
+a source map, not app traffic.
 
 **Fix (source):** `beacon-extension-csp.ts` adds one constant, `https://cdn.prod.website-files.com`,
 to `script-src`, `style-src`, `style-src-elem` and `font-src` in both shipped documents (extension
@@ -3598,7 +3601,8 @@ usable", in two places — both ours, neither a Webflow requirement.**
 
 **Not defects — expected console residue (R7b.15), runbook corrected:** the two CSP lines in the 09-22
 console come from Webflow's own injected `entrypoint-designer-extensions-client.….js`: `Applying inline style
-violates … style-src-elem` (its rrweb `<style>`) and `Connecting to https://d3e54v103j8qbb.cloudfront.net/…js…
+violates … style-src-elem` (its theme-variable bridge `<style id="webflow-style-system-x-bridge">`; "rrweb
+`<style>`" here was a misattribution, corrected in R8.25) and `Connecting to https://d3e54v103j8qbb.cloudfront.net/…js…
 violates … connect-src` (DevTools fetching its `.js.map`). Both are deliberately blocked; nothing in Beacon depends
 on them, and admitting them would reopen finding 5 (`unsafe-inline`). The PayPal 400 and the `start_url` manifest
 warning are the Designer's top frame. SUBMIT.md Step 3.2 said "no CSP violation" — it now names these lines as
@@ -3938,3 +3942,61 @@ CDN host is expected residue — both `needs reviewer clarification`, with this 
 **States.** Source ✓ (script + docs, uncommitted; no app source change) · Artifact ✓ (12:24, unchanged) · Tower ✓
 (09-25 19:03) · Installed ✗ · Runtime — page unchanged since 09-18 (tag still carries the R8.23 legacy attributes;
 migration not yet triggered) · Submitted ✗ · Accepted ✗.
+
+### R8.25 The two CSP console lines in the installed iframe re-identified — the blocked `<style>` is Webflow's theme-variable bridge, not rrweb; the `connect-src` line is DevTools fetching a 403 source map; kept blocked, attribution corrected (2026-09-26, evening)
+
+**Observed.** Opening Beacon on beacon-demo with DevTools open, the extension iframe console shows the two lines the
+runbook already lists as expected: `Applying inline style violates … 'style-src-elem'` (hash
+`sha256-wp89sCw2jHchslygp9Q4wvSH6EX/4RvgyvQlnpOCknU=`) from `entrypoint-designer-extensions-client.6d25459f20d9a794.js:234`,
+and `Connecting to https://d3e54v103j8qbb.cloudfront.net/gen/js/entrypoint-designer-extensions-client.….js.map violates …
+connect-src`. R7b.15 and R8.20 attributed the first to an rrweb `html.rrweb-paused` rule. Re-examined rather than
+re-ignored.
+
+**What the script does (downloaded and decompressed, 2 660 923 bytes on 234 lines, so `:234` is the whole minified
+body).** Its tail creates `<style id="webflow-style-system-x-bridge">` in `document.head` and, on a
+`system-css-variables` message from the trusted Designer parent, sets `documentElement[data-webflow-style-system-x-bridge]`
+and `style.textContent = message.data.systemCSS`. That is the delivery path for the hosted theme variables the design
+guidelines describe as "automatically adjust[ing] based on a user's Appearance settings" (`--background1`,
+`--actionPrimaryBackground`, `--font-stack`, …). Setting the text of an attached `<style>` is an inline-style check,
+so `style-src-elem 'self' https://cdn.prod.website-files.com` blocks it. The rrweb text is in the same bundle but in
+the *replayer*'s `insertStyleRules`, which only runs when a recording is played back; Emotion, also bundled, inserts
+through `CSSStyleSheet.insertRule` in production. Neither can raise `style-src-elem` in the iframe. The reported
+hash matches none of the four theme files in `webflow/webflow-apps-css` — the bridge text is generated at runtime,
+per theme and per Designer release. Beacon's stylesheet and components reference none of those variables (grep over
+`apps/beacon/src`: 0), so the block has no visible effect. Check on the machine: in the iframe context,
+`crypto.subtle.digest('SHA-256', new TextEncoder().encode(document.getElementById('webflow-style-system-x-bridge').textContent))`
+base64-encodes to the hash in the console line.
+
+**The second line.** Chrome loads a script's `sourceMappingURL` through the page, subject to the page's `connect-src`;
+Chromium treats a bypass of that check as a vulnerability (CVE-2026-87629, fixed in Chrome 153.0.8010.36), so it is
+by design, and it fires only with DevTools open. Webflow's map URL answers **403**, so admitting
+`d3e54v103j8qbb.cloudfront.net` would widen `connect-src` for a file the browser could not fetch anyway.
+
+**Options weighed.** (1) Hash-allow the bridge: one hash per theme, invalidated by every change Webflow makes to its
+variables, and the release build pins the `sha256-` token count — the violation would return on the next Designer
+release. Rejected. (2) `'unsafe-inline'` on `style-src-elem`: reverses R8.5, whose text was "Remove 'unsafe-inline'
+from both directives". Rejected. (3) Adopt Webflow's theme variables in Beacon's UI: no product reason; Beacon ships
+its own tokens. Not pursued. (4) Keep both blocked and disclose — chosen. Upstream, the durable fix is Webflow's:
+apply `systemCSS` through `new CSSStyleSheet()` + `replaceSync` + `document.adoptedStyleSheets` (CSSOM writes are
+outside CSP; rrweb inside the same bundle already uses `adoptedStyleSheets`) and drop `sourceMappingURL` from a
+production client whose map is not served. Channels if filed: the developer community space or the
+`webflow/webflow-apps-css` issue tracker (the only Webflow repository with issues enabled). GitHub code search finds
+no other public extension shipping its own CSP meta, so there is no community precedent either way.
+
+**Review exposure.** The Marketplace Guidelines' only CSP sentence is "Ensure your App code is compatible with
+Webflow's enforced Content Security Policy. Inline event handler attributes, `javascript:` URIs, and unsafe-eval
+patterns will not pass review." No `style-src` rule, no clean-console rule. App Review Preflight parses no CSP
+directive; its runner stores up to 100 console messages as `console_log` evidence (`runner/src/index.ts:772`), so a
+reviewer can see both lines. SUBMIT.md Step 3.2 already names them as the expected set; its wording now names the
+bridge.
+
+**Fix (docs only).** R7b.15 paragraph "Also in the console" and R8.20 "Not defects" corrected in place with a
+pointer here; SUBMIT.md Step 3.2 names the bridge, notes Beacon uses none of its variables, and records the 403 on the
+map. No app source change, no rebuild: the 12:24 artifact stands.
+
+**Provenance.** Published requirement: CSP compatibility sentence (Marketplace Guidelines); hosted CSS variables
+(design guidelines). Issued finding: none. Security control: `style-src-elem` without `'unsafe-inline'` (R8.5).
+Verified fact: script contents, map status, variable usage count, Preflight console capture — all this entry.
+
+**States.** Source ✓ (docs only, uncommitted) · Artifact ✓ (12:24, unchanged) · Tower ✓ (09-25 19:03) · Installed ✗ ·
+Runtime — unchanged since R8.24 · Submitted ✗ · Accepted ✗.

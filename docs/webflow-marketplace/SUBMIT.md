@@ -117,9 +117,11 @@ Commit before uploading anything, so the artifact hash maps to a commit.
    used for an internal-testing publish. It is not licence to build a test artifact into that folder
    ([playbook.md](playbook.md) § A3).
 2. Open Beacon on **beacon-demo**. The panel must render. The extension console may show exactly two CSP lines,
-   both from Webflow's own injected `entrypoint-designer-extensions-client.….js` and expected (R7b.15, R8.20):
-   `Applying inline style violates … 'style-src-elem'` (its rrweb `<style>`) and `Connecting to
-   https://d3e54v103j8qbb.cloudfront.net/…js… violates … "connect-src"` (DevTools fetching its `.js.map`). The
+   both from Webflow's own injected `entrypoint-designer-extensions-client.….js` and expected (R7b.15, R8.20, R8.25):
+   `Applying inline style violates … 'style-src-elem'` (its theme-variable bridge
+   `<style id="webflow-style-system-x-bridge">`; Beacon uses none of those variables) and `Connecting to
+   https://d3e54v103j8qbb.cloudfront.net/…js… violates … "connect-src"` (DevTools fetching its `.js.map`, which
+   returns 403; only visible with DevTools open). The
    PayPal 400 and the `start_url` manifest warning are the Designer's top frame. **Any CSP line naming a Beacon
    file, or any Tower request error, → stop** and record it.
 3. Sign in. If the welcome screen shows, click **Continue with Webflow** (no password; a profile that never

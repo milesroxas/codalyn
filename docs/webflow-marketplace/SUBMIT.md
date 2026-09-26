@@ -45,6 +45,14 @@
 > screens that never render the "Open Tower" link. The mint now happens only on the zero-workspace screen. One
 > file plus a container test; scanner markers identical to 19:44. 19:44 was never installed, published or filed.
 
+> **2026-09-26, evening — FILED (R8.26).** Steps 3–6 completed on the 12:24 build: installed for internal testing,
+> page entry migrated by a non-forced Composer save and published (tag ends at `crossorigin="anonymous"`, runtime
+> `…9b7da263.js` unchanged, pin + observe scripts exit 0), Preflight receipt `wfpre_22999fcd8fac48877918bdf0e96b4a03`,
+> Workspace publish on the Marketplace radio, form filed as App Update — **Webflow reference ID
+> `1d3acdf7-fdb1-4e03-8a62-e5016224b64a`**. Review window 10–15 business days; feedback arrives on this submission's
+> email thread. A further bundle for this review goes through *Publish → Upload Bundle for Review* in the app settings
+> (the confirmation page names that path) and continues on the same thread.
+
 **Build to submit:** `v0.1.0_public_09-26_12-24-24.zip` (built 2026-09-26 12:24). Everything on this page is for this build only.
 Why each thing is the way it is: [compliance-record.md](compliance-record.md) Round 8, R8.1–R8.23.
 Anything Preflight shows that is not listed under step 4 or step 5 below → stop and follow [playbook.md](playbook.md) § B.
@@ -268,7 +276,7 @@ support fields untouched this round; nothing about them changed.
 | App name | Beacon |
 | Client ID (required) | `610625f8…` — the production app. Copy the full value from Workspace settings → Apps & Integrations → Beacon → **…** → *Edit App*. The `.env.local` id `c6cff6ae…` is the **dev** app; never paste that |
 | New or changed bundle? | Yes |
-| Designer Extension bundle | `apps/beacon/bundle/production/public/v0.1.0_public_09-26_12-24-24.zip` — sha256 `29f1087c54a4aed157f23a2f2b239bae779d839944435234f8c303cabb414142`. Same zip as Step 6a; the form copy is only so review can reconcile the artifact — the bundle that *enters* review is the version published in 6a |
+| Designer Extension bundle | **Not a form field.** The current form has no bundle upload; the bundle enters review only through the Workspace publish in 6a (`v0.1.0_public_09-26_12-24-24.zip`, sha256 `29f1087c54a4aed157f23a2f2b239bae779d839944435234f8c303cabb414142`). Do not zip the bundle together with the source maps |
 | Source maps (private field only, never the bundle) | `apps/beacon/bundle/production/public/v0.1.0_public_09-26_12-24-24.sourcemaps.zip` — sha256 `e0524504a2c6c6fa4c756eba9225354ca48089444febef68de803a5e63611d2f` |
 | Package manifest + lockfile | `apps/beacon/package.json` + root `pnpm-lock.yaml` as committed at the build commit |
 | App Review Preflight receipt | the `wfpre_…` code from Step 4 |

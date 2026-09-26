@@ -4000,3 +4000,41 @@ Verified fact: script contents, map status, variable usage count, Preflight cons
 
 **States.** Source ✓ (docs only, uncommitted) · Artifact ✓ (12:24, unchanged) · Tower ✓ (09-25 19:03) · Installed ✗ ·
 Runtime — unchanged since R8.24 · Submitted ✗ · Accepted ✗.
+
+### R8.26 App Update submitted on the 12:24 build (2026-09-26, evening)
+
+**Filed through the submission form** (App Update). The current form carries no bundle upload: the bundle enters
+review only through the Workspace *Publish new version* dialog on the Marketplace radio (Step 6a), done first with
+`v0.1.0_public_09-26_12-24-24.zip` (`29f1087c…4142`). The form took the source maps in its private field
+(`v0.1.0_public_09-26_12-24-24.sourcemaps.zip`, `e0524504…1d2f`), the Preflight receipt
+`wfpre_22999fcd8fac48877918bdf0e96b4a03`, the testing site and the SUBMIT.md notes as they stand at this commit.
+**Webflow reference ID `1d3acdf7-fdb1-4e03-8a62-e5016224b64a`.** Form confirmation: evaluation against the
+Marketplace Guidelines, typically 10–15 business days; feedback and the decision arrive by email on this
+submission's thread; if changes are required, a new bundle goes through *Publish → Upload Bundle for Review* in app
+settings and the review continues on the same thread. The SUBMIT.md Step 6b row that listed a "Designer Extension
+bundle" form field is corrected (the field does not exist; the 09-18 form may have had one).
+
+**Verified before filing (terminal, read-only).** Live page `Last Published: Sat Sep 26 2026 19:30:41 GMT+0000`;
+the Beacon tag ends at `crossorigin="anonymous"` with zero `data-codalyn-beacon*` attributes — the R8.23 in-place
+migration ran through a non-forced Composer save (no Sync button): runtime still
+`…6aac8a88596e00b6a2967e15_codalyn-beacon-runtime-9b7da263.js`, SHA-256 `49b338fa…05fd`, SRI `sha256-SbM4+…Bf0=`,
+no trailing newline, v3 source map reachable. `webflow-runtime-observe.mjs` exit 0 (Beacon requested 0 scripts,
+integrity matches served bytes); `webflow-runtime-pin.mjs` with the saved package's `--expect-*` values exit 0.
+The runtime source generated from HEAD hashes (FNV-1a) to `9b7da263` and is byte-identical to the served file minus
+its map trailer, which is why the sync took the `reapply` branch and not `register`. Bundle provenance: the 12:24 zip
+predates the `--purpose marketplace` flag (commit 5802349, 12:43) and was built as `build:prod` with recipient
+`public`; the pipeline takes only `{channel, recipient}`, so the artifact is what `build:marketplace` produces
+(`channel:production, recipient:public` embedded in `assets/switch-*.js`); no beacon source changed between the build
+and HEAD (only the `build:marketplace` script line and a gate test). Scopes re-verified against the endpoint
+reference pages: the nine requested scopes (`sites:read pages:read cms:read cms:write assets:read assets:write
+custom_code:read custom_code:write authorized_user:read`) cover every route in the Tower proxy allowlist and
+`GET /token/authorized_by`; registered scripts use `custom_code:*`, not `site_config:*`; nothing added or removed.
+
+**While under review — do not invalidate what was filed:** no Sync on beacon-demo (forced Sync mints a new runtime
+asset id, R8.16); no republish that changes the test page's tag; keep Tower production up and the reviewer account
+working; no new bundle upload unless the review thread asks for one.
+
+**States.** Source ✓ (HEAD `2a4da63` + this docs edit) · Artifact ✓ (12:24, sha256 re-verified on disk before
+filing) · Tower ✓ (09-25 19:03) · Installed ✓ (operator-reported; page migration observed via the 19:30 UTC
+republish) · Runtime ✓ (pin + observe exit 0 post-migration) · **Submitted ✓ (2026-09-26, reference
+`1d3acdf7-fdb1-4e03-8a62-e5016224b64a`, receipt `wfpre_22999fcd8fac48877918bdf0e96b4a03`)** · Accepted ✗.

@@ -104,7 +104,10 @@ Commit before uploading anything, so the artifact hash maps to a commit.
    `apps/beacon/bundle/production/public/v0.1.0_public_09-26_12-24-24.zip` → distribution **"Publish for internal
    testing (Workspace only)"** → publish. This installs the build on beacon-demo for Steps 3–5 and is **not** the
    submission: an internal version never enters review (what happened on 09-18, R8.18). Step 6a publishes the same
-   zip again with the Marketplace radio.
+   zip again with the Marketplace radio. Uploading the *submission* zip here is deliberate — Steps 3–5 must exercise
+   the exact artifact that goes to review — and is the one case where a file from `bundle/production/public/` is
+   used for an internal-testing publish. It is not licence to build a test artifact into that folder
+   ([playbook.md](playbook.md) § A3).
 2. Open Beacon on **beacon-demo**. The panel must render. The extension console may show exactly two CSP lines,
    both from Webflow's own injected `entrypoint-designer-extensions-client.….js` and expected (R7b.15, R8.20):
    `Applying inline style violates … 'style-src-elem'` (its rrweb `<style>`) and `Connecting to
@@ -322,7 +325,11 @@ Beacon sends no usage or error telemetry. AVIF conversion is opt-in and sends on
 ## Rebuild (only if source changes again)
 
 ```bash
-CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod
+CI=true BUILD_PURPOSE=marketplace pnpm --filter beacon build:prod
 ```
+
+`BUILD_PURPOSE=marketplace` is what puts the artifact in `bundle/production/public/`; that folder is
+for submission builds only. Anything you build to test a fix is `pnpm --filter beacon build:prod`
+(recipient `internal`) and never goes in it — see [playbook.md](playbook.md) § A3.
 
 Release flags unset = the Marketplace state (no telemetry SDK, no rich-text editor, localized-site CMS writes blocked). A new zip means: new hashes here, new Preflight scan, new receipt, re-install on beacon-demo, re-run Step 3 (Sync re-pushes the runtime and its map).

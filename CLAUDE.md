@@ -94,6 +94,22 @@ PR checklist:
 - [ ] No new `fetch` call outside the egress module; no new scanner-shaped token (see list).
 - [ ] New dependency audited for the same shapes before it is added.
 
+## Build Distribution Lane Rule (internal vs public)
+
+`bundle/production/public/` is the Webflow Marketplace lane. The only artifacts allowed in it are the `.zip` + `.sourcemaps.zip` pair built for an actual App Review submission. Every internal review, beta, demo or smoke-test build goes to another recipient folder — `bundle/<channel>/internal/` by default.
+
+Both folders hold identically shaped `v<ver>_<recipient>_<stamp>.zip` names, and the submission form and the Workspace *Publish new version* dialog both take a file path, so a dev-intent artifact in the public folder is one click away from being submitted.
+
+- Build a submission artifact with the purpose named: `pnpm --filter beacon build:marketplace` (or `BUILD_PURPOSE=marketplace`). That is the only way anything reaches the public folder.
+- Build everything else with `build:prod` / `build:preview` / `build:dev`; the recipient defaults to `internal`.
+- Never pass `BUILD_RECIPIENT=public`, never hand-copy or rename a zip into the public folder, and never create a `public` folder under the preview or development channel.
+- The purpose is explicit, never inferred: `scripts/build-cli.mjs` fails the build (before lint) when the purpose and the target disagree, and the guards are unit-tested in `apps/beacon/scripts/release-build-gates.test.mjs`.
+- Both files travel together. A build's `.sourcemaps.zip` is private submission-form input — it belongs in the same lane as its zip and nowhere else.
+
+PR checklist:
+
+- [ ] Any new build path names its purpose; nothing writes to `public/` except a Marketplace submission build.
+
 ## Reference Docs
 
 - [Agent Teams guide](docs/agent-teams.md) — how to spin up effective Claude Code agent teams (enable flag, teams vs subagents, spawn templates, monorepo patterns).

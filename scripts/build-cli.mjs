@@ -43,6 +43,25 @@ const BEACON_PRODUCTION_TOWER_ORIGIN = "https://tower.codalyn.app";
 const BEACON_PREVIEW_TOWER_ORIGIN = "https://tower-preview.codalyn.app";
 const VALID_BUILD_CHANNELS = ["production", "development", "preview"];
 
+/**
+ * Distribution audience, decided before anything is built.
+ *
+ * `bundle/production/public/` is the Webflow Marketplace lane and nothing else: the only artifacts
+ * that may land there are the zip + `.sourcemaps.zip` pair uploaded to App Review for that exact
+ * submission, and no other channel may have a `public` folder at all. Every internal review, beta, demo or smoke-test build goes to another recipient
+ * folder. Both folders hold identically shaped `v<ver>_<recipient>_<stamp>.zip` names, and both the
+ * submission form and the Workspace "Publish new version" dialog take a file path — so a
+ * dev-intent artifact sitting in the public folder is how the wrong bundle reaches reviewers.
+ *
+ * The purpose is therefore explicit and never inferred from the recipient: `internal` is the
+ * default, and `marketplace` has to be asked for by name (`--purpose marketplace`, or
+ * `BUILD_PURPOSE=marketplace` for a non-interactive run). See docs/webflow-marketplace/playbook.md.
+ */
+const MARKETPLACE_RECIPIENT = "public";
+const VALID_BUILD_PURPOSES = ["marketplace", "internal"];
+const DEFAULT_INTERNAL_RECIPIENT = "internal";
+const MARKETPLACE_CHANNEL = "production";
+
 function channelOutputDir(channel) {
   if (channel === "production") return "production";
   if (channel === "preview") return "preview";
@@ -50,7 +69,7 @@ function channelOutputDir(channel) {
 }
 
 function parseArgs(argv) {
-  const args = { app: null, channel: null };
+  const args = { app: null, channel: null, purpose: null };
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
     const next = argv[i + 1];
@@ -59,6 +78,9 @@ function parseArgs(argv) {
       i++;
     } else if (key === "--channel" && next) {
       args.channel = next;
+      i++;
+    } else if (key === "--purpose" && next) {
+      args.purpose = next;
       i++;
     }
   }
@@ -102,6 +124,114 @@ function getExistingRecipients(appPath, channelDir) {
 function validateRecipientName(value) {
   if (!value || value.trim().length === 0) return "Name is required";
   if (!/^[a-z0-9_-]+$/.test(value)) return "Use only lowercase letters, numbers, underscores, or hyphens";
+  if (value.trim() === MARKETPLACE_RECIPIENT) {
+    return `"${MARKETPLACE_RECIPIENT}" is reserved for Webflow Marketplace submissions — build those with --purpose marketplace`;
+  }
+}
+
+/**
+ * Pure guard over the three things that decide where a build lands. The `public` recipient and the
+ * `marketplace` purpose imply each other, and a Marketplace artifact is always a production build:
+ * a preview or development bundle in the public folder is a dev build one upload away from review.
+ *
+ * Throws with the corrected command rather than silently retargeting, because the operator (or an
+ * agent following the runbook) has to see which of the two lanes they actually asked for.
+ * Exported for the release-gate tests.
+ */
+function assertDistributionTarget({ channel, recipient, purpose }) {
+  if (!VALID_BUILD_PURPOSES.includes(purpose)) {
+    throw new Error(`Invalid build purpose: ${JSON.stringify(purpose)} (expected ${VALID_BUILD_PURPOSES.join(" | ")})`);
+  }
+  if (purpose === "marketplace") {
+    if (channel !== MARKETPLACE_CHANNEL) {
+      throw new Error(
+        `A Marketplace submission build is always a ${MARKETPLACE_CHANNEL} build, not "${channel}". ` +
+          `Fix: drop --channel, or use --purpose internal for a ${channel} test build.`
+      );
+    }
+    if (recipient !== MARKETPLACE_RECIPIENT) {
+      throw new Error(
+        `--purpose marketplace writes to bundle/${MARKETPLACE_CHANNEL}/${MARKETPLACE_RECIPIENT}/ only, ` +
+          `but the recipient is "${recipient}". Fix: drop BUILD_RECIPIENT, or use --purpose internal.`
+      );
+    }
+    return;
+  }
+  if (recipient === MARKETPLACE_RECIPIENT) {
+    throw new Error(
+      `bundle/${channelOutputDir(channel)}/${MARKETPLACE_RECIPIENT}/ holds Webflow Marketplace submission ` +
+        "artifacts only — an internal review or test build must not be written there, or it can be " +
+        "uploaded to App Review by mistake. Fix: pick another recipient (BUILD_RECIPIENT=internal), or " +
+        "if this really is the submission artifact, build it with BUILD_PURPOSE=marketplace."
+    );
+  }
+}
+
+/**
+ * `public` is a production-only folder (see assertDistributionTarget). One under another channel is
+ * a pre-guard build or a hand copy — an artifact that looks submittable and is not. Fail instead of
+ * building beside it, and name the folder so it can be moved or deleted.
+ */
+function assertNoMisplacedMarketplaceBundles(appPath) {
+  const strays = [];
+  for (const channelDir of ["preview", "development"]) {
+    for (const base of [resolve(appPath, "bundle", channelDir), resolve(appPath, "bundle", "archive", channelDir)]) {
+      const dir = resolve(base, MARKETPLACE_RECIPIENT);
+      if (existsSync(dir)) strays.push(relative(ROOT, dir));
+    }
+  }
+  if (strays.length > 0) {
+    throw new Error(
+      `Non-production bundles in the Marketplace lane: ${strays.join(", ")}. Only ` +
+        `bundle/${MARKETPLACE_CHANNEL}/${MARKETPLACE_RECIPIENT}/ may hold "${MARKETPLACE_RECIPIENT}" artifacts. ` +
+        "Move or delete these folders before building."
+    );
+  }
+}
+
+/** Explicit purpose from `--purpose` or `BUILD_PURPOSE`; null when the caller has to decide. */
+function resolveBuildPurposeInput(purposeArg, env = process.env) {
+  const raw = (purposeArg ?? env.BUILD_PURPOSE ?? "").trim();
+  if (raw.length === 0) return null;
+  if (!VALID_BUILD_PURPOSES.includes(raw)) {
+    throw new Error(`Invalid --purpose value: ${raw} (expected ${VALID_BUILD_PURPOSES.join(" | ")})`);
+  }
+  return raw;
+}
+
+async function resolveBuildPurpose(purposeArg) {
+  let explicit;
+  try {
+    explicit = resolveBuildPurposeInput(purposeArg);
+  } catch (err) {
+    p.cancel(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+  if (explicit) return explicit;
+  // No purpose asked for: never guess "marketplace". A non-interactive run defaults to the
+  // internal lane, and an interactive one has to pick.
+  if (isNonInteractive) return "internal";
+  const picked = await p.select({
+    message: "What is this build for?",
+    options: [
+      {
+        value: "internal",
+        label: "Internal review / testing",
+        hint: "bundle/<channel>/<recipient>/ — never the public folder",
+      },
+      {
+        value: "marketplace",
+        label: color.yellow("Webflow Marketplace submission"),
+        hint: `bundle/${MARKETPLACE_CHANNEL}/${MARKETPLACE_RECIPIENT}/ — goes to App Review`,
+      },
+    ],
+    initialValue: "internal",
+  });
+  if (p.isCancel(picked)) {
+    p.cancel("Build cancelled.");
+    process.exit(0);
+  }
+  return picked;
 }
 
 function buildTimestamp() {
@@ -122,10 +252,20 @@ const STEPS = [
   { label: "Organizing output", pct: 95 },
 ];
 
-async function resolveBuildChannel(channelArg, appName) {
+async function resolveBuildChannel(channelArg, appName, purpose) {
   if (channelArg && !VALID_BUILD_CHANNELS.includes(channelArg)) {
     p.cancel(`Invalid --channel value: ${channelArg}`);
     process.exit(1);
+  }
+  if (purpose === "marketplace") {
+    if (channelArg && channelArg !== MARKETPLACE_CHANNEL) {
+      p.cancel(
+        `--purpose marketplace builds the ${MARKETPLACE_CHANNEL} channel; --channel ${channelArg} was requested. ` +
+          `Use --purpose internal for a ${channelArg} build.`
+      );
+      process.exit(1);
+    }
+    return MARKETPLACE_CHANNEL;
   }
   if (channelArg) return channelArg;
   if (isNonInteractive) return "production";
@@ -154,12 +294,16 @@ async function resolveBuildChannel(channelArg, appName) {
   return picked;
 }
 
-async function resolveRecipientName(appPath, channelDir) {
+async function resolveRecipientName(appPath, channelDir, purpose) {
+  // The Marketplace lane has exactly one recipient; BUILD_RECIPIENT cannot redirect it, and
+  // assertDistributionTarget rejects the reverse (a `public` recipient on an internal build).
+  if (purpose === "marketplace") return MARKETPLACE_RECIPIENT;
   const ciRecipient = process.env.BUILD_RECIPIENT ?? process.env.VITE_BUNDLE_RECIPIENT;
   if (ciRecipient?.trim()) return ciRecipient.trim();
-  if (isNonInteractive) return "internal";
+  if (isNonInteractive) return DEFAULT_INTERNAL_RECIPIENT;
 
-  const existing = getExistingRecipients(appPath, channelDir);
+  // `public` is never offered here: picking it from the list is the accident this guard exists for.
+  const existing = getExistingRecipients(appPath, channelDir).filter((r) => r !== MARKETPLACE_RECIPIENT);
   const recipientOptions = [
     ...existing.map((r) => ({ value: r, label: r, hint: "existing" })),
     { value: "__new__", label: color.cyan("+ New recipient"), hint: "create a new distribution target" },
@@ -1237,7 +1381,7 @@ async function runBuildPipeline({ appPath, appName, pkg, channel, recipient }) {
 }
 
 async function main() {
-  const { app: appArg, channel: channelArg } = parseArgs(process.argv.slice(2));
+  const { app: appArg, channel: channelArg, purpose: purposeArg } = parseArgs(process.argv.slice(2));
 
   if (!appArg) {
     console.error("Usage: node scripts/build-cli.mjs --app <name> [--channel production|development|preview]");
@@ -1258,14 +1402,29 @@ async function main() {
 
   p.intro(`${color.bgCyan(color.black(`  ${appArg}  `))} ${color.dim("build cli")}  ${color.dim(`v${pkg.version}`)}`);
 
-  const channel = await resolveBuildChannel(channelArg, appArg);
+  const purpose = await resolveBuildPurpose(purposeArg);
+  const channel = await resolveBuildChannel(channelArg, appArg, purpose);
   const channelDir = channelOutputDir(channel);
-  const recipient = await resolveRecipientName(appPath, channelDir);
+  const recipient = await resolveRecipientName(appPath, channelDir, purpose);
+
+  try {
+    assertDistributionTarget({ channel, recipient, purpose });
+    assertNoMisplacedMarketplaceBundles(appPath);
+  } catch (err) {
+    p.cancel(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+
+  const purposeLine =
+    purpose === "marketplace"
+      ? color.yellow("marketplace — this artifact goes to Webflow App Review")
+      : color.white("internal — review / testing only, never uploaded to Webflow");
 
   p.note(
     [
       `${color.dim("app")}        ${color.white(appArg)}`,
       `${color.dim("version")}    ${color.white(pkg.version)}`,
+      `${color.dim("purpose")}    ${purposeLine}`,
       `${color.dim("channel")}    ${color.white(channel)}`,
       `${color.dim("recipient")}  ${color.white(recipient)}`,
       `${color.dim("output")}     ${color.white(`apps/${appArg}/bundle/${channelDir}/${recipient}/`)}`,
@@ -1273,7 +1432,11 @@ async function main() {
     "Build summary"
   );
 
-  const confirmed = isNonInteractive ? true : await p.confirm({ message: "Start build?", initialValue: true });
+  const confirmMessage =
+    purpose === "marketplace"
+      ? `Build the Marketplace submission artifact into bundle/${channelDir}/${recipient}/?`
+      : "Start build?";
+  const confirmed = isNonInteractive ? true : await p.confirm({ message: confirmMessage, initialValue: true });
 
   if (p.isCancel(confirmed) || !confirmed) {
     p.cancel("Build cancelled.");
@@ -1329,6 +1492,8 @@ if (isDirectInvocation()) {
 /** Exported for scripts/__tests__ coverage of the release gates; not part of the CLI surface. */
 export {
   archiveBaseName,
+  assertDistributionTarget,
+  assertNoMisplacedMarketplaceBundles,
   assertPinnedMarkerCounts,
   assertRequiredReleaseEnv,
   collectForbiddenBundleMarkers,
@@ -1340,5 +1505,7 @@ export {
   pruneBundleArchives,
   pruneBundleArchivesForApp,
   referencedArchiveBaseNames,
+  resolveBuildPurposeInput,
   resolveViteEnvValue,
+  validateRecipientName,
 };

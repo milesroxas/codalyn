@@ -5,6 +5,7 @@
   "globalEnv": ["NODE_ENV", "CI"],
   "globalPassThroughEnv": [
     "BLOB_READ_WRITE_TOKEN",
+    "BUILD_PURPOSE",
     "BUILD_RECIPIENT",
     "DATABASE_URL_UNPOOLED",
     "NEON_PROJECT_ID",
@@ -62,6 +63,11 @@
       ]
     },
     "build:dev": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "bundle/**"],
+      "env": ["VITE_*"]
+    },
+    "build:marketplace": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "bundle/**"],
       "env": ["VITE_*"]

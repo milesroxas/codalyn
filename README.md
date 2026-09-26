@@ -110,11 +110,19 @@ Vercel-hosted DB targets: `db:migrate:dev:vercel`, `db:migrate:preview:vercel`, 
 Each Webflow Designer Extension app shares a single interactive build CLI at `scripts/build-cli.mjs`. Before bundling it runs **`pnpm lint:all`** (typecheck + lint) and **`pnpm test:run`** for that app, then builds with Vite, verifies baked-in markers, calls `webflow extension bundle`, and moves `bundle.zip` into `apps/<app>/bundle/<channel>/<recipient>/v<version>_<recipient>_<timestamp>.zip` (upload that file to Webflow).
 
 ```bash
-pnpm app <app> build           # interactive: prompts for channel + recipient
-pnpm app <app> build:prod      # production → bundle/production/ (Beacon: tower.codalyn.app)
+pnpm app <app> build           # interactive: prompts for purpose, channel + recipient
+pnpm app <app> build:prod      # production → bundle/production/internal/ (Beacon: tower.codalyn.app)
 pnpm app <app> build:preview   # preview → bundle/preview/ (Beacon: tower-preview.codalyn.app)
 pnpm app <app> build:dev       # development → bundle/development/ (local Tower default)
+pnpm app beacon build:marketplace   # Webflow submission → bundle/production/public/
 ```
+
+**Distribution lanes.** `bundle/production/public/` is the Webflow Marketplace lane: only the zip +
+`.sourcemaps.zip` pair built for an actual App Review submission belongs in it, and only
+`build:marketplace` (`BUILD_PURPOSE=marketplace`) writes there. Every other build — internal review,
+internal-testing publishes, beta, demo, smoke tests — defaults to the `internal` recipient. The build
+fails before lint if the purpose and the target folder disagree, if `public` is passed as a recipient
+name, or if a `public` folder exists under the preview or development channel.
 
 Applies to `flint` and `beacon`. Tower uses `pnpm app tower dev` / `pnpm app tower build`. Local Tower dev owns host port **3100** by default; see **Tower database** above and [apps/tower/README.md](apps/tower/README.md) for Docker/Neon setup.
 

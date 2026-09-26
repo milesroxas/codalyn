@@ -8,6 +8,10 @@ Cursor (`.cursor/skills/`):
 | ----------------------------- | -------------------------------- | -------------------------------------------------------------- |
 | Before any submission         | `webflow-app-preflight`          | go / no-go quality gate, evidence per checklist item           |
 | After Webflow issues findings | `webflow-app-review-remediation` | normalized findings table → fix → evidence → resubmission packet |
+| Before **any** build or upload | `codalyn-release-lanes`         | which folder this artifact is allowed to land in (internal vs `public`) |
+
+The first two are vendored from Webflow and unmodified; `codalyn-release-lanes` is repo-local and
+carries the rules the vendored pair cannot know (see `.claude/skills/LOCAL-RULES.md`).
 
 Both are markdown instruction sets, not scripts. Invoke with `/webflow-app-preflight` or
 `/webflow-app-review-remediation` in Claude Code (or just describe the task — they auto-trigger on
@@ -45,11 +49,28 @@ Fix every fail. Re-run until go. The gate itself lives at
 ### A3. Build the production artifact
 
 ```bash
-CI=true BUILD_RECIPIENT=public pnpm --filter beacon build:prod
+CI=true BUILD_PURPOSE=marketplace pnpm --filter beacon build:prod
+# interactive equivalent: pnpm --filter beacon build:marketplace
 ```
 
 Output: `apps/beacon/bundle/production/public/v<ver>_public_<MM-DD_HH-mm-ss>.zip` plus the matching
 `.sourcemaps.zip` (private — submission form field only, never inside the bundle).
+
+> **`bundle/production/public/` is the Marketplace lane and holds nothing else.** Only a build made
+> with `BUILD_PURPOSE=marketplace` (or `--purpose marketplace`) writes there, and it is the only
+> thing you may upload to App Review. Every other build — internal review, beta, demo, a smoke test
+> of a fix — is `pnpm --filter beacon build:prod` with the default `internal` recipient and lands in
+> `bundle/production/internal/`. Do not pass `BUILD_RECIPIENT=public`, do not copy or rename a zip
+> into the public folder, and do not create a `public` folder under the preview or development
+> channel: `scripts/build-cli.mjs` fails the build on each of those before it runs lint
+> (`assertDistributionTarget` / `assertNoMisplacedMarketplaceBundles`, unit-tested in
+> `apps/beacon/scripts/release-build-gates.test.mjs`). A build's `.sourcemaps.zip` always stays in the
+> same folder as its zip.
+>
+> The **internal-testing publish** in [SUBMIT.md](SUBMIT.md) Step 3 is not an exception: it uploads
+> the *submission* zip from the public folder on purpose, because Steps 3–5 have to exercise the exact
+> artifact that then goes to review. The lane is about which build lands in the folder, not which
+> Workspace distribution radio you pick.
 
 Retention runs at the end of every build (`BUNDLE_RETENTION` in `scripts/build-cli.mjs`): the newest 2
 builds stay in place, older builds that this doc or the compliance doc names (scan targets, submitted

@@ -14,6 +14,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   archiveBaseName,
+  assertDistributionTarget,
+  assertNoMisplacedMarketplaceBundles,
   assertPinnedMarkerCounts,
   assertRequiredReleaseEnv,
   collectForbiddenBundleMarkers,
@@ -24,8 +26,10 @@ import {
   pinnedMarkerCounts,
   pruneBundleArchives,
   referencedArchiveBaseNames,
+  resolveBuildPurposeInput,
   resolveViteEnvValue,
   rewriteSourceMapInsecureSchemes,
+  validateRecipientName,
 } from "../../../scripts/build-cli.mjs";
 import { assertBundleOutputMatchesBuild } from "../../../scripts/extension-build.mjs";
 import { minifyCssWithSourceMap } from "../../../scripts/vite-css-sourcemap-plugin.mjs";
@@ -1000,5 +1004,86 @@ describe("@dnd-kit/core / MutationObserver (pnpm patch applied)", () => {
     expect(esm).toContain("function useRect(");
     expect(esm).toContain("function useResizeObserver(");
     expect(esm).toContain("resizeObserver.observe(element)");
+  });
+});
+
+describe("distribution lane (internal review vs Webflow Marketplace)", () => {
+  // bundle/production/public/ holds the artifacts uploaded to App Review and nothing else. An
+  // internal review or test build that lands there is one file-picker click away from being
+  // submitted, so the build refuses the combination instead of producing it.
+
+  it("accepts the Marketplace lane: marketplace purpose, production channel, public recipient", () => {
+    expect(() =>
+      assertDistributionTarget({ channel: "production", recipient: "public", purpose: "marketplace" })
+    ).not.toThrow();
+  });
+
+  it("accepts an internal build on any channel, including a production internal-testing build", () => {
+    for (const channel of ["production", "preview", "development"]) {
+      expect(() => assertDistributionTarget({ channel, recipient: "internal", purpose: "internal" })).not.toThrow();
+      expect(() => assertDistributionTarget({ channel, recipient: "beacon-demo", purpose: "internal" })).not.toThrow();
+    }
+  });
+
+  it("refuses to write an internal build into the public folder, on every channel", () => {
+    for (const channel of ["production", "preview", "development"]) {
+      expect(() => assertDistributionTarget({ channel, recipient: "public", purpose: "internal" })).toThrow(
+        /Marketplace submission/
+      );
+    }
+  });
+
+  it("refuses a Marketplace build that is not a production build", () => {
+    for (const channel of ["preview", "development"]) {
+      expect(() => assertDistributionTarget({ channel, recipient: "public", purpose: "marketplace" })).toThrow(
+        /always a production build/
+      );
+    }
+  });
+
+  it("refuses a Marketplace build redirected to another recipient", () => {
+    expect(() =>
+      assertDistributionTarget({ channel: "production", recipient: "internal", purpose: "marketplace" })
+    ).toThrow(/writes to bundle\/production\/public\/ only/);
+  });
+
+  it("refuses an unknown purpose rather than defaulting one", () => {
+    expect(() => assertDistributionTarget({ channel: "production", recipient: "public", purpose: "" })).toThrow(
+      /Invalid build purpose/
+    );
+    expect(() => assertDistributionTarget({ channel: "production", recipient: "public", purpose: "release" })).toThrow(
+      /Invalid build purpose/
+    );
+  });
+
+  it("never infers the Marketplace purpose — it is explicit or absent", () => {
+    expect(resolveBuildPurposeInput(null, {})).toBeNull();
+    expect(resolveBuildPurposeInput(null, { BUILD_RECIPIENT: "public" })).toBeNull();
+    expect(resolveBuildPurposeInput(null, { BUILD_PURPOSE: "marketplace" })).toBe("marketplace");
+    expect(resolveBuildPurposeInput("marketplace", {})).toBe("marketplace");
+    expect(resolveBuildPurposeInput("internal", { BUILD_PURPOSE: "marketplace" })).toBe("internal");
+    expect(() => resolveBuildPurposeInput("prod", {})).toThrow(/Invalid --purpose value/);
+  });
+
+  it("reserves the recipient name so it cannot be typed in at the prompt either", () => {
+    expect(validateRecipientName("public")).toMatch(/reserved/);
+    expect(validateRecipientName("beacon-demo")).toBeUndefined();
+    expect(validateRecipientName("public-beta")).toBeUndefined();
+  });
+
+  it("fails the build when a public folder exists outside the production channel", () => {
+    const appPath = tempAppDir();
+    expect(() => assertNoMisplacedMarketplaceBundles(appPath)).not.toThrow();
+    mkdirSync(join(appPath, "bundle", "production", "public"), { recursive: true });
+    mkdirSync(join(appPath, "bundle", "preview", "internal"), { recursive: true });
+    expect(() => assertNoMisplacedMarketplaceBundles(appPath)).not.toThrow();
+    mkdirSync(join(appPath, "bundle", "preview", "public"), { recursive: true });
+    expect(() => assertNoMisplacedMarketplaceBundles(appPath)).toThrow(/Marketplace lane/);
+  });
+
+  it("catches an archived non-production public folder too", () => {
+    const appPath = tempAppDir();
+    mkdirSync(join(appPath, "bundle", "archive", "development", "public"), { recursive: true });
+    expect(() => assertNoMisplacedMarketplaceBundles(appPath)).toThrow(/Marketplace lane/);
   });
 });

@@ -1,0 +1,44 @@
+---
+description: Never write an internal or test build into the Webflow Marketplace bundle folder
+alwaysApply: true
+---
+
+# Build distribution lanes (internal vs public)
+
+Extension builds land in `apps/<app>/bundle/<channel>/<recipient>/`. The recipient folder is the
+distribution lane, and the two lanes are not interchangeable.
+
+| Lane | Folder | What may be in it |
+| --- | --- | --- |
+| **Marketplace** | `bundle/production/public/` | Only the `.zip` + `.sourcemaps.zip` pair built for an actual Webflow App Review submission |
+| **Internal** | `bundle/<channel>/internal/` (or any other recipient name) | Every internal review, internal-testing publish, beta, demo and smoke-test build |
+
+## Rules
+
+- Build a submission artifact only with the purpose named: `pnpm --filter beacon build:marketplace`,
+  or `BUILD_PURPOSE=marketplace` for a non-interactive run. It pins the production channel and the
+  `public` recipient.
+- Build everything else with `build:prod`, `build:preview` or `build:dev`. The recipient defaults to
+  `internal`; pass `BUILD_RECIPIENT=<name>` for a named target.
+- **Never** pass `BUILD_RECIPIENT=public`, never copy, move or rename an artifact into the public
+  folder, and never create a `public` folder under the preview or development channel.
+- The source maps follow their zip. A `.sourcemaps.zip` is private submission-form input; it lives in
+  the same lane as the bundle it came from and nowhere else.
+- Never infer the purpose from a build that is already in the public folder, from the channel, or
+  from the fact that a previous command in the runbook used `public`. If the intent is not stated,
+  it is internal — or ask.
+
+## Why
+
+`v0.1.0_public_<stamp>.zip` and `v0.1.0_internal_<stamp>.zip` look the same in a file picker, and both
+the submission form and the Workspace *Publish new version* dialog take a file path. A dev-intent
+artifact sitting in the public folder is one click away from entering App Review, and a dev build in
+review costs a full round.
+
+## Enforcement
+
+`scripts/build-cli.mjs` fails before lint when the purpose and the target disagree
+(`assertDistributionTarget`), when a `public` folder exists outside the production channel
+(`assertNoMisplacedMarketplaceBundles`), and it refuses `public` as a typed recipient name. The guards
+are unit-tested in `apps/beacon/scripts/release-build-gates.test.mjs`
+(`describe("distribution lane …")`). Runbook: `docs/webflow-marketplace/playbook.md` § A3.

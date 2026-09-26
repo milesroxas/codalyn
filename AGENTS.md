@@ -8,6 +8,7 @@ Persistent instructions for AI agents (Cursor and similar) live in **`.cursor/ru
 | `code-quality.mdc` | DRY, single source of truth, no hacks; FSD and package boundaries |
 | `security.mdc` | Extra scrutiny for auth, secrets, APIs, and user data |
 | `runtime-value-shape-safety.mdc` | Normalize external/runtime data at integration boundaries |
+| `bundle-distribution-lanes.mdc` | Never write an internal or test build into the Marketplace `bundle/production/public/` folder |
 
 ## Verify commands (match CI)
 
@@ -41,6 +42,27 @@ Use **pnpm** only (`packageManager` in root `package.json`).
 - When a new look is needed, update or extend the component variant/API at the owning primitive (typically under `shared/ui`), then consume the variant.
 - Allow call-site overrides only when absolutely necessary for non-visual layout placement that cannot be expressed in the primitive without harming reuse.
 - Treat call-site visual styling as a DRY/single-source-of-truth violation and refactor before considering work complete.
+
+## Build distribution lanes (always enforce)
+
+Extension builds land in `apps/<app>/bundle/<channel>/<recipient>/`. The recipient folder is the
+distribution lane:
+
+- `bundle/production/public/` is the **Webflow Marketplace** lane — only the `.zip` + `.sourcemaps.zip`
+  pair built for an actual App Review submission may be in it.
+- Everything else — internal review, internal-testing publishes, beta, demo, smoke tests — goes to
+  `bundle/<channel>/internal/` or another named recipient.
+
+```bash
+pnpm --filter beacon build:marketplace   # the ONLY command that writes to bundle/production/public/
+pnpm --filter beacon build:prod          # internal production build → bundle/production/internal/
+CI=true BUILD_PURPOSE=marketplace pnpm --filter beacon build:prod   # non-interactive submission build
+```
+
+Never pass `BUILD_RECIPIENT=public`, never copy or rename an artifact into the public folder, and never
+create a `public` folder under the preview or development channel. A build's source-map zip stays in the
+same lane as its bundle. `scripts/build-cli.mjs` fails the build when purpose and target disagree; full
+rule in `.cursor/rules/bundle-distribution-lanes.mdc`.
 
 ## App-specific guides
 

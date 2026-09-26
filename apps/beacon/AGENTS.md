@@ -77,6 +77,23 @@ Common fields (see [configuring guide](https://developers.webflow.com/designer/r
 
 This repo uses **pnpm** (`packageManager` in `package.json`); align with that for installs and scripts.
 
+### Build distribution lanes — read before any release build
+
+Builds go to `bundle/<channel>/<recipient>/`. `bundle/production/public/` is the **Webflow Marketplace**
+lane and holds only the `.zip` + `.sourcemaps.zip` pair built for an actual App Review submission.
+Internal review, internal-testing publishes, beta, demo and smoke-test builds go to
+`bundle/<channel>/internal/` (or another named recipient).
+
+```bash
+pnpm --filter beacon build:marketplace   # only command that writes to bundle/production/public/
+pnpm --filter beacon build:prod          # internal production build → bundle/production/internal/
+```
+
+Never pass `BUILD_RECIPIENT=public` and never copy or rename an artifact into the public folder. A
+build's source-map zip stays with its bundle. `scripts/build-cli.mjs` fails the build when the purpose
+and the target disagree; full rule in `.cursor/rules/bundle-distribution-lanes.mdc`, runbook in
+`docs/webflow-marketplace/playbook.md` § A3.
+
 ## Errors
 
 Designer API errors are structured for programmatic handling:

@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { SINGLE_WORKSPACE_CONFIRM_LABEL } from "@/features/settings/ui/beacon-workspace-control";
-import { BeaconWorkspaceGateView } from "./beacon-workspace-gate-view";
+import { BeaconWorkspaceGateView, TOWER_CONTINUE_LABEL, TOWER_OPEN_LABEL } from "./beacon-workspace-gate-view";
 
 // Radix ScrollArea observes its viewport; jsdom ships no ResizeObserver.
 beforeAll(() => {
@@ -20,13 +20,19 @@ beforeAll(() => {
 const ACME = { id: "org-acme", name: "Acme Web Team" };
 const NORTH = { id: "org-north", name: "Northwind Studio" };
 
-const towerLink = {
-  href: "https://tower.example.test/auth/continue",
+const towerAnchor = {
+  href: "https://tower.example.test/beacon-handoff#ott=ott-1&callbackUrl=%2Fauth%2Fcontinue",
   target: "_blank" as const,
   rel: "noopener noreferrer" as const,
   onPointerEnter: vi.fn(),
   onFocus: vi.fn(),
   onClick: vi.fn(),
+};
+const towerLinkIdle = { state: { kind: "idle" as const }, linkProps: null, prepare: vi.fn() };
+const towerLinkReady = {
+  state: { kind: "ready" as const, url: towerAnchor.href, preparedAt: 0 },
+  linkProps: towerAnchor,
+  prepare: vi.fn(),
 };
 
 function renderView(overrides: Partial<Parameters<typeof BeaconWorkspaceGateView>[0]> = {}) {
@@ -39,7 +45,7 @@ function renderView(overrides: Partial<Parameters<typeof BeaconWorkspaceGateView
       workspaces={[ACME]}
       selectingId={null}
       selectFailed={false}
-      towerLinkProps={towerLink}
+      towerLink={towerLinkIdle}
       onSelectWorkspace={onSelectWorkspace}
       onCheckAgain={onCheckAgain}
       onSignOut={onSignOut}
@@ -78,21 +84,32 @@ describe("BeaconWorkspaceGateView", () => {
     expect(screen.getByRole("button", { name: NORTH.name })).toBeDisabled();
   });
 
-  it("with no workspace, links to Tower as a new-tab anchor and offers a re-check", async () => {
+  it("with no workspace, offers Tower as an explicit action: the click prepares, no anchor before it", async () => {
+    towerLinkIdle.prepare.mockClear();
     const { onSelectWorkspace, onCheckAgain } = renderView({ workspaces: [] });
-    const link = screen.getByRole("link", { name: /Open Tower/ });
-    expect(link).toHaveAttribute("href", towerLink.href);
-    expect(link).toHaveAttribute("target", "_blank");
-    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.queryByRole("link")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: TOWER_OPEN_LABEL }));
+    expect(towerLinkIdle.prepare).toHaveBeenCalledTimes(1);
 
     await userEvent.click(screen.getByRole("button", { name: /Check again/ }));
     expect(onCheckAgain).toHaveBeenCalledTimes(1);
     expect(onSelectWorkspace).not.toHaveBeenCalled();
   });
 
-  it("omits the Tower link when no Tower origin is configured", () => {
-    renderView({ workspaces: [], towerLinkProps: null });
-    expect(screen.queryByRole("link", { name: /Open Tower/ })).toBeNull();
+  it("with the handoff prepared, links to Tower as a new-tab anchor carrying the token in the fragment", () => {
+    renderView({ workspaces: [], towerLink: towerLinkReady });
+    const link = screen.getByRole("link", { name: TOWER_CONTINUE_LABEL });
+    expect(link).toHaveAttribute("href", towerAnchor.href);
+    expect(link.getAttribute("href")).not.toMatch(/[?&]ott=/);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.queryByRole("button", { name: TOWER_OPEN_LABEL })).toBeNull();
+  });
+
+  it("omits the Tower control when no Tower origin is configured", () => {
+    renderView({ workspaces: [], towerLink: null });
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByRole("button", { name: TOWER_OPEN_LABEL })).toBeNull();
     expect(screen.getByRole("button", { name: /Check again/ })).toBeInTheDocument();
   });
 

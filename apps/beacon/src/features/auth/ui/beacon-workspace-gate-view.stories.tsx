@@ -2,13 +2,19 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 import { BeaconWorkspaceGateView } from "@/features/auth/ui/beacon-workspace-gate-view";
 
-const towerLink = {
-  href: "https://tower.example.test/auth/continue",
+const towerAnchor = {
+  href: "https://tower.example.test/beacon-handoff#ott=demo&callbackUrl=%2Fauth%2Fcontinue",
   target: "_blank" as const,
   rel: "noopener noreferrer" as const,
   onPointerEnter: fn(),
   onFocus: fn(),
   onClick: fn(),
+};
+const towerLinkIdle = { state: { kind: "idle" as const }, linkProps: null, prepare: fn() };
+const towerLinkReady = {
+  state: { kind: "ready" as const, url: towerAnchor.href, preparedAt: 0 },
+  linkProps: towerAnchor,
+  prepare: fn(),
 };
 
 const ACME = { id: "org-acme", name: "Acme Web Team" };
@@ -17,8 +23,8 @@ const ORBIT = { id: "org-orbit", name: "Orbit Agency" };
 
 /**
  * Workspace step of the site gate: a signed-in Designer session with no active Tower workspace.
- * Nothing persists until the user clicks (review round 8); with no workspace, Tower opens as a
- * new-tab link.
+ * Nothing persists until the user clicks (review round 8); with no workspace, Tower is an explicit
+ * two-step control: the click mints the session handoff, then a new-tab link (review round 9).
  */
 const meta = {
   title: "Auth/BeaconWorkspaceGateView",
@@ -36,7 +42,7 @@ const meta = {
     workspaces: [ACME],
     selectingId: null,
     selectFailed: false,
-    towerLinkProps: towerLink,
+    towerLink: towerLinkIdle,
     onSelectWorkspace: fn(),
     onCheckAgain: fn(),
     onSignOut: fn(),
@@ -64,12 +70,17 @@ export const SelectFailed: Story = {
   args: { workspaces: [ACME, NORTH], selectFailed: true },
 };
 
-/** No workspace at all: Tower link plus "Check again" after creating or joining one there. */
+/** No workspace at all: the explicit "Open Tower" action (nothing minted yet) plus "Check again". */
 export const NoWorkspace: Story = {
   args: { workspaces: [] },
 };
 
+/** No workspace, handoff minted after the click: "Continue to Tower" is a plain new-tab anchor. */
+export const NoWorkspaceTowerReady: Story = {
+  args: { workspaces: [], towerLink: towerLinkReady },
+};
+
 /** No workspace and no Tower origin in this build: only "Check again" and sign-out remain. */
 export const NoWorkspaceTowerUnavailable: Story = {
-  args: { workspaces: [], towerLinkProps: null },
+  args: { workspaces: [], towerLink: null },
 };

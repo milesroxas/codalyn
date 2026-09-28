@@ -18,6 +18,12 @@ describe("messageForWebflowSignInError", () => {
     expect([...messages][0]).toMatch(/can't verify Webflow sign-ins/);
   });
 
+  it("names the way out of a Webflow-identity mismatch without relying on e-mail matching", () => {
+    const message = messageForWebflowSignInError("webflow_user_mismatch");
+    expect(message).toMatch(/email and password/);
+    expect(message).toMatch(/relink Webflow/i);
+  });
+
   it("tolerates whitespace around a known code and falls back for unknown ones", () => {
     expect(messageForWebflowSignInError(" rate_limited ")).toMatch(/Too many/);
     expect(messageForWebflowSignInError("http_500")).toMatch(/Try again/);

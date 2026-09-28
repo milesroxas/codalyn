@@ -1,8 +1,9 @@
-import { ExternalLink, Loader2, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import type {
   WebflowAuthorizeAnchorProps,
   WebflowAuthorizeLinkState,
 } from "@/features/auth/model/use-webflow-authorize-link";
+import { PreparedExternalLinkAction } from "@/features/auth/ui/prepared-external-link-action";
 import { Button } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
@@ -24,54 +25,50 @@ export function messageForAuthorizeError(error: string): string {
   }
 }
 
+export const WEBFLOW_AUTHORIZE_CONNECT_LABEL = "Connect site in Webflow";
+export const WEBFLOW_AUTHORIZE_OPEN_LABEL = "Open Webflow authorization";
+
 export type WebflowAuthorizeGateViewProps = {
   siteLabel: string;
   state: WebflowAuthorizeLinkState;
   /** Anchor props for the consent link; present only while `state.kind === "ready"`. */
   linkProps: WebflowAuthorizeAnchorProps | null;
-  onRetry: () => void;
+  /** The explicit Connect action: mints the authorize URL (and retries after a failure). */
+  onConnect: () => void;
   onSignOut: () => void;
 };
 
 /**
- * Presentational body of the site-authorization gate. The consent screen opens through an ordinary
- * `<a target="_blank">` link — the extension spawns no windows — so the primary action is a link
- * while the authorize URL is ready, a disabled "Preparing…" button while it is being minted, and a
- * "Try again" button after a mint failure.
+ * Presentational body of the site-authorization gate: the user is signed in (their session was
+ * restored without any OAuth), but the site open in the Designer is not in the workspace's existing
+ * Webflow authorization. This is a *new* authorization for that site, so it is asked for explicitly:
+ * "Connect site in Webflow" mints the authorize URL on the click, and the consent screen then opens
+ * through an ordinary `<a target="_blank">` link — the extension spawns no windows.
  */
 export function WebflowAuthorizeGateView(props: WebflowAuthorizeGateViewProps) {
-  const { siteLabel, state, linkProps, onRetry, onSignOut } = props;
+  const { siteLabel, state, linkProps, onConnect, onSignOut } = props;
 
   return (
     <ScrollArea className="min-h-0 min-w-0 flex-1">
       <div className="flex min-h-full min-w-0 flex-col items-center justify-center px-4 py-8">
         <div className="mx-auto w-full max-w-sm space-y-4 text-center">
-          <p className="text-sm text-foreground">
-            Authorize <span className="font-medium">{siteLabel}</span> in Webflow to continue. The consent screen opens
-            in a new tab; Beacon unlocks automatically once you approve.
+          <h2 className="text-base font-semibold text-foreground">Authorize this site in Webflow</h2>
+          <p className="text-sm text-muted-foreground">
+            You're signed in, but <span className="font-medium text-foreground">{siteLabel}</span> isn't part of your
+            workspace's Webflow authorization yet. Connecting it opens Webflow's consent screen in a new tab; Beacon
+            unlocks once you approve. Your existing authorization for other sites is not affected.
           </p>
-          {state.kind === "error" ? (
-            <p className="text-xs leading-snug text-destructive" role="alert">
-              {messageForAuthorizeError(state.error)}
-            </p>
-          ) : null}
-          {state.kind === "ready" && linkProps ? (
-            <Button asChild className="w-full">
-              <a {...linkProps}>
-                <ExternalLink aria-hidden data-icon="inline-start" />
-                Open Webflow authorization
-              </a>
-            </Button>
-          ) : state.kind === "error" ? (
-            <Button type="button" className="w-full" onClick={onRetry}>
-              Try again
-            </Button>
-          ) : (
-            <Button type="button" className="w-full" disabled aria-busy>
-              <Loader2 aria-hidden data-icon="inline-start" className="animate-spin" />
-              Preparing Webflow authorization…
-            </Button>
-          )}
+          <PreparedExternalLinkAction
+            state={state}
+            linkProps={linkProps}
+            onPrepare={onConnect}
+            labels={{
+              prepare: WEBFLOW_AUTHORIZE_CONNECT_LABEL,
+              preparing: "Preparing Webflow authorization…",
+              open: WEBFLOW_AUTHORIZE_OPEN_LABEL,
+            }}
+            messageForError={messageForAuthorizeError}
+          />
           <Button
             type="button"
             variant="ghost"

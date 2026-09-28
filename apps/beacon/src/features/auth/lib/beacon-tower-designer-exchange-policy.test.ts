@@ -9,6 +9,10 @@ describe("isPermanentDesignerExchangeFailure", () => {
     expect(isPermanentDesignerExchangeFailure("tower_not_configured")).toBe(true);
   });
 
+  it("treats 'no Tower account yet' (silent restore) as permanent — the explicit sign-in is the next step", () => {
+    expect(isPermanentDesignerExchangeFailure("no_tower_account")).toBe(true);
+  });
+
   it("treats resolve-bearer misconfig as permanent (retrying fresh idTokens cannot fix it)", () => {
     expect(isPermanentDesignerExchangeFailure("webflow_resolve_bearer_invalid")).toBe(true);
     expect(isPermanentDesignerExchangeFailure("webflow_resolve_scope_missing")).toBe(true);

@@ -29,10 +29,26 @@ export function setSuppressDesignerSessionExchange(suppress: boolean): void {
 }
 
 /**
+ * What the exchange may do on Tower's side.
+ *
+ * - `restore` — the silent run on load/focus: sign the verified Webflow user into the Tower account
+ *   already associated with them (a Designer link, or the account that completed the install-time
+ *   OAuth as that Webflow user). Tower creates nothing and links nothing new; with no such account it
+ *   answers `no_tower_account` and the welcome screen is shown. Restoring a session is not an OAuth
+ *   flow and never re-triggers one (Marketplace guidelines, "Session behavior").
+ * - `sign_in` — the explicit "Continue with Webflow" click: the same, plus linking a Tower account with
+ *   the same Webflow-verified e-mail or creating a new Tower account when there is none. Account
+ *   creation and linking are state-changing, so they follow the click, never the load (review round 9).
+ */
+export type WebflowDesignerExchangeIntent = "restore" | "sign_in";
+
+/**
  * Webflow hybrid auth: Designer `getIdToken` → Tower resolves via Data API and issues a Better Auth session.
  * @see https://developers.webflow.com/designer/reference/get-user-id-token
  */
-export async function exchangeWebflowDesignerSession(): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function exchangeWebflowDesignerSession(
+  intent: WebflowDesignerExchangeIntent
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const towerOrigin = getTowerAuthBaseUrl();
   if (!towerOrigin) {
     return { ok: false, error: "tower_not_configured" };
@@ -66,7 +82,7 @@ export async function exchangeWebflowDesignerSession(): Promise<{ ok: true } | {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ idToken, app: "beacon", ...(siteId ? { siteId } : {}) }),
+      body: JSON.stringify({ idToken, app: "beacon", intent, ...(siteId ? { siteId } : {}) }),
     });
   } catch (error) {
     // Network/CORS failure reaching Tower's auth API (common on preview behind Deployment Protection).

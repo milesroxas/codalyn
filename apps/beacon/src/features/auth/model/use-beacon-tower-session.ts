@@ -18,6 +18,7 @@ import {
   readBeaconTowerSessionToken,
   readSuppressDesignerSessionExchange,
   setSuppressDesignerSessionExchange,
+  type WebflowDesignerExchangeIntent,
 } from "@/features/auth/lib/webflow-designer-session";
 import { getTowerAuthBaseUrl } from "@/features/auth/model/tower-auth-client";
 import { requestTowerSignOut, useTowerSession } from "@/features/auth/model/tower-session-client";
@@ -87,14 +88,16 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
-async function runDesignerExchangeWithRetries(): Promise<{ ok: true } | { ok: false; error: string }> {
+async function runDesignerExchangeWithRetries(
+  intent: WebflowDesignerExchangeIntent
+): Promise<{ ok: true } | { ok: false; error: string }> {
   let lastError = "exchange_failed";
   for (let attempt = 0; attempt < DESIGNER_EXCHANGE_RETRY_DELAYS_MS.length; attempt += 1) {
     const delay = DESIGNER_EXCHANGE_RETRY_DELAYS_MS[attempt] ?? 0;
     if (delay > 0) {
       await sleep(delay);
     }
-    const result = await exchangeWebflowDesignerSession();
+    const result = await exchangeWebflowDesignerSession(intent);
     if (result.ok) {
       return result;
     }
@@ -171,10 +174,11 @@ export function useBeaconTowerSession(): {
 
   /**
    * The documented hybrid-app sign-in (`webflow.getIdToken()` → Tower `token/resolve` → Tower session),
-   * run on the user's click. Unlike the silent run on load it ignores the sign-out suppression and the
-   * after-failure block — both exist only to stop *automatic* re-sign-in — and clears them, so a later
-   * silent run behaves normally again. Never flips the exchange phase (that feeds `isPending` and would
-   * unmount the welcome screen before its error could show); the reaper is held like an email sign-in.
+   * run on the user's click with intent `sign_in`: unlike the silent `restore` run on load it may link a
+   * same-e-mail Tower account or create one, and it ignores the sign-out suppression and the after-failure
+   * block — both exist only to stop *automatic* re-sign-in — and clears them, so a later silent run behaves
+   * normally again. Never flips the exchange phase (that feeds `isPending` and would unmount the welcome
+   * screen before its error could show); the reaper is held like an email sign-in.
    */
   const signInWithWebflow = useCallback(async (): Promise<WebflowSignInResult> => {
     if (!towerOrigin) {
@@ -189,7 +193,7 @@ export function useBeaconTowerSession(): {
     designerExchangeInFlight = true;
     explicitSignInInFlight = true;
     try {
-      const result = await runDesignerExchangeWithRetries();
+      const result = await runDesignerExchangeWithRetries("sign_in");
       if (result.ok) {
         await refetch();
       } else {
@@ -228,7 +232,10 @@ export function useBeaconTowerSession(): {
       }
       designerExchangeInFlight = true;
       setBeaconTowerDesignerExchangePhase("running");
-      void runDesignerExchangeWithRetries()
+      // Silent = restore only: Tower signs in the account already associated with this Webflow user and
+      // creates or links nothing (`no_tower_account` lands the user on the welcome screen, whose
+      // "Continue with Webflow" runs the `sign_in` intent on the click).
+      void runDesignerExchangeWithRetries("restore")
         .then(async (r) => {
           if (r.ok) {
             designerExchangeBlockedAfterFailure = false;

@@ -80,16 +80,29 @@ describe("towerConnectionPathForSite", () => {
 describe("isAllowedWebflowAuthorizeUrl", () => {
   it("accepts exactly https://webflow.com/oauth/authorize", () => {
     expect(isAllowedWebflowAuthorizeUrl("https://webflow.com/oauth/authorize?state=abc&client_id=x")).toBe(true);
+    // A fragment and query never change the origin or path.
+    expect(isAllowedWebflowAuthorizeUrl("https://webflow.com/oauth/authorize?state=abc#top")).toBe(true);
+    // The default port is the same origin (the URL parser drops it), so it is not a different destination.
+    expect(isAllowedWebflowAuthorizeUrl("https://webflow.com:443/oauth/authorize?state=abc")).toBe(true);
   });
 
+  // Review round 9 (2026-09-28): "Require url.origin === 'https://webflow.com', the exact /oauth/authorize
+  // path, and empty username and password fields."
   it.each([
     ["wrong host", "https://evil.example/oauth/authorize"],
     ["lookalike host", "https://webflow.com.evil.example/oauth/authorize"],
     ["subdomain", "https://app.webflow.com/oauth/authorize"],
     ["non-https", "http://webflow.com/oauth/authorize"],
+    ["non-default port (a different origin)", "https://webflow.com:8443/oauth/authorize?state=abc"],
+    ["URL username", "https://user@webflow.com/oauth/authorize?state=abc"],
+    ["URL username and password", "https://user:secret@webflow.com/oauth/authorize?state=abc"],
     ["wrong path", "https://webflow.com/dashboard"],
     ["path prefix", "https://webflow.com/oauth/authorize/extra"],
+    ["trailing slash", "https://webflow.com/oauth/authorize/"],
+    ["percent-encoded path", "https://webflow.com/oauth%2Fauthorize"],
+    ["path case", "https://webflow.com/OAuth/Authorize"],
     ["not a URL", "oauth/authorize"],
+    ["protocol-relative", "//webflow.com/oauth/authorize"],
     ["empty", ""],
   ])("rejects %s", (_label, url) => {
     expect(isAllowedWebflowAuthorizeUrl(url)).toBe(false);

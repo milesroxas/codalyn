@@ -5,7 +5,7 @@ import { resolveBeaconSiteLinkGateState } from "@/features/auth/lib/beacon-site-
 import { type BeaconCurrentSite, useBeaconCurrentSite } from "@/features/auth/lib/use-beacon-current-site";
 import { TOWER_APP_ENTRY_PATH } from "@/features/auth/model/tower-auth-client";
 import { useBeaconTowerSession } from "@/features/auth/model/use-beacon-tower-session";
-import { useTowerAppLink } from "@/features/auth/model/use-tower-app-link";
+import { useTowerHandoffLink } from "@/features/auth/model/use-tower-handoff-link";
 import { useWebflowAuthorizeLink } from "@/features/auth/model/use-webflow-authorize-link";
 import {
   BeaconWorkspaceGateView,
@@ -34,13 +34,13 @@ function siteLabelFor(site: BeaconCurrentSite): string {
 
 /**
  * "No workspace at all" body. The only way forward is Tower, so this is the one branch that mounts
- * the session-handoff link — `useTowerAppLink` pre-mints its one-time token on mount, and that Tower
- * request must not fire on the confirm/pick screens, which never render the link (Marketplace
- * guidelines: state-changing actions are not "fired on load").
+ * the session-handoff link — as an explicit two-step control: nothing is requested on mount, the
+ * "Open Tower" click mints the one-time token, and the minted URL then opens as a new-tab anchor
+ * (Marketplace guidelines: state-changing actions are not "fired on load"; review round 9).
  */
-function BeaconNoWorkspaceGate(props: Omit<BeaconWorkspaceGateViewProps, "towerLinkProps">) {
-  const towerLinkProps = useTowerAppLink(TOWER_APP_ENTRY_PATH);
-  return <BeaconWorkspaceGateView {...props} towerLinkProps={towerLinkProps} />;
+function BeaconNoWorkspaceGate(props: Omit<BeaconWorkspaceGateViewProps, "towerLink">) {
+  const towerLink = useTowerHandoffLink(TOWER_APP_ENTRY_PATH);
+  return <BeaconWorkspaceGateView {...props} towerLink={towerLink} />;
 }
 
 /**
@@ -72,7 +72,7 @@ function BeaconWorkspaceGate(props: { site: BeaconCurrentSite }) {
     [setActiveBeaconWorkspace]
   );
 
-  const viewProps: Omit<BeaconWorkspaceGateViewProps, "towerLinkProps"> = {
+  const viewProps: Omit<BeaconWorkspaceGateViewProps, "towerLink"> = {
     siteLabel: siteLabelFor(site),
     workspaces: beaconWorkspaces,
     selectingId,
@@ -84,28 +84,29 @@ function BeaconWorkspaceGate(props: { site: BeaconCurrentSite }) {
   return beaconWorkspaces.length === 0 ? (
     <BeaconNoWorkspaceGate {...viewProps} />
   ) : (
-    <BeaconWorkspaceGateView {...viewProps} towerLinkProps={null} />
+    <BeaconWorkspaceGateView {...viewProps} towerLink={null} />
   );
 }
 
 /**
- * Drives the Webflow OAuth consent link for the current site. The authorize URL is minted when this
- * mounts (never on a timer, never opened automatically) and rendered as an ordinary new-tab link —
- * the extension spawns no windows (Marketplace popup guidance). After the click, Tower state is
- * re-read on a bounded interval and when the Designer tab regains visibility (`onGrantCheck`); once
+ * Drives the Webflow OAuth consent link for the current site — a new authorization for a site outside
+ * the workspace's grant, never a sign-in. Nothing is minted when this mounts: the "Connect site in
+ * Webflow" click asks Tower for the authorize URL (single-use OAuth `state`), which then opens as an
+ * ordinary new-tab link (the extension spawns no windows; review round 9). After the click, Tower state
+ * is re-read on a bounded interval and when the Designer tab regains visibility (`onGrantCheck`); once
  * the site is granted, the surrounding guard unmounts this and the app unlocks.
  */
 function WebflowAuthorizeGate(props: { site: BeaconCurrentSite; onGrantCheck: () => void }) {
   const { site, onGrantCheck } = props;
   const { clearStoredSession } = useBeaconTowerSession();
-  const { state, linkProps, retry } = useWebflowAuthorizeLink(onGrantCheck);
+  const { state, linkProps, connect } = useWebflowAuthorizeLink(onGrantCheck);
 
   return (
     <WebflowAuthorizeGateView
       siteLabel={siteLabelFor(site)}
       state={state}
       linkProps={linkProps}
-      onRetry={retry}
+      onConnect={connect}
       onSignOut={clearStoredSession}
     />
   );
@@ -120,6 +121,7 @@ function WebflowAuthorizeGate(props: { site: BeaconCurrentSite; onGrantCheck: ()
  *    consent URL, so the user confirms/picks a workspace here first.
  * 2. **Site authorization** — with a workspace active and the site outside its grant, the Webflow OAuth
  *    consent screen is linked directly (no Tower-side "authorize" page) so the user ticks the site there.
+ *    This is the only place OAuth is ever started from the extension, and only on the user's click.
  *
  * It only gates when we KNOW the state — signed in, settings synced (authoritative `workspaces` /
  * `webflowSites`), and the current site resolved. Logged-out users (handled by the welcome gate), an

@@ -4038,3 +4038,187 @@ working; no new bundle upload unless the review thread asks for one.
 filing) · Tower ✓ (09-25 19:03) · Installed ✓ (operator-reported; page migration observed via the 19:30 UTC
 republish) · Runtime ✓ (pin + observe exit 0 post-migration) · **Submitted ✓ (2026-09-26, reference
 `1d3acdf7-fdb1-4e03-8a62-e5016224b64a`, receipt `wfpre_22999fcd8fac48877918bdf0e96b4a03`)** · Accepted ✗.
+
+## Round 9 — 2026-09-28 review-team feedback on submission 1d3acdf7
+
+Feedback email on App Update `1d3acdf7-fdb1-4e03-8a62-e5016224b64a` (bundle
+`v0.1.0_public_09-26_12-24-24.zip`, `29f1087c…4142`), ticket #1197949, received 2026-09-28 15:19; the
+message is saved beside this file as `Ticket #1197949 Re Your Webflow Marketplace App submission.pdf`.
+One headline finding with four sub-findings, each with a file:line in the submitted source maps, none with
+an ID or priority → all `unassigned` = P1 (skill rule). The two "screenshot" links resolve to the same
+Loom image: Tower's **Webflow connection** page for the workspace "Webflow Marketplace Team", signed in as
+`marketplaceteam@webflow.c…`, status *Connected · 1 site linked*, one authorized site ("Shea's CMS4",
+`672e54319512eefce92d02de`), captured by the reviewer. The email also points at the updated
+[Marketplace guidelines](https://developers.webflow.com/apps/docs/marketplace-guidelines) and
+[submission artifacts](https://developers.webflow.com/apps/docs/marketplace/submitting-your-app#submission-artifacts)
+(published `.webflow.io` testing site; source maps from the exact build **plus the package manifest and
+lockfile**; Preflight receipt optional) and at a downloadable "developer toolkit" of agent skills
+(`webflow-app-form.webflow.io/app-form/api/skills/download`) — not fetched in this session (the download was
+refused by the agent sandbox's egress policy); worth pulling by hand and diffing against
+`.claude/skills/webflow-app-*`.
+
+**Method for this round (Miles, 2026-09-28):** first principles from the reviewer's text, the linked guideline
+sections (fetched verbatim), the screenshot and the source at HEAD `c8537ea` — not from the earlier round notes,
+which had recorded two of these items as "open decisions, never raised" (R8.21, R8.22) and had described the
+identity model in R8.11 in terms the install flow never implemented (see *Records corrected* below).
+
+### Normalized findings
+
+| Finding (reviewer's title) | Priority | Observed (source-verified at `c8537ea`) | Acceptance criterion (quoted) | Provenance | Evidence state |
+| --- | --- | --- | --- | --- | --- |
+| R9.1 Resolve repeated sign-in and OAuth after installation — `use-beacon-tower-session.ts`, `webflow-sign-in-error.ts` (`webflow_user_mismatch`) | unassigned | Tower stored the install-time token on the workspace with **no record of the Webflow user who approved it** (cookie-flow callback never called `token/authorized_by`); the Designer ID-token exchange matched a Tower account by `user.webflow_authorized_user_id` — set only by an earlier *Designer* sign-in — then by **e-mail**, else provisioned a new account (or 403 `early_access_required`). A Tower account whose e-mail differs from the Webflow user's (the reviewer's setup) therefore never resolved to the account holding the authorization: welcome gate, or a fresh account with no workspace, and from either the gate offered OAuth again. The silent run on load could also *create* accounts (a state change on load). | "Associate the verified Webflow user ID with the existing Tower account and install-time authorization rather than relying on matching email addresses. Routine sign-in must preserve the existing Webflow authorization." | issued finding + published requirement (Session behavior 1–2; Designer authentication guide; `GET /v2/token/authorized_by`) | source-verified |
+| R9.2 Prepare the Webflow authorization URL after a user action — `use-webflow-authorize-link.ts:79–91` | unassigned | `useWebflowAuthorizeLink` minted the authorize URL (a single-use OAuth `state` row on Tower) in its mount effect; the same shape existed for the Tower session-handoff token on the zero-workspace gate (`useTowerAppLink` mount mint, kept there deliberately in R8.21). | "Move this preparation to an explicit Connect action. Distinguish this new authorization flow from restoring an existing authenticated session." | issued finding + published requirement (User interaction 3) | source-verified |
+| R9.3 Validate every image `srcset` candidate — `cms-slot-beacon-prop-runtime.ts:294–310` | unassigned | `bSafeSrc` accepted any value starting `https://`; a candidate list (`https://a/a.png 1x, http://b/b.png 2x`) passed and was written unchanged to `<source srcset>`, so the browser could pick the unchecked second URL. | "Accept a single validated URL or parse and validate each candidate before assignment." | issued finding + published requirement (Recommended practices for published-site code) | source-verified |
+| R9.4 Restrict OAuth URLs to the exact trusted origin — `tower-app-link.ts:85–92` | unassigned | `isAllowedWebflowAuthorizeUrl` checked protocol, hostname and path; `https://webflow.com:8443/oauth/authorize` and `https://user:pw@webflow.com/oauth/authorize` passed. Reviewer: "No cross-host bypass was identified." | "Require `url.origin === \"https://webflow.com\"`, the exact `/oauth/authorize` path, and empty `username` and `password` fields." | issued finding + published requirement (Request handling 1) | source-verified |
+| R9.5 Validate the hosted script URL before registration — `cms-slot-page-inline-script.ts:734–739` | unassigned | `createAndUploadSiteAsset` returned `asset.hostedUrl ?? asset.assetUrl` after a non-empty-string check only; `registerHostedScript` registered whatever it got. (`isWebflowHostedAssetUrl` existed but guarded only the source-map trailer and asset reuse.) | "Validate the destination against the expected HTTPS Webflow asset origins and reject credentials or nondefault ports before registration. Retain the existing SHA-256 integrity hash." | issued finding + published requirement (Recommended practices for published-site code) | source-verified |
+
+Routing: R9.1 is **State and data + Behavior** (Tower schema + callback + exchange, extension intent);
+R9.2–R9.5 are **Behavior** (extension source). No open policy decision. Authority for R9.1: the Designer ID
+token (issuer Webflow, audience Tower, identity only) and the workspace OAuth token (issuer Webflow, audience
+Tower, resource: the customer's Webflow workspace, scopes as filed) — Webflow-issued credentials, so the
+published OAuth/session rules apply directly. Tower's session bearer and handoff token are App credentials.
+
+### R9.1 Identity is the Webflow user id, associated at install time and at Designer sign-in
+
+**What the reviewer did (reconstructed from the text, the screenshot and the code paths at `c8537ea`).** Tower
+account `marketplaceteam@…` owns the workspace "Webflow Marketplace Team"; the Marketplace install URL is
+Tower's `GET /api/integrations/webflow/authorize` (cookie flow), so the install ran as that Tower session and
+was approved on webflow.com by the reviewer's own Webflow user (a different e-mail). Tower stored the token
+on the workspace and linked the site. Opening Beacon on that site: `getIdToken` → `POST /api/auth/webflow-designer`
+→ Webflow resolves the reviewer's Webflow user → Tower finds no account by Webflow id (the install never
+recorded one) and none by e-mail → provisions a new account (no workspace → "Open Tower" → connect → OAuth) or,
+with the early-access gate on, answers 403 → welcome gate → "Continue with Webflow" fails / an e-mail sign-in
+lands in the right account but the user has already been shown a second sign-in. Either way the authorization
+the reviewer had just granted was never reached from the Designer.
+
+**Change (Tower, deploy + migration `0038_webflow_token_authorizer`).**
+
+- Schema: `organization_webflow_oauth_token` gains `webflow_authorized_user_id` (the approving Webflow user,
+  indexed) and `authorized_by_user_id` (the Tower account whose session completed the OAuth, FK `user`,
+  `ON DELETE SET NULL`). `persistOrganizationWebflowOAuthToken` takes both (`webflow-oauth-persist.ts`); a
+  reconnect replaces them.
+- Callback (`api/integrations/webflow/callback/route.ts`): **every** flow now calls
+  `GET /v2/token/authorized_by` with the fresh token. The Designer (DB-state) flow keeps requiring approver =
+  minter (R7b.2); the cookie flow — dashboard *Connect/Relink* and the Marketplace install — records the approver
+  (best-effort: a failed read stores null and is resolved lazily later). The row is persisted with approver +
+  installer, and the approver is **linked to the installing account** (`bindWebflowUserToTowerUser`).
+- Identity module (`server/webflow-designer-identity.ts`): the link is a Better Auth `account` row
+  (`providerId: "webflow"`, `accountId: <Webflow user id>`) written for exactly the (user, Webflow id) pair,
+  plus the legacy unique `user.webflow_authorized_user_id` when free. Lookups: `listTowerUsersBoundToWebflowUser`
+  (account rows, then the legacy column), `chooseBoundTowerUser` (pure: with several linked accounts, the one
+  that is a live member of a workspace whose token reaches the Designer's current site, else the newest link),
+  `findInstallTimeAuthorizationUser` (token rows recorded as approved by this Webflow user, plus — for the
+  workspaces linked to the current site — rows with no recorded approver, resolved once by asking Webflow who
+  authorized the stored token and cached; within the workspace, `chooseInstallerForOrganization`, pure: the
+  recorded installer while still an admin, else the workspace owner when an admin, else the sole admin, else
+  nothing — a Webflow user is never guessed into someone else's account).
+- Exchange (`server/webflow-designer-session-logic.ts`) with an **intent**: `restore` (the extension's silent
+  run on load/focus/visibility) signs in the associated account only — Designer link, then install-time
+  authorization (which links it for next time) — and otherwise answers 404 `no_tower_account`; it never links by
+  e-mail, never flips `emailVerified`, never revokes a credential, never creates an account. `sign_in` (the
+  user's click; also untagged requests from older bundles, so the installed 12:24 build keeps working after the
+  Tower deploy) goes on to the Webflow-verified e-mail link (with the R8.11 pre-hijack rule) and to
+  provisioning. Accounts reached by Webflow id get **no** e-mail flip and **no** credential revocation — the
+  old `finalizeExistingDesignerUser` applied the e-mail-path rule to id matches too, which after this round's
+  install-time link would have revoked the reviewer's Tower password on their next Designer sign-in.
+  `readDesignerExchangeIntent` is the boundary reader (exactly `"restore"`; anything else is `sign_in`).
+- `POST /api/integrations/webflow/authorize` (Designer consent mint) accepts a minter identity that lives only
+  in an `account` row (sole linked Webflow user), since the legacy column is unique per Webflow id.
+
+**Change (extension).** `exchangeWebflowDesignerSession(intent)` sends `intent` in the JSON body;
+`use-beacon-tower-session.ts` sends `restore` on load/focus/visibility and `sign_in` from "Continue with
+Webflow"; `no_tower_account` is terminal for the silent path (`beacon-tower-designer-exchange-policy.ts`) and
+lands on the welcome screen; `webflow_user_mismatch` copy now names the way out (sign in with the password,
+then *Relink Webflow* on Tower's Connection page, which performs the install-time link) instead of "sign in
+with email instead". Not changed, on purpose: the workspace confirmation step (R8.1 acceptance — a click, not
+OAuth; "Routine sign-in must preserve the existing Webflow authorization" holds because the confirmed workspace
+already holds the grant); guest mode; sign-out (clears the bearer only).
+
+**Security note (recorded, not a finding).** After this round a Webflow user who completes the install OAuth
+from a signed-in Tower session becomes a sign-in identity for that Tower account. The approval happens inside
+that account's own authenticated browser session (cookie flow) or under the minter = approver rule (Designer
+flow), so the account holder is the one who let it happen; it is the model the reviewer asked for. Tower shows
+the workspace's connection and lets an admin *Disconnect Webflow*; a per-identity unlink control is a follow-up.
+
+**Tests.** `webflow-designer-identity.test.ts` (8: bound-user choice prefers the site-holding account then
+recency; installer choice — recorded installer, lapsed installer, owner, sole admin, never a guess among
+several admins), `webflow-designer-session-logic.test.ts` (+2: intent reader), Beacon
+`use-beacon-tower-session.test.tsx` (+1: silent run sends `restore`, `no_tower_account` → no user, no retry on
+focus, the click sends `sign_in` and signs in; the existing click test now asserts `sign_in`),
+`beacon-tower-designer-exchange-policy.test.ts` (+1), `webflow-sign-in-error.test.ts` (+1). Tower 749/749,
+`db:check` OK (journal 39, snapshot 0038), typecheck + biome clean.
+
+### R9.2 The consent URL — and the Tower handoff — are minted by the user's click
+
+**Change (extension).** New `usePreparedExternalLink(prepareUrl, { staleMs, onOpen })`
+(`features/auth/model/use-prepared-external-link.ts`): `idle` → the click calls `prepare` → `preparing` →
+`ready` (a plain `<a target="_blank" rel="noopener noreferrer">`) or `error` (retry). Nothing is requested on
+mount; a stale destination returns the control to `idle` on hover/focus instead of re-minting; an opened
+destination is forgotten 1.5 s after the click. `useWebflowAuthorizeLink` is now a thin wrapper (grant polling
+after the click unchanged: 3 s, 10-minute cap, visibility check). `useTowerHandoffLink` gives the zero-workspace
+gate the same two-step control for the session handoff; `useTowerAppLink` (header, account panel, billing,
+sign-in form links — hover/focus-minted, never on mount) is unchanged. Presentational
+`PreparedExternalLinkAction` (`features/auth/ui/prepared-external-link-action.tsx`, story
+`Auth/PreparedExternalLinkAction`) renders the four states for both gates.
+**Copy distinguishes the flows:** the gate is headed "Authorize this site in Webflow" and says "You're signed
+in, but *site* isn't part of your workspace's Webflow authorization yet … Your existing authorization for other
+sites is not affected"; the actions are **Connect site in Webflow** → **Open Webflow authorization**. The
+zero-workspace gate: **Open Tower** → **Continue to Tower**.
+**Tests.** `use-prepared-external-link.test.tsx` (6), `beacon-site-link-gate.test.tsx` (6: no Tower request on
+any gate screen at mount; one mint per click; anchor attributes; refused mint → reason + retry, no anchor),
+`beacon-workspace-gate-view.test.tsx` (updated), stories `Auth/WebflowAuthorizeGateView` (Idle added) and
+`Auth/BeaconWorkspaceGateView` (`NoWorkspaceTowerReady` added).
+
+### R9.3 The image gate accepts exactly one URL
+
+`bSafeSrc` (`cms-slot-beacon-prop-runtime.ts`) refuses any value with whitespace or a trailing comma — the
+srcset candidate separators — after the existing control-character reduction and scheme rules. The value
+written to `<img src>`, `<source srcset>` and the CSS background is therefore one URL that is also exactly one
+srcset candidate; a candidate list applies nothing anywhere (no partial application across a `<picture>`).
+A comma inside a path (image-transform style) is still one candidate and stays accepted.
+**Tests.** `cms-slot-beacon-prop-runtime.test.ts` (+5: the reviewer's value on `<picture>`, on `<img>`, on a
+background container; single-URL writes; the generated page runtime carries the gate). **The published-site
+runtime source changed → the runtime hash changes → Step 4 of SUBMIT.md must push a new runtime (forced
+Sync) and Step 5's Preflight values must be re-read from the pin script.**
+
+### R9.4 Exact OAuth origin
+
+`isAllowedWebflowAuthorizeUrl` = `url.origin === "https://webflow.com" && url.pathname === "/oauth/authorize"
+&& url.username === "" && url.password === ""` (`tower-app-link.ts`; constants
+`WEBFLOW_OAUTH_AUTHORIZE_ORIGIN` / `_PATH`). `tower-app-link.test.ts` (+8 rows: non-default port, username,
+username+password, trailing slash, percent-encoded path, path case, protocol-relative; explicit `:443` and a
+fragment are accepted — same origin).
+
+### R9.5 Hosted script URL validated before registration
+
+`shared/lib/webflow-hosted-asset-url.ts` (`isWebflowHostedAssetUrl`, `readWebflowHostedAssetUrl`): absolute
+`https:`, host `website-files.com` / `*.website-files.com` / `*.webflow.com`, no username/password, no
+non-default port, no whitespace, non-strings refused. `createAndUploadSiteAsset` reads the hosted location
+through it (a malformed value fails the sync; nothing is registered), `registerHostedScript` checks again before
+the POST, the source-map trailer and asset reuse use the same module. The SHA-256 `integrityHash` over the
+uploaded bytes is unchanged. `webflow-hosted-asset-url.test.ts` (17).
+
+### Records corrected
+
+- R8.21 / R8.22 "open decisions" (a) *silent ID-token exchange on load* and (b) *consent-URL mint on gate mount* —
+  both are now issued findings; both resolved in code above. The R8.22 line "the consent-URL mint on gate
+  mount … accepted in R8.21 as explicit re-authorization" was wrong: the mount is not a user action.
+- R8.11 described identity as "matched by the stable Webflow `authorized_user` id first, then by the
+  Webflow-verified email". True for accounts that had already signed in from the Designer; the *install* never
+  recorded the Webflow user, so for a Tower account created on Tower (the Marketplace path) the first rule could
+  never match and the e-mail rule decided. That is the finding.
+- SUBMIT.md's round-8 claim that the silent exchange had "never been raised in nine rounds" is history, not
+  guidance; the runbook is rewritten for this round.
+
+### Artifact
+
+No submission artifact yet — Tower must be deployed and migrated first (SUBMIT.md Step 1), then Step 3 builds
+the Marketplace pair. Gate check: `CI=true pnpm --filter beacon build:prod` (internal lane) →
+`bundle/production/internal/v0.1.0_internal_09-28_17-00-33.zip` — lint, typecheck, 1208/1208 tests, Vite and
+every release pin green. Zip greps (same pins as R8.22): `window.open(` 0 · `MutationObserver` 0 ·
+`postMessage(` 0 · `sourceMappingURL` 0 · `http://` only the W3C namespace literals React needs (R6.6) · `ws://` 0 · posthog 0 · sentry 0 · localhost 0 ·
+bare `fetch(` 1 (the Tower call); the new strings ("Connect site in Webflow", `no_tower_account`,
+`"restore"`) are present; the runtime gate line is in the bundle.
+
+**States.** Source ✓ (uncommitted) · Artifact ✗ (internal gate build only) · Tower ✗ **NOT deployed;
+migration 0038 NOT applied** · Installed ✗ · Runtime ✗ (changes; re-push required) · Submitted ✗ · Accepted ✗.

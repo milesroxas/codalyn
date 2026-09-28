@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { isTowerTeamAdminMemberOfOrg } from "@/server/tower-webflow-oauth-team-admin";
 import { normalizeWebflowAppKey, WEBFLOW_DATA_API_APP_KEY, type WebflowAppKey } from "@/server/webflow-app-registry";
+import { bindWebflowUserToTowerUser } from "@/server/webflow-designer-identity";
 import { resolveWebflowOAuthCallbackKind } from "@/server/webflow-oauth-completion";
 import {
   resolveWebflowOAuthAppUrl,
@@ -54,6 +55,12 @@ type ResolvedConnectTarget = {
   organizationId: string;
   appKey: WebflowAppKey;
   /**
+   * The Tower account completing this OAuth: the signed-in session for the dashboard / Marketplace-install
+   * cookie flow, the state row's minter for the Designer flow. Recorded on the token as its install-time
+   * account, and the approving Webflow user is linked to it (review round 9).
+   */
+  installerUserId: string;
+  /**
    * Set for the Designer-initiated (DB-state) flow: the exchanged token must be proven (via Webflow
    * `token/authorized_by`) to belong to this Webflow user before it is stored. Undefined for the
    * dashboard cookie flow, which is bound to the browser session that started it.
@@ -80,7 +87,7 @@ async function resolveOrganizationFromCookieFlow(
     return { error: oauthErrorRedirect(appUrl, { error: "team_admin_required" }, { popup: isPopupFlow }) };
   }
   // The first-party dashboard "Connect Webflow" flow is the Beacon Data API app.
-  return { organizationId: orgFromCookie, appKey: WEBFLOW_DATA_API_APP_KEY };
+  return { organizationId: orgFromCookie, appKey: WEBFLOW_DATA_API_APP_KEY, installerUserId: sessionUserId };
 }
 
 async function resolveOrganizationFromDbStateFlow(
@@ -118,6 +125,7 @@ async function resolveOrganizationFromDbStateFlow(
   return {
     organizationId: bound.organizationId,
     appKey: normalizeWebflowAppKey(bound.appKey),
+    installerUserId: bound.userId,
     requiredWebflowUserId: bound.webflowAuthorizedUserId,
   };
 }
@@ -184,13 +192,18 @@ type ExchangeAndStoreOutcome = "ok" | "token_exchange" | "identity_mismatch" | "
  * Exchanges the code and stores the token under the resolved org. For the Designer-initiated flow
  * (`requiredWebflowUserId` set) the approving Webflow user must be proven to be the minter first;
  * a token that fails binding or storage is revoked (best-effort) rather than left live.
+ *
+ * Every flow then records the install-time identity — the approving Webflow user (from
+ * `token/authorized_by`) and the Tower account completing the OAuth — on the token row, and links the
+ * approving Webflow user to that account, so opening the Designer as that Webflow user restores this
+ * account and its authorization instead of matching e-mail addresses (review round 9, 2026-09-28).
  */
 async function exchangeAndStoreConnectTarget(
   target: ResolvedConnectTarget,
   code: string,
   redirectUri: string
 ): Promise<ExchangeAndStoreOutcome> {
-  const { organizationId, appKey, requiredWebflowUserId } = target;
+  const { organizationId, appKey, installerUserId, requiredWebflowUserId } = target;
 
   let tokenResponse: WebflowOAuthTokenResponse;
   try {
@@ -199,22 +212,40 @@ async function exchangeAndStoreConnectTarget(
     return "token_exchange";
   }
 
+  const approver = await fetchWebflowAuthorizedUserId(tokenResponse.access_token);
   if (requiredWebflowUserId) {
-    const approver = await fetchWebflowAuthorizedUserId(tokenResponse.access_token);
     if (!isWebflowOAuthApproverBound(requiredWebflowUserId, approver)) {
       await revokeWebflowAccessToken(tokenResponse.access_token, appKey);
       console.warn(`[tower/webflow-oauth] callback identity mismatch for org ${organizationId}; token discarded`);
       return "identity_mismatch";
     }
+  } else if (!approver) {
+    // Cookie flow: the approver could not be read right now. The authorization is stored regardless; the
+    // Designer exchange resolves the approver lazily from the stored token the next time it needs it.
+    console.warn(`[tower/webflow-oauth] approver unknown for org ${organizationId}; identity resolved lazily`);
   }
 
   try {
-    await persistOrganizationWebflowOAuthToken(organizationId, tokenResponse, appKey);
+    await persistOrganizationWebflowOAuthToken(organizationId, tokenResponse, appKey, {
+      webflowAuthorizedUserId: approver,
+      authorizedByUserId: installerUserId,
+    });
   } catch (error) {
     // e.g. MissingSecretEncryptionKeyError in production — the token is never stored in plaintext.
     console.error(`[tower/webflow-oauth] token storage failed: ${error instanceof Error ? error.message : error}`);
     await revokeWebflowAccessToken(tokenResponse.access_token, appKey);
     return "token_storage";
+  }
+
+  if (approver) {
+    try {
+      await bindWebflowUserToTowerUser(approver, installerUserId);
+    } catch (error) {
+      // The token is stored; the link is re-attempted by the Designer exchange (install-time lookup).
+      console.warn(
+        `[tower/webflow-oauth] webflow identity link failed: ${error instanceof Error ? error.message : error}`
+      );
+    }
   }
   return "ok";
 }

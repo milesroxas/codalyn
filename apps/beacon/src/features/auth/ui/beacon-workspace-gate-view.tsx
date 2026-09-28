@@ -1,9 +1,13 @@
-import { ExternalLink, Loader2, LogOut, RefreshCw } from "lucide-react";
-import type { TowerAppLinkProps } from "@/features/auth/model/use-tower-app-link";
+import { Loader2, LogOut, RefreshCw } from "lucide-react";
+import type { PreparedExternalLink } from "@/features/auth/model/use-prepared-external-link";
+import { PreparedExternalLinkAction } from "@/features/auth/ui/prepared-external-link-action";
 import type { BeaconTowerWorkspace } from "@/features/settings/model/beacon-app-settings-provider";
 import { SINGLE_WORKSPACE_CONFIRM_LABEL } from "@/features/settings/ui/beacon-workspace-control";
 import { Button } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
+
+export const TOWER_OPEN_LABEL = "Open Tower";
+export const TOWER_CONTINUE_LABEL = "Continue to Tower";
 
 export type BeaconWorkspaceGateViewProps = {
   siteLabel: string;
@@ -13,8 +17,11 @@ export type BeaconWorkspaceGateViewProps = {
   selectingId: string | null;
   /** True after a confirmation Tower refused or that failed to reach it. */
   selectFailed: boolean;
-  /** New-tab link into Tower for users with no workspace; `null` when no Tower origin is configured. */
-  towerLinkProps: TowerAppLinkProps | null;
+  /**
+   * Tower, for users with no workspace: an explicit two-step control (the click mints the session
+   * handoff, then a new-tab anchor). `null` when no Tower origin is configured.
+   */
+  towerLink: PreparedExternalLink | null;
   onSelectWorkspace: (organizationId: string) => void;
   onCheckAgain: () => void;
   onSignOut: () => void;
@@ -40,19 +47,12 @@ function SignOutButton(props: { onSignOut: () => void }) {
  * holds no active Tower workspace yet. Nothing is persisted until the user clicks — a single
  * workspace is shown as the default with an explicit confirmation, several are listed to pick from
  * (Marketplace review round 8, "Workspace state persisted without explicit user interaction"). With
- * no workspace at all, the only way forward is Tower, opened as an ordinary new-tab link.
+ * no workspace at all, the only way forward is Tower: the click mints the session handoff, and the
+ * minted destination opens as an ordinary new-tab link (nothing requested on mount, review round 9).
  */
 export function BeaconWorkspaceGateView(props: BeaconWorkspaceGateViewProps) {
-  const {
-    siteLabel,
-    workspaces,
-    selectingId,
-    selectFailed,
-    towerLinkProps,
-    onSelectWorkspace,
-    onCheckAgain,
-    onSignOut,
-  } = props;
+  const { siteLabel, workspaces, selectingId, selectFailed, towerLink, onSelectWorkspace, onCheckAgain, onSignOut } =
+    props;
   const busy = selectingId !== null;
   const only = workspaces.length === 1 ? workspaces[0] : null;
 
@@ -67,13 +67,18 @@ export function BeaconWorkspaceGateView(props: BeaconWorkspaceGateViewProps) {
                 Your Tower account isn't part of a workspace. Open Tower to create or join one, then check again to
                 continue on <span className="font-medium text-foreground">{siteLabel}</span>.
               </p>
-              {towerLinkProps ? (
-                <Button asChild className="w-full">
-                  <a {...towerLinkProps}>
-                    <ExternalLink aria-hidden data-icon="inline-start" />
-                    Open Tower
-                  </a>
-                </Button>
+              {towerLink ? (
+                <PreparedExternalLinkAction
+                  state={towerLink.state}
+                  linkProps={towerLink.linkProps}
+                  onPrepare={towerLink.prepare}
+                  labels={{
+                    prepare: TOWER_OPEN_LABEL,
+                    preparing: "Preparing Tower…",
+                    open: TOWER_CONTINUE_LABEL,
+                  }}
+                  messageForError={() => "Couldn't prepare the Tower link. Try again."}
+                />
               ) : null}
               <Button type="button" variant="outline" className="w-full" onClick={onCheckAgain}>
                 <RefreshCw aria-hidden data-icon="inline-start" />

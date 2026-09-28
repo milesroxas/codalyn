@@ -210,3 +210,61 @@ UNINSTALL: page-level code only, never site-level. Deleting the last slot list o
 EXTERNAL-SERVICE DISCLOSURE: AVIF conversion is opt-in, off by default. Selecting AVIF shows a consent prompt disclosing the image is sent to tower.codalyn.app for conversion, in memory, never stored; revocable in Settings, Privacy; persistent indicator while active. A guard at the single call site refuses AVIF without consent. WebP stays fully in-Designer.
 ```
 
+---
+
+## 2026-09-26 — filed form text (App Update ref 1d3acdf7-fdb1-4e03-8a62-e5016224b64a), replaced by round 9 on 2026-09-28
+
+Review feedback arrived 2026-09-28 (ticket #1197949): one finding with four sub-findings (repeated sign-in
+and OAuth after installation; authorize URL minted on gate mount; srcset candidate list; OAuth URL
+allowlist ports/credentials; hosted script URL validation). Engineering detail: compliance-record.md Round 9.
+
+### Version notes (Workspace publish dialog, 500 characters), as filed
+
+Version notes for the dialog — **this field is the 500-character one** (the form's notes field is 5000; do not swap
+them). Plain text, no angle brackets. The block below is 496 characters including the four pre-filled headings:
+
+```
+# New Features
+None.
+
+# Changes/Fixes
+Answers the 2026-09-17 review: workspace saved only on the user's click, no server default; no telemetry SDK; every request uses redirect mode error; uploads only to the exact create-asset URL; no unsafe-inline, style attributes blocked; cmsLocaleId on every CMS write, localized sites refused.
+
+# Improvements
+No MutationObserver in the bundle; release build pins the shipped inventory; v3 source maps for every file.
+
+# Resolution notes
+Detail in the form.
+```
+
+### Additional notes (form field, 5000 characters), as filed
+
+**Additional notes** (form limit 5000 characters; this is 4995). The form's WAF blocks angle brackets, key-equals-value pairs, DOM API names, `\u00a0` and `/*` — the block below avoids them, paste as is:
+
+```
+WHAT CHANGED (bundle v0.1.0, 09-26_12-24-24) - 1 to 6 answer the 2026-09-17 feedback; 7, 8 Preflight scans; 9 our 2026-09-25 audit
+
+1. Workspace state. The effect that posted the single workspace to /api/v1/beacon/active-workspace on sync completion is removed. A user with one workspace and none active sees it as a suggestion with an explicit "Use this workspace" control; the only request to that endpoint comes from that click or the multi-workspace picker. The server sets no default either: an extension session without a chosen workspace stays without one until the user confirms. Unit tests pin zero requests after sync, one after the click, no server fallback.
+
+2. Exception telemetry. The Marketplace build ships no telemetry SDK: the dependency sits behind a build-time release flag that is off for Marketplace bundles; the release build fails if it is on and verifies the zip has no trace of it (no analytics chunk, no telemetry host, no consent prompt). Settings and the privacy policy say so. Builds that enable telemetry run a unit-tested redaction handler on every event.
+
+3. Redirects. The single network call site (extension-egress.ts) runs every request with redirect mode set to error; callers cannot override it. No path needs a redirect: Tower answers directly and the presigned upload returns 2xx with no redirect.
+
+4. Upload allowlist. The create-asset adapter registers the exact uploadUrl Webflow returned as a one-shot permitted destination, only if it names the webflow-prod-assets bucket (host exactly webflow-prod-assets.s3.amazonaws.com, or host s3.amazonaws.com with first path segment webflow-prod-assets). The egress policy accepts an upload only for a granted URL and consumes the grant; every other bucket or host is refused before any request. connect-src names that bucket in both syntaxes, never the bare S3 host.
+
+5. CSP style directives. unsafe-inline is removed: style-src and style-src-elem allow self plus the hosted bundle host; style-src-attr is none. The UI styles through the CSSOM. The two style-attribute writes left are pinned by count and are Designer API calls styling the CMS Slots placeholder on the user's canvas, outside the extension's policy.
+
+6. Localization. Every CMS item write names its locale: the extension reads the site's locales once per session and sends the primary locale's cmsLocaleId on every write and on the matching staged read. Sites with secondary locales are refused before any request. The listing states this.
+
+7. DOM observers. The rich-text property editor is withdrawn behind a release flag like item 2. Rich-text properties are edited as HTML in a text box. The drag-and-drop library's re-measuring observer is removed by a dependency patch. The release build pins the observer identifier to zero across every shipped file.
+
+8. Browser storage and cookies. The session bearer is held in memory only; no storage call in the bundle is keyed by a credential name. Every request sets the cookie mode to omit at the single call site; the only credential on the wire is our Tower session bearer, sent only to tower.codalyn.app.
+
+UNCHANGED FROM 2026-09-15: one network call site with an explicit destination policy; canvas changes only through the Designer API on explicit user action; Tower with allowlist-only CORS, session-only auth, server-stored OAuth state, the Webflow ID token never forwarded; no plaintext-HTTP or insecure-websocket URLs, no HTML-injection sinks, popups, cross-window messaging, credentials in URLs or session replay; every shipped JS and CSS file has a private v3 source map; none names a map.
+
+9. Audit of 2026-09-25 against the guidelines. The canvas clear that ran on Designer mode and page changes is removed: every canvas write now follows a click. Install and rename toasts prompt to publish. The sign-in card names the free plan, that paid plans raise monthly limits, and links pricing. A dependency polyfill that assigned ArrayBuffer.prototype.slice is removed by patch; the build pins native prototype assignments to zero.
+
+PUBLISHED-RUNTIME TEST: one page-level script, registered with a SHA-256 integrityHash carried verbatim in the page tag with anonymous crossorigin; served unminified with a version-3 source map beside it. Every other script on the test page is Webflow's own site runtime; Beacon loads none. The Script integrity row is tool-side: the runner reads the tag at the file's first request, issued by the preload scanner before the parser inserts any script element after jQuery and webflow.js, so the attribute is never read; reproduced locally 3 of 3, also for Webflow's jQuery tag; the served tag and CDN CORS verify correct. The unreviewed rows are Webflow's site runtime on our asset's CDN host.
+
+BACKEND (Hybrid): https://tower.codalyn.app only, HTTPS, production; paths as filed on 2026-09-15; in-app policy and docs links are anchors on it. Other destination: the presigned upload URL in item 4. No telemetry host. Uninstall and AVIF disclosure unchanged.
+```

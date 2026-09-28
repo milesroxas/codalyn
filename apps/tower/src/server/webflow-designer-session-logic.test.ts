@@ -8,8 +8,36 @@ vi.mock("@/server/access/early-access", () => ({
   userMaySignIn: vi.fn(),
 }));
 vi.mock("@/server/access/early-access-feature", () => ({ isTowerEarlyAccessGateEnabled: () => false }));
+vi.mock("@/server/webflow-designer-identity", () => ({
+  bindWebflowUserToTowerUser: vi.fn(),
+  chooseBoundTowerUser: vi.fn(),
+  findInstallTimeAuthorizationUser: vi.fn(),
+  listTowerUsersBoundToWebflowUser: vi.fn(),
+  userHoldsAuthorizationForSite: vi.fn(),
+}));
 
-import { mustRevokeCredentialBeforeDesignerLink } from "@/server/webflow-designer-session-logic";
+import {
+  mustRevokeCredentialBeforeDesignerLink,
+  readDesignerExchangeIntent,
+} from "@/server/webflow-designer-session-logic";
+
+/**
+ * Review round 9 (2026-09-28): the extension's silent run only restores an associated account; older
+ * builds send no intent and keep the full sign-in behaviour, so absence never means "restore".
+ */
+describe("readDesignerExchangeIntent", () => {
+  it("restores only on the exact string", () => {
+    expect(readDesignerExchangeIntent("restore")).toBe("restore");
+  });
+
+  it("treats everything else — including no value — as the explicit sign-in", () => {
+    expect(readDesignerExchangeIntent("sign_in")).toBe("sign_in");
+    expect(readDesignerExchangeIntent(undefined)).toBe("sign_in");
+    expect(readDesignerExchangeIntent(null)).toBe("sign_in");
+    expect(readDesignerExchangeIntent("RESTORE")).toBe("sign_in");
+    expect(readDesignerExchangeIntent({ value: "restore" })).toBe("sign_in");
+  });
+});
 
 describe("mustRevokeCredentialBeforeDesignerLink (account pre-hijack guard)", () => {
   it("revokes a password minted on an account whose email was never verified", () => {

@@ -3,7 +3,10 @@ import { RateLimitError } from "@/server/security/rate-limit";
 import { assertWebflowDesignerExchangeIpRateLimit } from "@/server/security/webflow-designer-exchange-rate-limit";
 import { towerCorsHeadersFor } from "@/server/tower-cors";
 import { normalizeWebflowAppKey } from "@/server/webflow-app-registry";
-import { establishDesignerBetterAuthSession } from "@/server/webflow-designer-session-logic";
+import {
+  establishDesignerBetterAuthSession,
+  readDesignerExchangeIntent,
+} from "@/server/webflow-designer-session-logic";
 import { isWebflowSiteId } from "@/server/webflow-organization-sites";
 import {
   collectWebflowIdTokenResolveBearers,
@@ -66,9 +69,9 @@ export async function POST(request: Request) {
     return limited;
   }
 
-  let parsed: { idToken?: string; app?: string; siteId?: unknown };
+  let parsed: { idToken?: string; app?: string; siteId?: unknown; intent?: unknown };
   try {
-    parsed = (await request.json()) as { idToken?: string; app?: string; siteId?: unknown };
+    parsed = (await request.json()) as { idToken?: string; app?: string; siteId?: unknown; intent?: unknown };
   } catch {
     return jsonWithCors(request, { error: "invalid_json" }, { status: 400 });
   }
@@ -111,7 +114,11 @@ export async function POST(request: Request) {
     return jsonWithCors(request, hint ? { error, hint } : { error }, { status });
   }
 
-  const session = await establishDesignerBetterAuthSession(resolution.user);
+  // `restore` (the extension's silent run on load) signs in an account already associated with this
+  // Webflow user and creates or links nothing; `sign_in` (the user's click, and untagged legacy requests)
+  // may also link a same-e-mail account or create one.
+  const intent = readDesignerExchangeIntent(parsed.intent);
+  const session = await establishDesignerBetterAuthSession(resolution.user, { intent, siteId, app });
   if (!session.ok) {
     // Log the Webflow user id, not the email (PII stays out of function logs).
     console.warn(

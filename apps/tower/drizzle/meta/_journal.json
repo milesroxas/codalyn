@@ -267,6 +267,13 @@
       "when": 1789684256289,
       "tag": "0037_salty_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1790628863462,
+      "tag": "0038_webflow_token_authorizer",
+      "breakpoints": true
     }
   ]
 }

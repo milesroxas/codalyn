@@ -287,13 +287,19 @@ export function beaconPropApplyValueRuntimeSource(): string {
   return String(u).replace(/\\\\/g, "\\\\\\\\").replace(/"/g, '\\\\"');
 }
 `,
-    // Media-src gate: https absolute, protocol-relative `//host` (inherits the published page's https), or a
-    // scheme-less relative path. Any other explicit scheme (http:, data:, blob:, javascript:, …) → null and the
-    // value is not applied at all (no partial application). http: is rejected as a downgrade/interception risk
-    // (Marketplace round-6); the same control-character reduction as bSafeHref runs first.
+    // Media-src gate: exactly ONE URL — https absolute, protocol-relative `//host` (inherits the published
+    // page's https), or a scheme-less relative path. Any other explicit scheme (http:, data:, blob:,
+    // javascript:, …) → null and the value is not applied at all (no partial application). http: is rejected
+    // as a downgrade/interception risk (Marketplace round-6); the same control-character reduction as
+    // bSafeHref runs first. Whitespace or a trailing comma → null: a URL contains neither, and in a `srcset`
+    // they are the candidate separators — "https://a.example/a.png 1x, http://b.example/b.png 2x" passed the
+    // https prefix test yet carried an unchecked second URL (review round 9, 2026-09-28). What comes back is
+    // a single URL that is also a single srcset candidate, so every write below emits exactly the validated
+    // string, whichever attribute it lands in.
     `function bSafeSrc(v) {
   v = bStripCtl(String(v == null ? "" : v));
   if (!v) return null;
+  if (/\\s|,$/.test(v)) return null;
   if (/^https:\\/\\//i.test(v)) return v;
   if (v.indexOf("//") === 0) return v;
   if (/^[a-z][a-z0-9+.-]*:/i.test(v)) return null;

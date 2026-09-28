@@ -10,6 +10,7 @@ import {
   WEBFLOW_DATA_API_APP_KEY,
   type WebflowAppKey,
 } from "@/server/webflow-app-registry";
+import { listWebflowUserIdsBoundToTowerUser } from "@/server/webflow-designer-identity";
 import {
   resolveWebflowOAuthAppUrl,
   resolveWebflowOAuthRedirectUri,
@@ -43,6 +44,11 @@ function readSessionWebflowAuthorizedUserId(sessionUser: unknown): string | null
   }
   const raw = (sessionUser as { webflowAuthorizedUserId?: unknown }).webflowAuthorizedUserId;
   return typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
+}
+
+async function resolveSoleLinkedWebflowUserId(userId: string): Promise<string | null> {
+  const linked = await listWebflowUserIdsBoundToTowerUser(userId);
+  return linked.length === 1 ? (linked[0] ?? null) : null;
 }
 
 function buildWebflowAuthorizeUrl(state: string, app: WebflowAppKey = WEBFLOW_DATA_API_APP_KEY): string {
@@ -154,8 +160,11 @@ export async function POST(request: Request) {
   // The callback binds the exchanged token to the Webflow user who approves it (token/authorized_by)
   // and requires that to be the same Webflow user who minted this state. A Tower user with no Designer
   // identity cannot be bound, so they cannot start the Designer flow (the dashboard GET flow is
-  // session-cookie bound instead).
-  const minterWebflowUserId = readSessionWebflowAuthorizedUserId(session.user);
+  // session-cookie bound instead). The identity is the legacy user column, else the account's single
+  // linked Webflow user (an install-time link may live only in an `account` row); with several linked
+  // Webflow users and no column the approver cannot be predicted, so the Designer flow is refused.
+  const minterWebflowUserId =
+    readSessionWebflowAuthorizedUserId(session.user) ?? (await resolveSoleLinkedWebflowUserId(session.user.id));
   if (!minterWebflowUserId) {
     return Response.json({ error: "webflow_identity_required" }, { status: 403, headers: jsonHeaders });
   }

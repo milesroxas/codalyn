@@ -428,6 +428,86 @@ describe("beacon prop applyValue runtime", () => {
 });
 
 /**
+ * Review round 9 (2026-09-28): "a value such as `https://example.org/a.png 1x, http://example.net/b.png 2x`
+ * passes the initial HTTPS check and is assigned unchanged to a SOURCE element's srcset." The image gate now
+ * accepts exactly one URL: any whitespace (the srcset candidate separator) or a trailing comma refuses the
+ * whole value, so nothing is written to the img, the sources or a CSS background — no partial application.
+ */
+describe("beacon prop image runtime — srcset is a single validated candidate", () => {
+  const load = () =>
+    new Function(
+      `${beaconPropApplyValueRuntimeSource()}; return { applyValue, bSafeSrc, bApplyImageToContainer };`
+    )() as {
+      applyValue: (el: Element, v: string) => void;
+      bSafeSrc: (v: unknown) => string | null;
+      bApplyImageToContainer: (el: Element, v: string) => boolean;
+    };
+  const CANDIDATE_LIST = "https://example.org/a.png 1x, http://example.net/b.png 2x";
+
+  it("bSafeSrc refuses candidate lists, descriptors and trailing commas, keeps single URLs", () => {
+    const { bSafeSrc } = load();
+    expect(bSafeSrc(CANDIDATE_LIST)).toBeNull();
+    expect(bSafeSrc("https://example.org/a.png 2x")).toBeNull();
+    expect(bSafeSrc("https://example.org/a.png, https://example.org/b.png")).toBeNull();
+    expect(bSafeSrc("https://example.org/a.png,")).toBeNull();
+    expect(bSafeSrc("//cdn.example.com/a.png 1x")).toBeNull();
+    expect(bSafeSrc("/assets/a.png 1x")).toBeNull();
+    // Single URLs — a comma inside a path (image-transform style) is one candidate, not a separator.
+    expect(bSafeSrc("https://example.org/a.png")).toBe("https://example.org/a.png");
+    expect(bSafeSrc("https://example.org/w_300,h_200/a.png")).toBe("https://example.org/w_300,h_200/a.png");
+    expect(bSafeSrc("https://example.org/a.png?w=1&h=2")).toBe("https://example.org/a.png?w=1&h=2");
+    // Surrounding whitespace is trimmed by the control reduction; interior whitespace is a refusal.
+    expect(bSafeSrc("  https://example.org/a.png  ")).toBe("https://example.org/a.png");
+  });
+
+  it("applies nothing to a picture, its sources or its img for a candidate list", () => {
+    const { applyValue } = load();
+    const picture = document.createElement("picture");
+    const source = document.createElement("source");
+    source.setAttribute("srcset", "#codalyn-beacon-publish-placeholder");
+    const img = document.createElement("img");
+    img.setAttribute("src", "https://keep.example/orig.png");
+    picture.append(source, img);
+
+    applyValue(picture, CANDIDATE_LIST);
+    expect(source.getAttribute("srcset")).toBe("#codalyn-beacon-publish-placeholder");
+    expect(source.getAttribute("type")).toBeNull();
+    expect(img.getAttribute("src")).toBe("https://keep.example/orig.png");
+
+    // Binding the img directly (sources updated through the parent picture) — same refusal, same result.
+    applyValue(img, CANDIDATE_LIST);
+    expect(img.getAttribute("src")).toBe("https://keep.example/orig.png");
+    expect(source.getAttribute("srcset")).toBe("#codalyn-beacon-publish-placeholder");
+  });
+
+  it("writes exactly the validated single URL to every source srcset and the img src", () => {
+    const { applyValue } = load();
+    const url = "https://cdn.prod.website-files.com/site/asset_hero.webp";
+    const picture = document.createElement("picture");
+    const source = document.createElement("source");
+    const img = document.createElement("img");
+    picture.append(source, img);
+
+    applyValue(picture, url);
+    expect(source.getAttribute("srcset")).toBe(url);
+    expect(source.getAttribute("type")).toBe("image/webp");
+    expect(img.getAttribute("src")).toBe(url);
+  });
+
+  it("refuses a candidate list for a CSS background container too", () => {
+    const { bApplyImageToContainer } = load();
+    const div = document.createElement("div");
+    expect(bApplyImageToContainer(div, CANDIDATE_LIST)).toBe(false);
+    expect((div as HTMLElement).style.getPropertyValue("background-image")).toBe("");
+  });
+
+  it("ships the single-candidate gate in the generated page runtime", () => {
+    const s = getCmsSlotPageInlineScriptSource();
+    expect(s).toContain("if (/\\s|,$/.test(v)) return null;");
+  });
+});
+
+/**
  * Control-character scheme-obfuscation payloads. Browsers remove every C0 control character from a URL before
  * parsing its scheme, so each of these navigates as `javascript:` / `data:` / `vbscript:` even though the raw
  * string does not match a `^scheme:` test. Mirrors the corpus pinned against `isSafeRichTextUrl` in

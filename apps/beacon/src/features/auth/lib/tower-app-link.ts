@@ -77,10 +77,19 @@ export function towerConnectionPathForSite(siteId: string | null | undefined): s
   return id ? `/connection?siteId=${encodeURIComponent(id)}` : "/connection";
 }
 
+/** The exact origin and path of Webflow's OAuth consent screen — the only destination the consent link may open. */
+export const WEBFLOW_OAUTH_AUTHORIZE_ORIGIN = "https://webflow.com";
+export const WEBFLOW_OAUTH_AUTHORIZE_PATH = "/oauth/authorize";
+
 /**
  * The only destination the OAuth consent link may point at. Tower mints the authorize URL, but the
- * client still allowlists it (Marketplace OAuth guidance): a compromised or misconfigured response
- * must not be able to send the user anywhere but Webflow's consent screen.
+ * client still allowlists it (Marketplace guidelines, "Request handling": external redirects lead only
+ * to trusted domains you declare): a compromised or misconfigured response must not be able to send the
+ * user anywhere but Webflow's consent screen.
+ *
+ * Exact-origin match (`url.origin`, so a non-default port is a different origin and refused), the exact
+ * `/oauth/authorize` path (no trailing slash, no sub-path) and no URL credentials — `new URL()` drops
+ * `user:pass@` from `origin`, so `username` / `password` are checked on their own (review round 9).
  */
 export function isAllowedWebflowAuthorizeUrl(raw: string): boolean {
   let url: URL;
@@ -89,5 +98,10 @@ export function isAllowedWebflowAuthorizeUrl(raw: string): boolean {
   } catch {
     return false;
   }
-  return url.protocol === "https:" && url.hostname === "webflow.com" && url.pathname === "/oauth/authorize";
+  return (
+    url.origin === WEBFLOW_OAUTH_AUTHORIZE_ORIGIN &&
+    url.pathname === WEBFLOW_OAUTH_AUTHORIZE_PATH &&
+    url.username === "" &&
+    url.password === ""
+  );
 }

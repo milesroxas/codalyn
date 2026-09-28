@@ -1,0 +1,4 @@
+ALTER TABLE "organization_webflow_oauth_token" ADD COLUMN "webflow_authorized_user_id" text;--> statement-breakpoint
+ALTER TABLE "organization_webflow_oauth_token" ADD COLUMN "authorized_by_user_id" text;--> statement-breakpoint
+ALTER TABLE "organization_webflow_oauth_token" ADD CONSTRAINT "organization_webflow_oauth_token_authorized_by_user_id_user_id_fk" FOREIGN KEY ("authorized_by_user_id") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "organization_webflow_oauth_token_authorized_user_idx" ON "organization_webflow_oauth_token" USING btree ("webflow_authorized_user_id");

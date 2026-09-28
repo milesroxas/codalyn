@@ -21,6 +21,7 @@ import {
 import { extensionFetch, grantWebflowAssetUpload, isWebflowAssetUploadUrlShape } from "@/shared/lib/extension-egress";
 import { readStringLikeValue } from "@/shared/lib/read-string-like-value";
 import { getTowerOrigin, towerFetchWithRetry } from "@/shared/lib/tower-client";
+import { isWebflowHostedAssetUrl, readWebflowHostedAssetUrl } from "@/shared/lib/webflow-hosted-asset-url";
 
 /**
  * Legacy page-entry markers. Builds before 2026-09-26 applied the runtime with two `data-*` `attributes`, which Webflow
@@ -585,24 +586,6 @@ function sourceMapTrailerLine(mapUrl: string): string {
   return SOURCE_MAP_PRAGMA_HALVES.concat(mapUrl).join("");
 }
 
-/** Webflow-hosted asset URL (`https://cdn.prod.website-files.com/…`): absolute HTTPS on a Webflow asset host, no whitespace. */
-function isWebflowHostedAssetUrl(raw: string): boolean {
-  if (/\s/.test(raw)) {
-    return false;
-  }
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return false;
-  }
-  if (url.protocol !== "https:" || url.username !== "" || url.password !== "") {
-    return false;
-  }
-  const host = url.hostname;
-  return host === "website-files.com" || host.endsWith(".website-files.com") || host.endsWith(".webflow.com");
-}
-
 /**
  * Appends the source-map pointer as the runtime's last line. Nothing follows it — no trailing newline — so the served
  * bytes end with the map URL and a consumer that trims the body before hashing still reproduces the registered SRI.
@@ -696,6 +679,11 @@ async function registerHostedScript(
   version: string,
   displayName: string
 ): Promise<{ id: string; version: string }> {
+  // Boundary: the registered location is what every visitor's browser will load. Only a Webflow-hosted
+  // HTTPS asset URL (no credentials, no non-default port) may be registered, whatever produced it.
+  if (!isWebflowHostedAssetUrl(hostedLocation)) {
+    throw new Error("Register hosted script: hosted location is not a Webflow-hosted HTTPS asset URL.");
+  }
   const res = await towerFetchWithRetry(
     `/api/v2/webflow/sites/${encodeURIComponent(siteId)}/registered_scripts/hosted`,
     {
@@ -732,9 +720,13 @@ async function createAndUploadSiteAsset(
     throw new Error("Create runtime asset: missing upload payload.");
   }
   await uploadRuntimeAsset(uploadUrl, uploadDetails, content, fileName, blobType);
-  const hostedLocation = asset.hostedUrl ?? asset.assetUrl;
-  if (typeof hostedLocation !== "string" || hostedLocation.length === 0) {
-    throw new Error("Create runtime asset: missing hosted URL.");
+  // Boundary: the hosted location Webflow reports (`hostedUrl`, or the reference's `assetUrl` name) must be
+  // an HTTPS URL on a Webflow asset origin with no credentials and no non-default port before anything is
+  // registered from it or written into the runtime's source-map trailer (review round 9). A malformed value
+  // fails the sync here rather than being registered as is.
+  const hostedLocation = readWebflowHostedAssetUrl(asset.hostedUrl ?? asset.assetUrl);
+  if (hostedLocation == null) {
+    throw new Error("Create runtime asset: hosted URL is not a Webflow-hosted HTTPS asset URL.");
   }
   return hostedLocation;
 }

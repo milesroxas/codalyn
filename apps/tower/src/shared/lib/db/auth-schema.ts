@@ -278,13 +278,26 @@ export const organizationWebflowOAuthToken = pgTable(
     refreshToken: text("refresh_token"),
     expiresAt: timestamp("expires_at"),
     scope: text("scope"),
+    /**
+     * Webflow `authorized_user` id of the Webflow user who approved this token (`GET /v2/token/authorized_by`,
+     * scope `authorized_user:read`). Written by the OAuth callback; filled in lazily for rows that predate the
+     * column. This is the install-time authorization's identity: the Designer ID-token exchange lands that
+     * Webflow user in the Tower account that completed the install instead of matching e-mail addresses
+     * (Marketplace review round 9, 2026-09-28).
+     */
+    webflowAuthorizedUserId: text("webflow_authorized_user_id"),
+    /** Tower user whose session completed the OAuth (the install-time account). Null for legacy rows. */
+    authorizedByUserId: text("authorized_by_user_id").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [primaryKey({ columns: [table.organizationId, table.appKey] })]
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.appKey] }),
+    index("organization_webflow_oauth_token_authorized_user_idx").on(table.webflowAuthorizedUserId),
+  ]
 );
 
 /**

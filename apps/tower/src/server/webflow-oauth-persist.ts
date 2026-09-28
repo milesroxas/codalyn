@@ -11,10 +11,21 @@ import { organizationWebflowOAuthToken } from "@/shared/lib/db/auth-schema";
  * Matches the Data Client flow: exchange `code` for tokens, store in your app DB — never ship the access token to the client.
  * @see https://developers.webflow.com/apps/docs/data-clients/build-a-data-client#oauth-authentication
  */
+/**
+ * Who authorized the token: the approving Webflow user (`GET /v2/token/authorized_by`) and the Tower
+ * account whose session completed the OAuth. Recorded so the Designer ID-token exchange can land the
+ * approving Webflow user in that account (review round 9). Unknown values are stored as null, never guessed.
+ */
+export type WebflowOAuthTokenIdentity = {
+  webflowAuthorizedUserId: string | null;
+  authorizedByUserId: string | null;
+};
+
 export async function persistOrganizationWebflowOAuthToken(
   organizationId: string,
   tokenResponse: WebflowOAuthTokenResponse,
-  appKey: WebflowAppKey = WEBFLOW_DATA_API_APP_KEY
+  appKey: WebflowAppKey = WEBFLOW_DATA_API_APP_KEY,
+  identity: WebflowOAuthTokenIdentity = { webflowAuthorizedUserId: null, authorizedByUserId: null }
 ): Promise<void> {
   const expiresIn = tokenResponse.expires_in;
   const expiresAt =
@@ -22,6 +33,8 @@ export async function persistOrganizationWebflowOAuthToken(
 
   const accessToken = encryptStoredSecret(tokenResponse.access_token);
   const refreshToken = tokenResponse.refresh_token ? encryptStoredSecret(tokenResponse.refresh_token) : null;
+  const webflowAuthorizedUserId = identity.webflowAuthorizedUserId?.trim() || null;
+  const authorizedByUserId = identity.authorizedByUserId?.trim() || null;
 
   await db
     .insert(organizationWebflowOAuthToken)
@@ -32,6 +45,8 @@ export async function persistOrganizationWebflowOAuthToken(
       refreshToken,
       expiresAt,
       scope: tokenResponse.scope ?? null,
+      webflowAuthorizedUserId,
+      authorizedByUserId,
     })
     .onConflictDoUpdate({
       target: [organizationWebflowOAuthToken.organizationId, organizationWebflowOAuthToken.appKey],
@@ -40,6 +55,9 @@ export async function persistOrganizationWebflowOAuthToken(
         refreshToken,
         expiresAt,
         scope: tokenResponse.scope ?? null,
+        // A reconnect is a new authorization: its approver replaces the old one (null when unknown).
+        webflowAuthorizedUserId,
+        authorizedByUserId,
         updatedAt: new Date(),
       },
     });

@@ -12,8 +12,9 @@ const readyLink = {
 };
 
 /**
- * Body of the site-authorization gate. The consent screen is an ordinary new-tab link (the extension
- * opens no windows), so the primary action changes with the authorize-URL mint state.
+ * Body of the site-authorization gate: a new authorization for the current site, asked for explicitly.
+ * Nothing is minted on mount — "Connect site in Webflow" mints the authorize URL on the click, and the
+ * consent screen is then an ordinary new-tab link (the extension opens no windows).
  */
 const meta = {
   title: "Auth/WebflowAuthorizeGateView",
@@ -28,9 +29,9 @@ const meta = {
   ],
   args: {
     siteLabel: "Acme Marketing",
-    state: { kind: "ready", url: readyLink.href, mintedAt: 0 },
-    linkProps: readyLink,
-    onRetry: fn(),
+    state: { kind: "idle" },
+    linkProps: null,
+    onConnect: fn(),
     onSignOut: fn(),
   },
 } satisfies Meta<typeof WebflowAuthorizeGateView>;
@@ -38,22 +39,27 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Authorize URL minted: the primary action is a link to Webflow's consent screen. */
-export const Ready: Story = {};
+/** Initial state: the explicit Connect action; no Tower request has been made. */
+export const Idle: Story = {};
 
-/** Minting the authorize URL from Tower — disabled, busy primary action. */
-export const Minting: Story = {
-  args: { state: { kind: "minting" }, linkProps: null },
+/** Minting the authorize URL from Tower after the click — disabled, busy primary action. */
+export const Preparing: Story = {
+  args: { state: { kind: "preparing" } },
+};
+
+/** Authorize URL minted: the primary action is a link to Webflow's consent screen. */
+export const Ready: Story = {
+  args: { state: { kind: "ready", url: readyLink.href, preparedAt: 0 }, linkProps: readyLink },
 };
 
 /** Tower declined (workspace-admin required): actionable message plus "Try again". */
 export const ErrorTeamAdminRequired: Story = {
-  args: { state: { kind: "error", error: "team_admin_required" }, linkProps: null },
+  args: { state: { kind: "error", error: "team_admin_required" } },
 };
 
 /** Tower unreachable: generic retry path. */
 export const ErrorTowerUnreachable: Story = {
-  args: { state: { kind: "error", error: "tower_unreachable" }, linkProps: null },
+  args: { state: { kind: "error", error: "tower_unreachable" } },
 };
 
 /**
@@ -62,5 +68,5 @@ export const ErrorTowerUnreachable: Story = {
  * between the two.
  */
 export const ErrorNoActiveWorkspace: Story = {
-  args: { state: { kind: "error", error: "no_active_workspace" }, linkProps: null },
+  args: { state: { kind: "error", error: "no_active_workspace" } },
 };

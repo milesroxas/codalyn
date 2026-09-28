@@ -37,7 +37,12 @@ pnpm app tower db:migrate:prod    # TOWER_NEON_BRANCH_PROD + NEON_*; requires `-
 pnpm app tower db:migrate:dev:vercel     # Vercel Preview DATABASE_URL only (ignores TOWER_*)
 pnpm app tower db:migrate:preview:vercel # same as dev:vercel
 pnpm app tower db:migrate:prod:vercel    # Vercel Production DATABASE_URL; requires `-- --confirm`
+pnpm app tower db:migrate:status:prod    # read-only applied/pending report, no --confirm (also :local / :dev / :preview / :prod:vercel)
 ```
+
+### Deploy order for schema changes
+
+Production deploys from CI on every green push to `main` (`deploy-tower` job in `.github/workflows/ci.yml`; Vercel's git auto-deploy is off so only CI-green code ships). Nothing in that pipeline runs migrations. For a commit that adds a migration: apply it to production first (`db:migrate:prod -- --confirm`), confirm with `db:migrate:status:prod`, then push. Keep migrations additive so the still-running deployment survives the window. See the "Tower Deploy & Migration Rule" in the root `CLAUDE.md`.
 
 Copy `.env.example` to `.env.local` and fill values before `pnpm build` or `db:push`.
 

@@ -4043,7 +4043,8 @@ republish) · Runtime ✓ (pin + observe exit 0 post-migration) · **Submitted �
 
 Feedback email on App Update `1d3acdf7-fdb1-4e03-8a62-e5016224b64a` (bundle
 `v0.1.0_public_09-26_12-24-24.zip`, `29f1087c…4142`), ticket #1197949, received 2026-09-28 15:19; the
-message is saved beside this file as `Ticket #1197949 Re Your Webflow Marketplace App submission.pdf`.
+message lives in the ticket #1197949 email thread (a PDF of it was committed in `748e2f20` and removed the same
+evening; it carried the reviewer's and Miles's e-mail addresses and nothing the record above does not quote).
 One headline finding with four sub-findings, each with a file:line in the submitted source maps, none with
 an ID or priority → all `unassigned` = P1 (skill rule). The two "screenshot" links resolve to the same
 Loom image: Tower's **Webflow connection** page for the workspace "Webflow Marketplace Team", signed in as
@@ -4209,16 +4210,31 @@ uploaded bytes is unchanged. `webflow-hosted-asset-url.test.ts` (17).
   never match and the e-mail rule decided. That is the finding.
 - SUBMIT.md's round-8 claim that the silent exchange had "never been raised in nine rounds" is history, not
   guidance; the runbook is rewritten for this round.
+- The R8.11 memory note and SUBMIT.md Step 1 (first draft, 09-28) said Tower production is deployed by hand
+  with `vercel deploy --prod`. Wrong since 2026-08-04: the CI job `deploy-tower` deploys every green push to
+  `main` (it ran on the 09-26 and 09-28 pushes); Vercel's git auto-deploy is off only so that CI gates the
+  deploy. Migrations are the part that is manual. Corrected in SUBMIT.md Step 1, the `tower-vercel-deploy`
+  memory and a new CLAUDE.md rule ("Tower Deploy & Migration Rule").
+
+### Deploy order — recorded 2026-09-28 evening (near miss, no outage)
+
+`748e2f20` (this round, including migration 0038) was pushed at 17:12 EDT on the belief that the push runs the
+migration. It does not. Miles applied 0038 by hand while the CI `verify` job was still running, so the
+`deploy-tower` job that follows it deploys onto a migrated database. Had the deploy landed first, the only
+code touching the new columns — `POST /api/auth/webflow-designer` (identity lookup) and the OAuth callback
+(persist) — would have failed on every Beacon open with a missing-column error, while the Data API proxy
+(`webflow-proxy-token.ts`, explicit column selects) would have kept working. Rule from now on: migrate →
+`db:migrate:status:prod` (read-only, added this evening) → push.
 
 ### Artifact
 
-No submission artifact yet — Tower must be deployed and migrated first (SUBMIT.md Step 1), then Step 3 builds
-the Marketplace pair. Gate check: `CI=true pnpm --filter beacon build:prod` (internal lane) →
+No submission artifact yet — Tower deploy (CI, from the 21:12Z push) and migration 0038 come first (SUBMIT.md
+Step 1), then Step 3 builds the Marketplace pair. Gate check: `CI=true pnpm --filter beacon build:prod` (internal lane) →
 `bundle/production/internal/v0.1.0_internal_09-28_17-00-33.zip` — lint, typecheck, 1208/1208 tests, Vite and
 every release pin green. Zip greps (same pins as R8.22): `window.open(` 0 · `MutationObserver` 0 ·
 `postMessage(` 0 · `sourceMappingURL` 0 · `http://` only the W3C namespace literals React needs (R6.6) · `ws://` 0 · posthog 0 · sentry 0 · localhost 0 ·
 bare `fetch(` 1 (the Tower call); the new strings ("Connect site in Webflow", `no_tower_account`,
 `"restore"`) are present; the runtime gate line is in the bundle.
 
-**States.** Source ✓ (uncommitted) · Artifact ✗ (internal gate build only) · Tower ✗ **NOT deployed;
-migration 0038 NOT applied** · Installed ✗ · Runtime ✗ (changes; re-push required) · Submitted ✗ · Accepted ✗.
+**States.** Source ✓ (committed `748e2f20`, pushed 2026-09-28 21:12Z) · Artifact ✗ (internal gate build only) ·
+Tower: migration 0038 applied by Miles 09-28 ahead of the deploy — verified read-only 21:23Z, `db:migrate:status:prod:vercel` → 39/39 applied; deploy = CI run 36484535449 `deploy-tower` success 21:27:49Z (deployment `codalyn-tower-mp1v74bjs`, aliased to codalyn.app / tower.codalyn.app; `/api/health` → `{"ok":true,"service":"tower"}` at 21:27:54Z) · Installed ✗ · Runtime ✗ (changes; re-push required) · Submitted ✗ · Accepted ✗.

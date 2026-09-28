@@ -15,6 +15,7 @@ Schema source: `src/shared/lib/db/auth-schema.ts`. Generated artifacts in this f
 | `pnpm db:migrate:*:vercel` | **`vercel env pull`** only — ignores local `TOWER_*` overrides. Requires linked `apps/tower/.vercel`. |
 | `pnpm db:push` | **Dev-only** shortcut: sync schema to DB **without** new migration files. Fast iteration; do not rely on this alone for releases. |
 | `pnpm db:check` | Validates migration files against snapshots (good for CI). |
+| `pnpm db:migrate:status:local` / `:dev` / `:preview` / `:prod` (+ `:prod:vercel`) | **Read-only** applied/pending report from `drizzle.__drizzle_migrations`; no `--confirm` needed; exit 0 = nothing pending, 2 = pending. Run it against prod before and after a release that carries a migration. |
 | `pnpm db:beacon-preset-storage-migrate:local` | One-time JSON cleanup for legacy Beacon preset keys in `beacon_app_settings.payload` and `organization.beacon_team_settings`. Add `--dry-run` to preview. |
 | `pnpm db:beacon-preset-storage-migrate:dev` / `:prod` | Same data migration against remote DB (Neon / Vercel env variants mirror `db:migrate`). |
 | `pnpm db:studio` | Opens Drizzle Studio against `DATABASE_URL`. |
@@ -46,7 +47,7 @@ Preview/production do **not** use these scripts. There, set `TOWER_PRODUCT_ADMIN
 3. `pnpm db:check` — validates journal ↔ SQL alignment, snapshot chain, and runs `drizzle-kit check`. **Required before opening a PR** when schema or migration files changed.
 4. Locally: `pnpm db:migrate:local`, or `pnpm db:migrate` with `DATABASE_URL` set, or `pnpm db:push` (push skips migration history).
 5. Remote: `pnpm db:migrate:dev` / `pnpm db:migrate:preview` / `pnpm db:migrate:prod` (Neon or Vercel variants) — see `.env.example` keys under **db:migrate**.
-6. Deploy / CI: `pnpm db:migrate` with `DATABASE_URL` before or with app startup.
+6. Deploy: **nothing runs migrations automatically** — not CI, not the Vercel build, not `vercel deploy`. A push to `main` deploys Tower from CI, so apply the migration to production (`pnpm db:migrate:prod -- --confirm`) and confirm with `pnpm db:migrate:status:prod` **before** pushing the commit that reads the new schema. Keep migrations additive so the still-running deployment survives the window (root `CLAUDE.md`, "Tower Deploy & Migration Rule").
 
 ## Journal integrity (agents and reviewers)
 

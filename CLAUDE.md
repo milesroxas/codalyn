@@ -110,6 +110,20 @@ PR checklist:
 
 - [ ] Any new build path names its purpose; nothing writes to `public/` except a Marketplace submission build.
 
+## Tower Deploy & Migration Rule
+
+A push to `main` **is** the Tower production deploy: the CI job `deploy-tower` (`.github/workflows/ci.yml`) runs `vercel deploy --prod` after `verify` is green. Vercel's git auto-deploy for `main` is off on purpose so only CI-green code ships; a manual `vercel deploy --prod --yes` from the repo root is the fallback, not the normal path.
+
+Nothing runs database migrations: not CI, not the Vercel build, not `vercel deploy`. A commit that adds `apps/tower/drizzle/*.sql` is only safe to push after the migration is applied to production.
+
+- Order for a schema change: apply the migration (`pnpm --filter tower db:migrate:prod -- --confirm`), confirm nothing is pending (`pnpm --filter tower db:migrate:status:prod`, read-only), then `git push`.
+- Write migrations additively (nullable columns, new tables). Drop or rename in a later commit, after the code that read the old shape is deployed, so the still-running deployment survives the window.
+- When a review-remediation runbook says "deploy Tower", it means: migrate, then push; then check the CI run's `deploy-tower` job and `https://tower.codalyn.app/api/health`.
+
+PR checklist:
+
+- [ ] A migration in this change was applied to production before the push (or the change is behind a flag that tolerates the missing schema).
+
 ## Reference Docs
 
 - [Agent Teams guide](docs/agent-teams.md) — how to spin up effective Claude Code agent teams (enable flag, teams vs subagents, spawn templates, monorepo patterns).

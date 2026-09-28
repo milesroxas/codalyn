@@ -151,7 +151,9 @@ one that can honestly go.
    `https://cdn.prod.website-files.com/<upload id>/`, not the document origin, so a CSP regression
    only shows up installed (R7b.15: blank panel; `serve`, tests and the A4 greps all passed).
    Reviewer credentials still valid; demo data present; Tower backend live for the whole review
-   window (10–15 business days).
+   window (10–15 business days). A Tower change ships by pushing `main` (CI `deploy-tower`, ~15 min);
+   a migration in that change is applied to production by hand **before** the push and confirmed with
+   `pnpm --filter tower db:migrate:status:prod` (root `CLAUDE.md`, "Tower Deploy & Migration Rule").
 2. **App Review Preflight** Designer Extension (install link in
    `.cursor/skills/webflow-app-preflight/README-START-HERE.md`) — run it on the **same** bundle zip
    **and** the **same** `.sourcemaps.zip`. Zero blockers → copy the `wfpre_…` receipt.

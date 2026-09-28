@@ -193,7 +193,8 @@ Apply with your usual process (see [README.md](../README.md#scripts)):
 
 ```bash
 pnpm app tower db:migrate:local
-pnpm app tower db:migrate:prod   # or dev / vercel variants
+pnpm app tower db:migrate:prod -- --confirm   # or dev / preview / :vercel variants; run BEFORE pushing the commit (CI deploys main, never migrates)
+pnpm app tower db:migrate:status:prod         # read-only: confirm nothing is pending
 ```
 
 ## Local development

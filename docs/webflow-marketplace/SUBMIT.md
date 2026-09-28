@@ -2,7 +2,8 @@
 
 > **2026-09-28 — feedback on the 09-26 filing (ref `1d3acdf7-fdb1-4e03-8a62-e5016224b64a`).** One finding with
 > four sub-findings, all fixed in code (compliance-record.md Round 9, R9.1–R9.5). The main one is server-side:
-> **Tower must be deployed and migration 0038 applied before anything is installed or tested (Step 1).** The
+> **Tower must be deployed and migration 0038 applied before anything is installed or tested (Step 1 — migration
+> applied and code pushed 09-28; confirm the CI deploy before Step 4).** The
 > published-site runtime changed (R9.3), so the test site needs a **forced Sync + publish** this round (Step 4)
 > and new Preflight runtime values (Step 5). No submission artifact exists yet — Step 3 builds it.
 >
@@ -29,29 +30,44 @@ page entry) is unchanged and still pinned by the release build.
 
 ## Do these in order
 
-### Step 1 — Deploy Tower and apply migration 0038 (finding 1 is server-side)
+### Step 1 — Migrate, then push: a push to `main` is the Tower deploy (finding 1 is server-side)
 
-From the repo root, signed in to the Vercel account that owns `codalyn-tower`:
+`git push` of `main` **is** the production deploy: the CI job `deploy-tower` runs `vercel deploy --prod` after
+`verify` is green (about 15 minutes; Vercel's own git auto-deploy is off so only CI-green code ships). Nothing
+in that pipeline runs migrations — not CI, not the Vercel build. So the order is migration first, push second:
 
 ```bash
 pnpm --filter tower db:migrate:prod -- --confirm   # applies 0038_webflow_token_authorizer (two nullable columns + index + FK on organization_webflow_oauth_token)
-vercel deploy --prod --yes
+pnpm --filter tower db:migrate:status:prod         # read-only: must report 39/39 applied, exit 0
+git push origin main                               # CI: verify → deploy-tower
 ```
 
-Order: migration first (the new code reads the columns; the old code ignores them, so the migration is safe
-ahead of the deploy). Verify after deploy: `curl -s https://tower.codalyn.app/api/health` answers, and
-`pnpm --filter tower db:migrate:prod -- --confirm` run again reports nothing pending.
+The migration is additive, so it is safe ahead of the deploy (the old code ignores the columns). The reverse
+order is not safe: the new `POST /api/auth/webflow-designer` and the OAuth callback read and write the new
+columns, so a deploy that lands before the migration fails every Beacon open with a column error (the Data API
+proxy reads select explicit columns and would keep working).
+
+**State 2026-09-28:** commit `748e2f20` (all of round 9) pushed 17:12 EDT; migration 0038 applied by Miles by
+hand while CI `verify` was still running (the push had been made on the belief that it runs migrations — it
+does not; rule now in CLAUDE.md); `pnpm --filter tower db:migrate:status:prod:vercel` at 21:23Z → **39/39 applied**.
+CI run 36484535449 `deploy-tower`: success 21:27:49Z (deployment `codalyn-tower-mp1v74bjs`, aliased to codalyn.app / tower.codalyn.app; `/api/health` → `{"ok":true,"service":"tower"}` at 21:27:54Z). Step 1 is complete; the three checks below were run at 21:28Z and passed.
+
+Verify before Step 4: `gh run view 36484535449` shows `deploy-tower: success`;
+`curl -s https://tower.codalyn.app/api/health` answers `{"ok":true,"service":"tower"}`;
+`pnpm --filter tower db:migrate:status:prod` reports nothing pending. Manual fallback only if CI is red:
+`vercel deploy --prod --yes` from the repo root.
 
 The installed 09-26 bundle keeps working against the new Tower (untagged exchange requests are treated as
 the full sign-in), so the deploy can go out before the new bundle is installed.
 
 ### Step 2 — Commit
 
-All of round 9 is uncommitted at the time of writing: the Tower files in the table above with their tests,
-`drizzle/0038_webflow_token_authorizer.sql` + `drizzle/meta/_journal.json` + `drizzle/meta/0038_snapshot.json`,
+Done for round 9: `748e2f20` (2026-09-28 17:12 EDT) holds the Tower files in the table above with their
+tests, `drizzle/0038_webflow_token_authorizer.sql` + `drizzle/meta/_journal.json` + `drizzle/meta/0038_snapshot.json`,
 the Beacon files in the table with their tests and stories, `docs/webflow-marketplace/compliance-record.md`
-(Round 9), this file, `history/responses.md`, and the saved review email PDF. Commit before building, so the
-artifact hash maps to a commit.
+(Round 9), this file and `history/responses.md`. (The review email PDF committed there was removed the same
+evening — the thread lives in ticket #1197949; nothing from it belongs in the repo.) Any further source change gets
+its own commit before Step 3, so the artifact hash maps to a commit.
 
 ### Step 3 — Build the Marketplace artifact
 

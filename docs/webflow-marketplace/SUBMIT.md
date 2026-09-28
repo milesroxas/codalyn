@@ -47,7 +47,7 @@ order is not safe: the new `POST /api/auth/webflow-designer` and the OAuth callb
 columns, so a deploy that lands before the migration fails every Beacon open with a column error (the Data API
 proxy reads select explicit columns and would keep working).
 
-**State 2026-09-28:** commit `748e2f20` (all of round 9) pushed 17:12 EDT; migration 0038 applied by Miles by
+**State 2026-09-28:** commit `7db30cd9` (all of round 9) pushed 17:12 EDT; migration 0038 applied by Miles by
 hand while CI `verify` was still running (the push had been made on the belief that it runs migrations — it
 does not; rule now in CLAUDE.md); `pnpm --filter tower db:migrate:status:prod:vercel` at 21:23Z → **39/39 applied**.
 CI run 36484535449 `deploy-tower`: success 21:27:49Z (deployment `codalyn-tower-mp1v74bjs`, aliased to codalyn.app / tower.codalyn.app; `/api/health` → `{"ok":true,"service":"tower"}` at 21:27:54Z). Step 1 is complete; the three checks below were run at 21:28Z and passed.
@@ -62,7 +62,7 @@ the full sign-in), so the deploy can go out before the new bundle is installed.
 
 ### Step 2 — Commit
 
-Done for round 9: `748e2f20` (2026-09-28 17:12 EDT) holds the Tower files in the table above with their
+Done for round 9: `7db30cd9` (2026-09-28 17:12 EDT) holds the Tower files in the table above with their
 tests, `drizzle/0038_webflow_token_authorizer.sql` + `drizzle/meta/_journal.json` + `drizzle/meta/0038_snapshot.json`,
 the Beacon files in the table with their tests and stories, `docs/webflow-marketplace/compliance-record.md`
 (Round 9), this file and `history/responses.md`. (The review email PDF committed there was removed the same

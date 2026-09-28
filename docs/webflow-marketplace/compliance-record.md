@@ -4043,8 +4043,10 @@ republish) · Runtime ✓ (pin + observe exit 0 post-migration) · **Submitted �
 
 Feedback email on App Update `1d3acdf7-fdb1-4e03-8a62-e5016224b64a` (bundle
 `v0.1.0_public_09-26_12-24-24.zip`, `29f1087c…4142`), ticket #1197949, received 2026-09-28 15:19; the
-message lives in the ticket #1197949 email thread (a PDF of it was committed in `748e2f20` and removed the same
-evening; it carried the reviewer's and Miles's e-mail addresses and nothing the record above does not quote).
+message lives in the ticket #1197949 email thread (a PDF of it was committed with the round-9 commit and purged
+from history the same evening — `main` rewritten with `git filter-branch` and force-pushed at 22:44Z, the round-9
+commit `748e2f20` became `7db30cd9` and the docs commit `8aa41e29` became `229ac2f9`; it carried the reviewer's
+and Miles's e-mail addresses and nothing the record above does not quote).
 One headline finding with four sub-findings, each with a file:line in the submitted source maps, none with
 an ID or priority → all `unassigned` = P1 (skill rule). The two "screenshot" links resolve to the same
 Loom image: Tower's **Webflow connection** page for the workspace "Webflow Marketplace Team", signed in as
@@ -4218,7 +4220,7 @@ uploaded bytes is unchanged. `webflow-hosted-asset-url.test.ts` (17).
 
 ### Deploy order — recorded 2026-09-28 evening (near miss, no outage)
 
-`748e2f20` (this round, including migration 0038) was pushed at 17:12 EDT on the belief that the push runs the
+`7db30cd9` (this round, including migration 0038) was pushed at 17:12 EDT on the belief that the push runs the
 migration. It does not. Miles applied 0038 by hand while the CI `verify` job was still running, so the
 `deploy-tower` job that follows it deploys onto a migrated database. Had the deploy landed first, the only
 code touching the new columns — `POST /api/auth/webflow-designer` (identity lookup) and the OAuth callback
@@ -4236,5 +4238,5 @@ every release pin green. Zip greps (same pins as R8.22): `window.open(` 0 · `Mu
 bare `fetch(` 1 (the Tower call); the new strings ("Connect site in Webflow", `no_tower_account`,
 `"restore"`) are present; the runtime gate line is in the bundle.
 
-**States.** Source ✓ (committed `748e2f20`, pushed 2026-09-28 21:12Z) · Artifact ✗ (internal gate build only) ·
+**States.** Source ✓ (committed `7db30cd9`, pushed 2026-09-28 21:12Z) · Artifact ✗ (internal gate build only) ·
 Tower: migration 0038 applied by Miles 09-28 ahead of the deploy — verified read-only 21:23Z, `db:migrate:status:prod:vercel` → 39/39 applied; deploy = CI run 36484535449 `deploy-tower` success 21:27:49Z (deployment `codalyn-tower-mp1v74bjs`, aliased to codalyn.app / tower.codalyn.app; `/api/health` → `{"ok":true,"service":"tower"}` at 21:27:54Z) · Installed ✗ · Runtime ✗ (changes; re-push required) · Submitted ✗ · Accepted ✗.

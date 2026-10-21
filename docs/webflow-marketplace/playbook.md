@@ -16,7 +16,7 @@ carries the rules the vendored pair cannot know (see `.claude/skills/LOCAL-RULES
 Both are markdown instruction sets, not scripts. Invoke with `/webflow-app-preflight` or
 `/webflow-app-review-remediation` in Claude Code (or just describe the task — they auto-trigger on
 Marketplace work). In Cursor, name the skill in the prompt. Skill source + version:
-`.cursor/skills/*/PROVENANCE.txt` (packaged 2026-08-12 rev b).
+`.cursor/skills/PROVENANCE.txt` (packaged 2026-10-16, Preflight ruleset 1.7.0).
 
 Running log of every round, finding and fix: [compliance-record.md](compliance-record.md).
 **What to paste into the form (current round): [SUBMIT.md](SUBMIT.md).** Earlier pasted responses: [history/responses.md](history/responses.md).

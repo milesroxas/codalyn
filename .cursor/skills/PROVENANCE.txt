@@ -1,32 +1,37 @@
 Webflow App developer skills — webflow-app-preflight + webflow-app-review-remediation
 
-Packaged:        2026-09-16 (development-build evidence: no false residue flags)
-Source commit:   d453c2b462e86ae9ba1d7705d5aff77c0119cea0
-Linear issue:    CRE-2020
+Packaged:        2026-10-16 (App Review Preflight ruleset 1.7.0: docs-aligned labels + syntax-tree confirmation)
+Source commit:   34bc5b21665b3b5f8bc96358bcdc56ec0d244a72
+Change record:   create-something-monorepo PR #1947; webflow-app-preflight PRs #23, #24;
+                 submission form PRs #22, #26, #27, #28, #29 (wf-app-form-cloud);
+                 developer docs openapi-internal PR #1044
 Contents:        2 skill directories + README-START-HERE.md (toolkit overview)
 
-This revision stops treating three production-build facts as development
-residue: a react-router 7.x source-map path under dist/development (the
-package routes every consumer there; its production folder differs by one
-warnings flag), a http://localhost literal in a library URL fallback or an
-app's own hostname blocklist, and the telemetry.global block that Webflow CLI
-2.3.0 and earlier write into webflow.json. A development-build finding now
-needs a marker that differs between the dependency's development and
-production output. The telemetry block is packaging hygiene: strip it or
-upgrade the CLI.
+This revision aligns both skills with Preflight ruleset 1.7.0 and the live
+submission form.
 
-The token and scope authority classification from the 2026-08-27 revision is
-unchanged.
+- Every Preflight finding is labeled on two axes: the published guideline
+  sets the weight (a MUST is a Blocker or Required update, a recommended
+  practice is a Suggested update) and match confidence decides whether it
+  gates. Only a certain match produces changes_required; a probable match
+  goes to Manual review (needs_review); a hint stays a suggestion.
+- A syntax-tree pass confirms context the pattern match cannot see: whether
+  window.open, a Designer write call, or getUserMedia runs at load or inside
+  a click handler; whether a message handler reads event.origin; whether an
+  http:// literal reaches a request helper. React DOM's resource hoisting no
+  longer registers as script injection.
+- Production-runtime checks (script pinning, SRI on the testing site) are
+  runtime findings, not blockers. Fix them anyway; reviewers read them.
+- The submission form now requires a Preflight receipt for new Apps and for
+  updates that change code or scopes, and blocks a receipt that reports
+  changes_required. Listing-only updates skip the receipt.
 
-Reference claims were checked against the public Webflow developer documentation,
-the npm registry (react-router 7.7.1–8.4.0, @webflow/webflow-cli 2.3.0 and 2.7.1),
-and the production App submission form on 2026-09-16. Public documentation and
-Marketplace expectations change — re-verify links and rerun the included evals
-before reuse.
+Public documentation and Marketplace expectations change — re-verify links
+and rerun the included evals before reuse.
 
 Validation:
-  - webflow-app-preflight static evals: 151/151
-  - webflow-app-review-remediation static evals: 79/79
+  - webflow-app-preflight static evals: 158 passed, 0 failed
+  - webflow-app-review-remediation static evals: 97 passed, 0 failed
 
 These skills are developer aids. They do not make, predict, or substitute for a
 Webflow Marketplace review decision.

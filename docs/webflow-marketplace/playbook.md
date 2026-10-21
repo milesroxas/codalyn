@@ -54,7 +54,8 @@ CI=true BUILD_PURPOSE=marketplace pnpm --filter beacon build:prod
 ```
 
 Output: `apps/beacon/bundle/production/public/v<ver>_public_<MM-DD_HH-mm-ss>.zip` plus the matching
-`.sourcemaps.zip` (private — submission form field only, never inside the bundle).
+`.sourcemaps.zip` (private — the form's "Source map artifact" review ZIP: `.map` files + `package.json` +
+`pnpm-lock.yaml` from the build, per the 2026-10-16 toolkit; never inside the bundle).
 
 > **`bundle/production/public/` is the Marketplace lane and holds nothing else.** Only a build made
 > with `BUILD_PURPOSE=marketplace` (or `--purpose marketplace`) writes there, and it is the only

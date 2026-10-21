@@ -83,7 +83,9 @@ record, the two file names and `shasum -a 256` of both. Anything you build to te
 only the W3C namespace literals React needs (`www.w3.org/…`, R6.6).
 
 - Build to submit: _(fill in)_ `v0.1.0_public_09-28_<stamp>.zip` — sha256 `…`
-- Source maps: `v0.1.0_public_09-28_<stamp>.sourcemaps.zip` — sha256 `…`
+- Review ZIP (form field "Source map artifact"): `v0.1.0_public_<stamp>.sourcemaps.zip` — sha256 `…`. Since the
+  2026-10-16 toolkit (Preflight ruleset 1.7.0) this zip carries the `.map` files **plus** `package.json` and
+  `pnpm-lock.yaml` from the build; `build-cli` assembles it and fails if either is missing. Check with `unzip -l`.
 
 ### Step 4 — Install on the test site and reproduce the reviewer's flow
 
@@ -182,9 +184,9 @@ Detail in the form.
 **6b — The form.** <https://developers.webflow.com/submit> → App Update → *App functionality, permissions, or
 bundle*, on the same email thread (ticket #1197949). Required: App Name, Client ID (production app — copy from
 Workspace settings → Apps & Integrations → Beacon → *Edit App*; never the `.env.local` dev id), the published
-`.webflow.io` testing site with this build installed, source maps from the exact build, **package manifest and
-lockfile** (`apps/beacon/package.json` + root `pnpm-lock.yaml` at the build commit — the submission-artifacts
-page now lists them), Preflight receipt. Leave listing copy, install URL, scopes, pricing and support fields
+`.webflow.io` testing site with this build installed, the review ZIP from the exact build (the Step 3
+`.sourcemaps.zip`: maps + `apps/beacon/package.json` + root `pnpm-lock.yaml` at the build commit — the form's
+"Source map artifact" field; one upload covers all three), Preflight receipt. Leave listing copy, install URL, scopes, pricing and support fields
 untouched; nothing about them changed. Reviewer credentials go in the form only, never in this repo; the
 reviewer's existing Tower account (`marketplaceteam@…`) and its workspace keep working: Tower resolves the
 approver of the token stored last round lazily, so the reviewer does not have to relink.

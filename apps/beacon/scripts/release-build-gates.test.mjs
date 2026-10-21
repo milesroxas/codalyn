@@ -28,6 +28,7 @@ import {
   referencedArchiveBaseNames,
   resolveBuildPurposeInput,
   resolveViteEnvValue,
+  reviewZipInputs,
   rewriteSourceMapInsecureSchemes,
   validateRecipientName,
 } from "../../../scripts/build-cli.mjs";
@@ -845,6 +846,48 @@ describe("source-map extraction (Marketplace submission form field)", () => {
       .filter(Boolean)
       .sort();
     expect(entries).toEqual(["assets/", "assets/chunk-abc.js.map", "bundle.js.map"]);
+  });
+
+  it("ships package.json and the lockfile beside the maps as the review ZIP (Preflight ruleset 1.7.0)", () => {
+    const appPath = tempAppDir();
+    fakeDist(appPath, { "bundle.js": "console.log(1)", "bundle.js.map": '{"version":3}' });
+    writeFileSync(join(appPath, "package.json"), '{"name":"x","version":"0.0.0"}');
+    writeFileSync(join(appPath, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+    const archive = join(appPath, "bundle", "production", "public", "v0.0.0_public_x.sourcemaps.zip");
+
+    const reviewFiles = [
+      { src: join(appPath, "package.json"), dest: "package.json" },
+      { src: join(appPath, "pnpm-lock.yaml"), dest: "pnpm-lock.yaml" },
+    ];
+    expect(extractSourceMapsToPrivateZip(appPath, archive, { strict: true, reviewFiles })).toBe(archive);
+    const entries = execSync(`unzip -Z1 ${JSON.stringify(archive)}`, { encoding: "utf-8" })
+      .split("\n")
+      .filter(Boolean)
+      .sort();
+    expect(entries).toEqual(["bundle.js.map", "package.json", "pnpm-lock.yaml"]);
+    // The inputs are copied, never moved: the app still has its manifest after the build.
+    expect(existsSync(join(appPath, "package.json"))).toBe(true);
+  });
+
+  it("fails the build when a review ZIP input is missing instead of shipping a half-assembled artifact", () => {
+    const appPath = tempAppDir();
+    fakeDist(appPath, { "bundle.js": "console.log(1)", "bundle.js.map": '{"version":3}' });
+    const archive = join(appPath, "bundle", "x.sourcemaps.zip");
+    expect(() =>
+      extractSourceMapsToPrivateZip(appPath, archive, {
+        strict: true,
+        reviewFiles: [{ src: join(appPath, "pnpm-lock.yaml"), dest: "pnpm-lock.yaml" }],
+      })
+    ).toThrow(/Review ZIP input missing: .*pnpm-lock\.yaml/);
+    expect(existsSync(archive)).toBe(false);
+  });
+
+  it("reviewZipInputs names the app manifest and the workspace lockfile", () => {
+    const inputs = reviewZipInputs("/repo/apps/beacon");
+    expect(inputs.map((f) => f.dest)).toEqual(["package.json", "pnpm-lock.yaml"]);
+    expect(inputs[0].src).toBe("/repo/apps/beacon/package.json");
+    expect(inputs[1].src).toMatch(/\/pnpm-lock\.yaml$/);
+    expect(inputs[1].src).not.toContain("apps/beacon");
   });
 
   it("rewrites audited vendor sourcesContent so the private map artifact carries no token-in-query URL", () => {

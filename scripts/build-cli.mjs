@@ -16,6 +16,7 @@
 
 import { execSync, spawn } from "node:child_process";
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -444,6 +445,11 @@ export function rewriteSourceMapInsecureSchemes(map) {
  * text (rewriteSourceMapVendorContent), so the private artifact carries no literal the bundle gate
  * forbids — in particular no token-in-query URL (App Review Preflight "Credential in URL",
  * 2026-08-19). `strict` mirrors the plugin option: release channels fail on any residual.
+ *
+ * The same zip is the submission form's "Source map artifact" review ZIP. Since the 2026-10-16 toolkit
+ * (Preflight ruleset 1.7.0) that field wants the `.map` files **plus** the production `package.json` and
+ * lockfile from the exact build, so `options.reviewFiles` (`[{ src, dest }]`) copies those in beside the
+ * maps; a missing file is a build error so the pair never ships half-assembled.
  */
 function extractSourceMapsToPrivateZip(appPath, archivePath, options = {}) {
   const maps = listDistSourceMaps(appPath);
@@ -451,9 +457,18 @@ function extractSourceMapsToPrivateZip(appPath, archivePath, options = {}) {
     return null;
   }
   const strict = options.strict !== false;
+  const reviewFiles = options.reviewFiles ?? [];
   const distDir = resolve(appPath, "dist");
   const staging = mkdtempSync(resolve(tmpdir(), "codalyn-sourcemaps-"));
   try {
+    for (const { src, dest } of reviewFiles) {
+      if (!existsSync(src)) {
+        throw new Error(`Review ZIP input missing: ${src} (expected to ship as ${dest} beside the source maps)`);
+      }
+      const target = resolve(staging, dest);
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(src, target);
+    }
     for (const rel of maps) {
       const src = resolve(distDir, rel);
       const dest = resolve(staging, rel);
@@ -1254,9 +1269,20 @@ function verifyArchivedZipBundle(archivePath, markers) {
   verifyArchivedManifest(archivePath);
 }
 
+/** Files the submission form's review ZIP must carry beside the maps (ruleset 1.7.0). */
+function reviewZipInputs(appPath) {
+  return [
+    { src: resolve(appPath, "package.json"), dest: "package.json" },
+    { src: resolve(ROOT, "pnpm-lock.yaml"), dest: "pnpm-lock.yaml" },
+  ];
+}
+
 function extractSourceMapsOrExit(s, appPath, archivePath, channel) {
   try {
-    return extractSourceMapsToPrivateZip(appPath, archivePath, { strict: channel !== "development" });
+    return extractSourceMapsToPrivateZip(appPath, archivePath, {
+      strict: channel !== "development",
+      reviewFiles: reviewZipInputs(appPath),
+    });
   } catch (err) {
     s.stop(color.red("Source map extraction failed"));
     p.log.error(err instanceof Error ? err.message : String(err));
@@ -1507,5 +1533,6 @@ export {
   referencedArchiveBaseNames,
   resolveBuildPurposeInput,
   resolveViteEnvValue,
+  reviewZipInputs,
   validateRecipientName,
 };

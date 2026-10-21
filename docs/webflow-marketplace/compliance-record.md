@@ -4238,5 +4238,23 @@ every release pin green. Zip greps (same pins as R8.22): `window.open(` 0 · `Mu
 bare `fetch(` 1 (the Tower call); the new strings ("Connect site in Webflow", `no_tower_account`,
 `"restore"`) are present; the runtime gate line is in the bundle.
 
-**States.** Source ✓ (committed `7db30cd9`, pushed 2026-09-28 21:12Z) · Artifact ✗ (internal gate build only) ·
+**2026-10-21 — submission artifact built.** The 2026-10-16 Webflow toolkit (Preflight ruleset 1.7.0, vendored
+`56481d0`) redefines the form's "Source map artifact" as one review ZIP: the `.map` files plus the production
+`package.json` and lockfile from the exact build. `scripts/build-cli.mjs` now copies `apps/beacon/package.json` and
+the root `pnpm-lock.yaml` into the `.sourcemaps.zip` and fails the build if either is missing (three gate tests,
+92/92; commit `3d4b2cb`). The same ruleset makes hotkey-library bindings a Required update and raw modifier-key
+handlers Manual review: the bundle has no hotkey library and no `keydown` listener of its own — every
+`metaKey`/`ctrlKey` hit is React's synthetic-event table or Radix typeahead, and the four `javascript:` hits are
+React's own URL blocker — and names `atob`/`btoa` a Suggested confirmation, which closes that R8.22 open decision.
+`CI=true BUILD_PURPOSE=marketplace pnpm --filter beacon build:prod` at 16:02 EDT →
+`bundle/production/public/v0.1.0_public_10-21_16-02-02.zip` sha256
+`731b9dd02f0007f0daaa6bebec0e93fcc6ae0a4c7a3ce3f0776248a33e60f071`; review ZIP
+`v0.1.0_public_10-21_16-02-02.sourcemaps.zip` sha256
+`3f36162e8a7d1b1bfc17369e0e1281e7107f80e4b6019dfd4e28cfd9ccada529` (7 maps + `package.json` + `pnpm-lock.yaml`).
+Zip greps identical to the 09-28 gate build (`window.open(` 0 · `MutationObserver` 0 · `postMessage(` 0 ·
+`sourceMappingURL` 0 · `ws://` 0 · posthog/sentry/localhost 0 · bare `fetch(` 1 · `http://` W3C namespaces only;
+`restore`/`sign_in` intents and `no_tower_account` present). Application source unchanged since `7db30cd9`.
+
+**States.** Source ✓ (committed `7db30cd9`, pushed 2026-09-28 21:12Z; build tooling `3d4b2cb` 2026-10-21) ·
+Artifact ✓ (`v0.1.0_public_10-21_16-02-02`, above) ·
 Tower: migration 0038 applied by Miles 09-28 ahead of the deploy — verified read-only 21:23Z, `db:migrate:status:prod:vercel` → 39/39 applied; deploy = CI run 36484535449 `deploy-tower` success 21:27:49Z (deployment `codalyn-tower-mp1v74bjs`, aliased to codalyn.app / tower.codalyn.app; `/api/health` → `{"ok":true,"service":"tower"}` at 21:27:54Z) · Installed ✗ · Runtime ✗ (changes; re-push required) · Submitted ✗ · Accepted ✗.

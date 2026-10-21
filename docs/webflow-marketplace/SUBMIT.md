@@ -5,7 +5,7 @@
 > **Tower must be deployed and migration 0038 applied before anything is installed or tested (Step 1 — migration
 > applied and code pushed 09-28; confirm the CI deploy before Step 4).** The
 > published-site runtime changed (R9.3), so the test site needs a **forced Sync + publish** this round (Step 4)
-> and new Preflight runtime values (Step 5). No submission artifact exists yet — Step 3 builds it.
+> and new Preflight runtime values (Step 5). Step 3 is done (2026-10-21 16:02 build, hashes below); next is Step 4.
 >
 > The reviewer's reproduction uses **a Tower account and a Webflow account with different e-mails**. Step 4
 > reproduces exactly that; do not test with matching e-mails only.
@@ -82,8 +82,13 @@ record, the two file names and `shasum -a 256` of both. Anything you build to te
 `postMessage(` 0 · `sourceMappingURL` 0 · `ws://` 0 · posthog/sentry/localhost 0 · bare `fetch(` 1 · `http://`
 only the W3C namespace literals React needs (`www.w3.org/…`, R6.6).
 
-- Build to submit: _(fill in)_ `v0.1.0_public_09-28_<stamp>.zip` — sha256 `…`
-- Review ZIP (form field "Source map artifact"): `v0.1.0_public_<stamp>.sourcemaps.zip` — sha256 `…`. Since the
+- Build to submit: `v0.1.0_public_10-21_16-02-02.zip` — sha256
+  `731b9dd02f0007f0daaa6bebec0e93fcc6ae0a4c7a3ce3f0776248a33e60f071` (built 2026-10-21 16:02 EDT at commit
+  `3d4b2cb`; source identical to `7db30cd9` + the review-ZIP build change; greps all as expected, `fetch(` 1,
+  `http://` only the W3C namespaces; `restore`/`sign_in` intents and `no_tower_account` present).
+- Review ZIP (form field "Source map artifact"): `v0.1.0_public_10-21_16-02-02.sourcemaps.zip` — sha256
+  `3f36162e8a7d1b1bfc17369e0e1281e7107f80e4b6019dfd4e28cfd9ccada529` (7 maps + `package.json` + `pnpm-lock.yaml`,
+  verified with `unzip -Z1`). Since the
   2026-10-16 toolkit (Preflight ruleset 1.7.0) this zip carries the `.map` files **plus** `package.json` and
   `pnpm-lock.yaml` from the build; `build-cli` assembles it and fails if either is missing. Check with `unzip -l`.
 

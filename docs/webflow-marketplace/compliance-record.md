@@ -4258,3 +4258,105 @@ Zip greps identical to the 09-28 gate build (`window.open(` 0 · `MutationObserv
 **States.** Source ✓ (committed `7db30cd9`, pushed 2026-09-28 21:12Z; build tooling `3d4b2cb` 2026-10-21) ·
 Artifact ✓ (`v0.1.0_public_10-21_16-02-02`, above) ·
 Tower: migration 0038 applied by Miles 09-28 ahead of the deploy — verified read-only 21:23Z, `db:migrate:status:prod:vercel` → 39/39 applied; deploy = CI run 36484535449 `deploy-tower` success 21:27:49Z (deployment `codalyn-tower-mp1v74bjs`, aliased to codalyn.app / tower.codalyn.app; `/api/health` → `{"ok":true,"service":"tower"}` at 21:27:54Z) · Installed ✗ · Runtime ✗ (changes; re-push required) · Submitted ✗ · Accepted ✗.
+
+**2026-10-25 — runtime re-pushed; first Preflight scan of the 10-21 artifact (ruleset 1.7.0).** Miles installed
+`v0.1.0_public_10-21_16-02-02.zip` for internal testing on beacon-demo, ran the page-runtime **Sync** (forced path)
+and published. Observed from the terminal: `webflow-runtime-pin.mjs` exit 0 — runtime
+`https://cdn.prod.website-files.com/6a35c562c551e2eb11bc4f1c/6ade7fa552ec2a2781d649bf_codalyn-beacon-runtime-a845ca3b.js`,
+20524 bytes, SHA-256 `979e38a590233cd4d6d8f306541c9ef9d9aa0ccb44047cb566afff7cc38e64fd`, SRI
+`sha256-l544pZAjPNTW2PMGVBye+dmqDMtEBHy1Zq//fMOOZP0=` matching the served tag, `crossorigin="anonymous"`, no
+trailing newline, source map `…6ade7fa3d308557e5785dc39_codalyn-beacon-runtime-a845ca3b.map.json` (v3, 24831 bytes,
+`sourcesContent` equals the served file minus its last line); `webflow-runtime-observe.mjs`: Beacon requested 0
+scripts, 0 scripts neither Webflow nor Beacon. The served file carries the R9.3 line (`if (/\s|,$/.test(v)) return
+null;` in `bSafeSrc`), so the published runtime is the round-9 source. The 09-18 `…9b7da263.js` registration is
+replaced. Values recorded in SUBMIT.md Step 5.
+
+Preflight bundle scan on the 10-21 zip + review ZIP returned four items, none a Blocker or Required update
+(readiness `needs_review` from the manual-review item). Each traced to its rule in the open-source ruleset
+(`packages/bundle-scanner-core/src/policy/default-ruleset.ts`, clone of 2026-10-22) and to source; no code change.
+
+- **Keyboard Shortcut** (REVIEW, `assets/label-D1aWY9se.js:1`, `assets/separator-BOg8r44V.js:1`) — rule
+  `UX-NO-KEYBOARD-SHORTCUTS`, matcher `modifier-plus-key`, confidence MEDIUM: a `metaKey|ctrlKey|altKey` and a
+  `.key|code|keyCode|which ===` joined by `&&` within 40 characters. Matches are Radix UI accessibility handlers
+  only: the FocusScope focus trap (`key === "Tab" && !altKey && !ctrlKey && !metaKey`, keeps Tab inside an open
+  dialog), roving-focus and Menu/Select typeahead (`!(ctrlKey||altKey||metaKey) && key.length === 1`, which
+  *ignores* modified keys), and react-remove-scroll's pinch-zoom check. Beacon source has no key listener and no
+  shortcut; the only first-party `keydown` (`cms-slot-beacon-debug.ts`, Ctrl/Cmd+Shift+D debug overlay in the
+  published runtime) is stripped from release builds — the zip holds the `function bDbgRuntimeInfo() {}` stub and
+  0 `keydown` registrations. React's synthetic-event tables in `bundle.js` (22 modifier-flag hits) do not match the
+  predicate. Disposition: explained in the notes; a pnpm patch that reshapes Radix's expressions would change
+  nothing the reviewer cares about and is the kind of scanner-shaping this record refuses.
+- **External API Calls** (SUGGESTED, `assets/label-D1aWY9se.js:41`) — the single Tower `fetch(` (R8.24); now a
+  Suggested confirmation under 1.7.0 instead of Required.
+- **Runtime Base64 Decoding** (SUGGESTED, `bundle.js:365` ×2, `assets/label-D1aWY9se.js:41`) — rule
+  `SEC-RUNTIME-DECODING`, confidence LOW, matcher `\b(atob|btoa)\s*\(`. Five sites in the zip, all data:
+  `cms-slot-data-list-display.ts` (`encodeDisplayNameAttrValue`/`decodeDisplayNameAttrValue`, `b64:` prefix) and
+  `cms-slot-designer-slot-props.ts` (`encodeSlotPropsAttrValue`/`decodeSlotPropsAttrValue`) exist because
+  `setCustomAttribute` rejects double quotes; `cms-slot-page-inline-script.ts` `arrayBufferToBase64` builds the SRI
+  string; the chunk hit is zod's JWT-header check (`JSON.parse(atob(...))` on a validator input). Open decision (c)
+  of 2026-09-26 stands: the recorded fallback (percent-encoding) would not clear the finding while legacy `b64:`
+  values on existing canvases (beacon-demo included, format live since 2026-06-19) still need decoding, and a
+  Suggested item never affects readiness — so the encoding is unchanged and the confirmation goes in the notes.
+- **Site Mutation Without User Action** (SUGGESTED, `bundle.js:27`, `:369`, `:371`) — rule
+  `UX-NO-MUTATION-ON-LOAD`, confidence LOW, regex on `webflow.create*(`/`webflow.remove*(`. Six call sites:
+  `cms-slot-list-target-slot-style.ts` ×2 (`beacon_list_render`, `beacon_list_layout`),
+  `create-cms-slot-target.ts`, `install-cms-slots-wrapper.ts`, `cms-slot-publish-placeholder-image-asset.ts`
+  (`codalyn-beacon-publish-placeholder.png`), `image-editor/lib/apply-cropped-export.ts`. Every path traced to a
+  click handler in `cms-slots-screen.tsx` (`handleCreate`, `handleInstallWrapper`, `handleCreateListTarget`,
+  `handlePlaceListTargetOnCanvas`, `handleSyncInstallEmbed`, `handleResyncDesignerSlotAttrs` = "Make editable",
+  `handleConfirmDeleteBeacon`), the composer Save (`execute-cms-slot-composer-save.ts`), the page-runtime Sync
+  (`syncCmsSlotPageInlineScript`), and the image editor's Place (`useApplyCroppedToWebflow.applyToCanvas`); none of
+  the screen's 16 effects reaches them. Explained in the notes.
+
+SUBMIT.md: Step 5 now lists these four as the expected scan result; the Additional notes block gained a
+"PREFLIGHT BUNDLE SCAN" paragraph (items 1, 2 and 5 tightened to stay under the 5000-character field).
+
+**States.** Source ✓ (`7db30cd9`; build tooling `3d4b2cb`) · Artifact ✓ (`v0.1.0_public_10-21_16-02-02`) ·
+Tower ✓ (prod on CI deploy of `56481d0`, 2026-10-21; `/api/health` ok, 39/39 migrations 2026-10-25) · Installed ✓
+(internal testing, beacon-demo, 2026-10-25) · Runtime ✓ (`…a845ca3b.js`, pin/observe exit 0, 2026-10-25) · Preflight
+scan ✓ four expected items; runtime test and receipt pending · Submitted ✗ · Accepted ✗.
+
+**2026-10-26 — SUBMIT.md re-sequenced against the official process.** Steps rewritten from the published pages
+(Submitting your App, Publishing a Designer Extension, Marketplace Guidelines, Listing your App) and the two
+vendored skills only. Gaps closed: 2FA on a Workspace admin as a prerequisite; review-account check (highest
+tier, no expiry); Install URL and scope-match checks; Tower dependency scan; artifact checks on the unzipped
+bundle (no maps, one `webflow.json` with `name`/`apiVersion`/`publicDir` and no telemetry block, ≤ 5 MB);
+**Launch App**, not **Launch development app**; a full-App retest instead of only the round-9 repro — OAuth
+**denial**, disconnect/reconnect, uninstall cleanup at page level with the publish prompt, core-workflow smoke;
+Preflight readiness semantics (`needs_review` accepted, `changes_required` blocks); a new demo video showing
+OAuth approve **and** deny and the changed sign-in flow; the explicit "Yes" to "new or changed app bundle" on the
+form; the three Data Client attestations (token encrypted at rest, server-side only, deleted on uninstall or
+revocation) and an APP-DELIVERED CODE disclosure (what the hosted script does, where it runs, how it is removed)
+in the notes; after-submission conduct (no Sync, no republish, no behavioural Tower push; "fix all earlier
+feedback"). Notes block 4988/5000 characters. No code change.
+
+**2026-10-26 — build-step review against the publishing docs; review-ZIP hygiene; new artifact.** Audit of the
+10-21 artifacts against *Publishing a Designer Extension* and *Submitting your App*: the bundle was compliant
+(official CLI bundling, flat `publicDir` + sanitised `webflow.json`, 466 KB, no maps, no dev/test residue), but
+Vite had copied an unreferenced `public/beacon-thumb.jpg` (Storybook fixture) into it, and the review ZIP's source
+maps embedded first-party source that exists only for development or tests: the published-site debug HUD
+(`cms-slot-beacon-debug.ts`, Ctrl/Cmd+Shift+D hotkey + `console.log`, compiled to a stub but present in full in
+`sourcesContent`), a `MODE === "test"` relative-path relaxation inside `extension-egress.ts` (reads as a bypass
+flag), developer-only copy in `tower-reachability-error.ts` (tunnels, Vercel Deployment Protection) and an
+`import.meta.env.DEV` "Resolved constraints" readout in the image editor. Changes, all behaviour-neutral for
+customers: HUD split into `cms-slot-beacon-debug-hud.ts` (imported only when `__BUILD_CHANNEL__ === "development"`,
+so Rollup drops the module and the map no longer lists it); egress branch deleted, Vitest bakes
+`__BEACON_TOWER_ORIGIN__ = "https://tower.test"` and `beacon-tower-origin.ts` reads only the baked constant (the
+`VITE_TOWER_ORIGIN` runtime fallback is gone; three tests now mock the module); reachability copy reduced to the
+product sentence; readout component, prop and wiring removed; thumbnail moved to `.storybook/public/`;
+`scripts/build-cli.mjs` gained `bundleEntryAllowlist` / `findUnexpectedArchiveEntries` /
+`verifyArchivedZipInventory` (exact names for fixed files, shape patterns for hashed chunks and Geist fonts) with
+three gate tests. Verified: `lint:all` clean, 1215/1215 Beacon tests, `CI=true BUILD_PURPOSE=marketplace build:prod`
+green → `v0.1.0_public_10-26_13-50-30.zip` sha256 `a27f05116aa2ee3dac8daf3a08d301f27f2737ce4c57e735804bd8ab78f773c2`
+(456 493 bytes, 20 entries all in the inventory) and `v0.1.0_public_10-26_13-50-30.sourcemaps.zip` sha256
+`1c7ccaedfdd5e694674f6d8196b2a4fa742bcea24964a5d0e5c255971c02f152`; map scan: 566 sources, HUD absent, no
+`import.meta.env.DEV` / `MODE === "test"` / test / story / mock paths; bundle greps unchanged (fetch 1, keydown
+token count 22 = React's event table in both builds). The generated published-site runtime equals the served
+`…a845ca3b.js` minus its map trailer (checked under `--mode production`), so the 2026-10-25 Sync stands and no
+re-sync is needed. Still in the maps and accepted: react-router's `dist/development` path (toolkit: not a dev
+build), four tree-shaken `webflow-kit/dist/flint/*` sources via the package barrel (0 Flint identifiers in the
+shipped JS). The 10-21 artifact is superseded, not uploaded anywhere but internal testing.
+
+**States.** Source ✓ (working tree; commit pending) · Artifact ✓ (`v0.1.0_public_10-26_13-50-30`) · Tower ✓ ·
+Installed ✗ for 10-26 (10-21 still installed for internal testing) · Runtime ✓ unchanged (`…a845ca3b.js`) ·
+Preflight ✗ for 10-26 · Submitted ✗ · Accepted ✗.

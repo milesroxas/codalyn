@@ -71,9 +71,9 @@ describe("extension egress policy (App Review Preflight: External API Calls)", (
     expect(resolveEgressDestination("")).toBeNull();
   });
 
-  it("with no baked origin (Vitest only) accepts Tower-relative paths and nothing else absolute-but-foreign", () => {
+  it("with no baked origin refuses everything that is not a granted upload URL, relative paths included", () => {
     towerOrigin.value = "";
-    expect(resolveEgressDestination("/api/auth/get-session")).toBe("tower");
+    expect(resolveEgressDestination("/api/auth/get-session")).toBeNull();
     expect(resolveEgressDestination("//evil.example/api")).toBeNull();
     expect(resolveEgressDestination("https://evil.example/api")).toBeNull();
     expect(resolveEgressDestination(UPLOAD_URL)).toBeNull();

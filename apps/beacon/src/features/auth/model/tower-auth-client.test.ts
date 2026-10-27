@@ -1,13 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const towerOrigin = vi.hoisted(() => ({ value: "https://tower.test" }));
+
+vi.mock("@/shared/lib/beacon-tower-origin", () => ({
+  readBeaconTowerOrigin: () => towerOrigin.value.replace(/\/$/, ""),
+  isBeaconTowerOriginConfigured: () => towerOrigin.value.length > 0,
+}));
+
 describe("tower-auth-client URL builders", () => {
   afterEach(() => {
     vi.resetModules();
-    vi.unstubAllEnvs();
+    towerOrigin.value = "https://tower.test";
   });
 
   it("builds app paths on the Tower app host", async () => {
-    vi.stubEnv("VITE_TOWER_ORIGIN", "https://tower-preview.codalyn.app");
+    towerOrigin.value = "https://tower-preview.codalyn.app";
     const { buildTowerAppUrl, TOWER_APP_ENTRY_PATH } = await import("./tower-auth-client");
     expect(TOWER_APP_ENTRY_PATH).toBe("/auth/continue");
     expect(buildTowerAppUrl("/beacon")).toBe("https://tower-preview.codalyn.app/beacon");
@@ -15,7 +22,7 @@ describe("tower-auth-client URL builders", () => {
   });
 
   it("returns null when Tower origin is unset", async () => {
-    vi.stubEnv("VITE_TOWER_ORIGIN", "");
+    towerOrigin.value = "";
     const { buildTowerAppUrl } = await import("./tower-auth-client");
     expect(buildTowerAppUrl("/account")).toBeNull();
   });
@@ -42,12 +49,12 @@ describe("tower-auth-client URL builders", () => {
 describe("mint helpers", () => {
   afterEach(() => {
     vi.resetModules();
-    vi.unstubAllEnvs();
+    towerOrigin.value = "https://tower.test";
     vi.doUnmock("@/shared/lib/tower-client");
   });
 
   async function loadWithTowerFetch(impl: (path: string, init?: RequestInit) => Promise<Response>) {
-    vi.stubEnv("VITE_TOWER_ORIGIN", "https://tower.example");
+    towerOrigin.value = "https://tower.example";
     const towerFetch = vi.fn(impl);
     vi.doMock("@/shared/lib/tower-client", () => ({ towerFetch }));
     const client = await import("./tower-auth-client");

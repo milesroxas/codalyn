@@ -127,15 +127,14 @@ export function resetWebflowAssetUploadGrantsForTests(): void {
  * True when `raw` targets the Tower origin baked into this build (exact origin match — scheme, host
  * and port; the path is free).
  *
- * Every browser build bakes an origin (`vite.config` resolves one for each mode and release builds
- * assert it in the output), so a relative path is only meaningful under Vitest, where the origin is
- * deliberately empty and Tower paths resolve against the test document. Outside the test mode an
- * unconfigured origin refuses everything rather than guessing a destination.
+ * Every build bakes an origin (`vite.config` resolves one per mode, Vitest included, and release
+ * builds assert it in the output). An unconfigured origin refuses everything rather than guessing a
+ * destination, relative paths included.
  */
 export function isTowerUrl(raw: string): boolean {
   const towerOrigin = readBeaconTowerOrigin();
   if (towerOrigin.length === 0) {
-    return import.meta.env.MODE === "test" && raw.startsWith("/") && !raw.startsWith("//");
+    return false;
   }
   const url = parseUrl(raw);
   const tower = parseUrl(towerOrigin);

@@ -318,11 +318,6 @@ function applySessionConstraintsFromPickerSelection(
   setters.setAspectPreset("free");
 }
 
-// Debug-only readout: tree-shaken out of production builds via import.meta.env.DEV.
-function shouldShowResolvedReadout(composeActive: boolean): boolean {
-  return import.meta.env.DEV && !composeActive;
-}
-
 /**
  * Undefined when the quality-compare popout is flag-gated off: the "Pop out" button must disappear
  * entirely (Marketplace bars dead/placeholder UI), not render disabled.
@@ -1685,11 +1680,7 @@ export function ImageEditor({ composeSession }: { composeSession?: ImageEditorCo
         flowPhase: flowStep === "position" ? "position" : "save",
         hidePlacementCard,
         frameSummary,
-        showResolvedReadout: shouldShowResolvedReadout(compose.active),
         positionPageTarget,
-        resolvedUploadTarget,
-        resolvedConstraintsReadout,
-        sessionMaxFileSizeBytes,
         presetFileLimitBlocker,
         naturalSizeAdvisory,
         onDismissNaturalSizeAdvisory: dismissNaturalSizeAdvisory,

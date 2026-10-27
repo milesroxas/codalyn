@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { beaconPropDebugRuntimeSource } from "@/features/cms-slots/model/cms-slot-beacon-debug";
+import { beaconPropDebugRuntimeSource } from "@/features/cms-slots/model/cms-slot-beacon-debug-hud";
 import {
   beaconPropApplyValueRuntimeSource,
   beaconPropEmptyRuntimeSource,

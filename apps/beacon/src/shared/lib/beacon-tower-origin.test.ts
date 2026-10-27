@@ -1,19 +1,20 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { isBeaconTowerOriginConfigured, readBeaconTowerOrigin } from "./beacon-tower-origin";
+import { isBeaconTowerOriginConfigured, normalizeTowerOrigin, readBeaconTowerOrigin } from "./beacon-tower-origin";
 
 describe("beacon-tower-origin", () => {
-  it("reads configured origin without trailing slash", () => {
-    vi.stubEnv("VITE_TOWER_ORIGIN", "https://tower.codalyn.app/");
-    expect(readBeaconTowerOrigin()).toBe("https://tower.codalyn.app");
-    expect(isBeaconTowerOriginConfigured()).toBe(true);
-    vi.unstubAllEnvs();
+  it("normalizes a configured origin without its trailing slash", () => {
+    expect(normalizeTowerOrigin("https://tower.codalyn.app/")).toBe("https://tower.codalyn.app");
+    expect(normalizeTowerOrigin("https://tower.codalyn.app")).toBe("https://tower.codalyn.app");
   });
 
-  it("returns empty when unset", () => {
-    vi.stubEnv("VITE_TOWER_ORIGIN", "");
-    expect(readBeaconTowerOrigin()).toBe("");
-    expect(isBeaconTowerOriginConfigured()).toBe(false);
-    vi.unstubAllEnvs();
+  it("treats an unset or empty origin as empty", () => {
+    expect(normalizeTowerOrigin(undefined)).toBe("");
+    expect(normalizeTowerOrigin("")).toBe("");
+  });
+
+  it("reads the origin baked into the build (Vitest bakes the fixed test origin)", () => {
+    expect(readBeaconTowerOrigin()).toBe("https://tower.test");
+    expect(isBeaconTowerOriginConfigured()).toBe(true);
   });
 });

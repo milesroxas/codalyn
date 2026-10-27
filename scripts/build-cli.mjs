@@ -586,6 +586,69 @@ function verifyArchivedManifest(archivePath) {
   }
 }
 
+/**
+ * Pinned inventory of what a Beacon release bundle may contain. Vite copies `public/` into the
+ * artifact verbatim, so a stray file dropped there (a Storybook fixture, a screenshot, a scratch
+ * script) ships to the Marketplace without any code referencing it — packaging debris the
+ * submission guide says to remove and the review team reads as a dev artifact. Fixed files are
+ * named exactly; Rollup chunks and fonts carry content hashes, so those are matched by shape.
+ * A new legitimate file means extending this list on purpose, with the compliance record.
+ */
+function bundleEntryAllowlist(appName, channel) {
+  if (appName !== "beacon" || (channel !== "production" && channel !== "preview")) {
+    return null;
+  }
+  return {
+    exact: new Set([
+      "webflow.json",
+      "index.html",
+      "bundle.js",
+      "styles.css",
+      "images/dark-app-bg.webp",
+      "images/dark-logo-beacon.svg",
+      "images/dark-tile-cms-slot.webp",
+      "images/dark-tile-image-upload.webp",
+      "images/light-app-bg.webp",
+      "images/light-logo-beacon.svg",
+      "images/light-tile-cms-slot.webp",
+      "images/light-tile-image-upload.webp",
+    ]),
+    patterns: [
+      // Rollup lazy chunks: `assets/<chunk-name>-<hash>.js`
+      /^assets\/[a-z0-9]+(?:-[a-z0-9]+)*-[A-Za-z0-9_-]{8}\.js$/,
+      // Geist variable font subsets bundled from @fontsource-variable/geist
+      /^assets\/geist-(?:latin|latin-ext|cyrillic)-wght-normal-[A-Za-z0-9_-]{8}\.woff2$/,
+    ],
+  };
+}
+
+/** Pure check for the bundle-inventory gate; exported for tests. Directory entries are ignored. */
+function findUnexpectedArchiveEntries(entries, allowlist) {
+  if (!allowlist) {
+    return [];
+  }
+  return entries.filter((name) => {
+    if (name.endsWith("/")) {
+      return false;
+    }
+    if (allowlist.exact.has(name)) {
+      return false;
+    }
+    return !allowlist.patterns.some((pattern) => pattern.test(name));
+  });
+}
+
+function verifyArchivedZipInventory(archivePath, allowlist) {
+  const unexpected = findUnexpectedArchiveEntries(listArchiveEntries(archivePath), allowlist);
+  if (unexpected.length > 0) {
+    throw new Error(
+      `Archived zip contains file(s) outside the pinned bundle inventory: ${unexpected.join(", ")} — ` +
+        "nothing in the extension references them. Remove them from public/ (or extend bundleEntryAllowlist " +
+        "in scripts/build-cli.mjs on purpose, with the compliance record)."
+    );
+  }
+}
+
 function verifyArchivedZipContains(archivePath, markers) {
   const needles = [markers.version, markers.recipient, markers.towerOrigin].filter(Boolean);
   for (const needle of needles) {
@@ -1204,6 +1267,7 @@ function expectedBundleMarkers({ appName, appPath, channel, recipient, pkg }) {
   if (appName === "beacon" && channel === "preview") {
     expected.towerOrigin = BEACON_PREVIEW_TOWER_ORIGIN;
   }
+  expected.entryAllowlist = bundleEntryAllowlist(appName, channel);
   return expected;
 }
 
@@ -1267,6 +1331,7 @@ function verifyArchivedZipBundle(archivePath, markers) {
   verifyArchivedZipExcludes(archivePath, markers.forbidden, markers.pinned);
   verifyArchivedZipHasNoSourceMaps(archivePath);
   verifyArchivedManifest(archivePath);
+  verifyArchivedZipInventory(archivePath, markers.entryAllowlist);
 }
 
 /** Files the submission form's review ZIP must carry beside the maps (ruleset 1.7.0). */
@@ -1522,9 +1587,11 @@ export {
   assertNoMisplacedMarketplaceBundles,
   assertPinnedMarkerCounts,
   assertRequiredReleaseEnv,
+  bundleEntryAllowlist,
   collectForbiddenBundleMarkers,
   extractSourceMapsToPrivateZip,
   findSourceMapEntries,
+  findUnexpectedArchiveEntries,
   listDistSourceMaps,
   matchForbiddenMarker,
   pinnedMarkerCounts,

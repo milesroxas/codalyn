@@ -162,7 +162,9 @@ function resolveTowerOrigin(mode: string): string {
 }
 
 export default defineConfig(({ mode }) => {
-  const towerOrigin = isVitest ? "" : resolveTowerOrigin(mode);
+  // Vitest bakes a fixed test origin so the egress policy is exercised exactly as shipped: no
+  // test-only relative-path branch exists in the source.
+  const towerOrigin = isVitest ? "https://tower.test" : resolveTowerOrigin(mode);
   // Vitest pins the flag on so popout unit/UI tests always exercise the real code paths; the
   // shipped state is decided by real builds, not the test runner.
   const qualityPopoutEnabled = isVitest || resolveQualityPopoutEnabled(mode);

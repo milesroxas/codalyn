@@ -1,4 +1,4 @@
-import type { ImageExportFormat, ResolvedUploadTarget, ResolverOutput } from "@codalyn/webflow-kit";
+import type { ImageExportFormat } from "@codalyn/webflow-kit";
 import { FolderPlus, Info, Loader2 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useState } from "react";
 import type { Area, MediaSize } from "react-easy-crop";
@@ -203,10 +203,6 @@ export type ImageEditorCropExportPanelProps = {
    */
   exportSizeUsesAspectAndMaxWidth?: boolean;
   onExportMaxWidthBlur?: () => void;
-  showResolvedReadout?: boolean;
-  resolvedUploadTarget?: ResolvedUploadTarget | null;
-  resolvedConstraintsReadout?: ResolverOutput | null;
-  sessionMaxFileSizeBytes?: number | null;
   presetFileLimitBlocker?: ImageEditorPresetFileLimitBlocker | null;
   naturalSizeAdvisory?: ImageEditorNaturalSizeAdvisory | null;
   onDismissNaturalSizeAdvisory?: () => void;
@@ -1162,51 +1158,6 @@ function ExportEncodeCard(p: ExportCardProps) {
   );
 }
 
-function ResolvedConstraintsReadOnlyCard(props: {
-  target: ResolvedUploadTarget | null;
-  readout: ResolverOutput | null;
-  sessionMaxFileSizeBytes: number | null;
-}) {
-  const { target, readout, sessionMaxFileSizeBytes } = props;
-  const constraints = readout?.constraints ?? null;
-  const blockers = readout?.blockers ?? [];
-  return (
-    <section className="mt-1 flex min-w-0 flex-col gap-4" aria-labelledby="resolved-export-constraints-readonly">
-      <h2 className="sr-only" id="resolved-export-constraints-readonly">
-        Resolved constraints
-      </h2>
-      <div className="flex min-w-0 flex-col gap-1">
-        <p className="text-sm font-medium leading-snug">Resolved constraints (read-only)</p>
-        <p className="min-w-0 text-xs leading-snug text-muted-foreground wrap-break-word">
-          Debug view only. Current export fields remain unchanged in this phase.
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-        <p className="text-muted-foreground">Target</p>
-        <p className="tabular-nums">{target?.kind ?? "none"}</p>
-        <p className="text-muted-foreground">Source</p>
-        <p className="tabular-nums">{readout?.source ?? "manual"}</p>
-        <p className="text-muted-foreground">Size</p>
-        <p className="tabular-nums">{constraints ? `${constraints.width}×${constraints.height}` : "—"}</p>
-        <p className="text-muted-foreground">Format</p>
-        <p className="tabular-nums">{constraints?.exportFormat ?? "—"}</p>
-        <p className="text-muted-foreground">Max file size</p>
-        <p className="tabular-nums">
-          {constraints?.maxFileSizeBytes == null ? "—" : `${constraints.maxFileSizeBytes.toLocaleString()} B`}
-        </p>
-        <p className="text-muted-foreground">Session max file size</p>
-        <p className="tabular-nums">
-          {sessionMaxFileSizeBytes == null ? "—" : `${sessionMaxFileSizeBytes.toLocaleString()} B`}
-        </p>
-        <p className="text-muted-foreground">Preset id</p>
-        <p className="tabular-nums">{readout?.presetId ?? "—"}</p>
-        <p className="text-muted-foreground">Blockers</p>
-        <p className="tabular-nums">{blockers.length === 0 ? "none" : blockers.join(", ")}</p>
-      </div>
-    </section>
-  );
-}
-
 type AssetFolderCardProps = {
   baseId: string;
   assetFolders: AssetFolderRow[];
@@ -1760,10 +1711,6 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
     frameSummary,
     exportSizeUsesAspectAndMaxWidth = false,
     onExportMaxWidthBlur,
-    showResolvedReadout = false,
-    resolvedUploadTarget = null,
-    resolvedConstraintsReadout = null,
-    sessionMaxFileSizeBytes = null,
     presetFileLimitBlocker = null,
     naturalSizeAdvisory = null,
     onDismissNaturalSizeAdvisory = () => {},
@@ -1970,14 +1917,6 @@ export function ImageEditorCropExportPanel(props: ImageEditorCropExportPanelProp
         onGrantAvifTowerConsent={onGrantAvifTowerConsent}
         avifPresetAwaitingConsent={avifPresetAwaitingConsent}
       />
-
-      {showResolvedReadout ? (
-        <ResolvedConstraintsReadOnlyCard
-          target={resolvedUploadTarget}
-          readout={resolvedConstraintsReadout}
-          sessionMaxFileSizeBytes={sessionMaxFileSizeBytes}
-        />
-      ) : null}
 
       {hidePlacementCard ? null : (
         <PlacementCard

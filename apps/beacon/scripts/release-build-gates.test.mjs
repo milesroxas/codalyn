@@ -18,9 +18,11 @@ import {
   assertNoMisplacedMarketplaceBundles,
   assertPinnedMarkerCounts,
   assertRequiredReleaseEnv,
+  bundleEntryAllowlist,
   collectForbiddenBundleMarkers,
   extractSourceMapsToPrivateZip,
   findSourceMapEntries,
+  findUnexpectedArchiveEntries,
   listDistSourceMaps,
   matchForbiddenMarker,
   pinnedMarkerCounts,
@@ -981,6 +983,67 @@ describe("source-map extraction (Marketplace submission form field)", () => {
       "assets/x.js.MAP",
     ]);
     expect(findSourceMapEntries(["webflow.json", "index.html", "bundle.js"])).toEqual([]);
+  });
+});
+
+describe("bundle inventory (submission guide: remove debug routes, fixtures and other dev files before upload)", () => {
+  const observed1021 = [
+    "webflow.json",
+    "assets/geist-cyrillic-wght-normal-CHSlOQsW.woff2",
+    "assets/geist-latin-ext-wght-normal-DMtmJ5ZE.woff2",
+    "assets/geist-latin-wght-normal-Dm3htQBi.woff2",
+    "assets/label-D1aWY9se.js",
+    "assets/separator-BOg8r44V.js",
+    "assets/settings-account-panel-DfhSNiYp.js",
+    "assets/settings-preferences-panel-BF9b1G5l.js",
+    "assets/switch-BjHnANZP.js",
+    "bundle.js",
+    "images/dark-app-bg.webp",
+    "images/dark-logo-beacon.svg",
+    "images/dark-tile-cms-slot.webp",
+    "images/dark-tile-image-upload.webp",
+    "images/light-app-bg.webp",
+    "images/light-logo-beacon.svg",
+    "images/light-tile-cms-slot.webp",
+    "images/light-tile-image-upload.webp",
+    "index.html",
+    "styles.css",
+  ];
+
+  it("accepts every file a Beacon release bundle is expected to carry", () => {
+    expect(findUnexpectedArchiveEntries(observed1021, bundleEntryAllowlist("beacon", "production"))).toEqual([]);
+    expect(
+      findUnexpectedArchiveEntries(["assets/", ...observed1021], bundleEntryAllowlist("beacon", "preview"))
+    ).toEqual([]);
+  });
+
+  it("names a stray public/ file, a Storybook fixture, a source map and a popout entry", () => {
+    const allowlist = bundleEntryAllowlist("beacon", "production");
+    expect(
+      findUnexpectedArchiveEntries(
+        [
+          ...observed1021,
+          "beacon-thumb.jpg",
+          "mockServiceWorker.js",
+          "assets/label-D1aWY9se.js.map",
+          "quality-compare.html",
+          "images/scratch.png",
+        ],
+        allowlist
+      )
+    ).toEqual([
+      "beacon-thumb.jpg",
+      "mockServiceWorker.js",
+      "assets/label-D1aWY9se.js.map",
+      "quality-compare.html",
+      "images/scratch.png",
+    ]);
+  });
+
+  it("is a release-channel, Beacon-only gate", () => {
+    expect(bundleEntryAllowlist("beacon", "development")).toBeNull();
+    expect(bundleEntryAllowlist("flint", "production")).toBeNull();
+    expect(findUnexpectedArchiveEntries(["anything.txt"], null)).toEqual([]);
   });
 });
 

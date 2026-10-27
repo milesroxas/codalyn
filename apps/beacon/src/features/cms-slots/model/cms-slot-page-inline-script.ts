@@ -1,8 +1,6 @@
 import SparkMD5 from "spark-md5";
-import {
-  beaconPropDebugRuntimeSource,
-  beaconPropDebugStubSource,
-} from "@/features/cms-slots/model/cms-slot-beacon-debug";
+import { beaconPropDebugStubSource } from "@/features/cms-slots/model/cms-slot-beacon-debug";
+import { beaconPropDebugRuntimeSource } from "@/features/cms-slots/model/cms-slot-beacon-debug-hud";
 import {
   beaconPropApplyValueRuntimeSource,
   beaconPropEmptyRuntimeSource,
@@ -98,7 +96,7 @@ export function getCmsSlotPageInlineScriptSource(): string {
   // functionality; reviewed runtime must match the shipped one). The source still embeds the
   // channel + version so a synced runtime is self-identifying via its hash.
   const debugSource =
-    String(__BUILD_CHANNEL__) === "development" ? beaconPropDebugRuntimeSource() : beaconPropDebugStubSource();
+    __BUILD_CHANNEL__ === "development" ? beaconPropDebugRuntimeSource() : beaconPropDebugStubSource();
   return `/*
  * Codalyn Beacon - published-site list runtime v${buildVersion}.
  * Runtime revision ${CMS_SLOT_RUNTIME_REVISION}.

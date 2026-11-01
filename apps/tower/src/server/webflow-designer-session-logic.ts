@@ -188,14 +188,19 @@ async function provisionNewDesignerUser(
 
   const ctx = await auth.$context;
   try {
-    const created = await ctx.internalAdapter.createUser({
-      name: resolveDisplayName(resolved),
-      email: resolved.email,
-      emailVerified: true,
-      firstName: resolved.firstName ?? undefined,
-      lastName: resolved.lastName ?? undefined,
-      webflowAuthorizedUserId: resolved.id,
-    });
+    const created = await ctx.internalAdapter.createUser(
+      {
+        name: resolveDisplayName(resolved),
+        email: resolved.email,
+        emailVerified: true,
+        firstName: resolved.firstName ?? undefined,
+        lastName: resolved.lastName ?? undefined,
+        webflowAuthorizedUserId: resolved.id,
+      },
+      // better-auth >= 1.7: provisioning source for the `user.validateUserInfo` gate. The Designer
+      // identity is a Webflow OAuth profile and the user gets a linked `webflow` provider account.
+      { method: "oauth", oauth: { providerId: "webflow" } }
+    );
     await bindWebflowUserToTowerUser(resolved.id, created.id);
 
     if (isTowerEarlyAccessGateEnabled()) {

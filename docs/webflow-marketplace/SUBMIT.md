@@ -9,6 +9,23 @@
 > **Status 2026-10-26:** Step 2 redone (13:50 build, hashes below — the 10-21 artifact is superseded). Next: Step 3
 > (upload the 10-26 bundle for internal testing), Step 0 checks, then Steps 4, 5, 6, 7, 8 in that order. The
 > published runtime did not change, so Step 4.7 and the Step 5 runtime values stay valid.
+> **Status 2026-11-01:** Step 4 marked complete (Miles's decision; observed evidence in compliance-record.md,
+> "2026-11-01 — Step 4 closed"). Step 4.7 re-verified 2026-11-01 (observe + pin exit 0, values unchanged). Next:
+> Step 3 for the 10-26 bundle, Step 0 checks, then Steps 5, 6, 7, 8.
+> **Status 2026-11-01 (later):** Preflight revision 12 ran the bundle scan **and the published-runtime test** — but on
+> the 10-21 zip (`731b9dd0…`). Scan = the four expected items; runtime rows = the three R8.24 predictions (SRI
+> tool-side, twelve same-host Webflow runtime scripts incl. `gsap.min.js`); no receipt issued. Step 5 must be rerun
+> as a new revision on the 10-26 zip + `.sourcemaps.zip` (`a27f0511…` / `1c7ccaed…`) — do not issue a receipt from
+> revision 12. Details: compliance-record.md "2026-11-01 — Preflight revision 12".
+> **Status 2026-11-01 (receipt):** Step 5 done — revision 13 on the 10-26 zip + review ZIP, receipt
+> `wfpre_609ef17a3807de141e3693357c462354`, same four scan items and three runtime rows. Step 3 done the same day
+> (10-26 installed for internal testing, Launch App, console clean). Step 0 lines 2, 6, 8 verified 2026-11-01;
+> **line 7 (Tower dependency scan)** failed (10 critical / 50 high) and was resolved by the Tower dependency upgrade on
+> branch `chore/tower-deps-audit-2026-11-01` (0 critical / 6 high left, each with a reachability note in
+> compliance-record.md "Step 0 line 7 resolved"). **Deploy still owed before filing:** apply the Payload migration
+> `20261101_180941` to prod (`pnpm --filter tower payload:migrate:prod -- --confirm`), then push to `main`, then
+> re-check line 2. Lines 1, 3, 4, 5 are UI checks still to do. Then Step 6 (video), Step 7 (Workspace publish for
+> the Marketplace), Step 8. No Sync, no republish.
 >
 > The steps below follow the official process — [Submitting your App](https://developers.webflow.com/apps/docs/marketplace/submitting-your-app),
 > [Publishing a Designer Extension](https://developers.webflow.com/apps/docs/publishing-your-app),
@@ -135,7 +152,7 @@ production bundle, remove source maps, debug routes, bypass flags, staging ident
 | Pinned bundle inventory (new gate) | `unzip -Z1` vs `bundleEntryAllowlist` in `scripts/build-cli.mjs` | 20 entries, all allowed; no `beacon-thumb.jpg` |
 | Review-ZIP maps carry no dev/test-only first-party source | map `sources` + `sourcesContent` scan | no debug HUD, no `MODE === "test"`, no `import.meta.env.DEV`, no test/story/mock paths |
 
-### Step 3 — Upload the version to the Workspace and open it with "Launch App" (official "Publishing a Designer Extension")
+### Step 3 (done 2026-11-01 for the 10-26 bundle) — Upload the version to the Workspace and open it with "Launch App" (official "Publishing a Designer Extension")
 
 1. Workspace settings → **Apps & Integrations** → under **Develop**, Beacon → **Publish extension version**.
    This Workspace's dialog offers *Publish for internal testing (Workspace only)* and *Publish new version to
@@ -146,9 +163,11 @@ production bundle, remove source maps, debug routes, bypass flags, staging ident
    dev URL instead of the uploaded version. Confirm the panel renders and the extension console shows only
    the two Webflow-client CSP lines (R7b.15, R8.25). Any CSP line naming a Beacon file → stop (an
    installed-only CSP regression; playbook § A5).
-3. Done 2026-10-25 for the 10-21 bundle; **redo for the 10-26 bundle** (new internal-testing upload, Launch App, console check).
+3. Done 2026-10-25 for the 10-21 bundle. **Redone 2026-11-01 for the 10-26 bundle**: internal-testing upload, Launch App, panel
+   renders, console = the two expected lines only (`style-src-elem` hash `sha256-wp89sCw2…`, `connect-src` on the
+   `…extensions-client.461064e4a7de32bd.js.map`); no Beacon file in any CSP line. Compliance record "2026-11-01 — Step 3".
 
-### Step 4 — Retest the whole App on the testing site (official "Submission prep": test every core workflow end to end; verify installation, OAuth approval and denial, disconnect, reconnect and uninstall cleanup)
+### Step 4 (done 2026-11-01) — Retest the whole App on the testing site (official "Submission prep": test every core workflow end to end; verify installation, OAuth approval and denial, disconnect, reconnect and uninstall cleanup)
 
 Reviewers retest everything and "Fix all earlier feedback, not just the latest round", so this is a full
 pass, not only the round-9 reproduction. Use **two accounts with different e-mails**: Tower account **A**
@@ -251,6 +270,18 @@ wrong* may persist (tool-side request-time snapshot, reproduced with `scripts/we
 — keep the output); *New script elements / Unreviewed scripts* = Webflow's own site runtime on our asset's CDN
 host. Preflight observations are evidence from the Webflow-controlled run, never acceptance.
 
+Observed 2026-11-01 (revision 12, bound to the **10-21** zip): Loaded ✓ · Hash matched ✓ · SRI mismatch · Source
+map reachable ✓; the three rows above, exactly — twelve same-host scripts (`webflow.ec9e52e8.*.js`, ten
+`webflow.achunk.*.js`, `gsap.min.js`). The 10-26 revision is expected to repeat this; the runtime did not change.
+The scan's evidence paths will read `assets/label-By2KV2Iq.js` / `assets/separator-BF7HnO52.js` (10-26 chunk names).
+The run's "Part of this bundle could not be scanned" header is the tool's generic `needs_review` sentence for the
+manual-review item, not an unscanned file.
+
+**Done 2026-11-01 — revision 13**, bound to bundle `a27f0511…` (the 10-26 zip + its review ZIP): 0 blockers, 0
+required, 3 suggested, 1 manual review (`assets/label-By2KV2Iq.js:1`/`:41`, `assets/separator-BF7HnO52.js:1`,
+`bundle.js:27`/`:365`/`:369`/`:371`), readiness `needs_review`; runtime test re-run on this revision — same three
+rows. **Receipt: `wfpre_609ef17a3807de141e3693357c462354`.** Revision 12 and its (unissued) receipt are superseded.
+
 Copy the receipt — `wfpre_` + 32 hex characters — into Step 8. A new bundle, a new runtime registration or a
 scope change means a new run and a new receipt.
 
@@ -309,7 +340,7 @@ Detail in the form.
 | Published testing site | `https://beacon-demo.webflow.io` (https; the Step 3 version installed; review page published with the runtime) |
 | Install URL (Hybrid) | unchanged — `https://tower.codalyn.app/api/integrations/webflow/authorize` |
 | Source map artifact | the Step 2 **review ZIP** (`…sourcemaps.zip`: maps + `package.json` + lockfile). Upload the file; a link in notes does not count |
-| App Review Preflight receipt | the Step 5 `wfpre_…` code |
+| App Review Preflight receipt | `wfpre_609ef17a3807de141e3693357c462354` (revision 13, 2026-11-01, bundle `a27f0511…`) |
 | Demo video | the Step 6 link |
 | Review access | the reviewer's Tower account credentials and the Webflow test user, in the form only — never in this repo. The existing `marketplaceteam@…` account keeps working: Tower resolves the approver of last round's token lazily, so no relink is needed |
 | Pricing | unchanged; the notes restate it (free tier, paid seats, AVIF opt-in via Tower) |

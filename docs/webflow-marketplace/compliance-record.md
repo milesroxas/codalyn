@@ -4360,3 +4360,180 @@ shipped JS). The 10-21 artifact is superseded, not uploaded anywhere but interna
 **States.** Source ✓ (working tree; commit pending) · Artifact ✓ (`v0.1.0_public_10-26_13-50-30`) · Tower ✓ ·
 Installed ✗ for 10-26 (10-21 still installed for internal testing) · Runtime ✓ unchanged (`…a845ca3b.js`) ·
 Preflight ✗ for 10-26 · Submitted ✗ · Accepted ✗.
+
+**2026-11-01 — Step 4 closed.** Observed: the review page
+`https://beacon-demo.webflow.io/blog/the-power-of-resilience` re-verified with `scripts/webflow-runtime-observe.mjs`
+and `scripts/webflow-runtime-pin.mjs`, both exit 0 — one Beacon script in the served HTML, `…a845ca3b.js`,
+20524 bytes, sha256 `979e38a5…e64fd`, SRI `sha256-l544pZAjPNTW2PMGVBye+dmqDMtEBHy1Zq//fMOOZP0=` matching the served
+bytes, `crossorigin="anonymous"`, no trailing newline, map v3 24831 bytes; Beacon requested 0 scripts, 0 scripts
+outside Webflow platform + Beacon; two slot lists rendered (`data-cb-rendered="1"`); no legacy page-entry `data-*`
+attributes (R8.23). Two-account run: a second Webflow user (`miles.roxas@gmail.com`, editor on beacon-demo, no OAuth
+approval and no prior Designer sign-in) opened Beacon and saw the **Welcome** screen — the designed unknown-user
+path (no Webflow user id association exists for that user; R9.1), not the round-9 failure, which requires a user
+who approved the OAuth. The relink-as-second-user reproduction (4.1), routine sign-in (4.2), explicit
+authorization (4.3), denial (4.4), disconnect/reconnect (4.5), uninstall cleanup (4.6), the core-workflows smoke
+(4.8) and the localized-site check (4.9) were **not re-run this round**; Miles marked Step 4 complete on
+2026-11-01 on the strength of the 10-25 and earlier runs. Reviewer repro still uses different Tower and Webflow
+e-mails; if it is re-run later, record it here.
+
+**States.** Source ✓ (`a1d5045`) · Artifact ✓ (`v0.1.0_public_10-26_13-50-30`) · Tower ✓ · Installed ✗ for 10-26
+(10-21 still installed for internal testing) · Runtime ✓ re-observed 2026-11-01 (`…a845ca3b.js`) · Preflight ✗ for
+10-26 · Submitted ✗ · Accepted ✗.
+
+**2026-11-01 — Preflight revision 12: bundle scan + first published-runtime test, but bound to the 10-21 zip.**
+Pasted from the Preflight UI. The revision header reads "Part of this bundle could not be scanned. A reviewer must
+inspect the listed files." — that is the tool's generic `needs_review` readiness sentence
+(`extension/src/App.tsx:1559`, clone 9693886), produced by the Keyboard Shortcut manual-review item; no
+skipped-executable list exists (`unscannedExecutableGuidance` emits none), so nothing in the bundle went
+unscanned. Readiness `needs_review`, 0 Security blockers, 0 Required updates, 3 Suggested updates, 1 Manual
+review — the four items of 2026-10-25, same rules, same evidence lines (`assets/label-D1aWY9se.js:1`/`:41`,
+`assets/separator-BOg8r44V.js:1`, `bundle.js:27`/`:365`/`:369`/`:371`). Those chunk names and the runtime test's
+"Bound to bundle 731b9dd02f00…" identify the scanned artifact as `v0.1.0_public_10-21_16-02-02.zip` (sha256
+`731b9dd02f0007f0daaa6bebec0e93fcc6ae0a4c7a3ce3f0776248a33e60f071`), **not** the 10-26 artifact
+(`a27f05116aa2ee3dac8daf3a08d301f27f2737ce4c57e735804bd8ab78f773c2`, chunks `label-By2KV2Iq.js`,
+`separator-BF7HnO52.js`). A receipt issued from revision 12 would reconcile the superseded zip; none was issued.
+Artifact check of the 10-26 zip for the same matchers: `fetch(` 1 (label chunk), `atob|btoa(` 5 in `bundle.js` +
+1 in the label chunk, `webflow.create*(` 8, `bDbgRuntimeInfo() {}` stub present, Tower the only non-vendor-doc
+host — identical to the 10-21 counts, so the 10-26 rescan is expected to return the same four items under the new
+chunk names.
+
+Published-runtime test (Webflow-controlled run, first for this registration; evidence, not acceptance): page
+`https://beacon-demo.webflow.io/blog/the-power-of-resilience`, 1 declared runtime file, 8 evidence artifacts;
+proxy check not applicable (declared none). Runtime file `…6ade7fa552ec2a2781d649bf_codalyn-beacon-runtime-a845ca3b.js`:
+Loaded ✓ · Hash matched ✓ · SRI mismatch ✗ · Source map reachable ✓. Three "checks need attention", each the R8.24
+prediction:
+
+- **Script integrity is missing or wrong** — tool-side request-time DOM snapshot (predicate unchanged at
+  9693886; replica `scripts/webflow-runtime-sri-replica.mjs`). The served tag carries
+  `sha256-l544pZAjPNTW2PMGVBye+dmqDMtEBHy1Zq//fMOOZP0=` and `crossorigin="anonymous"`, re-verified the same day by
+  `webflow-runtime-pin.mjs` (exit 0). No runtime, tag or package change — see the 2026-09-26 rule.
+- **New script elements were created** / **Unreviewed scripts loaded** — twelve URLs, all Webflow's own site
+  runtime on the pinned file's host: `webflow.ec9e52e8.f2bc5d9b0d060db1.js`, ten `webflow.achunk.*.js`, and
+  `gsap.min.js` (Webflow interactions; `/gsap/` path on `cdn.prod.website-files.com`, classified
+  `webflow-platform` by `webflow-runtime-observe.mjs`). Beacon's runtime creates no script element and requests
+  nothing (observe: Beacon requested 0 scripts). Structural to the tool (same-host rows); explained in the notes.
+
+Disposition: no code change, no Tower change. Next: upload the 10-26 zip + `.sourcemaps.zip` as a new Preflight
+revision (Step 5), rerun the runtime test so the package binds to `a27f0511…`, then issue the receipt. Step 3
+(install the 10-26 bundle for internal testing) still precedes it.
+
+**States.** Source ✓ (`a1d5045`) · Artifact ✓ (`v0.1.0_public_10-26_13-50-30`) · Tower ✓ · Installed ✗ for 10-26
+(10-21 installed) · Runtime ✓ (`…a845ca3b.js`; Preflight run observed 2026-11-01 on revision 12) · Preflight ✗
+for 10-26 (revision 12 = 10-21 zip, readiness `needs_review`, no receipt) · Submitted ✗ · Accepted ✗.
+
+**2026-11-01 (later) — Script integrity row re-examined against the live page.** `webflow-runtime-pin.mjs`: DOM
+`integrity` attribute `sha256-l544pZAjPNTW2PMGVBye+dmqDMtEBHy1Zq//fMOOZP0=` ✓ matches the served bytes,
+`crossorigin="anonymous"`, 20524 bytes `application/javascript`, map v3 ✓. `webflow-runtime-sri-replica.mjs`
+(3 runs, ready selector observed each run): the pinned file is requested by the parser with **0** `script[src]`
+elements in the DOM and `readyState` `loading` in 3/3 runs — the tool's `domIntegrity` would be `null` every time,
+while the final DOM tag carries the exact value in 3/3. Acceptance criterion as issued ("add the saved integrity
+value and crossorigin to each script tag; CDN must allow cross-origin SRI") is already met in the served HTML and
+by the CDN (`Access-Control-Allow-Origin: *`); the row is the request-time snapshot defect of 2026-09-26.
+Disposition unchanged: no runtime, tag or package change; explained in the submission notes; exceptions-queue
+item at most. Evidence state: source-verified, artifact-verified, runtime-observed (ours + the Webflow-controlled
+run of revision 12); reviewer acceptance ✗.
+
+**2026-11-01 — Preflight revision 13 on the 10-26 artifact; receipt issued.** Miles uploaded
+`v0.1.0_public_10-26_13-50-30.zip` (bundle) and `v0.1.0_public_10-26_13-50-30.sourcemaps.zip` (review ZIP) from
+`apps/beacon/bundle/production/public/` as a new revision and re-ran the published-runtime test. Preflight UI:
+"0 Resolved · 4 Remaining · 0 New"; 0 Security blockers, 0 Required updates, 3 Suggested, 1 Manual review; readiness
+`needs_review` (generic "could not be scanned" header, as for revision 12). Evidence now carries the 10-26 chunk
+names — External API Calls at `assets/label-By2KV2Iq.js:41` (excerpt shows `_l(\`https://tower.codalyn.app\`)`, the
+origin-trim helper after the 10-26 egress cleanup); Keyboard Shortcut 2 locations, Base64 3, Site Mutation 3,
+unchanged. Runtime test "Bound to bundle a27f05116aa2…" ✓ (matches the 10-26 zip sha256), 1 declared runtime file,
+8 evidence artifacts (screenshots ×3 identical `21db79b2…` 69699 bytes, network log 9083 bytes, console log 546
+bytes, dom snapshot, storage snapshot, script inventory 707 bytes). Rows identical to revision 12: Loaded ✓ · Hash
+matched ✓ · SRI mismatch · Source map reachable ✓; Script integrity (tool-side), New script elements / Unreviewed
+scripts (the same twelve Webflow runtime URLs incl. `gsap.min.js`); proxy check not applicable.
+
+**Receipt `wfpre_609ef17a3807de141e3693357c462354`** — references this run only, not an approval. Pasted into
+SUBMIT.md Step 5 and Step 8. Revision 12 is superseded (scanned the 10-21 zip; no receipt was issued from it).
+
+**States.** Source ✓ (`a1d5045`) · Artifact ✓ (`v0.1.0_public_10-26_13-50-30`, `a27f0511…` / `1c7ccaed…`) · Tower ✓ ·
+Installed ✗ for 10-26 (10-21 still the internal-testing install; Step 3 pending) · Runtime ✓ (`…a845ca3b.js`,
+Webflow-controlled run observed on revision 13) · Preflight ✓ (revision 13, `needs_review`, receipt
+`wfpre_609ef17a…`) · Submitted ✗ · Accepted ✗.
+
+**2026-11-01 — Step 3 done for the 10-26 bundle; Step 0 partly verified; line 7 fails.** Miles uploaded
+`v0.1.0_public_10-26_13-50-30.zip` to the Workspace for internal testing and opened Beacon on beacon-demo with
+**Launch App**. Observed (screenshot, Designer console with the extension iframe): the panel renders; the only CSP
+lines are the two expected ones — `style-src-elem` blocking an inline `<style>` from
+`entrypoint-designer-extensions-client.461064e4a7de32bd.js:234`, hash
+`sha256-wp89sCw2jHchslygp9Q4wvSH6EX/4RvgyvQlnpOCknU=` (same hash as R8.25; Webflow's chunk id rotated from
+`6d25459f20d9a794`), and `connect-src` blocking DevTools' fetch of that chunk's `.js.map` from
+`d3e54v103j8qbb.cloudfront.net`. The directive echoed in the line is ours (`connect-src 'self'
+https://tower.codalyn.app https://webflow-prod-assets.s3.amazonaws.com https://s3.amazonaws.com/webflow-prod-assets`).
+No CSP line names a Beacon file. Every other console entry belongs to the Designer's own top-level page
+(`webflow-designer.*chunk` sources: manifest `start_url`, Datadog SDK, the "Hold up!" banner, `<link rel=preload>`
+`as`, socket ready, a PayPal SDK GET aborted 400) — not the extension.
+
+Step 0, same day: line 2 ✓ (`/api/health` `{"ok":true}`, `db:migrate:status:prod` 39/39, CI run 40427410462
+`deploy-tower` success), line 6 ✓ (codalyn.app, /privacy, /terms, tower /privacy, /terms, /docs all 200), line 8 ✓
+(`a1d5045` on origin/main). Line 7 ✗: `pnpm audit --prod --audit-level=high` in `apps/tower` → 10 critical / 50 high
+advisories with a path through Tower production dependencies, 59 of 60 published before 2026-10-25, the better-auth
+trio on 2026-10-27. Direct: `next` 15.5.23 (3 critical + 1 high, fixed 15.5.28), `payload` 3.86.0 (4 critical + 22
+high incl. undici/image-size/js-yaml transitives, fixed 3.90.0), `better-auth` 1.6.30 (1 critical + 2 high, fixed
+1.7.7), `@sentry/nextjs` 10.59.0 (1 critical + 13 high transitives, fixed 10.75.2), `sharp` 0.35.3 (2 high, fixed
+0.35.5), `posthog-js` → dompurify 3.4.11 (1 critical + 1 high, fixed ≥3.4.17), `@vercel/blob` 1.1.1 → undici 5 +
+@fastify/busboy (6 high), `zod` 3.25.76 (1 high, fix is zod 4). Open decision (Miles): upgrade + migrate + deploy
+Tower before filing, or record a per-advisory reachability analysis. Lines 1, 3, 4, 5 (2FA admin, review-account
+sign-in, Install URL, scope match) not yet re-checked this round.
+
+**States.** Source ✓ (`a1d5045`) · Artifact ✓ (`v0.1.0_public_10-26_13-50-30`) · Tower ✓ live (dependency scan ✗
+open) · Installed ✓ (10-26, internal testing, beacon-demo, 2026-11-01) · Runtime ✓ (`…a845ca3b.js`) · Preflight ✓
+(revision 13, `wfpre_609ef17a…`) · Submitted ✗ · Accepted ✗.
+
+**2026-11-01 — Step 0 line 7 resolved by upgrading Tower's production dependencies (branch
+`chore/tower-deps-audit-2026-11-01`).** Decision: upgrade rather than annotate — the findings sat in direct
+runtime dependencies with published fixes (Next.js image-optimisation RCE, Payload field-access and SQL-injection
+advisories, better-auth OAuth-state-as-magic-link). Bumps in `apps/tower/package.json`: `next` 15.5.23 → ^15.5.28,
+`payload` + `@payloadcms/{db-postgres,email-resend,next,richtext-lexical,storage-vercel-blob}` ^3.86.0 → ^3.92.1,
+`better-auth` ~1.6.30 → ~1.7.15, `@sentry/nextjs` ^10.59.0 → ^10.78.0, `sharp` ^0.35.3 → ^0.35.5, `posthog-js`
+^1.391.2 → ^1.444.0, `@vercel/blob` ^1.1.1 → ^2.8.2. Root `pnpm.overrides` gained `"undici@^6": "6.29.1"` and
+`"zod@^4": "4.6.7"` (transitive patch bumps; neither package range exists in Beacon's graph — Beacon resolves undici
+7 and zod 3). Code change: `webflow-designer-session-logic.ts` passes the better-auth ≥ 1.7 provisioning source
+`{ method: "oauth", oauth: { providerId: "webflow" } }` to `internalAdapter.createUser` (Tower sets no
+`validateUserInfo`, so the gate is a no-op). better-auth 1.7 table definitions diffed against 1.6.30: no field
+changes (index metadata only), so the drizzle auth schema is untouched; 1.7.3's init-time schema validation
+therefore passes. Tower uses none of the plugins the 1.7 breaking notes touch (no magic-link, generic-OAuth, OAuth
+proxy, device, SCIM, MCP; plugins are bearer, oneTimeToken, organization, admin, nextCookies). Sentry: no
+`tunnelRoute`, so GHSA-mchm-gjx6-7h55 was not reachable; `@opentelemetry/api` stays 1.9.1 (10.77.1 cap).
+
+Payload 3.90 schema change: `payload migrate:create` produced `apps/tower/src/cms/migrations/20261101_180941.ts`
+— one additive nullable column, `ALTER TABLE "payload"."cms_users" ADD COLUMN "reset_password_requested_at"
+timestamp(3) with time zone` (no `_objectKey` diff for `media`). `payload generate:types` added
+`resetPasswordRequestedAt` to `payload-types.ts`. Payload 3.90 behaviour changes accepted as-is: SVG/XML uploads
+now refused by default on `media` (`mimeTypes: ["image/*","video/*"]`, no `allowRestrictedFileTypes`), 50 MB
+multipart cap, API keys unreadable after creation (Tower defines none). Local check ran against the compose
+Postgres (`codalyn-tower` project, port 35432): drizzle 39/39; note that `payload migrate` on a push-mode local
+database blocks on an interactive data-loss prompt — run `migrate:create` alone locally; prod is migration-only.
+
+Audit (`pnpm audit --prod --audit-level=high` in `apps/tower`, paths through `apps__tower`): before 10 critical /
+50 high; after 0 critical / 6 high, each with a reachability disposition:
+
+- `brace-expansion` 5.0.6 and `fast-uri` 3.1.2 via `@sentry/nextjs>@sentry/bundler-plugins` (glob, webpack
+  schema-utils/ajv) — build-time source-map upload tooling; inputs are repository paths; not in the deployed
+  server or client bundles.
+- `dompurify` 3.2.7 via `@payloadcms/ui>@monaco-editor/react>monaco-editor` — the admin code editor; Tower defines
+  no `code`/`json` field, so monaco is never loaded; `/admin` is operator-only in any case.
+- `js-yaml` 4.2.0 via `payload>json-schema-to-typescript` — `payload generate:types` CLI only; no YAML is parsed at
+  runtime.
+- `vite` 8.0.8 via `better-auth>vitest` — better-auth's test-utils dependency; Tower imports no
+  `better-auth/test-utils`; the advisory is launch-editor on Windows dev servers. A `vite` override would alter
+  Beacon's build graph and was not applied.
+- `zod` 3.25.76 (direct) — GHSA-mrhx-c7xc-m3w5, memory exhaustion on oversized constrained collections; fix is
+  zod 4 only. Accepted for this round: Tower parses one `z.array` from request input and Vercel caps function
+  bodies at 4.5 MB; zod 4 migration (Tower + `@codalyn/webflow-kit`) deferred as its own change.
+
+Verification on the branch: `tsc --noEmit` clean, `biome check` 788 files clean, vitest 118 files / 747 tests
+pass, `next build` exit 0 (re-run after the migration + types change). Lockfile: Beacon's importer block differs
+from `a1d5045` only in vite's peer key (`tsx@4.22.4` → `tsx@4.23.15`, pulled in by `@payloadcms/graphql`); no
+Beacon dependency version moved, so the 10-26 artifact and its review-ZIP lockfile remain the Beacon truth.
+
+Deploy order (CLAUDE.md Tower rule): apply `pnpm --filter tower payload:migrate:prod -- --confirm`, confirm with
+`db:migrate:status:prod` (drizzle, unchanged 39/39) and a Payload status read, then push to `main` (CI
+`deploy-tower`), then `/api/health` and the CI job. Both steps are outward-facing and wait for Miles's go.
+
+**States.** Source ✓ on branch (uncommitted at time of writing) · Artifact ✓ (Beacon unchanged,
+`v0.1.0_public_10-26_13-50-30`) · Tower ✗ not yet deployed (upgrade pending migration + push) · Installed ✓ ·
+Runtime ✓ · Preflight ✓ (`wfpre_609ef17a…`) · Submitted ✗ · Accepted ✗.

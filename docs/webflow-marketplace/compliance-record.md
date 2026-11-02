@@ -4537,3 +4537,14 @@ Deploy order (CLAUDE.md Tower rule): apply `pnpm --filter tower payload:migrate:
 **States.** Source ✓ on branch (uncommitted at time of writing) · Artifact ✓ (Beacon unchanged,
 `v0.1.0_public_10-26_13-50-30`) · Tower ✗ not yet deployed (upgrade pending migration + push) · Installed ✓ ·
 Runtime ✓ · Preflight ✓ (`wfpre_609ef17a…`) · Submitted ✗ · Accepted ✗.
+
+**2026-11-02 — Step 0 lines 1 and 3 verified; line 2 re-checked after the dependency deploy.** Line 1 ✓: two-factor
+authentication is enabled on the Workspace admin account that publishes the extension version. Line 3 ✓: signed
+in to Tower as the reviewer's account in a private window; workspace "Webflow Marketplace Team" present;
+Connection *Connected*, one site linked, Authorized sites lists the reviewer's own "Shea's CMS4"
+(`672e54319512eefce92d02de`) with *Open in Designer*. The runbook line said "beacon-demo is listed as connected";
+corrected — beacon-demo is our published review page, not part of the reviewer's grant. Line 2 ✓ after `0dec895`
+(Payload migration `20261101_180941` applied to prod before the push; CI run 41479795109 `verify` + `deploy-tower`
+success; `/api/health` `{"ok":true,"service":"tower"}`; drizzle 39/39). Lines 4 and 5 (Install URL, scopes) still
+to confirm in Edit App.
+

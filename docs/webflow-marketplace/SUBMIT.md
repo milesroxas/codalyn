@@ -84,7 +84,8 @@ gh run list --branch main --workflow ci.yml --limit 1        # last push to main
    Do not push anything to `main` that changes Tower behaviour between filing and the decision.
 3. **The review account works and keeps working.** Sign in to Tower as the reviewer's account
    (`marketplaceteam@…`) in a private window: password sign-in succeeds, the workspace "Webflow Marketplace
-   Team" is present, beacon-demo is listed as connected. Official: "Keep the review account active through
+   Team" is present, Connection shows *Connected* with the reviewer's own site authorized (round 8: "Shea's
+   CMS4", `672e54319512eefce92d02de`; beacon-demo is ours and is not in their grant). Official: "Keep the review account active through
    review and after approval, on your highest tier, without expiry." No third-party service access is needed.
 4. **The App's registered Install URL is Tower's own endpoint**,
    `https://tower.codalyn.app/api/integrations/webflow/authorize` (Workspace settings → Apps & Integrations →

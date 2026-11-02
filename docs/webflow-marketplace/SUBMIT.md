@@ -24,8 +24,9 @@
 > branch `chore/tower-deps-audit-2026-11-01` (0 critical / 6 high left, each with a reachability note in
 > compliance-record.md "Step 0 line 7 resolved"). **Deploy still owed before filing:** apply the Payload migration
 > `20261101_180941` to prod (`pnpm --filter tower payload:migrate:prod -- --confirm`), then push to `main`, then
-> re-check line 2. Lines 1, 3, 4, 5 are UI checks still to do. Then Step 6 (video), Step 7 (Workspace publish for
-> the Marketplace), Step 8. No Sync, no republish.
+> re-check line 2. Lines 1, 3, 4, 5 are UI checks still to do. Then Step 6 (Workspace publish for
+> the Marketplace), Step 7 (the form). No Sync, no republish. The demo-video step was dropped 2026-11-02: an App
+> Update keeps the earlier round's video on file and the form field is left untouched.
 >
 > The steps below follow the official process — [Submitting your App](https://developers.webflow.com/apps/docs/marketplace/submitting-your-app),
 > [Publishing a Designer Extension](https://developers.webflow.com/apps/docs/publishing-your-app),
@@ -58,7 +59,7 @@ page entry) is unchanged and still pinned by the release build.
 ## Do these in order
 
 The official sequence is: prerequisites → production build → upload the version to the Workspace and test it
-there (**Launch App**) → App Review Preflight on the exact bundle and review ZIP → demo video → publish the
+there (**Launch App**) → App Review Preflight on the exact bundle and review ZIP → publish the
 version for review → the submission form → wait for the decision. Each step names where it comes from. The
 six states are reported separately and a later one is never inferred from an earlier one (remediation skill
 § 5): source verified · artifact verified · installed revision verified · runtime observed · submitted ·
@@ -115,8 +116,8 @@ CI=true BUILD_PURPOSE=marketplace pnpm --filter beacon build:prod
 ```
 
 Only this command writes to `apps/beacon/bundle/production/public/`. It produces the two files the process
-needs: the production bundle (uploaded through the Workspace, Steps 3 and 7) and the review ZIP (uploaded only
-through the form's **Source map artifact** field, Step 8). Record both names and `shasum -a 256` here and in
+needs: the production bundle (uploaded through the Workspace, Steps 3 and 6) and the review ZIP (uploaded only
+through the form's **Source map artifact** field, Step 7). Record both names and `shasum -a 256` here and in
 the compliance record.
 
 - Bundle: `v0.1.0_public_10-26_13-50-30.zip` — sha256
@@ -156,8 +157,7 @@ production bundle, remove source maps, debug routes, bypass flags, staging ident
 
 1. Workspace settings → **Apps & Integrations** → under **Develop**, Beacon → **Publish extension version**.
    This Workspace's dialog offers *Publish for internal testing (Workspace only)* and *Publish new version to
-   the App Marketplace*; choose **internal testing** here — the Marketplace publish is Step 7, after Preflight
-   and the video. Select the Step 2 bundle, add version notes, publish. The version appears under
+   the App Marketplace*; choose **internal testing** here — the Marketplace publish is Step 6, after Preflight. Select the Step 2 bundle, add version notes, publish. The version appears under
    **… → Version History**.
 2. On beacon-demo open Beacon with **Launch App** — never **Launch development app**, which loads the local
    dev URL instead of the uploaded version. Confirm the panel renders and the extension console shows only
@@ -239,7 +239,7 @@ Step 2 review ZIP — the same files the form gets.
 
 **Bundle scan** — observed 2026-10-25 on the 10-21 zip (ruleset 1.7.0): four items, no Blocker, no Required
 update, readiness `needs_review`. Rerun on the 10-26 zip + review ZIP; the same four items are expected (the
-10-26 change removed map-only source, not bundle code), each explained in the notes (Step 8):
+10-26 change removed map-only source, not bundle code), each explained in the notes (Step 7):
 
 | Item | Label | Evidence | Why it is expected |
 | --- | --- | --- | --- |
@@ -282,32 +282,14 @@ required, 3 suggested, 1 manual review (`assets/label-By2KV2Iq.js:1`/`:41`, `ass
 `bundle.js:27`/`:365`/`:369`/`:371`), readiness `needs_review`; runtime test re-run on this revision — same three
 rows. **Receipt: `wfpre_609ef17a3807de141e3693357c462354`.** Revision 12 and its (unissued) receipt are superseded.
 
-Copy the receipt — `wfpre_` + 32 hex characters — into Step 8. A new bundle, a new runtime registration or a
+Copy the receipt — `wfpre_` + 32 hex characters — into Step 7. A new bundle, a new runtime registration or a
 scope change means a new run and a new receipt.
 
-### Step 6 — Demo video (official "Demo video"; Hybrid content requirements)
-
-The finding this round was the sign-in and OAuth flow, and the video must match the App's actual behaviour
-(listing/behaviour match; "Review integrity"). Record a new one on the installed 10-21 version:
-
-- 2 to 5 minutes, English (or English subtitles), private link (Loom private, YouTube unlisted/private, or a
-  Google Drive share).
-- Install → setup → core features: the install from Tower's Install URL, the Webflow consent screen
-  **approved** and, in a second pass, **denied** (Hybrid Apps must show both), the Designer sign-in restoring
-  the account with no second OAuth (Step 4.1–4.2), the explicit **Connect site in Webflow** control for a
-  site outside the grant (Step 4.3), a CMS slot list composed, synced, published and rendering on the
-  published page, an image placed, and **Delete target** removing the runtime with the publish prompt.
-- Describe the Webflow integration: Data API through Tower (CMS reads and writes, assets, registered scripts
-  and page custom code), Designer API in the extension; name the one backend host and the hosted runtime;
-  state pricing (free tier, paid seats) and the AVIF-via-Tower opt-in.
-
-Put the link in the form (Step 8) and in the compliance record.
-
-### Step 7 — Publish the version for review from the Workspace (official "If you update a Designer Extension, publish a new version from your workspace")
+### Step 6 — Publish the version for review from the Workspace (official "If you update a Designer Extension, publish a new version from your workspace")
 
 Workspace settings → Apps & Integrations → Beacon → **Publish extension version** → the **same Step 2
 bundle** → **Publish new version to the App Marketplace (submit for review)** → version notes → submit.
-Confirm the version manager shows it as submitted for review. The form in Step 8 has no bundle upload; this is
+Confirm the version manager shows it as submitted for review. The form in Step 7 has no bundle upload; this is
 how the bundle reaches the reviewer. Describe any scope change in the version notes (none this round).
 
 Version notes (≤ 500 characters, plain text, no angle brackets; 497 with the four pre-filled headings):
@@ -326,7 +308,7 @@ One-URL image gate (srcset), exact OAuth origin allowlist, hosted script URL val
 Detail in the form.
 ```
 
-### Step 8 — The submission form (official "Submission form" and "App Update submissions")
+### Step 7 — The submission form (official "Submission form" and "App Update submissions")
 
 <https://developers.webflow.com/submit>. The form runs checks and names the field that fails.
 
@@ -341,7 +323,7 @@ Detail in the form.
 | Install URL (Hybrid) | unchanged — `https://tower.codalyn.app/api/integrations/webflow/authorize` |
 | Source map artifact | the Step 2 **review ZIP** (`…sourcemaps.zip`: maps + `package.json` + lockfile). Upload the file; a link in notes does not count |
 | App Review Preflight receipt | `wfpre_609ef17a3807de141e3693357c462354` (revision 13, 2026-11-01, bundle `a27f0511…`) |
-| Demo video | the Step 6 link |
+| Demo video | leave the field as filed in the earlier round (App Update: complete only the fields you're changing) |
 | Review access | the reviewer's Tower account credentials and the Webflow test user, in the form only — never in this repo. The existing `marketplaceteam@…` account keeps working: Tower resolves the approver of last round's token lazily, so no relink is needed |
 | Pricing | unchanged; the notes restate it (free tier, paid seats, AVIF opt-in via Tower) |
 | Data Client attestations | if the form shows the three attestation controls (token encrypted at rest; stored server-side only; deleted on uninstall or revocation) complete them; the notes carry the same three sentences either way |
@@ -377,7 +359,7 @@ BACKEND (Hybrid): https://tower.codalyn.app only, HTTPS, production, live for th
 
 Record the Webflow reference id from the confirmation e-mail in the compliance record, then commit the docs.
 
-### Step 9 — After submitting (official "After submitting")
+### Step 8 — After submitting (official "After submitting")
 
 - Webflow e-mails a confirmation and aims for a decision within 10 business days, to the account's e-mail.
 - Until then: Tower stays up and unchanged in behaviour; the review account, the test site and its published

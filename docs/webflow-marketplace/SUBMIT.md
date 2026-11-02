@@ -24,8 +24,8 @@
 > branch `chore/tower-deps-audit-2026-11-01` (0 critical / 6 high left, each with a reachability note in
 > compliance-record.md "Step 0 line 7 resolved"). **Deploy still owed before filing:** apply the Payload migration
 > `20261101_180941` to prod (`pnpm --filter tower payload:migrate:prod -- --confirm`), then push to `main`, then
-> re-check line 2. Lines 1, 3, 4, 5 are UI checks still to do. Then Step 6 (Workspace publish for
-> the Marketplace), Step 7 (the form). No Sync, no republish. The demo-video step was dropped 2026-11-02: an App
+> re-check line 2. Step 0 closed 2026-11-02 (all eight lines). Next: Step 6 (Workspace publish for
+> the Marketplace), then Step 7 (the form). No Sync, no republish. The demo-video step was dropped 2026-11-02: an App
 > Update keeps the earlier round's video on file and the form field is left untouched.
 >
 > The steps below follow the official process — [Submitting your App](https://developers.webflow.com/apps/docs/marketplace/submitting-your-app),
@@ -65,7 +65,7 @@ six states are reported separately and a later one is never inferred from an ear
 § 5): source verified · artifact verified · installed revision verified · runtime observed · submitted ·
 reviewer accepted.
 
-### Step 0 — Prerequisites (official "Prerequisites" and "Submission prep")
+### Step 0 (done 2026-11-02) — Prerequisites (official "Prerequisites" and "Submission prep")
 
 Check every line before uploading anything. A failed line is a stop.
 

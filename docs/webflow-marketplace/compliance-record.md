@@ -4548,3 +4548,17 @@ corrected — beacon-demo is our published review page, not part of the reviewer
 success; `/api/health` `{"ok":true,"service":"tower"}`; drizzle 39/39). Lines 4 and 5 (Install URL, scopes) still
 to confirm in Edit App.
 
+**2026-11-02 — Step 0 closed.** Lines 4 and 5 ✓: Edit App → Building blocks shows Designer Extension on
+(`https://69e2b49536eded7411b48cf6.webflow-ext.com`), Data Client on, Redirect URI
+`https://tower.codalyn.app/api/integrations/webflow/callback` (equals what `resolveWebflowOAuthRedirectUri` builds;
+production sets no `WEBFLOW_REDIRECT_URI`). The App configuration is unchanged since the round-8 and round-9
+filings; the Install URL (`…/api/integrations/webflow/authorize`) and the nine requested scopes
+(`sites:read pages:read cms:read cms:write assets:read assets:write custom_code:read custom_code:write
+authorized_user:read`, `BEACON_SCOPES` in `authorize/route.ts`, last changed `c47c867` 2026-05-26; production sets
+no `WEBFLOW_OAUTH_SCOPES` override) are the same values the reviewer accepted in those rounds, so no edit was
+made. Step 0 lines 1–8 are all verified for this filing.
+
+**States.** Source ✓ (`7b9ef37`) · Artifact ✓ (`v0.1.0_public_10-26_13-50-30`) · Tower ✓ (`0dec895` deployed) ·
+Installed ✓ for 10-26 (internal testing) · Runtime ✓ (`…a845ca3b.js`) · Preflight ✓ (`wfpre_609ef17a…`, rev 13) ·
+Submitted ✗ · Accepted ✗.
+
